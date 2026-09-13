@@ -1,8 +1,5 @@
-# centralized-by: HereLiesAz/workflows
-# central-source-path: .github/workflows/multiplatform.yml
-# central-source-sha256: 06200f47f77b8df11535d4f5f23a0b33e6833b57754d823cb2ea85a59104e885
-# This file intentionally contains no repository secrets.
-name: Build and Deploy [central proxy]
+name: Build and Deploy
+
 on:
   push:
     branches:
@@ -19,18 +16,468 @@ on:
 
 permissions:
   contents: read
+  pages: write
   id-token: write
+
+concurrency:
+  group: haive-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  central-dispatch:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check out pinned h2g2
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/conveyance-h2g2
+          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          path: vendor/conveyance-h2g2
+
+      - name: Check out pinned Conveyance
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/Conveyance
+          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          path: vendor/conveyance-h2g2/vendor/Conveyance
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Reconstruct and verify Android signing keystore
+        id: signing
+        if: github.event_name != 'pull_request'
+        uses: ./.github/actions/android-keystore
+        with:
+          keystore-private: ${{ secrets.KEYSTORE_PRIVATE }}
+          keystore-rsa: ${{ secrets.KEYSTORE_RSA }}
+          keystore-public: ${{ secrets.KEYSTORE_PUBLIC }}
+          keystore-chain: ${{ secrets.KEYSTORE_CHAIN }}
+          keystore-password: ${{ secrets.KEYSTORE_PASSWORD }}
+          key-alias: ${{ secrets.KEY_ALIAS }}
+          key-password: ${{ secrets.KEY_PASSWORD }}
+          expected-sha256: ${{ secrets.KEYSTORE_SHA256 }}
+          expected-sha1: ${{ secrets.KEYSTORE_SHA1 }}
+          expected-owner: ${{ secrets.KEYSTORE_OWNER }}
+
+      - name: Export Android signing path
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "HAIVE_KEYSTORE_PATH=${{ steps.signing.outputs.keystore-path }}" >> "$GITHUB_ENV"
+          echo "HAIVE_KEYSTORE_TYPE=${{ steps.signing.outputs.store-type }}" >> "$GITHUB_ENV"
+
+      - name: Select Android release versionCode
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOW_EPOCH=$(date -u +%s)
+          VERSION_CODE=$((NOW_EPOCH - 1500000000))
+          if [ "$VERSION_CODE" -le 0 ] || [ "$VERSION_CODE" -gt 2100000000 ]; then
+            echo "::error::Generated Android versionCode $VERSION_CODE is outside the Play-supported range"
+            exit 1
+          fi
+          echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Android release versionCode: $VERSION_CODE"
+
+      - name: Test shared domain
+        run: ./gradlew :shared:desktopTest
+
+      - name: Test Jules provider
+        run: ./gradlew :providers:jules:desktopTest
+
+      - name: Compile Jules provider Android
+        run: ./gradlew :providers:jules:compileAndroidMain
+
+      - name: Compile Jules provider JS
+        run: ./gradlew :providers:jules:compileKotlinJs
+
+      - name: Compile Jules provider Wasm
+        run: ./gradlew :providers:jules:compileKotlinWasmJs
+
+      - name: Test Android provider bootstrap
+        run: ./gradlew :androidApp:testDebugUnitTest
+
+      - name: Build Android (debug on PRs, release on push)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ./gradlew :androidApp:assembleDebug
+          else
+            ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" :androidApp:assembleRelease :androidApp:bundleRelease
+          fi
+
+      - name: Publish pinned Conveyance for isolated web builds
+        run: |
+          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
+            :conveyance-core:publishToMavenLocal \
+            :conveyance-compose:publishToMavenLocal
+
+      - name: Publish pinned h2g2 for isolated web builds
+        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
+
+      - name: Build Web JS
+        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:jsBrowserProductionWebpack
+
+      - name: Build Web Wasm
+        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:wasmJsBrowserProductionWebpack
+
+      - name: Stage GitHub Pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf webApp/build/pages
+
+          JS_BUNDLE="$(find webApp/build -type f -path '*/js/productionExecutable/haive.js' -print -quit)"
+          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
+          if [ -z "$JS_BUNDLE" ] || [ -z "$WASM_BUNDLE" ]; then
+            echo "Production bundles found under webApp/build:"
+            find webApp/build -type f -name 'haive.js' -print
+            exit 1
+          fi
+
+          JS_DIR="$(dirname "$JS_BUNDLE")"
+          WASM_DIR="$(dirname "$WASM_BUNDLE")"
+          echo "Staging JS bundle from $JS_DIR"
+          echo "Staging Wasm bundle from $WASM_DIR"
+
+          mkdir -p webApp/build/pages/wasm
+          cp -R "$JS_DIR"/. webApp/build/pages/
+          cp -R "$WASM_DIR"/. webApp/build/pages/wasm/
+          cp -R webApp/src/webMain/resources/. webApp/build/pages/
+          cp -R webApp/src/webMain/resources/. webApp/build/pages/wasm/
+          test -f webApp/build/pages/index.html
+          test -f webApp/build/pages/haive.js
+          test -f webApp/build/pages/wasm/index.html
+          test -f webApp/build/pages/wasm/haive.js
+
+      - name: Generate release notes
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p fastlane/metadata/android/en-US/changelogs
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges -n 50 \
+              > fastlane/metadata/android/en-US/changelogs/default.txt
+          else
+            git log --pretty=format:"- %s" --no-merges -20 \
+              > fastlane/metadata/android/en-US/changelogs/default.txt
+          fi
+          echo "=== Release notes ==="
+          cat fastlane/metadata/android/en-US/changelogs/default.txt
+
+      - name: Upload Android release inputs
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: haive-android-release
+          path: |
+            androidApp/build/outputs/apk/release/*.apk
+            androidApp/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Upload release notes
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: haive-release-notes
+          path: fastlane/metadata/android/en-US/changelogs/
+          if-no-files-found: error
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: webApp/build/pages
+
+  desktop-packages:
+    name: Desktop installer (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-latest
+            task: packageDeb
+            artifact: haive-desktop-linux
+            path: desktopApp/build/compose/binaries/main/deb/*.deb
+          - platform: windows
+            runner: windows-latest
+            task: packageMsi
+            artifact: haive-desktop-windows
+            path: desktopApp/build/compose/binaries/main/msi/*.msi
+          - platform: macos
+            runner: macos-latest
+            task: packageDmg
+            artifact: haive-desktop-macos
+            path: desktopApp/build/compose/binaries/main/dmg/*.dmg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Check out pinned h2g2
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/conveyance-h2g2
+          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          path: vendor/conveyance-h2g2
+
+      - name: Check out pinned Conveyance
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/Conveyance
+          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          path: vendor/conveyance-h2g2/vendor/Conveyance
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Verify desktop icons exist
+        shell: bash
+        run: |
+          test -f branding/haive-icon-color.png || { echo "Missing haive-icon-color.png"; exit 1; }
+          test -f branding/haive-icon.ico || { echo "Missing haive-icon.ico"; exit 1; }
+          test -f branding/haive-icon.icns || { echo "Missing haive-icon.icns"; exit 1; }
+
+      - name: Publish pinned Conveyance to Maven Local
+        shell: bash
+        run: |
+          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
+            :conveyance-core:publishToMavenLocal \
+            :conveyance-compose:publishToMavenLocal
+
+      - name: Publish pinned h2g2 to Maven Local
+        shell: bash
+        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
+
+      - name: Package native installer
+        shell: bash
+        run: |
+          set +e
+          ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true ":desktopApp:${{ matrix.task }}"
+          EXIT_CODE=$?
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "=== Native packaging diagnostics ==="
+            if [ -d desktopApp/build/compose/logs ]; then
+              find desktopApp/build/compose/logs -type f -print | while IFS= read -r log_file; do
+                echo "--- $log_file ---"
+                cat "$log_file"
+              done
+            else
+              echo "No Compose packaging logs directory found."
+            fi
+          fi
+          exit "$EXIT_CODE"
+
+      - name: Upload native installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
+
+  release:
+    name: Publish rolling alpha release
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs:
+      - build
+      - desktop-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Android release inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-android-release
+          path: release-input/android
+
+      - name: Download Linux installer
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-desktop-linux
+          path: release-input/linux
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-desktop-windows
+          path: release-input/windows
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-desktop-macos
+          path: release-input/macos
+
+      - name: Download release notes
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-release-notes
+          path: release-input/notes
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION_NAME=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
+          if [ -z "$VERSION_NAME" ]; then
+            echo "::error::app.versionName is missing from gradle.properties"
+            exit 1
+          fi
+
+          MAJOR_MINOR=$(printf '%s' "$VERSION_NAME" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+          TAG_NAME="latest-alpha-v${MAJOR_MINOR}"
+
+          mkdir -p release-files
+
+          APK_SOURCE=$(find release-input/android -type f -name '*.apk' -print -quit)
+          DEB_SOURCE=$(find release-input/linux -type f -name '*.deb' -print -quit)
+          MSI_SOURCE=$(find release-input/windows -type f -name '*.msi' -print -quit)
+          DMG_SOURCE=$(find release-input/macos -type f -name '*.dmg' -print -quit)
+
+          for entry in \
+            "APK_SOURCE:$APK_SOURCE" \
+            "DEB_SOURCE:$DEB_SOURCE" \
+            "MSI_SOURCE:$MSI_SOURCE" \
+            "DMG_SOURCE:$DMG_SOURCE"; do
+            label=${entry%%:*}
+            value=${entry#*:}
+            if [ -z "$value" ]; then
+              echo "::error::Missing release asset: $label"
+              find release-input -type f -print
+              exit 1
+            fi
+          done
+
+          cp "$APK_SOURCE" "release-files/TheHaive-${VERSION_NAME}-android.apk"
+          cp "$DEB_SOURCE" "release-files/$(basename "$DEB_SOURCE")"
+          cp "$MSI_SOURCE" "release-files/$(basename "$MSI_SOURCE")"
+          cp "$DMG_SOURCE" "release-files/$(basename "$DMG_SOURCE")"
+
+          NOTES_SOURCE=$(find release-input/notes -type f -name 'default.txt' -print -quit)
+          {
+            echo "# The Haive ${VERSION_NAME}"
+            echo
+            echo "Rolling alpha build from commit \`${GITHUB_SHA}\`."
+            if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
+              echo
+              echo "## Changes"
+              cat "$NOTES_SOURCE"
+            fi
+          } > release-notes.md
+
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "MAJOR_MINOR=$MAJOR_MINOR" >> "$GITHUB_ENV"
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+
+          echo "Release assets:"
+          ls -lh release-files
+
+      - name: Publish rolling alpha release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LEGACY_TAG="latest-debug-v${MAJOR_MINOR}"
+          if gh release view "$LEGACY_TAG" >/dev/null 2>&1; then
+            gh release delete "$LEGACY_TAG" --yes --cleanup-tag
+          elif git ls-remote --exit-code --tags origin "refs/tags/$LEGACY_TAG" >/dev/null 2>&1; then
+            git push origin ":refs/tags/$LEGACY_TAG"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa "$TAG_NAME" -m "Latest Haive alpha ${VERSION_NAME}"
+          git push origin "$TAG_NAME" --force
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" \
+              --title "The Haive ${VERSION_NAME} — Latest Alpha" \
+              --notes-file release-notes.md \
+              --prerelease
+            gh release upload "$TAG_NAME" release-files/* --clobber
+          else
+            gh release create "$TAG_NAME" release-files/* \
+              --prerelease \
+              --verify-tag \
+              --title "The Haive ${VERSION_NAME} — Latest Alpha" \
+              --notes-file release-notes.md
+          fi
+
+  deploy-pages:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  publish-play:
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_play) }}
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch to HereLiesAz/workflows
-        env:
-          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
-          EVENT_JSON: ${{ toJSON(github.event) }}
-          INPUTS_JSON: ${{ toJSON(inputs) }}
-          VARS_JSON: ${{ toJSON(vars) }}
-          SOURCE_WORKFLOW_PATH: .github/workflows/multiplatform.yml
-          SOURCE_SHA256: 06200f47f77b8df11535d4f5f23a0b33e6833b57754d823cb2ea85a59104e885
-        shell: bash
-        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
+      - name: Download Android release bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-android-release
+          path: android-release
+
+      - name: Download release notes
+        uses: actions/download-artifact@v8
+        with:
+          name: haive-release-notes
+          path: fastlane/metadata/android/en-US/changelogs
+
+      - name: Publish to Google Play internal track
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.hereliesaz.haive
+          releaseFiles: android-release/**/*.aab
+          track: internal
+          status: completed
+          whatsNewDirectory: fastlane/metadata/android/en-US/changelogs
