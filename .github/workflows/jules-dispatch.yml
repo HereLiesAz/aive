@@ -26,6 +26,14 @@ permissions:
   id-token: write
 jobs:
   central-dispatch:
+    if: >-
+      ${{
+        github.event_name == 'issues' ||
+        github.event_name == 'pull_request' ||
+        (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@jules')) ||
+        (github.event_name == 'pull_request_review_comment' && startsWith(github.event.comment.body, '@jules')) ||
+        (github.event_name == 'pull_request_review' && startsWith(github.event.review.body, '@jules'))
+      }}
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch to HereLiesAz/workflows
