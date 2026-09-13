@@ -1,0 +1,68 @@
+name: Cleanup Jules Audit Branches
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-jules-audit-branches.yml'
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Jules-created branches from the Glee loop
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const fullRepo = `${owner}/${repo}`;
+            const deleted = [];
+            const skipped = [];
+
+            for (let number = 114; number <= 199; number++) {
+              let pr;
+              try {
+                ({ data: pr } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: number,
+                }));
+              } catch (error) {
+                if (error.status === 404) continue;
+                throw error;
+              }
+
+              const body = pr.body || '';
+              const isJulesArtifact = body.includes('PR created automatically by Jules for task');
+              const isSameRepo = pr.head?.repo?.full_name === fullRepo;
+              const branch = pr.head?.ref;
+
+              if (!isJulesArtifact || !isSameRepo || !branch || branch === 'main') {
+                skipped.push(`#${number}:${branch || 'unknown'}`);
+                continue;
+              }
+
+              try {
+                await github.rest.git.deleteRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branch}`,
+                });
+                deleted.push(`#${number}:${branch}`);
+              } catch (error) {
+                if (error.status === 422 || error.status === 404) {
+                  skipped.push(`#${number}:${branch}`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            core.notice(`Deleted ${deleted.length} Jules branches.`);
+            core.info(deleted.join('\n'));
+            if (skipped.length) core.info(`Skipped/already absent:\n${skipped.join('\n')}`);
