@@ -1,97 +1,26 @@
-name: '📋 Jules Scheduled Issue Triage'
-
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/jules-scheduled-triage.yml
+# central-source-sha256: c5795302751261681062afb2384c0a30807517ee87a9246fcc46f874d0b0f7f1
+# This file intentionally contains no repository secrets.
+name: 📋 Jules Scheduled Issue Triage [central proxy]
 on:
   schedule:
     - cron: '0 * * * *' # Every hour
   workflow_dispatch:
-
-concurrency:
-  group: '${{ github.workflow }}'
-  cancel-in-progress: true
-
-defaults:
-  run:
-    shell: 'bash'
-
+permissions:
+  contents: read
+  id-token: write
 jobs:
-  find-issues:
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 7
-    permissions:
-      contents: 'read'
-      issues: 'read'
-    outputs:
-      available_labels: '${{ steps.get_labels.outputs.available_labels }}'
-      issues_to_triage: '${{ steps.find_issues.outputs.issues_to_triage }}'
-      has_issues: '${{ steps.find_issues.outputs.has_issues }}'
+  central-dispatch:
+    runs-on: ubuntu-latest
     steps:
-      - name: 'Get repository labels'
-        id: 'get_labels'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
-        with:
-          script: |-
-            const labels = [];
-            for await (const response of github.paginate.iterator(github.rest.issues.listLabelsForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100,
-            })) {
-              labels.push(...response.data);
-            }
-            if (!labels || labels.length === 0) {
-              core.setFailed('No issue labels found in this repository.')
-            }
-            const labelNames = labels.map(label => label.name).sort();
-            core.setOutput('available_labels', labelNames.join(','));
-
-      - name: 'Find untriaged issues'
-        id: 'find_issues'
+      - name: Dispatch to HereLiesAz/workflows
         env:
-          GH_TOKEN: '${{ secrets.GH_TOKEN || github.token }}'
-          GITHUB_REPOSITORY: '${{ github.repository }}'
-        run: |-
-          echo '🔍 Finding unlabeled open issues...'
-          ISSUES="$(gh issue list \
-            --state 'open' \
-            --search 'no:label' \
-            --json number,title,body \
-            --limit '20' \
-            --repo "${GITHUB_REPOSITORY}"
-          )"
-          ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
-          echo "Found ${ISSUE_COUNT} unlabeled issue(s)."
-          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
-          if [ "${ISSUE_COUNT}" -gt 0 ]; then
-            echo "has_issues=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "has_issues=false" >> "${GITHUB_OUTPUT}"
-          fi
-
-  triage:
-    needs: 'find-issues'
-    if: '${{ needs.find-issues.outputs.has_issues == ''true'' }}'
-    runs-on: 'ubuntu-latest'
-    timeout-minutes: 15
-    permissions:
-      contents: 'read'
-      issues: 'write'
-    strategy:
-      matrix:
-        issue: '${{ fromJson(needs.find-issues.outputs.issues_to_triage) }}'
-      max-parallel: 3
-    steps:
-      - name: 'Invoke Jules on issue #${{ matrix.issue.number }}'
-        uses: 'google-labs-code/jules-invoke@v1.0.0'
-        with:
-          prompt: |-
-            Triage this unlabeled GitHub issue and apply appropriate labels.
-
-            **Issue #${{ matrix.issue.number }}: ${{ matrix.issue.title }}**
-
-            ${{ matrix.issue.body }}
-
-            **Available labels (comma-separated):**
-            ${{ needs.find-issues.outputs.available_labels }}
-
-            Apply labels to issue #${{ matrix.issue.number }} in ${{ github.repository }} using only labels from the available set. Do not invent new labels. If the issue is ambiguous, apply "status/needs-triage" if it exists, otherwise leave it unlabeled.
-          jules_api_key: '${{ secrets.JULES_API_KEY }}'
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/jules-scheduled-triage.yml
+          SOURCE_SHA256: c5795302751261681062afb2384c0a30807517ee87a9246fcc46f874d0b0f7f1
+        shell: bash
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
