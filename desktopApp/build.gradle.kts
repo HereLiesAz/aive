@@ -1,3 +1,5 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.composeMultiplatform)
@@ -7,6 +9,7 @@ plugins {
 dependencies {
     implementation(projects.shared)
     implementation(projects.providers.jules)
+    implementation(projects.providers.llm)
     implementation(compose.desktop.currentOs)
     implementation(libs.ktor.client.cio)
 }
@@ -15,14 +18,29 @@ kotlin {
     jvmToolchain(17)
 }
 
+val appVersionName = providers.gradleProperty("app.versionName").get()
+// DMG and MSI only accept MAJOR.MINOR.PATCH; strip any prerelease suffix.
+val appPackageVersion = appVersionName.substringBefore("-")
+val nativePackageVersion = if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
+    // macOS jpackage requires the first app-version component to be greater than zero.
+    // Offset only the native macOS package major so Haive's public SemVer can remain pre-1.0.
+    val components = appPackageVersion.split('.').map { it.toInt() }
+    buildList {
+        add((components.first() + 1).toString())
+        addAll(components.drop(1).map(Int::toString))
+    }.joinToString(".")
+} else {
+    appPackageVersion
+}
+
 compose.desktop {
     application {
         mainClass = "com.hereliesaz.geministrator.MainKt"
 
         nativeDistributions {
+            targetFormats(TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi)
             packageName = "TheHaive"
-            // Strip pre-release suffix — packageVersion must be x.y.z.
-            packageVersion = providers.gradleProperty("app.versionName").get().substringBefore("-")
+            packageVersion = nativePackageVersion
             description = "The Haive — agentic workflow orchestration"
             copyright = "© 2026 HereLiesAz"
 

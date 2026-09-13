@@ -177,7 +177,7 @@ class ProviderBackedManagedSessionGateway(
         throw failure
     } catch (failure: Throwable) {
         throw ManagedSessionFailure.ProviderUnavailable(
-            failure.message?.takeIf(String::isNotBlank) ?: fallbackMessage,
+            failure.providerFailureMessage(fallbackMessage),
             failure,
         )
     }
@@ -201,9 +201,19 @@ class ProviderBackedManagedSessionGateway(
         throw failure
     } catch (failure: Throwable) {
         throw ManagedSessionFailure.ProviderOperationFailed(
-            failure.message?.takeIf(String::isNotBlank) ?: fallbackMessage,
+            failure.providerFailureMessage(fallbackMessage),
             failure,
         )
+    }
+
+    private fun Throwable.providerFailureMessage(fallbackMessage: String): String {
+        var current: Throwable? = this
+        while (current != null) {
+            current.message?.trim()?.takeIf(String::isNotEmpty)?.let { return it }
+            current = current.cause
+        }
+        val typeName = this::class.simpleName?.takeIf(String::isNotBlank)
+        return typeName?.let { "$fallbackMessage ($it)" } ?: fallbackMessage
     }
 
     private suspend fun applyEvent(

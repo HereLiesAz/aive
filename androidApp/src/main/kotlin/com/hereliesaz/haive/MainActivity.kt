@@ -8,50 +8,93 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.App
+import com.hereliesaz.geministrator.InitialProviderSetup
+import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.ProviderCredentialSetup
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
 import com.hereliesaz.geministrator.providers.jules.JulesRestApi
+import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
+import com.hereliesaz.geministrator.providers.llm.GeminiProvider
+import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
+import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
+import com.hereliesaz.geministrator.providers.llm.XaiProvider
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val credentialStore = AndroidJulesCredentialStore(this)
-        val storedKey = credentialStore.read()
+        val credentialStore = AndroidProviderCredentialStore(this)
+        val initialCredentials = credentialStore.readAll()
 
         setContent {
-            var julesKey by remember { mutableStateOf(storedKey) }
-            var continueWithoutJules by remember { mutableStateOf(false) }
+            var credentials by remember { mutableStateOf(initialCredentials) }
+            var setupComplete by remember { mutableStateOf(initialCredentials.isNotEmpty()) }
+            var configuringProviderId by remember { mutableStateOf<String?>(null) }
+            val providers = remember(credentials) { configuredAndroidProviders(credentials) }
 
-            val reconfigure: (String) -> Unit = {
-                credentialStore.clear()
-                julesKey = null
-                continueWithoutJules = false
-            }
+            val providerId = configuringProviderId
             when {
-                julesKey != null -> App(providers = configuredAndroidProviders(julesKey), onReconfigureProvider = reconfigure)
-                continueWithoutJules -> App(providers = emptyList(), onReconfigureProvider = reconfigure)
-                else -> JulesCredentialSetup(
+                providerId != null -> ProviderCredentialSetup(
+                    providerId = providerId,
                     onSave = { key ->
-                        credentialStore.write(key)
-                        julesKey = key
+                        credentialStore.write(providerId, key)
+                        credentials = credentialStore.readAll()
+                        configuringProviderId = null
+                        setupComplete = true
                     },
-                    onContinueWithoutJules = {
-                        continueWithoutJules = true
+                    onCancel = {
+                        configuringProviderId = null
                     },
+                )
+
+                !setupComplete -> InitialProviderSetup(
+                    configuredProviderIds = credentials.keys,
+                    onConfigure = { configuringProviderId = it },
+                    onContinue = { setupComplete = true },
+                )
+
+                else -> App(
+                    providers = providers,
+                    onReconfigureProvider = { configuringProviderId = it },
                 )
             }
         }
     }
 }
 
-internal fun configuredAndroidProviders(julesApiKey: String?): List<AgentProvider> {
-    val key = julesApiKey?.trim()?.takeIf(String::isNotEmpty) ?: return emptyList()
-    return listOf(
-        JulesProvider(
-            JulesRestApi(
-                JulesApiKeyProvider { key },
+internal fun configuredAndroidProviders(credentials: Map<String, String>): List<AgentProvider> = buildList {
+    credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
+        add(
+            JulesProvider(
+                JulesRestApi(
+                    JulesApiKeyProvider { key },
+                ),
             ),
-        ),
-    )
+        )
+    }
+    credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
+        add(OpenAiProvider(LlmApiKeyProvider { key }))
+    }
+    credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
+        add(AnthropicProvider(LlmApiKeyProvider { key }))
+    }
+    credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
+        add(GeminiProvider(LlmApiKeyProvider { key }))
+    }
+    credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
+        add(XaiProvider(LlmApiKeyProvider { key }))
+    }
 }
+
+internal fun configuredAndroidProviders(julesApiKey: String?): List<AgentProvider> =
+    configuredAndroidProviders(
+        julesApiKey
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { mapOf(ProviderCatalog.JULES_ID to it) }
+            .orEmpty(),
+    )
+
+private fun Map<String, String>.cleanKey(providerId: String): String? =
+    this[providerId]?.trim()?.takeIf(String::isNotEmpty)

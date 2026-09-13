@@ -39,6 +39,7 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":shared")
 include(":providers:jules")
+include(":providers:llm")
 include(":androidApp")
 include(":desktopApp")
 include(":webApp")

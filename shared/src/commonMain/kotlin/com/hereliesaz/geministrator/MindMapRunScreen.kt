@@ -32,6 +32,8 @@ internal fun MindMapRunScreen(
     onTaskSelected: (String) -> Unit,
     onLaunchWorkflow: (String, String, RepositoryRef?) -> Unit,
     onRecoverFromCorruption: () -> Unit = {},
+    onRetryRuntime: () -> Unit = {},
+    onReconfigureProvider: (String) -> Unit = {},
     onValidateWorkflow: () -> List<String> = { emptyList() },
     compact: Boolean,
     runtimeState: ApplicationRuntimeState,
@@ -65,6 +67,28 @@ internal fun MindMapRunScreen(
                     onClick = onRecoverFromCorruption,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+            val recoverableRuntimeFailure =
+                (runtimeState is ApplicationRuntimeState.ResumeFailed && !corrupted) ||
+                    runtimeState is ApplicationRuntimeState.Disconnected
+            if (recoverableRuntimeFailure) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AzphaltPill(
+                        "Retry runtime",
+                        "retry-runtime",
+                        onClick = onRetryRuntime,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AzphaltPill(
+                        "Reconfigure Jules",
+                        "reconfigure-jules",
+                        onClick = { onReconfigureProvider("jules") },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
             if (runtimeState == ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
                 OutlinedTextField(

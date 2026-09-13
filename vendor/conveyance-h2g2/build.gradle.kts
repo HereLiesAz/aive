@@ -32,7 +32,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Pin the exact patched Conveyance revision this binding was built against. Floating
+            // Pin the exact Conveyance revision this binding was built against. Floating
             // main-SNAPSHOT dependencies make KMP metadata non-reproducible and can resolve stale
             // target publications through JitPack.
             api("com.github.HereLiesAz.Conveyance:conveyance-core:b3e13674df9dfbcc0b35f800b57d78a305d07b03")

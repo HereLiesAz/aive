@@ -61,7 +61,7 @@ import kotlin.time.ExperimentalTime
 sealed interface ApplicationRuntimeState {
     data object Loading : ApplicationRuntimeState
     data object NoProject : ApplicationRuntimeState
-    data class NoRun(val project: Project) : ApplicationRuntimeState
+    data class NoRun(val project: Project, val roles: List<RoleDefinition> = emptyList()) : ApplicationRuntimeState
     data class Live(val presentation: LiveWorkflowPresentation) : ApplicationRuntimeState
     data class Disconnected(val message: String) : ApplicationRuntimeState
     data class ResumeFailed(val message: String, val isCorrupted: Boolean = false) : ApplicationRuntimeState
@@ -127,7 +127,8 @@ class ApplicationRuntime private constructor(
                     replaceCurrent(null)
                     publisher.publish(
                         ApplicationRuntimeState.NoRun(
-                            projects.maxByOrNull(Project::updatedAtEpochMillis) ?: projects.first(),
+                            project = projects.maxByOrNull(Project::updatedAtEpochMillis) ?: projects.first(),
+                            roles = roles,
                         ),
                     )
                     return@withLock

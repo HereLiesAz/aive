@@ -31,12 +31,14 @@ fun App(
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     onReconfigureProvider: (String) -> Unit = {},
+    onDisconnectProvider: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
+    var runtimeGeneration by remember { mutableStateOf(0) }
 
-    LaunchedEffect(providers, executorIntegrations) {
+    LaunchedEffect(providers, executorIntegrations, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -153,6 +155,21 @@ fun App(
                             }
                         }
                     },
+                    onRetryRuntime = {
+                        if (runtime == null) {
+                            runtimeGeneration += 1
+                        } else {
+                            scope.launch {
+                                try {
+                                    runtime?.refresh()
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Retry failed")
+                                }
+                            }
+                        }
+                    },
                     onCheckProviderHealth = {
                         runtime?.checkProviderHealth()?.mapValues { (_, result) ->
                             result.fold(
@@ -218,6 +235,7 @@ fun App(
                         scope.launch {
                             try {
                                 runtime?.saveRole(role)
+                                runtimeGeneration += 1
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
@@ -226,6 +244,7 @@ fun App(
                         }
                     },
                     onReconfigureProvider = onReconfigureProvider,
+                    onDisconnectProvider = onDisconnectProvider,
                     compact = maxWidth < ControlRoomBreakpoints.Wide,
                     contentPadding = paddingValues,
                     runtimeState = runtimeState,

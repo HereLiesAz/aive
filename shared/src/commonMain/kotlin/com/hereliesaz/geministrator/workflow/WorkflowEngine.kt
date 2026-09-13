@@ -1,10 +1,12 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -36,6 +38,8 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 class WorkflowEngine(
     private val sessionGateway: ManagedSessionGateway,
@@ -79,6 +83,19 @@ class WorkflowEngine(
         val dispatchable = refreshed.taskRuns.values.filter {
             it.status == TaskRunStatus.Ready || it.status == TaskRunStatus.Retrying
         }
+
+        // Phase 1: collect all role-agent dispatches and resolve providers (synchronous).
+        data class PendingAgentDispatch(
+            val taskRun: TaskRun,
+            val task: TaskDefinition,
+            val role: RoleDefinition,
+            val executor: TaskExecutor.RoleAgent,
+            val request: AgentTaskRequest,
+            val sessionRequest: ManagedSessionRequest,
+            val providerId: AgentProviderId,
+        )
+
+        val pendingAgentDispatches = mutableListOf<PendingAgentDispatch>()
 
         for (taskRun in dispatchable) {
             if (remainingSlots == 0) break
@@ -132,45 +149,23 @@ class WorkflowEngine(
                             cacheNamespace = "${nextRun.id.value}:${role.id.value}",
                         ),
                     )
-                    val handle = sessionGateway.createSession(
-                        ManagedSessionRequest(
+                    pendingAgentDispatches += PendingAgentDispatch(
+                        taskRun = taskRun,
+                        task = task,
+                        role = role,
+                        executor = executor,
+                        request = request,
+                        sessionRequest = ManagedSessionRequest(
                             providerSelection = selection.copy(
                                 preferredProviderId = providerId,
                                 constraints = ProviderConstraints.RequireProvider(providerId),
                             ),
                             taskRequest = request,
                         ),
-                    )
-                    handles[task.id] = handle
-                    val startedStatus = if (request.requirePlanApproval) {
-                        TaskRunStatus.Planning
-                    } else {
-                        TaskRunStatus.Running
-                    }
-                    TaskRunTransitions.requireAllowed(taskRun.status, startedStatus)
-                    nextRun = nextRun.copy(
-                        status = if (nextRun.status == WorkflowRunStatus.AwaitingHuman) {
-                            nextRun.status
-                        } else {
-                            WorkflowRunStatus.Running
-                        },
-                        taskRuns = nextRun.taskRuns + (
-                            task.id to taskRun.copy(
-                                status = startedStatus,
-                                assignedRoleId = task.roleId ?: role.id,
-                                executor = executor,
-                                assignedProviderId = handle.providerId,
-                                providerRunId = handle.providerRunId,
-                                externalRunId = null,
-                                blockingReason = null,
-                                progress = null,
-                                progressMessage = null,
-                            )
-                        ),
-                        updatedAtEpochMillis = nowEpochMillis,
+                        providerId = providerId,
                     )
                     activeByProvider[providerId] = providerActive + 1
-                    eventSink.append(AgentAssigned(nextRun.id, task.id, role.id, nowEpochMillis))
+                    remainingSlots -= 1
                 }
 
                 is TaskExecutor.HumanApproval -> {
@@ -201,10 +196,48 @@ class WorkflowEngine(
                 is TaskExecutor.NestedWorkflow,
                 -> continue
             }
+        }
 
-            eventSink.append(ExecutorAssigned(nextRun.id, task.id, executor, task.roleId, nowEpochMillis))
-            eventSink.append(TaskStarted(nextRun.id, task.id, taskRun.attempt, nowEpochMillis))
-            remainingSlots -= 1
+        // Phase 2: create sessions concurrently.
+        val createdHandles = coroutineScope {
+            pendingAgentDispatches.map { pending ->
+                async { pending to sessionGateway.createSession(pending.sessionRequest) }
+            }.map { it.await() }
+        }
+
+        // Phase 3: apply state mutations sequentially.
+        for ((pending, handle) in createdHandles) {
+            handles[pending.task.id] = handle
+            val startedStatus = if (pending.request.requirePlanApproval) {
+                TaskRunStatus.Planning
+            } else {
+                TaskRunStatus.Running
+            }
+            TaskRunTransitions.requireAllowed(pending.taskRun.status, startedStatus)
+            nextRun = nextRun.copy(
+                status = if (nextRun.status == WorkflowRunStatus.AwaitingHuman) {
+                    nextRun.status
+                } else {
+                    WorkflowRunStatus.Running
+                },
+                taskRuns = nextRun.taskRuns + (
+                    pending.task.id to pending.taskRun.copy(
+                        status = startedStatus,
+                        assignedRoleId = pending.task.roleId ?: pending.role.id,
+                        executor = pending.executor,
+                        assignedProviderId = handle.providerId,
+                        providerRunId = handle.providerRunId,
+                        externalRunId = null,
+                        blockingReason = null,
+                        progress = null,
+                        progressMessage = null,
+                    )
+                ),
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+            eventSink.append(AgentAssigned(nextRun.id, pending.task.id, pending.role.id, nowEpochMillis))
+            eventSink.append(ExecutorAssigned(nextRun.id, pending.task.id, pending.executor, pending.task.roleId, nowEpochMillis))
+            eventSink.append(TaskStarted(nextRun.id, pending.task.id, pending.taskRun.attempt, nowEpochMillis))
         }
 
         val hasHumanWaiting = nextRun.taskRuns.values.any {

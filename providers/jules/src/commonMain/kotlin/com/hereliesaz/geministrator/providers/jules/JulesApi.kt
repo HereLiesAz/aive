@@ -35,7 +35,7 @@ class JulesRestApi(
     private val apiKeyProvider: JulesApiKeyProvider,
     private val baseUrl: String = "https://jules.googleapis.com/v1alpha",
     client: HttpClient = HttpClient {
-        expectSuccess = true
+        expectSuccess = false
         followRedirects = false
         install(HttpTimeout) {
             requestTimeoutMillis = 30_000L

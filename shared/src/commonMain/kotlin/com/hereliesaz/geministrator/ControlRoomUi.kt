@@ -93,6 +93,7 @@ fun ControlRoom(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onRecoverFromCorruption: () -> Unit,
+    onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
     onClearWorkflowData: () -> Unit = {},
     onExportJson: suspend () -> String? = { null },
@@ -104,6 +105,7 @@ fun ControlRoom(
     onValidateWorkflow: () -> List<String> = { emptyList() },
     onSaveRole: (RoleDefinition) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
+    onDisconnectProvider: (String) -> Unit = {},
     compact: Boolean,
     contentPadding: PaddingValues,
     runtimeState: ApplicationRuntimeState,
@@ -133,6 +135,7 @@ fun ControlRoom(
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
                     onRecoverFromCorruption = onRecoverFromCorruption,
+                    onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
                     onClearWorkflowData = onClearWorkflowData,
                     onExportJson = onExportJson,
@@ -144,6 +147,7 @@ fun ControlRoom(
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRole = onSaveRole,
                     onReconfigureProvider = onReconfigureProvider,
+                    onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
                     modifier = Modifier.weight(1f),
                     compact = true,
@@ -183,6 +187,7 @@ fun ControlRoom(
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
                     onRecoverFromCorruption = onRecoverFromCorruption,
+                    onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
                     onClearWorkflowData = onClearWorkflowData,
                     onExportJson = onExportJson,
@@ -194,6 +199,7 @@ fun ControlRoom(
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRole = onSaveRole,
                     onReconfigureProvider = onReconfigureProvider,
+                    onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
                     modifier = Modifier.weight(1f),
                     runtimeState = runtimeState,
@@ -311,6 +317,7 @@ private fun MainDestination(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onRecoverFromCorruption: () -> Unit,
+    onRetryRuntime: () -> Unit,
     onCheckProviderHealth: suspend () -> Map<String, String>,
     onClearWorkflowData: () -> Unit,
     onExportJson: suspend () -> String?,
@@ -322,6 +329,7 @@ private fun MainDestination(
     onValidateWorkflow: () -> List<String>,
     onSaveRole: (RoleDefinition) -> Unit,
     onReconfigureProvider: (String) -> Unit = {},
+    onDisconnectProvider: (String) -> Unit = {},
     connectedProviderIds: Set<String>,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
@@ -335,6 +343,8 @@ private fun MainDestination(
                 onTaskSelected = onTaskSelected,
                 onLaunchWorkflow = onLaunchWorkflow,
                 onRecoverFromCorruption = onRecoverFromCorruption,
+                onRetryRuntime = onRetryRuntime,
+                onReconfigureProvider = onReconfigureProvider,
                 onValidateWorkflow = onValidateWorkflow,
                 compact = compact,
                 runtimeState = runtimeState,
@@ -347,10 +357,25 @@ private fun MainDestination(
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Workflows -> WorkflowTemplateScreen(runtimeState, Modifier.fillMaxSize())
-            ControlRoomDestination.Company -> CompanyScreen(runtimeState, onSaveRole, Modifier.fillMaxSize())
+            ControlRoomDestination.Company -> CompanyProviderScreen(
+                runtimeState = runtimeState,
+                connectedProviderIds = connectedProviderIds,
+                onSaveRole = onSaveRole,
+                modifier = Modifier.fillMaxSize(),
+            )
             ControlRoomDestination.Artifacts -> ArtifactFileManagerScreen(runtimeState, Modifier.fillMaxSize())
             ControlRoomDestination.Inbox -> InboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
-            ControlRoomDestination.Settings -> SettingsScreen(connectedProviderIds, onCheckProviderHealth, onClearWorkflowData, onExportJson, onImportJson, onExportDiagnosticBundle, onReconfigureProvider, modifier = Modifier.fillMaxSize())
+            ControlRoomDestination.Settings -> ProviderSettingsScreen(
+                connectedProviderIds = connectedProviderIds,
+                onCheckProviderHealth = onCheckProviderHealth,
+                onClearWorkflowData = onClearWorkflowData,
+                onExportJson = onExportJson,
+                onImportJson = onImportJson,
+                onExportDiagnosticBundle = onExportDiagnosticBundle,
+                onConfigureProvider = onReconfigureProvider,
+                onDisconnectProvider = onDisconnectProvider,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

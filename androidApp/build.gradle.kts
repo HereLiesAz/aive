@@ -48,6 +48,7 @@ android {
 dependencies {
     implementation(projects.shared)
     implementation(projects.providers.jules)
+    implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
     implementation(compose.material3)
     testImplementation(kotlin("test-junit"))

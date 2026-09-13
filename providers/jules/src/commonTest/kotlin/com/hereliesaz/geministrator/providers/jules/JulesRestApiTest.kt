@@ -11,6 +11,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
@@ -49,6 +50,37 @@ class JulesRestApiTest {
                 api.listSources()
             }
             assertFalse(redirectedRequestSeen)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun httpFailureIncludesStatusAndProviderResponseBody() = runBlocking {
+        val engine = MockEngine {
+            respond(
+                content = "{\"error\":{\"message\":\"API key not valid\"}}",
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+        val api = JulesRestApi(
+            apiKeyProvider = JulesApiKeyProvider { "bad-key" },
+            client = client,
+        )
+
+        try {
+            val failure = assertFailsWith<IllegalStateException> {
+                api.listSources()
+            }
+            val message = failure.message.orEmpty()
+            assertContains(message, "HTTP 401")
+            assertContains(message, "API key not valid")
         } finally {
             client.close()
         }
