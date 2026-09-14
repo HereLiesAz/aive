@@ -69,7 +69,7 @@ class GitHubRestRepositoryOperationClient(
         require(repository.remoteUrl == null || repository.remoteUrl.contains("github.com")) {
             "GitHub Enterprise repository operations require an explicit enterprise API configuration"
         }
-        val token = requireToken("GitHub")
+        val token = tokenProvider.requireToken("GitHub")
         val parsed = RemoteRepositoryOperation.parse(operation)
         val run = when (parsed) {
             RemoteRepositoryOperation.Status -> status(repository, token, operation)
@@ -205,7 +205,7 @@ class GitLabRestRepositoryOperationClient(
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitLab)
-        val token = requireToken("GitLab")
+        val token = tokenProvider.requireToken("GitLab")
         val parsed = RemoteRepositoryOperation.parse(operation)
         val run = when (parsed) {
             RemoteRepositoryOperation.Status -> status(repository, token, operation)
