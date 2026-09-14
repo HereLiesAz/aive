@@ -3,7 +3,9 @@ package com.hereliesaz.geministrator.workflow
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import kotlinx.coroutines.CancellationException
 
 interface RepositoryOperationClient {
     fun supports(project: Project): Boolean = true
@@ -21,14 +23,32 @@ class RepositoryOperationExecutorIntegration(
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
-        return client.start(context.project, executor.operation).toRepositoryTaskExecution(context)
+        return repositoryOperation("Repository operation '${executor.operation}' failed") {
+            client.start(context.project, executor.operation).toRepositoryTaskExecution(context)
+        }
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
         val runId = requireNotNull(context.taskRun.externalRunId) {
             "Repository operation task ${context.task.id.value} is missing its external run ID"
         }
-        return client.getRun(context.project, runId).toRepositoryTaskExecution(context)
+        return repositoryOperation("Repository operation '${context.task.name}' could not be reconciled") {
+            client.getRun(context.project, runId).toRepositoryTaskExecution(context)
+        }
+    }
+
+    private suspend fun repositoryOperation(
+        fallback: String,
+        block: suspend () -> TaskExecutorExecution,
+    ): TaskExecutorExecution = try {
+        block()
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (failure: Throwable) {
+        TaskExecutorExecution(
+            status = TaskRunStatus.Failed,
+            progressMessage = failure.message?.takeIf(String::isNotBlank) ?: fallback,
+        )
     }
 
     private fun ExternalExecutionRun.toRepositoryTaskExecution(context: TaskExecutorContext): TaskExecutorExecution =
