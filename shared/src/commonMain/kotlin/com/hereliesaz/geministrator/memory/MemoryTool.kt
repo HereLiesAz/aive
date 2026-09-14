@@ -217,7 +217,7 @@ private fun projectToKinds(
         val next = mutableListOf<MemoryNodeId>()
         frontier.forEach { id ->
             val node = nodesById[id]
-            if (id in activeIds && node?.kind in targetKinds && id !in result) {
+            if (id in activeIds && node?.kind in targetKinds) {
                 result[id] = depth
             }
             adjacency[id].orEmpty().forEach { neighbor ->
