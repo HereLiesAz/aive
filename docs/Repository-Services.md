@@ -26,11 +26,22 @@ Repository-operation tasks support:
 - `create-branch:<branch>`
 - `open-merge-request:<source>:<target>:<title>`
 
+When both a GitLab repository credential and a supported LLM provider are connected, Haive can also execute governed coding tasks directly against a linked GitLab project. The GitLab workspace agent:
+
+- reads a bounded repository tree and selected file contents
+- generates an approval-gated implementation plan when required
+- validates structured create/update/delete file actions before any write
+- creates a dedicated `haive/...` branch
+- commits all file actions atomically through the GitLab Repository Commits API
+- emits the resulting commit diff, branch, commit ID, and compare URL as workflow evidence
+
+GitLab workspace execution does not claim shell or test execution. Tests remain separate execution work until a GitLab CI executor is connected.
+
 GitLab.com and self-managed GitLab repository URLs are mapped to that host's `/api/v4` endpoint.
 
 ### Local Git
 
-Desktop Haive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary.
+Desktop Haive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `haive/...` branches.
 
 ## Orchestration artifacts
 
