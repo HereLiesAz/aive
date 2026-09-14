@@ -58,7 +58,7 @@ class LocalWorkspaceAgentProviderTest {
         val handle = runBlocking { provider.start(request(root, TaskRunId("task-1"))) }
         val events = runBlocking { provider.observe(handle.providerRunId).toList() }
 
-        assertIs<AgentEvent.Completed>(events.last())
+        assertCompleted(events)
         val artifacts = events.filterIsInstance<AgentEvent.ArtifactProduced>().map { it.artifact }
         val codeChange = artifacts.single { it.kind == ArtifactKind.CodeChange }
         val branch = codeChange.metadata.getValue("branch")
@@ -120,7 +120,7 @@ class LocalWorkspaceAgentProviderTest {
         )
         val events = runBlocking { provider.observe(handle.providerRunId).toList() }
 
-        assertIs<AgentEvent.Completed>(events.last())
+        assertCompleted(events)
         assertEquals(2, api.callCount)
         val codeChange = events
             .filterIsInstance<AgentEvent.ArtifactProduced>()
@@ -129,6 +129,12 @@ class LocalWorkspaceAgentProviderTest {
         val branch = codeChange.metadata.getValue("branch")
         assertEquals("approved", git(root, "show", "$branch:README.md").trim())
         assertEquals("initial\n", root.resolve("README.md").readText())
+    }
+
+    private fun assertCompleted(events: List<AgentEvent>) {
+        val failure = events.filterIsInstance<AgentEvent.Failed>().lastOrNull()
+        assertTrue(failure == null, failure?.reason ?: "Workspace provider emitted a failure")
+        assertIs<AgentEvent.Completed>(events.last())
     }
 
     private fun request(
