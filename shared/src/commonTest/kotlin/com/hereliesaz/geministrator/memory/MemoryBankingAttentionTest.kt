@@ -63,7 +63,7 @@ class MemoryBankingAttentionTest {
     }
 
     @Test
-    fun ambientRecallDefaultsToTagsAndCoTRTagsCanDrillDown() = runBlocking {
+    fun ambientGripDefaultsToTagsAndCoTRTagsCanDrillDown() = runBlocking {
         val episode = MemoryEpisode(
             id = MemoryEpisodeId("episode"),
             sourceSessionId = "session",
@@ -121,12 +121,12 @@ class MemoryBankingAttentionTest {
         )
         val tool = GraphMemoryTool(store)
 
-        val ambient = tool.grep(MemoryQuery(text = "Web Wasm", projectId = "project"))
+        val ambient = tool.grip(MemoryQuery(text = "Web Wasm", projectId = "project"))
         assertTrue(ambient.hits.isNotEmpty())
         assertTrue(ambient.hits.all { it.node.kind == MemoryNodeKind.NounTag || it.node.kind == MemoryNodeKind.VerbTag })
         assertEquals(wasmTag.id, ambient.hits.first().node.id)
 
-        val drilled = tool.grepTags(
+        val drilled = tool.grip(
             MemoryTagQuery(
                 tags = listOf("Web Wasm", "test"),
                 resolution = MemoryResolution.Context,
