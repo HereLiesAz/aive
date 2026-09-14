@@ -46,6 +46,7 @@ internal class LocalWorkspaceAgentProvider(
     private val api: TextGenerationApi,
 ) : AgentProvider {
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
+    private enum class TaskMode { Mutate, Verify }
 
     private data class Session(
         val request: AgentTaskRequest,
@@ -70,7 +71,12 @@ internal class LocalWorkspaceAgentProvider(
         val result: ProcessResult?,
     )
 
-    private val mutex = Mutex()
+    private data class WorkspaceOutcome(
+        val artifacts: List<ProviderArtifact>,
+        val generationUsage: TextGenerationResult? = null,
+        val failureReason: String? = null,
+    )
+
     private val sequence = AtomicLong(1L)
 
     private companion object {
@@ -96,7 +102,6 @@ internal class LocalWorkspaceAgentProvider(
             AgentCapability.Testing,
             AgentCapability.TestAuthoring,
         ),
-        requiresEnvironmentPlanning = true,
     )
 
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
@@ -126,13 +131,17 @@ internal class LocalWorkspaceAgentProvider(
             val trackedFiles = trackedFiles(root)
             require(trackedFiles.isNotEmpty()) { "Local Git repository has no tracked files" }
 
-            val plan = session.plan ?: generatePlan(session.request, root, trackedFiles).also {
-                session.plan = it.first
-                session.planUsage = it.second
-            }.first
+            var plan = session.plan
+            if (plan == null) {
+                val generated = generatePlan(session.request, root, trackedFiles)
+                plan = generated.first
+                session.plan = plan
+                session.planUsage = generated.second
+            }
+            val approvedPlan = requireNotNull(plan)
 
             if (session.request.requirePlanApproval && session.phase.value == Phase.AwaitingApproval) {
-                emit(AgentEvent.PlanGenerated(runId, plan.text.take(8_000)))
+                emit(AgentEvent.PlanGenerated(runId, approvedPlan.text.take(8_000)))
                 val phase = session.phase.filter { it != Phase.AwaitingApproval }.first()
                 if (phase == Phase.Cancelled) {
                     emit(AgentEvent.Failed(runId, "$displayName workspace session cancelled"))
@@ -147,31 +156,26 @@ internal class LocalWorkspaceAgentProvider(
             }
 
             emit(AgentEvent.Progress(runId, "Preparing isolated Local Git workspace"))
-            val mode = taskMode(session.request)
             val outcome = executeInWorktree(
-                runId = runId,
                 request = session.request,
                 root = root,
                 baseCommit = baseCommit,
                 trackedFiles = trackedFiles,
-                plan = plan,
-                mode = mode,
+                plan = approvedPlan,
+                mode = taskMode(session.request),
             )
 
-            outcome.artifacts.forEach { artifact ->
-                emit(AgentEvent.ArtifactProduced(runId, artifact))
-            }
-            val planUsage = session.planUsage
-            val inputTokens = listOfNotNull(planUsage?.inputTokens, outcome.generationUsage?.inputTokens).sumOrNull()
-            val outputTokens = listOfNotNull(planUsage?.outputTokens, outcome.generationUsage?.outputTokens).sumOrNull()
+            outcome.artifacts.forEach { artifact -> emit(AgentEvent.ArtifactProduced(runId, artifact)) }
+            val inputTokens = listOfNotNull(
+                session.planUsage?.inputTokens,
+                outcome.generationUsage?.inputTokens,
+            ).sumOrNull()
+            val outputTokens = listOfNotNull(
+                session.planUsage?.outputTokens,
+                outcome.generationUsage?.outputTokens,
+            ).sumOrNull()
             if (inputTokens != null || outputTokens != null) {
-                emit(
-                    AgentEvent.UsageReported(
-                        runId = runId,
-                        inputTokens = inputTokens,
-                        outputTokens = outputTokens,
-                    ),
-                )
+                emit(AgentEvent.UsageReported(runId, inputTokens = inputTokens, outputTokens = outputTokens))
             }
 
             if (outcome.failureReason != null) {
@@ -212,14 +216,6 @@ internal class LocalWorkspaceAgentProvider(
         return ProviderActionResult.Accepted
     }
 
-    private data class WorkspaceOutcome(
-        val artifacts: List<ProviderArtifact>,
-        val generationUsage: TextGenerationResult? = null,
-        val failureReason: String? = null,
-    )
-
-    private enum class TaskMode { Mutate, Verify }
-
     private fun taskMode(request: AgentTaskRequest): TaskMode {
         val instructions = request.roleInstructions.lowercase()
         val verificationSignals = listOf("attempt to falsify", "verifies acceptance", "verify acceptance", "qa engineer")
@@ -235,7 +231,6 @@ internal class LocalWorkspaceAgentProvider(
     }
 
     private suspend fun executeInWorktree(
-        runId: ProviderRunId,
         request: AgentTaskRequest,
         root: File,
         baseCommit: String,
@@ -243,21 +238,22 @@ internal class LocalWorkspaceAgentProvider(
         plan: WorkspacePlan,
         mode: TaskMode,
     ): WorkspaceOutcome {
-        val branch = workspaceBranch(request)
+        val branch = if (mode == TaskMode.Mutate) {
+            workspaceBranch(request)
+        } else {
+            request.repository?.defaultBranch ?: "HEAD"
+        }
         val workspace = withContext(Dispatchers.IO) {
             Files.createTempDirectory("haive-${safeSegment(request.taskRunId.value)}-").toFile()
         }
         var worktreeAdded = false
         return try {
-            git(
-                root,
-                "worktree",
-                "add",
-                "-b",
-                branch,
-                workspace.absolutePath,
-                baseCommit,
-            ).requireSuccess("create isolated Git worktree")
+            val addArgs = if (mode == TaskMode.Mutate) {
+                arrayOf("worktree", "add", "-b", branch, workspace.absolutePath, baseCommit)
+            } else {
+                arrayOf("worktree", "add", "--detach", workspace.absolutePath, baseCommit)
+            }
+            git(root, *addArgs).requireSuccess("create isolated Git worktree")
             worktreeAdded = true
 
             if (mode == TaskMode.Verify) {
@@ -276,10 +272,13 @@ internal class LocalWorkspaceAgentProvider(
                         failureReason = "No recognized test runner is available for Local Git verification",
                     )
                 }
-                val artifact = testArtifact(test, branch, baseCommit)
                 return WorkspaceOutcome(
-                    artifacts = listOf(artifact),
-                    failureReason = if (test.result.exitCode == 0 && !test.result.timedOut) null else "Local Git verification failed",
+                    artifacts = listOf(testArtifact(test, branch, baseCommit)),
+                    failureReason = if (test.result.exitCode == 0 && !test.result.timedOut) {
+                        null
+                    } else {
+                        "Local Git verification failed"
+                    },
                 )
             }
 
@@ -289,6 +288,7 @@ internal class LocalWorkspaceAgentProvider(
             val generation = api.generate(patchPrompt(request, plan, trackedFiles, snapshot))
             val patch = extractUnifiedDiff(generation.text)
             require(patch.isNotBlank()) { "$displayName did not return a unified Git diff" }
+            validatePatchPaths(patch)
 
             applyPatch(workspace, patch)
             val changed = git(workspace, "status", "--porcelain").requireSuccess("inspect workspace changes").output
@@ -296,10 +296,11 @@ internal class LocalWorkspaceAgentProvider(
 
             val test = runRecognizedTests(workspace)
             val testsPassed = test.result?.let { it.exitCode == 0 && !it.timedOut }
+            val firstObjectiveLine = request.objective.trim().lineSequence().firstOrNull().orEmpty()
             val commitMessage = if (testsPassed == false) {
-                "Haive WIP: ${request.objective.trim().lineSequence().firstOrNull().orEmpty().take(64)}"
+                "Haive WIP: ${firstObjectiveLine.take(64)}"
             } else {
-                "Haive: ${request.objective.trim().lineSequence().firstOrNull().orEmpty().take(68)}"
+                "Haive: ${firstObjectiveLine.take(68)}"
             }.trimEnd()
 
             git(workspace, "add", "--all").requireSuccess("stage workspace changes")
@@ -357,11 +358,19 @@ internal class LocalWorkspaceAgentProvider(
             WorkspaceOutcome(
                 artifacts = artifacts,
                 generationUsage = generation,
-                failureReason = if (testsPassed == false) "Workspace changes were preserved on $branch, but tests failed" else null,
+                failureReason = if (testsPassed == false) {
+                    "Workspace changes were preserved on $branch, but tests failed"
+                } else {
+                    null
+                },
             )
         } finally {
             if (worktreeAdded) {
-                runCatching { git(root, "worktree", "remove", "--force", workspace.absolutePath) }
+                try {
+                    git(root, "worktree", "remove", "--force", workspace.absolutePath)
+                } catch (_: Throwable) {
+                    // Best-effort cleanup only. The branch/commit remain durable in the source repository.
+                }
             }
             withContext(Dispatchers.IO) {
                 runCatching { workspace.deleteRecursively() }
@@ -375,11 +384,10 @@ internal class LocalWorkspaceAgentProvider(
         trackedFiles: List<String>,
     ): Pair<WorkspacePlan, TextGenerationResult> {
         val result = api.generate(planPrompt(request, root, trackedFiles))
-        val plan = WorkspacePlan(
+        return WorkspacePlan(
             text = result.text.trim(),
             requestedFiles = parseRequestedFiles(result.text, trackedFiles),
-        )
-        return plan to result
+        ) to result
     }
 
     private fun planPrompt(request: AgentTaskRequest, root: File, trackedFiles: List<String>): String = buildString {
@@ -532,12 +540,27 @@ internal class LocalWorkspaceAgentProvider(
     }
 
     private fun extractUnifiedDiff(raw: String): String {
-        var text = raw.trim()
-        if (text.startsWith("```")) {
-            text = text.lineSequence().drop(1).dropLastWhile { it.trim().startsWith("```") }.joinToString("\n")
-        }
+        val lines = raw.trim().lines().toMutableList()
+        if (lines.firstOrNull()?.trim()?.startsWith("```") == true) lines.removeAt(0)
+        if (lines.lastOrNull()?.trim()?.startsWith("```") == true) lines.removeAt(lines.lastIndex)
+        val text = lines.joinToString("\n").trim()
         val start = text.indexOf("diff --git ")
         return if (start >= 0) text.substring(start).trim() else ""
+    }
+
+    private fun validatePatchPaths(patch: String) {
+        patch.lineSequence()
+            .filter { it.startsWith("diff --git ") }
+            .forEach { header ->
+                val parts = header.split(' ')
+                require(parts.size >= 4) { "Generated diff contains an invalid file header" }
+                listOf(parts[2].removePrefix("a/"), parts[3].removePrefix("b/")).forEach { path ->
+                    require(path.isNotBlank()) { "Generated diff contains an empty path" }
+                    require(!path.startsWith('/') && !path.startsWith(".git/") && ".." !in path.split('/')) {
+                        "Generated diff attempts to write outside the repository: $path"
+                    }
+                }
+            }
     }
 
     private suspend fun runRecognizedTests(workspace: File): TestExecution {
@@ -611,7 +634,7 @@ internal class LocalWorkspaceAgentProvider(
     ): ProcessResult = coroutineScope {
         val process = withContext(Dispatchers.IO) {
             ProcessBuilder(command)
-                .apply { if (directory != null) directory(directory) }
+                .apply { if (directory != null) this.directory(directory) }
                 .redirectErrorStream(true)
                 .start()
         }
@@ -623,8 +646,10 @@ internal class LocalWorkspaceAgentProvider(
             runCatching { process.outputStream.close() }
         }
         val output = async(Dispatchers.IO) { process.inputStream.bufferedReader().use { it.readText() } }
-        val timeout = timeoutMinutes?.let { TimeUnit.MINUTES.toSeconds(it) } ?: PROCESS_TIMEOUT_SECONDS
-        val finished = withContext(Dispatchers.IO) { process.waitFor(timeout, TimeUnit.SECONDS) }
+        val timeoutSeconds = timeoutMinutes?.let(TimeUnit.MINUTES::toSeconds) ?: PROCESS_TIMEOUT_SECONDS
+        val finished = withContext(Dispatchers.IO) {
+            process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        }
         if (!finished) {
             process.destroyForcibly()
             withContext(Dispatchers.IO) { process.waitFor(10, TimeUnit.SECONDS) }
