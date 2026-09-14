@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.EnvironmentPlanningPolicy
 import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -20,7 +21,10 @@ class WorkflowDefinitionPreparer(
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
-    suspend fun prepare(definition: WorkflowDefinition): WorkflowDefinition {
+    suspend fun prepare(
+        definition: WorkflowDefinition,
+        repository: RepositoryRef? = null,
+    ): WorkflowDefinition {
         val withTestDesign = WorkflowDefinitionExpander.expand(definition)
         val originalIds = withTestDesign.tasks.mapTo(mutableSetOf()) { it.id }
         val prepared = buildList {
@@ -42,6 +46,7 @@ class WorkflowDefinitionPreparer(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
                         constraints = task.providerConstraints,
+                        repository = repository,
                     ),
                 )
                 val providerRequiresPlanning = selectedProvider.capabilities().requiresEnvironmentPlanning
