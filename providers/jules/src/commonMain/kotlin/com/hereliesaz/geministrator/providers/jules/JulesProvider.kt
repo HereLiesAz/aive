@@ -57,6 +57,9 @@ class JulesProvider(
         ),
     )
 
+    override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
+        repository == null || repository.source == RepositorySource.GitHub
+
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         val sourceContext = request.repository?.let { repository ->
             require(repository.source == RepositorySource.GitHub) {
