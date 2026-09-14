@@ -68,6 +68,10 @@ data class MemorySection(
     val metadata: Map<String, String> = emptyMap(),
 )
 
+/**
+ * The semantic ladder intentionally keeps noun and verb indexes distinct. A memory can be
+ * traversed in either direction: Context <-> tags <-> phrases <-> summaries <-> categories.
+ */
 @Serializable
 enum class MemoryNodeKind {
     Context,
@@ -99,10 +103,18 @@ data class MemoryNode(
 
 @Serializable
 enum class MemoryRelationKind {
+    /** Noun/verb index -> retained context. */
     Indexes,
+
+    /** Phrase -> noun/verb tags. */
     Composes,
+
+    /** Summary -> phrases. */
     Summarizes,
+
+    /** Category -> summaries. */
     Categorizes,
+
     SimilarTo,
     AssociatedWith,
     ConflictsWith,
@@ -136,7 +148,6 @@ enum class MemoryConsolidationStage {
     Summaries,
     Categories,
     Associations,
-    ConflictResolution,
     Condensation,
     Complete,
 }
@@ -282,6 +293,7 @@ data class MemoryWorkPacket(
     val queueId: MemoryQueueId,
     val episodeId: MemoryEpisodeId,
     val stage: MemoryConsolidationStage,
+    /** Stable within a specific bounded batch; prevents generated IDs colliding across packets. */
     val packetKey: String,
     val items: List<MemoryWorkItem>,
     val neighborhood: List<MemoryWorkItem> = emptyList(),
