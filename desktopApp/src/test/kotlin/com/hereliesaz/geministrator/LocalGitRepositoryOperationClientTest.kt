@@ -97,7 +97,9 @@ class LocalGitRepositoryOperationClientTest {
             block(root)
         } finally {
             Files.walk(root).use { paths ->
-                paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists)
+                paths.sorted(Comparator.reverseOrder()).forEach { path ->
+                    Files.deleteIfExists(path)
+                }
             }
         }
     }
