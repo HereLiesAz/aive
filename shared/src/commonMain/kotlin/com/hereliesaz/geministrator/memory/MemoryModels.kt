@@ -70,8 +70,9 @@ data class MemorySection(
 )
 
 /**
- * The semantic ladder intentionally keeps noun and verb indexes distinct. A memory can be
- * traversed in either direction: Context <-> tags <-> phrases <-> summaries <-> categories.
+ * The semantic ladder intentionally keeps noun and verb indexes distinct. Category nodes serve as
+ * broader category/subject tags. Memory can be traversed in either direction:
+ * Context <-> noun/verb tags <-> phrases <-> summaries <-> category/subject tags.
  */
 @Serializable
 enum class MemoryNodeKind {
@@ -113,7 +114,7 @@ enum class MemoryRelationKind {
     /** Summary -> phrases. */
     Summarizes,
 
-    /** Category -> summaries. */
+    /** Category/subject tag -> summaries. */
     Categorizes,
 
     SimilarTo,
@@ -295,8 +296,9 @@ enum class MemoryResolution {
 }
 
 /**
- * Free-text associative lookup. Its default resolution is Tag because tags are Haive's normal
- * ambient memory cue; deeper content is requested deliberately.
+ * Free-text associative lookup. Its default resolution is Tag because semantic noun/entity,
+ * verb/action, and category/subject tags are Haive's normal ambient memory cues; deeper content is
+ * requested deliberately.
  */
 @Serializable
 data class MemoryQuery(
@@ -318,8 +320,9 @@ data class MemoryQuery(
 }
 
 /**
- * Tag-addressed recall for agents that already carry semantic tags in their CoTR. No prose query
- * synthesis is required: the tags themselves are sufficient addresses into the memory graph.
+ * Tag-addressed recall for agents that already carry semantic tags in their CoTR. Tags may address
+ * noun/entity nodes, verb/action nodes, or broader category/subject nodes. No prose query synthesis
+ * is required: the tags themselves are sufficient addresses into the memory graph.
  */
 @Serializable
 data class MemoryTagQuery(
