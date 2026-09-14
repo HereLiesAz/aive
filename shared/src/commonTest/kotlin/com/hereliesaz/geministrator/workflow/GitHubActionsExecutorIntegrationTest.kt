@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -20,6 +21,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class GitHubActionsExecutorIntegrationTest {
     @Test
@@ -58,6 +60,24 @@ class GitHubActionsExecutorIntegrationTest {
         integration.dispatch(context)
 
         assertEquals("release/v2", client.lastDispatch?.ref)
+    }
+
+    @Test
+    fun gitLabLinkIsRejectedBeforeCallingGitHub() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val base = context(TaskExecutor.GitHubAction(workflow = "ci.yml"))
+        val foreignProject = base.project.copy(
+            repository = base.project.repository!!.copy(
+                source = RepositorySource.GitLab,
+                remoteUrl = "https://gitlab.com/team/haive",
+            ),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            integration.dispatch(base.copy(project = foreignProject))
+        }
+        assertEquals(null, client.lastDispatch)
     }
 
     @Test
