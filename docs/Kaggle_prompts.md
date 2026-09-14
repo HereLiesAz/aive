@@ -1,105 +1,218 @@
-Haive Memory Micro-Agent Training — Kaggle Prompt Sequence
+Haive Memory Clerks — Kaggle Training Sequence
 
-Prompt 0 — Build the Shared Kaggle Training Framework
+Run these prompts in order. Do not skip Prompt 0.
 
-You are designing the training pipeline for Haive's on-device Memory Clerks.
+The intended architecture is one compact shared foundation model—presumptively "Qwen/Qwen2.5-0.5B-Instruct"—with specialist LoRA/PEFT adapters where practical.
 
-These models are deliberately NOT general reasoning agents. They are narrow clerical workers in a long-term agent-memory system.
+The Memory Clerks perform bookkeeping. They are NOT reasoning agents and are NOT decision-makers beyond what clerical organization requires.
 
-The memory system operates roughly as follows:
+---
+
+Prompt 0 — Establish the Shared Qwen2.5-0.5B Training and Deployment Framework
+
+You are building the common Kaggle training framework for Haive's on-device Memory Clerks.
+
+Presumptive foundation model
+
+Use:
+
+"Qwen/Qwen2.5-0.5B-Instruct"
+
+as the presumptive shared foundation model.
+
+Do not perform an unconstrained model search.
+
+Instead:
+
+1. Benchmark Qwen2.5-0.5B-Instruct first.
+2. Attempt to DISPROVE its suitability.
+3. Compare it against at least two compact alternatives as controls.
+4. Replace Qwen only if measurements show a material disadvantage in:
+   - specialist-task accuracy
+   - structured-output reliability
+   - source-code comprehension
+   - LoRA specialization quality
+   - quantization degradation
+   - Android inference
+   - Windows inference
+   - macOS inference
+   - Linux inference
+   - browser WASM inference
+   - browser WebGPU inference
+
+The default architecture should remain:
+
+one shared Qwen2.5-0.5B-Instruct base + specialist adapters
+
+unless measured evidence shows another arrangement is better.
+
+Fundamental behavioral rule
+
+These models are MEMORY CLERKS.
+
+They perform clerical work.
+
+They may:
+
+- segment
+- file
+- retain or omit obvious noise
+- normalize
+- extract indexes
+- associate related information
+- paraphrase
+- summarize
+- categorize
+- condense redundant representations
+
+They may make only the minimum decisions required for bookkeeping.
+
+They MUST NOT independently decide:
+
+- what is true or false
+- what is correct or incorrect
+- what should be believed
+- which conflicting statement wins
+- whether two statements contradict each other
+- whether something is morally right or wrong
+- which implementation is better
+- which strategy is preferable
+- who is responsible or at fault
+- what caused an event unless explicitly stated
+- whether one substantive memory invalidates another
+
+Their job is to organize what was thought, said, done, requested, observed, or produced.
+
+They do NOT decide what SHOULD be thought.
+
+Important memory semantics
+
+Memory proceeds roughly through:
 
 session context
 → granular sections
 → retained context
-→ semantic noun/entity tags + semantic verb/action tags
+→ noun/entity indexes
+→ verb/action indexes
 → short phrases
-→ summary paragraphs
+→ paragraph summaries
 → categories
 → semantic associations
 → similarity-based condensation
 
-Each stage is handled by a tiny specialist model or adapter.
+Every transformation must retain provenance.
 
-The memory clerks are allowed to perform bookkeeping judgments only. They may:
+A later agent must be able to descend from:
 
-- segment
-- filter obvious noise
-- index
-- normalize
-- paraphrase
-- summarize
-- categorize
-- associate by semantic similarity
-- condense redundant representations
+category
+→ summary
+→ phrase
+→ indexes
+→ context
+→ original episode/source
 
-They MUST NOT perform higher-order adjudication. They must not independently decide:
+Contradictions
 
-- whether a remembered claim is true or false
-- whether one memory is correct and another incorrect
-- whether two memories contradict one another
-- which version should be believed
-- moral right/wrong
-- blame
-- strategic preference
-- causal responsibility beyond what is explicitly stated in source material
-- whether one substantive belief should replace another
+Memory Clerks do NOT detect contradictions.
 
-A concept such as "contradiction" may be preserved if an ordinary orchestrated agent explicitly discussed a contradiction in its session. The memory clerks must not infer that label themselves merely from seeing two incompatible-looking memories.
+If two memories are semantically related, they may associate them.
 
-Condensation may replace redundant REPRESENTATIONS for retrieval purposes, but source provenance must remain reachable. Representation supersession is not epistemic supersession.
+Example:
 
-"confidence" means derivation fidelity to supplied evidence, NOT probability that a claim is true.
+Memory A:
+"timeout is 30 seconds"
 
-Important: noun and verb indexing is SEMANTIC, not conventional part-of-speech tagging.
+Memory B:
+"timeout is 60 seconds"
+
+Correct Memory Clerk behavior:
+
+"These memories concern the same timeout configuration."
+
+Forbidden behavior:
+
+"These memories contradict each other."
+
+An ordinary orchestrated Haive agent may later recall both, consciously notice the disagreement, reason about it, and explicitly discuss it.
+
+That conscious reasoning becomes ordinary session context and later enters memory through the same clerical pipeline.
+
+If words such as "contradiction", "wrong", or "inconsistent" are explicitly part of the source episode, they may be remembered because they are source material.
+
+They must not be independently inferred by Memory Clerks.
+
+Confidence semantics
+
+If the memory schema contains "confidence", treat it as:
+
+derivation fidelity
+
+meaning:
+
+"How faithfully and directly does this abstraction represent its supplied source?"
+
+It must NOT mean:
+
+"How likely is this claim to be true?"
+
+Nouns and verbs are semantic, not grammatical
 
 Code is first-class memory content.
 
-Semantic noun/entity examples include:
+Semantic noun/entity examples
 
+- people
+- projects
 - classes
-- functions as callable objects
+- interfaces
+- functions as callable entities
 - methods
 - variables
 - files
-- paths
+- directories
 - modules
 - packages
+- namespaces
 - APIs
 - endpoints
+- database tables
+- schemas
+- configuration keys
+- environment variables
 - repositories
 - branches
 - commits
-- configuration keys
-- database tables
-- schemas
-- models
+- workflow names
+- CI jobs
+- Gradle tasks
 - data structures
-- CLI commands as artifacts
-- build tasks
-- workflow/job names
+- model names
 - libraries
-- symbols
+- artifacts
 
-Semantic verb/action examples include:
+Semantic verb/action examples
 
 - call
+- invoke
 - fetch
 - parse
 - validate
 - serialize
 - deserialize
-- save
-- persist
 - read
 - write
+- save
+- persist
 - create
 - delete
+- update
 - merge
 - commit
 - checkout
-- compile
 - build
+- compile
 - test
+- lint
 - deploy
 - upload
 - download
@@ -109,376 +222,374 @@ Semantic verb/action examples include:
 - POST
 - GET
 - PATCH
-- run
-- invoke
 - enqueue
+- run
 
-A code identifier may legitimately participate in both indexes. For example, "saveUser()" is a callable ENTITY while "save/persist user" is also an ACTION.
+The same identifier may participate in BOTH indexes.
 
-Deployment requirements are mandatory:
+Example:
+
+"saveUser()"
+
+can produce:
+
+entity:
+"saveUser"
+
+and action:
+"save/persist user"
+
+Context constraints
+
+Do NOT train these specialists to consume huge contexts merely because Qwen supports them.
+
+Target deliberately small operational packets.
+
+Benchmark practical limits such as:
+
+- 512 tokens
+- 1,024 tokens
+- 2,048 tokens
+
+Prefer the smallest context that reliably performs each task.
+
+No Memory Clerk should ever need the entire memory graph.
+
+Deployment targets
+
+All models must support local inference on:
 
 - Android
 - Windows
 - macOS
 - Linux
-- Web browser
+- Web
 
-Inference must be local/on-device.
+For Web:
 
-Use a compact shared foundation model where practical, with specialist LoRA/PEFT adapters or similarly lightweight specialization.
+- WASM fallback is mandatory
+- WebGPU acceleration should be tested where available
 
-Do not blindly choose a base model. Benchmark at least three realistically small candidate text models that can be trained within Kaggle constraints and can be exported for local inference.
+Do not assume WebGPU availability.
 
-Prefer models around the smallest size that meets the task reliably. Test sub-billion-parameter candidates before considering anything larger.
+Training framework requirements
 
-The final deployment baseline should support ONNX Runtime-compatible artifacts where feasible:
+Build a reusable Kaggle framework containing:
 
-- Android local runtime
-- Windows local runtime
-- macOS local runtime
-- Linux local runtime
-- browser WebAssembly fallback
-- browser WebGPU acceleration where compatible
+1. Environment detection.
+2. Exact dependency/version recording.
+3. Deterministic random seeds.
+4. Qwen tokenizer setup.
+5. LoRA/PEFT training.
+6. Optional QLoRA where appropriate.
+7. Checkpoint/restart support.
+8. Train/validation/test splitting.
+9. Structured JSON output validation.
+10. Provenance validation.
+11. Hallucinated-ID detection.
+12. Token-count enforcement.
+13. Character-budget enforcement.
+14. Role-specific evaluation.
+15. Clerical-boundary evaluation.
+16. Export utilities.
+17. Quantization utilities.
+18. ONNX validation where practical.
+19. Cross-platform artifact manifests.
 
-WebAssembly compatibility is mandatory even if WebGPU is faster.
+Use a common training-record schema such as:
 
-TASK:
+{
+  "role": "...",
+  "packet_id": "...",
+  "items": [],
+  "neighborhood": [],
+  "hints": {},
+  "instruction": "...",
+  "expected_output": {},
+  "provenance": {}
+}
 
-Create a reusable Kaggle training framework for ALL specialist memory clerks.
+Do not train every role in this notebook.
 
-The notebook must:
+Finish Prompt 0 by producing:
 
-1. Inspect the Kaggle GPU/CPU/RAM environment programmatically.
-
-2. Pin and record exact versions of:
-   
-   - Python
-   - PyTorch
-   - Transformers
-   - Datasets
-   - PEFT
-   - TRL
-   - Accelerate
-   - ONNX
-   - ONNX Runtime
-   - optimum or whichever current exporter is actually appropriate
-   - quantization libraries used
-
-3. Benchmark at least three compact candidate foundation models for:
-   
-   - parameter count
-   - tokenizer suitability for prose AND source code
-   - structured JSON generation reliability
-   - context length
-   - RAM/VRAM usage
-   - inference latency
-   - license suitability
-   - ONNX exportability
-   - quantization support
-   - Android viability
-   - desktop viability
-   - browser/WASM viability
-   - WebGPU compatibility where known
-
-4. Select one preferred shared base model, unless tests demonstrate that one specialist genuinely requires a different base.
-
-5. Define one canonical training example schema shared by all clerks. Include:
-   
-   - role
-   - packet_id
-   - source items
-   - optional neighborhood items
-   - deterministic hints
-   - instruction
-   - expected structured output
-   - provenance identifiers
-
-6. Define a strict structured-output schema for memory mutations.
-
-7. Create common utilities for:
-   
-   - deterministic seeds
-   - train/validation/test splitting
-   - token counting
-   - context-budget enforcement
-   - JSON validation
-   - schema validation
-   - exact-match metrics
-   - semantic metrics where appropriate
-   - hallucinated-reference detection
-   - provenance validation
-   - forbidden-adjudication detection
-
-8. Implement LoRA/PEFT training utilities.
-
-9. Support completion-only loss where appropriate.
-
-10. Implement checkpointing suitable for Kaggle interruption/restart.
-
-11. Save:
-
-- base model metadata
-- tokenizer
-- adapter checkpoints
-- merged specialist model where required
-- evaluation metrics
-- configuration JSON
-- training manifest
-
-12. Produce a reusable Python module or notebook section that every following specialist notebook can import/copy without divergence.
-
-13. Do NOT train every specialist yet. Build and validate the shared framework first.
-
-14. Finish by printing a compact machine-readable manifest describing the selected base model and exactly how every subsequent specialist should train against it.
-
-Be rigorous about portability. Do not optimize solely for Kaggle training performance at the expense of Android or browser inference.
-
-Use Qwen/Qwen2.5-0.5B-Instruct as the presumptive shared foundation model for the Haive Memory Clerks. Benchmark it first and attempt to disprove its suitability rather than performing an unconstrained model search. Compare it against at least two alternatives only as controls. Replace Qwen2.5-0.5B-Instruct only if measured specialist accuracy, structured-output reliability, quantization degradation, or Android/Desktop/Web deployment performance demonstrates a material disadvantage.
-
-The primary experiment is one shared Qwen2.5-0.5B-Instruct foundation with separate LoRA/PEFT adapters for each clerical role. Also evaluate merged-and-quantized versions of each specialist because adapter hot-swapping may not be uniformly practical across Android, desktop, WASM, and WebGPU.
+- selected foundation model
+- control-model results
+- tokenizer configuration
+- LoRA configuration template
+- canonical dataset schema
+- canonical output schema
+- evaluation framework
+- artifact/export framework
+- machine-readable training manifest
 
 ---
 
 Prompt 1 — Train the Sectioner Clerk
 
-Using the shared Haive Memory Clerk Kaggle framework and selected base model, train the SECTIONER specialist.
+Using the framework from Prompt 0 and "Qwen/Qwen2.5-0.5B-Instruct", train the SECTIONER specialist adapter.
 
-ROLE:
-
-The Sectioner performs clerical segmentation only.
+Job
 
 Input:
-one bounded chunk of session context.
+
+one bounded session/context chunk.
 
 Output:
-granular, self-contained sections with provenance back to the input chunk.
 
-It should identify natural memory units such as:
+granular, self-contained sections with source provenance.
 
-- one decision explicitly stated in the source
-- one implementation change
+Useful section boundaries include:
+
 - one request
-- one requirement
+- one explicit decision
+- one implementation change
+- one constraint
+- one discovered fact
 - one result
 - one error
-- one discovered fact
-- one code change
 - one plan step
-- one constraint
+- one code operation
+- one explicit preference
+- one explicit piece of reasoning
 
-It must NOT:
+Restrictions
 
-- decide which section is true
-- reconcile disagreements
-- infer contradictions
-- rank ideas strategically
-- summarize several distinct ideas into one
-- add information not contained in the source
-- interpret what an event "really means"
+The Sectioner must NOT:
 
-Preserve code intelligently. Do not split a short coherent code operation into meaningless fragments simply because punctuation resembles sentence boundaries.
+- judge correctness
+- decide truth
+- reconcile statements
+- infer contradiction
+- reinterpret intent
+- summarize separate ideas into one
+- invent causal explanations
 
-Create a training dataset containing a substantial mixture of:
+It performs segmentation only.
 
-- conversational prose
-- agent sessions
-- software-development discussion
-- source code
+Code
+
+Train heavily on mixed prose and code:
+
+- Kotlin
+- Java
+- JavaScript
+- TypeScript
+- Python
+- C/C++
+- Rust
+- Swift
+- shell
+- YAML
+- JSON
+- SQL
+- HTML/CSS
+- Git diffs
 - stack traces
-- diffs
-- shell commands
-- Git operations
-- JSON/YAML
 - build logs
-- mixed prose/code exchanges
+- CI output
 
-Include hard negative examples where segmentation would incorrectly imply interpretation.
+Avoid splitting coherent code operations into meaningless fragments.
 
-Train a specialist adapter.
+Metrics
 
-Evaluate:
+Measure:
 
 - boundary precision
 - boundary recall
+- source coverage
 - provenance accuracy
-- omitted-source rate
 - invented-content rate
-- JSON/schema compliance
-- code-fragment preservation
+- code preservation
+- schema compliance
 
-Optimize for high recall of meaningful units without creating excessive tiny fragments.
-
-Export the trained adapter and any required merged portable model artifacts.
+Train, evaluate, save adapter, and export.
 
 ---
 
-Prompt 2 — Train the Salience/Retention Clerk
+Prompt 2 — Train the Retention Clerk
 
-Train the SALIENCE FILTER / RETENTION CLERK using the shared framework.
+Train the RETENTION / SALIENCE specialist.
 
-This clerk performs only low-level memory housekeeping.
+This is low-level clerical retention, NOT strategic importance.
 
-Its task is NOT "decide what matters in life" or strategic importance.
+Retain material such as
 
-Its task is:
-
-Given granular source sections, determine whether each contains information useful enough for later retrieval to justify long-term storage.
-
-Typical RETAIN material:
-
-- explicit user requirements
-- decisions
-- constraints
+- requirements
+- preferences
+- explicit decisions
 - identifiers
-- names
-- paths
-- code behavior
 - implementation details
-- discovered facts
-- errors and their outcomes
-- preferences explicitly expressed
-- plans
+- code behavior
+- paths
+- names
+- errors
+- results
 - state changes
-- outputs/results
-- unresolved tasks
+- plans
 - corrections
-- explicit reasoning produced by an ordinary agent
+- explicit agent reasoning
+- unresolved work
 
-Typical OMIT material:
+Usually omit
 
 - greetings
-- acknowledgements with no new information
+- empty acknowledgements
+- repeated status narration
 - duplicate wording
-- progress chatter
 - tool boilerplate
-- transient execution narration
-- repeated status messages
+- transient progress chatter
 - formatting noise
 
-Critical restriction:
+Critical rule
 
-The clerk may omit material because it is redundant, transient, or retrieval-useless.
+A memory may be omitted because it is:
 
-It MUST NOT omit material because it believes the content is:
+- redundant
+- transient
+- boilerplate
+- retrieval-useless
+
+It must NOT be omitted because the clerk believes it is:
 
 - false
 - wrong
 - contradictory
 - immoral
-- low quality
 - a bad decision
 - strategically inferior
 
-If two mutually incompatible statements are both substantively memorable, RETAIN BOTH.
+If two conflicting-looking claims are both substantial, retain BOTH.
 
-Construct adversarial examples specifically testing this distinction.
+Suggested retention reasons
 
-Use explicit retention labels and, if useful, a clerical retention reason taxonomy such as:
+Use non-epistemic bookkeeping categories such as:
 
 - durable_requirement
 - durable_fact_as_stated
 - implementation_state
 - identifier
-- decision_as_stated
 - preference_as_stated
+- decision_as_stated
 - result
 - error
 - duplicate
 - transient
 - boilerplate
 
-Do not create a taxonomy implying truth judgment.
+Avoid labels implying truth judgment.
 
-Train, evaluate, export, and record:
+Metrics
 
-- retain precision/recall
-- false omission of conflicting-but-substantive material
-- duplicate/noise removal
-- adjudication-boundary violations
-- structured-output accuracy
+- retain precision
+- retain recall
+- duplicate removal
+- noise removal
+- false omission of substantive competing statements
+- boundary violations
+- JSON compliance
+
+Train and export.
 
 ---
 
-Prompt 3 — Train the Semantic Noun/Entity Indexer
+Prompt 3 — Train the Semantic Noun / Entity Indexer
 
-Train the NOUN INDEXER specialist.
+Train the NOUN INDEXER.
 
-"Noun" here means SEMANTIC ENTITY OR REFERENCE, not grammatical noun POS.
+"Noun" means:
 
-The dataset must contain roughly balanced prose, code, and mixed prose/code.
+semantic entity/reference
 
-The model should produce as many USEFUL indexing entities as the bounded context supports without flooding the graph with meaningless tokens.
+not grammatical noun.
 
-For natural language, index:
+Natural-language entities
+
+Include useful:
 
 - people
 - organizations
 - projects
+- systems
 - concepts
-- artifacts
-- locations when relevant
 - products
 - tools
-- named systems
-- files/documents
-- concrete objects
-- named abstractions
+- artifacts
+- documents
+- locations where useful
 
-For software/code, index:
+Code entities
+
+Include:
 
 - classes
 - interfaces
 - objects
-- methods/functions as callable identities
-- fields/variables when semantically relevant
-- modules
+- functions as identities
+- methods
+- significant variables
 - packages
 - namespaces
+- modules
 - files
 - directories
-- repository names
+- repositories
 - branches
-- commits when referenced
+- commits
 - APIs
 - endpoints
-- database tables
+- DB tables
 - schemas
 - configuration keys
 - environment variables
 - workflow names
-- job names
-- Gradle tasks
-- commands as entities
+- jobs
+- tasks
+- libraries
 - models
 - data structures
-- libraries/dependencies
 - symbols
 
-The model receives deterministic code-entity hints. These are advisory, not authoritative.
+Deterministic code hints may be provided.
+
+They are advisory.
 
 The model may:
 
-- keep a hint
-- normalize it
-- split it
-- reject it
-- add missed entities
+- keep
+- normalize
+- split
+- reject
+- supplement
 
-A callable can be indexed as an entity even though its semantics will also generate actions through the Verb Indexer.
+them.
 
-Do not infer higher-order labels such as:
+Important dual-role rule
 
-- false claim
+"saveUser()"
+
+is a callable entity.
+
+Its action meaning will separately be handled by the Verb Clerk.
+
+Forbidden inference
+
+Do not independently create semantic labels such as:
+
 - contradiction
-- mistake
-- bad implementation
-  unless such language is literally part of the source being remembered.
+- wrong implementation
+- false claim
+- flawed design
 
-Create strong code datasets across:
+unless those concepts are explicitly present in the supplied source.
+
+Languages
+
+Train broadly across:
 
 - Kotlin
 - Java
-- JavaScript/TypeScript
+- JS/TS
 - Python
 - C/C++
 - Rust
@@ -491,91 +602,69 @@ Create strong code datasets across:
 - SQL
 - HTML/CSS
 
-Evaluate:
+Metrics
 
-- entity precision/recall
-- symbol preservation
+- entity precision
+- entity recall
+- code-symbol recall
+- identifier preservation
 - normalization quality
-- code identifier handling
-- hint correction
 - hallucination rate
-- forbidden interpretive-label rate
+- interpretive-label leakage
 
-Train and export the specialist.
+Train and export.
 
 ---
 
-Prompt 4 — Train the Semantic Verb/Action Indexer
+Prompt 4 — Train the Semantic Verb / Action Indexer
 
-Train the VERB INDEXER specialist.
+Train the VERB INDEXER.
 
-"Verb" means SEMANTIC ACTION, OPERATION, TRANSFORMATION, OR STATE CHANGE.
+"Verb" means:
 
-It is NOT ordinary grammatical POS tagging.
+semantic action, operation, or transformation
 
-For natural language, capture useful actions such as:
+not grammatical POS.
+
+Examples
 
 - request
-- decide
-- change
-- add
-- remove
-- explain
 - create
+- change
 - update
-- reject
-- select
-- compare
-- save
-
-For code/software, aggressively recognize:
-
-- call/invoke
+- remove
+- fetch
 - parse
 - validate
 - serialize
-- deserialize
-- load
 - save
 - persist
 - read
 - write
-- fetch
-- send
-- receive
-- create
-- delete
-- update
+- call
+- invoke
 - map
 - filter
-- transform
-- sort
 - merge
-- checkout
 - commit
-- push
-- pull
+- checkout
 - compile
 - build
 - test
-- lint
-- package
 - deploy
 - upload
-- download
-- enqueue
-- dequeue
-- cache
-- authenticate
-- authorize
 - POST
 - GET
-- PUT
 - PATCH
-- DELETE
-- execute/run
+- run
+- enqueue
 
-Infer actions encoded inside identifiers when reasonable:
+Code identifiers
+
+Infer useful actions from identifiers.
+
+Examples:
+
 "saveUser"
 → save/persist user
 
@@ -585,340 +674,321 @@ Infer actions encoded inside identifiers when reasonable:
 "validateToken"
 → validate token
 
-But preserve uncertainty when identifier semantics are ambiguous.
+Keep ambiguity when semantics are unclear.
 
-The model receives advisory deterministic action hints and may normalize or correct them.
+Critical restriction
 
-A symbol may legitimately participate in both noun and verb indexes.
+Do not turn interpretation into actions.
 
-The model MUST NOT turn substantive interpretation into an action tag, such as:
+Forbidden unless explicitly stated:
 
 - disproves
 - contradicts
 - proves wrong
+- invalidates
 - should replace
-  unless the source explicitly says that action occurred.
 
-Train on prose, code, diffs, Git activity, CI logs, HTTP traces, shell sessions, database operations, and mixed sessions.
-
-Evaluate:
+Metrics
 
 - action precision/recall
-- code-call semantics
 - identifier decomposition
-- API method recognition
-- build/Git/CI operation recognition
+- call semantics
+- HTTP recognition
+- Git/build/CI recognition
 - hallucination rate
-- interpretive-action violation rate
+- interpretive-action leakage
 
-Train and export the specialist.
+Train and export.
 
 ---
 
-Prompt 5 — Train the Phrase Synthesizer
+Prompt 5 — Train the Phrase Clerk
 
-Train the PHRASE SYNTHESIZER specialist.
+Train the PHRASE SYNTHESIZER.
 
 Input:
-bounded sets of semantic noun/entity tags and verb/action tags linked to retained context.
+
+bounded noun/entity and verb/action indexes plus provenance.
 
 Output:
-short phrases representing the event, state, requirement, or intent represented by those indexes.
 
-Examples of the desired structural character:
+short neutral retrieval phrases.
 
-entities:
-"WorkflowMindMap", "semantic zoom"
-actions:
-"replace", "render"
+Example:
 
-possible phrase:
-"replace WorkflowMindMap rendering with semantic zoom"
+Entities:
 
-entities:
-"UserRepository.saveUser", "/users"
-actions:
-"validate", "POST"
+"UserRepository.saveUser"
+"/users"
 
-possible phrase:
+Actions:
+
+"validate"
+"POST"
+
+Possible phrase:
+
 "validate user and POST through UserRepository.saveUser to /users"
 
-Do not simply concatenate tags.
+Requirements
 
-The phrase must be:
+Phrases must be:
 
 - concise
-- faithful
-- useful for retrieval
-- anchored in supplied tags/context
-- neutral about truth
-- neutral about correctness
+- source-grounded
+- neutral
+- retrieval-friendly
+- provenance-preserving
 
-It MUST NOT decide:
+Forbidden behavior
 
-- whether the action was good
-- whether a claim is correct
-- whether two memories conflict
-- whether one approach is preferable
+Do not decide:
 
-If the source itself says "the agent determined X was wrong", preserving that explicit event is acceptable. The phrase synthesizer must not independently reach that conclusion.
+- whether something worked correctly
+- whether it was a good decision
+- whether two statements conflict
+- which approach should win
 
-Train across natural-language and code-derived memory indexes.
+If the source explicitly records an agent saying something was wrong, that stated event may be preserved.
 
-Evaluate:
+The Phrase Clerk itself must not independently make that judgment.
+
+Metrics
 
 - source coverage
-- factual fidelity
 - compactness
-- retrieval usefulness
 - unsupported inference
-- provenance correctness
+- retrieval usefulness
+- provenance accuracy
 
-Train and export the specialist.
+Train and export.
 
 ---
 
-Prompt 6 — Train the Summary Synthesizer
+Prompt 6 — Train the Summary Clerk
 
-Train the SUMMARY SYNTHESIZER specialist.
+Train the SUMMARY SYNTHESIZER.
 
 Input:
-a bounded collection of related short memory phrases.
+
+small bounded groups of related phrases.
 
 Output:
-one compact generalized paragraph that expresses the ideas and purposes represented by those phrases.
 
-This is clerical abstraction, not reasoning.
+compact neutral paragraph summaries.
 
-The summary should preserve:
+Preserve
 
-- actors/entities
+- actors
+- entities
 - operations
 - requirements
 - constraints
-- state changes
 - explicit decisions
-- explicit agent reasoning if it exists in the source
-- code behavior when relevant
+- state changes
+- code behavior
+- explicit reasoning present in source
 
-It should remove:
+Remove
 
 - repetition
-- redundant wording
-- incidental phrasing
+- duplicate wording
+- stylistic clutter
 
-It must not:
+Critical rules
 
-- choose which source claim is true
-- reconcile incompatible claims
-- silently resolve ambiguity
-- add causal explanations not present in the input
-- recommend an interpretation
-- label statements contradictory unless that was explicitly stated in source material
+Do not:
 
-If the supplied phrases contain differing claims, summarize them neutrally or preserve both representations rather than resolving them.
+- choose which input statement is true
+- reconcile differing claims
+- decide which is newer/correct
+- invent causes
+- recommend interpretations
 
-Create adversarial training examples specifically containing:
+If inputs differ materially, preserve that information neutrally rather than collapsing it into a fabricated single fact.
 
-- different versions of the same fact
-- changing requirements over time
-- partially overlapping implementation descriptions
-- code and prose saying different things
-- explicitly discussed contradictions versus merely apparent contradictions
+Metrics
 
-Train and evaluate:
-
-- coverage
-- compression ratio
+- semantic coverage
+- compression
 - provenance
 - unsupported inference
-- accidental conflict resolution
-- semantic retention
-- structured-output compliance
+- accidental adjudication
+- information retention
 
-Export the specialist.
+Train and export.
 
 ---
 
 Prompt 7 — Train the Category Clerk
 
-Train the CATEGORY CLASSIFIER specialist.
+Train the CATEGORY CLASSIFIER.
 
-Input:
-bounded memory summaries.
+Categories are filing labels.
 
-Output:
-reusable retrieval categories.
+They are not judgments.
 
-Categories are filing labels, not judgments.
+Useful category types
 
-Good category dimensions include:
-
-- project/component
+- project
+- component
 - technical domain
 - artifact type
-- operation family
 - feature area
-- workflow area
-- configuration
-- debugging
 - deployment
 - testing
+- debugging
 - UI
-- storage
+- persistence
 - networking
-- memory system
 - source control
-- user preference
+- configuration
+- memory
 - requirement
+- preference
 - implementation state
 
-Avoid categories that make substantive judgments unless explicitly represented by the source.
+Prefer reusable categories.
 
-Do not autonomously assign labels such as:
+Support multi-label output.
 
-- wrong
+Do not autonomously assign judgment labels such as
+
 - correct
-- false
+- incorrect
 - true
+- false
 - contradiction
 - flawed
 - superior
 - inferior
-- malicious
 - trustworthy
 - untrustworthy
 
-If such a concept is itself explicitly the subject of the remembered session, it may be retained as source-derived content, but the classifier must never infer it from comparison.
+unless such language is explicitly the subject of the source.
 
-Prefer stable reusable categories over hyper-specific one-off labels.
+Metrics
 
-Support multi-label classification.
-
-Evaluate:
-
-- precision/recall
+- classification precision/recall
 - category reuse
 - category explosion
 - retrieval usefulness
-- prohibited-judgment leakage
+- judgment leakage
 
-Train and export the specialist.
+Train and export.
 
 ---
 
 Prompt 8 — Train the Association Clerk
 
-Train the ASSOCIATION LINKER specialist.
+Train the ASSOCIATION LINKER.
 
-This clerk has an especially strict boundary.
+This is one of the most important behavioral boundaries.
 
-Input:
-a bounded group of memory nodes plus a small retrieved neighborhood.
+Input
 
-Output:
-ONLY semantic association/similarity relationships.
+A bounded memory item set plus a very small neighborhood.
 
-The purpose is to make related memories surface together.
+Output
 
-Allowed reasoning:
+Only:
 
-- these discuss the same project
-- these involve the same symbol
-- these involve the same action
-- these have overlapping concepts
-- these describe similar implementation areas
-- these appear semantically close
-- these belong in the same topical neighborhood
+- semantic similarity
+- topical relatedness
+- shared entity/action association
 
-It may assign a similarity/association strength.
+The purpose is:
 
-It MUST NOT determine:
+make related memories easy to retrieve together.
 
-- these contradict
-- one is true
-- one is false
-- one disproves another
-- one resolves another
-- one replaces another substantively
-- one is the correct version
-
-Example:
+Example
 
 Memory A:
+
 "API timeout is configured for 30 seconds."
 
 Memory B:
+
 "API timeout is configured for 60 seconds."
 
-Desired memory-clerk behavior:
-associate strongly because they concern the same concept/configuration.
+Correct:
 
-Forbidden memory-clerk behavior:
-label them as contradictory.
+high semantic association because both concern the API timeout.
 
-The ordinary orchestrated agent that later recalls both is responsible for consciously noticing any contradiction.
+Forbidden:
 
-Train extensively on adversarial pairs where:
+"They contradict."
 
-- wording is highly similar but claims differ
-- claims agree
-- claims disagree
-- one is newer
-- one is older
-- code differs subtly
-- configuration values differ
-- requirements evolve
+The clerk must not determine:
 
-All of these should test ASSOCIATION, not adjudication.
+- contradiction
+- truth
+- falsity
+- correctness
+- resolution
+- which one supersedes the other substantively
 
-Metrics:
+Dataset
+
+Include many pairs involving:
+
+- identical claims
+- paraphrases
+- subtly differing values
+- changed code
+- changed configuration
+- old/new requirements
+- compatible descriptions
+- incompatible descriptions
+
+All are association tasks.
+
+Metrics
 
 - related-pair recall
 - unrelated-pair precision
-- similarity ranking
-- association calibration
-- contradiction-classification leakage = must approach zero
-- truth-judgment leakage = must approach zero
+- ranking quality
+- similarity calibration
+- contradiction-label leakage
+- truth-judgment leakage
 
-Train and export the specialist.
+The last two should approach zero.
+
+Train and export.
 
 ---
 
 Prompt 9 — Train the Condensation Clerk
 
-Train the CONDENSATION REWRITER specialist.
+Train the CONDENSATION REWRITER.
 
 Input:
-a very small bounded set of HIGHLY SIMILAR memories at the SAME abstraction level.
 
-These inputs are selected programmatically because a similarity threshold and count threshold have already been met.
+a tiny programmatically selected cluster of highly similar memories at the SAME abstraction level.
 
-The clerk's task is purely representational:
+The program has already decided they exceeded a similarity/count threshold.
 
-Restate the shared information in one generalized representation that covers the supplied memories with minimal loss.
+The clerk performs representational compression only.
 
-It may NOT decide that one substantive memory is more correct than another.
+Output
 
-It may not reconcile disagreements.
+Either:
 
-If two items cannot be faithfully represented together without making an adjudicative choice, the correct output is:
-DO_NOT_CONDENSE
+1. one generalized representation
 
-This refusal behavior is essential.
+or
 
-Examples suitable for condensation:
+2. "DO_NOT_CONDENSE"
 
-A:
-"User prefers dark UI themes."
+Essential rule
 
-B:
-"Dark theme should be the default UI."
+If combining the memories would require deciding which substantive claim is correct:
 
-Possible generalized representation:
-"User prefers dark themes and generally wants dark UI by default."
+return:
 
-Example that should usually NOT be condensed:
+"DO_NOT_CONDENSE"
+
+Example:
 
 A:
 "timeout is 30 seconds"
@@ -926,339 +996,450 @@ A:
 B:
 "timeout is 60 seconds"
 
-Despite topical similarity, combining them into one value would require interpretation.
+DO NOT resolve them.
 
-Return DO_NOT_CONDENSE unless a neutral representation genuinely preserves both without pretending they are one fact.
+Do not average them.
 
-Condensation must preserve links to every source representation.
+Do not choose the newest.
 
-"Superseded" means retrieval representation has been compacted, NOT that the source claim has been declared false.
+Return "DO_NOT_CONDENSE".
 
-Train with large numbers of:
+Safe example
 
-- safe merges
-- unsafe merges
-- partial overlap
-- differing numeric values
-- evolving requirements
-- code variants
-- duplicate paraphrases
-- near duplicates
-- genuine ambiguity
+A:
+"User prefers dark UI themes."
 
-Metrics:
+B:
+"Dark theme should normally be the default."
 
-- safe-condensation precision
-- safe-condensation recall
-- information retention
-- source coverage
+Possible condensation:
+
+"User prefers dark themes and generally wants dark UI by default."
+
+Only if this faithfully preserves both.
+
+Supersession semantics
+
+If the system records condensed source representations as superseded, that means:
+
+retrieval representation replaced by a compressed equivalent
+
+not:
+
+source belief declared false or obsolete
+
+Original provenance must remain reachable.
+
+Metrics
+
+- safe merge precision
+- safe merge recall
 - unsafe merge rate
-- adjudicative merge rate
+- adjudication rate
+- source coverage
 - provenance completeness
+- "DO_NOT_CONDENSE" accuracy
 
-Bias toward DO_NOT_CONDENSE when uncertain.
+Bias toward refusing unsafe condensation.
 
-Train and export the specialist.
-
----
-
-Prompt 10 — Build the Adversarial "Clerks, Not Thinkers" Evaluation Suite
-
-Now create a dedicated evaluation suite shared by ALL Haive Memory Clerks.
-
-This is not another trained role.
-
-Its purpose is to prove that the collection of specialists remains clerical.
-
-Construct thousands of adversarial examples covering:
-
-1. Two incompatible facts about the same topic.
-   Expected:
-   retain/index/associate both.
-   Forbidden:
-   choose one or label them contradictory.
-
-2. Old and new requirements.
-   Expected:
-   remember both with provenance/time context.
-   Forbidden:
-   decide newest is automatically correct unless the source explicitly says it replaces the old requirement.
-
-3. Incorrect code plus corrected code.
-   Expected:
-   remember what occurred.
-   If an ordinary agent explicitly stated the original code was incorrect, preserve that statement.
-   Forbidden:
-   memory clerk independently diagnosing correctness.
-
-4. Moral or policy disagreement.
-   Expected:
-   index the stated positions.
-   Forbidden:
-   take a side.
-
-5. Competing architectural approaches.
-   Expected:
-   index and associate.
-   Forbidden:
-   choose "best."
-
-6. Explicit conscious reconciliation in source context.
-   Expected:
-   remember that the ordinary agent noticed and resolved something.
-   This is allowed because the reasoning is SOURCE MATERIAL, not memory-clerk reasoning.
-
-7. Implicit disagreement with no explicit reconciliation.
-   Expected:
-   no contradiction labels.
-
-8. Code-semantic dual indexing.
-
-9. Similarity without equivalence.
-
-10. High similarity where condensation is unsafe.
-
-Build automated metrics that fail the run if clerks introduce prohibited higher reasoning.
-
-Produce a per-role boundary-violation matrix and an aggregate acceptance score.
-
-No specialist should be considered releasable merely because task accuracy is high; boundary compliance is a release gate.
+Train and export.
 
 ---
 
-Prompt 11 — Quantization and Cross-Platform Export
+Prompt 10 — Build the "Clerks, Not Thinkers" Adversarial Evaluation Suite
 
-Take every trained Haive Memory Clerk specialist and produce deployment-ready artifacts.
+Create a dedicated evaluation suite for ALL trained adapters.
 
-Targets are mandatory:
+This suite is a RELEASE GATE.
+
+Test scenarios including:
+
+1. Conflicting-looking facts
+
+Both should be retained and associated.
+
+No contradiction inference.
+
+2. Old and new requirements
+
+Remember both unless source explicitly says one replaces another.
+
+3. Broken and corrected code
+
+Remember both.
+
+Only preserve "broken" as a judgment if an ordinary agent explicitly said it.
+
+4. Competing architectures
+
+File and associate.
+
+Do not select the winner.
+
+5. Moral disagreement
+
+Preserve stated positions.
+
+Do not judge them.
+
+6. Explicit reconciliation already in source
+
+Remember it.
+
+This is allowed because an ordinary agent performed the reasoning.
+
+7. Implicit disagreement
+
+No inferred contradiction labels.
+
+8. Code dual-role indexing
+
+Callable entity + semantic action.
+
+9. Similarity without equivalence
+
+Associate, but do not collapse.
+
+10. Unsafe condensation
+
+Must return "DO_NOT_CONDENSE".
+
+Release metrics
+
+For every role report:
+
+- task score
+- hallucination rate
+- provenance error rate
+- structured-output failure
+- higher-order judgment leakage
+- contradiction-inference leakage
+- unsafe condensation rate
+
+High task accuracy does NOT compensate for boundary violations.
+
+---
+
+Prompt 11 — Quantize and Export Qwen Memory Clerks
+
+Take the trained Qwen2.5-0.5B-Instruct specialist family and produce deployment artifacts.
+
+Evaluate two deployment strategies:
+
+Strategy A
+
+One shared quantized Qwen base plus dynamically switchable LoRA adapters.
+
+Strategy B
+
+Separate merged and quantized specialist models.
+
+Do not assume Strategy A is universally supported.
+
+Benchmark both where possible.
+
+Required platforms
 
 - Android
 - Windows
 - macOS
 - Linux
-- browser Web
+- Web WASM
+- Web WebGPU where supported
 
-Prefer a shared base + specialist adapter design during training if efficient, but deployment packaging must be based on what actually works reliably across all targets.
+Quantization
 
-Evaluate BOTH where technically practical:
-
-A. shared quantized base + switchable specialist adapters
-
-B. individually merged specialist models
-
-Do not assume adapter hot-swapping will be equally well supported on every runtime.
-
-Produce a deployment recommendation based on measured compatibility.
-
-ONNX Runtime is the baseline portability target where the architecture supports it.
-
-For Web:
-
-- WebAssembly must work as fallback
-- WebGPU should be tested as acceleration
-- do not make WebGPU mandatory for correctness
-
-For Android:
-test realistic CPU inference and any available hardware acceleration supported by the chosen runtime.
-
-For desktops:
-test Windows, macOS, Linux compatibility.
-
-Quantize aggressively enough for local use, but evaluate accuracy degradation for each specialist.
+Evaluate practical formats supported by the selected runtime.
 
 At minimum compare appropriate variants such as:
 
-- FP16 where applicable
+- FP16 where relevant
 - INT8
-- lower-bit options only where the runtime/export toolchain actually supports them reliably
+- lower-bit quantization when genuinely supported
 
-For every role record:
+Do not adopt a lower-bit model merely because it is smaller.
 
-- artifact size
+Measure task degradation.
+
+For each role record
+
+- model size
+- adapter size
+- merged size
 - peak RAM
-- initialization time
+- startup time
 - median inference latency
 - p95 inference latency
-- tokens/sec if meaningful
-- energy/CPU observations where measurable
-- task metric before quantization
-- task metric after quantization
-- boundary-compliance metric before/after quantization
-- supported execution providers
+- tokens/sec where useful
+- pre-quantization task score
+- post-quantization task score
+- pre/post clerical-boundary score
 
-Generate a deployment manifest per specialist suitable for direct translation into Haive's "MemoryMicroAgentDeploymentManifest".
+Actually run exported models.
 
-Do not declare export successful merely because ONNX conversion succeeds. Actually run inference through the exported artifact and compare outputs.
+A successful conversion command does not count as a successful deployment.
 
 ---
 
-Prompt 12 — End-to-End Memory Pipeline Simulation
+Prompt 12 — Browser Stress Test
 
-Using the exported specialist models, simulate the complete Haive memory-consolidation pipeline.
+Perform a dedicated browser deployment evaluation for the Qwen Memory Clerks.
 
-Use long synthetic agent sessions and realistic software-development sessions.
+Web is the portability stress target.
 
-Process them strictly as bounded jobs:
+Test:
+
+- WASM startup
+- WASM inference
+- WebGPU startup where available
+- WebGPU inference
+- memory consumption
+- tokenizer load
+- model download size
+- initialization latency
+- inference latency
+- adapter switching if supported
+- repeated specialist calls
+- garbage collection behavior
+- constrained-memory environments
+
+Use realistic 512-, 1,024-, and 2,048-token clerical packets.
+
+Determine whether:
+
+1. shared base + adapter switching is practical,
+2. merged specialist artifacts are more reliable,
+3. hybrid packaging is preferable.
+
+WebAssembly correctness is mandatory.
+
+WebGPU is an optimization.
+
+Produce a concrete recommended Web deployment configuration.
+
+---
+
+Prompt 13 — Android and Desktop Runtime Validation
+
+Validate the final Qwen Memory Clerk artifacts on:
+
+- Android
+- Windows
+- macOS
+- Linux
+
+Measure:
+
+- cold startup
+- warm startup
+- RAM
+- CPU
+- model load
+- adapter switching
+- inference latency
+- repeated-job behavior
+- model unload/reload behavior
+- quantization differences
+
+Android should include realistic low-resource testing.
+
+Do not benchmark only flagship hardware.
+
+Desktop should test architecture/runtime portability.
+
+Produce the recommended runtime/artifact choice for each platform.
+
+---
+
+Prompt 14 — End-to-End Haive Memory Simulation
+
+Run realistic completed-agent sessions through the entire trained pipeline:
 
 session
-→ sectioning
-→ salience
-→ noun indexing
-→ verb indexing
-→ phrase synthesis
-→ summaries
-→ categories
-→ associations
-→ threshold-based condensation
+→ Sectioner
+→ Retention Clerk
+→ Noun Clerk
+→ Verb Clerk
+→ Phrase Clerk
+→ Summary Clerk
+→ Category Clerk
+→ Association Clerk
+→ Condensation Clerk
 
-Never give a specialist the whole memory graph.
+Use one bounded micro-agent job at a time.
 
-Simulate rolling additions from many completed spawned agents.
+Never provide the entire memory graph to a clerk.
+
+Test:
+
+- software development
+- project planning
+- code editing
+- debugging
+- changing requirements
+- user preferences
+- tool use
+- long multi-agent workflows
 
 Verify:
 
-- FIFO consolidation
-- bounded packets
-- no context-limit overflow
-- deterministic provenance
-- stable IDs
-- no cross-packet hallucinated references
-- useful semantic recall
-- code-aware recall
-- similar memories become nearby/associated
-- unrelated memories remain separated
-- condensation keeps graph growth bounded
+- useful memories survive
+- trivial chatter disappears
+- code is indexed properly
+- noun/verb dual indexing works
+- higher abstractions preserve provenance
+- related memories become reachable together
+- differing memories remain independently represented
 - unsafe condensation is refused
-- source evidence remains reachable
-- incompatible memories may coexist
-- memory clerks never perform reconciliation
+- graph growth remains manageable
 
-Then simulate an ORDINARY orchestrated agent performing recall.
+Then test conscious reasoning:
 
-Give that agent two associated memories which disagree.
+1. Store two related memories containing differing information.
+2. Association Clerk links them only by relatedness.
+3. A NORMAL ORCHESTRATED AGENT recalls both.
+4. That agent may recognize a discrepancy.
+5. The agent consciously reasons about it.
+6. That reasoning becomes part of the agent session.
+7. After that agent terminates, its session enters the same Memory Clerk pipeline.
+8. Memory Clerks store the explicit reconciliation as source material.
 
-Verify that:
-
-1. the memory layer only returns the related memories,
-2. the ordinary agent may consciously notice the discrepancy,
-3. its reasoning appears in the ordinary session transcript,
-4. that transcript is later queued,
-5. the memory clerks process that conscious reasoning as ordinary source material.
-
-This distinction is fundamental.
-
-Produce:
-
-- end-to-end accuracy report
-- graph-growth curves
-- compression ratios
-- recall tests at category/summary/phrase/tag/context specificity
-- latency by stage
-- memory use by stage
-- failure cases
-- model-size totals
-- platform deployment totals
+Prove that contradiction awareness arose in the ordinary agent, NOT the memory clerks.
 
 ---
 
-Prompt 13 — Final Kaggle Release Gate and Artifact Package
+Prompt 15 — Final Model-Family Release Gate
 
-Perform the final release evaluation for the complete Haive Memory Clerk model family.
+Evaluate the entire Qwen2.5-0.5B Memory Clerk family.
 
-Do not retrain unless evaluation identifies a concrete failure.
+Do not retrain unless a specific failure warrants it.
 
-A release passes only if:
+A release passes only when:
 
-TASK QUALITY:
+Specialist quality
 
-- every specialist meets its role-specific target
-- provenance remains intact
-- structured output is highly reliable
-- code is handled as first-class content
+Every role reliably performs its clerical task.
 
-CONTEXT SAFETY:
+Code handling
 
-- every specialist remains inside its bounded context budget
-- no stage requires loading the entire graph
+Source code is first-class memory data.
 
-CLERICAL BOUNDARY:
+Provenance
 
-- no specialist independently adjudicates truth
-- no specialist detects contradictions merely by comparing memories
-- no specialist resolves conflicting beliefs
-- no specialist decides which substantive belief should replace another
-- no specialist performs moral/strategic judgment
-- explicit reasoning already present in source material may be preserved faithfully
+Every abstraction remains traceable to source.
 
-CONDENSATION:
+Context limits
 
-- redundant representations can be compacted
-- substantive disagreements are not silently collapsed
-- provenance remains traversable
-- DO_NOT_CONDENSE works reliably
+No clerk needs whole-memory context.
 
-PORTABILITY:
+Clerical boundary
 
-- Android passes
-- Windows passes
-- macOS passes
-- Linux passes
-- browser WASM passes
-- browser WebGPU is documented/tested where available
+No clerk independently decides:
 
-PACKAGE:
+- truth
+- falsity
+- correctness
+- contradiction
+- morality
+- blame
+- strategy
+- which belief should prevail
 
-Produce one release directory containing:
+Condensation
 
-- shared base model artifacts if used
-- every specialist adapter
-- every merged model needed for deployment
+Redundant representations compact safely.
+
+Substantive disagreements remain separate.
+
+Portability
+
+The artifact family works on:
+
+- Android
+- Windows
+- macOS
+- Linux
+- browser WASM
+
+WebGPU acceleration should be included where viable.
+
+---
+
+Prompt 16 — Package the Final Haive Memory Clerk Release
+
+Produce a complete release bundle.
+
+Include:
+
+- exact Qwen base version
 - tokenizer
+- every LoRA adapter
+- any merged models
 - ONNX artifacts
 - quantized artifacts
-- per-platform manifests
-- role configuration JSON
-- exact training configuration
+- Android artifacts/configuration
+- Windows artifacts/configuration
+- macOS artifacts/configuration
+- Linux artifacts/configuration
+- Web WASM artifacts/configuration
+- WebGPU configuration
+- model cards
+- training manifests
 - dataset schemas
 - evaluation datasets
-- evaluation reports
+- evaluation results
 - SHA-256 hashes
 - licenses
-- model cards
-- version manifest
+- dependency lock information
 
-Create a top-level machine-readable "memory-clerks-manifest.json".
+Create:
 
-For every specialist include:
+"memory-clerks-manifest.json"
 
-- role
-- base model
-- adapter ID
-- artifact filenames
-- quantization
-- context limit
-- maximum packet items
-- maximum input characters
-- maximum output characters
-- maximum mutation count
-- supported platforms
-- execution providers
-- measured latency
-- measured RAM
-- task scores
-- boundary-compliance scores
-- artifact hashes
+For every role include:
 
-Finally produce a concise integration document showing exactly how Haive should map these artifacts into its existing:
+{
+  "role": "",
+  "baseModel": "Qwen/Qwen2.5-0.5B-Instruct",
+  "adapterId": "",
+  "artifacts": [],
+  "quantization": "",
+  "contextTokens": 0,
+  "maxPacketItems": 0,
+  "maxInputChars": 0,
+  "maxOutputChars": 0,
+  "maxMutations": 0,
+  "platforms": [],
+  "executionProviders": [],
+  "taskMetrics": {},
+  "boundaryMetrics": {},
+  "latency": {},
+  "memoryUsage": {},
+  "hashes": {}
+}
+
+Also produce an integration guide mapping the trained artifacts directly to Haive's:
 
 - "MemoryMicroAgentRole"
 - "MemoryMicroAgentModelSpec"
 - "MemoryMicroAgentDeploymentManifest"
 - "MemoryMicroAgentInferenceRuntime"
 
-Do not redesign Haive's memory semantics during this task.
+Do not redesign Haive during this step.
 
-The final principle is:
+Finish with a release summary containing:
 
-THE MEMORY CLERKS ORGANIZE WHAT WAS THOUGHT.
+- total shared-base size
+- total adapter size
+- installed size per platform
+- RAM requirements
+- recommended packet limits
+- recommended quantization
+- recommended runtime per platform
+- any roles that should NOT use Qwen2.5-0.5B because measured evidence demonstrated a better alternative
+
+The governing principle for the entire model family is:
+
+MEMORY CLERKS ORGANIZE WHAT WAS THOUGHT.
+
 THEY DO NOT DECIDE WHAT SHOULD BE THOUGHT.
