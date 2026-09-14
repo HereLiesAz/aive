@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
@@ -104,6 +105,8 @@ fun ControlRoom(
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onValidateWorkflow: () -> List<String> = { emptyList() },
     onSaveRole: (RoleDefinition) -> Unit = {},
+    availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
+    onPickLocalRepository: (() -> String?)? = null,
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
     compact: Boolean,
@@ -146,6 +149,8 @@ fun ControlRoom(
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRole = onSaveRole,
+                    availableRepositorySources = availableRepositorySources,
+                    onPickLocalRepository = onPickLocalRepository,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
@@ -198,6 +203,8 @@ fun ControlRoom(
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRole = onSaveRole,
+                    availableRepositorySources = availableRepositorySources,
+                    onPickLocalRepository = onPickLocalRepository,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
@@ -328,6 +335,8 @@ private fun MainDestination(
     onExportDiagnosticBundle: suspend () -> String?,
     onValidateWorkflow: () -> List<String>,
     onSaveRole: (RoleDefinition) -> Unit,
+    availableRepositorySources: Set<RepositorySource>,
+    onPickLocalRepository: (() -> String?)?,
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
     connectedProviderIds: Set<String>,
@@ -346,6 +355,8 @@ private fun MainDestination(
                 onRetryRuntime = onRetryRuntime,
                 onReconfigureProvider = onReconfigureProvider,
                 onValidateWorkflow = onValidateWorkflow,
+                availableRepositorySources = availableRepositorySources,
+                onPickLocalRepository = onPickLocalRepository,
                 compact = compact,
                 runtimeState = runtimeState,
             )
