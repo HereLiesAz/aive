@@ -545,7 +545,8 @@ internal class LocalWorkspaceAgentProvider(
         if (lines.lastOrNull()?.trim()?.startsWith("```") == true) lines.removeAt(lines.lastIndex)
         val text = lines.joinToString("\n").trim()
         val start = text.indexOf("diff --git ")
-        return if (start >= 0) text.substring(start).trim() else ""
+        val diff = if (start >= 0) text.substring(start) else ""
+        return if (diff.isBlank()) "" else diff.trimEnd() + "\n"
     }
 
     private fun validatePatchPaths(patch: String) {
