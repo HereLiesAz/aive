@@ -16,18 +16,22 @@ The memory-facing backend uses three verbs:
 
 Do not use `grep(...)` as the memory API verb. `grep` already describes a different general search operation. GRIP is deliberately memory-specific.
 
-## Tag-first GRIP
+## Cue-first GRIP
 
-Normal recall begins with semantic noun/entity and verb/action tags.
+Normal recall begins with the cheapest useful semantic cues:
 
-An ambient memory pass should normally request `MemoryResolution.Tag`. The result should therefore look like a small set of related cues rather than remembered prose.
+- noun/entity tags
+- verb/action tags
+- category/subject tags
+
+An ambient memory pass should normally request `MemoryResolution.Tag`. In the memory backend, `Tag` resolution intentionally includes all three cue families, including `Category` nodes used as broader subject tags. The result should therefore look like a small set of related cues rather than remembered prose.
 
 Conceptually:
 
 ```text
 current thought
     -> GRIP
-related tags
+related entity/action/category-subject cues
     -> recognition inside the active agent
     -> usually stop
 ```
@@ -38,21 +42,21 @@ Only when those cues are insufficient should the active agent request phrases, s
 
 An agent does not need to synthesize a prose memory query in order to dig into memory.
 
-Semantic tags already present in the agent's CoTR are valid memory addresses. The agent may pass those tags directly to the tag-addressed `grip(...)` overload and choose the resolution it needs.
+Semantic cues already present in the agent's CoTR are valid memory addresses. The agent may pass noun/entity tags, verb/action tags, category/subject tags, or any combination of them directly to the tag-addressed `grip(...)` overload and choose the resolution it needs.
 
 Example:
 
 ```text
-CoTR tags: [Web Wasm, test, router]
+CoTR tags: [Web Wasm, test, build verification]
 
 GRIP(tags, resolution = Tag)
-    -> nearby memory tags
+    -> nearby memory cues
 
 GRIP(tags, resolution = Context)
     -> relevant retained context when deeper recall is actually needed
 ```
 
-The tag query begins from memory tags and traverses the existing graph. It is not a second retrieval system.
+The tag query begins from actual matching `NounTag`, `VerbTag`, and `Category` nodes and traverses the existing graph. It is not a second retrieval system and does not reduce category/subject cues to a prose search first.
 
 ## Deliberate banks and reminders
 
@@ -79,11 +83,11 @@ bank("After fixing the router, return to the failing Web Wasm test.")
 
     -> priority-next consolidation
     -> sectioning/indexing/phrasing/association
-    -> tags such as Web Wasm, test, router, return
+    -> cues such as Web Wasm, test, router, build verification
 
 later thought about a successful Wasm test
 
-    -> related tags enter attention
+    -> related cues enter attention
     -> the agent often recollects the intended follow-up without reading the stored reminder
 ```
 
@@ -91,7 +95,7 @@ There is no programmatic reminder engine for this behavior.
 
 ## Attention
 
-The Attention Deficit Dial controls how readily related tags are allowed into active context. It does not alter memory, and it does not create a separate reminder channel.
+The Attention Deficit Dial controls how readily related semantic cues are allowed into active context. It does not alter memory, and it does not create a separate reminder channel.
 
 Lowering the dial is temporary. Token use restores the effective setting toward the agent's baseline so a highly focused agent cannot permanently silence associative recall by forgetting to turn it back on.
 
@@ -99,10 +103,10 @@ The attention gate may deterministically vary:
 
 - minimum association score
 - minimum token interval between ambient cues
-- number of tags surfaced at once
+- number of cues surfaced at once
 
-Even at high attention, tags remain the default payload. Increased attention should increase the frequency or breadth of cues, not automatically dump full remembered passages.
+Even at high attention, semantic cues remain the default payload. Increased attention should increase the frequency or breadth of cues, not automatically dump full remembered passages.
 
 ## Durable rule
 
-> **BANK deposits experience. GRIP cues recollection. Tags are the normal address and the normal first result. Deliberate banks jump next in line, then become ordinary associative memory.**
+> **BANK deposits experience. GRIP cues recollection. Entity, action, and category/subject tags are normal memory addresses and normal first results. Deliberate banks jump next in line, then become ordinary associative memory.**
