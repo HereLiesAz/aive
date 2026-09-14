@@ -7,9 +7,10 @@ import kotlin.math.max
  * persistence directly.
  *
  * GRIP means Global Regular IMpression Print: Haive's memory-specific direct-recall operation.
- * Normal associative recall is tag-first. An agent that already carries semantic tags in its CoTR
+ * Normal associative recall is cue-first. An agent that already carries semantic tags in its CoTR
  * can pass those tags directly to [grip] and request a deeper resolution only when the tags
- * themselves are not enough to recollect what it needs.
+ * themselves are not enough to recollect what it needs. Semantic cue tags include noun/entity,
+ * verb/action, and category/subject tags.
  */
 interface MemoryTool {
     /**
@@ -68,7 +69,7 @@ class GraphMemoryTool(
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
         val scoredSeeds = active
             .asSequence()
-            .filter { it.kind == MemoryNodeKind.NounTag || it.kind == MemoryNodeKind.VerbTag }
+            .filter { it.kind in semanticCueKinds }
             .mapNotNull { node ->
                 val match = tagAddressScore(query.tags, node)
                 if (match <= 0f) return@mapNotNull null
@@ -115,6 +116,12 @@ class GraphMemoryTool(
             }
     }
 }
+
+private val semanticCueKinds = setOf(
+    MemoryNodeKind.NounTag,
+    MemoryNodeKind.VerbTag,
+    MemoryNodeKind.Category,
+)
 
 private fun MemorySnapshot.recallFromSeeds(
     query: MemoryQuery,
@@ -201,7 +208,7 @@ private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {
     MemoryResolution.Category -> setOf(MemoryNodeKind.Category)
     MemoryResolution.Summary -> setOf(MemoryNodeKind.Summary)
     MemoryResolution.Phrase -> setOf(MemoryNodeKind.Phrase)
-    MemoryResolution.Tag -> setOf(MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag)
+    MemoryResolution.Tag -> semanticCueKinds
     MemoryResolution.Context -> setOf(MemoryNodeKind.Context)
 }
 
