@@ -88,7 +88,7 @@ class MemoryLayerTest {
     }
 
     @Test
-    fun grepChoosesResolutionAndReturnsAssociativeConflicts() = runBlocking {
+    fun gripChoosesResolutionAndReturnsRequestedAssociativeConflicts() = runBlocking {
         val episode = MemoryEpisode(
             id = MemoryEpisodeId("episode"),
             sourceSessionId = "session",
@@ -151,10 +151,11 @@ class MemoryLayerTest {
         )
         val tool = GraphMemoryTool(store)
 
-        val recalled = tool.grep(
+        val recalled = tool.grip(
             MemoryQuery(
                 text = "production deployment workflow",
                 resolution = MemoryResolution.Summary,
+                includeConflicts = true,
                 projectId = "project",
             ),
         )
@@ -167,7 +168,7 @@ class MemoryLayerTest {
     }
 
     @Test
-    fun grepPrefersTheClosestOrchestrationHierarchy() = runBlocking {
+    fun gripPrefersTheClosestOrchestrationHierarchy() = runBlocking {
         val localEpisode = MemoryEpisode(
             id = MemoryEpisodeId("local-episode"),
             sourceSessionId = "local-session",
@@ -223,7 +224,7 @@ class MemoryLayerTest {
             ),
         )
 
-        val recalled = GraphMemoryTool(store).grep(
+        val recalled = GraphMemoryTool(store).grip(
             MemoryQuery(
                 text = "deployment workflow release pipeline",
                 resolution = MemoryResolution.Summary,
