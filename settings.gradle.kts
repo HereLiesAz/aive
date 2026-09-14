@@ -6,11 +6,6 @@ pluginManagement {
     }
 }
 
-// Override or align ANDROID_SDK_ROOT system property with ANDROID_HOME to prevent
-// SDK location conflict errors between ANDROID_HOME and ANDROID_SDK_ROOT environment variables.
-val androidHome = System.getenv("ANDROID_HOME") ?: "C:\\Users\\azrie\\AppData\\Local\\Android\\Sdk"
-System.setProperty("ANDROID_SDK_ROOT", androidHome)
-
 val useLocalH2g2 = providers.gradleProperty("haive.useLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
