@@ -63,7 +63,7 @@ class MemoryBankingAttentionTest {
     }
 
     @Test
-    fun ambientGripDefaultsToTagsAndCoTRTagsCanDrillDown() = runBlocking {
+    fun ambientGripDefaultsToEntityActionAndCategorySubjectTagsAndCoTRTagsCanDrillDown() = runBlocking {
         val episode = MemoryEpisode(
             id = MemoryEpisodeId("episode"),
             sourceSessionId = "session",
@@ -93,13 +93,20 @@ class MemoryBankingAttentionTest {
             sourceEpisodeIds = setOf(episode.id),
             createdAtEpochMillis = 2L,
         )
+        val subjectTag = MemoryNode(
+            id = MemoryNodeId("verification-subject"),
+            kind = MemoryNodeKind.Category,
+            text = "build verification",
+            sourceEpisodeIds = setOf(episode.id),
+            createdAtEpochMillis = 3L,
+        )
         val store = InMemoryMemoryStore()
         assertTrue(
             store.commit(
                 0,
                 MemoryStoreMutation(
                     episodesToAdd = listOf(episode),
-                    nodesToAdd = listOf(context, wasmTag, testTag),
+                    nodesToAdd = listOf(context, wasmTag, testTag, subjectTag),
                     edgesToAdd = listOf(
                         MemoryEdge(
                             MemoryEdgeId("index-wasm"),
@@ -115,6 +122,13 @@ class MemoryBankingAttentionTest {
                             MemoryRelationKind.Indexes,
                             createdAtEpochMillis = 2L,
                         ),
+                        MemoryEdge(
+                            MemoryEdgeId("associate-subject"),
+                            subjectTag.id,
+                            context.id,
+                            MemoryRelationKind.AssociatedWith,
+                            createdAtEpochMillis = 3L,
+                        ),
                     ),
                 ),
             ),
@@ -123,18 +137,31 @@ class MemoryBankingAttentionTest {
 
         val ambient = tool.grip(MemoryQuery(text = "Web Wasm", projectId = "project"))
         assertTrue(ambient.hits.isNotEmpty())
-        assertTrue(ambient.hits.all { it.node.kind == MemoryNodeKind.NounTag || it.node.kind == MemoryNodeKind.VerbTag })
+        assertTrue(ambient.hits.all {
+            it.node.kind == MemoryNodeKind.NounTag ||
+                it.node.kind == MemoryNodeKind.VerbTag ||
+                it.node.kind == MemoryNodeKind.Category
+        })
         assertEquals(wasmTag.id, ambient.hits.first().node.id)
 
-        val drilled = tool.grip(
+        val drilledFromEntityAndAction = tool.grip(
             MemoryTagQuery(
                 tags = listOf("Web Wasm", "test"),
                 resolution = MemoryResolution.Context,
                 scope = MemoryBankScope(projectId = "project"),
             ),
         )
-        assertTrue(drilled.hits.any { it.node.id == context.id })
-        assertTrue(drilled.hits.all { it.conflicts.isEmpty() })
+        assertTrue(drilledFromEntityAndAction.hits.any { it.node.id == context.id })
+        assertTrue(drilledFromEntityAndAction.hits.all { it.conflicts.isEmpty() })
+
+        val drilledFromSubject = tool.grip(
+            MemoryTagQuery(
+                tags = listOf("build verification"),
+                resolution = MemoryResolution.Context,
+                scope = MemoryBankScope(projectId = "project"),
+            ),
+        )
+        assertTrue(drilledFromSubject.hits.any { it.node.id == context.id })
     }
 
     @Test
