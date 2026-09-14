@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          ref: 8debce4d58d9389a909cffe7d1339206830a2c4e
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
@@ -242,7 +242,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          ref: 8debce4d58d9389a909cffe7d1339206830a2c4e
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
