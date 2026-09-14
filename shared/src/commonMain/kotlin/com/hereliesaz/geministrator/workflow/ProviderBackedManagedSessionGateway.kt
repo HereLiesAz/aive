@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.memory.MemorySessionObserver
+import com.hereliesaz.geministrator.memory.NoOpMemorySessionObserver
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
@@ -17,6 +19,7 @@ import kotlinx.coroutines.sync.withLock
 class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
     private val scope: CoroutineScope,
+    private val memoryObserver: MemorySessionObserver = NoOpMemorySessionObserver,
 ) : ManagedSessionGateway {
 
     private data class SessionSnapshot(
@@ -44,6 +47,7 @@ class ProviderBackedManagedSessionGateway(
                 providerId = provider.id,
                 providerRunId = run.providerRunId,
             )
+            recordMemory { memoryObserver.onSessionStarted(handle, request.taskRequest) }
             registerAndObserve(
                 handle = handle,
                 initialStatus = if (request.taskRequest.requirePlanApproval) {
@@ -104,6 +108,7 @@ class ProviderBackedManagedSessionGateway(
                     val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
                 }
+                recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
             }
             result
         }
@@ -146,11 +151,17 @@ class ProviderBackedManagedSessionGateway(
                 } catch (_: Exception) {
                     consecutiveFailures++
                     if (consecutiveFailures >= MAX_OBSERVER_FAILURES) {
-                        mutex.withLock {
-                            val current = snapshots[handle] ?: return@withLock
-                            if (current.status != ManagedSessionStatus.Completed) {
+                        val failed = mutex.withLock {
+                            val current = snapshots[handle] ?: return@withLock false
+                            if (current.status != ManagedSessionStatus.Completed && !current.status.isTerminal()) {
                                 snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
+                                true
+                            } else {
+                                false
                             }
+                        }
+                        if (failed) {
+                            recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
                         return@launch
                     }
@@ -209,6 +220,17 @@ class ProviderBackedManagedSessionGateway(
         )
     }
 
+    private suspend fun recordMemory(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Throwable) {
+            // Memory is a separate subsystem. A persistence/consolidation problem must not crash
+            // or alter the state of the live provider session.
+        }
+    }
+
     private fun Throwable.providerFailureMessage(fallbackMessage: String): String {
         var current: Throwable? = this
         while (current != null) {
@@ -223,6 +245,8 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         event: AgentEvent,
     ) {
+        var changed = false
+        var terminalStatus: ManagedSessionStatus? = null
         mutex.withLock {
             val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
             if (current.status.isTerminal()) return@withLock
@@ -265,6 +289,15 @@ class ProviderBackedManagedSessionGateway(
                 )
             }
             snapshots[handle] = next
+            changed = true
+            if (!current.status.isTerminal() && next.status.isTerminal()) {
+                terminalStatus = next.status
+            }
+        }
+        if (!changed) return
+        recordMemory { memoryObserver.onSessionEvent(handle, event) }
+        terminalStatus?.let { status ->
+            recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }
     }
 

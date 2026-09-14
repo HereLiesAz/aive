@@ -5,10 +5,15 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
 import kotlinx.coroutines.flow.Flow
 
 enum class PromptCacheMode {
@@ -42,6 +47,19 @@ data class PromptContext(
     val cacheNamespace: String? = null,
 )
 
+/**
+ * Structural coordinates are metadata for orchestration services such as memory. They are not
+ * provider instructions and should not be rendered into a model prompt unless a provider has a
+ * specific reason to expose them.
+ */
+data class AgentOrchestrationContext(
+    val projectId: ProjectId? = null,
+    val workflowRunId: WorkflowRunId? = null,
+    val workflowDefinitionId: WorkflowDefinitionId? = null,
+    val taskDefinitionId: TaskDefinitionId? = null,
+    val roleId: RoleDefinitionId? = null,
+)
+
 data class AgentTaskRequest(
     val taskRunId: TaskRunId,
     val objective: String,
@@ -52,6 +70,7 @@ data class AgentTaskRequest(
     val isolationHint: IsolationHint = IsolationHint.ProviderDefault,
     val requirePlanApproval: Boolean = false,
     val promptContext: PromptContext = PromptContext(),
+    val orchestrationContext: AgentOrchestrationContext = AgentOrchestrationContext(),
 )
 
 enum class IsolationHint {
