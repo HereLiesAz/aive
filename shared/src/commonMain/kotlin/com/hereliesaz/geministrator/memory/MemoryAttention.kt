@@ -71,7 +71,21 @@ class MemoryAttentionGate(
     /** Persistently changes the agent's normal ADD level. */
     fun setBaseline(state: MemoryAttentionState, level: Float): MemoryAttentionState {
         require(level in 0f..1f)
-        val effective = if (state.effectiveLevel > level) level else state.effectiveLevel
+
+        // A state already resting at baseline is not under temporary suppression, so a persistent
+        // baseline change should take effect immediately in either direction.
+        if (state.effectiveLevel == state.baselineLevel) {
+            return state.copy(
+                baselineLevel = level,
+                effectiveLevel = level,
+                suppressedFromLevel = level,
+                tokensSinceSuppression = 0,
+            )
+        }
+
+        // While focus suppression is active, changing the normal baseline must not unexpectedly
+        // raise current attention. Lower baselines still clamp the effective level immediately.
+        val effective = minOf(state.effectiveLevel, level)
         return state.copy(
             baselineLevel = level,
             effectiveLevel = effective,
@@ -100,16 +114,13 @@ class MemoryAttentionGate(
     fun consumeTokens(state: MemoryAttentionState, tokenCount: Int): MemoryAttentionState {
         require(tokenCount >= 0)
         if (tokenCount == 0) return state
-        val used = state.tokensSinceSuppression + tokenCount.toLong()
+        val increment = tokenCount.toLong()
+        val used = saturatingAdd(state.tokensSinceSuppression, increment)
         val progress = (used.toDouble() / policy.recoveryWindowTokens.toDouble())
             .coerceIn(0.0, 1.0)
             .toFloat()
         val recovered = lerp(state.suppressedFromLevel, state.baselineLevel, progress)
-        val cueTokens = if (state.tokensSinceCue == Long.MAX_VALUE) {
-            Long.MAX_VALUE
-        } else {
-            (state.tokensSinceCue + tokenCount.toLong()).coerceAtMost(Long.MAX_VALUE)
-        }
+        val cueTokens = saturatingAdd(state.tokensSinceCue, increment)
         return state.copy(
             effectiveLevel = recovered,
             tokensSinceSuppression = used,
@@ -149,6 +160,12 @@ class MemoryAttentionGate(
 
     fun markCueSurfaced(state: MemoryAttentionState): MemoryAttentionState =
         state.copy(tokensSinceCue = 0)
+}
+
+private fun saturatingAdd(current: Long, increment: Long): Long {
+    require(current >= 0)
+    require(increment >= 0)
+    return if (current > Long.MAX_VALUE - increment) Long.MAX_VALUE else current + increment
 }
 
 private fun lerp(start: Float, end: Float, fraction: Float): Float =
