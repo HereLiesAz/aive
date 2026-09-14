@@ -88,8 +88,20 @@ class MemoryMicroAgentsTest {
         )
 
         assertEquals(5, constrained.maxPacketItems)
-        assertEquals(2_048, constrained.maxPacketChars)
+        assertEquals(1_024, constrained.maxPacketChars)
         assertEquals(7, constrained.maxMutationsPerPacket)
+    }
+
+    @Test
+    fun localModelDefaultsCoverEveryHaivePlatform() {
+        val spec = MemoryMicroAgentModelSpec("portable-memory-model")
+        assertEquals(
+            MemoryMicroAgentPlatform.entries.toSet(),
+            spec.deployment.platforms,
+        )
+        assertTrue(spec.deployment.supportsAllHaivePlatforms())
+        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Web).isNotEmpty())
+        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Android).isNotEmpty())
     }
 
     private class RecordingMicroAgent(
