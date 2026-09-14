@@ -18,6 +18,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 interface TaskExecutorIntegration {
     fun supports(executor: TaskExecutor): Boolean
 
+    fun supports(executor: TaskExecutor, project: Project): Boolean = supports(executor)
+
     suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution
 
     suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution
@@ -65,7 +67,13 @@ class TaskExecutorIntegrationRegistry(
     fun integrationFor(executor: TaskExecutor): TaskExecutorIntegration? =
         integrations.firstOrNull { it.supports(executor) }
 
+    fun integrationFor(executor: TaskExecutor, project: Project): TaskExecutorIntegration? =
+        integrations.firstOrNull { it.supports(executor, project) }
+
     fun isAvailable(executor: TaskExecutor): Boolean = integrationFor(executor) != null
+
+    fun isAvailable(executor: TaskExecutor, project: Project): Boolean =
+        integrationFor(executor, project) != null
 
     companion object {
         val Empty = TaskExecutorIntegrationRegistry()
