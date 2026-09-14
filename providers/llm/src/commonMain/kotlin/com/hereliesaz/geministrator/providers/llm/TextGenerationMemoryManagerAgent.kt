@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.memory.MemoryChunkId
 import com.hereliesaz.geministrator.memory.MemoryConsolidationStage
 import com.hereliesaz.geministrator.memory.MemoryEdge
 import com.hereliesaz.geministrator.memory.MemoryEdgeId
+import com.hereliesaz.geministrator.memory.MemoryEpisodeId
 import com.hereliesaz.geministrator.memory.MemoryManagerAgent
 import com.hereliesaz.geministrator.memory.MemoryMutationBatch
 import com.hereliesaz.geministrator.memory.MemoryNode
@@ -12,6 +13,7 @@ import com.hereliesaz.geministrator.memory.MemoryNodeKind
 import com.hereliesaz.geministrator.memory.MemoryRelationKind
 import com.hereliesaz.geministrator.memory.MemorySection
 import com.hereliesaz.geministrator.memory.MemorySectionId
+import com.hereliesaz.geministrator.memory.MemoryWorkItem
 import com.hereliesaz.geministrator.memory.MemoryWorkPacket
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -81,48 +83,58 @@ private fun MemoryManagerProposal.toMutationBatch(
     require(nodes.map(NodeDraft::key).all(String::isNotBlank)) { "Memory node proposal keys must not be blank" }
     require(nodes.map(NodeDraft::key).distinct().size == nodes.size) { "Memory node proposal keys must be unique" }
 
-    val packetIds = (packet.items + packet.neighborhood).mapTo(hashSetOf()) { it.id }
+    val workItems = (packet.items + packet.neighborhood).associateBy(MemoryWorkItem::id)
+    val packetIds = workItems.keys
     val sourceOrdinals = packet.items.associate { item ->
         item.id to (item.metadata["ordinal"]?.toIntOrNull() ?: 0)
     }
 
-    val sectionsWithDrafts = sections.mapIndexed { index, draft ->
+    val builtSections = sections.mapIndexed { index, draft ->
         require(draft.sourceIds.all { it in packetIds }) {
             "Memory section references content outside its work packet"
         }
         val baseOrdinal = draft.sourceIds.minOfOrNull { sourceOrdinals[it] ?: 0 } ?: 0
-        val section = MemorySection(
-            id = MemorySectionId("${packet.queueId.value}:${packet.stage.name}:section:$index"),
+        MemorySection(
+            id = MemorySectionId("${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:section:$index"),
             episodeId = packet.episodeId,
             sourceChunkIds = draft.sourceIds.mapTo(linkedSetOf(), ::MemoryChunkId),
             ordinal = baseOrdinal * 1000 + index,
             text = draft.text.trim(),
             metadata = draft.metadata,
         )
-        draft to section
     }
 
     val nodeIdsByKey = nodes.mapIndexed { index, draft ->
-        draft.key to MemoryNodeId("${packet.queueId.value}:${packet.stage.name}:node:$index:${draft.key.safeIdPart()}")
+        draft.key to MemoryNodeId(
+            "${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:node:$index:${draft.key.safeIdPart()}",
+        )
     }.toMap()
 
     val builtNodes = nodes.map { draft ->
-        require(draft.sourceIds.all { it in packetIds || it in nodeIdsByKey }) {
+        require(draft.sourceIds.isNotEmpty()) { "Memory node ${draft.key} requires sourceIds" }
+        require(draft.sourceIds.all { it in packetIds }) {
             "Memory node ${draft.key} references content outside its work packet"
         }
         val kind = runCatching { MemoryNodeKind.valueOf(draft.kind) }
             .getOrElse { error("Unknown memory node kind ${draft.kind}") }
-        val sourceSections = if (packet.stage == MemoryConsolidationStage.Salience) {
-            draft.sourceIds.filter { it in packetIds }.mapTo(linkedSetOf(), ::MemorySectionId)
-        } else {
-            emptySet()
+
+        val inheritedEpisodes = draft.sourceIds
+            .flatMap { sourceId -> workItems[sourceId]?.sourceEpisodeIds().orEmpty() }
+            .toMutableSet()
+            .apply { add(packet.episodeId) }
+        val inheritedSections = draft.sourceIds
+            .flatMap { sourceId -> workItems[sourceId]?.sourceSectionIds().orEmpty() }
+            .toMutableSet()
+        if (packet.stage == MemoryConsolidationStage.Salience) {
+            draft.sourceIds.mapTo(inheritedSections, ::MemorySectionId)
         }
+
         MemoryNode(
             id = requireNotNull(nodeIdsByKey[draft.key]),
             kind = kind,
             text = draft.text.trim(),
-            sourceEpisodeIds = setOf(packet.episodeId),
-            sourceSectionIds = sourceSections,
+            sourceEpisodeIds = inheritedEpisodes,
+            sourceSectionIds = inheritedSections,
             salience = draft.salience.coerceIn(0f, 1f),
             confidence = draft.confidence.coerceIn(0f, 1f),
             createdAtEpochMillis = nowEpochMillis,
@@ -130,7 +142,7 @@ private fun MemoryManagerProposal.toMutationBatch(
         )
     }
 
-    val knownNodeIds = (packet.items + packet.neighborhood)
+    val knownNodeIds = workItems.values
         .filter { it.kind.startsWith("node:") }
         .mapTo(hashSetOf()) { it.id }
     val builtEdges = links.mapIndexed { index, link ->
@@ -145,7 +157,7 @@ private fun MemoryManagerProposal.toMutationBatch(
         val relation = runCatching { MemoryRelationKind.valueOf(link.relation) }
             .getOrElse { error("Unknown memory relation ${link.relation}") }
         MemoryEdge(
-            id = MemoryEdgeId("${packet.queueId.value}:${packet.stage.name}:edge:$index"),
+            id = MemoryEdgeId("${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:edge:$index"),
             from = from,
             to = to,
             relation = relation,
@@ -156,7 +168,7 @@ private fun MemoryManagerProposal.toMutationBatch(
     }
 
     return MemoryMutationBatch(
-        sectionsToAdd = sectionsWithDrafts.map { it.second },
+        sectionsToAdd = builtSections,
         nodesToAdd = builtNodes,
         edgesToAdd = builtEdges,
     )
@@ -166,6 +178,7 @@ private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
     appendLine("You are Haive's Memory Manager. Perform exactly one bounded memory-maintenance task.")
     appendLine("You are not solving the user's task. You may only curate the supplied memory packet.")
     appendLine("STAGE: ${stage.name}")
+    appendLine("PACKET: $packetKey")
     appendLine("INSTRUCTION: $instruction")
     appendLine()
     appendLine("INPUT ITEMS:")
@@ -188,9 +201,28 @@ private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
     appendLine(" \"nodes\":[{\"key\":\"local-key\",\"kind\":\"Context|NounTag|VerbTag|Phrase|Summary|Category\",\"text\":\"...\",\"sourceIds\":[\"input-id\"],\"salience\":0.0,\"confidence\":1.0,\"metadata\":{}}],")
     appendLine(" \"links\":[{\"from\":\"local-key-or-node-id\",\"to\":\"local-key-or-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|ConflictsWith|ResolvesConflict|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
     appendLine("Use empty arrays for mutation types that are irrelevant to this stage.")
+    appendLine("Node sourceIds must be IDs already present in this packet; local keys are only for links.")
     appendLine("Never reference an ID that is not in this packet unless it is a local node key you create in the same response.")
+    if (stage == MemoryConsolidationStage.Condensation) {
+        appendLine("Create exactly one node derived from ALL input node IDs.")
+        appendLine("For every input node, emit both CondensedFrom and Supersedes links from the new node to that source.")
+    }
     appendLine("Preserve disagreements with ConflictsWith; do not erase one memory merely because another conflicts with it.")
 }
+
+private fun MemoryWorkItem.sourceEpisodeIds(): List<MemoryEpisodeId> = metadata["sourceEpisodeIds"]
+    .orEmpty()
+    .split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
+    .map(::MemoryEpisodeId)
+
+private fun MemoryWorkItem.sourceSectionIds(): List<MemorySectionId> = metadata["sourceSectionIds"]
+    .orEmpty()
+    .split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
+    .map(::MemorySectionId)
 
 private fun String.extractJsonObject(): String {
     val trimmed = trim()
