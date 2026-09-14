@@ -69,6 +69,11 @@ data class MemoryMicroAgentInferenceResult(
 /**
  * Routes a bounded consolidation packet to the smallest appropriate specialist(s). Tags are
  * deliberately split between noun and verb models and merged only after both bounded jobs return.
+ *
+ * Noun/verb are semantic indexing roles, not ordinary English POS tagging. Code is first-class:
+ * a callable symbol may be indexed as a noun/entity while its action stem is independently indexed
+ * as a verb/action. Deterministic code hints reduce syntax-discovery work for the small models but
+ * remain advisory; the micro-agent owns the semantic decision.
  */
 class MemoryMicroAgentRouter(
     agents: Collection<MemoryMicroAgent>,
@@ -86,10 +91,13 @@ class MemoryMicroAgentRouter(
         val roles = rolesFor(packet.stage)
         val batches = roles.map { role ->
             val agent = requireNotNull(agentsByRole[role]) { "No memory micro-agent registered for $role" }
-            enforceInputBudget(agent, packet)
-            val batch = agent.process(packet.withRoleInstruction(role))
+            val routedPacket = packet
+                .withCodeSemanticHints(role)
+                .withRoleInstruction(role)
+            enforceInputBudget(agent, routedPacket)
+            val batch = agent.process(routedPacket)
             enforceOutputBudget(agent, batch)
-            validateRoleOutput(role, packet, batch)
+            validateRoleOutput(role, routedPacket, batch)
             batch
         }
         return mergeBatches(batches)
@@ -112,10 +120,11 @@ class MemoryMicroAgentRouter(
         val agent = requireNotNull(agentsByRole[MemoryMicroAgentRole.ConflictResolver]) {
             "No conflict-resolution micro-agent is registered"
         }
-        enforceInputBudget(agent, packet)
-        return agent.process(packet.withRoleInstruction(MemoryMicroAgentRole.ConflictResolver)).also { batch ->
+        val routedPacket = packet.withRoleInstruction(MemoryMicroAgentRole.ConflictResolver)
+        enforceInputBudget(agent, routedPacket)
+        return agent.process(routedPacket).also { batch ->
             enforceOutputBudget(agent, batch)
-            validateRoleOutput(MemoryMicroAgentRole.ConflictResolver, packet, batch)
+            validateRoleOutput(MemoryMicroAgentRole.ConflictResolver, routedPacket, batch)
         }
     }
 
@@ -252,7 +261,25 @@ class MemoryMicroAgentRouter(
     }
 
     private fun MemoryWorkPacket.withRoleInstruction(role: MemoryMicroAgentRole): MemoryWorkPacket = copy(
-        instruction = "MICRO-AGENT ROLE: ${role.name}. Perform only this role.\n$instruction",
+        instruction = buildString {
+            appendLine("MICRO-AGENT ROLE: ${role.name}. Perform only this role.")
+            when (role) {
+                MemoryMicroAgentRole.NounTagger -> appendLine(
+                    "NOUN means a semantic entity/reference, not merely an English noun. In code include relevant " +
+                        "symbols, callable identities, types, files, modules, APIs, endpoints, data structures, " +
+                        "configuration keys, branches, and other artifacts. Metadata '$CODE_NOUN_HINTS' contains " +
+                        "advisory code candidates; keep, normalize, split, ignore, or supplement them as semantics require.",
+                )
+                MemoryMicroAgentRole.VerbTagger -> appendLine(
+                    "VERB means a semantic action/transformation, not merely an English verb. In code include calls, " +
+                        "CRUD operations, parsing, validation, serialization, data-flow operations, build/test/deploy, " +
+                        "Git/shell actions, HTTP methods, and actions implied by identifiers. Metadata '$CODE_VERB_HINTS' " +
+                        "contains advisory candidates. A callable may simultaneously exist as a noun entity and imply a verb action.",
+                )
+                else -> Unit
+            }
+            append(instruction)
+        },
     )
 
     companion object {
