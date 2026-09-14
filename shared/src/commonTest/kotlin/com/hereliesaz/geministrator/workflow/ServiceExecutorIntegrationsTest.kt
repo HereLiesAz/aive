@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -28,12 +31,15 @@ class ServiceExecutorIntegrationsTest {
         val started = integration.dispatch(context)
         assertEquals("open-pull-request", client.operation)
         assertEquals("repo-1", started.externalRunId)
+        assertEquals(context.taskRun.id, started.artifacts.single().taskRunId)
 
-        val completed = integration.reconcile(
-            context.copy(taskRun = context.taskRun.copy(status = TaskRunStatus.Running, externalRunId = "repo-1")),
+        val runningContext = context.copy(
+            taskRun = context.taskRun.copy(status = TaskRunStatus.Running, externalRunId = "repo-1"),
         )
+        val completed = integration.reconcile(runningContext)
         assertEquals(TaskRunStatus.Completed, completed.status)
         assertEquals("repo-1", client.runId)
+        assertEquals(runningContext.taskRun.id, completed.artifacts.single().taskRunId)
     }
 
     @Test
@@ -98,14 +104,33 @@ class ServiceExecutorIntegrationsTest {
 private class RecordingRepositoryClient : RepositoryOperationClient {
     var operation: String? = null
     var runId: String? = null
+
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         this.operation = operation
-        return ExternalExecutionRun("repo-1", ExternalExecutionStatus.Running)
+        return ExternalExecutionRun(
+            id = "repo-1",
+            status = ExternalExecutionStatus.Running,
+            artifacts = listOf(repositoryArtifact()),
+        )
     }
+
     override suspend fun getRun(project: Project, runId: String): ExternalExecutionRun {
         this.runId = runId
-        return ExternalExecutionRun(runId, ExternalExecutionStatus.Completed)
+        return ExternalExecutionRun(
+            id = runId,
+            status = ExternalExecutionStatus.Completed,
+            artifacts = listOf(repositoryArtifact()),
+        )
     }
+
+    private fun repositoryArtifact() = ArtifactRef(
+        id = ArtifactId("repo-artifact"),
+        kind = ArtifactKind.CommandOutput,
+        taskRunId = TaskRunId("external-placeholder"),
+        label = "Repository operation",
+        textContent = "ok",
+        createdAtEpochMillis = 1L,
+    )
 }
 
 private class RecordingExternalServiceClient : ExternalServiceClient {
