@@ -44,7 +44,7 @@ kotlin {
             implementation(compose.animation)
             implementation(compose.material3)
             implementation(compose.ui)
-            implementation("com.github.HereLiesAz:conveyance-h2g2:8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a")
+            implementation("com.github.HereLiesAz:conveyance-h2g2:8debce4d58d9389a909cffe7d1339206830a2c4e")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
