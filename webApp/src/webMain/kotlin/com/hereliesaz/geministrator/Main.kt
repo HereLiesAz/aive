@@ -32,7 +32,6 @@ private const val GITHUB_TOKEN_STORAGE_KEY = "haive.githubToken"
 fun main() {
     ComposeViewport(viewportContainerId = "webApp") {
         var credentials by remember { mutableStateOf(readWebProviderCredentials()) }
-        var setupComplete by remember { mutableStateOf(credentials.isNotEmpty()) }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
         val providers = remember(credentials) { configuredWebProviders(credentials) }
         val githubToken = window.localStorage.getItem(GITHUB_TOKEN_STORAGE_KEY)
@@ -41,28 +40,25 @@ fun main() {
         }
 
         val providerId = configuringProviderId
-        when {
-            providerId != null -> ProviderCredentialSetup(
+        if (providerId != null) {
+            ProviderCredentialSetup(
                 providerId = providerId,
                 onSave = { key ->
                     window.localStorage.setItem(providerStorageKey(providerId), key)
                     credentials = readWebProviderCredentials()
                     configuringProviderId = null
-                    setupComplete = true
                 },
                 onCancel = { configuringProviderId = null },
             )
-
-            !setupComplete -> InitialProviderSetup(
-                configuredProviderIds = credentials.keys,
-                onConfigure = { configuringProviderId = it },
-                onContinue = { setupComplete = true },
-            )
-
-            else -> App(
+        } else {
+            App(
                 providers = providers,
                 executorIntegrations = executorIntegrations,
                 onReconfigureProvider = { configuringProviderId = it },
+                onDisconnectProvider = { disconnectedProviderId ->
+                    window.localStorage.removeItem(providerStorageKey(disconnectedProviderId))
+                    credentials = readWebProviderCredentials()
+                },
             )
         }
     }

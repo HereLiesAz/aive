@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.App
-import com.hereliesaz.geministrator.InitialProviderSetup
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -29,34 +28,30 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var credentials by remember { mutableStateOf(initialCredentials) }
-            var setupComplete by remember { mutableStateOf(initialCredentials.isNotEmpty()) }
             var configuringProviderId by remember { mutableStateOf<String?>(null) }
             val providers = remember(credentials) { configuredAndroidProviders(credentials) }
 
             val providerId = configuringProviderId
-            when {
-                providerId != null -> ProviderCredentialSetup(
+            if (providerId != null) {
+                ProviderCredentialSetup(
                     providerId = providerId,
                     onSave = { key ->
                         credentialStore.write(providerId, key)
                         credentials = credentialStore.readAll()
                         configuringProviderId = null
-                        setupComplete = true
                     },
                     onCancel = {
                         configuringProviderId = null
                     },
                 )
-
-                !setupComplete -> InitialProviderSetup(
-                    configuredProviderIds = credentials.keys,
-                    onConfigure = { configuringProviderId = it },
-                    onContinue = { setupComplete = true },
-                )
-
-                else -> App(
+            } else {
+                App(
                     providers = providers,
                     onReconfigureProvider = { configuringProviderId = it },
+                    onDisconnectProvider = { disconnectedProviderId ->
+                        credentialStore.clear(disconnectedProviderId)
+                        credentials = credentialStore.readAll()
+                    },
                 )
             }
         }

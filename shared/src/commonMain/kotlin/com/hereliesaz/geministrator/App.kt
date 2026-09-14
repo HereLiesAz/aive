@@ -65,7 +65,7 @@ fun App(
     }
 
     GeministratorTheme {
-        var destination by remember { mutableStateOf(ControlRoomDestination.Overview) }
+        var destination by remember { mutableStateOf(ControlRoomDestination.Settings) }
         var selectedTaskId by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(runtimeState) {
