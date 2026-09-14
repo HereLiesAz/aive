@@ -38,11 +38,18 @@ kotlin {
 
         val webMain by creating {
             dependsOn(commonMain.get())
+        }
+        jsMain.get().apply {
+            dependsOn(webMain)
             dependencies {
                 implementation(libs.ktor.client.js)
             }
         }
-        jsMain.get().dependsOn(webMain)
-        wasmJsMain.get().dependsOn(webMain)
+        wasmJsMain.get().apply {
+            dependsOn(webMain)
+            dependencies {
+                implementation(libs.ktor.client.js)
+            }
+        }
     }
 }
