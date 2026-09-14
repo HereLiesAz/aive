@@ -26,14 +26,22 @@ class GraphMemoryTool(
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
         val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
+        val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
         val adjacency = snapshot.adjacency()
         val targetKinds = query.resolution.nodeKinds()
+        val activeIds = active.mapTo(hashSetOf()) { it.id }
         val scoredSeeds = active
             .mapNotNull { node ->
-                val score = lexicalScore(query.text, node)
-                score.takeIf { it > 0f }?.let { node to it }
+                val lexical = lexicalScore(query.text, node)
+                if (lexical <= 0f) return@mapNotNull null
+                val score = (lexical + scopeAffinity(query, node, episodesById)).coerceIn(0f, 1f)
+                node to score
             }
-            .sortedByDescending { (_, score) -> score }
+            .sortedWith(
+                compareByDescending<Pair<MemoryNode, Float>> { it.second }
+                    .thenByDescending { it.first.salience }
+                    .thenByDescending { it.first.confidence },
+            )
             .take(max(query.maxResults * 4, 24))
 
         val projected = linkedMapOf<MemoryNodeId, Float>()
@@ -46,10 +54,13 @@ class GraphMemoryTool(
                 targetKinds = targetKinds,
                 nodesById = nodesById,
                 adjacency = adjacency,
-                activeIds = active.mapTo(hashSetOf()) { it.id },
+                activeIds = activeIds,
                 maxDepth = 5,
             ).forEach { (nodeId, distance) ->
-                val projectedScore = score * (1f / (1f + distance * 0.35f))
+                val targetNode = nodesById[nodeId] ?: return@forEach
+                val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
+                val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
+                    .coerceIn(0f, 1f)
                 projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
             }
         }
@@ -145,6 +156,49 @@ private fun MemorySnapshot.activeNodes(projectId: String?): List<MemoryNode> {
         node.id !in superseded &&
             (projectEpisodes == null || node.sourceEpisodeIds.isEmpty() || node.sourceEpisodeIds.any { it in projectEpisodes })
     }
+}
+
+private fun scopeAffinity(
+    query: MemoryQuery,
+    node: MemoryNode,
+    episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
+): Float {
+    if (
+        query.projectId == null &&
+        query.workflowRunId == null &&
+        query.workflowDefinitionId == null &&
+        query.taskRunId == null &&
+        query.taskDefinitionId == null &&
+        query.roleId == null
+    ) {
+        return 0f
+    }
+
+    return node.sourceEpisodeIds
+        .asSequence()
+        .mapNotNull(episodesById::get)
+        .maxOfOrNull { episode ->
+            var score = 0f
+            if (query.projectId != null && query.projectId == episode.projectId) score += 0.05f
+            if (query.roleId != null && query.roleId == episode.roleId) score += 0.08f
+            if (
+                query.workflowDefinitionId != null &&
+                query.workflowDefinitionId == episode.workflowDefinitionId
+            ) {
+                score += 0.12f
+            }
+            if (query.workflowRunId != null && query.workflowRunId == episode.workflowRunId) score += 0.16f
+            if (
+                query.taskDefinitionId != null &&
+                query.taskDefinitionId == episode.taskDefinitionId
+            ) {
+                score += 0.18f
+            }
+            if (query.taskRunId != null && query.taskRunId == episode.taskRunId) score += 0.25f
+            score
+        }
+        ?.coerceAtMost(0.45f)
+        ?: 0f
 }
 
 private fun projectToKinds(
