@@ -1,0 +1,236 @@
+package com.hereliesaz.geministrator.memory
+
+import kotlin.math.max
+
+/**
+ * Agent-facing memory surface. Agents query this service; they do not read persistence directly.
+ * A query chooses its desired semantic resolution and may then expand a hit up or down the graph.
+ */
+interface MemoryTool {
+    suspend fun grep(query: MemoryQuery): MemoryRecallBundle
+
+    suspend fun expand(
+        nodeId: MemoryNodeId,
+        resolution: MemoryResolution,
+        maxResults: Int = 12,
+        includeConflicts: Boolean = true,
+    ): List<MemoryRecallHit>
+}
+
+class GraphMemoryTool(
+    private val store: MemoryStore,
+) : MemoryTool {
+    override suspend fun grep(query: MemoryQuery): MemoryRecallBundle {
+        val snapshot = store.read()
+        val active = snapshot.activeNodes(query.projectId)
+        if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
+
+        val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
+        val adjacency = snapshot.adjacency()
+        val targetKinds = query.resolution.nodeKinds()
+        val scoredSeeds = active
+            .mapNotNull { node ->
+                val score = lexicalScore(query.text, node)
+                score.takeIf { it > 0f }?.let { node to it }
+            }
+            .sortedByDescending { (_, score) -> score }
+            .take(max(query.maxResults * 4, 24))
+
+        val projected = linkedMapOf<MemoryNodeId, Float>()
+        scoredSeeds.forEach { (seed, score) ->
+            if (seed.kind in targetKinds) {
+                projected[seed.id] = max(projected[seed.id] ?: 0f, score)
+            }
+            projectToKinds(
+                start = seed.id,
+                targetKinds = targetKinds,
+                nodesById = nodesById,
+                adjacency = adjacency,
+                activeIds = active.mapTo(hashSetOf()) { it.id },
+                maxDepth = 5,
+            ).forEach { (nodeId, distance) ->
+                val projectedScore = score * (1f / (1f + distance * 0.35f))
+                projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
+            }
+        }
+
+        val hits = projected.entries
+            .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
+            .sortedWith(
+                compareByDescending<Pair<MemoryNode, Float>> { it.second }
+                    .thenByDescending { it.first.salience }
+                    .thenByDescending { it.first.confidence },
+            )
+            .take(query.maxResults)
+            .map { (node, score) ->
+                MemoryRecallHit(
+                    node = node,
+                    score = score.coerceIn(0f, 1f),
+                    conflicts = if (query.includeConflicts) {
+                        snapshot.conflictsFor(node.id, nodesById)
+                    } else {
+                        emptyList()
+                    },
+                )
+            }
+
+        return MemoryRecallBundle(query, hits)
+    }
+
+    override suspend fun expand(
+        nodeId: MemoryNodeId,
+        resolution: MemoryResolution,
+        maxResults: Int,
+        includeConflicts: Boolean,
+    ): List<MemoryRecallHit> {
+        require(maxResults > 0)
+        val snapshot = store.read()
+        val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
+        require(nodeId in nodesById) { "Memory node ${nodeId.value} was not found" }
+        val activeIds = snapshot.activeNodes(null).mapTo(hashSetOf()) { it.id }
+        val distances = projectToKinds(
+            start = nodeId,
+            targetKinds = resolution.nodeKinds(),
+            nodesById = nodesById,
+            adjacency = snapshot.adjacency(),
+            activeIds = activeIds,
+            maxDepth = 6,
+        )
+        return distances.entries
+            .sortedBy { it.value }
+            .take(maxResults)
+            .mapNotNull { (id, distance) ->
+                nodesById[id]?.let { node ->
+                    MemoryRecallHit(
+                        node = node,
+                        score = (1f / (1f + distance * 0.35f)).coerceIn(0f, 1f),
+                        conflicts = if (includeConflicts) snapshot.conflictsFor(id, nodesById) else emptyList(),
+                    )
+                }
+            }
+    }
+}
+
+private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {
+    MemoryResolution.Category -> setOf(MemoryNodeKind.Category)
+    MemoryResolution.Summary -> setOf(MemoryNodeKind.Summary)
+    MemoryResolution.Phrase -> setOf(MemoryNodeKind.Phrase)
+    MemoryResolution.Tag -> setOf(MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag)
+    MemoryResolution.Context -> setOf(MemoryNodeKind.Context)
+}
+
+private data class Neighbor(
+    val id: MemoryNodeId,
+    val relation: MemoryRelationKind,
+)
+
+private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> = buildMap {
+    edges.forEach { edge ->
+        put(edge.from, getOrElse(edge.from) { emptyList() } + Neighbor(edge.to, edge.relation))
+        put(edge.to, getOrElse(edge.to) { emptyList() } + Neighbor(edge.from, edge.relation))
+    }
+}
+
+private fun MemorySnapshot.activeNodes(projectId: String?): List<MemoryNode> {
+    val superseded = edges
+        .asSequence()
+        .filter { it.relation == MemoryRelationKind.Supersedes }
+        .mapTo(hashSetOf()) { it.to }
+    val projectEpisodes = if (projectId == null) {
+        null
+    } else {
+        episodes.filter { it.projectId == projectId }.mapTo(hashSetOf()) { it.id }
+    }
+    return nodes.filter { node ->
+        node.id !in superseded &&
+            (projectEpisodes == null || node.sourceEpisodeIds.isEmpty() || node.sourceEpisodeIds.any { it in projectEpisodes })
+    }
+}
+
+private fun projectToKinds(
+    start: MemoryNodeId,
+    targetKinds: Set<MemoryNodeKind>,
+    nodesById: Map<MemoryNodeId, MemoryNode>,
+    adjacency: Map<MemoryNodeId, List<Neighbor>>,
+    activeIds: Set<MemoryNodeId>,
+    maxDepth: Int,
+): Map<MemoryNodeId, Int> {
+    val result = linkedMapOf<MemoryNodeId, Int>()
+    val visited = mutableSetOf(start)
+    var frontier = listOf(start)
+    var depth = 0
+    while (frontier.isNotEmpty() && depth <= maxDepth) {
+        val next = mutableListOf<MemoryNodeId>()
+        frontier.forEach { id ->
+            val node = nodesById[id]
+            if (id in activeIds && node?.kind in targetKinds) {
+                result.putIfAbsent(id, depth)
+            }
+            adjacency[id].orEmpty().forEach { neighbor ->
+                if (neighbor.id !in visited && neighbor.relation.isRecallTraversable()) {
+                    visited += neighbor.id
+                    next += neighbor.id
+                }
+            }
+        }
+        frontier = next
+        depth += 1
+    }
+    return result
+}
+
+private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
+    MemoryRelationKind.Indexes,
+    MemoryRelationKind.Composes,
+    MemoryRelationKind.Summarizes,
+    MemoryRelationKind.Categorizes,
+    MemoryRelationKind.SimilarTo,
+    MemoryRelationKind.AssociatedWith,
+    MemoryRelationKind.ConflictsWith,
+    MemoryRelationKind.ResolvesConflict,
+    MemoryRelationKind.CondensedFrom,
+    -> true
+
+    MemoryRelationKind.Supersedes -> false
+}
+
+private fun MemorySnapshot.conflictsFor(
+    nodeId: MemoryNodeId,
+    nodesById: Map<MemoryNodeId, MemoryNode>,
+): List<MemoryNode> = edges
+    .asSequence()
+    .filter { edge ->
+        edge.relation == MemoryRelationKind.ConflictsWith && (edge.from == nodeId || edge.to == nodeId)
+    }
+    .mapNotNull { edge ->
+        nodesById[if (edge.from == nodeId) edge.to else edge.from]
+    }
+    .distinctBy(MemoryNode::id)
+    .toList()
+
+private fun lexicalScore(query: String, node: MemoryNode): Float {
+    val queryTerms = query.memoryTerms()
+    if (queryTerms.isEmpty()) return 0f
+    val nodeTerms = node.text.memoryTerms() + node.metadata.values.flatMap(String::memoryTerms)
+    if (nodeTerms.isEmpty()) return 0f
+
+    val overlap = queryTerms.count { it in nodeTerms }.toFloat() / queryTerms.size
+    val exactBonus = if (node.text.lowercase().contains(query.trim().lowercase())) 0.25f else 0f
+    val semanticWeight = (node.salience * 0.15f) + (node.confidence * 0.10f)
+    return (overlap * 0.5f + exactBonus + semanticWeight).coerceIn(0f, 1f)
+}
+
+private fun String.memoryTerms(): List<String> {
+    val terms = mutableListOf<String>()
+    val token = StringBuilder()
+    lowercase().forEach { char ->
+        if (char.isLetterOrDigit() || char == '_' || char == '-') {
+            token.append(char)
+        } else if (token.isNotEmpty()) {
+            if (token.length > 1) terms += token.toString()
+            token.clear()
+        }
+    }
+    if (token.length > 1) terms += token.toString()
+    return terms.distinct()
+}
