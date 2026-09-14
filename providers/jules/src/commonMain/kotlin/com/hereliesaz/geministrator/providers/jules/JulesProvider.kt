@@ -5,6 +5,8 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -55,8 +57,15 @@ class JulesProvider(
         ),
     )
 
+    override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
+        repository == null || repository.source == RepositorySource.GitHub
+
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         val sourceContext = request.repository?.let { repository ->
+            require(repository.source == RepositorySource.GitHub) {
+                "Jules repository sessions currently require a GitHub-linked project; " +
+                    "this project is linked to ${repository.source.displayName()}."
+            }
             val source = findSource(repository)
             val branch = repository.defaultBranch
                 ?: source.githubRepo?.defaultBranch?.displayName

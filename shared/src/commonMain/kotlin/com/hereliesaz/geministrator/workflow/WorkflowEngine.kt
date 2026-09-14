@@ -113,6 +113,7 @@ class WorkflowEngine(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
                         constraints = task.providerConstraints,
+                        repository = project.repository,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE

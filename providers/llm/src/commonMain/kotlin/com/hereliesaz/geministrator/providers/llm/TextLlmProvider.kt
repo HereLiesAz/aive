@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.displayName
+import com.hereliesaz.geministrator.domain.locationLabel
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -221,11 +223,12 @@ open class TextLlmProvider(
         val repository = request.repository
         if (repository != null) {
             append("REPOSITORY CONTEXT\n")
-            append(repository.owner)
-            append('/')
-            append(repository.name)
+            append("Source: ")
+            append(repository.source.displayName())
+            append("\nLocation: ")
+            append(repository.locationLabel())
             repository.defaultBranch?.let { branch ->
-                append(" @ ")
+                append("\nBranch: ")
                 append(branch)
             }
             append("\n\n")

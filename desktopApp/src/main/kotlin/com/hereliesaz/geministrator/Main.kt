@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
@@ -23,6 +24,7 @@ import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import javax.swing.JFileChooser
 
 fun main() {
     val credentialStore = DesktopProviderCredentialStore()
@@ -71,6 +73,8 @@ fun main() {
                     App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        availableRepositorySources = RepositorySource.entries.toSet(),
+                        onPickLocalRepository = ::pickLocalGitFolder,
                         onReconfigureProvider = { configuringProviderId = it },
                         onDisconnectProvider = { disconnectedProviderId ->
                             credentialStore.clear(disconnectedProviderId)
@@ -127,6 +131,30 @@ private fun environmentProviderCredentials(): Map<String, String> = buildMap {
             ?.takeIf(String::isNotEmpty)
             ?.let { put(providerId, it) }
     }
+}
+
+private fun pickLocalGitFolder(): String? {
+    val chooser = JFileChooser().apply {
+        dialogTitle = "Link local Git repository"
+        fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+        isAcceptAllFileFilterUsed = false
+    }
+    if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return null
+    val selected = chooser.selectedFile?.absolutePath ?: return null
+
+    return runCatching {
+        val process = ProcessBuilder(
+            "git",
+            "-C",
+            selected,
+            "rev-parse",
+            "--show-toplevel",
+        )
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        if (process.waitFor() == 0) output.lineSequence().lastOrNull()?.trim()?.takeIf(String::isNotEmpty) else null
+    }.getOrNull()
 }
 
 private fun Map<String, String>.cleanKey(providerId: String): String? =

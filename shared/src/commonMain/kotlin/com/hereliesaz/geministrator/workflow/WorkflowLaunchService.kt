@@ -24,7 +24,7 @@ class WorkflowLaunchService(
         nowEpochMillis: Long,
         taskRunIdFactory: (TaskDefinitionId) -> TaskRunId,
     ): Pair<WorkflowDefinition, WorkflowRuntimeState> {
-        val prepared = preparer.prepare(definition)
+        val prepared = preparer.prepare(definition, project.repository)
         val run = WorkflowRunFactory.create(
             definition = prepared,
             workflowRunId = workflowRunId,

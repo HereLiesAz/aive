@@ -152,6 +152,12 @@ interface AgentProvider {
 
     suspend fun capabilities(): AgentCapabilities
 
+    /**
+     * Whether repository-capable work can be executed against this linked repository.
+     * Providers whose repository support is source-specific should override this boundary.
+     */
+    suspend fun supportsRepository(repository: RepositoryRef?): Boolean = true
+
     suspend fun start(request: AgentTaskRequest): AgentRunHandle
 
     fun observe(runId: ProviderRunId): Flow<AgentEvent>

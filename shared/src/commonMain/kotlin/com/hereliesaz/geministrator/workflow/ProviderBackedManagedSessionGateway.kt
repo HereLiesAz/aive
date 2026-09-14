@@ -33,7 +33,10 @@ class ProviderBackedManagedSessionGateway(
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
-        val provider = selectProvider(request.providerSelection, "No registered provider can satisfy this task")
+        val provider = selectProvider(
+            request.providerSelection.copy(repository = request.taskRequest.repository),
+            "No registered provider can satisfy this task",
+        )
         return providerOperation("Unable to start provider session") {
             val run = provider.start(request.taskRequest)
             val handle = ManagedSessionHandle(
