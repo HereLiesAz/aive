@@ -158,9 +158,9 @@ class MemoryBankingAttentionTest {
             baselineLevel = 0.8f,
             effectiveLevel = 0.05f,
             suppressedFromLevel = 0.05f,
-            tokensSinceCue = 200L,
+            tokensSinceCue = 300L,
         )
-        val intrusive = focused.copy(effectiveLevel = 0.95f, tokensSinceCue = 200L)
+        val intrusive = focused.copy(effectiveLevel = 0.95f, tokensSinceCue = 300L)
 
         val focusedPolicy = gate.cuePolicy(focused)
         val intrusivePolicy = gate.cuePolicy(intrusive)
