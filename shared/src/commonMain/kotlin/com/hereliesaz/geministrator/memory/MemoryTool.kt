@@ -6,9 +6,10 @@ import kotlin.math.max
  * Agent-facing memory surface. Agents bank experience and query this service; they do not read
  * persistence directly.
  *
+ * GRIP means Global Regular IMpression Print: Haive's memory-specific direct-recall operation.
  * Normal associative recall is tag-first. An agent that already carries semantic tags in its CoTR
- * can pass those tags directly through [grepTags] and request a deeper resolution only when the
- * tags themselves are not enough to recollect what it needs.
+ * can pass those tags directly to [grip] and request a deeper resolution only when the tags
+ * themselves are not enough to recollect what it needs.
  */
 interface MemoryTool {
     /**
@@ -18,11 +19,11 @@ interface MemoryTool {
      */
     suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry
 
-    /** Free-text associative lookup. Defaults to tag-level cues. */
-    suspend fun grep(query: MemoryQuery): MemoryRecallBundle
+    /** Free-text GRIP. Defaults to tag-level cues. */
+    suspend fun grip(query: MemoryQuery): MemoryRecallBundle
 
-    /** Tag-addressed lookup for semantic tags already present in an agent's CoTR. */
-    suspend fun grepTags(query: MemoryTagQuery): MemoryRecallBundle
+    /** Tag-addressed GRIP for semantic tags already present in an agent's CoTR. */
+    suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle
 
     /** Explicitly descend or ascend from a known memory node when tag cues are insufficient. */
     suspend fun expand(
@@ -39,9 +40,9 @@ class GraphMemoryTool(
 ) : MemoryTool {
     override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
 
-    override suspend fun grepTags(query: MemoryTagQuery): MemoryRecallBundle = grep(query.asMemoryQuery())
+    override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle = grip(query.asMemoryQuery())
 
-    override suspend fun grep(query: MemoryQuery): MemoryRecallBundle {
+    override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val snapshot = store.read()
         val active = snapshot.activeNodes(query.projectId)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
