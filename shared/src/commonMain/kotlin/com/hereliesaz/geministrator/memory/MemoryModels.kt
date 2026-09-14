@@ -49,7 +49,10 @@ data class MemoryEpisode(
     val sourceSessionId: String,
     val projectId: String? = null,
     val workflowRunId: String? = null,
+    val workflowDefinitionId: String? = null,
     val taskRunId: String? = null,
+    val taskDefinitionId: String? = null,
+    val roleId: String? = null,
     val userPrompt: String,
     val chunks: List<MemorySourceChunk>,
     val createdAtEpochMillis: Long,
@@ -201,7 +204,10 @@ data class MemorySessionEnvelope(
     val sourceSessionId: String,
     val projectId: String? = null,
     val workflowRunId: String? = null,
+    val workflowDefinitionId: String? = null,
     val taskRunId: String? = null,
+    val taskDefinitionId: String? = null,
+    val roleId: String? = null,
     val userPrompt: String,
     val parts: List<MemorySessionPart>,
     val closedAtEpochMillis: Long,
@@ -249,6 +255,11 @@ data class MemoryQuery(
     val maxResults: Int = 12,
     val includeConflicts: Boolean = true,
     val projectId: String? = null,
+    val workflowRunId: String? = null,
+    val workflowDefinitionId: String? = null,
+    val taskRunId: String? = null,
+    val taskDefinitionId: String? = null,
+    val roleId: String? = null,
 ) {
     init {
         require(text.isNotBlank()) { "Memory query must not be blank" }
