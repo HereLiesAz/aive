@@ -8,16 +8,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
 import com.hereliesaz.geministrator.providers.jules.JulesRestApi
+import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
+import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
+import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
+import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
 import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
@@ -111,16 +116,48 @@ internal fun configuredDesktopProviders(credentials: Map<String, String>): List<
         )
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
-        add(OpenAiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(OpenAiProvider(keyProvider))
+        add(
+            LocalWorkspaceAgentProvider(
+                id = AgentProviderId("openai-local-workspace"),
+                displayName = "OpenAI / Local Workspace",
+                api = OpenAiResponsesApi(keyProvider),
+            ),
+        )
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
-        add(AnthropicProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(AnthropicProvider(keyProvider))
+        add(
+            LocalWorkspaceAgentProvider(
+                id = AgentProviderId("anthropic-local-workspace"),
+                displayName = "Claude / Local Workspace",
+                api = AnthropicMessagesApi(keyProvider),
+            ),
+        )
     }
     credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
-        add(GeminiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(GeminiProvider(keyProvider))
+        add(
+            LocalWorkspaceAgentProvider(
+                id = AgentProviderId("gemini-local-workspace"),
+                displayName = "Gemini / Local Workspace",
+                api = GeminiGenerateContentApi(keyProvider),
+            ),
+        )
     }
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
-        add(XaiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(XaiProvider(keyProvider))
+        add(
+            LocalWorkspaceAgentProvider(
+                id = AgentProviderId("xai-local-workspace"),
+                displayName = "Grok / Local Workspace",
+                api = XaiResponsesApi(keyProvider),
+            ),
+        )
     }
 }
 
