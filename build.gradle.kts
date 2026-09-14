@@ -14,7 +14,7 @@ if (providers.gradleProperty("haive.useMavenLocalH2g2").orNull == "true") {
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {
-                substitute(module("com.github.HereLiesAz:conveyance-h2g2:8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a"))
+                substitute(module("com.github.HereLiesAz:conveyance-h2g2:5667da6fd07d856684048622ddf7722034f78b6b"))
                     .using(module("com.hereliesaz.conveyance:conveyance-h2g2:0.1.0"))
                 substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:b3e13674df9dfbcc0b35f800b57d78a305d07b03"))
                     .using(module("com.hereliesaz.conveyance:conveyance-core:0.1.0"))

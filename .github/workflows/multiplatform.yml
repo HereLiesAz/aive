@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          ref: 5667da6fd07d856684048622ddf7722034f78b6b
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
@@ -94,6 +94,9 @@ jobs:
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
+
+      - name: Test semantic workflow renderer
+        run: ./gradlew -p vendor/conveyance-h2g2 desktopTest
 
       - name: Test Jules provider
         run: ./gradlew :providers:jules:desktopTest
@@ -242,7 +245,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8da4f0b3a764fe6ecd96f9e32c6ba7d3b2eb900a
+          ref: 5667da6fd07d856684048622ddf7722034f78b6b
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
