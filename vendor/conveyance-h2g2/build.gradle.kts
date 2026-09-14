@@ -41,6 +41,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.animation)
             implementation(compose.ui)
+            implementation("org.jetbrains.compose.ui:ui-backhandler:1.12.0")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
