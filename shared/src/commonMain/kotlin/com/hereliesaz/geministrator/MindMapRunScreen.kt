@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.displayName
+import com.hereliesaz.geministrator.domain.locatorInput
+import com.hereliesaz.geministrator.domain.parseRepositoryRef
 
 @Composable
 internal fun MindMapRunScreen(
@@ -45,9 +48,14 @@ internal fun MindMapRunScreen(
     var projectName by remember(runtimeState) {
         mutableStateOf((runtimeState as? ApplicationRuntimeState.NoRun)?.project?.name.orEmpty())
     }
-    var repositoryOwner by remember(runtimeState) { mutableStateOf(existingRepository?.owner.orEmpty()) }
-    var repositoryName by remember(runtimeState) { mutableStateOf(existingRepository?.name.orEmpty()) }
+    var repositorySource by remember(runtimeState) {
+        mutableStateOf(existingRepository?.source ?: RepositorySource.GitHub)
+    }
+    var repositoryLocator by remember(runtimeState) {
+        mutableStateOf(existingRepository?.locatorInput().orEmpty())
+    }
     var defaultBranch by remember(runtimeState) { mutableStateOf(existingRepository?.defaultBranch.orEmpty()) }
+    var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var objective by remember(runtimeState) { mutableStateOf("") }
 
     Column(
@@ -98,19 +106,52 @@ internal fun MindMapRunScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = repositoryOwner,
-                    onValueChange = { repositoryOwner = it },
-                    label = { Text("Repository owner") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+
+                Text(
+                    "LINK REPOSITORY",
+                    style = AzphaltType.eyebrow,
+                    color = Azphalt.currentGround.onPage,
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RepositorySource.entries.forEach { source ->
+                        AzphaltPill(
+                            label = source.displayName(),
+                            seed = "repository-source-${source.name}",
+                            selected = repositorySource == source,
+                            onClick = {
+                                if (repositorySource != source) {
+                                    repositorySource = source
+                                    repositoryLocator = ""
+                                    repositoryError = null
+                                }
+                            },
+                        )
+                    }
+                }
                 OutlinedTextField(
-                    value = repositoryName,
-                    onValueChange = { repositoryName = it },
-                    label = { Text("Repository name") },
+                    value = repositoryLocator,
+                    onValueChange = {
+                        repositoryLocator = it
+                        repositoryError = null
+                    },
+                    label = {
+                        Text(
+                            when (repositorySource) {
+                                RepositorySource.GitHub -> "GitHub URL or owner/repository"
+                                RepositorySource.GitLab -> "GitLab URL or group/repository"
+                                RepositorySource.Local -> "Local Git folder path"
+                            },
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
+                    isError = repositoryError != null,
+                    supportingText = repositoryError?.let { message ->
+                        { Text(message) }
+                    },
                 )
                 OutlinedTextField(
                     value = defaultBranch,
@@ -119,6 +160,15 @@ internal fun MindMapRunScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Text(
+                    if (repositorySource == RepositorySource.Local) {
+                        "The folder path is linked to the project. Local filesystem execution is available only on runtimes that can access that path."
+                    } else {
+                        "Paste the repository URL or shorthand. Leave this blank only for a repoless orchestration."
+                    },
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
                 OutlinedTextField(
                     value = objective,
                     onValueChange = { objective = it },
@@ -126,26 +176,36 @@ internal fun MindMapRunScreen(
                     minLines = if (compact) 2 else 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                val owner = repositoryOwner.trim()
-                val name = repositoryName.trim()
-                val repositoryComplete = (owner.isEmpty() && name.isEmpty()) || (owner.isNotEmpty() && name.isNotEmpty())
-                Button(
+                AzphaltPill(
+                    label = if (runtimeState is ApplicationRuntimeState.NoRun) "Start run" else "Create project + start run",
+                    seed = "project-start-run",
+                    selected = projectName.isNotBlank() && objective.isNotBlank(),
                     onClick = {
-                        val repository = if (owner.isNotEmpty() && name.isNotEmpty()) {
-                            RepositoryRef(
-                                owner = owner,
-                                name = name,
-                                defaultBranch = defaultBranch.trim().takeIf(String::isNotEmpty),
-                            )
+                        if (projectName.isBlank() || objective.isBlank()) return@AzphaltPill
+                        val locator = repositoryLocator.trim()
+                        if (locator.isEmpty()) {
+                            repositoryError = null
+                            onLaunchWorkflow(projectName.trim(), objective.trim(), null)
                         } else {
-                            null
+                            runCatching {
+                                parseRepositoryRef(
+                                    source = repositorySource,
+                                    locator = locator,
+                                    defaultBranch = defaultBranch,
+                                )
+                            }.fold(
+                                onSuccess = { repository ->
+                                    repositoryError = null
+                                    onLaunchWorkflow(projectName.trim(), objective.trim(), repository)
+                                },
+                                onFailure = { failure ->
+                                    repositoryError = failure.message ?: "Invalid repository location"
+                                },
+                            )
                         }
-                        onLaunchWorkflow(projectName.trim(), objective.trim(), repository)
                     },
-                    enabled = projectName.isNotBlank() && objective.isNotBlank() && repositoryComplete,
-                ) {
-                    Text(if (runtimeState is ApplicationRuntimeState.NoRun) "START RUN" else "CREATE PROJECT + START RUN")
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             Spacer(Modifier.height(24.dp))
             return@Column
@@ -171,6 +231,13 @@ internal fun MindMapRunScreen(
                 "run-status",
                 endCap = "$completed/$total",
                 onClick = {},
+            )
+        }
+
+        liveWorkflow.project.repository?.let { repository ->
+            RepositoryProgressRecord(
+                repository = repository,
+                run = run,
             )
         }
 
