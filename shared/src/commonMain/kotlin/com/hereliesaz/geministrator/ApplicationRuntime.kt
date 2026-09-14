@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.persistence.PersistenceCorruptionException
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
@@ -98,12 +99,18 @@ class ApplicationRuntime private constructor(
         val state: WorkflowRuntimeState,
     )
 
+    private data class ViewingRun(
+        val project: Project,
+        val definition: WorkflowDefinition,
+        val run: WorkflowRun,
+    )
+
     private var current: Current? = null
     private var currentGeneration: Long = 0L
     private var cycleJob: Job? = null
     private val runtimeMutex = Mutex()
     /** Non-null while the UI is viewing a historical run; cycling continues on [current]. */
-    private var viewingRun: Pair<WorkflowDefinition, WorkflowRun>? = null
+    private var viewingRun: ViewingRun? = null
     val state: StateFlow<ApplicationRuntimeState> = publisher.state
 
     suspend fun loadLatest() {
@@ -170,9 +177,11 @@ class ApplicationRuntime private constructor(
             try {
                 val run = persistence.runs.get(runId)
                     ?: error("Run ${runId.value} not found")
+                val project = persistence.projects.get(run.projectId)
+                    ?: error("Project ${run.projectId.value} not found")
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} not found")
-                viewingRun = definition to run
+                viewingRun = ViewingRun(project, definition, run)
                 publishCurrent()
             } catch (failure: Throwable) {
                 publishFailure(failure)
@@ -200,17 +209,7 @@ class ApplicationRuntime private constructor(
             require(cleanProjectName.isNotEmpty()) { "Project name is required" }
             require(cleanObjective.isNotEmpty()) { "Objective is required" }
 
-            val normalizedRepository = repository?.let {
-                val owner = it.owner.trim()
-                val name = it.name.trim()
-                require(owner.isNotEmpty()) { "Repository owner is required" }
-                require(name.isNotEmpty()) { "Repository name is required" }
-                RepositoryRef(
-                    owner = owner,
-                    name = name,
-                    defaultBranch = it.defaultBranch?.trim()?.takeIf(String::isNotEmpty),
-                )
-            }
+            val normalizedRepository = repository?.normalized()
             val now = nowEpochMillis()
             val project = existingProject?.copy(
                 name = cleanProjectName,
@@ -383,12 +382,12 @@ class ApplicationRuntime private constructor(
     private fun publishCurrent() {
         val viewing = viewingRun
         if (viewing != null) {
-            val (definition, run) = viewing
             publisher.publish(
                 ApplicationRuntimeState.Live(
                     LiveWorkflowPresentation(
-                        definition = definition,
-                        run = run,
+                        project = viewing.project,
+                        definition = viewing.definition,
+                        run = viewing.run,
                         roles = roles,
                     ),
                 ),
@@ -399,6 +398,7 @@ class ApplicationRuntime private constructor(
         publisher.publish(
             ApplicationRuntimeState.Live(
                 LiveWorkflowPresentation(
+                    project = snapshot.project,
                     definition = snapshot.definition,
                     run = snapshot.state.run,
                     roles = roles,
@@ -517,7 +517,7 @@ class ApplicationRuntime private constructor(
                     '\r' -> append("\\r")
                     '\t' -> append("\\t")
                     '\b' -> append("\\b")
-                    '' -> append("\\f")
+                    '\u000C' -> append("\\f")
                     else -> if (ch.code < 0x20) append("\\u${ch.code.toString(16).padStart(4, '0')}") else append(ch)
                 }
             }
