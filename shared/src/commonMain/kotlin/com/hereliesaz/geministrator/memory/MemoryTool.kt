@@ -40,18 +40,12 @@ class GraphMemoryTool(
 ) : MemoryTool {
     override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
 
-    override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle = grip(query.asMemoryQuery())
-
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val snapshot = store.read()
         val active = snapshot.activeNodes(query.projectId)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
-        val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
-        val adjacency = snapshot.adjacency()
-        val targetKinds = query.resolution.nodeKinds()
-        val activeIds = active.mapTo(hashSetOf()) { it.id }
         val scoredSeeds = active
             .mapNotNull { node ->
                 val lexical = lexicalScore(query.text, node)
@@ -59,55 +53,33 @@ class GraphMemoryTool(
                 val score = (lexical + scopeAffinity(query, node, episodesById)).coerceIn(0f, 1f)
                 node to score
             }
-            .sortedWith(
-                compareByDescending<Pair<MemoryNode, Float>> { it.second }
-                    .thenByDescending { it.first.salience }
-                    .thenByDescending { it.first.confidence },
-            )
+            .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
-        val projected = linkedMapOf<MemoryNodeId, Float>()
-        scoredSeeds.forEach { (seed, score) ->
-            if (seed.kind in targetKinds) {
-                projected[seed.id] = max(projected[seed.id] ?: 0f, score)
-            }
-            projectToKinds(
-                start = seed.id,
-                targetKinds = targetKinds,
-                nodesById = nodesById,
-                adjacency = adjacency,
-                activeIds = activeIds,
-                maxDepth = 5,
-            ).forEach { (nodeId, distance) ->
-                val targetNode = nodesById[nodeId] ?: return@forEach
-                val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
-                val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
-                    .coerceIn(0f, 1f)
-                projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
-            }
-        }
+        return snapshot.recallFromSeeds(query, scoredSeeds)
+    }
 
-        val hits = projected.entries
-            .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
-            .sortedWith(
-                compareByDescending<Pair<MemoryNode, Float>> { it.second }
-                    .thenByDescending { it.first.salience }
-                    .thenByDescending { it.first.confidence },
-            )
-            .take(query.maxResults)
-            .map { (node, score) ->
-                MemoryRecallHit(
-                    node = node,
-                    score = score.coerceIn(0f, 1f),
-                    conflicts = if (query.includeConflicts) {
-                        snapshot.conflictsFor(node.id, nodesById)
-                    } else {
-                        emptyList()
-                    },
-                )
-            }
+    override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle {
+        val normalizedQuery = query.asMemoryQuery()
+        val snapshot = store.read()
+        val active = snapshot.activeNodes(query.scope.projectId)
+        if (active.isEmpty()) return MemoryRecallBundle(normalizedQuery, emptyList())
 
-        return MemoryRecallBundle(query, hits)
+        val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
+        val scoredSeeds = active
+            .asSequence()
+            .filter { it.kind == MemoryNodeKind.NounTag || it.kind == MemoryNodeKind.VerbTag }
+            .mapNotNull { node ->
+                val match = tagAddressScore(query.tags, node)
+                if (match <= 0f) return@mapNotNull null
+                val score = (match + scopeAffinity(normalizedQuery, node, episodesById)).coerceIn(0f, 1f)
+                node to score
+            }
+            .sortedWith(memorySeedComparator())
+            .take(max(query.maxResults * 4, 24))
+            .toList()
+
+        return snapshot.recallFromSeeds(normalizedQuery, scoredSeeds)
     }
 
     override suspend fun expand(
@@ -142,6 +114,74 @@ class GraphMemoryTool(
                 }
             }
     }
+}
+
+private fun MemorySnapshot.recallFromSeeds(
+    query: MemoryQuery,
+    scoredSeeds: List<Pair<MemoryNode, Float>>,
+): MemoryRecallBundle {
+    if (scoredSeeds.isEmpty()) return MemoryRecallBundle(query, emptyList())
+
+    val nodesById = nodes.associateBy(MemoryNode::id)
+    val episodesById = episodes.associateBy(MemoryEpisode::id)
+    val adjacency = adjacency()
+    val targetKinds = query.resolution.nodeKinds()
+    val activeIds = activeNodes(query.projectId).mapTo(hashSetOf()) { it.id }
+    val projected = linkedMapOf<MemoryNodeId, Float>()
+
+    scoredSeeds.forEach { (seed, score) ->
+        if (seed.kind in targetKinds) {
+            projected[seed.id] = max(projected[seed.id] ?: 0f, score)
+        }
+        projectToKinds(
+            start = seed.id,
+            targetKinds = targetKinds,
+            nodesById = nodesById,
+            adjacency = adjacency,
+            activeIds = activeIds,
+            maxDepth = 6,
+        ).forEach { (nodeId, distance) ->
+            val targetNode = nodesById[nodeId] ?: return@forEach
+            val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
+            val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
+                .coerceIn(0f, 1f)
+            projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
+        }
+    }
+
+    val hits = projected.entries
+        .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
+        .sortedWith(memorySeedComparator())
+        .take(query.maxResults)
+        .map { (node, score) ->
+            MemoryRecallHit(
+                node = node,
+                score = score.coerceIn(0f, 1f),
+                conflicts = if (query.includeConflicts) conflictsFor(node.id, nodesById) else emptyList(),
+            )
+        }
+
+    return MemoryRecallBundle(query, hits)
+}
+
+private fun memorySeedComparator(): Comparator<Pair<MemoryNode, Float>> =
+    compareByDescending<Pair<MemoryNode, Float>> { it.second }
+        .thenByDescending { it.first.salience }
+        .thenByDescending { it.first.confidence }
+
+private fun tagAddressScore(tags: List<String>, node: MemoryNode): Float {
+    val requestedPhrases = tags.map { it.trim().lowercase() }.filter(String::isNotEmpty)
+    val nodeText = node.text.trim().lowercase()
+    if (requestedPhrases.any { it == nodeText }) return 1f
+
+    val requestedTerms = tags.flatMap(String::memoryTerms).toSet()
+    if (requestedTerms.isEmpty()) return 0f
+    val nodeTerms = (node.text.memoryTerms() + node.metadata.values.flatMap(String::memoryTerms)).toSet()
+    if (nodeTerms.isEmpty()) return 0f
+
+    val overlap = requestedTerms.count { it in nodeTerms }.toFloat() / requestedTerms.size
+    val phraseBonus = if (requestedPhrases.any { phrase -> phrase in nodeText || nodeText in phrase }) 0.25f else 0f
+    return (overlap * 0.75f + phraseBonus).coerceIn(0f, 1f)
 }
 
 private fun MemoryTagQuery.asMemoryQuery(): MemoryQuery = MemoryQuery(
