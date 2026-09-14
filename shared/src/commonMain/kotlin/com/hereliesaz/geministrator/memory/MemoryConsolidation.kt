@@ -18,22 +18,56 @@ class MemoryConsolidationQueue(
         require(maxChunkChars > 0)
     }
 
-    suspend fun enqueueSession(envelope: MemorySessionEnvelope): MemoryQueueEntry {
+    suspend fun enqueueSession(
+        envelope: MemorySessionEnvelope,
+        priority: MemoryQueuePriority = MemoryQueuePriority.Normal,
+    ): MemoryQueueEntry {
         require(envelope.sourceSessionId.isNotBlank())
         require(envelope.userPrompt.isNotBlank())
+        val episodeId = envelope.episodeId()
+        return enqueueEpisode(envelope.toEpisode(episodeId, maxChunkChars), priority)
+    }
 
+    /**
+     * Deliberate in-session banks jump ahead of ordinary lifecycle backlog. Once consolidated,
+     * they are ordinary memory and retain no special reminder or retrieval semantics.
+     */
+    suspend fun enqueueBank(
+        request: MemoryBankRequest,
+        priority: MemoryQueuePriority = MemoryQueuePriority.Next,
+    ): MemoryQueueEntry {
+        val episodeId = request.episodeId()
+        return enqueueEpisode(request.toEpisode(episodeId, maxChunkChars), priority)
+    }
+
+    private suspend fun enqueueEpisode(
+        episode: MemoryEpisode,
+        priority: MemoryQueuePriority,
+    ): MemoryQueueEntry {
         while (true) {
             val snapshot = store.read()
-            val episodeId = envelope.episodeId()
-            snapshot.queue.firstOrNull { it.episodeId == episodeId }?.let { return it }
+            val existing = snapshot.queue.firstOrNull { it.episodeId == episode.id }
+            if (existing != null) {
+                if (
+                    existing.status != MemoryQueueStatus.Complete &&
+                    priority.ordinal > existing.priority.ordinal
+                ) {
+                    val promoted = existing.copy(priority = priority)
+                    if (store.commit(snapshot.revision, MemoryStoreMutation(queueUpserts = listOf(promoted)))) {
+                        return promoted
+                    }
+                    continue
+                }
+                return existing
+            }
 
-            val episode = envelope.toEpisode(episodeId, maxChunkChars)
             val sequence = (snapshot.queue.maxOfOrNull(MemoryQueueEntry::sequence) ?: 0L) + 1L
             val entry = MemoryQueueEntry(
-                id = MemoryQueueId("queue-$sequence-${episodeId.value}"),
+                id = MemoryQueueId("queue-$sequence-${episode.id.value}"),
                 sequence = sequence,
-                episodeId = episodeId,
-                createdAtEpochMillis = envelope.closedAtEpochMillis,
+                episodeId = episode.id,
+                priority = priority,
+                createdAtEpochMillis = episode.createdAtEpochMillis,
             )
             if (
                 store.commit(
@@ -74,8 +108,8 @@ class MemoryConsolidator(
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
 ) {
     /**
-     * Processes at most one manager packet. Empty stages can be skipped deterministically in the
-     * same call, but no second episode is touched until the earliest one reports Completed.
+     * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
+     * packets; entries at the same priority remain FIFO by sequence.
      */
     suspend fun processNext(nowEpochMillis: Long): MemoryConsolidationResult {
         @Suppress("UNUSED_VARIABLE")
@@ -86,7 +120,11 @@ class MemoryConsolidator(
             val entry = snapshot.queue
                 .asSequence()
                 .filter { it.status != MemoryQueueStatus.Complete }
-                .minByOrNull(MemoryQueueEntry::sequence)
+                .sortedWith(
+                    compareByDescending<MemoryQueueEntry> { it.priority.ordinal }
+                        .thenBy { it.sequence },
+                )
+                .firstOrNull()
                 ?: return MemoryConsolidationResult.Idle
 
             if (entry.stage == MemoryConsolidationStage.Complete) {
@@ -428,6 +466,10 @@ private fun MemorySessionEnvelope.episodeId(): MemoryEpisodeId = MemoryEpisodeId
     "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}",
 )
 
+private fun MemoryBankRequest.episodeId(): MemoryEpisodeId = MemoryEpisodeId(
+    "episode-${bankedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}-${text.hashCode().toString(16)}",
+)
+
 private fun MemorySessionEnvelope.toEpisode(
     episodeId: MemoryEpisodeId,
     maxChunkChars: Int,
@@ -465,6 +507,35 @@ private fun MemorySessionEnvelope.toEpisode(
         userPrompt = userPrompt,
         chunks = chunks,
         createdAtEpochMillis = closedAtEpochMillis,
+    )
+}
+
+private fun MemoryBankRequest.toEpisode(
+    episodeId: MemoryEpisodeId,
+    maxChunkChars: Int,
+): MemoryEpisode {
+    val chunks = text.trim().chunkedText(maxChunkChars).mapIndexed { index, piece ->
+        MemorySourceChunk(
+            id = MemoryChunkId("${episodeId.value}:chunk:0:$index"),
+            episodeId = episodeId,
+            ordinal = index,
+            kind = sourceKind,
+            label = label,
+            text = piece,
+        )
+    }
+    return MemoryEpisode(
+        id = episodeId,
+        sourceSessionId = sourceSessionId,
+        projectId = scope.projectId,
+        workflowRunId = scope.workflowRunId,
+        workflowDefinitionId = scope.workflowDefinitionId,
+        taskRunId = scope.taskRunId,
+        taskDefinitionId = scope.taskDefinitionId,
+        roleId = scope.roleId,
+        userPrompt = text,
+        chunks = chunks,
+        createdAtEpochMillis = bankedAtEpochMillis,
     )
 }
 
