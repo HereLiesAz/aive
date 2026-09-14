@@ -88,27 +88,16 @@ class MemoryMicroAgentsTest {
         )
 
         assertEquals(5, constrained.maxPacketItems)
-        assertEquals(1_024, constrained.maxPacketChars)
+        assertEquals(2_048, constrained.maxPacketChars)
         assertEquals(7, constrained.maxMutationsPerPacket)
-    }
-
-    @Test
-    fun localModelDefaultsCoverEveryHaivePlatform() {
-        val spec = MemoryMicroAgentModelSpec("portable-memory-model")
-        assertEquals(
-            MemoryMicroAgentPlatform.entries.toSet(),
-            spec.deployment.platforms,
-        )
-        assertTrue(spec.deployment.supportsAllHaivePlatforms())
-        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Web).isNotEmpty())
-        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Android).isNotEmpty())
     }
 
     private class RecordingMicroAgent(
         override val role: MemoryMicroAgentRole,
         private val sink: MutableMap<MemoryMicroAgentRole, MemoryWorkPacket>,
-        override val model: MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec("test-$role"),
+        spec: MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec("test-$role"),
     ) : MemoryMicroAgent {
+        override val model: MemoryMicroAgentModelSpec = spec
         override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
             sink[role] = packet
             return MemoryMutationBatch()

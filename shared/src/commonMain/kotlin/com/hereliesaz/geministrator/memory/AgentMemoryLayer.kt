@@ -33,12 +33,16 @@ class AgentMemoryLayer private constructor(
                 tool = GraphMemoryTool(store),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
-                consolidator = manager?.let {
-                    MemoryConsolidator(store, AssociativeMemoryManagerAgent(it), policy)
-                },
+                consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
             )
         }
 
+        /**
+         * Preferred production path for local memory maintenance. Each specialist may use its own
+         * small model or share a base model with role-specific adapters. The consolidation packet
+         * budget is clamped to the smallest configured specialist before any work is scheduled, so
+         * a model context overflow cannot be created by the memory engine itself.
+         */
         fun createWithMicroAgents(
             store: MemoryStore,
             agents: Collection<MemoryMicroAgent>,
