@@ -17,6 +17,9 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
     private val nextRunId = AtomicLong(1L)
     private val runs = ConcurrentHashMap<String, ExternalExecutionRun>()
 
+    override fun supports(project: Project): Boolean =
+        project.repository?.source == RepositorySource.Local
+
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireNotNull(project.repository) {
             "Repository operation requires a linked project repository"
@@ -24,7 +27,7 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
         require(repository.source == RepositorySource.Local) {
             "Local Git executor requires a Local Git repository"
         }
-        val path = requireNotNull(repository.localPath)?.trim().orEmpty()
+        val path = requireNotNull(repository.localPath).trim()
         require(path.isNotEmpty()) { "Local Git repository path is missing" }
 
         val root = resolveGitRoot(path)
