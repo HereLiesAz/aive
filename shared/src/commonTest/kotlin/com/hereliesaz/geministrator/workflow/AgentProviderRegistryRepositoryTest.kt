@@ -17,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class AgentProviderRegistryRepositoryTest {
     @Test
@@ -71,17 +72,22 @@ class AgentProviderRegistryRepositoryTest {
             )
         }
 
-        kotlin.test.assertTrue(failure.message.orEmpty().contains("Local Git"))
+        assertTrue(failure.message.orEmpty().contains("Local Git"))
     }
 
     @Test
-    fun nonRepositoryWorkIsNotFilteredByRepositorySource() = runBlocking {
-        val provider = SourceAwareProvider(
-            id = AgentProviderId("research"),
+    fun linkedProjectContextSkipsProviderThatCannotOpenThatRepositorySource() = runBlocking {
+        val githubOnly = SourceAwareProvider(
+            id = AgentProviderId("github-reviewer"),
             supportedSources = setOf(RepositorySource.GitHub),
             capabilities = setOf(AgentCapability.Research),
         )
-        val registry = AgentProviderRegistry(listOf(provider))
+        val gitLabCapable = SourceAwareProvider(
+            id = AgentProviderId("gitlab-reviewer"),
+            supportedSources = setOf(RepositorySource.GitLab),
+            capabilities = setOf(AgentCapability.Research),
+        )
+        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable))
 
         val selected = registry.select(
             ProviderSelectionRequest(
@@ -95,7 +101,7 @@ class AgentProviderRegistryRepositoryTest {
             ),
         )
 
-        assertEquals(provider.id, selected.id)
+        assertEquals(gitLabCapable.id, selected.id)
     }
 }
 
