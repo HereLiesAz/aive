@@ -177,6 +177,7 @@ private fun MemoryManagerProposal.toMutationBatch(
 private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
     appendLine("You are Haive's Memory Manager. Perform exactly one bounded memory-maintenance task.")
     appendLine("You are not solving the user's task. You may only curate the supplied memory packet.")
+    appendLine("Memory curation is associative, not conscious reasoning. Never infer contradiction, truth, falsity, or resolve competing beliefs.")
     appendLine("STAGE: ${stage.name}")
     appendLine("PACKET: $packetKey")
     appendLine("INSTRUCTION: $instruction")
@@ -199,7 +200,7 @@ private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
     appendLine("Schema:")
     appendLine("{\"sections\":[{\"text\":\"...\",\"sourceIds\":[\"input-id\"],\"metadata\":{}}],")
     appendLine(" \"nodes\":[{\"key\":\"local-key\",\"kind\":\"Context|NounTag|VerbTag|Phrase|Summary|Category\",\"text\":\"...\",\"sourceIds\":[\"input-id\"],\"salience\":0.0,\"confidence\":1.0,\"metadata\":{}}],")
-    appendLine(" \"links\":[{\"from\":\"local-key-or-node-id\",\"to\":\"local-key-or-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|ConflictsWith|ResolvesConflict|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
+    appendLine(" \"links\":[{\"from\":\"local-key-or-node-id\",\"to\":\"local-key-or-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
     appendLine("Use empty arrays for mutation types that are irrelevant to this stage.")
     appendLine("Node sourceIds must be IDs already present in this packet; local keys are only for links.")
     appendLine("Never reference an ID that is not in this packet unless it is a local node key you create in the same response.")
@@ -207,7 +208,9 @@ private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
         appendLine("Create exactly one node derived from ALL input node IDs.")
         appendLine("For every input node, emit both CondensedFrom and Supersedes links from the new node to that source.")
     }
-    appendLine("Preserve disagreements with ConflictsWith; do not erase one memory merely because another conflicts with it.")
+    if (stage == MemoryConsolidationStage.Associations) {
+        appendLine("Associate memories only because they share topics, concepts, entities, actions, or other semantic proximity.")
+    }
 }
 
 private fun MemoryWorkItem.sourceEpisodeIds(): List<MemoryEpisodeId> = metadata["sourceEpisodeIds"]

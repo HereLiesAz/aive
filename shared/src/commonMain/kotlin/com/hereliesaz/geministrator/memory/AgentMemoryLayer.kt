@@ -33,7 +33,24 @@ class AgentMemoryLayer private constructor(
                 tool = GraphMemoryTool(store),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
-                consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
+                consolidator = manager?.let {
+                    MemoryConsolidator(store, AssociativeMemoryManagerAgent(it), policy)
+                },
+            )
+        }
+
+        fun createWithMicroAgents(
+            store: MemoryStore,
+            agents: Collection<MemoryMicroAgent>,
+            policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+            maxChunkChars: Int = 6_000,
+        ): AgentMemoryLayer {
+            val router = MemoryMicroAgentRouter(agents)
+            return create(
+                store = store,
+                manager = router,
+                policy = router.constrainPolicy(policy),
+                maxChunkChars = maxChunkChars,
             )
         }
 
@@ -43,6 +60,15 @@ class AgentMemoryLayer private constructor(
         ): AgentMemoryLayer = create(
             store = SettingsMemoryStore.createDefault(),
             manager = manager,
+            policy = policy,
+        )
+
+        fun createDefaultWithMicroAgents(
+            agents: Collection<MemoryMicroAgent>,
+            policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+        ): AgentMemoryLayer = createWithMicroAgents(
+            store = SettingsMemoryStore.createDefault(),
+            agents = agents,
             policy = policy,
         )
     }
