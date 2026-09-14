@@ -60,7 +60,7 @@ class MemoryMicroAgentsTest {
         assertEquals(packet.items.single().text, nounPacket.items.single().text)
         assertEquals(packet.items.single().text, verbPacket.items.single().text)
         assertTrue(nounPacket.items.single().metadata[CODE_NOUN_HINTS].orEmpty().contains("UserRepository"))
-        assertTrue(verbPacket.items.single().metadata[CODE_VERB_HINTS].orEmpty().contains("persist"))
+        assertTrue(verbPacket.items.single().metadata[CODE_VERB_HINTS].orEmpty().contains("write"))
         assertTrue(nounPacket.instruction.contains("semantic entity/reference"))
         assertTrue(verbPacket.instruction.contains("semantic action/transformation"))
     }
@@ -71,7 +71,7 @@ class MemoryMicroAgentsTest {
             RecordingMicroAgent(
                 role = role,
                 sink = mutableMapOf(),
-                spec = MemoryMicroAgentModelSpec(
+                model = MemoryMicroAgentModelSpec(
                     modelId = "model-$role",
                     maxInputItems = if (index == 0) 5 else 12,
                     maxInputChars = if (index == 1) 2_048 else 8_000,

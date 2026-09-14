@@ -70,7 +70,7 @@ class MemoryLayerTest {
         var firstCompleted = false
         var iteration = 0
         while (!firstCompleted && iteration < 20) {
-            val result = consolidator.processNext(300 + iteration)
+            val result = consolidator.processNext(300L + iteration)
             firstCompleted = result is MemoryConsolidationResult.Completed && result.queueId == first.id
             iteration += 1
         }
@@ -82,7 +82,7 @@ class MemoryLayerTest {
         })
         assertTrue(seenPackets.all { it.queueId == first.id })
 
-        val next = consolidator.processNext(500)
+        val next = consolidator.processNext(500L)
         assertIs<MemoryConsolidationResult.Applied>(next)
         assertEquals(second.id, next.queueId)
     }
