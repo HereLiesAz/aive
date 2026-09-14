@@ -167,6 +167,80 @@ class MemoryLayerTest {
     }
 
     @Test
+    fun grepPrefersTheClosestOrchestrationHierarchy() = runBlocking {
+        val localEpisode = MemoryEpisode(
+            id = MemoryEpisodeId("local-episode"),
+            sourceSessionId = "local-session",
+            projectId = "project",
+            workflowRunId = "run-current",
+            workflowDefinitionId = "workflow-starter",
+            taskRunId = "task-current-run",
+            taskDefinitionId = "implementation",
+            roleId = "engineer",
+            userPrompt = "Fix deployment",
+            chunks = emptyList(),
+            createdAtEpochMillis = 10,
+        )
+        val distantEpisode = MemoryEpisode(
+            id = MemoryEpisodeId("distant-episode"),
+            sourceSessionId = "distant-session",
+            projectId = "project",
+            workflowRunId = "run-old",
+            workflowDefinitionId = "workflow-starter",
+            taskRunId = "task-old-run",
+            taskDefinitionId = "release",
+            roleId = "reviewer",
+            userPrompt = "Fix deployment",
+            chunks = emptyList(),
+            createdAtEpochMillis = 5,
+        )
+        val local = MemoryNode(
+            id = MemoryNodeId("local-summary"),
+            kind = MemoryNodeKind.Summary,
+            text = "deployment workflow uses the release pipeline",
+            sourceEpisodeIds = setOf(localEpisode.id),
+            salience = 0.5f,
+            confidence = 0.8f,
+            createdAtEpochMillis = 10,
+        )
+        val distant = MemoryNode(
+            id = MemoryNodeId("distant-summary"),
+            kind = MemoryNodeKind.Summary,
+            text = "deployment workflow uses the release pipeline",
+            sourceEpisodeIds = setOf(distantEpisode.id),
+            salience = 0.5f,
+            confidence = 0.8f,
+            createdAtEpochMillis = 5,
+        )
+        val store = InMemoryMemoryStore()
+        assertTrue(
+            store.commit(
+                0,
+                MemoryStoreMutation(
+                    episodesToAdd = listOf(distantEpisode, localEpisode),
+                    nodesToAdd = listOf(distant, local),
+                ),
+            ),
+        )
+
+        val recalled = GraphMemoryTool(store).grep(
+            MemoryQuery(
+                text = "deployment workflow release pipeline",
+                resolution = MemoryResolution.Summary,
+                projectId = "project",
+                workflowRunId = "run-current",
+                workflowDefinitionId = "workflow-starter",
+                taskRunId = "task-current-run",
+                taskDefinitionId = "implementation",
+                roleId = "engineer",
+            ),
+        )
+
+        assertEquals(local.id, recalled.hits.first().node.id)
+        assertTrue(recalled.hits.first().score > recalled.hits[1].score)
+    }
+
+    @Test
     fun staleStoreRevisionCannotOverwriteNewMemory() = runBlocking {
         val store = InMemoryMemoryStore()
         val first = MemoryEpisode(
