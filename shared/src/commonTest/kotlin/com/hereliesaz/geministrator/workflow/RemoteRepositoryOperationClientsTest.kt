@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -198,7 +199,7 @@ private class RecordingRepositoryOperationClient(
         ExternalExecutionRun(runId, ExternalExecutionStatus.Completed)
 }
 
-private fun MockEngine.respondJson(
+private fun MockRequestHandleScope.respondJson(
     content: String,
     status: HttpStatusCode = HttpStatusCode.OK,
 ) = respond(
