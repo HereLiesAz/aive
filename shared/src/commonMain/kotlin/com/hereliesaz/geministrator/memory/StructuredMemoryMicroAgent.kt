@@ -5,11 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/**
- * Runtime-agnostic local memory worker. Android, desktop, and web provide the inference runtime;
- * this class owns the shared prompt/output contract and converts the bounded JSON response into
- * declarative graph mutations.
- */
+/** Runtime-agnostic local memory worker shared by Android, desktop, and web. */
 class StructuredMemoryMicroAgent(
     override val role: MemoryMicroAgentRole,
     override val model: MemoryMicroAgentModelSpec,
@@ -51,8 +47,7 @@ class StructuredMemoryMicroAgent(
     }
 
     private suspend fun selectArtifact(): MemoryMicroAgentArtifact {
-        val candidates = model.deployment.artifactsFor(runtime.platform)
-        for (candidate in candidates) {
+        for (candidate in model.deployment.artifactsFor(runtime.platform)) {
             if (runtime.isAvailable(model, candidate)) return candidate
         }
         error("No available ${runtime.platform} artifact for ${model.modelId}/${role.name}")
@@ -107,9 +102,7 @@ private fun MicroAgentProposal.toMutationBatch(
     val namespace = "${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:${role.name}"
 
     val builtSections = sections.mapIndexed { index, draft ->
-        require(draft.sourceIds.all { it in packetIds }) {
-            "${role.name} section references content outside its packet"
-        }
+        require(draft.sourceIds.all { it in packetIds })
         MemorySection(
             id = MemorySectionId("$namespace:section:$index"),
             episodeId = packet.episodeId,
@@ -128,9 +121,7 @@ private fun MicroAgentProposal.toMutationBatch(
     }.toMap()
 
     val builtNodes = nodes.map { draft ->
-        require(draft.sourceIds.all { it in packetIds }) {
-            "${role.name} node ${draft.key} references content outside its packet"
-        }
+        require(draft.sourceIds.all { it in packetIds })
         val kind = runCatching { MemoryNodeKind.valueOf(draft.kind) }
             .getOrElse { error("Unknown memory node kind ${draft.kind}") }
         val inheritedEpisodes = draft.sourceIds
@@ -162,12 +153,8 @@ private fun MicroAgentProposal.toMutationBatch(
     val builtEdges = links.mapIndexed { index, link ->
         val from = nodeIdsByKey[link.from] ?: MemoryNodeId(link.from)
         val to = nodeIdsByKey[link.to] ?: MemoryNodeId(link.to)
-        require(from.value in knownNodeIds || from in nodeIdsByKey.values) {
-            "${role.name} link source ${link.from} is outside its packet"
-        }
-        require(to.value in knownNodeIds || to in nodeIdsByKey.values) {
-            "${role.name} link target ${link.to} is outside its packet"
-        }
+        require(from.value in knownNodeIds || from in nodeIdsByKey.values)
+        require(to.value in knownNodeIds || to in nodeIdsByKey.values)
         val relation = runCatching { MemoryRelationKind.valueOf(link.relation) }
             .getOrElse { error("Unknown memory relation ${link.relation}") }
         MemoryEdge(
@@ -206,8 +193,9 @@ private fun MemoryWorkPacket.renderMicroAgentPrompt(role: MemoryMicroAgentRole):
     appendLine("Return exactly one JSON object and nothing else.")
     appendLine("{\"sections\":[{\"text\":\"...\",\"sourceIds\":[\"id\"],\"metadata\":{}}],")
     appendLine(" \"nodes\":[{\"key\":\"local-key\",\"kind\":\"Context|NounTag|VerbTag|Phrase|Summary|Category\",\"text\":\"...\",\"sourceIds\":[\"id\"],\"salience\":0.5,\"confidence\":1.0,\"metadata\":{}}],")
-    appendLine(" \"links\":[{\"from\":\"local-key-or-visible-node-id\",\"to\":\"local-key-or-visible-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|ConflictsWith|ResolvesConflict|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
+    appendLine(" \"links\":[{\"from\":\"local-key-or-visible-node-id\",\"to\":\"local-key-or-visible-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
     appendLine("Use only IDs visible in this packet as sourceIds or link endpoints, except local keys created in this same response.")
+    appendLine("Never infer contradiction, truth, falsity, or conflict resolution. Memory micro-agents only organize and associate supplied material.")
 }
 
 private fun StringBuilder.appendMicroWorkItem(item: MemoryWorkItem) {
@@ -221,25 +209,13 @@ private fun StringBuilder.appendMicroWorkItem(item: MemoryWorkItem) {
 }
 
 private fun MemoryWorkItem.microSourceEpisodeIds(): List<MemoryEpisodeId> = metadata["sourceEpisodeIds"]
-    .orEmpty()
-    .split(',')
-    .map(String::trim)
-    .filter(String::isNotEmpty)
-    .map(::MemoryEpisodeId)
+    .orEmpty().split(',').map(String::trim).filter(String::isNotEmpty).map(::MemoryEpisodeId)
 
 private fun MemoryWorkItem.microSourceSectionIds(): List<MemorySectionId> = metadata["sourceSectionIds"]
-    .orEmpty()
-    .split(',')
-    .map(String::trim)
-    .filter(String::isNotEmpty)
-    .map(::MemorySectionId)
+    .orEmpty().split(',').map(String::trim).filter(String::isNotEmpty).map(::MemorySectionId)
 
 private fun String.extractMicroAgentJson(): String {
-    val cleaned = trim()
-        .removePrefix("```json")
-        .removePrefix("```")
-        .removeSuffix("```")
-        .trim()
+    val cleaned = trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
     val start = cleaned.indexOf('{')
     val end = cleaned.lastIndexOf('}')
     require(start >= 0 && end > start) { "Memory micro-agent did not return JSON" }
