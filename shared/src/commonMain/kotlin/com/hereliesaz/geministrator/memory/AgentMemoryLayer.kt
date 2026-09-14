@@ -37,12 +37,42 @@ class AgentMemoryLayer private constructor(
             )
         }
 
+        /**
+         * Preferred production path for local memory maintenance. Each specialist may use its own
+         * small model or share a base model with role-specific adapters. The consolidation packet
+         * budget is clamped to the smallest configured specialist before any work is scheduled, so
+         * a model context overflow cannot be created by the memory engine itself.
+         */
+        fun createWithMicroAgents(
+            store: MemoryStore,
+            agents: Collection<MemoryMicroAgent>,
+            policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+            maxChunkChars: Int = 6_000,
+        ): AgentMemoryLayer {
+            val router = MemoryMicroAgentRouter(agents)
+            return create(
+                store = store,
+                manager = router,
+                policy = router.constrainPolicy(policy),
+                maxChunkChars = maxChunkChars,
+            )
+        }
+
         fun createDefault(
             manager: MemoryManagerAgent? = null,
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
         ): AgentMemoryLayer = create(
             store = SettingsMemoryStore.createDefault(),
             manager = manager,
+            policy = policy,
+        )
+
+        fun createDefaultWithMicroAgents(
+            agents: Collection<MemoryMicroAgent>,
+            policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+        ): AgentMemoryLayer = createWithMicroAgents(
+            store = SettingsMemoryStore.createDefault(),
+            agents = agents,
             policy = policy,
         )
     }
