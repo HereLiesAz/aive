@@ -3,23 +3,44 @@ package com.hereliesaz.geministrator.memory
 import kotlin.math.max
 
 /**
- * Agent-facing memory surface. Agents query this service; they do not read persistence directly.
- * A query chooses its desired semantic resolution and may then expand a hit up or down the graph.
+ * Agent-facing memory surface. Agents bank experience and query this service; they do not read
+ * persistence directly.
+ *
+ * Normal associative recall is tag-first. An agent that already carries semantic tags in its CoTR
+ * can pass those tags directly through [grepTags] and request a deeper resolution only when the
+ * tags themselves are not enough to recollect what it needs.
  */
 interface MemoryTool {
+    /**
+     * Deliberately bank a note, small plan, checkpoint, procedure, resource, or other context now.
+     * The deposit enters the same clerical pipeline as lifecycle banking but jumps to next in line
+     * for consolidation. Once consolidated, it has no special reminder retrieval semantics.
+     */
+    suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry
+
+    /** Free-text associative lookup. Defaults to tag-level cues. */
     suspend fun grep(query: MemoryQuery): MemoryRecallBundle
 
+    /** Tag-addressed lookup for semantic tags already present in an agent's CoTR. */
+    suspend fun grepTags(query: MemoryTagQuery): MemoryRecallBundle
+
+    /** Explicitly descend or ascend from a known memory node when tag cues are insufficient. */
     suspend fun expand(
         nodeId: MemoryNodeId,
         resolution: MemoryResolution,
         maxResults: Int = 12,
-        includeConflicts: Boolean = true,
+        includeConflicts: Boolean = false,
     ): List<MemoryRecallHit>
 }
 
 class GraphMemoryTool(
     private val store: MemoryStore,
+    private val queue: MemoryConsolidationQueue = MemoryConsolidationQueue(store),
 ) : MemoryTool {
+    override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
+
+    override suspend fun grepTags(query: MemoryTagQuery): MemoryRecallBundle = grep(query.asMemoryQuery())
+
     override suspend fun grep(query: MemoryQuery): MemoryRecallBundle {
         val snapshot = store.read()
         val active = snapshot.activeNodes(query.projectId)
@@ -122,6 +143,19 @@ class GraphMemoryTool(
     }
 }
 
+private fun MemoryTagQuery.asMemoryQuery(): MemoryQuery = MemoryQuery(
+    text = tags.joinToString(" "),
+    resolution = resolution,
+    maxResults = maxResults,
+    includeConflicts = includeConflicts,
+    projectId = scope.projectId,
+    workflowRunId = scope.workflowRunId,
+    workflowDefinitionId = scope.workflowDefinitionId,
+    taskRunId = scope.taskRunId,
+    taskDefinitionId = scope.taskDefinitionId,
+    roleId = scope.roleId,
+)
+
 private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {
     MemoryResolution.Category -> setOf(MemoryNodeKind.Category)
     MemoryResolution.Summary -> setOf(MemoryNodeKind.Summary)
@@ -217,8 +251,8 @@ private fun projectToKinds(
         val next = mutableListOf<MemoryNodeId>()
         frontier.forEach { id ->
             val node = nodesById[id]
-            if (id in activeIds && node?.kind in targetKinds) {
-                result.putIfAbsent(id, depth)
+            if (id in activeIds && node?.kind in targetKinds && id !in result) {
+                result[id] = depth
             }
             adjacency[id].orEmpty().forEach { neighbor ->
                 if (neighbor.id !in visited && neighbor.relation.isRecallTraversable()) {
