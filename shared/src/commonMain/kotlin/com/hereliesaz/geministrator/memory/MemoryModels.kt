@@ -294,12 +294,16 @@ enum class MemoryResolution {
     Context,
 }
 
+/**
+ * Free-text associative lookup. Its default resolution is Tag because tags are Haive's normal
+ * ambient memory cue; deeper content is requested deliberately.
+ */
 @Serializable
 data class MemoryQuery(
     val text: String,
     val resolution: MemoryResolution = MemoryResolution.Tag,
     val maxResults: Int = 12,
-    val includeConflicts: Boolean = true,
+    val includeConflicts: Boolean = false,
     val projectId: String? = null,
     val workflowRunId: String? = null,
     val workflowDefinitionId: String? = null,
@@ -310,6 +314,25 @@ data class MemoryQuery(
     init {
         require(text.isNotBlank()) { "Memory query must not be blank" }
         require(maxResults > 0) { "Memory query result limit must be positive" }
+    }
+}
+
+/**
+ * Tag-addressed recall for agents that already carry semantic tags in their CoTR. No prose query
+ * synthesis is required: the tags themselves are sufficient addresses into the memory graph.
+ */
+@Serializable
+data class MemoryTagQuery(
+    val tags: List<String>,
+    val resolution: MemoryResolution = MemoryResolution.Tag,
+    val maxResults: Int = 12,
+    val includeConflicts: Boolean = false,
+    val scope: MemoryBankScope = MemoryBankScope(),
+) {
+    init {
+        require(tags.isNotEmpty()) { "Memory tag query must contain at least one tag" }
+        require(tags.all { it.isNotBlank() }) { "Memory tag query tags must not be blank" }
+        require(maxResults > 0) { "Memory tag query result limit must be positive" }
     }
 }
 
