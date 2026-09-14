@@ -4,8 +4,10 @@ import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.displayName
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
@@ -263,9 +265,7 @@ class GitHubActionsExecutorIntegration(
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.GitHubAction
-        val repository = requireNotNull(context.project.repository) {
-            "GitHub Action executor requires a project repository"
-        }
+        val repository = requireGitHubRepository(context)
         val ref = executor.ref ?: repository.defaultBranch
         require(!ref.isNullOrBlank()) {
             "GitHub Action executor requires an explicit ref or repository default branch"
@@ -276,13 +276,21 @@ class GitHubActionsExecutorIntegration(
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
-        val repository = requireNotNull(context.project.repository) {
-            "GitHub Action executor requires a project repository"
-        }
+        val repository = requireGitHubRepository(context)
         val runId = requireNotNull(context.taskRun.externalRunId) {
             "GitHub Action task ${context.task.id.value} is missing its external run ID"
         }
         return client.getRun(repository, runId).toExecution(context)
+    }
+
+    private fun requireGitHubRepository(context: TaskExecutorContext): RepositoryRef {
+        val repository = requireNotNull(context.project.repository) {
+            "GitHub Action executor requires a project repository"
+        }
+        require(repository.source == RepositorySource.GitHub) {
+            "GitHub Action executor requires a GitHub repository; project is linked to ${repository.source.displayName()}."
+        }
+        return repository
     }
 
     private fun GitHubWorkflowRun.toExecution(context: TaskExecutorContext): TaskExecutorExecution {
