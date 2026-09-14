@@ -43,7 +43,7 @@ class GraphMemoryTool(
 
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val snapshot = store.read()
-        val active = snapshot.activeNodes(query.projectId)
+        val active = snapshot.activeNodes(query)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
@@ -63,7 +63,7 @@ class GraphMemoryTool(
     override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle {
         val normalizedQuery = query.asMemoryQuery()
         val snapshot = store.read()
-        val active = snapshot.activeNodes(query.scope.projectId)
+        val active = snapshot.activeNodes(normalizedQuery)
         if (active.isEmpty()) return MemoryRecallBundle(normalizedQuery, emptyList())
 
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
@@ -133,7 +133,7 @@ private fun MemorySnapshot.recallFromSeeds(
     val episodesById = episodes.associateBy(MemoryEpisode::id)
     val adjacency = adjacency()
     val targetKinds = query.resolution.nodeKinds()
-    val activeIds = activeNodes(query.projectId).mapTo(hashSetOf()) { it.id }
+    val activeIds = activeNodes(query).mapTo(hashSetOf()) { it.id }
     val projected = linkedMapOf<MemoryNodeId, Float>()
 
     scoredSeeds.forEach { (seed, score) ->
@@ -224,41 +224,53 @@ private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> = buil
     }
 }
 
-private fun MemorySnapshot.activeNodes(projectId: String?): List<MemoryNode> {
+private fun MemorySnapshot.activeNodes(query: MemoryQuery?): List<MemoryNode> {
     val superseded = edges
         .asSequence()
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val projectEpisodes = if (projectId == null) {
-        null
-    } else {
-        episodes.filter { it.projectId == projectId }.mapTo(hashSetOf()) { it.id }
+
+    if (query == null || !query.hasScopeConstraints()) {
+        return nodes.filter { it.id !in superseded }
     }
+
+    val episodesById = episodes.associateBy(MemoryEpisode::id)
     return nodes.filter { node ->
         node.id !in superseded &&
-            (projectEpisodes == null || node.sourceEpisodeIds.isEmpty() || node.sourceEpisodeIds.any { it in projectEpisodes })
+            node.sourceEpisodeIds.isNotEmpty() &&
+            node.sourceEpisodeIds.any { episodeId ->
+                episodesById[episodeId]?.let(query::matchesScope) == true
+            }
     }
 }
+
+private fun MemoryQuery.hasScopeConstraints(): Boolean =
+    projectId != null ||
+        workflowRunId != null ||
+        workflowDefinitionId != null ||
+        taskRunId != null ||
+        taskDefinitionId != null ||
+        roleId != null
+
+private fun MemoryQuery.matchesScope(episode: MemoryEpisode): Boolean =
+    (projectId == null || projectId == episode.projectId) &&
+        (workflowRunId == null || workflowRunId == episode.workflowRunId) &&
+        (workflowDefinitionId == null || workflowDefinitionId == episode.workflowDefinitionId) &&
+        (taskRunId == null || taskRunId == episode.taskRunId) &&
+        (taskDefinitionId == null || taskDefinitionId == episode.taskDefinitionId) &&
+        (roleId == null || roleId == episode.roleId)
 
 private fun scopeAffinity(
     query: MemoryQuery,
     node: MemoryNode,
     episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
 ): Float {
-    if (
-        query.projectId == null &&
-        query.workflowRunId == null &&
-        query.workflowDefinitionId == null &&
-        query.taskRunId == null &&
-        query.taskDefinitionId == null &&
-        query.roleId == null
-    ) {
-        return 0f
-    }
+    if (!query.hasScopeConstraints()) return 0f
 
     return node.sourceEpisodeIds
         .asSequence()
         .mapNotNull(episodesById::get)
+        .filter(query::matchesScope)
         .maxOfOrNull { episode ->
             var score = 0f
             if (query.projectId != null && query.projectId == episode.projectId) score += 0.05f
