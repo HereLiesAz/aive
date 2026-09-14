@@ -53,35 +53,27 @@ fun main() {
                 state = rememberWindowState(width = 1180.dp, height = 760.dp),
             ) {
                 var credentials by remember { mutableStateOf(initialCredentials) }
-                var setupComplete by remember { mutableStateOf(initialCredentials.isNotEmpty()) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
                 val providers = remember(credentials) { configuredDesktopProviders(credentials) }
 
                 val providerId = configuringProviderId
-                when {
-                    providerId != null -> ProviderCredentialSetup(
+                if (providerId != null) {
+                    ProviderCredentialSetup(
                         providerId = providerId,
                         onSave = { key ->
                             credentialStore.write(providerId, key)
                             credentials = readDesktopProviderCredentials(credentialStore)
                             configuringProviderId = null
-                            setupComplete = true
                         },
                         onCancel = { configuringProviderId = null },
                     )
-
-                    !setupComplete -> InitialProviderSetup(
-                        configuredProviderIds = credentials.keys,
-                        onConfigure = { configuringProviderId = it },
-                        onContinue = { setupComplete = true },
-                    )
-
-                    else -> App(
+                } else {
+                    App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         onReconfigureProvider = { configuringProviderId = it },
-                        onDisconnectProvider = { providerId ->
-                            credentialStore.clear(providerId)
+                        onDisconnectProvider = { disconnectedProviderId ->
+                            credentialStore.clear(disconnectedProviderId)
                             credentials = readDesktopProviderCredentials(credentialStore)
                         },
                     )
