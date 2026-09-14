@@ -10,7 +10,15 @@ class AssociativeMemoryManagerAgent(
     private val delegate: MemoryManagerAgent,
 ) : MemoryManagerAgent {
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val batch = delegate.process(packet)
+        val safePacket = if (packet.stage == MemoryConsolidationStage.Associations) {
+            packet.copy(
+                instruction = "Associate memories only by shared topics, concepts, entities, actions, or other semantic proximity. " +
+                    "Do not infer contradiction, truth, falsity, conflict resolution, or which memory supersedes another.",
+            )
+        } else {
+            packet
+        }
+        val batch = delegate.process(safePacket)
         require(batch.edgesToAdd.none { edge ->
             edge.relation == MemoryRelationKind.ConflictsWith ||
                 edge.relation == MemoryRelationKind.ResolvesConflict
