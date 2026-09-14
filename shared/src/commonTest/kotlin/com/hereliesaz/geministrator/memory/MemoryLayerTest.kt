@@ -168,7 +168,7 @@ class MemoryLayerTest {
     }
 
     @Test
-    fun gripPrefersTheClosestOrchestrationHierarchy() = runBlocking {
+    fun gripRestrictsRecallToTheRequestedOrchestrationScope() = runBlocking {
         val localEpisode = MemoryEpisode(
             id = MemoryEpisodeId("local-episode"),
             sourceSessionId = "local-session",
@@ -237,8 +237,7 @@ class MemoryLayerTest {
             ),
         )
 
-        assertEquals(local.id, recalled.hits.first().node.id)
-        assertTrue(recalled.hits.first().score > recalled.hits[1].score)
+        assertEquals(listOf(local.id), recalled.hits.map { it.node.id })
     }
 
     @Test
