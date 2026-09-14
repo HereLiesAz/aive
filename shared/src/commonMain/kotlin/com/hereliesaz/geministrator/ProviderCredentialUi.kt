@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,20 +34,49 @@ fun ProviderCredentialSetup(
     var apiKey by remember(providerId) { mutableStateOf("") }
     var errorMessage by remember(providerId) { mutableStateOf<String?>(null) }
 
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
+    MaterialTheme(colorScheme = GeministratorColors) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Azphalt.currentGround.page,
+        ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(26.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("CONNECT ${entry.displayName.uppercase()}", style = MaterialTheme.typography.headlineMedium)
-                Text(entry.description, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(
-                    onClick = { uriHandler.openUri(entry.apiKeyUrl) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("GET ${entry.credentialLabel.uppercase()}")
-                }
+                Text(
+                    "CONNECT",
+                    style = AzphaltType.hero,
+                    color = Azphalt.currentGround.onPage,
+                )
+                Text(
+                    entry.displayName.uppercase(),
+                    style = AzphaltType.section,
+                    color = Azphalt.currentGround.onPage,
+                )
+
+                AzphaltRecord(
+                    seed = "credential-provider-${entry.id}",
+                    eyebrow = "AI provider",
+                    title = entry.displayName,
+                    body = entry.description,
+                    endCap = "Credential required",
+                    well = {
+                        AzphaltPill(
+                            label = "Get ${entry.credentialLabel}",
+                            seed = "credential-link-${entry.id}",
+                            onClick = { uriHandler.openUri(entry.apiKeyUrl) },
+                        )
+                    },
+                )
+
+                Text(
+                    "CREDENTIAL",
+                    style = AzphaltType.eyebrow,
+                    color = Azphalt.currentGround.onPage,
+                )
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = {
@@ -59,10 +88,16 @@ fun ProviderCredentialSetup(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     isError = errorMessage != null,
-                    supportingText = errorMessage?.let { message -> { Text(message) } },
+                    supportingText = errorMessage?.let { message ->
+                        { Text(message) }
+                    },
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AzphaltPill(
+                        label = "Save",
+                        seed = "credential-save-${entry.id}",
+                        selected = apiKey.isNotBlank(),
                         onClick = {
                             val clean = apiKey.trim()
                             if (clean.isEmpty()) {
@@ -71,13 +106,12 @@ fun ProviderCredentialSetup(
                                 onSave(clean)
                             }
                         },
-                        enabled = apiKey.isNotBlank(),
-                    ) {
-                        Text("SAVE")
-                    }
-                    OutlinedButton(onClick = onCancel) {
-                        Text("CANCEL")
-                    }
+                    )
+                    AzphaltPill(
+                        label = "Cancel",
+                        seed = "credential-cancel-${entry.id}",
+                        onClick = onCancel,
+                    )
                 }
             }
         }
@@ -91,39 +125,67 @@ fun InitialProviderSetup(
     onContinue: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
+
+    MaterialTheme(colorScheme = GeministratorColors) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Azphalt.currentGround.page,
+        ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(26.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("CONNECT AI PROVIDERS", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "CONNECT AI PROVIDERS",
+                    style = AzphaltType.hero,
+                    color = Azphalt.currentGround.onPage,
+                )
                 Text(
                     "Connect one or more providers. You can assign different company roles to different providers later, so a single service does not have to carry the whole orchestration.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
                 )
+
                 ProviderCatalog.entries.forEach { entry ->
                     val connected = entry.id in configuredProviderIds
-                    Text(
-                        "${entry.displayName} · ${if (connected) "Connected" else "Not configured"}",
-                        style = MaterialTheme.typography.titleMedium,
+                    AzphaltRecord(
+                        seed = "initial-provider-${entry.id}",
+                        eyebrow = "AI provider",
+                        title = entry.displayName,
+                        body = entry.description,
+                        endCap = if (connected) "Connected" else "Not configured",
+                        selected = connected,
+                        well = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AzphaltPill(
+                                    label = if (connected) "Reconfigure" else "Connect",
+                                    seed = "initial-configure-${entry.id}",
+                                    onClick = { onConfigure(entry.id) },
+                                )
+                                AzphaltPill(
+                                    label = "Get API key",
+                                    seed = "initial-key-link-${entry.id}",
+                                    onClick = { uriHandler.openUri(entry.apiKeyUrl) },
+                                )
+                            }
+                        },
                     )
-                    Text(entry.description, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { onConfigure(entry.id) }) {
-                            Text(if (connected) "RECONFIGURE" else "CONNECT")
-                        }
-                        OutlinedButton(onClick = { uriHandler.openUri(entry.apiKeyUrl) }) {
-                            Text("GET API KEY")
-                        }
-                    }
                 }
-                OutlinedButton(
+
+                AzphaltPill(
+                    label = if (configuredProviderIds.isEmpty()) {
+                        "Continue without a provider"
+                    } else {
+                        "Continue"
+                    },
+                    seed = "initial-provider-continue",
+                    selected = configuredProviderIds.isNotEmpty(),
                     onClick = onContinue,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (configuredProviderIds.isEmpty()) "CONTINUE WITHOUT A PROVIDER" else "CONTINUE")
-                }
+                )
             }
         }
     }
