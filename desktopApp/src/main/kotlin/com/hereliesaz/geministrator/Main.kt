@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
+import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -32,20 +33,21 @@ fun main() {
 
     val githubToken = System.getenv("GITHUB_TOKEN")?.takeIf(String::isNotBlank)
     val githubClient = githubToken?.let { HttpClient(CIO) }
-    val executorIntegrations = if (githubToken != null && githubClient != null) {
-        TaskExecutorIntegrationRegistry(
-            listOf(
-                GitHubActionsExecutorIntegration(
-                    GitHubRestActionsClient(
-                        httpClient = githubClient,
-                        tokenProvider = GitHubTokenProvider { githubToken },
+    val executorIntegrations = TaskExecutorIntegrationRegistry(
+        buildList {
+            add(RepositoryOperationExecutorIntegration(LocalGitRepositoryOperationClient()))
+            if (githubToken != null && githubClient != null) {
+                add(
+                    GitHubActionsExecutorIntegration(
+                        GitHubRestActionsClient(
+                            httpClient = githubClient,
+                            tokenProvider = GitHubTokenProvider { githubToken },
+                        ),
                     ),
-                ),
-            ),
-        )
-    } else {
-        TaskExecutorIntegrationRegistry.Empty
-    }
+                )
+            }
+        },
+    )
 
     try {
         application {
