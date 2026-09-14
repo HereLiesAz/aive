@@ -17,15 +17,22 @@ class RepositoryOperationExecutorIntegration(
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
-        return client.start(context.project, executor.operation).toTaskExecution()
+        return client.start(context.project, executor.operation).toRepositoryTaskExecution(context)
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
         val runId = requireNotNull(context.taskRun.externalRunId) {
             "Repository operation task ${context.task.id.value} is missing its external run ID"
         }
-        return client.getRun(context.project, runId).toTaskExecution()
+        return client.getRun(context.project, runId).toRepositoryTaskExecution(context)
     }
+
+    private fun ExternalExecutionRun.toRepositoryTaskExecution(context: TaskExecutorContext): TaskExecutorExecution =
+        copy(
+            artifacts = artifacts.map { artifact ->
+                artifact.copy(taskRunId = context.taskRun.id)
+            },
+        ).toTaskExecution()
 }
 
 interface ExternalServiceClient {

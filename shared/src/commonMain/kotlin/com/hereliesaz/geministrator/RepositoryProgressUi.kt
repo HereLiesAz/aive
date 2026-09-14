@@ -30,6 +30,9 @@ internal fun RepositoryProgressRecord(
     val latestChange = artifacts.firstOrNull { it.kind == ArtifactKind.CodeChange }
     val latestPullRequest = artifacts.firstOrNull { it.kind == ArtifactKind.PullRequest }
     val latestRelease = artifacts.firstOrNull { it.kind == ArtifactKind.Release }
+    val latestRepositoryOperation = artifacts.firstOrNull { artifact ->
+        artifact.metadata["repositorySource"] != null && artifact.metadata["operation"] != null
+    }
     val activeRepositoryTask = run.taskRuns.values.firstOrNull { taskRun ->
         !taskRun.status.isTerminal() &&
             (taskRun.executor is TaskExecutor.RepositoryOperation || taskRun.executor is TaskExecutor.GitHubAction)
@@ -45,9 +48,13 @@ internal fun RepositoryProgressRecord(
         !taskRun.status.isTerminal() && taskRun.assignedRoleId?.value in repositoryFacingRoles
     }
     val active = activeRepositoryTask ?: activeCodeTask
-    val branch = repository.defaultBranch ?: "Default branch not specified"
+    val reportedBranch = latestRepositoryOperation?.metadata?.get("branch")
+    val branch = reportedBranch ?: repository.defaultBranch ?: "Default branch not specified"
     val baseCommit = latestChange?.metadata?.get("baseCommitId")?.take(12)
     val suggestedCommit = latestChange?.metadata?.get("suggestedCommitMessage")
+    val headCommit = latestRepositoryOperation?.metadata?.get("headCommit")?.take(12)
+    val dirtyFileCount = latestRepositoryOperation?.metadata?.get("dirtyFileCount")?.toIntOrNull()
+    val latestRepositoryOperationLabel = latestRepositoryOperation?.metadata?.get("operation")
     val repositoryUrl = repository.remoteBrowserUrl()
     val pullRequestUrl = latestPullRequest?.uri
 
@@ -59,6 +66,23 @@ internal fun RepositoryProgressRecord(
             append(repository.locationLabel())
             append("\nBranch: ")
             append(branch)
+            headCommit?.let {
+                append("\nHEAD: ")
+                append(it)
+            }
+            dirtyFileCount?.let { count ->
+                append("\nWorking tree: ")
+                if (count == 0) {
+                    append("clean")
+                } else {
+                    append(count)
+                    append(if (count == 1) " changed file" else " changed files")
+                }
+            }
+            latestRepositoryOperationLabel?.takeIf(String::isNotBlank)?.let {
+                append("\nLast Git operation: ")
+                append(it)
+            }
             baseCommit?.let {
                 append("\nBase commit: ")
                 append(it)
@@ -89,6 +113,8 @@ internal fun RepositoryProgressRecord(
             active != null -> "Working"
             latestRelease != null -> "Released"
             latestPullRequest != null -> "PR ready"
+            dirtyFileCount != null && dirtyFileCount > 0 -> "Dirty"
+            latestRepositoryOperation != null -> "Clean"
             latestChange != null -> "Changes"
             else -> "Linked"
         },

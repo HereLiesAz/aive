@@ -12,6 +12,7 @@ dependencies {
     implementation(projects.providers.llm)
     implementation(compose.desktop.currentOs)
     implementation(libs.ktor.client.cio)
+    testImplementation(kotlin("test"))
 }
 
 kotlin {
