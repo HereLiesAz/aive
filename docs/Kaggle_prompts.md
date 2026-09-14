@@ -233,6 +233,10 @@ The notebook must:
 
 Be rigorous about portability. Do not optimize solely for Kaggle training performance at the expense of Android or browser inference.
 
+Use Qwen/Qwen2.5-0.5B-Instruct as the presumptive shared foundation model for the Haive Memory Clerks. Benchmark it first and attempt to disprove its suitability rather than performing an unconstrained model search. Compare it against at least two alternatives only as controls. Replace Qwen2.5-0.5B-Instruct only if measured specialist accuracy, structured-output reliability, quantization degradation, or Android/Desktop/Web deployment performance demonstrates a material disadvantage.
+
+The primary experiment is one shared Qwen2.5-0.5B-Instruct foundation with separate LoRA/PEFT adapters for each clerical role. Also evaluate merged-and-quantized versions of each specialist because adapter hot-swapping may not be uniformly practical across Android, desktop, WASM, and WebGPU.
+
 ---
 
 Prompt 1 — Train the Sectioner Clerk
