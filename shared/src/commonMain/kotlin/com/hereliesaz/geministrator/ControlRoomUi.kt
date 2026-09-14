@@ -49,6 +49,7 @@ enum class ControlRoomDestination(val label: String) {
     Company("Company"),
     Artifacts("Artifacts"),
     Inbox("Inbox"),
+    Repositories("Repositories"),
     Settings("Settings"),
 }
 
@@ -107,6 +108,9 @@ fun ControlRoom(
     onSaveRole: (RoleDefinition) -> Unit = {},
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
+    connectedRepositoryServiceIds: Set<String> = emptySet(),
+    onConfigureRepositoryService: (String) -> Unit = {},
+    onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
     compact: Boolean,
@@ -151,6 +155,9 @@ fun ControlRoom(
                     onSaveRole = onSaveRole,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
+                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                    onConfigureRepositoryService = onConfigureRepositoryService,
+                    onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
@@ -205,6 +212,9 @@ fun ControlRoom(
                     onSaveRole = onSaveRole,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
+                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                    onConfigureRepositoryService = onConfigureRepositoryService,
+                    onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
                     connectedProviderIds = connectedProviderIds,
@@ -337,6 +347,9 @@ private fun MainDestination(
     onSaveRole: (RoleDefinition) -> Unit,
     availableRepositorySources: Set<RepositorySource>,
     onPickLocalRepository: (() -> String?)?,
+    connectedRepositoryServiceIds: Set<String>,
+    onConfigureRepositoryService: (String) -> Unit,
+    onDisconnectRepositoryService: (String) -> Unit,
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
     connectedProviderIds: Set<String>,
@@ -376,6 +389,12 @@ private fun MainDestination(
             )
             ControlRoomDestination.Artifacts -> ArtifactFileManagerScreen(runtimeState, Modifier.fillMaxSize())
             ControlRoomDestination.Inbox -> InboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+            ControlRoomDestination.Repositories -> RepositoryServiceScreen(
+                connectedServiceIds = connectedRepositoryServiceIds,
+                onConfigureService = onConfigureRepositoryService,
+                onDisconnectService = onDisconnectRepositoryService,
+                modifier = Modifier.fillMaxSize(),
+            )
             ControlRoomDestination.Settings -> ProviderSettingsScreen(
                 connectedProviderIds = connectedProviderIds,
                 onCheckProviderHealth = onCheckProviderHealth,

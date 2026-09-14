@@ -18,6 +18,7 @@ class RepositoryRefsTest {
         assertEquals("haive", repository.name)
         assertEquals("main", repository.defaultBranch)
         assertEquals("https://github.com/HereLiesAz/haive.git", repository.remoteUrl)
+        assertEquals("https://github.com/HereLiesAz/haive", repository.remoteBrowserUrl())
         assertNull(repository.localPath)
     }
 
@@ -34,6 +35,20 @@ class RepositoryRefsTest {
         assertEquals("haive", repository.name)
         assertEquals("develop", repository.defaultBranch)
         assertEquals("git@gitlab.com:team/platform/haive.git", repository.remoteUrl)
+        assertEquals("https://gitlab.com/team/platform/haive", repository.remoteBrowserUrl())
+    }
+
+    @Test
+    fun selfManagedGitLabSshRemoteRetainsHostForBrowserLink() {
+        val repository = parseRepositoryRef(
+            source = RepositorySource.GitLab,
+            locator = "ssh://git@gitlab.example.test:2222/team/platform/haive.git",
+            defaultBranch = "main",
+        )
+
+        assertEquals("team/platform", repository.owner)
+        assertEquals("haive", repository.name)
+        assertEquals("https://gitlab.example.test/team/platform/haive", repository.remoteBrowserUrl())
     }
 
     @Test

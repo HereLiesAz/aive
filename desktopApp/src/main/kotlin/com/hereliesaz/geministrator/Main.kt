@@ -20,34 +20,23 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
+import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
+import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
+import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
+import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import javax.swing.JFileChooser
 
 fun main() {
-    val credentialStore = DesktopProviderCredentialStore()
-    val initialCredentials = readDesktopProviderCredentials(credentialStore)
-
-    val githubToken = System.getenv("GITHUB_TOKEN")?.takeIf(String::isNotBlank)
-    val githubClient = githubToken?.let { HttpClient(CIO) }
-    val executorIntegrations = TaskExecutorIntegrationRegistry(
-        buildList {
-            add(RepositoryOperationExecutorIntegration(LocalGitRepositoryOperationClient()))
-            if (githubToken != null && githubClient != null) {
-                add(
-                    GitHubActionsExecutorIntegration(
-                        GitHubRestActionsClient(
-                            httpClient = githubClient,
-                            tokenProvider = GitHubTokenProvider { githubToken },
-                        ),
-                    ),
-                )
-            }
-        },
-    )
+    val providerCredentialStore = DesktopProviderCredentialStore()
+    val repositoryCredentialStore = DesktopRepositoryCredentialStore()
+    val initialProviderCredentials = readDesktopProviderCredentials(providerCredentialStore)
+    val initialRepositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+    val httpClient = HttpClient(CIO)
 
     try {
         application {
@@ -56,38 +45,58 @@ fun main() {
                 title = "The Haive",
                 state = rememberWindowState(width = 1180.dp, height = 760.dp),
             ) {
-                var credentials by remember { mutableStateOf(initialCredentials) }
+                var credentials by remember { mutableStateOf(initialProviderCredentials) }
+                var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
+                var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 val providers = remember(credentials) { configuredDesktopProviders(credentials) }
+                val executorIntegrations = remember(repositoryCredentials) {
+                    configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
+                }
 
+                val repositoryServiceId = configuringRepositoryServiceId
                 val providerId = configuringProviderId
-                if (providerId != null) {
-                    ProviderCredentialSetup(
+                when {
+                    repositoryServiceId != null -> RepositoryCredentialSetup(
+                        serviceId = repositoryServiceId,
+                        onSave = { credential ->
+                            repositoryCredentialStore.write(repositoryServiceId, credential)
+                            repositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+                            configuringRepositoryServiceId = null
+                        },
+                        onCancel = { configuringRepositoryServiceId = null },
+                    )
+                    providerId != null -> ProviderCredentialSetup(
                         providerId = providerId,
                         onSave = { key ->
-                            credentialStore.write(providerId, key)
-                            credentials = readDesktopProviderCredentials(credentialStore)
+                            providerCredentialStore.write(providerId, key)
+                            credentials = readDesktopProviderCredentials(providerCredentialStore)
                             configuringProviderId = null
                         },
                         onCancel = { configuringProviderId = null },
                     )
-                } else {
-                    App(
+                    else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         availableRepositorySources = RepositorySource.entries.toSet(),
                         onPickLocalRepository = ::pickLocalGitFolder,
+                        connectedRepositoryServiceIds = repositoryCredentials.keys,
+                        onConfigureRepositoryService = { configuringRepositoryServiceId = it },
+                        onDisconnectRepositoryService = { serviceId ->
+                            repositoryCredentialStore.clear(serviceId)
+                            repositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+                        },
                         onReconfigureProvider = { configuringProviderId = it },
                         onDisconnectProvider = { disconnectedProviderId ->
-                            credentialStore.clear(disconnectedProviderId)
-                            credentials = readDesktopProviderCredentials(credentialStore)
+                            providerCredentialStore.clear(disconnectedProviderId)
+                            credentials = readDesktopProviderCredentials(providerCredentialStore)
                         },
                     )
                 }
             }
         }
     } finally {
-        githubClient?.close()
+        httpClient.close()
     }
 }
 
@@ -115,9 +124,60 @@ internal fun configuredDesktopProviders(credentials: Map<String, String>): List<
     }
 }
 
+internal fun configuredDesktopExecutorIntegrations(
+    repositoryCredentials: Map<String, String>,
+    httpClient: HttpClient,
+): TaskExecutorIntegrationRegistry {
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
+    val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    val repositoryClients = buildList {
+        add(LocalGitRepositoryOperationClient())
+        githubToken?.let { token ->
+            add(
+                GitHubRestRepositoryOperationClient(
+                    tokenProvider = RepositoryServiceTokenProvider { token },
+                    httpClient = httpClient,
+                ),
+            )
+        }
+        gitlabToken?.let { token ->
+            add(
+                GitLabRestRepositoryOperationClient(
+                    tokenProvider = RepositoryServiceTokenProvider { token },
+                    httpClient = httpClient,
+                ),
+            )
+        }
+    }
+    return TaskExecutorIntegrationRegistry(
+        buildList {
+            add(
+                RepositoryOperationExecutorIntegration(
+                    RoutingRepositoryOperationClient(repositoryClients),
+                ),
+            )
+            githubToken?.let { token ->
+                add(
+                    GitHubActionsExecutorIntegration(
+                        GitHubRestActionsClient(
+                            httpClient = httpClient,
+                            tokenProvider = GitHubTokenProvider { token },
+                        ),
+                    ),
+                )
+            }
+        },
+    )
+}
+
 private fun readDesktopProviderCredentials(store: DesktopProviderCredentialStore): Map<String, String> = buildMap {
     environmentProviderCredentials().forEach { (providerId, key) -> put(providerId, key) }
     store.readAll().forEach { (providerId, key) -> put(providerId, key) }
+}
+
+private fun readDesktopRepositoryCredentials(store: DesktopRepositoryCredentialStore): Map<String, String> = buildMap {
+    environmentRepositoryCredentials().forEach { (serviceId, credential) -> put(serviceId, credential) }
+    store.readAll().forEach { (serviceId, credential) -> put(serviceId, credential) }
 }
 
 private fun environmentProviderCredentials(): Map<String, String> = buildMap {
@@ -132,6 +192,18 @@ private fun environmentProviderCredentials(): Map<String, String> = buildMap {
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.let { put(providerId, it) }
+    }
+}
+
+private fun environmentRepositoryCredentials(): Map<String, String> = buildMap {
+    listOf(
+        RepositoryServiceCatalog.GITHUB_ID to "GITHUB_TOKEN",
+        RepositoryServiceCatalog.GITLAB_ID to "GITLAB_TOKEN",
+    ).forEach { (serviceId, environmentName) ->
+        System.getenv(environmentName)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { put(serviceId, it) }
     }
 }
 
@@ -159,5 +231,5 @@ private fun pickLocalGitFolder(): String? {
     }.getOrNull()
 }
 
-private fun Map<String, String>.cleanKey(providerId: String): String? =
-    this[providerId]?.trim()?.takeIf(String::isNotEmpty)
+private fun Map<String, String>.cleanKey(id: String): String? =
+    this[id]?.trim()?.takeIf(String::isNotEmpty)

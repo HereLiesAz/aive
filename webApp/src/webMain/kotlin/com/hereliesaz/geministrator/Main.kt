@@ -1,10 +1,10 @@
 package com.hereliesaz.geministrator
 
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
@@ -17,7 +17,12 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
+import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
+import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
+import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
+import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
+import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.browser.window
 
@@ -27,21 +32,36 @@ private const val ANTHROPIC_API_KEY_STORAGE_KEY = "haive.anthropicApiKey"
 private const val GEMINI_API_KEY_STORAGE_KEY = "haive.geminiApiKey"
 private const val XAI_API_KEY_STORAGE_KEY = "haive.xaiApiKey"
 private const val GITHUB_TOKEN_STORAGE_KEY = "haive.githubToken"
+private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     ComposeViewport(viewportContainerId = "webApp") {
         var credentials by remember { mutableStateOf(readWebProviderCredentials()) }
+        var repositoryCredentials by remember { mutableStateOf(readWebRepositoryCredentials()) }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
+        var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
         val providers = remember(credentials) { configuredWebProviders(credentials) }
-        val githubToken = window.localStorage.getItem(GITHUB_TOKEN_STORAGE_KEY)
-        val executorIntegrations = remember(githubToken) {
-            configuredWebExecutorIntegrations(githubToken)
+        val executorIntegrations = remember(repositoryCredentials) {
+            configuredWebExecutorIntegrations(
+                githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID),
+                gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID),
+            )
         }
 
+        val repositoryServiceId = configuringRepositoryServiceId
         val providerId = configuringProviderId
-        if (providerId != null) {
-            ProviderCredentialSetup(
+        when {
+            repositoryServiceId != null -> RepositoryCredentialSetup(
+                serviceId = repositoryServiceId,
+                onSave = { credential ->
+                    window.localStorage.setItem(repositoryStorageKey(repositoryServiceId), credential)
+                    repositoryCredentials = readWebRepositoryCredentials()
+                    configuringRepositoryServiceId = null
+                },
+                onCancel = { configuringRepositoryServiceId = null },
+            )
+            providerId != null -> ProviderCredentialSetup(
                 providerId = providerId,
                 onSave = { key ->
                     window.localStorage.setItem(providerStorageKey(providerId), key)
@@ -50,10 +70,15 @@ fun main() {
                 },
                 onCancel = { configuringProviderId = null },
             )
-        } else {
-            App(
+            else -> App(
                 providers = providers,
                 executorIntegrations = executorIntegrations,
+                connectedRepositoryServiceIds = repositoryCredentials.keys,
+                onConfigureRepositoryService = { configuringRepositoryServiceId = it },
+                onDisconnectRepositoryService = { serviceId ->
+                    window.localStorage.removeItem(repositoryStorageKey(serviceId))
+                    repositoryCredentials = readWebRepositoryCredentials()
+                },
                 onReconfigureProvider = { configuringProviderId = it },
                 onDisconnectProvider = { disconnectedProviderId ->
                     window.localStorage.removeItem(providerStorageKey(disconnectedProviderId))
@@ -97,23 +122,59 @@ internal fun configuredWebProviders(julesApiKey: String?): List<AgentProvider> =
             .orEmpty(),
     )
 
-internal fun configuredWebExecutorIntegrations(githubToken: String?): TaskExecutorIntegrationRegistry {
-    val token = githubToken?.trim()?.takeIf(String::isNotEmpty)
-        ?: return TaskExecutorIntegrationRegistry.Empty
+internal fun configuredWebExecutorIntegrations(
+    githubToken: String?,
+    gitlabToken: String?,
+): TaskExecutorIntegrationRegistry {
+    val github = githubToken?.trim()?.takeIf(String::isNotEmpty)
+    val gitlab = gitlabToken?.trim()?.takeIf(String::isNotEmpty)
+    val repositoryClients = buildList {
+        github?.let { token ->
+            add(GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { token }))
+        }
+        gitlab?.let { token ->
+            add(GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { token }))
+        }
+    }
+    if (repositoryClients.isEmpty() && github == null) return TaskExecutorIntegrationRegistry.Empty
+
     return TaskExecutorIntegrationRegistry(
-        listOf(
-            GitHubActionsExecutorIntegration(
-                GitHubRestActionsClient(
-                    tokenProvider = GitHubTokenProvider { token },
-                ),
-            ),
-        ),
+        buildList {
+            if (repositoryClients.isNotEmpty()) {
+                add(
+                    RepositoryOperationExecutorIntegration(
+                        RoutingRepositoryOperationClient(repositoryClients),
+                    ),
+                )
+            }
+            github?.let { token ->
+                add(
+                    GitHubActionsExecutorIntegration(
+                        GitHubRestActionsClient(
+                            tokenProvider = GitHubTokenProvider { token },
+                        ),
+                    ),
+                )
+            }
+        },
     )
 }
+
+internal fun configuredWebExecutorIntegrations(githubToken: String?): TaskExecutorIntegrationRegistry =
+    configuredWebExecutorIntegrations(githubToken, null)
 
 private fun readWebProviderCredentials(): Map<String, String> = buildMap {
     ProviderCatalog.entries.forEach { entry ->
         window.localStorage.getItem(providerStorageKey(entry.id))
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { put(entry.id, it) }
+    }
+}
+
+private fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
+    RepositoryServiceCatalog.entries.forEach { entry ->
+        window.localStorage.getItem(repositoryStorageKey(entry.id))
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.let { put(entry.id, it) }
@@ -129,5 +190,11 @@ private fun providerStorageKey(providerId: String): String = when (providerId) {
     else -> error("Unknown provider $providerId")
 }
 
-private fun Map<String, String>.cleanKey(providerId: String): String? =
-    this[providerId]?.trim()?.takeIf(String::isNotEmpty)
+private fun repositoryStorageKey(serviceId: String): String = when (serviceId) {
+    RepositoryServiceCatalog.GITHUB_ID -> GITHUB_TOKEN_STORAGE_KEY
+    RepositoryServiceCatalog.GITLAB_ID -> GITLAB_TOKEN_STORAGE_KEY
+    else -> error("Unknown repository service $serviceId")
+}
+
+private fun Map<String, String>.cleanKey(id: String): String? =
+    this[id]?.trim()?.takeIf(String::isNotEmpty)

@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ServiceExecutorIntegrationsTest {
     @Test
@@ -40,6 +41,15 @@ class ServiceExecutorIntegrationsTest {
         assertEquals(TaskRunStatus.Completed, completed.status)
         assertEquals("repo-1", client.runId)
         assertEquals(runningContext.taskRun.id, completed.artifacts.single().taskRunId)
+    }
+
+    @Test
+    fun repositoryOperationFailureBecomesTaskFailure() = runBlocking {
+        val integration = RepositoryOperationExecutorIntegration(FailingRepositoryClient())
+        val execution = integration.dispatch(context(TaskExecutor.RepositoryOperation("status")))
+
+        assertEquals(TaskRunStatus.Failed, execution.status)
+        assertTrue(execution.progressMessage.orEmpty().contains("credential rejected"))
     }
 
     @Test
@@ -131,6 +141,14 @@ private class RecordingRepositoryClient : RepositoryOperationClient {
         textContent = "ok",
         createdAtEpochMillis = 1L,
     )
+}
+
+private class FailingRepositoryClient : RepositoryOperationClient {
+    override suspend fun start(project: Project, operation: String): ExternalExecutionRun =
+        error("credential rejected")
+
+    override suspend fun getRun(project: Project, runId: String): ExternalExecutionRun =
+        error("credential rejected")
 }
 
 private class RecordingExternalServiceClient : ExternalServiceClient {

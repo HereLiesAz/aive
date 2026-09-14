@@ -51,5 +51,6 @@ dependencies {
     implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
     implementation(compose.material3)
+    implementation(libs.ktor.client.cio)
     testImplementation(kotlin("test-junit"))
 }

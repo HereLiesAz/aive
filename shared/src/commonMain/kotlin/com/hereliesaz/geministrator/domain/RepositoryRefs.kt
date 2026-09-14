@@ -29,12 +29,8 @@ fun RepositoryRef.locatorInput(): String = when (source) {
 
 fun RepositoryRef.remoteBrowserUrl(): String? = when (source) {
     RepositorySource.Local -> null
-    RepositorySource.GitHub -> remoteUrl
-        ?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
-        ?: "https://github.com/$owner/$name"
-    RepositorySource.GitLab -> remoteUrl
-        ?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
-        ?: "https://gitlab.com/$owner/$name"
+    RepositorySource.GitHub -> remoteUrl.toBrowserUrl() ?: "https://github.com/$owner/$name"
+    RepositorySource.GitLab -> remoteUrl.toBrowserUrl() ?: "https://gitlab.com/$owner/$name"
 }
 
 fun RepositoryRef.normalized(): RepositoryRef {
@@ -133,6 +129,30 @@ private fun remoteRepositoryPath(locator: String): String {
         return withoutScheme.substringAfter('/', missingDelimiterValue = "")
     }
     return withoutQuery
+}
+
+private fun String?.toBrowserUrl(): String? {
+    val remote = this?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    return when {
+        remote.startsWith("http://") || remote.startsWith("https://") ->
+            remote.substringBefore('?').substringBefore('#').trimEnd('/').removeSuffix(".git")
+
+        remote.startsWith("git@") && ':' in remote -> {
+            val host = remote.substringAfter("git@").substringBefore(':')
+            val path = remote.substringAfter(':').trim('/').removeSuffix(".git")
+            if (host.isBlank() || path.isBlank()) null else "https://$host/$path"
+        }
+
+        remote.startsWith("ssh://") -> {
+            val authorityAndPath = remote.substringAfter("ssh://")
+            val authority = authorityAndPath.substringBefore('/')
+            val host = authority.substringAfter('@').substringBefore(':')
+            val path = authorityAndPath.substringAfter('/', missingDelimiterValue = "").trim('/').removeSuffix(".git")
+            if (host.isBlank() || path.isBlank()) null else "https://$host/$path"
+        }
+
+        else -> null
+    }
 }
 
 private fun localRepositoryName(path: String): String {

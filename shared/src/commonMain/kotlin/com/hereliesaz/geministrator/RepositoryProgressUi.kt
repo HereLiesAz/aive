@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.displayName
@@ -28,7 +29,7 @@ internal fun RepositoryProgressRecord(
         .flatMap { it.artifacts }
         .sortedByDescending { it.createdAtEpochMillis }
     val latestChange = artifacts.firstOrNull { it.kind == ArtifactKind.CodeChange }
-    val latestPullRequest = artifacts.firstOrNull { it.kind == ArtifactKind.PullRequest }
+    val latestReview = artifacts.firstOrNull { it.kind == ArtifactKind.PullRequest }
     val latestRelease = artifacts.firstOrNull { it.kind == ArtifactKind.Release }
     val latestRepositoryOperation = artifacts.firstOrNull { artifact ->
         artifact.metadata["repositorySource"] != null && artifact.metadata["operation"] != null
@@ -55,8 +56,11 @@ internal fun RepositoryProgressRecord(
     val headCommit = latestRepositoryOperation?.metadata?.get("headCommit")?.take(12)
     val dirtyFileCount = latestRepositoryOperation?.metadata?.get("dirtyFileCount")?.toIntOrNull()
     val latestRepositoryOperationLabel = latestRepositoryOperation?.metadata?.get("operation")
-    val repositoryUrl = repository.remoteBrowserUrl()
-    val pullRequestUrl = latestPullRequest?.uri
+    val repositoryUrl = latestRepositoryOperation?.metadata?.get("repositoryUrl")
+        ?: repository.remoteBrowserUrl()
+    val reviewUrl = latestReview?.uri
+    val reviewLabel = if (repository.source == RepositorySource.GitLab) "Merge request" else "Pull request"
+    val reviewReadyLabel = if (repository.source == RepositorySource.GitLab) "MR ready" else "PR ready"
 
     AzphaltRecord(
         seed = "repository-progress-${repository.source}-${repository.displayName()}",
@@ -80,7 +84,7 @@ internal fun RepositoryProgressRecord(
                 }
             }
             latestRepositoryOperationLabel?.takeIf(String::isNotBlank)?.let {
-                append("\nLast Git operation: ")
+                append("\nLast repository operation: ")
                 append(it)
             }
             baseCommit?.let {
@@ -91,8 +95,8 @@ internal fun RepositoryProgressRecord(
                 append("\nLatest change: ")
                 append(it)
             }
-            latestPullRequest?.let {
-                append("\nPull request: ")
+            latestReview?.let {
+                append("\n$reviewLabel: ")
                 append(it.label)
             }
             latestRelease?.let {
@@ -112,13 +116,14 @@ internal fun RepositoryProgressRecord(
         endCap = when {
             active != null -> "Working"
             latestRelease != null -> "Released"
-            latestPullRequest != null -> "PR ready"
+            latestReview != null -> reviewReadyLabel
             dirtyFileCount != null && dirtyFileCount > 0 -> "Dirty"
-            latestRepositoryOperation != null -> "Clean"
+            dirtyFileCount == 0 -> "Clean"
+            latestRepositoryOperation != null -> "Updated"
             latestChange != null -> "Changes"
             else -> "Linked"
         },
-        well = if (repositoryUrl != null || pullRequestUrl != null) {
+        well = if (repositoryUrl != null || reviewUrl != null) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -134,10 +139,10 @@ internal fun RepositoryProgressRecord(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    pullRequestUrl?.let { url ->
+                    reviewUrl?.let { url ->
                         AzphaltPill(
-                            label = "Open pull request",
-                            seed = "open-pr-${latestPullRequest?.id?.value.orEmpty()}",
+                            label = "Open ${reviewLabel.lowercase()}",
+                            seed = "open-review-${latestReview?.id?.value.orEmpty()}",
                             onClick = { uriHandler.openUri(url) },
                             modifier = Modifier.fillMaxWidth(),
                         )
