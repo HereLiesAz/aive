@@ -6,15 +6,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
 import com.hereliesaz.geministrator.providers.jules.JulesRestApi
+import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
+import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
+import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
+import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
+import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
+import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
+import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
 import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
@@ -41,7 +49,9 @@ fun main() {
         var repositoryCredentials by remember { mutableStateOf(readWebRepositoryCredentials()) }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
         var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
-        val providers = remember(credentials) { configuredWebProviders(credentials) }
+        val providers = remember(credentials, repositoryCredentials) {
+            configuredWebProviders(credentials, repositoryCredentials)
+        }
         val executorIntegrations = remember(repositoryCredentials) {
             configuredWebExecutorIntegrations(
                 githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID),
@@ -89,7 +99,11 @@ fun main() {
     }
 }
 
-internal fun configuredWebProviders(credentials: Map<String, String>): List<AgentProvider> = buildList {
+internal fun configuredWebProviders(
+    credentials: Map<String, String>,
+    repositoryCredentials: Map<String, String> = emptyMap(),
+): List<AgentProvider> = buildList {
+    val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
@@ -100,17 +114,62 @@ internal fun configuredWebProviders(credentials: Map<String, String>): List<Agen
         )
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
-        add(OpenAiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(OpenAiProvider(keyProvider))
+        addGitLabWorkspaceProvider(
+            providerId = "openai-gitlab-workspace",
+            displayName = "OpenAI / GitLab Workspace",
+            api = OpenAiResponsesApi(keyProvider),
+            gitlabToken = gitlabToken,
+        )
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
-        add(AnthropicProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(AnthropicProvider(keyProvider))
+        addGitLabWorkspaceProvider(
+            providerId = "anthropic-gitlab-workspace",
+            displayName = "Claude / GitLab Workspace",
+            api = AnthropicMessagesApi(keyProvider),
+            gitlabToken = gitlabToken,
+        )
     }
     credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
-        add(GeminiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(GeminiProvider(keyProvider))
+        addGitLabWorkspaceProvider(
+            providerId = "gemini-gitlab-workspace",
+            displayName = "Gemini / GitLab Workspace",
+            api = GeminiGenerateContentApi(keyProvider),
+            gitlabToken = gitlabToken,
+        )
     }
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
-        add(XaiProvider(LlmApiKeyProvider { key }))
+        val keyProvider = LlmApiKeyProvider { key }
+        add(XaiProvider(keyProvider))
+        addGitLabWorkspaceProvider(
+            providerId = "xai-gitlab-workspace",
+            displayName = "Grok / GitLab Workspace",
+            api = XaiResponsesApi(keyProvider),
+            gitlabToken = gitlabToken,
+        )
     }
+}
+
+private fun MutableList<AgentProvider>.addGitLabWorkspaceProvider(
+    providerId: String,
+    displayName: String,
+    api: TextGenerationApi,
+    gitlabToken: String?,
+) {
+    if (gitlabToken == null) return
+    add(
+        GitLabWorkspaceAgentProvider(
+            id = AgentProviderId(providerId),
+            displayName = displayName,
+            api = api,
+            tokenProvider = GitLabWorkspaceTokenProvider { gitlabToken },
+        ),
+    )
 }
 
 internal fun configuredWebProviders(julesApiKey: String?): List<AgentProvider> =
