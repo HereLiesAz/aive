@@ -35,26 +35,32 @@ class MemoryConsolidationQueue(
                 episodeId = episodeId,
                 createdAtEpochMillis = envelope.closedAtEpochMillis,
             )
-            val committed = store.commit(
-                expectedRevision = snapshot.revision,
-                mutation = MemoryStoreMutation(
-                    episodesToAdd = listOf(episode),
-                    queueUpserts = listOf(entry),
-                ),
-            )
-            if (committed) return entry
+            if (
+                store.commit(
+                    expectedRevision = snapshot.revision,
+                    mutation = MemoryStoreMutation(
+                        episodesToAdd = listOf(episode),
+                        queueUpserts = listOf(entry),
+                    ),
+                )
+            ) {
+                return entry
+            }
         }
     }
 }
 
 sealed interface MemoryConsolidationResult {
     data object Idle : MemoryConsolidationResult
+
     data class Applied(
         val queueId: MemoryQueueId,
         val stage: MemoryConsolidationStage,
         val itemCount: Int,
     ) : MemoryConsolidationResult
+
     data class Completed(val queueId: MemoryQueueId) : MemoryConsolidationResult
+
     data class Failed(
         val queueId: MemoryQueueId,
         val stage: MemoryConsolidationStage,
@@ -68,10 +74,13 @@ class MemoryConsolidator(
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
 ) {
     /**
-     * Processes at most one bounded packet. The earliest unfinished episode owns the consolidator
-     * until it reaches Complete, which makes cross-session integration deterministic.
+     * Processes at most one manager packet. Empty stages can be skipped deterministically in the
+     * same call, but no second episode is touched until the earliest one reports Completed.
      */
     suspend fun processNext(nowEpochMillis: Long): MemoryConsolidationResult {
+        @Suppress("UNUSED_VARIABLE")
+        val invocationTime = nowEpochMillis
+
         while (true) {
             val snapshot = store.read()
             val entry = snapshot.queue
@@ -88,8 +97,8 @@ class MemoryConsolidator(
                 continue
             }
 
-            val packetPlan = buildPacket(snapshot, entry)
-            if (packetPlan == null) {
+            val plan = buildPacket(snapshot, entry)
+            if (plan == null) {
                 val advanced = if (entry.stage == MemoryConsolidationStage.Condensation) {
                     entry.copy(
                         stage = MemoryConsolidationStage.Complete,
@@ -119,27 +128,21 @@ class MemoryConsolidator(
             }
 
             val batch = try {
-                manager.process(packetPlan.packet)
+                manager.process(plan.packet)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
-                markFailed(processing, failure.message ?: failure::class.simpleName.orEmpty())
-                return MemoryConsolidationResult.Failed(
-                    queueId = entry.id,
-                    stage = entry.stage,
-                    reason = failure.message ?: "Memory manager failed",
-                )
+                val reason = failure.message ?: failure::class.simpleName ?: "Memory manager failed"
+                markFailed(processing, reason)
+                return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
             }
 
             try {
-                validateBatch(entry.stage, packetPlan, batch)
+                validateBatch(entry.stage, plan, batch)
             } catch (failure: Throwable) {
-                markFailed(processing, failure.message ?: "Invalid memory mutation batch")
-                return MemoryConsolidationResult.Failed(
-                    queueId = entry.id,
-                    stage = entry.stage,
-                    reason = failure.message ?: "Invalid memory mutation batch",
-                )
+                val reason = failure.message ?: "Invalid memory mutation batch"
+                markFailed(processing, reason)
+                return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
             }
 
             while (true) {
@@ -155,8 +158,8 @@ class MemoryConsolidator(
                         attempt = 0,
                         lastError = null,
                     )
-                    packetPlan.hasMore -> current.copy(
-                        cursor = current.cursor + packetPlan.consumed,
+                    plan.hasMore -> current.copy(
+                        cursor = current.cursor + plan.consumed,
                         status = MemoryQueueStatus.Pending,
                         attempt = 0,
                         lastError = null,
@@ -169,20 +172,22 @@ class MemoryConsolidator(
                         lastError = null,
                     )
                 }
-                val committed = store.commit(
-                    expectedRevision = latest.revision,
-                    mutation = MemoryStoreMutation(
-                        sectionsToAdd = batch.sectionsToAdd,
-                        nodesToAdd = batch.nodesToAdd,
-                        edgesToAdd = batch.edgesToAdd,
-                        queueUpserts = listOf(nextEntry),
-                    ),
-                )
-                if (committed) {
+
+                if (
+                    store.commit(
+                        expectedRevision = latest.revision,
+                        mutation = MemoryStoreMutation(
+                            sectionsToAdd = batch.sectionsToAdd,
+                            nodesToAdd = batch.nodesToAdd,
+                            edgesToAdd = batch.edgesToAdd,
+                            queueUpserts = listOf(nextEntry),
+                        ),
+                    )
+                ) {
                     return MemoryConsolidationResult.Applied(
                         queueId = entry.id,
                         stage = entry.stage,
-                        itemCount = packetPlan.packet.items.size,
+                        itemCount = plan.packet.items.size,
                     )
                 }
             }
@@ -210,13 +215,14 @@ class MemoryConsolidator(
         if (entry.stage == MemoryConsolidationStage.Condensation) {
             val cluster = snapshot.findCondensationCluster(policy) ?: return null
             val items = cluster.map(MemoryNode::asWorkItem)
+            val packetKey = "condense-${cluster.map { it.id.value }.sorted().joinToString("|").hashCode().toString(16)}"
             return PacketPlan(
                 packet = MemoryWorkPacket(
                     queueId = entry.id,
                     episodeId = entry.episodeId,
                     stage = entry.stage,
+                    packetKey = packetKey,
                     items = items,
-                    neighborhood = emptyList(),
                     instruction = instructionFor(entry.stage),
                 ),
                 consumed = items.size,
@@ -243,14 +249,7 @@ class MemoryConsolidator(
                 .map(MemoryNode::asWorkItem)
             MemoryConsolidationStage.Associations -> snapshot.episodeNodes(
                 entry.episodeId,
-                setOf(
-                    MemoryNodeKind.Context,
-                    MemoryNodeKind.NounTag,
-                    MemoryNodeKind.VerbTag,
-                    MemoryNodeKind.Phrase,
-                    MemoryNodeKind.Summary,
-                    MemoryNodeKind.Category,
-                ),
+                MemoryNodeKind.entries.toSet(),
             ).map(MemoryNode::asWorkItem)
             MemoryConsolidationStage.Condensation,
             MemoryConsolidationStage.Complete,
@@ -277,6 +276,7 @@ class MemoryConsolidator(
                 queueId = entry.id,
                 episodeId = entry.episodeId,
                 stage = entry.stage,
+                packetKey = "${entry.stage.name.lowercase()}-${entry.cursor}",
                 items = selected,
                 neighborhood = neighborhood,
                 instruction = instructionFor(entry.stage),
@@ -300,14 +300,39 @@ class MemoryConsolidator(
                 policy.maxPacketChars,
         ) { "Memory work packet exceeded its character budget" }
 
+        val visibleNodeIds = (plan.packet.items + plan.packet.neighborhood)
+            .filter { it.kind.startsWith("node:") }
+            .mapTo(hashSetOf()) { MemoryNodeId(it.id) }
+        val proposedNodeIds = batch.nodesToAdd.mapTo(hashSetOf(), MemoryNode::id)
+        val legalEdgeEndpoints = visibleNodeIds + proposedNodeIds
+        require(batch.edgesToAdd.all { it.from in legalEdgeEndpoints && it.to in legalEdgeEndpoints }) {
+            "Memory manager attempted to link a node outside its bounded packet"
+        }
+
+        if (stage != MemoryConsolidationStage.Condensation) {
+            require(batch.nodesToAdd.all { plan.packet.episodeId in it.sourceEpisodeIds }) {
+                "New memory nodes must preserve their source episode"
+            }
+        }
+
         when (stage) {
             MemoryConsolidationStage.Sectioning -> {
                 require(batch.nodesToAdd.isEmpty() && batch.edgesToAdd.isEmpty())
-                require(batch.sectionsToAdd.all { it.episodeId == plan.packet.episodeId })
+                val visibleChunks = plan.packet.items.mapTo(hashSetOf()) { MemoryChunkId(it.id) }
+                require(batch.sectionsToAdd.all { section ->
+                    section.episodeId == plan.packet.episodeId &&
+                        section.sourceChunkIds.isNotEmpty() &&
+                        section.sourceChunkIds.all { it in visibleChunks }
+                }) { "Memory sections must point only to chunks in their packet" }
             }
             MemoryConsolidationStage.Salience -> {
                 require(batch.sectionsToAdd.isEmpty() && batch.edgesToAdd.isEmpty())
-                require(batch.nodesToAdd.all { it.kind == MemoryNodeKind.Context })
+                val visibleSections = plan.packet.items.mapTo(hashSetOf()) { MemorySectionId(it.id) }
+                require(batch.nodesToAdd.all {
+                    it.kind == MemoryNodeKind.Context &&
+                        it.sourceSectionIds.isNotEmpty() &&
+                        it.sourceSectionIds.all { sectionId -> sectionId in visibleSections }
+                }) { "Context memories must retain direct evidence-section provenance" }
             }
             MemoryConsolidationStage.Tags -> validateSemanticStage(
                 batch,
@@ -340,8 +365,25 @@ class MemoryConsolidator(
             }
             MemoryConsolidationStage.Condensation -> {
                 require(batch.sectionsToAdd.isEmpty())
-                require(batch.nodesToAdd.isNotEmpty()) { "Condensation must create a generalized memory" }
-                require(batch.nodesToAdd.all { it.kind == plan.condensationKind })
+                require(batch.nodesToAdd.size == 1) {
+                    "One condensation packet must create exactly one generalized memory"
+                }
+                val generalized = batch.nodesToAdd.single()
+                require(generalized.kind == plan.condensationKind)
+                val sourceIds = plan.packet.items.mapTo(linkedSetOf()) { MemoryNodeId(it.id) }
+                require(sourceIds.isNotEmpty())
+                require(sourceIds.all { sourceId ->
+                    batch.edgesToAdd.any {
+                        it.from == generalized.id &&
+                            it.to == sourceId &&
+                            it.relation == MemoryRelationKind.CondensedFrom
+                    } &&
+                        batch.edgesToAdd.any {
+                            it.from == generalized.id &&
+                                it.to == sourceId &&
+                                it.relation == MemoryRelationKind.Supersedes
+                        }
+                }) { "Condensation must preserve and supersede every source memory explicitly" }
                 require(batch.edgesToAdd.all {
                     it.relation == MemoryRelationKind.CondensedFrom ||
                         it.relation == MemoryRelationKind.Supersedes ||
@@ -484,6 +526,8 @@ private fun MemoryNode.asWorkItem() = MemoryWorkItem(
     metadata = metadata + mapOf(
         "salience" to salience.toString(),
         "confidence" to confidence.toString(),
+        "sourceEpisodeIds" to sourceEpisodeIds.joinToString(",") { it.value },
+        "sourceSectionIds" to sourceSectionIds.joinToString(",") { it.value },
     ),
 )
 
@@ -491,7 +535,9 @@ private fun MemorySnapshot.episodeNodes(
     episodeId: MemoryEpisodeId,
     kinds: Set<MemoryNodeKind>,
 ): List<MemoryNode> {
-    val superseded = edges.filter { it.relation == MemoryRelationKind.Supersedes }.mapTo(hashSetOf()) { it.to }
+    val superseded = edges
+        .filter { it.relation == MemoryRelationKind.Supersedes }
+        .mapTo(hashSetOf()) { it.to }
     return nodes
         .filter { episodeId in it.sourceEpisodeIds && it.kind in kinds && it.id !in superseded }
         .sortedWith(compareBy<MemoryNode> { it.kind.ordinal }.thenBy { it.createdAtEpochMillis }.thenBy { it.id.value })
@@ -531,7 +577,9 @@ private fun MemorySnapshot.relatedNeighborhood(
 }
 
 private fun MemorySnapshot.findCondensationCluster(policy: MemoryConsolidationPolicy): List<MemoryNode>? {
-    val superseded = edges.filter { it.relation == MemoryRelationKind.Supersedes }.mapTo(hashSetOf()) { it.to }
+    val superseded = edges
+        .filter { it.relation == MemoryRelationKind.Supersedes }
+        .mapTo(hashSetOf()) { it.to }
     val activeById = nodes.filter { it.id !in superseded }.associateBy(MemoryNode::id)
     val similarEdges = edges.filter {
         it.relation == MemoryRelationKind.SimilarTo &&
@@ -547,6 +595,7 @@ private fun MemorySnapshot.findCondensationCluster(policy: MemoryConsolidationPo
         adjacency.getOrPut(edge.from) { mutableSetOf() } += edge.to
         adjacency.getOrPut(edge.to) { mutableSetOf() } += edge.from
     }
+
     val visited = mutableSetOf<MemoryNodeId>()
     val qualifying = mutableListOf<List<MemoryNode>>()
     adjacency.keys.forEach { start ->
@@ -566,8 +615,10 @@ private fun MemorySnapshot.findCondensationCluster(policy: MemoryConsolidationPo
         val threshold = policy.maxSimilarPerKind[kind] ?: Int.MAX_VALUE
         if (componentNodes.size > threshold) qualifying += componentNodes
     }
-    val chosen = qualifying.maxByOrNull(List<MemoryNode>::size) ?: return null
-    val weights = similarEdges.flatMap { edge -> listOf(edge.from to edge.weight, edge.to to edge.weight) }
+
+    val chosen = qualifying.maxByOrNull { it.size } ?: return null
+    val weights = similarEdges
+        .flatMap { edge -> listOf(edge.from to edge.weight, edge.to to edge.weight) }
         .groupBy({ it.first }, { it.second })
         .mapValues { (_, values) -> values.sum() }
     return chosen
@@ -591,7 +642,7 @@ private fun instructionFor(stage: MemoryConsolidationStage): String = when (stag
     MemoryConsolidationStage.Associations ->
         "Compare this bounded memory neighborhood. Link similarities, useful associations, and contradictions. Preserve conflicts rather than resolving them by deletion."
     MemoryConsolidationStage.Condensation ->
-        "Restate these highly similar same-level memories as one memory that truthfully expresses all of them. Link the new memory to every source and supersede only the redundant representations."
+        "Restate these highly similar same-level memories as exactly one generalized memory. Link that memory to every supplied source with both CondensedFrom and Supersedes."
     MemoryConsolidationStage.Complete -> "No work."
 }
 
