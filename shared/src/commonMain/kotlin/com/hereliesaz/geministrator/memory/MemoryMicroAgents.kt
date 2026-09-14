@@ -292,6 +292,7 @@ class MemoryMicroAgentRouter(
             MemoryMicroAgentRole.SummarySynthesizer,
             MemoryMicroAgentRole.CategoryClassifier,
             MemoryMicroAgentRole.AssociationLinker,
+            MemoryMicroAgentRole.ConflictResolver,
             MemoryMicroAgentRole.CondensationRewriter,
         )
     }
