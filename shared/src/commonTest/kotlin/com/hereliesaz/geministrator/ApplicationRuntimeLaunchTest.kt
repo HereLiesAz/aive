@@ -2,7 +2,9 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +44,7 @@ class ApplicationRuntimeLaunchTest {
                 ?: error("Project was not persisted")
             assertEquals("The Haive", project.name)
             assertEquals(RepositoryRef("HereLiesAz", "haive", "main"), project.repository)
+            assertEquals(project, live.presentation.project)
             assertEquals("Ship one complete workflow", live.presentation.run.objective)
             assertEquals(
                 ApprovalPolicy.HumanApproval,
@@ -91,8 +94,41 @@ class ApplicationRuntimeLaunchTest {
             val project = persistence.projects.get(resumed.presentation.run.projectId)
                 ?: error("Project was not persisted")
             assertEquals(repository, project.repository)
+            assertEquals(project, resumed.presentation.project)
         } finally {
             secondScope.cancel()
+        }
+    }
+
+    @Test
+    fun localRepositoryLinkSurvivesLaunchAndLiveProjection() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val repository = parseRepositoryRef(
+            source = RepositorySource.Local,
+            locator = "/workspace/haive",
+            defaultBranch = "main",
+        )
+
+        try {
+            val runtime = ApplicationRuntime.create(
+                providers = emptyList(),
+                scope = scope,
+                persistence = persistence,
+            )
+
+            runtime.launchStarterWorkflow(
+                projectName = "Local Haive",
+                objective = "Inspect the local checkout",
+                repository = repository,
+            )
+
+            val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
+            assertEquals(repository, live.presentation.project.repository)
+            assertEquals(RepositorySource.Local, live.presentation.project.repository?.source)
+            assertEquals("/workspace/haive", live.presentation.project.repository?.localPath)
+        } finally {
+            scope.cancel()
         }
     }
 }
