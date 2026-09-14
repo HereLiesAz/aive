@@ -1,10 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
-/**
- * Small, single-purpose memory workers. A production installation may back every role with a
- * different on-device SLM/LoRA adapter. Roles are intentionally narrower than consolidation
- * stages so no model needs to learn the entire memory-maintenance problem.
- */
+/** Small, single-purpose local memory workers. */
 enum class MemoryMicroAgentRole {
     Sectioner,
     SalienceFilter,
@@ -14,7 +10,6 @@ enum class MemoryMicroAgentRole {
     SummarySynthesizer,
     CategoryClassifier,
     AssociationLinker,
-    ConflictResolver,
     CondensationRewriter,
 }
 
@@ -22,18 +17,13 @@ data class MemoryMicroAgentModelSpec(
     val modelId: String,
     val adapterId: String? = null,
     val quantization: String? = null,
-    /** Runtime tokenizer limit; platform inference backends must enforce it exactly. */
     val maxContextTokens: Int = 4_096,
     val maxInputItems: Int = 24,
-    /** Tokenizer-independent preflight limit used by common code before inference. */
     val maxInputChars: Int = 12_000,
     val maxOutputChars: Int = 8_000,
     val maxMutations: Int = 96,
-    /** Reserved for instructions, schemas, IDs, and code-semantic hint metadata. */
     val promptOverheadReserveChars: Int = 1_024,
-    /** Memory maintenance is local-first. Set false only for explicit development fallbacks. */
     val localOnly: Boolean = true,
-    /** Every local production role must resolve to Android, Windows, macOS, Linux, and Web. */
     val deployment: MemoryMicroAgentDeploymentManifest = MemoryMicroAgentDeploymentManifest.portableOnnx(
         artifactId = modelId,
         quantization = quantization ?: "int8",
@@ -63,10 +53,6 @@ interface MemoryMicroAgent {
     suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch
 }
 
-/**
- * Platform inference boundary. Android/Desktop/Web implementations may use different local
- * runtimes while consuming the same role contract and deployment manifest.
- */
 interface MemoryMicroAgentInferenceRuntime {
     val platform: MemoryMicroAgentPlatform
 
@@ -96,13 +82,16 @@ data class MemoryMicroAgentInferenceResult(
 )
 
 /**
- * Routes a bounded consolidation packet to the smallest appropriate specialist(s). Tags are
- * deliberately split between noun and verb models and merged only after both bounded jobs return.
+ * Routes one bounded packet to the smallest specialist(s) required for that stage.
+ *
+ * The memory layer is deliberately associative rather than conscious. Association workers may
+ * connect memories by shared topics or semantics, but they must not decide that two memories
+ * contradict one another, determine which is true, or reconcile them. That reasoning belongs to
+ * an ordinary orchestrated agent after recall; its explicit reasoning later enters memory as a
+ * normal session episode.
  *
  * Noun/verb are semantic indexing roles, not ordinary English POS tagging. Code is first-class:
- * a callable symbol may be indexed as a noun/entity while its action stem is independently indexed
- * as a verb/action. Deterministic code hints reduce syntax-discovery work for the small models but
- * remain advisory; the micro-agent owns the semantic decision.
+ * a callable can be a noun/entity while its action meaning is independently indexed as a verb.
  */
 class MemoryMicroAgentRouter(
     agents: Collection<MemoryMicroAgent>,
@@ -122,27 +111,21 @@ class MemoryMicroAgentRouter(
     }
 
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val roles = rolesFor(packet.stage)
-        val batches = roles.map { role ->
-            val agent = requireNotNull(agentsByRole[role]) { "No memory micro-agent registered for $role" }
-            val routedPacket = packet
+        val batches = rolesFor(packet.stage).map { role ->
+            val agent = requireNotNull(agentsByRole[role])
+            val routed = packet
                 .withCodeSemanticHints(role)
-                .fitToModel(agent.model)
                 .withRoleInstruction(role)
-            enforceInputBudget(agent, routedPacket)
-            val batch = agent.process(routedPacket)
-            enforceOutputBudget(agent, batch)
-            validateRoleOutput(role, routedPacket, batch)
-            batch
+                .fitToModel(agent.model)
+            enforceInputBudget(agent, routed)
+            agent.process(routed).also { batch ->
+                enforceOutputBudget(agent, batch)
+                validateRoleOutput(role, routed, batch)
+            }
         }
         return mergeBatches(batches)
     }
 
-    /**
-     * Returns a consolidation policy that cannot create primary content larger than any active
-     * specialist can accept. Per-role routing trims optional neighborhoods and re-checks the fully
-     * rendered packet after code hints and instructions are attached.
-     */
     fun constrainPolicy(base: MemoryConsolidationPolicy = MemoryConsolidationPolicy()): MemoryConsolidationPolicy {
         val active = REQUIRED_ROLES.mapNotNull(agentsByRole::get)
         return base.copy(
@@ -150,20 +133,6 @@ class MemoryMicroAgentRouter(
             maxPacketChars = minOf(base.maxPacketChars, active.minOf { it.model.maxContentChars }),
             maxMutationsPerPacket = minOf(base.maxMutationsPerPacket, active.minOf { it.model.maxMutations }),
         )
-    }
-
-    suspend fun resolveConflict(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val agent = requireNotNull(agentsByRole[MemoryMicroAgentRole.ConflictResolver]) {
-            "No conflict-resolution micro-agent is registered"
-        }
-        val routedPacket = packet
-            .fitToModel(agent.model)
-            .withRoleInstruction(MemoryMicroAgentRole.ConflictResolver)
-        enforceInputBudget(agent, routedPacket)
-        return agent.process(routedPacket).also { batch ->
-            enforceOutputBudget(agent, batch)
-            validateRoleOutput(MemoryMicroAgentRole.ConflictResolver, routedPacket, batch)
-        }
     }
 
     private fun rolesFor(stage: MemoryConsolidationStage): List<MemoryMicroAgentRole> = when (stage) {
@@ -182,39 +151,38 @@ class MemoryMicroAgentRouter(
         require(items.size <= model.maxInputItems) {
             "Primary packet has ${items.size} items; ${model.modelId} limit is ${model.maxInputItems}"
         }
-        val primaryChars = items.sumOf { it.text.length }
-        require(primaryChars <= model.maxContentChars) {
-            "Primary packet has $primaryChars chars; ${model.modelId} content limit is ${model.maxContentChars}"
+        val fixedChars = instruction.length + packetKey.length
+        val primaryChars = items.sumOf(MemoryWorkItem::estimatedInputChars)
+        require(fixedChars + primaryChars <= model.maxInputChars) {
+            "Primary packet exceeds ${model.modelId} input budget"
         }
 
         var remainingItems = model.maxInputItems - items.size
-        var remainingChars = model.maxContentChars - primaryChars
+        var remainingChars = model.maxInputChars - fixedChars - primaryChars
         val fittedNeighborhood = buildList {
             for (item in neighborhood) {
                 if (remainingItems <= 0 || remainingChars <= 0) break
-                if (item.text.length > remainingChars) continue
+                val cost = item.estimatedInputChars()
+                if (cost > remainingChars) continue
                 add(item)
                 remainingItems -= 1
-                remainingChars -= item.text.length
+                remainingChars -= cost
             }
         }
         return copy(neighborhood = fittedNeighborhood)
     }
 
     private fun enforceInputBudget(agent: MemoryMicroAgent, packet: MemoryWorkPacket) {
-        require(packet.items.size + packet.neighborhood.size <= agent.model.maxInputItems) {
-            "${agent.role} packet has too many items for ${agent.model.modelId}"
-        }
-        val chars = packet.estimatedInputChars()
-        require(chars <= agent.model.maxInputChars) {
-            "${agent.role} rendered packet is approximately $chars chars; ${agent.model.modelId} limit is ${agent.model.maxInputChars}"
+        require(packet.items.size + packet.neighborhood.size <= agent.model.maxInputItems)
+        require(packet.estimatedInputChars() <= agent.model.maxInputChars) {
+            "${agent.role} rendered packet exceeds ${agent.model.modelId} character budget"
         }
     }
 
     private fun MemoryWorkPacket.estimatedInputChars(): Int =
         instruction.length + packetKey.length +
-            items.sumOf { it.estimatedInputChars() } +
-            neighborhood.sumOf { it.estimatedInputChars() }
+            items.sumOf(MemoryWorkItem::estimatedInputChars) +
+            neighborhood.sumOf(MemoryWorkItem::estimatedInputChars)
 
     private fun MemoryWorkItem.estimatedInputChars(): Int =
         id.length + kind.length + text.length + metadata.entries.sumOf { (key, value) -> key.length + value.length + 2 }
@@ -235,55 +203,52 @@ class MemoryMicroAgentRouter(
         batch: MemoryMutationBatch,
     ) {
         when (role) {
-            MemoryMicroAgentRole.Sectioner -> {
+            MemoryMicroAgentRole.Sectioner ->
                 require(batch.nodesToAdd.isEmpty() && batch.edgesToAdd.isEmpty())
-            }
+
             MemoryMicroAgentRole.SalienceFilter -> {
                 require(batch.sectionsToAdd.isEmpty() && batch.edgesToAdd.isEmpty())
                 require(batch.nodesToAdd.all { it.kind == MemoryNodeKind.Context })
             }
+
             MemoryMicroAgentRole.NounTagger -> validateSemanticRole(
                 batch,
                 setOf(MemoryNodeKind.NounTag),
                 setOf(MemoryRelationKind.Indexes),
             )
+
             MemoryMicroAgentRole.VerbTagger -> validateSemanticRole(
                 batch,
                 setOf(MemoryNodeKind.VerbTag),
                 setOf(MemoryRelationKind.Indexes),
             )
+
             MemoryMicroAgentRole.PhraseSynthesizer -> validateSemanticRole(
                 batch,
                 setOf(MemoryNodeKind.Phrase),
                 setOf(MemoryRelationKind.Composes),
             )
+
             MemoryMicroAgentRole.SummarySynthesizer -> validateSemanticRole(
                 batch,
                 setOf(MemoryNodeKind.Summary),
                 setOf(MemoryRelationKind.Summarizes),
             )
+
             MemoryMicroAgentRole.CategoryClassifier -> validateSemanticRole(
                 batch,
                 setOf(MemoryNodeKind.Category),
                 setOf(MemoryRelationKind.Categorizes),
             )
+
             MemoryMicroAgentRole.AssociationLinker -> {
                 require(batch.sectionsToAdd.isEmpty() && batch.nodesToAdd.isEmpty())
                 require(batch.edgesToAdd.all {
                     it.relation == MemoryRelationKind.SimilarTo ||
-                        it.relation == MemoryRelationKind.AssociatedWith ||
-                        it.relation == MemoryRelationKind.ConflictsWith
-                })
-            }
-            MemoryMicroAgentRole.ConflictResolver -> {
-                require(batch.sectionsToAdd.isEmpty())
-                require(batch.nodesToAdd.size <= 1)
-                require(batch.nodesToAdd.all { it.kind == MemoryNodeKind.Summary })
-                require(batch.edgesToAdd.all {
-                    it.relation == MemoryRelationKind.ResolvesConflict ||
                         it.relation == MemoryRelationKind.AssociatedWith
-                })
+                }) { "Association micro-agents may only express similarity/relatedness" }
             }
+
             MemoryMicroAgentRole.CondensationRewriter -> {
                 require(batch.sectionsToAdd.isEmpty())
                 require(batch.nodesToAdd.size <= 1)
@@ -317,15 +282,9 @@ class MemoryMicroAgentRouter(
             nodesToAdd = batches.flatMap(MemoryMutationBatch::nodesToAdd),
             edgesToAdd = batches.flatMap(MemoryMutationBatch::edgesToAdd),
         )
-        require(merged.sectionsToAdd.map { it.id }.distinct().size == merged.sectionsToAdd.size) {
-            "Memory micro-agents returned duplicate section IDs"
-        }
-        require(merged.nodesToAdd.map { it.id }.distinct().size == merged.nodesToAdd.size) {
-            "Memory micro-agents returned duplicate node IDs"
-        }
-        require(merged.edgesToAdd.map { it.id }.distinct().size == merged.edgesToAdd.size) {
-            "Memory micro-agents returned duplicate edge IDs"
-        }
+        require(merged.sectionsToAdd.map { it.id }.distinct().size == merged.sectionsToAdd.size)
+        require(merged.nodesToAdd.map { it.id }.distinct().size == merged.nodesToAdd.size)
+        require(merged.edgesToAdd.map { it.id }.distinct().size == merged.edgesToAdd.size)
         return merged
     }
 
@@ -334,16 +293,13 @@ class MemoryMicroAgentRouter(
             appendLine("MICRO-AGENT ROLE: ${role.name}. Perform only this role.")
             when (role) {
                 MemoryMicroAgentRole.NounTagger -> appendLine(
-                    "NOUN means a semantic entity/reference, not merely an English noun. In code include relevant " +
-                        "symbols, callable identities, types, files, modules, APIs, endpoints, data structures, " +
-                        "configuration keys, branches, and other artifacts. Metadata '$CODE_NOUN_HINTS' contains " +
-                        "advisory code candidates; keep, normalize, split, ignore, or supplement them as semantics require.",
+                    "NOUN means a semantic entity/reference, not merely an English noun. In code include relevant symbols, callable identities, types, files, modules, APIs, endpoints, data structures, configuration keys, branches, and other artifacts. Metadata '$CODE_NOUN_HINTS' contains advisory candidates; keep, normalize, split, ignore, or supplement them as semantics require.",
                 )
                 MemoryMicroAgentRole.VerbTagger -> appendLine(
-                    "VERB means a semantic action/transformation, not merely an English verb. In code include calls, " +
-                        "CRUD operations, parsing, validation, serialization, data-flow operations, build/test/deploy, " +
-                        "Git/shell actions, HTTP methods, and actions implied by identifiers. Metadata '$CODE_VERB_HINTS' " +
-                        "contains advisory candidates. A callable may simultaneously exist as a noun entity and imply a verb action.",
+                    "VERB means a semantic action/transformation, not merely an English verb. In code include calls, CRUD operations, parsing, validation, serialization, data-flow operations, build/test/deploy, Git/shell actions, HTTP methods, and actions implied by identifiers. Metadata '$CODE_VERB_HINTS' contains advisory candidates. A callable may simultaneously exist as a noun entity and imply a verb action.",
+                )
+                MemoryMicroAgentRole.AssociationLinker -> appendLine(
+                    "Associate memories only by topical or semantic relatedness. Do not infer contradiction, truth, falsity, conflict resolution, or which memory supersedes another. Conscious reconciliation belongs to a normal orchestrated agent and will later enter memory through ordinary session consolidation.",
                 )
                 else -> Unit
             }
