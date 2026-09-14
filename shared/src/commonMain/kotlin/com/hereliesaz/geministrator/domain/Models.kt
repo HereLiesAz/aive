@@ -3,10 +3,20 @@ package com.hereliesaz.geministrator.domain
 import kotlinx.serialization.Serializable
 
 @Serializable
+enum class RepositorySource {
+    GitHub,
+    GitLab,
+    Local,
+}
+
+@Serializable
 data class RepositoryRef(
     val owner: String,
     val name: String,
     val defaultBranch: String? = null,
+    val source: RepositorySource = RepositorySource.GitHub,
+    val remoteUrl: String? = null,
+    val localPath: String? = null,
 )
 
 @Serializable
