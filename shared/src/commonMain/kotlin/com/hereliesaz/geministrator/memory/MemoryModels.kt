@@ -282,6 +282,8 @@ data class MemoryWorkPacket(
     val queueId: MemoryQueueId,
     val episodeId: MemoryEpisodeId,
     val stage: MemoryConsolidationStage,
+    /** Stable within a specific bounded batch; prevents generated IDs colliding across packets. */
+    val packetKey: String,
     val items: List<MemoryWorkItem>,
     val neighborhood: List<MemoryWorkItem> = emptyList(),
     val instruction: String,
