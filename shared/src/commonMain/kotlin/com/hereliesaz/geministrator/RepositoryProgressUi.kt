@@ -2,7 +2,6 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.TaskExecutor
-import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.isTerminal
@@ -36,8 +34,15 @@ internal fun RepositoryProgressRecord(
         !taskRun.status.isTerminal() &&
             (taskRun.executor is TaskExecutor.RepositoryOperation || taskRun.executor is TaskExecutor.GitHubAction)
     }
+    val repositoryFacingRoles = setOf(
+        "implementation-engineer",
+        "crash-test-dummy",
+        "qa-engineer",
+        "code-reviewer",
+        "release-engineer",
+    )
     val activeCodeTask = run.taskRuns.values.firstOrNull { taskRun ->
-        !taskRun.status.isTerminal() && taskRun.progressMessage?.contains("git", ignoreCase = true) == true
+        !taskRun.status.isTerminal() && taskRun.assignedRoleId?.value in repositoryFacingRoles
     }
     val active = activeRepositoryTask ?: activeCodeTask
     val branch = repository.defaultBranch ?: "Default branch not specified"
@@ -70,9 +75,14 @@ internal fun RepositoryProgressRecord(
                 append("\nRelease: ")
                 append(it.label)
             }
-            active?.progressMessage?.takeIf(String::isNotBlank)?.let {
+            active?.let { taskRun ->
                 append("\nNow: ")
-                append(it)
+                append(
+                    taskRun.progressMessage?.takeIf(String::isNotBlank)
+                        ?: taskRun.assignedRoleId?.value?.replace('-', ' ')?.replaceFirstChar(Char::uppercase)
+                        ?: taskRun.executor?.let { executor -> executor::class.simpleName }
+                        ?: taskRun.status.name,
+                )
             }
         },
         endCap = when {
@@ -88,26 +98,23 @@ internal fun RepositoryProgressRecord(
                     Text(
                         "REPOSITORY ACTIVITY",
                         style = AzphaltType.eyebrow,
-                        color = Azphalt.currentGround.onPage,
+                        color = Azphalt.White,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        repositoryUrl?.let { url ->
-                            AzphaltPill(
-                                label = "Open repository",
-                                seed = "open-repository-${repository.displayName()}",
-                                onClick = { uriHandler.openUri(url) },
-                            )
-                        }
-                        pullRequestUrl?.let { url ->
-                            AzphaltPill(
-                                label = "Open pull request",
-                                seed = "open-pr-${latestPullRequest?.id?.value.orEmpty()}",
-                                onClick = { uriHandler.openUri(url) },
-                            )
-                        }
+                    repositoryUrl?.let { url ->
+                        AzphaltPill(
+                            label = "Open repository",
+                            seed = "open-repository-${repository.displayName()}",
+                            onClick = { uriHandler.openUri(url) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    pullRequestUrl?.let { url ->
+                        AzphaltPill(
+                            label = "Open pull request",
+                            seed = "open-pr-${latestPullRequest?.id?.value.orEmpty()}",
+                            onClick = { uriHandler.openUri(url) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }
