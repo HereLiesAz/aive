@@ -22,20 +22,38 @@ data class MemoryMicroAgentModelSpec(
     val modelId: String,
     val adapterId: String? = null,
     val quantization: String? = null,
+    /** Runtime tokenizer limit; platform inference backends must enforce it exactly. */
+    val maxContextTokens: Int = 4_096,
     val maxInputItems: Int = 24,
+    /** Tokenizer-independent preflight limit used by common code before inference. */
     val maxInputChars: Int = 12_000,
     val maxOutputChars: Int = 8_000,
     val maxMutations: Int = 96,
+    /** Reserved for instructions, schemas, IDs, and code-semantic hint metadata. */
+    val promptOverheadReserveChars: Int = 1_024,
     /** Memory maintenance is local-first. Set false only for explicit development fallbacks. */
     val localOnly: Boolean = true,
+    /** Every local production role must resolve to Android, Windows, macOS, Linux, and Web. */
+    val deployment: MemoryMicroAgentDeploymentManifest = MemoryMicroAgentDeploymentManifest.portableOnnx(
+        artifactId = modelId,
+        quantization = quantization ?: "int8",
+    ),
 ) {
     init {
         require(modelId.isNotBlank())
+        require(maxContextTokens > 0)
         require(maxInputItems > 0)
         require(maxInputChars > 0)
         require(maxOutputChars > 0)
         require(maxMutations > 0)
+        require(promptOverheadReserveChars >= 0)
+        require(promptOverheadReserveChars < maxInputChars)
+        require(!localOnly || deployment.supportsAllHaivePlatforms()) {
+            "Local memory model $modelId must support Android, Windows, macOS, Linux, and Web"
+        }
     }
+
+    val maxContentChars: Int get() = maxInputChars - promptOverheadReserveChars
 }
 
 interface MemoryMicroAgent {
@@ -46,11 +64,16 @@ interface MemoryMicroAgent {
 }
 
 /**
- * Platform inference boundary. Android/Desktop implementations can use different local runtimes
- * while the memory system remains runtime-agnostic.
+ * Platform inference boundary. Android/Desktop/Web implementations may use different local
+ * runtimes while consuming the same role contract and deployment manifest.
  */
 interface MemoryMicroAgentInferenceRuntime {
-    suspend fun isAvailable(model: MemoryMicroAgentModelSpec): Boolean
+    val platform: MemoryMicroAgentPlatform
+
+    suspend fun isAvailable(
+        model: MemoryMicroAgentModelSpec,
+        artifact: MemoryMicroAgentArtifact,
+    ): Boolean
 
     suspend fun infer(request: MemoryMicroAgentInferenceRequest): MemoryMicroAgentInferenceResult
 }
@@ -58,9 +81,15 @@ interface MemoryMicroAgentInferenceRuntime {
 data class MemoryMicroAgentInferenceRequest(
     val role: MemoryMicroAgentRole,
     val model: MemoryMicroAgentModelSpec,
+    val artifact: MemoryMicroAgentArtifact,
     val prompt: String,
     val maxOutputChars: Int = model.maxOutputChars,
-)
+) {
+    init {
+        require(artifact.platform in model.deployment.platforms)
+        require(prompt.isNotBlank())
+    }
+}
 
 data class MemoryMicroAgentInferenceResult(
     val text: String,
@@ -85,6 +114,11 @@ class MemoryMicroAgentRouter(
         REQUIRED_ROLES.forEach { role ->
             require(role in agentsByRole) { "Missing memory micro-agent for $role" }
         }
+        agentsByRole.values.forEach { agent ->
+            require(!agent.model.localOnly || agent.model.deployment.supportsAllHaivePlatforms()) {
+                "${agent.role} has an incomplete local deployment manifest"
+            }
+        }
     }
 
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
@@ -93,6 +127,7 @@ class MemoryMicroAgentRouter(
             val agent = requireNotNull(agentsByRole[role]) { "No memory micro-agent registered for $role" }
             val routedPacket = packet
                 .withCodeSemanticHints(role)
+                .fitToModel(agent.model)
                 .withRoleInstruction(role)
             enforceInputBudget(agent, routedPacket)
             val batch = agent.process(routedPacket)
@@ -104,14 +139,15 @@ class MemoryMicroAgentRouter(
     }
 
     /**
-     * Returns a consolidation policy that cannot create a packet larger than any active specialist
-     * can accept. This makes model context limits a deterministic system invariant.
+     * Returns a consolidation policy that cannot create primary content larger than any active
+     * specialist can accept. Per-role routing trims optional neighborhoods and re-checks the fully
+     * rendered packet after code hints and instructions are attached.
      */
     fun constrainPolicy(base: MemoryConsolidationPolicy = MemoryConsolidationPolicy()): MemoryConsolidationPolicy {
         val active = REQUIRED_ROLES.mapNotNull(agentsByRole::get)
         return base.copy(
             maxPacketItems = minOf(base.maxPacketItems, active.minOf { it.model.maxInputItems }),
-            maxPacketChars = minOf(base.maxPacketChars, active.minOf { it.model.maxInputChars }),
+            maxPacketChars = minOf(base.maxPacketChars, active.minOf { it.model.maxContentChars }),
             maxMutationsPerPacket = minOf(base.maxMutationsPerPacket, active.minOf { it.model.maxMutations }),
         )
     }
@@ -120,7 +156,9 @@ class MemoryMicroAgentRouter(
         val agent = requireNotNull(agentsByRole[MemoryMicroAgentRole.ConflictResolver]) {
             "No conflict-resolution micro-agent is registered"
         }
-        val routedPacket = packet.withRoleInstruction(MemoryMicroAgentRole.ConflictResolver)
+        val routedPacket = packet
+            .fitToModel(agent.model)
+            .withRoleInstruction(MemoryMicroAgentRole.ConflictResolver)
         enforceInputBudget(agent, routedPacket)
         return agent.process(routedPacket).also { batch ->
             enforceOutputBudget(agent, batch)
@@ -140,15 +178,46 @@ class MemoryMicroAgentRouter(
         MemoryConsolidationStage.Complete -> error("Complete memory jobs cannot be routed")
     }
 
+    private fun MemoryWorkPacket.fitToModel(model: MemoryMicroAgentModelSpec): MemoryWorkPacket {
+        require(items.size <= model.maxInputItems) {
+            "Primary packet has ${items.size} items; ${model.modelId} limit is ${model.maxInputItems}"
+        }
+        val primaryChars = items.sumOf { it.text.length }
+        require(primaryChars <= model.maxContentChars) {
+            "Primary packet has $primaryChars chars; ${model.modelId} content limit is ${model.maxContentChars}"
+        }
+
+        var remainingItems = model.maxInputItems - items.size
+        var remainingChars = model.maxContentChars - primaryChars
+        val fittedNeighborhood = buildList {
+            for (item in neighborhood) {
+                if (remainingItems <= 0 || remainingChars <= 0) break
+                if (item.text.length > remainingChars) continue
+                add(item)
+                remainingItems -= 1
+                remainingChars -= item.text.length
+            }
+        }
+        return copy(neighborhood = fittedNeighborhood)
+    }
+
     private fun enforceInputBudget(agent: MemoryMicroAgent, packet: MemoryWorkPacket) {
         require(packet.items.size + packet.neighborhood.size <= agent.model.maxInputItems) {
             "${agent.role} packet has too many items for ${agent.model.modelId}"
         }
-        val chars = packet.items.sumOf { it.text.length } + packet.neighborhood.sumOf { it.text.length }
+        val chars = packet.estimatedInputChars()
         require(chars <= agent.model.maxInputChars) {
-            "${agent.role} packet has $chars chars; ${agent.model.modelId} limit is ${agent.model.maxInputChars}"
+            "${agent.role} rendered packet is approximately $chars chars; ${agent.model.modelId} limit is ${agent.model.maxInputChars}"
         }
     }
+
+    private fun MemoryWorkPacket.estimatedInputChars(): Int =
+        instruction.length + packetKey.length +
+            items.sumOf { it.estimatedInputChars() } +
+            neighborhood.sumOf { it.estimatedInputChars() }
+
+    private fun MemoryWorkItem.estimatedInputChars(): Int =
+        id.length + kind.length + text.length + metadata.entries.sumOf { (key, value) -> key.length + value.length + 2 }
 
     private fun enforceOutputBudget(agent: MemoryMicroAgent, batch: MemoryMutationBatch) {
         require(batch.size <= agent.model.maxMutations) {
