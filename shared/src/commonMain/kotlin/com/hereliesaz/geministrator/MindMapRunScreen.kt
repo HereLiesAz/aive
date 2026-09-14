@@ -38,6 +38,8 @@ internal fun MindMapRunScreen(
     onRetryRuntime: () -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
     onValidateWorkflow: () -> List<String> = { emptyList() },
+    availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
+    onPickLocalRepository: (() -> String?)? = null,
     compact: Boolean,
     runtimeState: ApplicationRuntimeState,
 ) {
@@ -45,11 +47,16 @@ internal fun MindMapRunScreen(
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val activityEntrance = remember { AzphaltEntrance.childBand() }
     val existingRepository = (runtimeState as? ApplicationRuntimeState.NoRun)?.project?.repository
+    val selectableRepositorySources = remember(availableRepositorySources, existingRepository?.source) {
+        (availableRepositorySources + listOfNotNull(existingRepository?.source))
+            .ifEmpty { setOf(RepositorySource.GitHub, RepositorySource.GitLab) }
+            .sortedBy { it.ordinal }
+    }
     var projectName by remember(runtimeState) {
         mutableStateOf((runtimeState as? ApplicationRuntimeState.NoRun)?.project?.name.orEmpty())
     }
     var repositorySource by remember(runtimeState) {
-        mutableStateOf(existingRepository?.source ?: RepositorySource.GitHub)
+        mutableStateOf(existingRepository?.source ?: selectableRepositorySources.first())
     }
     var repositoryLocator by remember(runtimeState) {
         mutableStateOf(existingRepository?.locatorInput().orEmpty())
@@ -116,7 +123,7 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    RepositorySource.entries.forEach { source ->
+                    selectableRepositorySources.forEach { source ->
                         AzphaltPill(
                             label = source.displayName(),
                             seed = "repository-source-${source.name}",
@@ -130,6 +137,19 @@ internal fun MindMapRunScreen(
                             },
                         )
                     }
+                }
+                if (repositorySource == RepositorySource.Local && onPickLocalRepository != null) {
+                    AzphaltPill(
+                        label = "Choose Git folder",
+                        seed = "choose-local-git-folder",
+                        onClick = {
+                            onPickLocalRepository()?.let { path ->
+                                repositoryLocator = path
+                                repositoryError = null
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 OutlinedTextField(
                     value = repositoryLocator,
@@ -162,7 +182,7 @@ internal fun MindMapRunScreen(
                 )
                 Text(
                     if (repositorySource == RepositorySource.Local) {
-                        "The folder path is linked to the project. Local filesystem execution is available only on runtimes that can access that path."
+                        "This runtime can link the selected Git checkout. The path stays project-local and is never rewritten as a remote repository."
                     } else {
                         "Paste the repository URL or shorthand. Leave this blank only for a repoless orchestration."
                     },
