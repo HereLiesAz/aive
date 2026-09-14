@@ -3,12 +3,15 @@ package com.hereliesaz.geministrator.workflow
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.providers.AgentProvider
 
 data class ProviderSelectionRequest(
     val preferredProviderId: AgentProviderId? = null,
     val requiredCapabilities: Set<AgentCapability> = emptySet(),
     val constraints: ProviderConstraints = ProviderConstraints.None,
+    val repository: RepositoryRef? = null,
 )
 
 class AgentProviderRegistry(
@@ -32,6 +35,12 @@ class AgentProviderRegistry(
                 addAll(constraints.capabilities)
             }
         }
+        val repositoryAccessRequired =
+            AgentCapability.RepositoryRead in required || AgentCapability.RepositoryWrite in required
+
+        suspend fun eligible(provider: AgentProvider): Boolean =
+            provider.capabilities().supported.containsAll(required) &&
+                (!repositoryAccessRequired || provider.supportsRepository(request.repository))
 
         when (val constraints = request.constraints) {
             is ProviderConstraints.RequireProvider -> {
@@ -39,6 +48,10 @@ class AgentProviderRegistry(
                     ?: error("Required provider ${constraints.providerId.value} is not registered")
                 if (!provider.capabilities().supported.containsAll(required)) {
                     error("Provider ${constraints.providerId.value} does not satisfy required capabilities $required")
+                }
+                if (repositoryAccessRequired && !provider.supportsRepository(request.repository)) {
+                    val source = request.repository?.source?.displayName() ?: "repository"
+                    error("Provider ${constraints.providerId.value} cannot operate on the linked $source repository")
                 }
                 return provider
             }
@@ -51,9 +64,14 @@ class AgentProviderRegistry(
         }
 
         for (provider in ordered) {
-            if (provider.capabilities().supported.containsAll(required)) return provider
+            if (eligible(provider)) return provider
         }
 
-        error("No agent provider satisfies required capabilities $required")
+        val repositorySuffix = if (repositoryAccessRequired && request.repository != null) {
+            " for linked ${request.repository.source.displayName()} repository"
+        } else {
+            ""
+        }
+        error("No agent provider satisfies required capabilities $required$repositorySuffix")
     }
 }
