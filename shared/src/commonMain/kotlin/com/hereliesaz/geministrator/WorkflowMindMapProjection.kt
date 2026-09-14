@@ -5,6 +5,7 @@ import com.hereliesaz.conveyance.h2g2.H2g2WorkflowEdge
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowMotion
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -17,6 +18,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 
 data class LiveWorkflowPresentation(
+    val project: Project,
     val definition: WorkflowDefinition,
     val run: WorkflowRun,
     val roles: Collection<RoleDefinition>,
