@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 
 interface RepositoryOperationClient {
+    fun supports(project: Project): Boolean = true
     suspend fun start(project: Project, operation: String): ExternalExecutionRun
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
 }
@@ -14,6 +15,9 @@ class RepositoryOperationExecutorIntegration(
     private val client: RepositoryOperationClient,
 ) : TaskExecutorIntegration {
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.RepositoryOperation
+
+    override fun supports(executor: TaskExecutor, project: Project): Boolean =
+        executor is TaskExecutor.RepositoryOperation && client.supports(project)
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
