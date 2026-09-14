@@ -68,12 +68,11 @@ class MemoryLayerTest {
         )
 
         var firstCompleted = false
-        repeat(20) {
-            val result = consolidator.processNext(300 + it)
-            if (result is MemoryConsolidationResult.Completed && result.queueId == first.id) {
-                firstCompleted = true
-                return@repeat
-            }
+        var iteration = 0
+        while (!firstCompleted && iteration < 20) {
+            val result = consolidator.processNext(300 + iteration)
+            firstCompleted = result is MemoryConsolidationResult.Completed && result.queueId == first.id
+            iteration += 1
         }
         assertTrue(firstCompleted)
         assertTrue(seenPackets.isNotEmpty())
