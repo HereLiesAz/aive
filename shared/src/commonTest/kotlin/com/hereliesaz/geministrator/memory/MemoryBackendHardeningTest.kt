@@ -277,6 +277,7 @@ class MemoryBackendHardeningTest {
 
         val result = MemoryConsolidator(store, manager).processNext(4L)
         assertIs<MemoryConsolidationResult.Failed>(result)
+        Unit
     }
 
     private fun episode(
