@@ -3,8 +3,9 @@ package com.hereliesaz.geministrator.memory
 /**
  * Public orchestration boundary for long-term agent memory.
  *
- * The live workflow only needs [sessionObserver] and [tool]. Consolidation is deliberately a
- * separate operation and is available only when a Memory Manager has been configured.
+ * The live workflow uses [sessionObserver] for lifecycle banking and [tool] for deliberate banking,
+ * tag-first recall, and explicit drill-down. Consolidation remains a separate operation and is
+ * available only when a Memory Manager has been configured.
  */
 class AgentMemoryLayer private constructor(
     val store: MemoryStore,
@@ -18,7 +19,10 @@ class AgentMemoryLayer private constructor(
 
     suspend fun pendingEpisodes(): List<MemoryQueueEntry> = store.read().queue
         .filter { it.status != MemoryQueueStatus.Complete }
-        .sortedBy(MemoryQueueEntry::sequence)
+        .sortedWith(
+            compareByDescending<MemoryQueueEntry> { it.priority.ordinal }
+                .thenBy { it.sequence },
+        )
 
     companion object {
         fun create(
@@ -30,7 +34,7 @@ class AgentMemoryLayer private constructor(
             val queue = MemoryConsolidationQueue(store, maxChunkChars)
             return AgentMemoryLayer(
                 store = store,
-                tool = GraphMemoryTool(store),
+                tool = GraphMemoryTool(store, queue),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
                 consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
