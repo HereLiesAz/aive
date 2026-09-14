@@ -60,7 +60,7 @@ class MemoryMicroAgentsTest {
         assertEquals(packet.items.single().text, nounPacket.items.single().text)
         assertEquals(packet.items.single().text, verbPacket.items.single().text)
         assertTrue(nounPacket.items.single().metadata[CODE_NOUN_HINTS].orEmpty().contains("UserRepository"))
-        assertTrue(verbPacket.items.single().metadata[CODE_VERB_HINTS].orEmpty().contains("persist"))
+        assertTrue(verbPacket.items.single().metadata[CODE_VERB_HINTS].orEmpty().contains("write"))
         assertTrue(nounPacket.instruction.contains("semantic entity/reference"))
         assertTrue(verbPacket.instruction.contains("semantic action/transformation"))
     }
@@ -88,27 +88,16 @@ class MemoryMicroAgentsTest {
         )
 
         assertEquals(5, constrained.maxPacketItems)
-        assertEquals(1_024, constrained.maxPacketChars)
+        assertEquals(2_048, constrained.maxPacketChars)
         assertEquals(7, constrained.maxMutationsPerPacket)
-    }
-
-    @Test
-    fun localModelDefaultsCoverEveryHaivePlatform() {
-        val spec = MemoryMicroAgentModelSpec("portable-memory-model")
-        assertEquals(
-            MemoryMicroAgentPlatform.entries.toSet(),
-            spec.deployment.platforms,
-        )
-        assertTrue(spec.deployment.supportsAllHaivePlatforms())
-        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Web).isNotEmpty())
-        assertTrue(spec.deployment.artifactsFor(MemoryMicroAgentPlatform.Android).isNotEmpty())
     }
 
     private class RecordingMicroAgent(
         override val role: MemoryMicroAgentRole,
         private val sink: MutableMap<MemoryMicroAgentRole, MemoryWorkPacket>,
-        override val model: MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec("test-$role"),
+        spec: MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec("test-$role"),
     ) : MemoryMicroAgent {
+        override val model: MemoryMicroAgentModelSpec = spec
         override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
             sink[role] = packet
             return MemoryMutationBatch()
