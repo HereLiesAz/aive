@@ -40,7 +40,7 @@ class AgentProviderRegistry(
 
         suspend fun eligible(provider: AgentProvider): Boolean =
             provider.capabilities().supported.containsAll(required) &&
-                (!repositoryAccessRequired || provider.supportsRepository(request.repository))
+                (request.repository == null || provider.supportsRepository(request.repository))
 
         when (val constraints = request.constraints) {
             is ProviderConstraints.RequireProvider -> {
@@ -49,9 +49,11 @@ class AgentProviderRegistry(
                 if (!provider.capabilities().supported.containsAll(required)) {
                     error("Provider ${constraints.providerId.value} does not satisfy required capabilities $required")
                 }
-                if (repositoryAccessRequired && !provider.supportsRepository(request.repository)) {
-                    val source = request.repository?.source?.displayName() ?: "repository"
-                    error("Provider ${constraints.providerId.value} cannot operate on the linked $source repository")
+                if (request.repository != null && !provider.supportsRepository(request.repository)) {
+                    error(
+                        "Provider ${constraints.providerId.value} cannot operate in the context of the linked " +
+                            "${request.repository.source.displayName()} repository",
+                    )
                 }
                 return provider
             }
@@ -67,8 +69,12 @@ class AgentProviderRegistry(
             if (eligible(provider)) return provider
         }
 
-        val repositorySuffix = if (repositoryAccessRequired && request.repository != null) {
-            " for linked ${request.repository.source.displayName()} repository"
+        val repositorySuffix = if (request.repository != null) {
+            if (repositoryAccessRequired) {
+                " for linked ${request.repository.source.displayName()} repository"
+            } else {
+                " in the context of linked ${request.repository.source.displayName()} repository"
+            }
         } else {
             ""
         }
