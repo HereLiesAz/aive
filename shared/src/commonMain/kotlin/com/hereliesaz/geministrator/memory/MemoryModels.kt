@@ -28,6 +28,7 @@ enum class MemorySourceKind {
     PromptContext,
     Plan,
     Message,
+    AgentNote,
     Artifact,
     Failure,
     Other,
@@ -69,8 +70,9 @@ data class MemorySection(
 )
 
 /**
- * The semantic ladder intentionally keeps noun and verb indexes distinct. A memory can be
- * traversed in either direction: Context <-> tags <-> phrases <-> summaries <-> categories.
+ * The semantic ladder intentionally keeps noun and verb indexes distinct. Category nodes serve as
+ * broader category/subject tags. Memory can be traversed in either direction:
+ * Context <-> noun/verb tags <-> phrases <-> summaries <-> category/subject tags.
  */
 @Serializable
 enum class MemoryNodeKind {
@@ -112,7 +114,7 @@ enum class MemoryRelationKind {
     /** Summary -> phrases. */
     Summarizes,
 
-    /** Category -> summaries. */
+    /** Category/subject tag -> summaries. */
     Categorizes,
 
     SimilarTo,
@@ -160,6 +162,16 @@ enum class MemoryQueueStatus {
     Complete,
 }
 
+/**
+ * Deliberate in-session banks are processed before ordinary lifecycle backlog. Priority affects
+ * consolidation order only; it does not survive as special retrieval or reminder semantics.
+ */
+@Serializable
+enum class MemoryQueuePriority {
+    Normal,
+    Next,
+}
+
 @Serializable
 data class MemoryQueueEntry(
     val id: MemoryQueueId,
@@ -168,6 +180,7 @@ data class MemoryQueueEntry(
     val stage: MemoryConsolidationStage = MemoryConsolidationStage.Sectioning,
     val cursor: Int = 0,
     val status: MemoryQueueStatus = MemoryQueueStatus.Pending,
+    val priority: MemoryQueuePriority = MemoryQueuePriority.Normal,
     val attempt: Int = 0,
     val lastError: String? = null,
     val createdAtEpochMillis: Long,
@@ -213,6 +226,40 @@ data class MemorySessionEnvelope(
     val closedAtEpochMillis: Long,
 )
 
+/**
+ * Scope is chosen by the active agent when it deliberately banks a note, plan, checkpoint, or
+ * other small piece of context. Null fields intentionally broaden eligibility.
+ */
+@Serializable
+data class MemoryBankScope(
+    val projectId: String? = null,
+    val workflowRunId: String? = null,
+    val workflowDefinitionId: String? = null,
+    val taskRunId: String? = null,
+    val taskDefinitionId: String? = null,
+    val roleId: String? = null,
+)
+
+/**
+ * An early intentional deposit into the same memory pipeline used by lifecycle banking. It gains
+ * queue priority so it is consolidated next, but receives no special retrieval behavior later.
+ */
+@Serializable
+data class MemoryBankRequest(
+    val sourceSessionId: String,
+    val text: String,
+    val label: String = "Agent note",
+    val sourceKind: MemorySourceKind = MemorySourceKind.AgentNote,
+    val scope: MemoryBankScope = MemoryBankScope(),
+    val bankedAtEpochMillis: Long,
+) {
+    init {
+        require(sourceSessionId.isNotBlank()) { "Memory bank source session must not be blank" }
+        require(text.isNotBlank()) { "Memory bank text must not be blank" }
+        require(label.isNotBlank()) { "Memory bank label must not be blank" }
+    }
+}
+
 @Serializable
 data class MemoryConsolidationPolicy(
     val maxPacketItems: Int = 24,
@@ -248,12 +295,17 @@ enum class MemoryResolution {
     Context,
 }
 
+/**
+ * Free-text associative lookup. Its default resolution is Tag because semantic noun/entity,
+ * verb/action, and category/subject tags are Haive's normal ambient memory cues; deeper content is
+ * requested deliberately.
+ */
 @Serializable
 data class MemoryQuery(
     val text: String,
-    val resolution: MemoryResolution = MemoryResolution.Summary,
+    val resolution: MemoryResolution = MemoryResolution.Tag,
     val maxResults: Int = 12,
-    val includeConflicts: Boolean = true,
+    val includeConflicts: Boolean = false,
     val projectId: String? = null,
     val workflowRunId: String? = null,
     val workflowDefinitionId: String? = null,
@@ -264,6 +316,26 @@ data class MemoryQuery(
     init {
         require(text.isNotBlank()) { "Memory query must not be blank" }
         require(maxResults > 0) { "Memory query result limit must be positive" }
+    }
+}
+
+/**
+ * Tag-addressed recall for agents that already carry semantic tags in their CoTR. Tags may address
+ * noun/entity nodes, verb/action nodes, or broader category/subject nodes. No prose query synthesis
+ * is required: the tags themselves are sufficient addresses into the memory graph.
+ */
+@Serializable
+data class MemoryTagQuery(
+    val tags: List<String>,
+    val resolution: MemoryResolution = MemoryResolution.Tag,
+    val maxResults: Int = 12,
+    val includeConflicts: Boolean = false,
+    val scope: MemoryBankScope = MemoryBankScope(),
+) {
+    init {
+        require(tags.isNotEmpty()) { "Memory tag query must contain at least one tag" }
+        require(tags.all { it.isNotBlank() }) { "Memory tag query tags must not be blank" }
+        require(maxResults > 0) { "Memory tag query result limit must be positive" }
     }
 }
 

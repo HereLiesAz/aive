@@ -3,33 +3,50 @@ package com.hereliesaz.geministrator.memory
 import kotlin.math.max
 
 /**
- * Agent-facing memory surface. Agents query this service; they do not read persistence directly.
- * A query chooses its desired semantic resolution and may then expand a hit up or down the graph.
+ * Agent-facing memory surface. Agents bank experience and query this service; they do not read
+ * persistence directly.
+ *
+ * GRIP means Global Regular IMpression Print: Haive's memory-specific direct-recall operation.
+ * Normal associative recall is cue-first. An agent that already carries semantic tags in its CoTR
+ * can pass those tags directly to [grip] and request a deeper resolution only when the tags
+ * themselves are not enough to recollect what it needs. Semantic cue tags include noun/entity,
+ * verb/action, and category/subject tags.
  */
 interface MemoryTool {
-    suspend fun grep(query: MemoryQuery): MemoryRecallBundle
+    /**
+     * Deliberately bank a note, small plan, checkpoint, procedure, resource, or other context now.
+     * The deposit enters the same clerical pipeline as lifecycle banking but jumps to next in line
+     * for consolidation. Once consolidated, it has no special reminder retrieval semantics.
+     */
+    suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry
 
+    /** Free-text GRIP. Defaults to tag-level cues. */
+    suspend fun grip(query: MemoryQuery): MemoryRecallBundle
+
+    /** Tag-addressed GRIP for semantic tags already present in an agent's CoTR. */
+    suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle
+
+    /** Explicitly descend or ascend from a known memory node when tag cues are insufficient. */
     suspend fun expand(
         nodeId: MemoryNodeId,
         resolution: MemoryResolution,
         maxResults: Int = 12,
-        includeConflicts: Boolean = true,
+        includeConflicts: Boolean = false,
     ): List<MemoryRecallHit>
 }
 
 class GraphMemoryTool(
     private val store: MemoryStore,
+    private val queue: MemoryConsolidationQueue = MemoryConsolidationQueue(store),
 ) : MemoryTool {
-    override suspend fun grep(query: MemoryQuery): MemoryRecallBundle {
+    override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
+
+    override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val snapshot = store.read()
-        val active = snapshot.activeNodes(query.projectId)
+        val active = snapshot.activeNodes(query)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
-        val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
-        val adjacency = snapshot.adjacency()
-        val targetKinds = query.resolution.nodeKinds()
-        val activeIds = active.mapTo(hashSetOf()) { it.id }
         val scoredSeeds = active
             .mapNotNull { node ->
                 val lexical = lexicalScore(query.text, node)
@@ -37,55 +54,33 @@ class GraphMemoryTool(
                 val score = (lexical + scopeAffinity(query, node, episodesById)).coerceIn(0f, 1f)
                 node to score
             }
-            .sortedWith(
-                compareByDescending<Pair<MemoryNode, Float>> { it.second }
-                    .thenByDescending { it.first.salience }
-                    .thenByDescending { it.first.confidence },
-            )
+            .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
-        val projected = linkedMapOf<MemoryNodeId, Float>()
-        scoredSeeds.forEach { (seed, score) ->
-            if (seed.kind in targetKinds) {
-                projected[seed.id] = max(projected[seed.id] ?: 0f, score)
-            }
-            projectToKinds(
-                start = seed.id,
-                targetKinds = targetKinds,
-                nodesById = nodesById,
-                adjacency = adjacency,
-                activeIds = activeIds,
-                maxDepth = 5,
-            ).forEach { (nodeId, distance) ->
-                val targetNode = nodesById[nodeId] ?: return@forEach
-                val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
-                val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
-                    .coerceIn(0f, 1f)
-                projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
-            }
-        }
+        return snapshot.recallFromSeeds(query, scoredSeeds)
+    }
 
-        val hits = projected.entries
-            .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
-            .sortedWith(
-                compareByDescending<Pair<MemoryNode, Float>> { it.second }
-                    .thenByDescending { it.first.salience }
-                    .thenByDescending { it.first.confidence },
-            )
-            .take(query.maxResults)
-            .map { (node, score) ->
-                MemoryRecallHit(
-                    node = node,
-                    score = score.coerceIn(0f, 1f),
-                    conflicts = if (query.includeConflicts) {
-                        snapshot.conflictsFor(node.id, nodesById)
-                    } else {
-                        emptyList()
-                    },
-                )
-            }
+    override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle {
+        val normalizedQuery = query.asMemoryQuery()
+        val snapshot = store.read()
+        val active = snapshot.activeNodes(normalizedQuery)
+        if (active.isEmpty()) return MemoryRecallBundle(normalizedQuery, emptyList())
 
-        return MemoryRecallBundle(query, hits)
+        val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
+        val scoredSeeds = active
+            .asSequence()
+            .filter { it.kind in semanticCueKinds }
+            .mapNotNull { node ->
+                val match = tagAddressScore(query.tags, node)
+                if (match <= 0f) return@mapNotNull null
+                val score = (match + scopeAffinity(normalizedQuery, node, episodesById)).coerceIn(0f, 1f)
+                node to score
+            }
+            .sortedWith(memorySeedComparator())
+            .take(max(query.maxResults * 4, 24))
+            .toList()
+
+        return snapshot.recallFromSeeds(normalizedQuery, scoredSeeds)
     }
 
     override suspend fun expand(
@@ -122,11 +117,98 @@ class GraphMemoryTool(
     }
 }
 
+private val semanticCueKinds = setOf(
+    MemoryNodeKind.NounTag,
+    MemoryNodeKind.VerbTag,
+    MemoryNodeKind.Category,
+)
+
+private fun MemorySnapshot.recallFromSeeds(
+    query: MemoryQuery,
+    scoredSeeds: List<Pair<MemoryNode, Float>>,
+): MemoryRecallBundle {
+    if (scoredSeeds.isEmpty()) return MemoryRecallBundle(query, emptyList())
+
+    val nodesById = nodes.associateBy(MemoryNode::id)
+    val episodesById = episodes.associateBy(MemoryEpisode::id)
+    val adjacency = adjacency()
+    val targetKinds = query.resolution.nodeKinds()
+    val activeIds = activeNodes(query).mapTo(hashSetOf()) { it.id }
+    val projected = linkedMapOf<MemoryNodeId, Float>()
+
+    scoredSeeds.forEach { (seed, score) ->
+        if (seed.kind in targetKinds) {
+            projected[seed.id] = max(projected[seed.id] ?: 0f, score)
+        }
+        projectToKinds(
+            start = seed.id,
+            targetKinds = targetKinds,
+            nodesById = nodesById,
+            adjacency = adjacency,
+            activeIds = activeIds,
+            maxDepth = 6,
+        ).forEach { (nodeId, distance) ->
+            val targetNode = nodesById[nodeId] ?: return@forEach
+            val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
+            val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
+                .coerceIn(0f, 1f)
+            projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
+        }
+    }
+
+    val hits = projected.entries
+        .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
+        .sortedWith(memorySeedComparator())
+        .take(query.maxResults)
+        .map { (node, score) ->
+            MemoryRecallHit(
+                node = node,
+                score = score.coerceIn(0f, 1f),
+                conflicts = if (query.includeConflicts) conflictsFor(node.id, nodesById) else emptyList(),
+            )
+        }
+
+    return MemoryRecallBundle(query, hits)
+}
+
+private fun memorySeedComparator(): Comparator<Pair<MemoryNode, Float>> =
+    compareByDescending<Pair<MemoryNode, Float>> { it.second }
+        .thenByDescending { it.first.salience }
+        .thenByDescending { it.first.confidence }
+
+private fun tagAddressScore(tags: List<String>, node: MemoryNode): Float {
+    val requestedPhrases = tags.map { it.trim().lowercase() }.filter(String::isNotEmpty)
+    val nodeText = node.text.trim().lowercase()
+    if (requestedPhrases.any { it == nodeText }) return 1f
+
+    val requestedTerms = tags.flatMap(String::memoryTerms).toSet()
+    if (requestedTerms.isEmpty()) return 0f
+    val nodeTerms = (node.text.memoryTerms() + node.metadata.values.flatMap(String::memoryTerms)).toSet()
+    if (nodeTerms.isEmpty()) return 0f
+
+    val overlap = requestedTerms.count { it in nodeTerms }.toFloat() / requestedTerms.size
+    val phraseBonus = if (requestedPhrases.any { phrase -> phrase in nodeText || nodeText in phrase }) 0.25f else 0f
+    return (overlap * 0.75f + phraseBonus).coerceIn(0f, 1f)
+}
+
+private fun MemoryTagQuery.asMemoryQuery(): MemoryQuery = MemoryQuery(
+    text = tags.joinToString(" "),
+    resolution = resolution,
+    maxResults = maxResults,
+    includeConflicts = includeConflicts,
+    projectId = scope.projectId,
+    workflowRunId = scope.workflowRunId,
+    workflowDefinitionId = scope.workflowDefinitionId,
+    taskRunId = scope.taskRunId,
+    taskDefinitionId = scope.taskDefinitionId,
+    roleId = scope.roleId,
+)
+
 private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {
     MemoryResolution.Category -> setOf(MemoryNodeKind.Category)
     MemoryResolution.Summary -> setOf(MemoryNodeKind.Summary)
     MemoryResolution.Phrase -> setOf(MemoryNodeKind.Phrase)
-    MemoryResolution.Tag -> setOf(MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag)
+    MemoryResolution.Tag -> semanticCueKinds
     MemoryResolution.Context -> setOf(MemoryNodeKind.Context)
 }
 
@@ -142,41 +224,53 @@ private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> = buil
     }
 }
 
-private fun MemorySnapshot.activeNodes(projectId: String?): List<MemoryNode> {
+private fun MemorySnapshot.activeNodes(query: MemoryQuery?): List<MemoryNode> {
     val superseded = edges
         .asSequence()
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val projectEpisodes = if (projectId == null) {
-        null
-    } else {
-        episodes.filter { it.projectId == projectId }.mapTo(hashSetOf()) { it.id }
+
+    if (query == null || !query.hasScopeConstraints()) {
+        return nodes.filter { it.id !in superseded }
     }
+
+    val episodesById = episodes.associateBy(MemoryEpisode::id)
     return nodes.filter { node ->
         node.id !in superseded &&
-            (projectEpisodes == null || node.sourceEpisodeIds.isEmpty() || node.sourceEpisodeIds.any { it in projectEpisodes })
+            node.sourceEpisodeIds.isNotEmpty() &&
+            node.sourceEpisodeIds.any { episodeId ->
+                episodesById[episodeId]?.let(query::matchesScope) == true
+            }
     }
 }
+
+private fun MemoryQuery.hasScopeConstraints(): Boolean =
+    projectId != null ||
+        workflowRunId != null ||
+        workflowDefinitionId != null ||
+        taskRunId != null ||
+        taskDefinitionId != null ||
+        roleId != null
+
+private fun MemoryQuery.matchesScope(episode: MemoryEpisode): Boolean =
+    (projectId == null || projectId == episode.projectId) &&
+        (workflowRunId == null || workflowRunId == episode.workflowRunId) &&
+        (workflowDefinitionId == null || workflowDefinitionId == episode.workflowDefinitionId) &&
+        (taskRunId == null || taskRunId == episode.taskRunId) &&
+        (taskDefinitionId == null || taskDefinitionId == episode.taskDefinitionId) &&
+        (roleId == null || roleId == episode.roleId)
 
 private fun scopeAffinity(
     query: MemoryQuery,
     node: MemoryNode,
     episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
 ): Float {
-    if (
-        query.projectId == null &&
-        query.workflowRunId == null &&
-        query.workflowDefinitionId == null &&
-        query.taskRunId == null &&
-        query.taskDefinitionId == null &&
-        query.roleId == null
-    ) {
-        return 0f
-    }
+    if (!query.hasScopeConstraints()) return 0f
 
     return node.sourceEpisodeIds
         .asSequence()
         .mapNotNull(episodesById::get)
+        .filter(query::matchesScope)
         .maxOfOrNull { episode ->
             var score = 0f
             if (query.projectId != null && query.projectId == episode.projectId) score += 0.05f

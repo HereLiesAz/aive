@@ -25,6 +25,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/MEMORY_BANKING_AND_ATTENTION.md`](architecture/MEMORY_BANKING_AND_ATTENTION.md) defines the canonical memory-banking, deliberate note-to-self deposit, tag-first associative surfacing, Attention Deficit Dial, token-driven attention recovery, non-destructive memory, and no-programmatic-reminder invariants. Future memory and orchestration work should treat this document as normative.
 
+### GRIP memory recall
+
+[`architecture/GRIP.md`](architecture/GRIP.md) defines the memory-tool API contract: `bank(...)` for deposits, `grip(...)` for memory-specific direct recall, CoTR tags as direct memory addresses, priority-next consolidation for deliberate banks, and tag-first results before deeper explicit recall.
+
 ### Persistence
 
 [`architecture/PERSISTENCE.md`](architecture/PERSISTENCE.md) defines what survives restarts, where it is stored, what must never enter workflow persistence, and the resume invariants.
