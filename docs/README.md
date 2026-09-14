@@ -21,6 +21,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md) defines the product boundaries, runtime model, executor model, workflow UI, provider boundary, and delivery architecture.
 
+### Memory banking and attention
+
+[`architecture/MEMORY_BANKING_AND_ATTENTION.md`](architecture/MEMORY_BANKING_AND_ATTENTION.md) defines the canonical memory-banking, deliberate note-to-self deposit, tag-first associative surfacing, Attention Deficit Dial, token-driven attention recovery, non-destructive memory, and no-programmatic-reminder invariants. Future memory and orchestration work should treat this document as normative.
+
 ### Persistence
 
 [`architecture/PERSISTENCE.md`](architecture/PERSISTENCE.md) defines what survives restarts, where it is stored, what must never enter workflow persistence, and the resume invariants.
