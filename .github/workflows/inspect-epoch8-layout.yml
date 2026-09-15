@@ -50,7 +50,7 @@ jobs:
             echo "=== $file ==="
             sed -n '1,220p' "$file"
           done < <(find /tmp/epoch8/association /tmp/epoch8/noun -type f \
-            \( -name '*.json' -o -name '*.txt' -o -name '*.md' \) \
+            \( -name '*.json' -o -name '*.txt' -o -name '*.md' -o -name '*.jinja' \) \
             -size -256k | sort)
 
       - name: Inspect ONNX graph contracts
@@ -87,4 +87,79 @@ jobs:
                       for d in t.shape.dim:
                           shape.append(d.dim_param or d.dim_value or '?')
                       print(' ', value.name, 'elem_type=', t.elem_type, 'shape=', shape)
+          PY
+
+      - name: Execute Specialist 08 and probe tokenizers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet 'onnxruntime>=1.23,<2' 'tokenizers>=0.22,<1' 'transformers>=4.57,<6' 'numpy>=2,<3'
+          python - <<'PY'
+          from pathlib import Path
+          import numpy as np
+          import onnxruntime as ort
+          from tokenizers import Tokenizer
+          from transformers import AutoTokenizer
+
+          assoc = Path('/tmp/epoch8/association/onnx')
+          tokenizer = Tokenizer.from_file(str(assoc / 'tokenizer.json'))
+          tokenizer.enable_padding()
+          tokenizer.enable_truncation(max_length=256)
+          texts = [
+              'API timeout is configured for 30 seconds.',
+              'API timeout is configured for 60 seconds.',
+              'The UI uses a dark theme.',
+          ]
+          encoded = tokenizer.encode_batch(texts)
+          max_len = max(len(e.ids) for e in encoded)
+          ids = np.asarray([e.ids + [0] * (max_len - len(e.ids)) for e in encoded], dtype=np.int64)
+          masks = np.asarray([e.attention_mask + [0] * (max_len - len(e.attention_mask)) for e in encoded], dtype=np.int64)
+          types = np.asarray([e.type_ids + [0] * (max_len - len(e.type_ids)) for e in encoded], dtype=np.int64)
+
+          sess = ort.InferenceSession(str(assoc / 'model.onnx'), providers=['CPUExecutionProvider'])
+          output_names = [o.name for o in sess.get_outputs()]
+          values = sess.run(None, {
+              'input_ids': ids,
+              'attention_mask': masks,
+              'token_type_ids': types,
+          })
+          print('association output names:', output_names)
+          for name, value in zip(output_names, values):
+              print('association output:', name, value.shape, value.dtype)
+          hidden = values[output_names.index('last_hidden_state')]
+          pooled_name = next(name for name in output_names if name != 'last_hidden_state')
+          pooled = values[output_names.index(pooled_name)]
+          expanded = masks[..., None].astype(np.float32)
+          manual = (hidden * expanded).sum(axis=1) / np.clip(expanded.sum(axis=1), 1e-9, None)
+          manual /= np.clip(np.linalg.norm(manual, axis=1, keepdims=True), 1e-12, None)
+          print('pooled output name:', pooled_name)
+          print('pooled norms:', np.linalg.norm(pooled, axis=1).tolist())
+          print('manual-normalized max abs diff:', float(np.max(np.abs(pooled - manual))))
+          normalized = pooled / np.clip(np.linalg.norm(pooled, axis=1, keepdims=True), 1e-12, None)
+          print('similarity timeout30-timeout60:', float(normalized[0] @ normalized[1]))
+          print('similarity timeout30-ui:', float(normalized[0] @ normalized[2]))
+
+          noun_root = Path('/tmp/epoch8/noun')
+          raw_qwen = Tokenizer.from_file(str(noun_root / 'tokenizer.json'))
+          print('qwen tokenizer model:', type(raw_qwen.model).__name__)
+          print('qwen pre_tokenizer:', raw_qwen.pre_tokenizer)
+          print('qwen decoder:', raw_qwen.decoder)
+          print('qwen post_processor:', raw_qwen.post_processor)
+
+          hf = AutoTokenizer.from_pretrained(str(noun_root), local_files_only=True, trust_remote_code=False)
+          rendered = hf.apply_chat_template(
+              [{'role': 'user', 'content': 'Return one JSON object with noun/entity tags for this packet.'}],
+              tokenize=False,
+              add_generation_prompt=True,
+          )
+          token_ids = hf.apply_chat_template(
+              [{'role': 'user', 'content': 'Return one JSON object with noun/entity tags for this packet.'}],
+              tokenize=True,
+              add_generation_prompt=True,
+          )
+          print('qwen chat template rendered repr:', repr(rendered))
+          print('qwen chat token ids:', token_ids[:80])
+          print('qwen chat token count:', len(token_ids))
+          print('qwen eos token/id:', hf.eos_token, hf.eos_token_id)
+          print('qwen pad token/id:', hf.pad_token, hf.pad_token_id)
           PY
