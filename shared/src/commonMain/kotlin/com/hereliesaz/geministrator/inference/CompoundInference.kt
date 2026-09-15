@@ -42,7 +42,7 @@ data class InferenceGenealogy(
 }
 
 /**
- * Compound-inference metadata attached to every provider-backed [AgentTaskRequest].
+ * Compound-inference metadata attached to every provider-backed agent task request.
  *
  * [candidateBudget] and [aggregatorDepth] describe the maximum collaboration shape authorized for
  * this invocation. The initial runtime uses [CompoundInferenceStrategy.Single]; centralized MoA,
