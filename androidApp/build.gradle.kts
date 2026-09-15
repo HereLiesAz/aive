@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.onnxruntime.android)
     implementation(libs.commons.compress)
     implementation(libs.djl.huggingface.tokenizers)
     runtimeOnly(libs.djl.android.tokenizer.native)
