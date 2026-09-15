@@ -59,6 +59,15 @@ class StarterWorkflowDispatchTest {
         val request = assertNotNull(gateway.lastRequest).taskRequest
         assertEquals(repository, request.repository)
         assertTrue(request.requirePlanApproval)
+        assertEquals(project.id, request.orchestrationContext.projectId)
+        assertEquals(run.id, request.orchestrationContext.workflowRunId)
+        assertEquals(definition.id, request.orchestrationContext.workflowDefinitionId)
+        assertEquals(TaskDefinitionId("implementation"), request.orchestrationContext.taskDefinitionId)
+        assertNotNull(request.orchestrationContext.roleId)
+        assertEquals(
+            "workflow:${run.id.value}:task-run:${request.taskRunId.value}",
+            request.compoundInference.genealogy.invocationId,
+        )
         assertEquals(TaskRunStatus.Planning, dispatched.run.taskRuns.getValue(TaskDefinitionId("implementation")).status)
     }
 }
