@@ -299,12 +299,25 @@ class BlueprintCompoundInferenceFabric(
 ) : CompoundInferenceFabric {
     private val mutex = Mutex()
     private val invocationByTaskRun = linkedMapOf<TaskRunId, String>()
+    private val nextInvocationSequenceByTaskRun = linkedMapOf<TaskRunId, Long>()
 
     override suspend fun prepareDispatch(
         request: AgentTaskRequest,
         providerId: AgentProviderId,
         capabilities: AgentCapabilities,
     ): PreparedInferenceDispatch {
+        val concreteInvocationId = mutex.withLock {
+            val nextSequence = (nextInvocationSequenceByTaskRun[request.taskRunId] ?: 0L) + 1L
+            nextInvocationSequenceByTaskRun[request.taskRunId] = nextSequence
+            "${request.compoundInference.genealogy.invocationId}:invocation:$nextSequence"
+        }
+        val preparedRequest = request.copy(
+            compoundInference = request.compoundInference.copy(
+                genealogy = request.compoundInference.genealogy.copy(
+                    invocationId = concreteInvocationId,
+                ),
+            ),
+        )
         val agent = InferenceAgentDescriptor(
             providerId = providerId,
             capabilities = capabilities.supported,
@@ -313,19 +326,19 @@ class BlueprintCompoundInferenceFabric(
         )
         agentRegistry.register(agent)
 
-        val data = request.contextArtifacts.map { artifact ->
+        val data = preparedRequest.contextArtifacts.map { artifact ->
             artifact.toInferenceData().also { dataRegistry.register(it) }
         }
         val plan = planner.plan(
             InferencePlanningRequest(
-                request = request,
+                request = preparedRequest,
                 providerId = providerId,
                 agent = agent,
                 data = data,
             ),
         )
         mutex.withLock {
-            invocationByTaskRun[request.taskRunId] = plan.invocationId
+            invocationByTaskRun[preparedRequest.taskRunId] = plan.invocationId
         }
         streamFabric.append(
             invocationId = plan.invocationId,
@@ -337,7 +350,7 @@ class BlueprintCompoundInferenceFabric(
                 aggregatorDepth = plan.aggregatorDepth,
             ),
         )
-        return PreparedInferenceDispatch(request = request, plan = plan)
+        return PreparedInferenceDispatch(request = preparedRequest, plan = plan)
     }
 
     override suspend fun recordArtifact(taskRunId: TaskRunId, artifact: ProviderArtifact) {
