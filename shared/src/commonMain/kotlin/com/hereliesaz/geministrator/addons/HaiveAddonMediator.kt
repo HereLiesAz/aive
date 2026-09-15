@@ -33,7 +33,10 @@ interface HostSettingsBridge {
     fun getScopedSetting(namespace: String, key: String): String?
     fun setScopedSetting(namespace: String, key: String, value: String)
 }
-interface HostUiBridge { fun dispatchAction(actionId: String): Boolean }
+interface HostUiBridge {
+    fun provideScreen(namespace: String): AddonScreen
+    fun dispatchAction(namespace: String, actionId: String): Boolean
+}
 
 class HaiveAddonMediator(
     private val addonId: String,
@@ -56,7 +59,7 @@ class HaiveAddonMediator(
 
     private fun checkPermission(permission: HostPermission) {
         if (!grantedPermissions.contains(permission)) {
-            throw RuntimeException("Add-on \$addonId lacks permission \$permission")
+            throw RuntimeException("Add-on $addonId lacks permission $permission")
         }
     }
 
@@ -182,7 +185,7 @@ class HaiveAddonMediator(
     override val ui = object : AddonUiApi {
         override fun provideScreen(): AddonScreen {
             checkPermission(HostPermission.UiScreen)
-            return AddonScreen("Addon Screen", emptyList())
+            return uiBridge.provideScreen(addonId)
         }
     }
 }
