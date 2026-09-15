@@ -1,12 +1,12 @@
 package com.hereliesaz.geministrator.addons
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -24,12 +24,33 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AddonHostScreen(
     installations: List<AddonInstallation>,
+    onInstall: (AzphaltPackageManifest, Set<HostPermission>) -> Unit,
     onRemove: (String) -> Unit,
     onEnableDisable: (String, Boolean) -> Unit,
-    onAddAgentsToCompany: ((String) -> Unit)? = null,
-    packageSourceStatus: String? = null,
+    onAddAgentsToCompany: (String) -> Unit,
     modifier: Modifier = Modifier,
+    enableCompanyContribution: Boolean = false,
+    packageSourceStatus: String? = null,
 ) {
+    val persistence = remember { SettingsAddonPersistence.createDefault() }
+    var storedInstallations by remember {
+        mutableStateOf(runCatching { persistence.getInstallations() }.getOrDefault(emptyList()))
+    }
+    var storageFailure by remember { mutableStateOf<String?>(null) }
+
+    fun reloadStoredInstallations() {
+        runCatching { persistence.getInstallations() }
+            .onSuccess {
+                storedInstallations = it
+                storageFailure = null
+            }
+            .onFailure { failure ->
+                storageFailure = failure.message ?: "Add-on storage could not be read."
+            }
+    }
+
+    val visibleInstallations = if (installations.isNotEmpty()) installations else storedInstallations
+
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -37,22 +58,41 @@ fun AddonHostScreen(
         Text("ADD-ONS")
         Text("Verified Azphalt workflow packages installed in Haive.")
 
-        if (installations.isEmpty()) {
+        storageFailure?.let { Text("Storage error: $it") }
+
+        if (visibleInstallations.isEmpty()) {
             Text("No workflow add-ons are installed.")
         } else {
-            installations.sortedBy(AddonInstallation::id).forEach { installation ->
+            visibleInstallations.sortedBy(AddonInstallation::id).forEach { installation ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${installation.id} · ${installation.version}")
                     Text(if (installation.enabled) "Enabled" else "Disabled")
                     Button(onClick = {
-                        onEnableDisable(installation.id, !installation.enabled)
+                        val enabled = !installation.enabled
+                        runCatching {
+                            persistence.saveInstallation(installation.copy(enabled = enabled))
+                        }.onSuccess {
+                            reloadStoredInstallations()
+                            onEnableDisable(installation.id, enabled)
+                        }.onFailure { failure ->
+                            storageFailure = failure.message ?: "Add-on state could not be saved."
+                        }
                     }) {
                         Text(if (installation.enabled) "Disable" else "Enable")
                     }
-                    Button(onClick = { onRemove(installation.id) }) {
+                    Button(onClick = {
+                        runCatching { persistence.removeInstallation(installation.id) }
+                            .onSuccess {
+                                reloadStoredInstallations()
+                                onRemove(installation.id)
+                            }
+                            .onFailure { failure ->
+                                storageFailure = failure.message ?: "Add-on could not be removed."
+                            }
+                    }) {
                         Text("Remove")
                     }
-                    if (onAddAgentsToCompany != null) {
+                    if (enableCompanyContribution) {
                         Button(onClick = { onAddAgentsToCompany(installation.id) }) {
                             Text("Add agents to company")
                         }
