@@ -309,7 +309,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish rolling alpha release
+    name: Publish rolling release
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs:
       - build
@@ -365,8 +365,23 @@ jobs:
             exit 1
           fi
 
-          MAJOR_MINOR=$(printf '%s' "$VERSION_NAME" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
-          TAG_NAME="latest-alpha-v${MAJOR_MINOR}"
+          if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Haive versions must be plain numeric versions (for example 0.9.0 or 1.2.0); alpha/beta suffixes are not used"
+            exit 1
+          fi
+
+          MAJOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f1)
+          MINOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f2)
+          MAJOR_MINOR="${MAJOR}.${MINOR}"
+          TAG_NAME="latest-v${MAJOR_MINOR}"
+          RELEASE_TITLE="The Haive ${VERSION_NAME}"
+
+          # Maturity is encoded by the number, never by a label:
+          # 0.x = alpha; 1.0 through 1.3 = beta; 1.4+ = stable.
+          IS_PRERELEASE=false
+          if [ "$MAJOR" -eq 0 ] || { [ "$MAJOR" -eq 1 ] && [ "$MINOR" -le 3 ]; }; then
+            IS_PRERELEASE=true
+          fi
 
           mkdir -p release-files
 
@@ -398,7 +413,7 @@ jobs:
           {
             echo "# The Haive ${VERSION_NAME}"
             echo
-            echo "Rolling alpha build from commit \`${GITHUB_SHA}\`."
+            echo "Rolling build from commit \`${GITHUB_SHA}\`."
             if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
               echo
               echo "## Changes"
@@ -409,40 +424,52 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "MAJOR_MINOR=$MAJOR_MINOR" >> "$GITHUB_ENV"
           echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
+          echo "RELEASE_TITLE=$RELEASE_TITLE" >> "$GITHUB_ENV"
+          echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
 
           echo "Release assets:"
           ls -lh release-files
 
-      - name: Publish rolling alpha release
+      - name: Publish rolling release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
-          LEGACY_TAG="latest-debug-v${MAJOR_MINOR}"
-          if gh release view "$LEGACY_TAG" >/dev/null 2>&1; then
-            gh release delete "$LEGACY_TAG" --yes --cleanup-tag
-          elif git ls-remote --exit-code --tags origin "refs/tags/$LEGACY_TAG" >/dev/null 2>&1; then
-            git push origin ":refs/tags/$LEGACY_TAG"
-          fi
+          # Remove obsolete labeled rolling channels. Haive's maturity is implicit in
+          # its numeric version and never appears as alpha/beta text in tags or titles.
+          for pattern in 'latest-debug-v*' 'latest-alpha-v*' 'latest-beta-v*'; do
+            while IFS= read -r LEGACY_TAG; do
+              [ -n "$LEGACY_TAG" ] || continue
+              if gh release view "$LEGACY_TAG" >/dev/null 2>&1; then
+                gh release delete "$LEGACY_TAG" --yes --cleanup-tag
+              else
+                git push origin ":refs/tags/$LEGACY_TAG" || true
+              fi
+            done < <(git tag -l "$pattern")
+          done
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa "$TAG_NAME" -m "Latest Haive alpha ${VERSION_NAME}"
+          git tag -fa "$TAG_NAME" -m "Latest Haive ${VERSION_NAME}"
           git push origin "$TAG_NAME" --force
 
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             gh release edit "$TAG_NAME" \
-              --title "The Haive ${VERSION_NAME} — Latest Alpha" \
-              --notes-file release-notes.md \
-              --prerelease
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md
             gh release upload "$TAG_NAME" release-files/* --clobber
-          else
+          elif [ "$IS_PRERELEASE" = "true" ]; then
             gh release create "$TAG_NAME" release-files/* \
               --prerelease \
               --verify-tag \
-              --title "The Haive ${VERSION_NAME} — Latest Alpha" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md
+          else
+            gh release create "$TAG_NAME" release-files/* \
+              --verify-tag \
+              --title "$RELEASE_TITLE" \
               --notes-file release-notes.md
           fi
 
