@@ -16,6 +16,7 @@ data class ManagedSessionHandle(
     val taskRunId: TaskRunId,
     val providerId: AgentProviderId,
     val providerRunId: ProviderRunId,
+    val inferenceInvocationId: String? = null,
 )
 
 data class ManagedSessionProgress(
