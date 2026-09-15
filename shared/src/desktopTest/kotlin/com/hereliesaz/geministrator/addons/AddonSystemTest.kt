@@ -23,9 +23,19 @@ class AddonSystemTest {
     @Test
     fun testUnknownPermissionsDenied() {
         val parser = AzphaltPackageParser()
-        val mapped = parser.mapPermissions(listOf("AppRead", "UnknownPermission", "CompanyRead"))
+        val mapped = parser.parseRequestedPermissions(listOf("AppRead", "UnknownPermission", "CompanyRead"))
         assertTrue(mapped.contains(HostPermission.AppRead))
         assertTrue(mapped.contains(HostPermission.CompanyRead))
         assertEquals(2, mapped.size)
+    }
+
+    @Test
+    fun testUnapprovedPermissionsDenied() {
+        val parser = AzphaltPackageParser()
+        val requested = parser.parseRequestedPermissions(listOf("AppRead", "CompanyRead"))
+        val approved = setOf(HostPermission.AppRead)
+        val granted = parser.selectGrantedPermissions(requested, approved)
+        assertTrue(granted.contains(HostPermission.AppRead))
+        assertEquals(1, granted.size)
     }
 }

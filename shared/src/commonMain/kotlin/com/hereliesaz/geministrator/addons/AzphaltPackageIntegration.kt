@@ -27,7 +27,7 @@ class AzphaltPackageParser {
         return manifest
     }
 
-    fun mapPermissions(requested: List<String>): Set<HostPermission> {
+    fun parseRequestedPermissions(requested: List<String>): Set<HostPermission> {
         val mapped = mutableSetOf<HostPermission>()
         for (req in requested) {
             try {
@@ -37,5 +37,9 @@ class AzphaltPackageParser {
             }
         }
         return mapped
+    }
+
+    fun selectGrantedPermissions(requested: Set<HostPermission>, approved: Set<HostPermission>): Set<HostPermission> {
+        return requested.intersect(approved)
     }
 }
