@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
+import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
 import com.hereliesaz.geministrator.RepositoryCredentialSetup
 import com.hereliesaz.geministrator.RepositoryServiceCatalog
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -62,6 +63,9 @@ class MainActivity : ComponentActivity() {
             val executorIntegrations = remember(repositoryCredentials) {
                 configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
             }
+            val repositoryDiscovery = remember(repositoryCredentials) {
+                configuredAndroidRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
+            }
 
             val repositoryServiceId = configuringRepositoryServiceId
             val providerId = configuringProviderId
@@ -88,6 +92,7 @@ class MainActivity : ComponentActivity() {
                     providers = providers,
                     executorIntegrations = executorIntegrations,
                     connectedRepositoryServiceIds = repositoryCredentials.keys,
+                    onSearchRepositories = repositoryDiscovery::search,
                     onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                     onDisconnectRepositoryService = { serviceId ->
                         repositoryCredentialStore.clear(serviceId)
@@ -244,6 +249,19 @@ internal fun configuredAndroidExecutorIntegrations(
                 )
             }
         },
+    )
+}
+
+internal fun configuredAndroidRepositoryDiscovery(
+    repositoryCredentials: Map<String, String>,
+    httpClient: HttpClient,
+): RemoteRepositoryDiscoveryClient {
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
+    val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    return RemoteRepositoryDiscoveryClient(
+        httpClient = httpClient,
+        githubTokenProvider = githubToken?.let { token -> RepositoryServiceTokenProvider { token } },
+        gitlabTokenProvider = gitlabToken?.let { token -> RepositoryServiceTokenProvider { token } },
     )
 }
 
