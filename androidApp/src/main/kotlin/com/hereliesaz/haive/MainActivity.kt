@@ -44,6 +44,13 @@ import io.ktor.client.engine.cio.CIO
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
+    private val orchestrationRuntimeDelegate = lazy {
+        AndroidOrchestrationAgentRuntime(
+            installer = AndroidOrchestrationModelInstaller(this, repositoryHttpClient),
+            cacheDirectory = cacheDir,
+        )
+    }
+    private val orchestrationRuntime by orchestrationRuntimeDelegate
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,6 +98,7 @@ class MainActivity : ComponentActivity() {
                 else -> App(
                     providers = providers,
                     executorIntegrations = executorIntegrations,
+                    orchestrationRuntime = orchestrationRuntime,
                     connectedRepositoryServiceIds = repositoryCredentials.keys,
                     onSearchRepositories = repositoryDiscovery::search,
                     onConfigureRepositoryService = { configuringRepositoryServiceId = it },
@@ -109,6 +117,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (orchestrationRuntimeDelegate.isInitialized()) {
+            orchestrationRuntime.close()
+        }
         repositoryHttpClient.close()
         super.onDestroy()
     }
