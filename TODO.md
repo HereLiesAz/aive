@@ -48,10 +48,12 @@ Tracking issue: #35
 - [x] Document the compound-inference architecture and preserve the existing human-like memory/reconsolidation authority boundary.
 - [x] Add provider-neutral compound-inference strategy and direct genealogy contracts.
 - [x] Attach baseline single-model compound-inference metadata to every `AgentTaskRequest`, including direct dependency artifact ancestry.
-- [ ] Populate complete workflow/project/task/role coordinates before provider dispatch so genealogy is fully namespaced without fallback inference.
+- [x] Populate complete workflow/project/task/role coordinates before provider dispatch so genealogy is fully namespaced without fallback inference.
 - [ ] Persist the genealogy graph and expose it to verification/aggregation without turning it into a truth database.
 - [ ] Add genealogy governance for common ancestry, unsupported consensus, circular derivation, missing evidence, and independence checks.
-- [ ] Build the Blueprint-style compound inference infrastructure: model/agent registry, data registry, typed stream fabric, task/data planning boundary, and resource telemetry.
+- [x] Establish the Blueprint-style runtime fabric: model/agent registry, data registry, typed stream fabric, task/data planning boundary, and provider resource telemetry for provider-backed inference.
+- [ ] Persist/restore inference registries, streams, and resource history, and ingest non-agent executor evidence directly instead of only when it later enters model context.
+- [ ] Make task/data planning resource-aware and capable of choosing an implemented execution topology rather than only honoring the already-authorized strategy.
 - [ ] Implement centralized mixture-of-agents as a governed proposer → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
 - [ ] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
 - [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models.
