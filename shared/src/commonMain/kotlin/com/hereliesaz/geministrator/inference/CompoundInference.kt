@@ -77,12 +77,14 @@ data class CompoundInferenceContext(
         /**
          * Builds the baseline single-model context used by provider requests today.
          *
-         * Dependency artifacts contribute both artifact and producing-task ancestry. A workflow
-         * run ID, when available, namespaces the invocation for stable cross-task genealogy.
+         * Dependency artifacts contribute artifact, producing-task, and concrete inference
+         * invocation ancestry. A workflow run ID, when available, namespaces the invocation for
+         * stable cross-task genealogy.
          */
         fun single(
             taskRunId: TaskRunId,
             workflowRunId: WorkflowRunId? = null,
+            upstreamInvocationIds: Set<String> = emptySet(),
             upstreamTaskRunIds: Set<TaskRunId> = emptySet(),
             upstreamArtifactIds: Set<ArtifactId> = emptySet(),
         ): CompoundInferenceContext {
@@ -95,6 +97,7 @@ data class CompoundInferenceContext(
                 strategy = CompoundInferenceStrategy.Single,
                 genealogy = InferenceGenealogy(
                     invocationId = invocationId,
+                    upstreamInvocationIds = upstreamInvocationIds,
                     upstreamTaskRunIds = upstreamTaskRunIds,
                     upstreamArtifactIds = upstreamArtifactIds,
                 ),
