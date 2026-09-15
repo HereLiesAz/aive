@@ -27,6 +27,7 @@ enum class CompoundInferenceStrategy {
  */
 data class InferenceGenealogy(
     val invocationId: String,
+    val upstreamInvocationIds: Set<String> = emptySet(),
     val upstreamTaskRunIds: Set<TaskRunId> = emptySet(),
     val upstreamArtifactIds: Set<ArtifactId> = emptySet(),
     val memoryAddresses: Set<String> = emptySet(),
@@ -36,6 +37,10 @@ data class InferenceGenealogy(
 ) {
     init {
         require(invocationId.isNotBlank()) { "Inference genealogy invocationId must not be blank" }
+        require(invocationId !in upstreamInvocationIds) {
+            "Inference genealogy cannot list its own invocation as a direct ancestor"
+        }
+        require(upstreamInvocationIds.none(String::isBlank)) { "Upstream invocation IDs must not be blank" }
         require(memoryAddresses.none(String::isBlank)) { "Memory addresses must not be blank" }
         require(toolEvidenceIds.none(String::isBlank)) { "Tool evidence IDs must not be blank" }
     }
