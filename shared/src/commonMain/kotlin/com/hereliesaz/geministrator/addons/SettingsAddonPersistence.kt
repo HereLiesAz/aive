@@ -29,18 +29,23 @@ class SettingsAddonPersistence(private val settings: Settings) : AddonPersistenc
     override fun removeInstallation(id: String) {
         val current = getInstallations()
         val toRemove = current.find { it.id == id } ?: return
-        val remaining = current.filterNot { it.id == id }
-        settings.putString(installationsKey, json.encodeToString(remaining))
+        val history = readHistory().toMutableList()
 
-        val historyRaw = settings.getStringOrNull(historyKey) ?: "[]"
-        val history = try {
-            json.decodeFromString<List<AddonInstallation>>(historyRaw).toMutableList()
+        val remaining = current.filterNot { it.id == id }
+        history.removeAll { it.id == id && it.version == toRemove.version }
+        history.add(toRemove.copy(enabled = false))
+
+        settings.putString(installationsKey, json.encodeToString(remaining))
+        settings.putString(historyKey, json.encodeToString(history))
+    }
+
+    private fun readHistory(): List<AddonInstallation> {
+        val raw = settings.getStringOrNull(historyKey) ?: return emptyList()
+        return try {
+            json.decodeFromString<List<AddonInstallation>>(raw)
         } catch (failure: Exception) {
             throw AddonPersistenceCorruptionException("Stored add-on tombstone data is corrupted.", failure)
         }
-        history.removeAll { it.id == id && it.version == toRemove.version }
-        history.add(toRemove.copy(enabled = false))
-        settings.putString(historyKey, json.encodeToString(history))
     }
 
     companion object {
