@@ -101,11 +101,12 @@ class CentralizedMixtureOfAgentsTest {
         assertEquals(TaskRunStatus.Completed, execution.status)
         assertEquals(1, execution.artifacts.size)
         assertEquals(ArtifactKind.Verification, execution.artifacts.single().kind)
+        assertEquals("true", execution.artifacts.single().metadata["gatePassed"])
         assertEquals("true", execution.artifacts.single().metadata["structurallyIndependent"])
     }
 
     @Test
-    fun genealogyGateFailsFalseConsensusFromSharedEvidence() = runBlocking {
+    fun genealogyGateFlagsFalseConsensusFromSharedEvidenceButAllowsSynthesis() = runBlocking {
         val governance = InferenceGenealogyGovernanceRuntime()
         val sharedEvidence = ArtifactId("same-source")
         governance.registerInvocation(
@@ -125,9 +126,11 @@ class CentralizedMixtureOfAgentsTest {
             governanceContext("candidate-a", "candidate-b"),
         )
 
-        assertEquals(TaskRunStatus.Failed, execution.status)
+        assertEquals(TaskRunStatus.Completed, execution.status)
+        assertEquals("true", execution.artifacts.single().metadata["gatePassed"])
         assertEquals("false", execution.artifacts.single().metadata["structurallyIndependent"])
         assertTrue(execution.artifacts.single().textContent.orEmpty().contains("CommonAncestry"))
+        assertTrue(execution.artifacts.single().textContent.orEmpty().contains("UnsupportedConsensus"))
     }
 
     @Test
