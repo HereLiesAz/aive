@@ -1,8 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
-import com.hereliesaz.geministrator.memory.NoOpMemorySessionObserver
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
@@ -19,7 +19,7 @@ import kotlinx.coroutines.sync.withLock
 class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
     private val scope: CoroutineScope,
-    private val memoryObserver: MemorySessionObserver = NoOpMemorySessionObserver,
+    private val memoryObserver: MemorySessionObserver = MemoryRuntimeBridge.observer,
 ) : ManagedSessionGateway {
 
     private data class SessionSnapshot(
