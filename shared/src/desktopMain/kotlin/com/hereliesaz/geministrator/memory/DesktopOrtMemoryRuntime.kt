@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Enumerates the execution-provider/device tuples exposed by the installed ORT build. */
@@ -85,7 +84,6 @@ class DesktopOrtPreparedSession internal constructor(
     private val options: OrtSession.SessionOptions,
     val selection: MemoryComputeSelection,
     private val discoveredDevices: List<MemoryComputeDevice>,
-    private val profileFilePrefix: String,
 ) : AutoCloseable {
     @Volatile
     private var report: MemoryExecutionReport = MemoryExecutionReport(
@@ -99,10 +97,12 @@ class DesktopOrtPreparedSession internal constructor(
     fun captureExecutionProfile(): MemoryExecutionReport {
         if (report.verification == MemoryExecutionVerification.ProfiledRun) return report
         val profilePath = runCatching { session.endProfiling() }.getOrNull() ?: return report
-        val providers = runCatching { profileProviders(File(profilePath)) }.getOrDefault(emptyList())
-        runCatching { File(profilePath).delete() }
-        if (providers.isEmpty()) return report
+        val profileFile = File(profilePath)
+        val nodeProviders = runCatching { profileProviderEvents(profileFile) }.getOrDefault(emptyList())
+        runCatching { profileFile.delete() }
+        if (nodeProviders.isEmpty()) return report
 
+        val providers = nodeProviders.distinct()
         val actualDevices = providers.map { providerName ->
             discoveredDevices.firstOrNull { it.backend.equals(providerName, ignoreCase = true) }
                 ?: if (selection.device.backend.equals(providerName, ignoreCase = true)) {
@@ -115,9 +115,8 @@ class DesktopOrtPreparedSession internal constructor(
                     )
                 }
         }.distinctBy { Triple(it.backend, it.deviceId, it.deviceType) }
-        val nodeProviders = profileProviderEvents(File(profilePath), allowMissing = true)
         val acceleratedEvents = nodeProviders.count { providerType(it) != MemoryComputeDeviceType.CPU }
-        val fraction = if (nodeProviders.isEmpty()) null else acceleratedEvents.toFloat() / nodeProviders.size
+        val fraction = acceleratedEvents.toFloat() / nodeProviders.size
         val cpuFallback = selection.device.deviceType != MemoryComputeDeviceType.CPU &&
             actualDevices.any { it.deviceType == MemoryComputeDeviceType.CPU }
 
@@ -128,7 +127,6 @@ class DesktopOrtPreparedSession internal constructor(
             acceleratedNodeFraction = fraction,
             verification = MemoryExecutionVerification.ProfiledRun,
         )
-        runCatching { File(profileFilePrefix).delete() }
         return report
     }
 
@@ -199,6 +197,36 @@ class DesktopOrtMemorySessionManager(
         discovered: List<MemoryComputeDevice>,
         providerOptions: Map<String, String>,
     ): DesktopOrtPreparedSession {
+        return try {
+            createSessionAttempt(modelPath, model, selection, discovered, providerOptions)
+        } catch (acceleratorFailure: Throwable) {
+            if (selection.device.deviceType == MemoryComputeDeviceType.CPU || !model.requirements.allowCpuFallback) {
+                throw acceleratorFailure
+            }
+            val cpu = discovered.firstOrNull { it.deviceType == MemoryComputeDeviceType.CPU }
+                ?: MemoryComputeDevice("CPUExecutionProvider", "CPU", MemoryComputeDeviceType.CPU)
+            val cpuSelection = MemoryComputeSelection(
+                preference = computePreference,
+                device = cpu.copy(
+                    supportedModels = cpu.supportedModels + model.modelId,
+                    metadata = cpu.metadata + mapOf(
+                        "fallbackFrom" to selection.device.backend,
+                        "fallbackReason" to (acceleratorFailure.message ?: acceleratorFailure::class.simpleName.orEmpty()).take(240),
+                    ),
+                ),
+                cpuFallbackEnabled = false,
+            )
+            createSessionAttempt(modelPath, model, cpuSelection, discovered, emptyMap())
+        }
+    }
+
+    private fun createSessionAttempt(
+        modelPath: String,
+        model: MemoryMicroAgentModelSpec,
+        selection: MemoryComputeSelection,
+        discovered: List<MemoryComputeDevice>,
+        providerOptions: Map<String, String>,
+    ): DesktopOrtPreparedSession {
         val options = OrtSession.SessionOptions()
         options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
         if (!model.requirements.allowCpuFallback && selection.device.deviceType != MemoryComputeDeviceType.CPU) {
@@ -228,7 +256,6 @@ class DesktopOrtMemorySessionManager(
                 options = options,
                 selection = selection,
                 discoveredDevices = discovered,
-                profileFilePrefix = profilePrefix,
             )
         } catch (failure: Throwable) {
             options.close()
@@ -296,14 +323,12 @@ private fun Map<String, String>.findMemoryBytes(hint: String): Long? = entries
     ?.filter(Char::isDigit)
     ?.toLongOrNull()
 
-private fun profileProviders(file: File): List<String> = profileProviderEvents(file).distinct()
-
-private fun profileProviderEvents(file: File, allowMissing: Boolean = false): List<String> {
-    if (!file.exists()) return if (allowMissing) emptyList() else error("ORT profile ${file.path} is missing")
+private fun profileProviderEvents(file: File): List<String> {
+    if (!file.exists()) return emptyList()
     val root = Json.parseToJsonElement(file.readText()) as? JsonArray ?: return emptyList()
     return root.mapNotNull { element ->
         val event = element as? JsonObject ?: return@mapNotNull null
-        val args = event["args"]?.jsonObject ?: return@mapNotNull null
+        val args = event["args"] as? JsonObject ?: return@mapNotNull null
         args["provider"]?.jsonPrimitive?.content
     }
 }
