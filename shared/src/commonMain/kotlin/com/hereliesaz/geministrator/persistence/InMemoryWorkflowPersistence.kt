@@ -25,7 +25,7 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
     private val definitionItems = mutableMapOf<WorkflowDefinitionId, WorkflowDefinition>()
     private val runItems = mutableMapOf<WorkflowRunId, WorkflowRun>()
     private val eventItems = mutableMapOf<WorkflowRunId, MutableList<WorkflowEvent>>()
-    private val roleItems = mutableMapOf<RoleDefinitionId, RoleDefinition>()
+    private val roleItems = linkedMapOf<RoleDefinitionId, RoleDefinition>()
     private val artifactItems = mutableMapOf<ArtifactId, ArtifactRef>()
     private val gateItems = mutableMapOf<ApprovalGateId, ApprovalGate>()
 
@@ -80,6 +80,13 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
 
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = mutex.withLock { roleItems[id] }
         override suspend fun all(): List<RoleDefinition> = mutex.withLock { roleItems.values.toList() }
+
+        override suspend fun replaceAll(roles: List<RoleDefinition>) {
+            mutex.withLock {
+                roleItems.clear()
+                roles.forEach { role -> roleItems[role.id] = role }
+            }
+        }
     }
 
     override val artifacts: ArtifactRepository = object : ArtifactRepository {
