@@ -4,8 +4,9 @@ package com.hereliesaz.geministrator.memory
  * Strongest shared lexical/structural signal between two texts.
  *
  * This is used to keep Specialist 08 focused on semantic residue. A pair already explained by a
- * sufficiently strong deterministic lexical feature does not need an embedding comparison merely
- * to rediscover the same relationship.
+ * sufficiently strong *decisive* lexical feature does not need an embedding comparison merely to
+ * rediscover the same relationship. Generic shared verbs/actions remain useful association
+ * evidence, but deliberately do not suppress embeddings by themselves.
  */
 data class MemoryLexicalPairEvidence(
     val kind: MemoryLexicalFeatureKind,
@@ -22,6 +23,7 @@ internal fun strongestMemoryLexicalPairEvidence(
     val rightByKey = memoryLexicalFeatures(right, lexicon).features.associateBy { it.kind to it.value }
 
     return leftFeatures.asSequence()
+        .filter { it.kind in EMBEDDING_SUPPRESSING_FEATURES }
         .mapNotNull { leftFeature ->
             val rightFeature = rightByKey[leftFeature.kind to leftFeature.value] ?: return@mapNotNull null
             val base = leftFeature.kind.semanticAssociationBaseWeight()
@@ -49,4 +51,12 @@ internal fun MemoryLexicalFeatureKind.semanticAssociationBaseWeight(): Float = w
     MemoryLexicalFeatureKind.NounLemma -> 0.58f
 }
 
-internal const val MIN_STRONG_LEXICAL_PAIR_WEIGHT: Float = 0.70f
+private val EMBEDDING_SUPPRESSING_FEATURES = setOf(
+    MemoryLexicalFeatureKind.CodeEntity,
+    MemoryLexicalFeatureKind.NounSense,
+    MemoryLexicalFeatureKind.VerbSense,
+    MemoryLexicalFeatureKind.SubjectVerbObject,
+    MemoryLexicalFeatureKind.VerbObject,
+)
+
+internal const val MIN_STRONG_LEXICAL_PAIR_WEIGHT: Float = 0.72f
