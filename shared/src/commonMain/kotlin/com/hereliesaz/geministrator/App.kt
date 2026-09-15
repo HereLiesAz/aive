@@ -19,6 +19,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
@@ -31,6 +32,7 @@ import kotlinx.coroutines.launch
 fun App(
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
+    orchestrationRuntime: OrchestrationAgentRuntime? = null,
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
@@ -97,12 +99,24 @@ fun App(
                         val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
                         scope.launch {
                             try {
-                                runtime?.launchStarterWorkflow(
-                                    projectName = projectName,
-                                    objective = objective,
-                                    repository = repository,
-                                    existingProject = existingProject,
-                                )
+                                val activeRuntime = runtime
+                                    ?: error("Runtime is unavailable")
+                                if (orchestrationRuntime != null) {
+                                    activeRuntime.launchOrchestratedWorkflow(
+                                        projectName = projectName,
+                                        objective = objective,
+                                        orchestrationRuntime = orchestrationRuntime,
+                                        repository = repository,
+                                        existingProject = existingProject,
+                                    )
+                                } else {
+                                    activeRuntime.launchStarterWorkflow(
+                                        projectName = projectName,
+                                        objective = objective,
+                                        repository = repository,
+                                        existingProject = existingProject,
+                                    )
+                                }
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
