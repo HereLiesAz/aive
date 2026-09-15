@@ -17,13 +17,17 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.activeRoles
+import com.hereliesaz.geministrator.domain.defaultRoleCollectionEntries
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.normalized
+import com.hereliesaz.geministrator.domain.resolveRoleCollection
+import com.hereliesaz.geministrator.domain.roleCollectionEntries
+import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.persistence.PersistenceCorruptionException
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
-import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderArtifact
@@ -38,12 +42,12 @@ import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
-import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
-import com.hereliesaz.geministrator.workflow.humanReadable
 import com.hereliesaz.geministrator.workflow.WorkflowEngine
+import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeCoordinator
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
+import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -222,15 +226,17 @@ class ApplicationRuntime private constructor(
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
             )
+            val launchRoles = activeRoles(roles)
             val definition = StarterWorkflowFactory.create(
                 id = WorkflowDefinitionId("workflow-$now"),
                 objective = cleanObjective,
+                roles = launchRoles,
             )
             val launchService = WorkflowLaunchService(
-                preparer = WorkflowDefinitionPreparer(providerRegistry, roles),
+                preparer = WorkflowDefinitionPreparer(providerRegistry, launchRoles),
                 persistence = persistence,
                 eventSink = RepositoryWorkflowEventSink(persistence.events),
-                roles = roles,
+                roles = launchRoles,
             )
             val (prepared, runtimeState) = launchService.launch(
                 project = project,
@@ -453,6 +459,16 @@ class ApplicationRuntime private constructor(
         loadLatest()
     }
 
+    suspend fun saveRoleCollection(activeRoleCollection: List<RoleDefinition>) {
+        val existing = persistence.roles.all()
+        roleCollectionEntries(activeRoleCollection, existing).forEach { persistence.roles.put(it) }
+    }
+
+    suspend fun resetRoleCollection() {
+        val existing = persistence.roles.all()
+        defaultRoleCollectionEntries(existing).forEach { persistence.roles.put(it) }
+    }
+
     fun validateCurrentWorkflow(): List<String> {
         val definition = current?.definition ?: return emptyList()
         return WorkflowGraphValidator.validate(definition).map { it.humanReadable() }
@@ -596,10 +612,7 @@ class ApplicationRuntime private constructor(
             }
 
             val runtime = try {
-                val roles = (BuiltInRoles.all + persistence.roles.all())
-                    .associateBy(RoleDefinition::id)
-                    .values
-                    .toList()
+                val roles = resolveRoleCollection(persistence.roles.all())
                 build(roles)
             } catch (failure: Throwable) {
                 build(BuiltInRoles.all).also {

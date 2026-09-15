@@ -105,7 +105,9 @@ fun ControlRoom(
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onValidateWorkflow: () -> List<String> = { emptyList() },
-    onSaveRole: (RoleDefinition) -> Unit = {},
+    onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
+    onResetRoleCollection: () -> Unit = {},
+    onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
@@ -152,7 +154,9 @@ fun ControlRoom(
                     onLoadRunTimeline = onLoadRunTimeline,
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
-                    onSaveRole = onSaveRole,
+                    onSaveRoleCollection = onSaveRoleCollection,
+                    onResetRoleCollection = onResetRoleCollection,
+                    onSearchRepositories = onSearchRepositories,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
                     connectedRepositoryServiceIds = connectedRepositoryServiceIds,
@@ -209,7 +213,9 @@ fun ControlRoom(
                     onLoadRunTimeline = onLoadRunTimeline,
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
-                    onSaveRole = onSaveRole,
+                    onSaveRoleCollection = onSaveRoleCollection,
+                    onResetRoleCollection = onResetRoleCollection,
+                    onSearchRepositories = onSearchRepositories,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
                     connectedRepositoryServiceIds = connectedRepositoryServiceIds,
@@ -344,7 +350,9 @@ private fun MainDestination(
     onLoadRunTimeline: suspend () -> List<WorkflowEvent>,
     onExportDiagnosticBundle: suspend () -> String?,
     onValidateWorkflow: () -> List<String>,
-    onSaveRole: (RoleDefinition) -> Unit,
+    onSaveRoleCollection: (List<RoleDefinition>) -> Unit,
+    onResetRoleCollection: () -> Unit,
+    onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion>,
     availableRepositorySources: Set<RepositorySource>,
     onPickLocalRepository: (() -> String?)?,
     connectedRepositoryServiceIds: Set<String>,
@@ -370,6 +378,8 @@ private fun MainDestination(
                 onValidateWorkflow = onValidateWorkflow,
                 availableRepositorySources = availableRepositorySources,
                 onPickLocalRepository = onPickLocalRepository,
+                connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                onSearchRepositories = onSearchRepositories,
                 compact = compact,
                 runtimeState = runtimeState,
             )
@@ -381,10 +391,11 @@ private fun MainDestination(
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Workflows -> WorkflowTemplateScreen(runtimeState, Modifier.fillMaxSize())
-            ControlRoomDestination.Company -> CompanyProviderScreen(
+            ControlRoomDestination.Company -> CustomCompanyProviderScreen(
                 runtimeState = runtimeState,
                 connectedProviderIds = connectedProviderIds,
-                onSaveRole = onSaveRole,
+                onSaveRoleCollection = onSaveRoleCollection,
+                onResetRoleCollection = onResetRoleCollection,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Artifacts -> ArtifactFileManagerScreen(runtimeState, Modifier.fillMaxSize())
