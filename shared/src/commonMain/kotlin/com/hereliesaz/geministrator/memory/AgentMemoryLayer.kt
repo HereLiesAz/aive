@@ -21,7 +21,9 @@ class AgentMemoryLayer private constructor(
 ) {
     suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
         val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
-        programmaticAssociator.refresh(nowEpochMillis)
+        if (result is MemoryConsolidationResult.Completed) {
+            programmaticAssociator.refresh(nowEpochMillis)
+        }
         return result
     }
 
