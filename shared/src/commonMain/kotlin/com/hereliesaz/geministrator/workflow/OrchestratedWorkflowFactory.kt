@@ -45,7 +45,7 @@ object OrchestratedWorkflowFactory {
                     approvalPolicy = if (step.requiresHumanApproval) {
                         ApprovalPolicy.HumanApproval
                     } else {
-                        ApprovalPolicy.Automatic
+                        ApprovalPolicy.None
                     },
                     environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
                 )
