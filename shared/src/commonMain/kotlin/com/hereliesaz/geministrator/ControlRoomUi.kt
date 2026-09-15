@@ -50,6 +50,7 @@ enum class ControlRoomDestination(val label: String) {
     Artifacts("Artifacts"),
     Inbox("Inbox"),
     Repositories("Repositories"),
+    AddOns("ADD-ONS"),
     Settings("Settings"),
 }
 
@@ -405,6 +406,14 @@ private fun MainDestination(
                 onConfigureService = onConfigureRepositoryService,
                 onDisconnectService = onDisconnectRepositoryService,
                 modifier = Modifier.fillMaxSize(),
+            )
+            ControlRoomDestination.AddOns -> com.hereliesaz.geministrator.addons.AddonHostScreen(
+                installations = emptyList(),
+                onInstall = { _, _ -> },
+                onRemove = {},
+                onEnableDisable = { _, _ -> },
+                onAddAgentsToCompany = {},
+                modifier = Modifier.fillMaxSize()
             )
             ControlRoomDestination.Settings -> ProviderSettingsScreen(
                 connectedProviderIds = connectedProviderIds,
