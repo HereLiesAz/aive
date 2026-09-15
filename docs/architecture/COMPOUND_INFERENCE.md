@@ -87,6 +87,8 @@ Runtime genealogy governance is implemented. `GovernedCompoundInferenceFabric` r
 
 The evaluator does not rank candidate quality, label claims true or false, resolve conflicting memories, or rewrite worker output. Its reports are structural provenance evidence only.
 
+A critical distinction applies to MoA: multiple legitimate proposers normally receive the same authorized task inputs. Shared source ancestry therefore means their agreement is **not independent evidence**, but it does not make their candidate analyses unusable. MoA governance blocks missing or circular lineage. Shared ancestry, insufficient independence, and unsupported-consensus findings remain visible to the aggregator and verifier as advisory provenance so agreement cannot be mistaken for proof.
+
 The genealogy graph is currently runtime-local. Durable persistence/restoration across process restart remains an explicit follow-up.
 
 ## Blueprint inference infrastructure
@@ -193,7 +195,8 @@ The first production-safe form has these rules:
 - proposers emit bounded `TaskPlan` candidate artifacts and do not mutate the repository
 - each provider artifact is tagged with `haive.inferenceInvocationId`, allowing downstream genealogy to name the exact producing invocation
 - a deterministic `haive.genealogy-governance` system-executor node runs after all proposers and before aggregation
-- the governance gate requires at least two candidate invocation records and fails on missing genealogy, circular derivation, insufficient independence, or unsupported consensus
+- the governance gate requires at least two candidate invocation records and blocks missing genealogy or circular derivation
+- shared input/evidence is recorded as common ancestry; it makes candidate agreement ineligible to count as independent consensus but does not block synthesis of the candidates
 - the original task ID becomes the aggregator task, preserving its durable workflow identity and original required outputs
 - aggregation preserves meaningful disagreement and cannot treat candidate agreement as verification
 - a separate verifier role runs after aggregation and produces a `Verification` artifact
@@ -320,6 +323,7 @@ Implemented and called by production runtime:
 - `GenealogyGovernanceExecutorIntegration`
 - centralized runtime registration of the genealogy gate
 - explicit proposer → governance → aggregator → verifier DAG execution
+- advisory false-consensus detection without blocking legitimate shared-input synthesis
 
 Not yet implemented:
 
