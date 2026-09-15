@@ -95,6 +95,7 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onMessageAgent: (String, String) -> Unit = { _, _ -> },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -144,6 +145,7 @@ fun ControlRoom(
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
+                    onMessageAgent = onMessageAgent,
                     onRecoverFromCorruption = onRecoverFromCorruption,
                     onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
@@ -182,6 +184,7 @@ fun ControlRoom(
                             onApproveTask = onApproveTask,
                             onRejectPlan = onRejectPlan,
                             onResolveEscalation = onResolveEscalation,
+                            onMessageAgent = onMessageAgent,
                             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.35f),
                         )
                     }
@@ -203,6 +206,7 @@ fun ControlRoom(
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
+                    onMessageAgent = onMessageAgent,
                     onRecoverFromCorruption = onRecoverFromCorruption,
                     onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
@@ -246,6 +250,7 @@ fun ControlRoom(
                             onApproveTask = onApproveTask,
                             onRejectPlan = onRejectPlan,
                             onResolveEscalation = onResolveEscalation,
+                            onMessageAgent = onMessageAgent,
                             modifier = Modifier.width(310.dp).fillMaxHeight(),
                         )
                     }
@@ -340,6 +345,7 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onMessageAgent: (String, String) -> Unit,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
     onCheckProviderHealth: suspend () -> Map<String, String>,
@@ -373,6 +379,9 @@ private fun MainDestination(
                 selectedTaskId = selectedTaskId,
                 onTaskSelected = onTaskSelected,
                 onLaunchWorkflow = onLaunchWorkflow,
+                onApproveTask = onApproveTask,
+                onRejectPlan = onRejectPlan,
+                onResolveEscalation = onResolveEscalation,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
                 onReconfigureProvider = onReconfigureProvider,
