@@ -94,6 +94,7 @@ data class TaskDefinition(
     val escalationPolicy: EscalationPolicy = EscalationPolicy.FailWorkflow,
     val providerConstraints: ProviderConstraints = ProviderConstraints.None,
     val environmentPlanningPolicy: EnvironmentPlanningPolicy = EnvironmentPlanningPolicy.WhenProviderRequires,
+    val compoundInferencePolicy: CompoundInferencePolicy = CompoundInferencePolicy.Single,
     val executor: TaskExecutor? = null,
 )
 
