@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,15 +11,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
@@ -27,6 +32,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.locatorInput
 import com.hereliesaz.geministrator.domain.parseRepositoryRef
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun MindMapRunScreen(
@@ -40,6 +46,8 @@ internal fun MindMapRunScreen(
     onValidateWorkflow: () -> List<String> = { emptyList() },
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
+    connectedRepositoryServiceIds: Set<String> = emptySet(),
+    onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     compact: Boolean,
     runtimeState: ApplicationRuntimeState,
 ) {
@@ -63,7 +71,33 @@ internal fun MindMapRunScreen(
     }
     var defaultBranch by remember(runtimeState) { mutableStateOf(existingRepository?.defaultBranch.orEmpty()) }
     var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
+    var repositorySearchError by remember(runtimeState) { mutableStateOf<String?>(null) }
+    var repositorySuggestions by remember(runtimeState) { mutableStateOf<List<RepositorySuggestion>>(emptyList()) }
+    var repositoryMenuExpanded by remember(runtimeState) { mutableStateOf(false) }
     var objective by remember(runtimeState) { mutableStateOf("") }
+
+    val repositorySearchConnected = when (repositorySource) {
+        RepositorySource.GitHub -> RepositoryServiceCatalog.GITHUB_ID in connectedRepositoryServiceIds
+        RepositorySource.GitLab -> RepositoryServiceCatalog.GITLAB_ID in connectedRepositoryServiceIds
+        RepositorySource.Local -> false
+    }
+
+    LaunchedEffect(repositorySource, repositoryLocator, repositorySearchConnected) {
+        repositorySuggestions = emptyList()
+        repositorySearchError = null
+        if (!repositorySearchConnected) return@LaunchedEffect
+        delay(180)
+        runCatching {
+            onSearchRepositories(repositorySource, repositoryLocator.trim())
+        }.fold(
+            onSuccess = { suggestions ->
+                repositorySuggestions = suggestions
+            },
+            onFailure = { failure ->
+                repositorySearchError = failure.message?.take(120) ?: "Repository search unavailable"
+            },
+        )
+    }
 
     Column(
         modifier = modifier
@@ -133,6 +167,9 @@ internal fun MindMapRunScreen(
                                     repositorySource = source
                                     repositoryLocator = ""
                                     repositoryError = null
+                                    repositorySearchError = null
+                                    repositorySuggestions = emptyList()
+                                    repositoryMenuExpanded = false
                                 }
                             },
                         )
@@ -151,28 +188,95 @@ internal fun MindMapRunScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                OutlinedTextField(
-                    value = repositoryLocator,
-                    onValueChange = {
-                        repositoryLocator = it
-                        repositoryError = null
-                    },
-                    label = {
-                        Text(
-                            when (repositorySource) {
-                                RepositorySource.GitHub -> "GitHub URL or owner/repository"
-                                RepositorySource.GitLab -> "GitLab URL or group/repository"
-                                RepositorySource.Local -> "Local Git folder path"
+
+                if (repositorySearchConnected) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = repositoryLocator,
+                            onValueChange = {
+                                repositoryLocator = it
+                                repositoryError = null
+                                repositoryMenuExpanded = true
+                            },
+                            label = {
+                                Text(
+                                    when (repositorySource) {
+                                        RepositorySource.GitHub -> "Search GitHub repositories or paste URL"
+                                        RepositorySource.GitLab -> "Search GitLab repositories or paste URL"
+                                        RepositorySource.Local -> "Local Git folder path"
+                                    },
+                                )
+                            },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focus ->
+                                    if (focus.isFocused) repositoryMenuExpanded = true
+                                },
+                            isError = repositoryError != null,
+                            supportingText = (repositoryError ?: repositorySearchError)?.let { message ->
+                                { Text(message) }
                             },
                         )
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = repositoryError != null,
-                    supportingText = repositoryError?.let { message ->
-                        { Text(message) }
-                    },
-                )
+                        DropdownMenu(
+                            expanded = repositoryMenuExpanded && repositorySuggestions.isNotEmpty(),
+                            onDismissRequest = { repositoryMenuExpanded = false },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            repositorySuggestions.forEach { suggestion ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Column {
+                                            Text(
+                                                buildString {
+                                                    if (suggestion.ownedByCurrentUser) append("YOURS · ")
+                                                    append(suggestion.fullName)
+                                                },
+                                            )
+                                            val detail = listOfNotNull(
+                                                suggestion.defaultBranch?.let { "Branch: $it" },
+                                                suggestion.description?.takeIf(String::isNotBlank),
+                                            ).joinToString(" · ")
+                                            if (detail.isNotBlank()) {
+                                                Text(detail, style = AzphaltType.body)
+                                            }
+                                        }
+                                    },
+                                    onClick = {
+                                        repositoryLocator = suggestion.webUrl
+                                        suggestion.defaultBranch?.takeIf(String::isNotBlank)?.let { defaultBranch = it }
+                                        repositoryError = null
+                                        repositorySearchError = null
+                                        repositoryMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = repositoryLocator,
+                        onValueChange = {
+                            repositoryLocator = it
+                            repositoryError = null
+                        },
+                        label = {
+                            Text(
+                                when (repositorySource) {
+                                    RepositorySource.GitHub -> "GitHub URL or owner/repository"
+                                    RepositorySource.GitLab -> "GitLab URL or group/repository"
+                                    RepositorySource.Local -> "Local Git folder path"
+                                },
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = repositoryError != null,
+                        supportingText = repositoryError?.let { message ->
+                            { Text(message) }
+                        },
+                    )
+                }
                 OutlinedTextField(
                     value = defaultBranch,
                     onValueChange = { defaultBranch = it },
@@ -181,10 +285,13 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    if (repositorySource == RepositorySource.Local) {
-                        "This runtime can link the selected Git checkout. The path stays project-local and is never rewritten as a remote repository."
-                    } else {
-                        "Paste the repository URL or shorthand. Leave this blank only for a repoless orchestration."
+                    when {
+                        repositorySource == RepositorySource.Local ->
+                            "This runtime can link the selected Git checkout. The path stays project-local and is never rewritten as a remote repository."
+                        repositorySearchConnected ->
+                            "Start typing to search. Your own repositories are ranked first; other accessible/public repositories appear as autocomplete suggestions. You can still paste any repository URL or shorthand manually."
+                        else ->
+                            "Paste the repository URL or shorthand. Connect this repository service from Repositories to enable search and autocomplete. Leave this blank only for a repoless orchestration."
                     },
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
