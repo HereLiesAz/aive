@@ -1,8 +1,8 @@
 # Compound inference architecture
 
-This document defines The Haive's planned compound-inference architecture derived from the ideas evaluated in `../Composite Frontier Model Architectures.md` and the current runtime contracts on `main`.
+This document defines The Haive's compound-inference architecture derived from the ideas evaluated in `../Composite Frontier Model Architectures.md` and the current runtime contracts.
 
-The goal is not to replace the workflow engine with a second orchestration system. The workflow DAG remains runtime truth. Compound inference is the governed execution fabric used by model-backed work inside that DAG.
+The workflow DAG remains runtime truth. Compound inference is the governed execution fabric used by model-backed work inside that DAG; it is not a second workflow engine.
 
 ## Architectural invariant: memory remains human-like and non-epistemic
 
@@ -10,7 +10,7 @@ The existing memory architecture is intentionally preserved.
 
 Haive manages conflicting memories by keeping related traces available, surfacing them associatively into active reasoning, allowing the conscious/orchestration layer to notice and reason about the disagreement, and banking the resulting experience back into memory for later consolidation.
 
-Memory clerks therefore continue to organize, associate, condense, and retrieve what was thought, said, observed, requested, done, or produced. They do not decide which conflicting trace is true. Genealogy and compound inference must strengthen provenance and reasoning without moving epistemic authority into the memory layer.
+Memory clerks therefore continue to organize, associate, condense, and retrieve what was thought, said, observed, requested, done, or produced. They do not decide which conflicting trace is true. Genealogy and compound inference strengthen provenance and reasoning without moving epistemic authority into the memory layer.
 
 ## Target architecture
 
@@ -47,30 +47,121 @@ Memory clerks therefore continue to organize, associate, condense, and retrieve 
                           Memory
 ```
 
-System executors remain executor-neutral workflow nodes. They participate in provenance, streams, evidence, and governance, but they do not masquerade as model agents.
+System executors remain executor-neutral workflow nodes. They may participate in provenance, data, evidence, and governance, but they do not masquerade as model agents.
 
-## Compound inference fabric
+## Compound inference contract
 
-Every provider-backed task request carries compound-inference metadata. The fabric is the single seam through which future model collaboration strategies, model libraries, adapter selection, and governance are introduced.
+Every provider-backed `AgentTaskRequest` carries `CompoundInferenceContext` containing:
 
-Initial execution strategy:
+- execution strategy
+- direct `InferenceGenealogy`
+- candidate budget
+- aggregation depth
 
-- `Single`
-
-Planned strategies:
+The currently authorized default is `Single`. The contract also defines future strategies:
 
 - `CentralizedMixtureOfAgents`
 - `ParallelIndependent`
 - `SequentialPipeline`
 - `Escalate`
 
-The planner must select a strategy based on task structure rather than assuming that more agents are always better. Centralized multi-agent collaboration is appropriate when work can be decomposed into genuinely independent or complementary candidate contributions. Strongly sequential work should normally remain single-agent or sequentially pipelined because additional independent agents can amplify rather than reduce error.
+The planner must select a strategy based on task structure rather than assuming that more agents are always better. Strongly sequential work should normally remain single-agent or sequentially pipelined unless measured evidence justifies another topology.
+
+## Genealogy-based governance
+
+Genealogy records information ancestry. It does not decide truth.
+
+Each model invocation has a stable invocation identity plus direct ancestry such as producing task runs, upstream artifacts, recalled memory addresses, tool-evidence identifiers, and later prompt/config/model/adapter/provider fingerprints.
+
+`WorkflowEngine` supplies real project, workflow-run, workflow-definition, task, and role coordinates before provider dispatch. Dependency artifacts contribute producing task-run IDs and artifact IDs to the request genealogy.
+
+Future genealogy governance will persist these relationships as a graph and expose them to verification and aggregation. Governance may flag common ancestry, unsupported consensus, circular derivation, missing evidence, or insufficient independence. It must not silently rewrite a worker's reasoning or convert memory into a truth database.
+
+## Blueprint inference infrastructure
+
+The Blueprint layer is now a real runtime subsystem, not only a design target.
+
+Each `AgentProviderRegistry` owns one `BlueprintCompoundInferenceFabric`, and the `ProviderBackedManagedSessionGateway` routes every started provider-backed session through that shared fabric before `provider.start(...)`.
+
+The first production slice is deliberately runtime-local. Workflow state, memory, repositories, provider sessions, and durable artifacts remain authoritative in their existing stores. The inference fabric indexes and coordinates those systems rather than duplicating their payload ownership.
+
+### Model registry
+
+`InferenceModelRegistry` tracks execution-capable model assets through `InferenceModelDescriptor`:
+
+- logical model ID
+- base model ID
+- adapter ID
+- precision / quantization label
+- backend
+- capabilities
+- release digest
+
+The registry exists now, but current provider-backed agents do not expose a portable model identity, so the runtime does not fabricate one. The Epoch-8 local model families will populate this registry when the generalized local model library is wired.
+
+### Agent registry
+
+`InferenceAgentRegistry` records the actual provider selected for a started session together with observed provider capabilities, prompt-cache modes, and environment-planning requirements.
+
+This is an index of execution capability. `AgentProviderRegistry` remains the authoritative provider selector and still enforces repository compatibility and provider constraints.
+
+### Data registry
+
+`InferenceDataRegistry` provides symbolic references to governed inputs without flattening or copying payloads into a second store.
+
+Today, dependency `ArtifactRef`s become entries such as `artifact:<artifact-id>` and preserve:
+
+- artifact ID
+- producing task-run ID
+- label
+- media type
+
+The original artifact remains authoritative in workflow persistence. Memory, repository, tool-evidence, and imported-reference data kinds are represented by the same registry contract and will be populated by later integrations.
+
+### Typed stream fabric
+
+`InferenceStreamFabric` provides ordered per-invocation records with typed payloads. The current stream records:
+
+- dispatch preparation and execution plan
+- observed provider artifacts
+- provider usage/resource reports
+- terminal completion, failure, or cancellation
+
+Stream records carry the stable genealogy invocation ID. The stream does not replace workflow events; it is the inference-specific communication/observability channel that centralized MoA and later compound strategies will reuse.
+
+### Task and data planner
+
+`CompoundInferenceTaskPlanner` is now invoked before every provider-backed session starts. It receives:
+
+- the complete `AgentTaskRequest`
+- selected provider identity
+- observed agent capabilities
+- symbolic governed data inputs
+- the authorized compound-inference context
+
+The baseline planner produces `InferenceExecutionPlan` and honors the strategy/budgets already authorized by orchestration. It intentionally does **not** select an unimplemented topology yet. Resource-aware topology selection begins only when the corresponding execution strategies are real and testable.
+
+### Resource telemetry
+
+`InferenceResourceTelemetry` records provider-reported input/output tokens, cost, cache-hit fraction, and latency against the same invocation identity used by the stream and genealogy.
+
+This telemetry is diagnostic/planning input. It does not affect workflow correctness or completion claims.
+
+### Current Blueprint limitations
+
+The first slice is intentionally not presented as enterprise-complete:
+
+- registries, streams, and inference telemetry are runtime-local and are not yet restored after process restart
+- local model assets are not yet registered in the model registry
+- non-agent executor evidence enters the data registry when it becomes context for provider-backed inference, not immediately at system-executor production time
+- the planner does not yet choose among multiple implemented compound topologies
+- stream records are not yet the persisted genealogy graph
+
+Those are explicit follow-up items in `TODO.md`.
 
 ## Centralized mixture of agents
 
-Centralized MoA is a governed subgraph, not an unstructured swarm.
-
-A typical MoA execution is:
+Centralized MoA is the next major execution strategy. It is a governed subgraph, not an unstructured swarm.
 
 ```text
 input
@@ -82,92 +173,25 @@ input
 
 Required properties:
 
-- proposer contexts are isolated from one another unless the topology explicitly permits sharing
-- proposer outputs are typed artifacts rather than implicit transcript inheritance
+- proposer contexts are isolated unless the topology explicitly permits sharing
+- proposer outputs are typed artifacts/stream records rather than implicit transcript inheritance
 - the aggregator receives bounded, validated candidate outputs
-- genealogy preserves each candidate's ancestry
-- the aggregator's result is not considered verified merely because several candidates agree
+- genealogy preserves candidate ancestry
+- common ancestry is not mistaken for independent consensus
+- agreement is not itself verification
 - verification uses evidence and acceptance criteria
-- collaboration depth and candidate count are bounded by policy
-- sequential tasks are not automatically converted into MoA
+- collaboration depth and candidate count are policy-bounded
+- strongly sequential tasks are not automatically converted into MoA
 
-The existing workflow DAG, concurrency limits, artifact model, and independent verification machinery are the foundation for this strategy.
-
-## Genealogy-based governance
-
-Genealogy records information ancestry. It does not decide truth.
-
-Each model invocation has a stable invocation identity plus direct ancestry such as:
-
-- producing task runs
-- upstream artifacts
-- recalled memory addresses
-- tool-evidence identifiers
-- prompt fingerprint
-- configuration fingerprint
-- later: model/base/adapter identity and provider execution identity
-
-This allows the runtime to distinguish independent evidence from repeated descendants of the same unsupported claim.
-
-The initial code contract is `InferenceGenealogy` carried inside `CompoundInferenceContext` on every `AgentTaskRequest`. Dependency artifacts automatically contribute the producing task-run IDs and artifact IDs to this baseline genealogy.
-
-Future genealogy governance will persist these relationships as a graph and make them available to verification and aggregation. Governance may flag common ancestry, unsupported consensus, circular derivation, missing evidence, or insufficient independence. It must not silently rewrite a worker's reasoning or convert memory into a truth database.
-
-## Blueprint enterprise inference infrastructure
-
-The Composite Frontier research recommends treating inference as infrastructure rather than a set of unrelated model calls. Haive will develop this as a first-class part of every workflow.
-
-The target infrastructure has four major registries/fabrics:
-
-### Model and agent registry
-
-Tracks execution-capable model assets and provider agents, including:
-
-- logical model ID
-- base model ID
-- adapter ID
-- precision / quantization
-- supported task capabilities
-- tokenizer compatibility
-- runtime backend
-- hardware requirements
-- residency state
-- measured latency / memory / energy where available
-- release digest and provenance
-
-### Data registry
-
-Provides stable symbolic references to governed data sources without flattening them into prompts prematurely:
-
-- workflow artifacts
-- memory addresses
-- repositories and files
-- tool outputs
-- verification evidence
-- imported references
-
-### Stream fabric
-
-Carries typed intermediate outputs between inference stages. Streams preserve bounded schemas, genealogy, execution identity, and isolation policy instead of relying on shared hidden transcript state.
-
-### Task and data planner
-
-Selects execution topology, models/adapters, relevant data, and resource allocation while respecting workflow authority, cost, latency, hardware, privacy, and verification policy.
-
-The workflow DAG remains authoritative. The task/data planner may materialize governed inference subgraphs inside an authorized workflow task; it does not invent unrelated work outside the workflow contract.
+The existing workflow DAG, concurrency limits, artifact model, Blueprint stream fabric, genealogy, and independent verification machinery are the foundation for this strategy.
 
 ## Specialized local model and LoRA library
 
-Haive already has the seed of this architecture in the Epoch-8 memory layer.
+Haive already has the seed of the specialist-library architecture in the Epoch-8 memory layer.
 
-The Memory Epoch-8 release contains:
+The Memory Epoch-8 release contains FP16 specialist artifacts, INT8 specialist artifacts, LoRA specialist artifacts, and a separate embedding specialist for association. The current Android production path primarily binds role-specific INT8 ONNX artifacts.
 
-- FP16 specialist model artifacts
-- INT8 specialist model artifacts
-- LoRA specialist artifacts
-- a separate embedding specialist for association
-
-The current Android production path primarily binds the role-specific INT8 ONNX artifacts. The next model-library step is to generalize these assets into a reusable local specialist library rather than treating memory models as a one-off installation path.
+The next model-library step is to generalize those assets into `InferenceModelRegistry` entries and a reusable runtime library with shared-base residency where the backend supports safe adapter switching.
 
 Target shape:
 
@@ -183,7 +207,7 @@ shared local base model
     +-- Condensation adapter
 ```
 
-The same library pattern will later serve orchestration utilities such as:
+The same library pattern will later serve orchestration utilities:
 
 - Memory Query Composer
 - Context Packer
@@ -193,24 +217,15 @@ The same library pattern will later serve orchestration utilities such as:
 - Escalation Gate
 - Completion Gate
 - Execution State Summarizer
+- Verification Planner
 
 Planner and Plan Repair remain a larger reasoning tier when necessary.
 
-Runtime requirements:
-
-- shared-base residency where the backend supports safe adapter switching
-- versioned adapter identity
-- cryptographic artifact verification
-- tokenizer/base compatibility checks
-- merged-model fallback when hot adapter switching is unavailable or unproven
-- hardware-aware placement
-- measured execution reporting rather than assumed accelerator use
+Runtime requirements include versioned adapter identity, cryptographic artifact verification, tokenizer/base compatibility checks, merged-model fallback when hot adapter switching is unavailable or unproven, hardware-aware placement, and measured execution reporting rather than assumed accelerator use.
 
 ## DSPy-optimized small models
 
 DSPy belongs in the model-development pipeline, not in workflow correctness.
-
-The intended pipeline is:
 
 ```text
 Haive task contract
@@ -223,39 +238,13 @@ Haive task contract
     -> runtime manifest
 ```
 
-Small models should be optimized against the exact structured function they perform. Optimization must preserve the authority boundary of the role. For example, a Completion Gate may be optimized to demand explicit evidence, but a memory clerk may not be optimized into deciding truth or contradiction because that would violate the memory contract.
-
-## Orchestration utility family
-
-The orchestration design currently describes more local utility roles than the deployed Epoch-8 orchestration runtime exposes. The release-backed runtime presently has Planner and Plan Repair.
-
-The planned specialist family includes:
-
-- Memory Query Composer
-- Context Packer
-- Agent Router
-- Tool Router
-- Handoff Composer
-- Escalation Gate
-- Completion Gate
-- Execution State Summarizer
-- Verification Planner
-
-These utilities should be cheap, structured, and trained to escalate when uncertain. Their objective is not maximum local handling rate; it is correct cheap handling plus correct escalation.
+Small models should be optimized against the exact structured function they perform. Optimization must preserve role authority boundaries. A Completion Gate may be optimized to demand explicit evidence; a memory clerk may not be optimized into deciding truth or contradiction.
 
 ## Experimental phase: BitNet b1.58
 
 BitNet b1.58 is an experimental backend/model-family direction, not a drop-in post-training quantization flag for existing Qwen artifacts.
 
-Adoption requires BitNet-native model artifacts and backend benchmarking against the existing specialist family for:
-
-- task accuracy
-- latency
-- RAM
-- energy / thermals
-- startup time
-- supported hardware
-- runtime portability
+Adoption requires BitNet-native model artifacts and benchmarking against the existing specialist family for task accuracy, latency, RAM, energy/thermals, startup time, supported hardware, and runtime portability.
 
 Existing Qwen/ONNX paths remain until BitNet demonstrates an actual advantage for the relevant specialist workload.
 
@@ -272,60 +261,50 @@ objective
    -> verification
 ```
 
-It reuses the same workflow concurrency, genealogy, streams, and verification contracts as centralized MoA. A skeleton branch is parallelized only when its dependencies permit it.
+It reuses the same workflow concurrency, genealogy, stream, planning, and verification contracts as centralized MoA. A skeleton branch is parallelized only when its dependencies permit it.
 
 ## Implementation sequence
 
-1. **Compound inference + genealogy foundation**
-   - attach `CompoundInferenceContext` to every model-backed task request
-   - establish stable invocation ancestry
-   - preserve existing workflow and memory semantics
-2. **Blueprint inference infrastructure**
-   - model/agent registry
-   - data registry
-   - typed stream fabric
-   - task/data planning boundary
-   - resource and execution telemetry
-3. **Centralized MoA**
-   - isolated proposer subgraphs
-   - bounded aggregation
-   - genealogy-aware independence checks
-   - explicit verification
-4. **Generalized local specialist/LoRA library**
-   - shared bases and adapters
-   - compatibility manifests
-   - residency/cache policy
-   - merged fallbacks
-5. **DSPy optimization pipeline**
-   - typed signatures
-   - evaluation metrics
-   - optimization and release pipeline
-6. **Finish the local orchestration utility family**
-7. **BitNet b1.58 experiments**
-8. **Skeleton-of-Thought experiments**
+1. Compound inference + direct genealogy foundation — implemented.
+2. Blueprint runtime fabric — first production slice implemented; persistence/resource-aware planning remain.
+3. Genealogy persistence and governance.
+4. Centralized MoA proposer/aggregator/verifier execution.
+5. Generalized local specialist/LoRA library registered into the model registry.
+6. DSPy optimization and release pipeline.
+7. Remaining local orchestration utility family.
+8. BitNet b1.58 experiments.
+9. Skeleton-of-Thought experiments.
 
 ## Current implementation status
 
-Implemented foundation:
+Implemented and called by production runtime:
 
 - `CompoundInferenceStrategy`
 - `InferenceGenealogy`
 - `CompoundInferenceContext`
-- default single-model compound-inference metadata on every `AgentTaskRequest`
-- automatic direct ancestry from dependency artifacts
+- workflow/project/task/role orchestration coordinates on provider dispatch
+- automatic dependency artifact ancestry
+- `BlueprintCompoundInferenceFabric`
+- `InferenceModelRegistry`
+- `InferenceAgentRegistry`
+- `InferenceDataRegistry`
+- `InferenceStreamFabric`
+- `InferenceResourceTelemetry`
+- `CompoundInferenceTaskPlanner`
+- provider-session preparation through the fabric
+- provider artifact, usage, and terminal stream recording
 
 Not yet implemented:
 
-- persisted genealogy graph
-- genealogy-aware verification policy
+- persisted genealogy graph and governance policy
+- persisted/restored inference registries and streams
+- direct non-agent executor stream ingestion
+- resource-aware automatic topology selection
 - centralized MoA execution
-- model/agent registry
-- data registry
-- typed stream fabric
-- shared-base runtime LoRA switching
+- generalized shared-base/LoRA model library integration
 - DSPy optimization pipeline
 - remaining orchestration utility models
 - BitNet runtime/model family
 - Skeleton-of-Thought execution
 
-Those items must not be represented as complete until they have real callers, tests, and runtime verification appropriate to the target platform.
+No item above should be represented as complete until it has real callers, tests, and runtime verification appropriate to its target platform.
