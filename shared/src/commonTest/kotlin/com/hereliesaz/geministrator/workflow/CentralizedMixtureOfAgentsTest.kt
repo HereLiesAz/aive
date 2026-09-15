@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
 import com.hereliesaz.geministrator.inference.InferenceGenealogy
 import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -127,6 +128,32 @@ class CentralizedMixtureOfAgentsTest {
         assertEquals(TaskRunStatus.Failed, execution.status)
         assertEquals("false", execution.artifacts.single().metadata["structurallyIndependent"])
         assertTrue(execution.artifacts.single().textContent.orEmpty().contains("CommonAncestry"))
+    }
+
+    @Test
+    fun downstreamRequestInheritsProducingInvocationFromDurableArtifact() {
+        val artifact = candidateArtifact(
+            suffix = "a",
+            invocationId = "candidate-a",
+            taskRunId = TaskRunId("candidate-run-1"),
+        )
+
+        val request = AgentTaskRequest(
+            taskRunId = TaskRunId("aggregator-run"),
+            objective = "Aggregate the candidates",
+            roleInstructions = "Preserve disagreement and evidence.",
+            acceptanceCriteria = emptyList(),
+            contextArtifacts = listOf(artifact),
+        )
+
+        assertEquals(
+            setOf("candidate-a"),
+            request.compoundInference.genealogy.upstreamInvocationIds,
+        )
+        assertEquals(
+            setOf(artifact.id),
+            request.compoundInference.genealogy.upstreamArtifactIds,
+        )
     }
 
     private fun governanceContext(
