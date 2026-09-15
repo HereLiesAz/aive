@@ -18,22 +18,82 @@ class MemoryConsolidationQueue(
         require(maxChunkChars > 0)
     }
 
-    suspend fun enqueueSession(envelope: MemorySessionEnvelope): MemoryQueueEntry {
+    suspend fun enqueueSession(
+        envelope: MemorySessionEnvelope,
+        priority: MemoryQueuePriority = MemoryQueuePriority.Normal,
+    ): MemoryQueueEntry {
         require(envelope.sourceSessionId.isNotBlank())
         require(envelope.userPrompt.isNotBlank())
+        val episodeId = envelope.episodeId()
+        return enqueueEpisode(envelope.toEpisode(episodeId, maxChunkChars), priority)
+    }
 
+    /**
+     * Deliberate in-session banks jump ahead of ordinary lifecycle backlog. Once consolidated,
+     * they are ordinary memory and retain no special reminder or retrieval semantics.
+     *
+     * Unlike lifecycle envelopes, every deliberate bank is an event. Its identity is allocated
+     * from the CAS-protected queue sequence so two same-text, same-millisecond deposits cannot
+     * collide or silently replace one another.
+     */
+    suspend fun enqueueBank(
+        request: MemoryBankRequest,
+        priority: MemoryQueuePriority = MemoryQueuePriority.Next,
+    ): MemoryQueueEntry {
         while (true) {
             val snapshot = store.read()
-            val episodeId = envelope.episodeId()
-            snapshot.queue.firstOrNull { it.episodeId == episodeId }?.let { return it }
-
-            val episode = envelope.toEpisode(episodeId, maxChunkChars)
-            val sequence = (snapshot.queue.maxOfOrNull(MemoryQueueEntry::sequence) ?: 0L) + 1L
+            val sequence = snapshot.nextQueueSequence()
+            val episodeId = request.episodeId(sequence)
+            val episode = request.toEpisode(episodeId, maxChunkChars)
             val entry = MemoryQueueEntry(
-                id = MemoryQueueId("queue-$sequence-${episodeId.value}"),
+                id = MemoryQueueId("queue-$sequence-${episode.id.value}"),
                 sequence = sequence,
-                episodeId = episodeId,
-                createdAtEpochMillis = envelope.closedAtEpochMillis,
+                episodeId = episode.id,
+                priority = priority,
+                createdAtEpochMillis = episode.createdAtEpochMillis,
+            )
+            if (
+                store.commit(
+                    expectedRevision = snapshot.revision,
+                    mutation = MemoryStoreMutation(
+                        episodesToAdd = listOf(episode),
+                        queueUpserts = listOf(entry),
+                    ),
+                )
+            ) {
+                return entry
+            }
+        }
+    }
+
+    private suspend fun enqueueEpisode(
+        episode: MemoryEpisode,
+        priority: MemoryQueuePriority,
+    ): MemoryQueueEntry {
+        while (true) {
+            val snapshot = store.read()
+            val existing = snapshot.queue.firstOrNull { it.episodeId == episode.id }
+            if (existing != null) {
+                if (
+                    existing.status != MemoryQueueStatus.Complete &&
+                    priority.ordinal > existing.priority.ordinal
+                ) {
+                    val promoted = existing.copy(priority = priority)
+                    if (store.commit(snapshot.revision, MemoryStoreMutation(queueUpserts = listOf(promoted)))) {
+                        return promoted
+                    }
+                    continue
+                }
+                return existing
+            }
+
+            val sequence = snapshot.nextQueueSequence()
+            val entry = MemoryQueueEntry(
+                id = MemoryQueueId("queue-$sequence-${episode.id.value}"),
+                sequence = sequence,
+                episodeId = episode.id,
+                priority = priority,
+                createdAtEpochMillis = episode.createdAtEpochMillis,
             )
             if (
                 store.commit(
@@ -49,6 +109,9 @@ class MemoryConsolidationQueue(
         }
     }
 }
+
+private fun MemorySnapshot.nextQueueSequence(): Long =
+    (queue.maxOfOrNull(MemoryQueueEntry::sequence) ?: 0L) + 1L
 
 sealed interface MemoryConsolidationResult {
     data object Idle : MemoryConsolidationResult
@@ -74,8 +137,8 @@ class MemoryConsolidator(
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
 ) {
     /**
-     * Processes at most one manager packet. Empty stages can be skipped deterministically in the
-     * same call, but no second episode is touched until the earliest one reports Completed.
+     * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
+     * packets; entries at the same priority remain FIFO by sequence.
      */
     suspend fun processNext(nowEpochMillis: Long): MemoryConsolidationResult {
         @Suppress("UNUSED_VARIABLE")
@@ -86,7 +149,11 @@ class MemoryConsolidator(
             val entry = snapshot.queue
                 .asSequence()
                 .filter { it.status != MemoryQueueStatus.Complete }
-                .minByOrNull(MemoryQueueEntry::sequence)
+                .sortedWith(
+                    compareByDescending<MemoryQueueEntry> { it.priority.ordinal }
+                        .thenBy { it.sequence },
+                )
+                .firstOrNull()
                 ?: return MemoryConsolidationResult.Idle
 
             if (entry.stage == MemoryConsolidationStage.Complete) {
@@ -213,9 +280,19 @@ class MemoryConsolidator(
             ?: error("Memory episode ${entry.episodeId.value} is missing")
 
         if (entry.stage == MemoryConsolidationStage.Condensation) {
-            val cluster = snapshot.findCondensationCluster(policy) ?: return null
-            val items = cluster.map(MemoryNode::asWorkItem)
-            val packetKey = "condense-${cluster.map { it.id.value }.sorted().joinToString("|").hashCode().toString(16)}"
+            // Priority preemption must not let a newly banked episode condense/supersede nodes that
+            // belong to another unfinished queue entry. Otherwise that paused entry's numeric cursor
+            // can shift underneath it and skip unprocessed memories when it resumes.
+            val protectedEpisodeIds = snapshot.queue
+                .asSequence()
+                .filter { it.status != MemoryQueueStatus.Complete && it.id != entry.id }
+                .mapTo(linkedSetOf()) { it.episodeId }
+            val cluster = snapshot.findCondensationCluster(policy, protectedEpisodeIds) ?: return null
+            val items = cluster
+                .map(MemoryNode::asWorkItem)
+                .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
+            if (items.size < 2) return null
+            val packetKey = "condense-${items.map { it.id }.sorted().joinToString("|").hashCode().toString(16)}"
             return PacketPlan(
                 packet = MemoryWorkPacket(
                     queueId = entry.id,
@@ -260,11 +337,16 @@ class MemoryConsolidator(
         val selected = allItems.boundedSlice(entry.cursor, policy.maxPacketItems, policy.maxPacketChars)
         if (selected.isEmpty()) return null
         val remainingChars = (policy.maxPacketChars - selected.sumOf { it.text.length }).coerceAtLeast(0)
-        val neighborhood = if (entry.stage == MemoryConsolidationStage.Associations && remainingChars > 0) {
+        val remainingItems = (policy.maxPacketItems - selected.size).coerceAtLeast(0)
+        val neighborhood = if (
+            entry.stage == MemoryConsolidationStage.Associations &&
+            remainingChars > 0 &&
+            remainingItems > 0
+        ) {
             snapshot.relatedNeighborhood(
                 episodeId = entry.episodeId,
                 needles = selected,
-                maxItems = policy.maxPacketItems,
+                maxItems = remainingItems,
                 maxChars = remainingChars,
             )
         } else {
@@ -294,7 +376,9 @@ class MemoryConsolidator(
         require(batch.size <= policy.maxMutationsPerPacket) {
             "Memory manager returned ${batch.size} mutations; limit is ${policy.maxMutationsPerPacket}"
         }
-        require(plan.packet.items.size <= policy.maxPacketItems)
+        require(plan.packet.items.size + plan.packet.neighborhood.size <= policy.maxPacketItems) {
+            "Memory work packet exceeded its item budget"
+        }
         require(
             plan.packet.items.sumOf { it.text.length } + plan.packet.neighborhood.sumOf { it.text.length } <=
                 policy.maxPacketChars,
@@ -358,10 +442,8 @@ class MemoryConsolidator(
                 require(batch.sectionsToAdd.isEmpty() && batch.nodesToAdd.isEmpty())
                 require(batch.edgesToAdd.all {
                     it.relation == MemoryRelationKind.SimilarTo ||
-                        it.relation == MemoryRelationKind.AssociatedWith ||
-                        it.relation == MemoryRelationKind.ConflictsWith ||
-                        it.relation == MemoryRelationKind.ResolvesConflict
-                })
+                        it.relation == MemoryRelationKind.AssociatedWith
+                }) { "Association clerks may create only neutral similarity/association edges" }
             }
             MemoryConsolidationStage.Condensation -> {
                 require(batch.sectionsToAdd.isEmpty())
@@ -428,6 +510,10 @@ private fun MemorySessionEnvelope.episodeId(): MemoryEpisodeId = MemoryEpisodeId
     "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}",
 )
 
+private fun MemoryBankRequest.episodeId(sequence: Long): MemoryEpisodeId = MemoryEpisodeId(
+    "episode-bank-$bankedAtEpochMillis-$sequence",
+)
+
 private fun MemorySessionEnvelope.toEpisode(
     episodeId: MemoryEpisodeId,
     maxChunkChars: Int,
@@ -465,6 +551,35 @@ private fun MemorySessionEnvelope.toEpisode(
         userPrompt = userPrompt,
         chunks = chunks,
         createdAtEpochMillis = closedAtEpochMillis,
+    )
+}
+
+private fun MemoryBankRequest.toEpisode(
+    episodeId: MemoryEpisodeId,
+    maxChunkChars: Int,
+): MemoryEpisode {
+    val chunks = text.trim().chunkedText(maxChunkChars).mapIndexed { index, piece ->
+        MemorySourceChunk(
+            id = MemoryChunkId("${episodeId.value}:chunk:0:$index"),
+            episodeId = episodeId,
+            ordinal = index,
+            kind = sourceKind,
+            label = label,
+            text = piece,
+        )
+    }
+    return MemoryEpisode(
+        id = episodeId,
+        sourceSessionId = sourceSessionId,
+        projectId = scope.projectId,
+        workflowRunId = scope.workflowRunId,
+        workflowDefinitionId = scope.workflowDefinitionId,
+        taskRunId = scope.taskRunId,
+        taskDefinitionId = scope.taskDefinitionId,
+        roleId = scope.roleId,
+        userPrompt = text,
+        chunks = chunks,
+        createdAtEpochMillis = bankedAtEpochMillis,
     )
 }
 
@@ -553,7 +668,7 @@ private fun MemorySnapshot.relatedNeighborhood(
     maxChars: Int,
 ): List<MemoryWorkItem> {
     val terms = needles.flatMap { it.text.memoryTerms() }.toSet()
-    if (terms.isEmpty()) return emptyList()
+    if (terms.isEmpty() || maxItems <= 0 || maxChars <= 0) return emptyList()
     var chars = 0
     val candidates = nodes
         .asSequence()
@@ -579,11 +694,19 @@ private fun MemorySnapshot.relatedNeighborhood(
     }
 }
 
-private fun MemorySnapshot.findCondensationCluster(policy: MemoryConsolidationPolicy): List<MemoryNode>? {
+private fun MemorySnapshot.findCondensationCluster(
+    policy: MemoryConsolidationPolicy,
+    protectedEpisodeIds: Set<MemoryEpisodeId> = emptySet(),
+): List<MemoryNode>? {
     val superseded = edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val activeById = nodes.filter { it.id !in superseded }.associateBy(MemoryNode::id)
+    val activeById = nodes
+        .filter { node ->
+            node.id !in superseded &&
+                node.sourceEpisodeIds.none { it in protectedEpisodeIds }
+        }
+        .associateBy(MemoryNode::id)
     val similarEdges = edges.filter {
         it.relation == MemoryRelationKind.SimilarTo &&
             it.weight >= policy.minimumSimilarityWeight &&
@@ -633,19 +756,19 @@ private fun instructionFor(stage: MemoryConsolidationStage): String = when (stag
     MemoryConsolidationStage.Sectioning ->
         "Split only these source chunks into granular, self-contained memory sections. Preserve source links."
     MemoryConsolidationStage.Salience ->
-        "Keep only information worth remembering. Create Context nodes for retained sections; omit noise and transient chatter."
+        "Keep only information worth remembering under the retention rules. Create Context nodes for retained sections; omit only bookkeeping noise and transient chatter."
     MemoryConsolidationStage.Tags ->
-        "Create as many useful noun and verb index tags as the retained context supports, then link each tag to its evidence."
+        "Create as many useful semantic noun/entity and verb/action index tags as the retained context supports, then link each tag to its evidence. Code symbols and operations are first-class semantic candidates."
     MemoryConsolidationStage.Phrases ->
-        "Combine noun and verb indexes into short, precise phrases that express what happened, what changed, or what is intended."
+        "Combine noun/entity and verb/action indexes into short, precise phrases supported by the supplied context. Do not decide which interpretation is correct."
     MemoryConsolidationStage.Summaries ->
-        "Generalize related phrases into compact paragraphs that preserve their ideas and purposes without inventing facts."
+        "Generalize related phrases into compact paragraphs that preserve their ideas and purposes without inventing facts or adjudicating them."
     MemoryConsolidationStage.Categories ->
-        "Assign reusable conceptual categories to the summaries. Prefer categories that will help later recall."
+        "Assign reusable conceptual category/subject tags to the summaries. Categorize for recall only; do not judge truth or preference."
     MemoryConsolidationStage.Associations ->
-        "Compare this bounded memory neighborhood. Link similarities, useful associations, and contradictions. Preserve conflicts rather than resolving them by deletion."
+        "Link only neutral semantic similarity or association supported by shared topics, concepts, entities, actions, or proximity. Do not infer contradiction, truth, falsity, or reconciliation."
     MemoryConsolidationStage.Condensation ->
-        "Restate these highly similar same-level memories as exactly one generalized memory. Link that memory to every supplied source with both CondensedFrom and Supersedes."
+        "Mechanically restate these highly similar same-level representations as exactly one compact representation. Preserve provenance to every supplied source; representational supersession is not a judgment that any source is wrong."
     MemoryConsolidationStage.Complete -> "No work."
 }
 

@@ -9,6 +9,8 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
+val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
+
 kotlin {
     androidLibrary {
         namespace = "com.hereliesaz.geministrator.shared"
@@ -49,6 +51,22 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.ktor.client.core)
+        }
+
+        getByName("androidMain").dependencies {
+            implementation(libs.onnxruntime.android)
+        }
+
+        getByName("desktopMain").dependencies {
+            if (isMacHost) {
+                implementation(libs.onnxruntime)
+            } else {
+                implementation(libs.onnxruntime.gpu)
+            }
+        }
+
+        getByName("jsMain").dependencies {
+            implementation(npm("onnxruntime-web", libs.versions.onnxruntime.get()))
         }
 
         commonTest.dependencies {
