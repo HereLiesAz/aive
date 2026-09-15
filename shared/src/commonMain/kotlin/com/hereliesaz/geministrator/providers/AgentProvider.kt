@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.inference.CompoundInferenceContext
 import kotlinx.coroutines.flow.Flow
 
 enum class PromptCacheMode {
@@ -71,6 +72,12 @@ data class AgentTaskRequest(
     val requirePlanApproval: Boolean = false,
     val promptContext: PromptContext = PromptContext(),
     val orchestrationContext: AgentOrchestrationContext = AgentOrchestrationContext(),
+    val compoundInference: CompoundInferenceContext = CompoundInferenceContext.single(
+        taskRunId = taskRunId,
+        workflowRunId = orchestrationContext.workflowRunId,
+        upstreamTaskRunIds = contextArtifacts.mapTo(linkedSetOf()) { it.taskRunId },
+        upstreamArtifactIds = contextArtifacts.mapTo(linkedSetOf()) { it.id },
+    ),
 )
 
 enum class IsolationHint {

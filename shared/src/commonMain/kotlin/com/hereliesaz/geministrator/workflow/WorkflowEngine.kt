@@ -34,6 +34,7 @@ import com.hereliesaz.geministrator.events.WorkflowCancelled
 import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.events.WorkflowEventSink
 import com.hereliesaz.geministrator.events.WorkflowFailed
+import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
@@ -148,6 +149,13 @@ class WorkflowEngine(
                             ),
                             reusePolicy = definition.promptReusePolicy,
                             cacheNamespace = "${nextRun.id.value}:${role.id.value}",
+                        ),
+                        orchestrationContext = AgentOrchestrationContext(
+                            projectId = project.id,
+                            workflowRunId = nextRun.id,
+                            workflowDefinitionId = definition.id,
+                            taskDefinitionId = task.id,
+                            roleId = role.id,
                         ),
                     )
                     pendingAgentDispatches += PendingAgentDispatch(
