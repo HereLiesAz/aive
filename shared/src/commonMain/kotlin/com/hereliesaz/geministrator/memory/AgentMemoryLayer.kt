@@ -8,8 +8,8 @@ package com.hereliesaz.geministrator.memory
  * available only when a Memory Manager has been configured.
  *
  * Deterministic temporal organization and bookkeeping associations are kept outside the Memory
- * Clerks. They are derived programmatically from immutable episode timestamps, provenance,
- * orchestration scope, sequence, and exact identifiers.
+ * Clerks. Reproducible lexical/structural heuristics are also kept outside the model clerks, but
+ * remain a distinct evidence class from facts derived from immutable provenance and scope.
  */
 class AgentMemoryLayer private constructor(
     val store: MemoryStore,
@@ -18,11 +18,13 @@ class AgentMemoryLayer private constructor(
     val sessionObserver: MemorySessionObserver,
     private val consolidator: MemoryConsolidator?,
     private val programmaticAssociator: MemoryProgrammaticAssociator,
+    private val lexicalAssociator: MemoryLexicalAssociator,
 ) {
     suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
         val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
         if (result is MemoryConsolidationResult.Completed) {
             programmaticAssociator.refresh(nowEpochMillis)
+            lexicalAssociator.refresh(nowEpochMillis)
         }
         return result
     }
@@ -30,6 +32,14 @@ class AgentMemoryLayer private constructor(
     /** Refresh exact/bookkeeping associations without invoking a model. */
     suspend fun refreshProgrammaticAssociations(nowEpochMillis: Long): Int =
         programmaticAssociator.refresh(nowEpochMillis)
+
+    /** Refresh deterministic lexical/structural heuristic associations without invoking a model. */
+    suspend fun refreshLexicalAssociations(nowEpochMillis: Long): Int =
+        lexicalAssociator.refresh(nowEpochMillis)
+
+    /** Refresh both non-model association layers while preserving their distinct evidence metadata. */
+    suspend fun refreshNonModelAssociations(nowEpochMillis: Long): Int =
+        programmaticAssociator.refresh(nowEpochMillis) + lexicalAssociator.refresh(nowEpochMillis)
 
     /**
      * Returns the active derived temporal index. Building it is deterministic and non-destructive;
@@ -51,6 +61,7 @@ class AgentMemoryLayer private constructor(
             manager: MemoryManagerAgent? = null,
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
             maxChunkChars: Int = 6_000,
+            lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
         ): AgentMemoryLayer {
             val queue = MemoryConsolidationQueue(store, maxChunkChars)
             return AgentMemoryLayer(
@@ -60,46 +71,61 @@ class AgentMemoryLayer private constructor(
                 sessionObserver = QueuedMemorySessionObserver(queue),
                 consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
                 programmaticAssociator = MemoryProgrammaticAssociator(store),
+                lexicalAssociator = MemoryLexicalAssociator(store, lexicon),
             )
         }
 
         /**
-         * Preferred production path for local memory maintenance. Each specialist may use its own
-         * small model or share a base model with role-specific adapters. The consolidation packet
-         * budget is clamped to the smallest configured specialist before any work is scheduled, so
-         * a model context overflow cannot be created by the memory engine itself.
+         * Preferred production path for local memory maintenance. NounTagger and VerbTagger are
+         * automatically wrapped with conservative deterministic technical fast paths; their trained
+         * specialists remain the fallback for ambiguous or natural-language packets. Other clerks
+         * remain unchanged.
          */
         fun createWithMicroAgents(
             store: MemoryStore,
             agents: Collection<MemoryMicroAgent>,
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
             maxChunkChars: Int = 6_000,
+            lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
+            programmaticSemanticFastPaths: Boolean = true,
         ): AgentMemoryLayer {
-            val router = MemoryMicroAgentRouter(agents)
+            val routedAgents = if (programmaticSemanticFastPaths) {
+                agents.withProgrammaticSemanticFastPaths()
+            } else {
+                agents.toList()
+            }
+            val router = MemoryMicroAgentRouter(routedAgents)
             return create(
                 store = store,
                 manager = router,
                 policy = router.constrainPolicy(policy),
                 maxChunkChars = maxChunkChars,
+                lexicon = lexicon,
             )
         }
 
         fun createDefault(
             manager: MemoryManagerAgent? = null,
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+            lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
         ): AgentMemoryLayer = create(
             store = SettingsMemoryStore.createDefault(),
             manager = manager,
             policy = policy,
+            lexicon = lexicon,
         )
 
         fun createDefaultWithMicroAgents(
             agents: Collection<MemoryMicroAgent>,
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+            lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
+            programmaticSemanticFastPaths: Boolean = true,
         ): AgentMemoryLayer = createWithMicroAgents(
             store = SettingsMemoryStore.createDefault(),
             agents = agents,
             policy = policy,
+            lexicon = lexicon,
+            programmaticSemanticFastPaths = programmaticSemanticFastPaths,
         )
     }
 }
