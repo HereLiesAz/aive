@@ -63,6 +63,9 @@ fun main() {
                 val executorIntegrations = remember(repositoryCredentials) {
                     configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
                 }
+                val repositoryDiscovery = remember(repositoryCredentials) {
+                    configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
+                }
 
                 val repositoryServiceId = configuringRepositoryServiceId
                 val providerId = configuringProviderId
@@ -91,6 +94,7 @@ fun main() {
                         availableRepositorySources = RepositorySource.entries.toSet(),
                         onPickLocalRepository = ::pickLocalGitFolder,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
+                        onSearchRepositories = repositoryDiscovery::search,
                         onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                         onDisconnectRepositoryService = { serviceId ->
                             repositoryCredentialStore.clear(serviceId)
@@ -261,6 +265,19 @@ internal fun configuredDesktopExecutorIntegrations(
                 )
             }
         },
+    )
+}
+
+internal fun configuredDesktopRepositoryDiscovery(
+    repositoryCredentials: Map<String, String>,
+    httpClient: HttpClient,
+): RemoteRepositoryDiscoveryClient {
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
+    val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    return RemoteRepositoryDiscoveryClient(
+        httpClient = httpClient,
+        githubTokenProvider = githubToken?.let { token -> RepositoryServiceTokenProvider { token } },
+        gitlabTokenProvider = gitlabToken?.let { token -> RepositoryServiceTokenProvider { token } },
     )
 }
 
