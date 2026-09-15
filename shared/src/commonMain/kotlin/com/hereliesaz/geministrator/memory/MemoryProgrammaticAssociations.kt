@@ -49,6 +49,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
 
     fun add(left: MemoryNode?, right: MemoryNode?, basis: String, weight: Float, detail: String? = null) {
         if (left == null || right == null || left.id == right.id || candidates.size >= limit) return
+        if (!left.isProjectCompatibleWith(right, episodeById)) return
+
         val first: MemoryNode
         val second: MemoryNode
         if (left.id.value <= right.id.value) {
@@ -75,34 +77,47 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         )
     }
 
-    // Exact semantic cue identity is a bookkeeping fact, not a semantic inference.
+    // Exact semantic cue identity is a bookkeeping fact, not a semantic inference. Cue identity is
+    // still project-scoped so generic tags such as "test" cannot bridge unrelated project graphs.
     activeNodes
         .filter { it.kind == MemoryNodeKind.NounTag || it.kind == MemoryNodeKind.VerbTag || it.kind == MemoryNodeKind.Category }
-        .groupBy { "${it.kind.name}:${it.text.normalizedMemoryKey()}" }
+        .flatMap { node ->
+            node.projectScopeKeys(episodeById).map { scope ->
+                "$scope|${node.kind.name}:${node.text.normalizedMemoryKey()}" to node
+            }
+        }
+        .groupBy({ it.first }, { it.second })
         .entries
         .sortedBy { it.key }
         .map { it.value }
         .filter { it.size > 1 }
         .forEach { group ->
-            group.sortedBy { it.createdAtEpochMillis }.zipWithNext().forEach { (left, right) ->
-                add(left, right, "exact-cue", 1f, left.text.normalizedMemoryKey())
-            }
+            group.distinctBy(MemoryNode::id)
+                .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
+                .zipWithNext()
+                .forEach { (left, right) ->
+                    add(left, right, "exact-cue", 1f, left.text.normalizedMemoryKey())
+                }
         }
 
     // Exact machine-readable artifacts and identifiers: URLs, paths, commit hashes, PR/issue refs,
-    // code spans, task paths, and exception/error type names.
+    // code spans, task paths, and exception/error type names. Project scoping prevents generic local
+    // identifiers such as src/... or #12 from joining unrelated repositories.
     val identifierGroups = linkedMapOf<String, MutableList<MemoryNode>>()
     activeNodes.forEach { node ->
         node.text.exactMemoryIdentifiers().forEach { identifier ->
-            identifierGroups.getOrPut(identifier) { mutableListOf() } += node
+            node.projectScopeKeys(episodeById).forEach { scope ->
+                identifierGroups.getOrPut("$scope|$identifier") { mutableListOf() } += node
+            }
         }
     }
     identifierGroups.entries
         .filter { it.value.size > 1 }
         .sortedBy { it.key }
-        .forEach { (identifier, group) ->
+        .forEach { (scopedIdentifier, group) ->
+            val identifier = scopedIdentifier.substringAfter('|')
             group.distinctBy(MemoryNode::id)
-                .sortedBy { it.createdAtEpochMillis }
+                .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
                 .forEach { (left, right) -> add(left, right, "exact-identifier", 0.98f, identifier) }
         }
@@ -117,7 +132,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         .filter { it.size > 1 }
         .forEach { group ->
             group.distinctBy(MemoryNode::id)
-                .sortedBy { it.createdAtEpochMillis }
+                .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
                 .forEach { (left, right) -> add(left, right, "shared-provenance", 1f) }
         }
@@ -139,30 +154,34 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     associateEpisodeGroups(
         basis = "scope:session",
         weight = 0.98f,
-        groups = episodes.groupBy { it.sourceSessionId },
+        groups = episodes.groupBy { it.scopedKey(it.sourceSessionId) },
     )
     associateEpisodeGroups(
         basis = "scope:task-run",
         weight = 0.96f,
-        groups = episodes.mapNotNull { it.taskRunId?.let { value -> value to it } }.groupBy({ it.first }, { it.second }),
+        groups = episodes.mapNotNull { episode ->
+            episode.taskRunId?.let { value -> episode.scopedKey(value) to episode }
+        }.groupBy({ it.first }, { it.second }),
     )
     associateEpisodeGroups(
         basis = "scope:workflow-run",
         weight = 0.92f,
-        groups = episodes.mapNotNull { it.workflowRunId?.let { value -> value to it } }.groupBy({ it.first }, { it.second }),
+        groups = episodes.mapNotNull { episode ->
+            episode.workflowRunId?.let { value -> episode.scopedKey(value) to episode }
+        }.groupBy({ it.first }, { it.second }),
     )
     associateEpisodeGroups(
         basis = "scope:task-definition",
         weight = 0.84f,
         groups = episodes.mapNotNull { episode ->
-            episode.taskDefinitionId?.let { value -> "${episode.projectId.orEmpty()}|$value" to episode }
+            episode.taskDefinitionId?.let { value -> episode.scopedKey(value) to episode }
         }.groupBy({ it.first }, { it.second }),
     )
     associateEpisodeGroups(
         basis = "scope:workflow-definition",
         weight = 0.80f,
         groups = episodes.mapNotNull { episode ->
-            episode.workflowDefinitionId?.let { value -> "${episode.projectId.orEmpty()}|$value" to episode }
+            episode.workflowDefinitionId?.let { value -> episode.scopedKey(value) to episode }
         }.groupBy({ it.first }, { it.second }),
     )
     associateEpisodeGroups(
@@ -190,6 +209,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         }
 
     // Active temporal buckets provide bounded recency associations without any model inference.
+    // The temporal window is partitioned by project before linking, so coincidental clock proximity
+    // cannot bridge unrelated project memory graphs.
     val temporal = MemoryTemporalIndex.build(episodes)
     temporal.buckets
         .sortedWith(compareBy<MemoryTemporalBucket> { it.level.ordinal }.thenBy { it.startEpochMillis })
@@ -204,16 +225,43 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             }
             bucket.episodeIds
                 .mapNotNull { episodeById[it] }
-                .sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
-                .mapNotNull { anchors[it.id] }
-                .distinctBy(MemoryNode::id)
-                .zipWithNext()
-                .forEach { (left, right) ->
-                    add(left, right, "temporal:${bucket.level.name}", weight, bucket.id)
+                .groupBy { it.projectId ?: UNSCOPED_PROJECT }
+                .entries
+                .sortedBy { it.key }
+                .forEach { (_, projectEpisodes) ->
+                    projectEpisodes
+                        .sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
+                        .mapNotNull { anchors[it.id] }
+                        .distinctBy(MemoryNode::id)
+                        .zipWithNext()
+                        .forEach { (left, right) ->
+                            add(left, right, "temporal:${bucket.level.name}", weight, bucket.id)
+                        }
                 }
         }
 
     return candidates.values.take(limit)
+}
+
+private const val UNSCOPED_PROJECT = "<unscoped>"
+
+private fun MemoryEpisode.scopedKey(value: String): String =
+    "${projectId ?: UNSCOPED_PROJECT}|$value"
+
+private fun MemoryNode.projectScopeKeys(
+    episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
+): Set<String> {
+    val projects = sourceEpisodeIds.mapNotNull { episodesById[it]?.projectId }.toSet()
+    return if (projects.isEmpty()) setOf(UNSCOPED_PROJECT) else projects
+}
+
+private fun MemoryNode.isProjectCompatibleWith(
+    other: MemoryNode,
+    episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
+): Boolean {
+    val leftProjects = sourceEpisodeIds.mapNotNull { episodesById[it]?.projectId }.toSet()
+    val rightProjects = other.sourceEpisodeIds.mapNotNull { episodesById[it]?.projectId }.toSet()
+    return leftProjects.isEmpty() || rightProjects.isEmpty() || leftProjects.any { it in rightProjects }
 }
 
 private fun List<MemoryNode>.anchorForEpisode(episodeId: MemoryEpisodeId): MemoryNode? =
