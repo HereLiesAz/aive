@@ -12,7 +12,7 @@ class MemoryTemporalProgrammaticTest {
         val episodes = (0 until (14 * 24 * 4)).map { index ->
             episode(
                 id = "episode-$index",
-                timestamp = index * quarterHour,
+                timestamp = index.toLong() * quarterHour,
                 projectId = "project",
             )
         }
@@ -35,12 +35,12 @@ class MemoryTemporalProgrammaticTest {
     @Test
     fun eightQuarterHourBucketsRemainGranularAndNinthRollsOldestWindowUp() {
         val quarterHour = MemoryTemporalLevel.FifteenMinutes.durationMillis
-        val eight = (0 until 8).map { index -> episode("e$index", index * quarterHour, "project") }
+        val eight = (0 until 8).map { index -> episode("e$index", index.toLong() * quarterHour, "project") }
         val eightIndex = MemoryTemporalIndex.build(eight)
         assertEquals(8, eightIndex.buckets.count { it.level == MemoryTemporalLevel.FifteenMinutes })
         assertEquals(0, eightIndex.buckets.count { it.level == MemoryTemporalLevel.OneHour })
 
-        val nine = eight + episode("e8", 8 * quarterHour, "project")
+        val nine = eight + episode("e8", 8L * quarterHour, "project")
         val nineIndex = MemoryTemporalIndex.build(nine)
         assertTrue(nineIndex.buckets.count { it.level == MemoryTemporalLevel.FifteenMinutes } <= 8)
         assertTrue(nineIndex.buckets.any { it.level == MemoryTemporalLevel.OneHour })
