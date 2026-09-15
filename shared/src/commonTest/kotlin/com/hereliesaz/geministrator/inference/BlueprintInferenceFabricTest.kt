@@ -30,6 +30,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 
 class BlueprintInferenceFabricTest {
@@ -71,6 +72,26 @@ class BlueprintInferenceFabricTest {
         val records = fabric.streamFabric.records(prepared.plan.invocationId)
         assertEquals(1, records.size)
         assertIs<InferenceStreamPayload.DispatchPrepared>(records.single().payload)
+    }
+
+    @Test
+    fun repeatedStartsOfTheSameTaskCreateDistinctConcreteInvocations() = runBlocking {
+        val fabric = BlueprintCompoundInferenceFabric()
+        val providerId = AgentProviderId("provider")
+        val request = AgentTaskRequest(
+            taskRunId = TaskRunId("retry-task"),
+            objective = "Retryable work",
+            roleInstructions = "Do the work.",
+            acceptanceCriteria = emptyList(),
+        )
+        val capabilities = AgentCapabilities(supported = emptySet())
+
+        val first = fabric.prepareDispatch(request, providerId, capabilities)
+        val second = fabric.prepareDispatch(request, providerId, capabilities)
+
+        assertNotEquals(first.plan.invocationId, second.plan.invocationId)
+        assertEquals("${request.compoundInference.genealogy.invocationId}:invocation:1", first.plan.invocationId)
+        assertEquals("${request.compoundInference.genealogy.invocationId}:invocation:2", second.plan.invocationId)
     }
 
     @Test
@@ -137,9 +158,9 @@ class BlueprintInferenceFabricTest {
                 ),
             )
 
-            assertNotNull(provider.startedRequest)
+            val started = assertNotNull(provider.startedRequest)
             assertNotNull(fabric.agentRegistry.get(provider.id))
-            val records = fabric.streamFabric.records(request.compoundInference.genealogy.invocationId)
+            val records = fabric.streamFabric.records(started.compoundInference.genealogy.invocationId)
             assertEquals(1, records.size)
             assertIs<InferenceStreamPayload.DispatchPrepared>(records.single().payload)
         } finally {
