@@ -89,7 +89,7 @@ Exact machine-readable identifiers can be associated directly, including:
 - exception/error type names
 - Gradle/task-style paths such as `:shared:desktopTest`
 
-This is identity matching, not semantic inference.
+This is identity matching, not semantic inference. Exactness must remain genuinely exact: case-sensitive identifiers such as repository paths and code symbols retain case. Project-relative identifiers such as repository paths, PR/issue numbers, task paths, and code symbols are grouped inside their source-project namespace rather than treated as globally unique. Global identifiers such as a full URL or commit hash may associate across project IDs inside the same store.
 
 ### Shared provenance
 
@@ -107,6 +107,8 @@ Episode representatives can be associated from exact shared orchestration coordi
 - role/project combination
 
 Source session, task-run, and workflow-run identity intentionally remain capable of spanning project IDs. One orchestration may legitimately be touching several projects at once.
+
+Task-definition identity is qualified by both project and workflow definition because a task name may be reused by multiple workflows.
 
 ### Sequential work history
 
@@ -129,6 +131,78 @@ Episode representatives that occupy the same active temporal bucket can be assoc
 
 Temporal proximity does not imply semantic similarity or causal relationship. It only records that the memories occurred within the same active time window in the same memory store.
 
+Coarser temporal buckets therefore carry weaker edge weights than precise bookkeeping relationships. A week-only association must not behave like an exact cue or shared-provenance edge during recall.
+
+## Association weights are retrieval evidence
+
+`MemoryEdge.weight` is semantically meaningful and must survive into traversal. GRIP and explicit expansion must propagate edge strength instead of scoring graph paths solely by hop count.
+
+A traversal path combines two independent attenuations:
+
+1. **association strength** — the accumulated weight of the edges actually traversed;
+2. **graph distance** — the ordinary depth penalty for increasingly indirect recall.
+
+A weak one-hop temporal edge must therefore score below a strong one-hop exact edge, and a chain of weak edges must attenuate further rather than becoming equivalent merely because the hop count matches.
+
+When multiple independent association edges connect the same pair of nodes, their evidence is accumulated before traversal rather than taking only the strongest edge or adding weights linearly.
+
+## Associative strength accumulates on a saturating exponential curve
+
+Repeated supporting associations should strengthen memory indefinitely in the sense that every additional piece of evidence can increase associative strength, but the increase must have diminishing returns and approach a ceiling asymptotically.
+
+For independent association weights `w1 ... wn`, Haive uses complementary exponential accumulation:
+
+```text
+combined = 1 - Π(1 - wi)
+```
+
+For repeated equal evidence `w`, this becomes:
+
+```text
+combined(n) = 1 - (1 - w)^n
+```
+
+For example, repeated `0.50` evidence produces:
+
+```text
+1 association  -> 0.500
+2 associations -> 0.750
+3 associations -> 0.875
+4 associations -> 0.9375
+```
+
+The first reinforcement is large, later reinforcements become progressively smaller, and the strength approaches `1.0` without linear runaway. This is deliberately **not** `sum(weights)` and not simple doubling with a hard clamp.
+
+This rule applies wherever multiple independent graph associations support the same relationship, including parallel deterministic/semantic evidence and inherited overlap during condensation.
+
+## Condensation trades specificity for associative strength
+
+When several highly similar memories are mechanically condensed into a more general representation, their shared associations become more important, not less.
+
+The generalized memory therefore receives direct `AssociatedWith` edges for external targets that were associated with **two or more** of the condensed source memories. The source-specific edge weights are first accumulated per source, then the independent source contributions are accumulated again with the same saturating exponential rule.
+
+Conceptually:
+
+```text
+memory A --0.50--> target X
+memory B --0.50--> target X
+
+A + B -> generalized memory G
+
+G --0.75--> target X
+```
+
+If a third independently condensed source also carries `0.50` support for `X`, the generalized association becomes `0.875`, not `1.25` and not a clamped `1.0`.
+
+This creates the intended tradeoff:
+
+- **specificity decreases** as multiple detailed memories become one broader representation;
+- **shared associative strength increases** because repeated evidence says the broader representation is reliably connected to that neighboring concept.
+
+Unique associations belonging to only one condensed source are not artificially reinforced. They remain recoverable through preserved provenance and `CondensedFrom` traversal. Condensation therefore strengthens overlap without pretending that every source-specific relationship became common.
+
+Further rounds of condensation apply the same curve again. Associative strength can continue increasing with additional independent support while each increment gets smaller.
+
 ## Graph-density rule
 
 Programmatic associations must remain bounded.
@@ -136,6 +210,8 @@ Programmatic associations must remain bounded.
 For large groups, deterministic code should connect memories in stable chains or bounded neighborhoods rather than create an all-to-all clique. This preserves reachability without quadratic graph growth.
 
 Programmatic association refresh is also mutation-bounded per pass. Additional deterministic links can be filled in on later consolidation passes.
+
+Condensation-overlap propagation follows the same bounded-maintenance rule: strongest shared overlaps are emitted first when a refresh limit is reached, while source provenance remains available for deeper traversal.
 
 ## Separation from learned association
 
@@ -166,8 +242,8 @@ current thought
     -> GRIP drill-down only if needed
 ```
 
-The Attention Deficit Dial controls how readily those related cues enter active context. It does not alter temporal roll-up rules or deterministic graph facts.
+Edge weights determine how strongly a graph neighborhood participates in that surfacing. The Attention Deficit Dial controls how readily sufficiently related cues enter active context; it does not erase the distinction between strong and weak associations.
 
 ## Durable rule
 
-> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. The memory store is the association universe; project IDs are context, not walls. Save model inference for relationships that actually require semantics.**
+> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. Preserve edge strength during recall. Accumulate repeated associative evidence with diminishing returns, so condensation loses specificity while shared associations become stronger. Save model inference for relationships that actually require semantics.**
