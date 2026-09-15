@@ -17,7 +17,9 @@ import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntim
  * Deterministic system executor for centralized-MoA ancestry gating.
  *
  * It evaluates only structural provenance. It never chooses a candidate, resolves a memory
- * disagreement, or labels a claim true/false.
+ * disagreement, or labels a claim true/false. Shared source evidence makes candidate agreement
+ * non-independent, but does not prevent synthesis of those candidates; the aggregator and verifier
+ * receive that finding and must not treat agreement itself as proof.
  */
 class GenealogyGovernanceExecutorIntegration(
     private val governance: InferenceGenealogyGovernanceRuntime,
@@ -64,16 +66,17 @@ class GenealogyGovernanceExecutorIntegration(
         val blockingKinds = setOf(
             GenealogyGovernanceFindingKind.MissingGenealogy,
             GenealogyGovernanceFindingKind.CircularDerivation,
-            GenealogyGovernanceFindingKind.InsufficientIndependence,
-            GenealogyGovernanceFindingKind.UnsupportedConsensus,
         )
         val blockingFindings = report.findings.filter { it.kind in blockingKinds }
         val lineageComplete = invocationIds.size >= 2
-        val passed = lineageComplete && blockingFindings.isEmpty()
+        val gatePassed = lineageComplete && blockingFindings.isEmpty()
+        val structurallyIndependent = lineageComplete &&
+            report.pairwiseIndependence.isNotEmpty() &&
+            report.pairwiseIndependence.all { it.independent }
         val text = report.render(lineageComplete)
 
         return TaskExecutorExecution(
-            status = if (passed) TaskRunStatus.Completed else TaskRunStatus.Failed,
+            status = if (gatePassed) TaskRunStatus.Completed else TaskRunStatus.Failed,
             externalRunId = "genealogy:${context.run.id.value}:${context.task.id.value}",
             artifacts = listOf(
                 ArtifactRef(
@@ -85,19 +88,22 @@ class GenealogyGovernanceExecutorIntegration(
                     mediaType = "text/plain",
                     metadata = mapOf(
                         "source" to GENEALOGY_GOVERNANCE_SERVICE,
-                        "structurallyIndependent" to passed.toString(),
+                        "gatePassed" to gatePassed.toString(),
+                        "structurallyIndependent" to structurallyIndependent.toString(),
                         "candidateInvocationCount" to invocationIds.size.toString(),
                     ),
                     createdAtEpochMillis = context.nowEpochMillis,
                 ),
             ),
-            progress = if (passed) 1f else null,
-            progressMessage = if (passed) {
-                "Candidate genealogy satisfies the configured independence gate"
-            } else if (!lineageComplete) {
+            progress = if (gatePassed) 1f else null,
+            progressMessage = if (!lineageComplete) {
                 "Genealogy gate requires at least two candidate invocation records"
-            } else {
+            } else if (blockingFindings.isNotEmpty()) {
                 blockingFindings.joinToString("; ") { it.message }
+            } else if (structurallyIndependent) {
+                "Candidate genealogy is complete and candidate lineages are structurally independent"
+            } else {
+                "Candidate genealogy is complete; shared ancestry is recorded as advisory and agreement must not be treated as independent evidence"
             },
         )
     }
