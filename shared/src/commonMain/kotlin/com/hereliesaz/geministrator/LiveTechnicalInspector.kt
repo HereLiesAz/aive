@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,7 +21,6 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun TechnicalInspector(
@@ -31,7 +29,7 @@ internal fun TechnicalInspector(
     onApproveTask: (String) -> Unit = {},
     onRejectPlan: (String) -> Unit = {},
     onResolveEscalation: (String, Boolean) -> Unit = { _, _ -> },
-    onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    onMessageAgent: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     if (liveWorkflow == null) {
@@ -47,10 +45,7 @@ internal fun TechnicalInspector(
         return
     }
 
-    val scope = rememberCoroutineScope()
     var messageDraft by remember(selectedTaskId) { mutableStateOf("") }
-    var messageStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
-    var messageSending by remember(selectedTaskId) { mutableStateOf(false) }
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
     val identity = role?.name ?: executor.displayName()
@@ -137,39 +132,24 @@ internal fun TechnicalInspector(
         if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
             OutlinedTextField(
                 value = messageDraft,
-                onValueChange = {
-                    messageDraft = it
-                    messageStatus = null
-                },
+                onValueChange = { messageDraft = it },
                 label = { Text("Message agent") },
                 minLines = 2,
-                enabled = !messageSending,
                 modifier = Modifier.fillMaxWidth(),
             )
             AzphaltPill(
-                label = if (messageSending) "Sending…" else "Send message",
+                label = "Send message",
                 seed = "message-$selectedTaskId",
                 endCap = "Send",
                 onClick = {
                     val message = messageDraft.trim()
-                    if (message.isNotEmpty() && !messageSending) {
-                        messageSending = true
-                        messageStatus = null
-                        scope.launch {
-                            val failure = onMessageAgent(selectedTaskId, message)
-                            messageSending = false
-                            if (failure == null) {
-                                messageDraft = ""
-                                messageStatus = "Sent"
-                            } else {
-                                messageStatus = failure
-                            }
-                        }
+                    if (message.isNotEmpty()) {
+                        onMessageAgent(selectedTaskId, message)
+                        messageDraft = ""
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            messageStatus?.let { LiveInspectorLine("MESSAGE", it) }
         }
         val roleForPayload = role
             ?: task.roleId?.let { rid -> liveWorkflow.roles.firstOrNull { it.id == rid } }
