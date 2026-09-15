@@ -79,12 +79,14 @@ data class MemoryTemporalIndex(
                 if (active.size <= cap) return@forEach
                 val parentBuckets = byLevel.getValue(parent)
 
-                // Group once by parent window and process oldest parent groups first. The previous
-                // implementation repeatedly rescanned the entire active map for every rollup, which
-                // became quadratic for sparse long-lived histories.
+                // Group once by parent window and process oldest parent groups first. Keep this in
+                // common-Kotlin collection APIs so the same implementation compiles on JVM, JS,
+                // and Wasm. The previous implementation repeatedly rescanned the entire active map
+                // for every rollup, which became quadratic for sparse long-lived histories.
                 val childrenByParent = active.values
                     .groupBy { child -> align(child.startEpochMillis, parent.durationMillis) }
-                    .toSortedMap()
+                    .entries
+                    .sortedBy { it.key }
 
                 for ((parentStart, children) in childrenByParent) {
                     if (active.size <= cap) break
