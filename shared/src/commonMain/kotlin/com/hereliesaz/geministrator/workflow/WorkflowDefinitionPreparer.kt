@@ -28,9 +28,10 @@ class WorkflowDefinitionPreparer(
         repository: RepositoryRef? = null,
     ): WorkflowDefinition {
         val withTestDesign = WorkflowDefinitionExpander.expand(definition, activeRoles)
-        val originalIds = withTestDesign.tasks.mapTo(mutableSetOf()) { it.id }
+        val withCompoundInference = CentralizedMixtureOfAgentsExpander.expand(withTestDesign, activeRoles)
+        val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }
         val prepared = buildList {
-            for (task in withTestDesign.tasks) {
+            for (task in withCompoundInference.tasks) {
                 val executor = task.effectiveExecutor()
                 if (executor !is TaskExecutor.RoleAgent || task.environmentPlanningPolicy == EnvironmentPlanningPolicy.NotRequired) {
                     add(task)
@@ -97,7 +98,7 @@ class WorkflowDefinitionPreparer(
             }
         }
 
-        return withTestDesign.copy(tasks = prepared).also(WorkflowGraphValidator::requireValid)
+        return withCompoundInference.copy(tasks = prepared).also(WorkflowGraphValidator::requireValid)
     }
 }
 
