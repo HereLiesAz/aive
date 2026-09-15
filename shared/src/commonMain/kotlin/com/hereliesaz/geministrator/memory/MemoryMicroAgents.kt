@@ -200,7 +200,7 @@ class MemoryMicroAgentRouter(
             "Primary packet has ${items.size} items; ${model.modelId} limit is ${model.maxInputItems}"
         }
         val fixedChars = instruction.length + packetKey.length
-        val primaryChars = items.sumOf(MemoryWorkItem::estimatedInputChars)
+        val primaryChars = items.sumOf { it.estimatedInputChars() }
         require(fixedChars + primaryChars <= model.maxInputChars) {
             "Primary packet exceeds ${model.modelId} input budget"
         }
@@ -229,8 +229,8 @@ class MemoryMicroAgentRouter(
 
     private fun MemoryWorkPacket.estimatedInputChars(): Int =
         instruction.length + packetKey.length +
-            items.sumOf(MemoryWorkItem::estimatedInputChars) +
-            neighborhood.sumOf(MemoryWorkItem::estimatedInputChars)
+            items.sumOf { it.estimatedInputChars() } +
+            neighborhood.sumOf { it.estimatedInputChars() }
 
     private fun MemoryWorkItem.estimatedInputChars(): Int =
         id.length + kind.length + text.length + metadata.entries.sumOf { (key, value) -> key.length + value.length + 2 }
