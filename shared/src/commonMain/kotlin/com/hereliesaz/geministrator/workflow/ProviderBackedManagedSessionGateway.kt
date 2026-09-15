@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.CancellationException
@@ -36,21 +37,22 @@ class ProviderBackedManagedSessionGateway(
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        val taskRequest = request.taskRequest.withRecalledMemory()
         val provider = selectProvider(
-            request.providerSelection.copy(repository = request.taskRequest.repository),
+            request.providerSelection.copy(repository = taskRequest.repository),
             "No registered provider can satisfy this task",
         )
         return providerOperation("Unable to start provider session") {
-            val run = provider.start(request.taskRequest)
+            val run = provider.start(taskRequest)
             val handle = ManagedSessionHandle(
-                taskRunId = request.taskRequest.taskRunId,
+                taskRunId = taskRequest.taskRunId,
                 providerId = provider.id,
                 providerRunId = run.providerRunId,
             )
-            recordMemory { memoryObserver.onSessionStarted(handle, request.taskRequest) }
+            recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
             registerAndObserve(
                 handle = handle,
-                initialStatus = if (request.taskRequest.requirePlanApproval) {
+                initialStatus = if (taskRequest.requirePlanApproval) {
                     ManagedSessionStatus.Planning
                 } else {
                     ManagedSessionStatus.Running
@@ -58,6 +60,22 @@ class ProviderBackedManagedSessionGateway(
             )
             handle
         }
+    }
+
+    private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
+        val recalled = try {
+            MemoryRuntimeBridge.promptContextProvider.contextFor(this)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Throwable) {
+            emptyList()
+        }
+        if (recalled.isEmpty()) return this
+        return copy(
+            promptContext = promptContext.copy(
+                dynamicContext = promptContext.dynamicContext + recalled,
+            ),
+        )
     }
 
     override suspend fun reconnect(
