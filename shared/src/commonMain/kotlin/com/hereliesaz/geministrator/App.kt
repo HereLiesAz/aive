@@ -152,20 +152,16 @@ fun App(
                         }
                     },
                     onMessageAgent = { taskId, message ->
-                        scope.launch {
-                            try {
-                                when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
-                                    null -> runtimeState = ApplicationRuntimeState.ResumeFailed("Runtime is unavailable")
-                                    ProviderActionResult.Accepted -> Unit
-                                    is ProviderActionResult.Rejected -> {
-                                        runtimeState = ApplicationRuntimeState.ResumeFailed(result.reason)
-                                    }
-                                }
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Provider message failed")
+                        try {
+                            when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
+                                null -> "Runtime is unavailable"
+                                ProviderActionResult.Accepted -> null
+                                is ProviderActionResult.Rejected -> result.reason
                             }
+                        } catch (failure: CancellationException) {
+                            throw failure
+                        } catch (failure: Exception) {
+                            failure.message?.takeIf(String::isNotBlank) ?: "Provider message failed"
                         }
                     },
                     onRecoverFromCorruption = {
