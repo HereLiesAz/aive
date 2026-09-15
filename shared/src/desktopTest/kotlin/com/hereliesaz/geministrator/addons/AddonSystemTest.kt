@@ -5,9 +5,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
-import com.russhwolf.settings.MapSettings
 
 class AddonSystemTest {
+
+    private val providedScreen = AddonScreen(
+        title = "Real add-on screen",
+        sections = listOf(
+            AddonScreenSection.Group(
+                title = "Status",
+                items = listOf(AddonScreenItem.Text("live")),
+            ),
+        ),
+    )
 
     private val dummyBridge = object : HostAppBridge, HostProjectBridge, HostRepositoryBridge, HostCompanyBridge, HostWorkflowBridge, HostRunBridge, HostArtifactBridge, HostApprovalBridge, HostEventBridge, HostProviderBridge, HostExecutorBridge, HostPackageBridge, HostSettingsBridge, HostUiBridge {
         override val version: String = "1.0"
@@ -30,28 +39,54 @@ class AddonSystemTest {
         override fun resolveDependencies() = emptyList<AddonPackageDependencyDto>()
         override fun getScopedSetting(namespace: String, key: String) = "val"
         override fun setScopedSetting(namespace: String, key: String, value: String) {}
-        override fun dispatchAction(actionId: String) = true
+        override fun provideScreen(namespace: String) = providedScreen
+        override fun dispatchAction(namespace: String, actionId: String) = true
     }
+
+    private fun mediator(permissions: Set<HostPermission>) = HaiveAddonMediator(
+        "testAddon",
+        permissions,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+        dummyBridge,
+    )
 
     @Test
     fun testPermissionDenialIsolation() {
-        val mediator = HaiveAddonMediator("testAddon", emptySet(), dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge)
+        val mediator = mediator(emptySet())
         assertFailsWith<RuntimeException> { mediator.app.version }
         assertFailsWith<RuntimeException> { mediator.repository.getInfo() }
     }
 
     @Test
     fun testGrantedExecutionAndNamespaceIsolation() {
-        val mediator = HaiveAddonMediator("ns1", setOf(HostPermission.AppRead, HostPermission.ScopedSettings), dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge)
+        val mediator = mediator(setOf(HostPermission.AppRead, HostPermission.ScopedSettings))
         assertEquals("1.0", mediator.app.version)
         assertEquals("val", mediator.settings.getScopedSetting("key"))
     }
 
     @Test
     fun testCompanyOptInNoSilentMutation() {
-        val mediator = HaiveAddonMediator("ns1", setOf(HostPermission.CompanyContribute), dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge, dummyBridge)
+        val mediator = mediator(setOf(HostPermission.CompanyContribute))
         val mutatedGlobal = mediator.company.contributeAgent(AddonRoleDto("1", "Ag", "Desc"))
         assertFalse(mutatedGlobal)
+    }
+
+    @Test
+    fun testUiScreenDelegatesToHostInsteadOfFabricatingEmptyScreen() {
+        val mediator = mediator(setOf(HostPermission.UiScreen))
+        assertEquals(providedScreen, mediator.ui.provideScreen())
     }
 
     @Test
