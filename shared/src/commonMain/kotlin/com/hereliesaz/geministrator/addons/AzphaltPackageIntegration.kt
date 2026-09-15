@@ -2,7 +2,6 @@ package com.hereliesaz.geministrator.addons
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class AzphaltPackageManifest(
@@ -37,12 +36,19 @@ data class AzphaltDependencyEntry(
     val version: String
 )
 
+/**
+ * Parses the manifest metadata from an Azphalt workflow package.
+ *
+ * This class deliberately does not claim to verify package authenticity. Cryptographic package
+ * verification belongs at the package acquisition boundary; only metadata from a package that has
+ * already passed that boundary may be handed to [parseManifest]. Keeping parsing and verification
+ * separate prevents a non-empty JSON string from masquerading as a verified package.
+ */
 class AzphaltPackageParser {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(payload: String): AzphaltPackageManifest {
-        // Enforce verified payload by simulating verification (stub for architecture)
-        require(payload.isNotBlank()) { "Payload must be a verified package payload." }
+    fun parseManifest(payload: String): AzphaltPackageManifest {
+        require(payload.isNotBlank()) { "Manifest payload must not be blank." }
         return json.decodeFromString<AzphaltPackageManifest>(payload)
     }
 
@@ -51,14 +57,15 @@ class AzphaltPackageParser {
         for (req in requested) {
             try {
                 mapped.add(HostPermission.valueOf(req))
-            } catch (e: IllegalArgumentException) {
-                // Deny unknown strings (inert)
+            } catch (_: IllegalArgumentException) {
+                // Unknown permissions are denied by omission.
             }
         }
         return mapped
     }
 
-    fun selectGrantedPermissions(requested: Set<HostPermission>, approved: Set<HostPermission>): Set<HostPermission> {
-        return requested.intersect(approved)
-    }
+    fun selectGrantedPermissions(
+        requested: Set<HostPermission>,
+        approved: Set<HostPermission>,
+    ): Set<HostPermission> = requested.intersect(approved)
 }

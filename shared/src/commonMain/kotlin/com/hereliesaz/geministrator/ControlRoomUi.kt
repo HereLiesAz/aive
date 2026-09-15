@@ -33,6 +33,7 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
 
@@ -95,6 +96,7 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -104,6 +106,7 @@ fun ControlRoom(
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>> = { emptyList() },
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
+    onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onValidateWorkflow: () -> List<String> = { emptyList() },
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
@@ -144,6 +147,7 @@ fun ControlRoom(
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
+                    onMessageAgent = onMessageAgent,
                     onRecoverFromCorruption = onRecoverFromCorruption,
                     onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
@@ -153,6 +157,7 @@ fun ControlRoom(
                     onLoadRunHistory = onLoadRunHistory,
                     onSwitchRun = onSwitchRun,
                     onLoadRunTimeline = onLoadRunTimeline,
+                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRoleCollection = onSaveRoleCollection,
@@ -182,6 +187,7 @@ fun ControlRoom(
                             onApproveTask = onApproveTask,
                             onRejectPlan = onRejectPlan,
                             onResolveEscalation = onResolveEscalation,
+                            onMessageAgent = onMessageAgent,
                             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.35f),
                         )
                     }
@@ -203,6 +209,7 @@ fun ControlRoom(
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
+                    onMessageAgent = onMessageAgent,
                     onRecoverFromCorruption = onRecoverFromCorruption,
                     onRetryRuntime = onRetryRuntime,
                     onCheckProviderHealth = onCheckProviderHealth,
@@ -212,6 +219,7 @@ fun ControlRoom(
                     onLoadRunHistory = onLoadRunHistory,
                     onSwitchRun = onSwitchRun,
                     onLoadRunTimeline = onLoadRunTimeline,
+                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                     onExportDiagnosticBundle = onExportDiagnosticBundle,
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRoleCollection = onSaveRoleCollection,
@@ -246,6 +254,7 @@ fun ControlRoom(
                             onApproveTask = onApproveTask,
                             onRejectPlan = onRejectPlan,
                             onResolveEscalation = onResolveEscalation,
+                            onMessageAgent = onMessageAgent,
                             modifier = Modifier.width(310.dp).fillMaxHeight(),
                         )
                     }
@@ -340,6 +349,7 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
     onCheckProviderHealth: suspend () -> Map<String, String>,
@@ -349,6 +359,7 @@ private fun MainDestination(
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>>,
     onSwitchRun: (String) -> Unit,
     onLoadRunTimeline: suspend () -> List<WorkflowEvent>,
+    onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition>,
     onExportDiagnosticBundle: suspend () -> String?,
     onValidateWorkflow: () -> List<String>,
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit,
@@ -391,7 +402,11 @@ private fun MainDestination(
                 onLoadRunTimeline = onLoadRunTimeline,
                 modifier = Modifier.fillMaxSize(),
             )
-            ControlRoomDestination.Workflows -> WorkflowTemplateScreen(runtimeState, Modifier.fillMaxSize())
+            ControlRoomDestination.Workflows -> LiveWorkflowLibraryScreen(
+                runtimeState = runtimeState,
+                onLoadDefinitions = onLoadWorkflowDefinitions,
+                modifier = Modifier.fillMaxSize(),
+            )
             ControlRoomDestination.Company -> CustomCompanyProviderScreen(
                 runtimeState = runtimeState,
                 connectedProviderIds = connectedProviderIds,
@@ -399,8 +414,8 @@ private fun MainDestination(
                 onResetRoleCollection = onResetRoleCollection,
                 modifier = Modifier.fillMaxSize(),
             )
-            ControlRoomDestination.Artifacts -> ArtifactFileManagerScreen(runtimeState, Modifier.fillMaxSize())
-            ControlRoomDestination.Inbox -> InboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+            ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
+            ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
             ControlRoomDestination.Repositories -> RepositoryServiceScreen(
                 connectedServiceIds = connectedRepositoryServiceIds,
                 onConfigureService = onConfigureRepositoryService,
