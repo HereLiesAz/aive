@@ -52,7 +52,8 @@ class SettingsAddonPersistenceTest {
 
     @Test
     fun corruptedInstallationStateFailsClosedInsteadOfPretendingNothingIsInstalled() {
-        val settings = MapSettings("addon_installations" to "not-json")
+        val settings = MapSettings()
+        settings.putString("addon_installations", "not-json")
         val persistence = SettingsAddonPersistence(settings)
 
         assertFailsWith<AddonPersistenceCorruptionException> {
