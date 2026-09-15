@@ -415,7 +415,7 @@ private fun MainDestination(
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
-            ControlRoomDestination.Inbox -> InboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+            ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
             ControlRoomDestination.Repositories -> RepositoryServiceScreen(
                 connectedServiceIds = connectedRepositoryServiceIds,
                 onConfigureService = onConfigureRepositoryService,
