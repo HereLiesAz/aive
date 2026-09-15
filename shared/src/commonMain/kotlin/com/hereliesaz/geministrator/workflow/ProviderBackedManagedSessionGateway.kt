@@ -51,23 +51,45 @@ class ProviderBackedManagedSessionGateway(
             capabilities = provider.capabilities(),
         )
         val taskRequest = prepared.request
-        return providerOperation("Unable to start provider session") {
-            val run = provider.start(taskRequest)
-            val handle = ManagedSessionHandle(
-                taskRunId = taskRequest.taskRunId,
-                providerId = provider.id,
-                providerRunId = run.providerRunId,
+        return try {
+            providerOperation("Unable to start provider session") {
+                val run = provider.start(taskRequest)
+                inferenceFabric.bindProviderRun(
+                    invocationId = prepared.plan.invocationId,
+                    taskRunId = taskRequest.taskRunId,
+                    providerId = provider.id,
+                    providerRunId = run.providerRunId,
+                )
+                val handle = ManagedSessionHandle(
+                    taskRunId = taskRequest.taskRunId,
+                    providerId = provider.id,
+                    providerRunId = run.providerRunId,
+                )
+                recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
+                registerAndObserve(
+                    handle = handle,
+                    initialStatus = if (taskRequest.requirePlanApproval) {
+                        ManagedSessionStatus.Planning
+                    } else {
+                        ManagedSessionStatus.Running
+                    },
+                )
+                handle
+            }
+        } catch (failure: CancellationException) {
+            inferenceFabric.recordTerminal(
+                prepared.plan.invocationId,
+                InferenceTerminalStatus.Cancelled,
+                "Provider start cancelled",
             )
-            recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
-            registerAndObserve(
-                handle = handle,
-                initialStatus = if (taskRequest.requirePlanApproval) {
-                    ManagedSessionStatus.Planning
-                } else {
-                    ManagedSessionStatus.Running
-                },
+            throw failure
+        } catch (failure: Throwable) {
+            inferenceFabric.recordTerminal(
+                prepared.plan.invocationId,
+                InferenceTerminalStatus.Failed,
+                failure.providerFailureMessage("Unable to start provider session"),
             )
-            handle
+            throw failure
         }
     }
 
@@ -135,7 +157,11 @@ class ProviderBackedManagedSessionGateway(
                     val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
                 }
-                inferenceFabric.recordTerminal(handle.taskRunId, InferenceTerminalStatus.Cancelled)
+                inferenceFabric.recordTerminal(
+                    handle.providerId,
+                    handle.providerRunId,
+                    InferenceTerminalStatus.Cancelled,
+                )
                 recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
             }
             result
@@ -190,7 +216,8 @@ class ProviderBackedManagedSessionGateway(
                         }
                         if (failed) {
                             inferenceFabric.recordTerminal(
-                                handle.taskRunId,
+                                handle.providerId,
+                                handle.providerRunId,
                                 InferenceTerminalStatus.Failed,
                                 "Provider observation failed repeatedly",
                             )
@@ -329,10 +356,14 @@ class ProviderBackedManagedSessionGateway(
         }
         if (!changed) return
         when (event) {
-            is AgentEvent.ArtifactProduced -> inferenceFabric.recordArtifact(handle.taskRunId, event.artifact)
+            is AgentEvent.ArtifactProduced -> inferenceFabric.recordArtifact(
+                handle.providerId,
+                handle.providerRunId,
+                event.artifact,
+            )
             is AgentEvent.UsageReported -> inferenceFabric.recordUsage(
-                taskRunId = handle.taskRunId,
                 providerId = handle.providerId,
+                providerRunId = handle.providerRunId,
                 inputTokens = event.inputTokens,
                 outputTokens = event.outputTokens,
                 costUsd = event.costUsd,
@@ -344,7 +375,8 @@ class ProviderBackedManagedSessionGateway(
         recordMemory { memoryObserver.onSessionEvent(handle, event) }
         terminalStatus?.let { status ->
             inferenceFabric.recordTerminal(
-                taskRunId = handle.taskRunId,
+                providerId = handle.providerId,
+                providerRunId = handle.providerRunId,
                 status = if (status == ManagedSessionStatus.Completed) {
                     InferenceTerminalStatus.Completed
                 } else {
