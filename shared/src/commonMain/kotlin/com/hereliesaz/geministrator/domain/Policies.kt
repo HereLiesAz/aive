@@ -18,6 +18,34 @@ sealed interface VerificationPolicy {
     ) : VerificationPolicy
 }
 
+/**
+ * Declares how model-backed reasoning for a workflow task should be materialized.
+ *
+ * The default remains a single governed task. Centralized MoA is expanded into explicit workflow
+ * DAG nodes before execution so normal persistence, retries, approvals, artifacts, and verification
+ * remain authoritative.
+ */
+@Serializable
+sealed interface CompoundInferencePolicy {
+    @Serializable data object Single : CompoundInferencePolicy
+
+    @Serializable
+    data class CentralizedMixtureOfAgents(
+        val proposerRoleIds: List<RoleDefinitionId>,
+        val aggregatorRoleId: RoleDefinitionId,
+    ) : CompoundInferencePolicy {
+        init {
+            require(proposerRoleIds.size in 2..MAX_PROPOSERS) {
+                "Centralized MoA requires 2..$MAX_PROPOSERS proposers"
+            }
+        }
+    }
+
+    companion object {
+        const val MAX_PROPOSERS: Int = 8
+    }
+}
+
 @Serializable
 enum class TestDesignPolicy {
     None,
