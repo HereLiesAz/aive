@@ -347,7 +347,6 @@ private fun projectToKinds(
         frontier.forEach { (id, edgeStrength) ->
             val node = nodesById[id]
             if (id in activeIds && node?.kind in targetKinds) {
-                result[id] = depth
                 val candidate = TraversalPath(depth, edgeStrength)
                 val existing = result[id]
                 if (existing == null || candidate.score > existing.score) {
