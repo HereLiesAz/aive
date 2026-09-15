@@ -4,6 +4,7 @@ import kotlin.js.Promise
 import kotlinx.coroutines.await
 
 @JsModule("onnxruntime-web/webgpu")
+@JsNonModule
 private external val ortWeb: dynamic
 
 class BrowserOrtHardwareCapabilityDetector(
@@ -134,7 +135,7 @@ class BrowserOrtMemorySessionManager(
         val ranked = model.requirements.copy(
             preferredBackends = (model.requirements.preferredBackends + platform.preferredExecutionProviders()).distinct(),
         )
-        val initial = MemoryComputeSelector.select(discovered, ranked, computePreference)
+        val initial = MemoryComputeSelector.select(discovered, ranked, computePreference, model.modelId)
         val selected = initial.copy(
             device = initial.device.copy(supportedModels = initial.device.supportedModels + model.modelId),
         )
@@ -168,10 +169,11 @@ class BrowserOrtMemorySessionManager(
         check(activeProfiledSession == null) { "Browser ORT memory inference is already running" }
         activeProfiledSession = session
         activeRunObservedGpu = false
+        var succeeded = false
         return try {
-            block()
+            block().also { succeeded = true }
         } finally {
-            session.recordSuccessfulRun(activeRunObservedGpu)
+            if (succeeded) session.recordSuccessfulRun(activeRunObservedGpu)
             activeProfiledSession = null
             activeRunObservedGpu = false
         }
