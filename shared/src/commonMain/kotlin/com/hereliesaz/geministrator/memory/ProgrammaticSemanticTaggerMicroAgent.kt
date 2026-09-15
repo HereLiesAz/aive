@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.memory
 
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
 /**
  * Deterministic fast path for the noun/entity and verb/action tagging stages.
  *
@@ -10,6 +13,7 @@ package com.hereliesaz.geministrator.memory
  */
 class ProgrammaticSemanticTaggerMicroAgent(
     private val fallback: MemoryMicroAgent,
+    private val nowEpochMillis: () -> Long = ::programmaticTagNowEpochMillis,
 ) : MemoryMicroAgent {
     override val role: MemoryMicroAgentRole = fallback.role
     override val model: MemoryMicroAgentModelSpec = fallback.model
@@ -43,6 +47,7 @@ class ProgrammaticSemanticTaggerMicroAgent(
         }
         if (!canBypassModel) return fallback.process(packet)
 
+        val createdAt = nowEpochMillis()
         val namespace = "${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:${role.name}:programmatic"
         val nodes = mutableListOf<MemoryNode>()
         val edges = mutableListOf<MemoryEdge>()
@@ -71,7 +76,7 @@ class ProgrammaticSemanticTaggerMicroAgent(
                     sourceSectionIds = inheritedSections,
                     salience = salience,
                     confidence = PROGRAMMATIC_TAG_CONFIDENCE,
-                    createdAtEpochMillis = input.item.createdAtEpochMillisOrZero(),
+                    createdAtEpochMillis = createdAt,
                     metadata = mapOf(
                         "microAgentRole" to role.name,
                         "semanticSource" to "programmatic-code",
@@ -85,7 +90,7 @@ class ProgrammaticSemanticTaggerMicroAgent(
                     to = MemoryNodeId(input.item.id),
                     relation = MemoryRelationKind.Indexes,
                     weight = 1f,
-                    createdAtEpochMillis = input.item.createdAtEpochMillisOrZero(),
+                    createdAtEpochMillis = createdAt,
                     metadata = mapOf(
                         "microAgentRole" to role.name,
                         "semanticSource" to "programmatic-code",
@@ -132,9 +137,6 @@ private fun MemoryWorkItem.semanticSourceSectionIds(): List<MemorySectionId> = m
     .filter(String::isNotEmpty)
     .map(::MemorySectionId)
 
-private fun MemoryWorkItem.createdAtEpochMillisOrZero(): Long =
-    metadata["createdAtEpochMillis"]?.toLongOrNull() ?: 0L
-
 private fun String.programmaticTagIdPart(): String = buildString {
     this@programmaticTagIdPart.forEach { char ->
         when {
@@ -147,3 +149,6 @@ private fun String.programmaticTagIdPart(): String = buildString {
 
 private const val MAX_PROGRAMMATIC_TAGS_PER_ITEM = 64
 private const val PROGRAMMATIC_TAG_CONFIDENCE = 0.98f
+
+@OptIn(ExperimentalTime::class)
+private fun programmaticTagNowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
