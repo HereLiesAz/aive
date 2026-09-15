@@ -56,7 +56,7 @@ fun AddonHostScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("ADD-ONS")
-        Text("Verified Azphalt workflow packages installed in Haive.")
+        Text("Azphalt workflow packages installed in Haive.")
 
         storageFailure?.let { Text("Storage error: $it") }
 
