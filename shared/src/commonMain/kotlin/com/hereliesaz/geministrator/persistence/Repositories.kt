@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.workflow.ApprovalGate
 import com.hereliesaz.geministrator.workflow.ApprovalGateRepository
 import com.hereliesaz.geministrator.workflow.FailureEscalationDecisionStore
 
@@ -41,7 +42,6 @@ interface RoleRepository {
     suspend fun put(role: RoleDefinition)
     suspend fun get(id: RoleDefinitionId): RoleDefinition?
     suspend fun all(): List<RoleDefinition>
-    suspend fun replaceAll(roles: List<RoleDefinition>)
 }
 
 interface ArtifactRepository {
