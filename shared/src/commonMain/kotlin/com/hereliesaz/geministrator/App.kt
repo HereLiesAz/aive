@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
@@ -147,6 +148,23 @@ fun App(
                                 throw failure
                             } catch (failure: Exception) {
                                 runtimeState = failure.toRuntimeFailureState("Escalation decision failed")
+                            }
+                        }
+                    },
+                    onMessageAgent = { taskId, message ->
+                        scope.launch {
+                            try {
+                                when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
+                                    null -> runtimeState = ApplicationRuntimeState.ResumeFailed("Runtime is unavailable")
+                                    ProviderActionResult.Accepted -> Unit
+                                    is ProviderActionResult.Rejected -> {
+                                        runtimeState = ApplicationRuntimeState.ResumeFailed(result.reason)
+                                    }
+                                }
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                runtimeState = failure.toRuntimeFailureState("Provider message failed")
                             }
                         }
                     },
