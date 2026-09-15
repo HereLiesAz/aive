@@ -90,46 +90,63 @@ object MemoryComputeSelector {
         requirements: MemoryModelRequirements,
         preference: MemoryComputePreference = MemoryComputePreference.AUTO,
         modelId: String? = null,
-    ): MemoryComputeSelection {
-        val compatible = devices
+    ): MemoryComputeSelection = rank(devices, requirements, preference, modelId).firstOrNull()
+        ?: error("No compatible local compute device is available")
+
+    /**
+     * Returns the complete attempt order for a model. Accelerators are ordered by workload and
+     * preference; CPU is appended only as the explicit final fallback (or is the sole CPU_ONLY
+     * choice). Runtimes should attempt these selections in order and cache the first session that
+     * actually accepts the model.
+     */
+    fun rank(
+        devices: List<MemoryComputeDevice>,
+        requirements: MemoryModelRequirements,
+        preference: MemoryComputePreference = MemoryComputePreference.AUTO,
+        modelId: String? = null,
+    ): List<MemoryComputeSelection> {
+        val available = devices
             .asSequence()
             .filter(MemoryComputeDevice::available)
-            .filter { it.deviceType in requirements.allowedDeviceTypes }
             .filter { device ->
                 modelId == null || device.supportedModels.isEmpty() || modelId in device.supportedModels
             }
+            .toList()
+
+        val cpu = available
+            .filter { it.deviceType == MemoryComputeDeviceType.CPU }
+            .sortedByDescending { score(it, requirements, preference) }
+
+        if (preference == MemoryComputePreference.CPU_ONLY) {
+            return cpu.map { device ->
+                MemoryComputeSelection(preference, device, cpuFallbackEnabled = false)
+            }
+        }
+
+        val accelerators = available
+            .asSequence()
+            .filter { it.deviceType != MemoryComputeDeviceType.CPU }
+            .filter { it.deviceType in requirements.allowedDeviceTypes }
             .filter { device ->
                 val minimum = requirements.minimumDedicatedMemoryBytes
-                minimum == null || device.deviceType == MemoryComputeDeviceType.CPU ||
-                    (device.dedicatedMemory != null && device.dedicatedMemory >= minimum)
+                minimum == null || (device.dedicatedMemory != null && device.dedicatedMemory >= minimum)
+            }
+            .sortedByDescending { score(it, requirements, preference) }
+            .map { device ->
+                MemoryComputeSelection(
+                    preference = preference,
+                    device = device,
+                    cpuFallbackEnabled = requirements.allowCpuFallback && cpu.isNotEmpty(),
+                )
             }
             .toList()
 
-        val candidates = if (preference == MemoryComputePreference.CPU_ONLY) {
-            compatible.filter { it.deviceType == MemoryComputeDeviceType.CPU }
+        val cpuFallback = if (requirements.allowCpuFallback) {
+            cpu.map { device -> MemoryComputeSelection(preference, device, cpuFallbackEnabled = false) }
         } else {
-            compatible
+            emptyList()
         }
-
-        val selected = candidates.maxByOrNull { device ->
-            score(device, requirements, preference)
-        } ?: if (requirements.allowCpuFallback) {
-            compatible.firstOrNull { it.deviceType == MemoryComputeDeviceType.CPU }
-        } else {
-            null
-        } ?: error("No compatible local compute device is available")
-
-        if (selected.deviceType == MemoryComputeDeviceType.CPU && !requirements.allowCpuFallback &&
-            preference != MemoryComputePreference.CPU_ONLY
-        ) {
-            error("No compatible accelerator is available and CPU fallback is disabled")
-        }
-
-        return MemoryComputeSelection(
-            preference = preference,
-            device = selected,
-            cpuFallbackEnabled = requirements.allowCpuFallback && selected.deviceType != MemoryComputeDeviceType.CPU,
-        )
+        return accelerators + cpuFallback
     }
 
     private fun score(
