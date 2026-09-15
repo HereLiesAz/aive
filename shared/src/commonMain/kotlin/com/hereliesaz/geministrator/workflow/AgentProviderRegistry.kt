@@ -5,6 +5,8 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.displayName
+import com.hereliesaz.geministrator.inference.BlueprintCompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.providers.AgentProvider
 
 data class ProviderSelectionRequest(
@@ -16,6 +18,7 @@ data class ProviderSelectionRequest(
 
 class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
+    val inferenceFabric: CompoundInferenceFabric = BlueprintCompoundInferenceFabric(),
 ) {
     private val providersById = providers.associateBy { it.id }
 
