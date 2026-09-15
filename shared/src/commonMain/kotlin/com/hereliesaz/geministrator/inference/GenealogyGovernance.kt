@@ -193,26 +193,68 @@ class DefaultGenealogyGovernanceEvaluator(
         fun ancestors(invocationId: String, activePath: Set<String> = emptySet()): Set<String> {
             ancestryCache[invocationId]?.let { return it }
             val node = allNodes[invocationId] ?: return emptySet()
-            if (invocationId in activePath) return setOf(invocationId)
-            val nextPath = activePath + invocationId
+            if (invocationId in activePath) return emptySet()
             val result = buildSet {
                 node.upstreamInvocationIds.forEach { parent ->
                     add(parent)
-                    addAll(ancestors(parent, nextPath))
+                    addAll(ancestors(parent, activePath + invocationId))
                 }
             }
-            if (invocationId !in result) ancestryCache[invocationId] = result
+            ancestryCache[invocationId] = result
             return result
         }
 
+        fun reachableCycle(startInvocationId: String): Set<String> {
+            val path = mutableListOf<String>()
+            val pathIndex = mutableMapOf<String, Int>()
+            val fullyVisited = mutableSetOf<String>()
+
+            fun visit(invocationId: String): Set<String>? {
+                pathIndex[invocationId]?.let { index ->
+                    return path.subList(index, path.size).toSet() + invocationId
+                }
+                if (!fullyVisited.add(invocationId)) return null
+                pathIndex[invocationId] = path.size
+                path += invocationId
+                val node = allNodes[invocationId]
+                if (node != null) {
+                    for (parent in node.upstreamInvocationIds) {
+                        val cycle = visit(parent)
+                        if (cycle != null) return cycle
+                    }
+                }
+                path.removeAt(path.lastIndex)
+                pathIndex.remove(invocationId)
+                return null
+            }
+
+            return visit(startInvocationId).orEmpty()
+        }
+
+        val evidenceClosureCache = mutableMapOf<String, Set<GenealogyEvidenceKey>>()
+        fun evidenceClosure(invocationId: String, activePath: Set<String> = emptySet()): Set<GenealogyEvidenceKey> {
+            evidenceClosureCache[invocationId]?.let { return it }
+            val node = allNodes[invocationId] ?: return emptySet()
+            if (invocationId in activePath) return node.directEvidenceKeys()
+            val evidence = buildSet {
+                addAll(node.directEvidenceKeys())
+                node.upstreamInvocationIds.forEach { parent ->
+                    addAll(evidenceClosure(parent, activePath + invocationId))
+                }
+            }
+            evidenceClosureCache[invocationId] = evidence
+            return evidence
+        }
+
+        val reportedCycles = mutableSetOf<Set<String>>()
         requestedNodes.forEach { node ->
-            val nodeAncestors = ancestors(node.invocationId)
-            if (node.invocationId in nodeAncestors) {
+            val cycle = reachableCycle(node.invocationId)
+            if (cycle.isNotEmpty() && reportedCycles.add(cycle)) {
                 findings += GenealogyGovernanceFinding(
                     kind = GenealogyGovernanceFindingKind.CircularDerivation,
-                    invocationIds = setOf(node.invocationId) + nodeAncestors,
-                    sharedAncestorInvocationIds = nodeAncestors,
-                    message = "Invocation ${node.invocationId} participates in circular derivation ancestry.",
+                    invocationIds = cycle,
+                    sharedAncestorInvocationIds = cycle,
+                    message = "Inference genealogy contains a circular derivation path involving ${cycle.sorted().joinToString()}.",
                 )
             }
         }
@@ -222,7 +264,7 @@ class DefaultGenealogyGovernanceEvaluator(
             for (rightIndex in leftIndex + 1 until requestedNodes.size) {
                 val left = requestedNodes[leftIndex]
                 val right = requestedNodes[rightIndex]
-                val sharedEvidence = left.directEvidenceKeys() intersect right.directEvidenceKeys()
+                val sharedEvidence = evidenceClosure(left.invocationId) intersect evidenceClosure(right.invocationId)
                 val leftAncestors = ancestors(left.invocationId)
                 val rightAncestors = ancestors(right.invocationId)
                 val sharedAncestors = buildSet {
@@ -252,7 +294,10 @@ class DefaultGenealogyGovernanceEvaluator(
 
         request.consensusGroups.forEach { group ->
             val groupNodes = group.invocationIds.mapNotNull(allNodes::get)
-            val independentMembers = maximumPairwiseIndependentCount(groupNodes.map(InferenceGenealogyNode::invocationId), pairwise)
+            val independentMembers = maximumPairwiseIndependentCount(
+                invocationIds = groupNodes.map(InferenceGenealogyNode::invocationId),
+                pairwise = pairwise,
+            )
             if (independentMembers < request.policy.minimumIndependentMembersForConsensus) {
                 findings += GenealogyGovernanceFinding(
                     kind = GenealogyGovernanceFindingKind.UnsupportedConsensus,
@@ -279,34 +324,74 @@ class DefaultGenealogyGovernanceEvaluator(
         pairwise: List<GenealogyIndependenceAssessment>,
     ): Int {
         if (invocationIds.isEmpty()) return 0
-        if (invocationIds.size == 1) return 1
         val independenceByPair = pairwise.associateBy {
             normalizedPair(it.leftInvocationId, it.rightInvocationId)
         }
-        var best = 1
-        val totalMasks = 1 shl invocationIds.size
-        for (mask in 1 until totalMasks) {
-            val selected = invocationIds.indices.filter { index -> mask and (1 shl index) != 0 }
-            if (selected.size <= best) continue
-            val allIndependent = selected.allIndexedPairs { leftIndex, rightIndex ->
-                independenceByPair[normalizedPair(invocationIds[leftIndex], invocationIds[rightIndex])]?.independent == true
+        var best = 0
+        val selected = mutableListOf<String>()
+
+        fun search(index: Int) {
+            if (selected.size + (invocationIds.size - index) <= best) return
+            if (index >= invocationIds.size) {
+                best = maxOf(best, selected.size)
+                return
             }
-            if (allIndependent) best = selected.size
+
+            val candidate = invocationIds[index]
+            val compatible = selected.all { existing ->
+                independenceByPair[normalizedPair(existing, candidate)]?.independent == true
+            }
+            if (compatible) {
+                selected += candidate
+                search(index + 1)
+                selected.removeAt(selected.lastIndex)
+            }
+            search(index + 1)
         }
+
+        search(0)
         return best
     }
 
     private fun normalizedPair(left: String, right: String): Pair<String, String> =
         if (left <= right) left to right else right to left
+}
 
-    private inline fun List<Int>.allIndexedPairs(predicate: (Int, Int) -> Boolean): Boolean {
-        for (leftIndex in indices) {
-            for (rightIndex in leftIndex + 1 until size) {
-                if (!predicate(this[leftIndex], this[rightIndex])) return false
+/**
+ * Runtime coordinator used by every provider-backed inference path.
+ *
+ * Reports are advisory structural governance. They are not epistemic verdicts and never mutate
+ * memory or silently rewrite worker output.
+ */
+class InferenceGenealogyGovernanceRuntime(
+    val graph: InferenceGenealogyGraph = InMemoryInferenceGenealogyGraph(),
+    evaluator: GenealogyGovernanceEvaluator? = null,
+) {
+    private val evaluator: GenealogyGovernanceEvaluator = evaluator ?: DefaultGenealogyGovernanceEvaluator(graph)
+    private val mutex = Mutex()
+    private val latestReportsByInvocation = linkedMapOf<String, GenealogyGovernanceReport>()
+
+    suspend fun registerInvocation(genealogy: InferenceGenealogy): GenealogyGovernanceReport {
+        graph.register(genealogy.toNode())
+        return evaluate(
+            GenealogyGovernanceRequest(
+                invocationIds = setOf(genealogy.invocationId),
+            ),
+        )
+    }
+
+    suspend fun evaluate(request: GenealogyGovernanceRequest): GenealogyGovernanceReport {
+        val report = evaluator.evaluate(request)
+        mutex.withLock {
+            report.invocationIds.forEach { invocationId ->
+                latestReportsByInvocation[invocationId] = report
             }
         }
-        return true
+        return report
     }
+
+    suspend fun latestReport(invocationId: String): GenealogyGovernanceReport? =
+        mutex.withLock { latestReportsByInvocation[invocationId] }
 }
 
 fun InferenceGenealogy.toNode(): InferenceGenealogyNode = InferenceGenealogyNode(
