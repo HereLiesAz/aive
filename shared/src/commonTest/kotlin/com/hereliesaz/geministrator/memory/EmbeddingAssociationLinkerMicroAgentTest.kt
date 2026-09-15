@@ -148,8 +148,7 @@ class EmbeddingAssociationLinkerMicroAgentTest {
                 when {
                     "30 seconds" in text -> listOf(1f, 0f)
                     "60 seconds" in text -> listOf(0.99f, 0.01f)
-                    "weather" in text.lowercase() -> listOf(0f, 1f)
-                    else -> listOf(1f, 0f)
+                    else -> listOf(0f, 1f)
                 }
             }
             return MemoryEmbeddingInferenceResult(vectors = vectors)
