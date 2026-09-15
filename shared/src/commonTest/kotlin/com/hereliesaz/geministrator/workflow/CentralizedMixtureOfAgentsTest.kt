@@ -134,6 +134,19 @@ class CentralizedMixtureOfAgentsTest {
     }
 
     @Test
+    fun genealogyGateBlocksMissingCandidateGenealogy() = runBlocking {
+        val governance = InferenceGenealogyGovernanceRuntime()
+
+        val execution = GenealogyGovernanceExecutorIntegration(governance).dispatch(
+            governanceContext("candidate-a", "candidate-b"),
+        )
+
+        assertEquals(TaskRunStatus.Failed, execution.status)
+        assertEquals("false", execution.artifacts.single().metadata["gatePassed"])
+        assertTrue(execution.artifacts.single().textContent.orEmpty().contains("MissingGenealogy"))
+    }
+
+    @Test
     fun downstreamRequestInheritsProducingInvocationFromDurableArtifact() {
         val artifact = candidateArtifact(
             suffix = "a",
