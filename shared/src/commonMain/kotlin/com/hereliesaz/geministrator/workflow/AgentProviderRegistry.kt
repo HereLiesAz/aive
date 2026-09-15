@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.inference.BlueprintCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
 import com.hereliesaz.geministrator.providers.AgentProvider
 
@@ -19,9 +20,13 @@ data class ProviderSelectionRequest(
 
 class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
-    val inferenceFabric: CompoundInferenceFabric = BlueprintCompoundInferenceFabric(),
+    inferenceFabric: CompoundInferenceFabric = BlueprintCompoundInferenceFabric(),
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(),
 ) {
+    val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
+        delegate = inferenceFabric,
+        governance = genealogyGovernance,
+    )
     private val providersById = providers.associateBy { it.id }
 
     init {
