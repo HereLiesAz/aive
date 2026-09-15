@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositorySource
-import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -34,6 +33,7 @@ fun App(
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
+    onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     onConfigureRepositoryService: (String) -> Unit = {},
     onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
@@ -237,18 +237,31 @@ fun App(
                     onValidateWorkflow = {
                         runtime?.validateCurrentWorkflow() ?: emptyList()
                     },
-                    onSaveRole = { role ->
+                    onSaveRoleCollection = { roles ->
                         scope.launch {
                             try {
-                                runtime?.saveRole(role)
+                                runtime?.saveRoleCollection(roles)
                                 runtimeGeneration += 1
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Save role failed")
+                                runtimeState = failure.toRuntimeFailureState("Save company failed")
                             }
                         }
                     },
+                    onResetRoleCollection = {
+                        scope.launch {
+                            try {
+                                runtime?.resetRoleCollection()
+                                runtimeGeneration += 1
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                            }
+                        }
+                    },
+                    onSearchRepositories = onSearchRepositories,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
                     connectedRepositoryServiceIds = connectedRepositoryServiceIds,
