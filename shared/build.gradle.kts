@@ -53,11 +53,11 @@ kotlin {
             implementation(libs.ktor.client.core)
         }
 
-        androidMain.dependencies {
+        getByName("androidMain").dependencies {
             implementation(libs.onnxruntime.android)
         }
 
-        desktopMain.dependencies {
+        getByName("desktopMain").dependencies {
             if (isMacHost) {
                 implementation(libs.onnxruntime)
             } else {
@@ -65,7 +65,7 @@ kotlin {
             }
         }
 
-        jsMain.dependencies {
+        getByName("jsMain").dependencies {
             implementation(npm("onnxruntime-web", libs.versions.onnxruntime.get()))
         }
 
