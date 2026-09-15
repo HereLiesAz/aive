@@ -95,9 +95,41 @@ class BlueprintInferenceFabricTest {
     }
 
     @Test
-    fun usageArtifactsAndTerminalStateStayOnTheSameInvocationStream() = runBlocking {
+    fun lateEventsFromAnOlderProviderRunStayWithTheOlderInvocation() = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val providerId = AgentProviderId("provider")
+        val taskRunId = TaskRunId("retry-task")
+        val request = AgentTaskRequest(
+            taskRunId = taskRunId,
+            objective = "Retryable work",
+            roleInstructions = "Do the work.",
+            acceptanceCriteria = emptyList(),
+        )
+        val capabilities = AgentCapabilities(supported = emptySet())
+        val first = fabric.prepareDispatch(request, providerId, capabilities)
+        val firstRunId = ProviderRunId("provider-run-1")
+        fabric.bindProviderRun(first.plan.invocationId, taskRunId, providerId, firstRunId)
+        val second = fabric.prepareDispatch(request, providerId, capabilities)
+        val secondRunId = ProviderRunId("provider-run-2")
+        fabric.bindProviderRun(second.plan.invocationId, taskRunId, providerId, secondRunId)
+
+        fabric.recordArtifact(
+            providerId,
+            firstRunId,
+            ProviderArtifact(ArtifactKind.Research, "Late old evidence", textContent = "old"),
+        )
+
+        val firstRecords = fabric.streamFabric.records(first.plan.invocationId)
+        val secondRecords = fabric.streamFabric.records(second.plan.invocationId)
+        assertIs<InferenceStreamPayload.ArtifactObserved>(firstRecords.last().payload)
+        assertIs<InferenceStreamPayload.ProviderRunBound>(secondRecords.last().payload)
+    }
+
+    @Test
+    fun usageArtifactsAndTerminalStateStayOnTheSameProviderBoundInvocationStream() = runBlocking {
+        val fabric = BlueprintCompoundInferenceFabric()
+        val providerId = AgentProviderId("provider")
+        val providerRunId = ProviderRunId("provider-run")
         val taskRunId = TaskRunId("task")
         val request = AgentTaskRequest(
             taskRunId = taskRunId,
@@ -110,27 +142,30 @@ class BlueprintInferenceFabricTest {
             providerId,
             AgentCapabilities(supported = emptySet()),
         ).plan
+        fabric.bindProviderRun(plan.invocationId, taskRunId, providerId, providerRunId)
 
         fabric.recordArtifact(
-            taskRunId,
+            providerId,
+            providerRunId,
             ProviderArtifact(ArtifactKind.Research, "Observed evidence", textContent = "evidence"),
         )
         fabric.recordUsage(
-            taskRunId = taskRunId,
             providerId = providerId,
+            providerRunId = providerRunId,
             inputTokens = 100,
             outputTokens = 25,
             costUsd = 0.01,
             cacheHitFraction = 0.5f,
             latencyMillis = 400,
         )
-        fabric.recordTerminal(taskRunId, InferenceTerminalStatus.Completed)
+        fabric.recordTerminal(providerId, providerRunId, InferenceTerminalStatus.Completed)
 
         val records = fabric.streamFabric.records(plan.invocationId)
-        assertEquals(4, records.size)
-        assertIs<InferenceStreamPayload.ArtifactObserved>(records[1].payload)
-        assertIs<InferenceStreamPayload.UsageObserved>(records[2].payload)
-        assertIs<InferenceStreamPayload.Terminal>(records[3].payload)
+        assertEquals(5, records.size)
+        assertIs<InferenceStreamPayload.ProviderRunBound>(records[1].payload)
+        assertIs<InferenceStreamPayload.ArtifactObserved>(records[2].payload)
+        assertIs<InferenceStreamPayload.UsageObserved>(records[3].payload)
+        assertIs<InferenceStreamPayload.Terminal>(records[4].payload)
         val samples = fabric.resourceTelemetry.samples(plan.invocationId)
         assertEquals(1, samples.size)
         assertEquals(400, samples.single().latencyMillis)
@@ -161,8 +196,9 @@ class BlueprintInferenceFabricTest {
             val started = assertNotNull(provider.startedRequest)
             assertNotNull(fabric.agentRegistry.get(provider.id))
             val records = fabric.streamFabric.records(started.compoundInference.genealogy.invocationId)
-            assertEquals(1, records.size)
-            assertIs<InferenceStreamPayload.DispatchPrepared>(records.single().payload)
+            assertEquals(2, records.size)
+            assertIs<InferenceStreamPayload.DispatchPrepared>(records[0].payload)
+            assertIs<InferenceStreamPayload.ProviderRunBound>(records[1].payload)
         } finally {
             scope.cancel()
         }
