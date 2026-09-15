@@ -5,6 +5,9 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 
 val useLocalH2g2 = providers.gradleProperty("haive.useLocalH2g2")
     .orNull

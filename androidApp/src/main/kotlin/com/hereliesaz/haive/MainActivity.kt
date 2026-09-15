@@ -1,12 +1,25 @@
 package com.hereliesaz.haive
 
+import android.net.Uri
 import android.os.Bundle
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
@@ -41,6 +54,7 @@ import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
@@ -71,58 +85,63 @@ class MainActivity : ComponentActivity() {
         memoryRuntime
 
         setContent {
-            var credentials by remember { mutableStateOf(initialCredentials) }
-            var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
-            var configuringProviderId by remember { mutableStateOf<String?>(null) }
-            var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
-            val providers = remember(credentials, repositoryCredentials) {
-                configuredAndroidProviders(credentials, repositoryCredentials, repositoryHttpClient)
-            }
-            val executorIntegrations = remember(repositoryCredentials) {
-                configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
-            }
-            val repositoryDiscovery = remember(repositoryCredentials) {
-                configuredAndroidRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
-            }
+            var showSplash by remember { mutableStateOf(true) }
+            if (showSplash) {
+                HaiveSplashScreen(onSplashFinished = { showSplash = false })
+            } else {
+                var credentials by remember { mutableStateOf(initialCredentials) }
+                var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
+                var configuringProviderId by remember { mutableStateOf<String?>(null) }
+                var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
+                val providers = remember(credentials, repositoryCredentials) {
+                    configuredAndroidProviders(credentials, repositoryCredentials, repositoryHttpClient)
+                }
+                val executorIntegrations = remember(repositoryCredentials) {
+                    configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
+                }
+                val repositoryDiscovery = remember(repositoryCredentials) {
+                    configuredAndroidRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
+                }
 
-            val repositoryServiceId = configuringRepositoryServiceId
-            val providerId = configuringProviderId
-            when {
-                repositoryServiceId != null -> RepositoryCredentialSetup(
-                    serviceId = repositoryServiceId,
-                    onSave = { credential ->
-                        repositoryCredentialStore.write(repositoryServiceId, credential)
-                        repositoryCredentials = repositoryCredentialStore.readAll()
-                        configuringRepositoryServiceId = null
-                    },
-                    onCancel = { configuringRepositoryServiceId = null },
-                )
-                providerId != null -> ProviderCredentialSetup(
-                    providerId = providerId,
-                    onSave = { key ->
-                        providerCredentialStore.write(providerId, key)
-                        credentials = providerCredentialStore.readAll()
-                        configuringProviderId = null
-                    },
-                    onCancel = { configuringProviderId = null },
-                )
-                else -> App(
-                    providers = providers,
-                    executorIntegrations = executorIntegrations,
-                    orchestrationRuntime = orchestrationRuntime,
-                    connectedRepositoryServiceIds = repositoryCredentials.keys,
-                    onSearchRepositories = repositoryDiscovery::search,
-                    onConfigureRepositoryService = { configuringRepositoryServiceId = it },
-                    onDisconnectRepositoryService = { serviceId ->
-                        repositoryCredentialStore.clear(serviceId)
-                        repositoryCredentials = repositoryCredentialStore.readAll()
-                    },
-                    onReconfigureProvider = { configuringProviderId = it },
-                    onDisconnectProvider = { disconnectedProviderId ->
-                        providerCredentialStore.clear(disconnectedProviderId)
-                        credentials = providerCredentialStore.readAll()
-                    },
-                )
+                val repositoryServiceId = configuringRepositoryServiceId
+                val providerId = configuringProviderId
+                when {
+                    repositoryServiceId != null -> RepositoryCredentialSetup(
+                        serviceId = repositoryServiceId,
+                        onSave = { credential ->
+                            repositoryCredentialStore.write(repositoryServiceId, credential)
+                            repositoryCredentials = repositoryCredentialStore.readAll()
+                            configuringRepositoryServiceId = null
+                        },
+                        onCancel = { configuringRepositoryServiceId = null },
+                    )
+                    providerId != null -> ProviderCredentialSetup(
+                        providerId = providerId,
+                        onSave = { key ->
+                            providerCredentialStore.write(providerId, key)
+                            credentials = providerCredentialStore.readAll()
+                            configuringProviderId = null
+                        },
+                        onCancel = { configuringProviderId = null },
+                    )
+                    else -> App(
+                        providers = providers,
+                        executorIntegrations = executorIntegrations,
+                        orchestrationRuntime = orchestrationRuntime,
+                        connectedRepositoryServiceIds = repositoryCredentials.keys,
+                        onSearchRepositories = repositoryDiscovery::search,
+                        onConfigureRepositoryService = { configuringRepositoryServiceId = it },
+                        onDisconnectRepositoryService = { serviceId ->
+                            repositoryCredentialStore.clear(serviceId)
+                            repositoryCredentials = repositoryCredentialStore.readAll()
+                        },
+                        onReconfigureProvider = { configuringProviderId = it },
+                        onDisconnectProvider = { disconnectedProviderId ->
+                            providerCredentialStore.clear(disconnectedProviderId)
+                            credentials = providerCredentialStore.readAll()
+                        },
+                    )
+                }
             }
         }
     }
@@ -136,6 +155,39 @@ class MainActivity : ComponentActivity() {
         }
         repositoryHttpClient.close()
         super.onDestroy()
+    }
+}
+
+@Composable
+fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(4000)
+        onSplashFinished()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0D1026)),
+        contentAlignment = Alignment.Center
+    ) {
+        AndroidView(
+            factory = { context ->
+                VideoView(context).apply {
+                    val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.haive_animation1}")
+                    setVideoURI(uri)
+                    setOnPreparedListener { mediaPlayer ->
+                        mediaPlayer.isLooping = true
+                        start()
+                    }
+                    setOnErrorListener { _, _, _ ->
+                        onSplashFinished()
+                        true
+                    }
+                }
+            },
+            modifier = Modifier.size(280.dp)
+        )
     }
 }
 
