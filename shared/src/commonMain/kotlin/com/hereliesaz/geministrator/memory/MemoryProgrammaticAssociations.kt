@@ -79,7 +79,9 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     activeNodes
         .filter { it.kind == MemoryNodeKind.NounTag || it.kind == MemoryNodeKind.VerbTag || it.kind == MemoryNodeKind.Category }
         .groupBy { "${it.kind.name}:${it.text.normalizedMemoryKey()}" }
-        .values
+        .entries
+        .sortedBy { it.key }
+        .map { it.value }
         .filter { it.size > 1 }
         .forEach { group ->
             group.sortedBy { it.createdAtEpochMillis }.zipWithNext().forEach { (left, right) ->
@@ -95,9 +97,9 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             identifierGroups.getOrPut(identifier) { mutableListOf() } += node
         }
     }
-    identifierGroups
-        .filterValues { it.size > 1 }
-        .toSortedMap()
+    identifierGroups.entries
+        .filter { it.value.size > 1 }
+        .sortedBy { it.key }
         .forEach { (identifier, group) ->
             group.distinctBy(MemoryNode::id)
                 .sortedBy { it.createdAtEpochMillis }
@@ -109,7 +111,9 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     activeNodes
         .flatMap { node -> node.sourceSectionIds.map { sectionId -> sectionId to node } }
         .groupBy({ it.first }, { it.second })
-        .values
+        .entries
+        .sortedBy { it.key.value }
+        .map { it.value }
         .filter { it.size > 1 }
         .forEach { group ->
             group.distinctBy(MemoryNode::id)
@@ -123,7 +127,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         weight: Float,
         groups: Map<String, List<MemoryEpisode>>,
     ) {
-        groups.toSortedMap().values.forEach { group ->
+        groups.entries.sortedBy { it.key }.forEach { (_, group) ->
             group.sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .mapNotNull { anchors[it.id] }
                 .distinctBy(MemoryNode::id)
@@ -135,7 +139,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     associateEpisodeGroups(
         basis = "scope:session",
         weight = 0.98f,
-        groups = episodes.groupBy(MemoryEpisode::sourceSessionId),
+        groups = episodes.groupBy { it.sourceSessionId },
     )
     associateEpisodeGroups(
         basis = "scope:task-run",
@@ -161,14 +165,23 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             episode.workflowDefinitionId?.let { value -> "${episode.projectId.orEmpty()}|$value" to episode }
         }.groupBy({ it.first }, { it.second }),
     )
+    associateEpisodeGroups(
+        basis = "scope:project-role",
+        weight = 0.76f,
+        groups = episodes.mapNotNull { episode ->
+            val projectId = episode.projectId
+            val roleId = episode.roleId
+            if (projectId != null && roleId != null) "$projectId|$roleId" to episode else null
+        }.groupBy({ it.first }, { it.second }),
+    )
 
     // Neighboring episodes in the same project are mechanically adjacent in work history even when
     // their text shares no vocabulary.
     episodes.mapNotNull { episode -> episode.projectId?.let { it to episode } }
         .groupBy({ it.first }, { it.second })
-        .toSortedMap()
-        .values
-        .forEach { group ->
+        .entries
+        .sortedBy { it.key }
+        .forEach { (_, group) ->
             group.sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
                 .forEach { (leftEpisode, rightEpisode) ->
@@ -190,7 +203,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
                 MemoryTemporalLevel.Week -> 0.50f
             }
             bucket.episodeIds
-                .mapNotNull(episodeById::get)
+                .mapNotNull { episodeById[it] }
                 .sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .mapNotNull { anchors[it.id] }
                 .distinctBy(MemoryNode::id)
@@ -231,11 +244,11 @@ private fun String.exactMemoryIdentifiers(): Set<String> {
         .findAll(this)
         .forEach { identifiers += "url:${it.value.trimEnd('.', ',', ';').lowercase()}" }
 
-    Regex("(?<![A-Za-z0-9])[0-9a-fA-F]{7,40}(?![A-Za-z0-9])")
+    Regex("\\b[0-9a-fA-F]{7,40}\\b")
         .findAll(this)
         .forEach { identifiers += "commit:${it.value.lowercase()}" }
 
-    Regex("(?<![A-Za-z0-9])#\\d+(?!\\d)")
+    Regex("#\\d+\\b")
         .findAll(this)
         .forEach { identifiers += "review:${it.value}" }
 
