@@ -221,27 +221,28 @@ private data class Neighbor(
 )
 
 /**
- * Parallel graph facts between the same pair are independent associative evidence. Collapse them
- * with the same saturating curve used by condensation before GRIP starts path traversal.
+ * Parallel graph facts between the same pair are accumulated only when they are independent
+ * evidence. Correlated re-representations such as temporal rebucketing contribute once through the
+ * canonical evidence-family policy before GRIP starts path traversal.
  */
 private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
-    val weightsBySource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<Float>>>()
+    val evidenceBySource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<MemoryEdge>>>()
 
-    fun add(from: MemoryNodeId, to: MemoryNodeId, weight: Float) {
-        if (weight <= 0f) return
-        val byTarget = weightsBySource.getOrPut(from) { linkedMapOf() }
-        byTarget.getOrPut(to) { mutableListOf() } += weight
+    fun add(from: MemoryNodeId, to: MemoryNodeId, edge: MemoryEdge) {
+        if (edge.weight <= 0f) return
+        val byTarget = evidenceBySource.getOrPut(from) { linkedMapOf() }
+        byTarget.getOrPut(to) { mutableListOf() } += edge
     }
 
     edges.forEach { edge ->
         if (!edge.relation.isRecallTraversable()) return@forEach
-        add(edge.from, edge.to, edge.weight)
-        add(edge.to, edge.from, edge.weight)
+        add(edge.from, edge.to, edge)
+        add(edge.to, edge.from, edge)
     }
 
-    return weightsBySource.mapValues { (_, byTarget) ->
-        byTarget.entries.map { (target, weights) ->
-            Neighbor(target, accumulateAssociationStrength(weights))
+    return evidenceBySource.mapValues { (_, byTarget) ->
+        byTarget.entries.map { (target, evidence) ->
+            Neighbor(target, accumulateAssociationEvidence(evidence))
         }
     }
 }
