@@ -75,6 +75,9 @@ class TaskExecutorIntegrationRegistry(
     fun isAvailable(executor: TaskExecutor, project: Project): Boolean =
         integrationFor(executor, project) != null
 
+    fun withIntegration(integration: TaskExecutorIntegration): TaskExecutorIntegrationRegistry =
+        TaskExecutorIntegrationRegistry(integrations + integration)
+
     companion object {
         val Empty = TaskExecutorIntegrationRegistry()
     }
