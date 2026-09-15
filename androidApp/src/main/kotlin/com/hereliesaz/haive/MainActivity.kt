@@ -44,6 +44,14 @@ import io.ktor.client.engine.cio.CIO
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
+    private val memoryRuntimeDelegate = lazy {
+        AndroidMemoryLayerRuntime(
+            context = this,
+            httpClient = repositoryHttpClient,
+            cacheDirectory = cacheDir,
+        )
+    }
+    private val memoryRuntime by memoryRuntimeDelegate
     private val orchestrationRuntimeDelegate = lazy {
         AndroidOrchestrationAgentRuntime(
             installer = AndroidOrchestrationModelInstaller(this, repositoryHttpClient),
@@ -58,6 +66,9 @@ class MainActivity : ComponentActivity() {
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
+
+        // Install the process Memory observer before App creates its provider-session gateway.
+        memoryRuntime
 
         setContent {
             var credentials by remember { mutableStateOf(initialCredentials) }
@@ -119,6 +130,9 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         if (orchestrationRuntimeDelegate.isInitialized()) {
             orchestrationRuntime.close()
+        }
+        if (memoryRuntimeDelegate.isInitialized()) {
+            memoryRuntime.close()
         }
         repositoryHttpClient.close()
         super.onDestroy()
