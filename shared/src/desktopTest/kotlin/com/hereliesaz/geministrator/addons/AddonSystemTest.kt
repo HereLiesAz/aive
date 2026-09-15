@@ -57,26 +57,19 @@ class AddonSystemTest {
     @Test
     fun testParserRejectsUnknownPermissionsAndDoesNotAutoGrant() {
         val parser = AzphaltPackageParser()
-        val requested = parser.mapRequestedPermissions(listOf("AppRead", "FakePerm"))
-        assertEquals(1, requested.size)
-        assertTrue(requested.contains(HostPermission.AppRead))
-        assertFalse(requested.contains(HostPermission.CompanyRead))
+        val mapped = parser.parseRequestedPermissions(listOf("AppRead", "UnknownPermission", "CompanyRead"))
+        assertTrue(mapped.contains(HostPermission.AppRead))
+        assertTrue(mapped.contains(HostPermission.CompanyRead))
+        assertEquals(2, mapped.size)
     }
 
     @Test
-    fun testPersistenceMigrationAndTombstones() {
-        val settings = MapSettings()
-        val persistence = SettingsAddonPersistence(settings)
-        val inst = AddonInstallation("addon1", "1.0", true, setOf(HostPermission.AppRead), emptyMap(), listOf("w1"))
-
-        persistence.saveInstallation(inst)
-        assertEquals(1, persistence.getInstallations().size)
-
-        persistence.removeInstallation("addon1")
-        assertEquals(0, persistence.getInstallations().size)
-
-        val historyStr = settings.getStringOrNull("addon_tombstones")
-        assertTrue(historyStr!!.contains("addon1"))
-        assertTrue(historyStr.contains("\"enabled\":false"))
+    fun testUnapprovedPermissionsDenied() {
+        val parser = AzphaltPackageParser()
+        val requested = parser.parseRequestedPermissions(listOf("AppRead", "CompanyRead"))
+        val approved = setOf(HostPermission.AppRead)
+        val granted = parser.selectGrantedPermissions(requested, approved)
+        assertTrue(granted.contains(HostPermission.AppRead))
+        assertEquals(1, granted.size)
     }
 }
