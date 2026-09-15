@@ -586,6 +586,11 @@ class ApplicationRuntime private constructor(
             val registry = AgentProviderRegistry(providers)
             val gateway = ProviderBackedManagedSessionGateway(registry, runtimeScope)
             val publisher = WorkflowRuntimePublisher()
+            val effectiveExecutorIntegrations = executorIntegrations.withIntegration(
+                com.hereliesaz.geministrator.workflow.GenealogyGovernanceExecutorIntegration(
+                    registry.genealogyGovernance,
+                ),
+            )
 
             fun build(roles: List<RoleDefinition>): ApplicationRuntime {
                 val engine = WorkflowEngine(
@@ -597,7 +602,7 @@ class ApplicationRuntime private constructor(
                     persistence = persistence,
                     engine = engine,
                     sessionGateway = gateway,
-                    executorIntegrations = executorIntegrations,
+                    executorIntegrations = effectiveExecutorIntegrations,
                 )
                 return ApplicationRuntime(
                     persistence,
