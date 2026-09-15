@@ -76,26 +76,29 @@ data class MemoryTemporalIndex(
                 val cap = level.maxActiveBuckets ?: return@forEach
                 val parent = level.parent ?: return@forEach
                 val active = byLevel.getValue(level)
+                if (active.size <= cap) return@forEach
                 val parentBuckets = byLevel.getValue(parent)
 
-                while (active.size > cap) {
-                    val oldestStart = active.keys.minOrNull() ?: break
-                    val parentStart = align(oldestStart, parent.durationMillis)
-                    val parentEnd = parentStart + parent.durationMillis
-                    val children = active.values
-                        .filter { it.startEpochMillis in parentStart until parentEnd }
-                        .sortedBy(MutableTemporalBucket::startEpochMillis)
-                    if (children.isEmpty()) break
+                // Group once by parent window and process oldest parent groups first. The previous
+                // implementation repeatedly rescanned the entire active map for every rollup, which
+                // became quadratic for sparse long-lived histories.
+                val childrenByParent = active.values
+                    .groupBy { child -> align(child.startEpochMillis, parent.durationMillis) }
+                    .toSortedMap()
 
+                for ((parentStart, children) in childrenByParent) {
+                    if (active.size <= cap) break
                     val rolled = parentBuckets.getOrPut(parentStart) {
                         MutableTemporalBucket(parent, parentStart)
                     }
-                    children.forEach { child ->
-                        rolled.episodeIds += child.episodeIds
-                        rolled.sourceBucketIds += child.id
-                        rolled.sourceBucketIds += child.sourceBucketIds
-                        active.remove(child.startEpochMillis)
-                    }
+                    children
+                        .sortedBy(MutableTemporalBucket::startEpochMillis)
+                        .forEach { child ->
+                            rolled.episodeIds += child.episodeIds
+                            rolled.sourceBucketIds += child.id
+                            rolled.sourceBucketIds += child.sourceBucketIds
+                            active.remove(child.startEpochMillis)
+                        }
                 }
             }
 
