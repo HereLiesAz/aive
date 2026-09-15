@@ -8,7 +8,6 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
 import com.hereliesaz.geministrator.memory.AgentMemoryLayer
-import com.hereliesaz.geministrator.memory.AndroidFileOrtArtifactResolver
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingInferenceRuntime
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingModelAdapter
 import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeInferenceRuntime
@@ -24,11 +23,15 @@ import com.hereliesaz.geministrator.memory.MemoryMicroAgent
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentArtifact
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
+import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
+import com.hereliesaz.geministrator.memory.MemoryQuery
+import com.hereliesaz.geministrator.memory.MemoryResolution
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
 import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
 import io.ktor.client.HttpClient
@@ -260,10 +263,10 @@ internal class AndroidEpoch8GenerativeAdapter(
             } finally {
                 owned.forEach(OnnxTensor::close)
             }
-            repeat(maxNewTokens) {
+            for (ignored in 0 until maxNewTokens) {
                 val current = requireNotNull(activeResult)
                 val nextToken = argmaxLastLogit(current)
-                if (nextToken in stopIds) return@repeat
+                if (nextToken in stopIds) break
                 generated += nextToken
                 totalLength += 1
                 val nextOwned = mutableListOf<OnnxTensor>()
@@ -396,7 +399,7 @@ internal class AndroidEpoch8EmbeddingAdapter(
     override suspend fun embed(session: OrtSession, request: MemoryEmbeddingInferenceRequest): List<List<Float>> {
         val installed = installer.ensureInstalled(request.artifact)
         HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
-            val encodings = request.texts.map(tokenizer::encode)
+            val encodings = request.texts.map { text -> tokenizer.encode(text) }
             val maxLength = encodings.maxOf { it.ids.size }
             require(maxLength > 0) { "Embedding tokenizer returned no tokens" }
             val batch = encodings.size
@@ -536,8 +539,31 @@ internal class AndroidMemoryLayerRuntime(
         }
     }
 
+    private val promptContextProvider = MemoryPromptContextProvider { request ->
+        val context = request.orchestrationContext
+        val recall = layer.tool.grip(
+            MemoryQuery(
+                text = request.objective,
+                resolution = MemoryResolution.Summary,
+                maxResults = MAX_RECALL_RESULTS,
+                projectId = context.projectId?.value,
+                roleId = context.roleId?.value,
+            ),
+        )
+        if (recall.hits.isEmpty()) {
+            emptyList()
+        } else {
+            val content = recall.hits.joinToString("\n\n") { hit ->
+                "[${"%.2f".format(hit.score)}] ${hit.node.kind.name}: ${hit.node.text}"
+            }.take(MAX_RECALL_CHARS)
+            listOf(PromptContextBlock("Relevant memory", content))
+        }
+    }
+
     init {
         MemoryRuntimeBridge.observer = observer
+        MemoryRuntimeBridge.promptContextProvider = promptContextProvider
+        scope.launch { drainConsolidationQueue() }
     }
 
     @OptIn(ExperimentalTime::class)
@@ -552,9 +578,14 @@ internal class AndroidMemoryLayerRuntime(
 
     override fun close() {
         if (MemoryRuntimeBridge.observer === observer) {
-            MemoryRuntimeBridge.observer = com.hereliesaz.geministrator.memory.NoOpMemorySessionObserver
+            MemoryRuntimeBridge.reset()
         }
         scope.cancel()
         sessionManager.close()
+    }
+
+    private companion object {
+        const val MAX_RECALL_RESULTS = 6
+        const val MAX_RECALL_CHARS = 6_000
     }
 }
