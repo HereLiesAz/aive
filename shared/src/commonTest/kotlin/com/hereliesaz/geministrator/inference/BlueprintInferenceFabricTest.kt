@@ -35,7 +35,7 @@ import kotlin.test.assertNotNull
 
 class BlueprintInferenceFabricTest {
     @Test
-    fun prepareDispatchIndexesAgentDataAndCreatesTypedInputStream() = runBlocking {
+    fun prepareDispatchIndexesAgentDataAndCreatesTypedInputStream(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val taskRunId = TaskRunId("child")
         val artifact = ArtifactRef(
@@ -75,7 +75,7 @@ class BlueprintInferenceFabricTest {
     }
 
     @Test
-    fun repeatedStartsOfTheSameTaskCreateDistinctConcreteInvocations() = runBlocking {
+    fun repeatedStartsOfTheSameTaskCreateDistinctConcreteInvocations(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val providerId = AgentProviderId("provider")
         val request = AgentTaskRequest(
@@ -95,7 +95,7 @@ class BlueprintInferenceFabricTest {
     }
 
     @Test
-    fun lateEventsFromAnOlderProviderRunStayWithTheOlderInvocation() = runBlocking {
+    fun lateEventsFromAnOlderProviderRunStayWithTheOlderInvocation(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val providerId = AgentProviderId("provider")
         val taskRunId = TaskRunId("retry-task")
@@ -126,7 +126,7 @@ class BlueprintInferenceFabricTest {
     }
 
     @Test
-    fun usageArtifactsAndTerminalStateStayOnTheSameProviderBoundInvocationStream() = runBlocking {
+    fun usageArtifactsAndTerminalStateStayOnTheSameProviderBoundInvocationStream(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val providerId = AgentProviderId("provider")
         val providerRunId = ProviderRunId("provider-run")
@@ -172,7 +172,7 @@ class BlueprintInferenceFabricTest {
     }
 
     @Test
-    fun providerGatewayRoutesEveryStartedAgentSessionThroughFabric() = runBlocking {
+    fun providerGatewayRoutesEveryStartedAgentSessionThroughFabric(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val provider = CapturingInferenceProvider()
         val registry = AgentProviderRegistry(listOf(provider), fabric)
