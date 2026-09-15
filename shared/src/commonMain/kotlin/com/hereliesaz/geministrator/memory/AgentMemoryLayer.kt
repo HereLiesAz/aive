@@ -64,9 +64,10 @@ class AgentMemoryLayer private constructor(
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
         ): AgentMemoryLayer {
             val queue = MemoryConsolidationQueue(store, maxChunkChars)
+            val graphTool = GraphMemoryTool(store, queue)
             return AgentMemoryLayer(
                 store = store,
-                tool = GraphMemoryTool(store, queue),
+                tool = LexicalMemoryTool(graphTool, lexicon),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
                 consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
