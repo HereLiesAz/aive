@@ -177,6 +177,30 @@ This is deliberately **not** `sum(weights)` and not simple doubling with a hard 
 
 This rule applies wherever multiple independent graph associations support the same relationship, including parallel deterministic/semantic evidence and inherited overlap during condensation.
 
+## Independence is required for reinforcement
+
+The accumulation curve applies to **independent support**, not merely to every edge that happens to connect the same pair of nodes.
+
+Some append-only edges are later representations of the same underlying evidence. Those representations must not reinforce one another. Temporal roll-up is the canonical example: a pair of memories may first be represented by a `temporal:FifteenMinutes` edge and later by a `temporal:Week` edge after the temporal index compacts. The week edge is a coarser replacement representation of the same temporal co-presence, not a second observation that the two memories are related.
+
+Therefore temporal co-bucket edges belong to one evidence family with a **latest-representation** policy:
+
+```text
+old temporal:FifteenMinutes 0.88
+new temporal:Week           0.50
+
+current temporal evidence  = 0.50
+not                        = 1 - (1 - 0.88)(1 - 0.50) = 0.94
+```
+
+This preserves the intended loss of temporal specificity as memories age. Historical edges remain stored because the memory layer is non-destructive; retrieval simply recognizes that correlated historical representations are one evidence family and uses the current representation once.
+
+Independent evidence still reinforces normally. If the current week-level temporal evidence is `0.50` and an unrelated exact/provenance/semantic association independently contributes `0.50`, their effective relationship becomes `0.75` through the normal saturating curve.
+
+The same evidence-family rule applies before condensation inherits a source memory's associative strength. A generalized memory must inherit the source's **current effective support**, not accidentally treat old and new representations of one fact as multiple independent reasons.
+
+New replaceable evidence families should explicitly store `evidenceFamily` and `evidencePolicy=latest`. The backend also recognizes legacy `temporal:*` bases as the temporal family so already-persisted memories remain correct after upgrades.
+
 ## Condensation trades specificity for associative strength
 
 When several highly similar memories are mechanically condensed into a more general representation, their shared associations become more important, not less.
@@ -250,4 +274,4 @@ Edge weights determine how strongly a graph neighborhood participates in that su
 
 ## Durable rule
 
-> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. Preserve edge strength during recall. Accumulate repeated associative evidence with diminishing returns, so condensation loses specificity while shared associations become stronger. Save model inference for relationships that actually require semantics.**
+> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. Preserve edge strength during recall. Accumulate only independent associative evidence with diminishing returns; correlated re-representations such as temporal rebucketing contribute once through their current representation. Condensation loses specificity while genuinely shared associations become stronger. Save model inference for relationships that actually require semantics.**
