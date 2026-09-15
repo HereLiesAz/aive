@@ -13,12 +13,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
-import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
-import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -99,8 +96,7 @@ fun App(
                         val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
                         scope.launch {
                             try {
-                                val activeRuntime = runtime
-                                    ?: error("Runtime is unavailable")
+                                val activeRuntime = runtime ?: error("Runtime is unavailable")
                                 if (orchestrationRuntime != null) {
                                     activeRuntime.launchOrchestratedWorkflow(
                                         projectName = projectName,
@@ -149,15 +145,23 @@ fun App(
                     onResolveEscalation = { taskId, approved ->
                         scope.launch {
                             try {
-                                runtime?.decideFailureEscalation(
-                                    taskDefinitionId = TaskDefinitionId(taskId),
-                                    approved = approved,
-                                    note = if (approved) {
-                                        "Retry approved in application"
-                                    } else {
-                                        "Escalation rejected in application"
-                                    },
-                                )
+                                val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                if (approved && orchestrationRuntime != null) {
+                                    activeRuntime.repairFailureEscalation(
+                                        taskDefinitionId = TaskDefinitionId(taskId),
+                                        orchestrationRuntime = orchestrationRuntime,
+                                    )
+                                } else {
+                                    activeRuntime.decideFailureEscalation(
+                                        taskDefinitionId = TaskDefinitionId(taskId),
+                                        approved = approved,
+                                        note = if (approved) {
+                                            "Retry approved in application"
+                                        } else {
+                                            "Escalation rejected in application"
+                                        },
+                                    )
+                                }
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
@@ -207,9 +211,7 @@ fun App(
                     onCheckProviderHealth = {
                         runtime?.checkProviderHealth()?.mapValues { (_, result) ->
                             result.fold(
-                                onSuccess = { caps ->
-                                    "Reachable · ${caps.supported.size} capabilities"
-                                },
+                                onSuccess = { caps -> "Reachable · ${caps.supported.size} capabilities" },
                                 onFailure = { failure ->
                                     "Unreachable · ${failure.message?.take(60) ?: "unknown error"}"
                                 },
@@ -228,9 +230,7 @@ fun App(
                             }
                         }
                     },
-                    onExportJson = suspend {
-                        runtime?.exportJson()
-                    },
+                    onExportJson = suspend { runtime?.exportJson() },
                     onImportJson = { encoded ->
                         scope.launch {
                             try {
@@ -242,9 +242,7 @@ fun App(
                             }
                         }
                     },
-                    onLoadRunHistory = {
-                        runtime?.loadRunHistory() ?: emptyList()
-                    },
+                    onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
                     onSwitchRun = { runId ->
                         scope.launch {
                             try {
@@ -256,15 +254,9 @@ fun App(
                             }
                         }
                     },
-                    onLoadRunTimeline = {
-                        runtime?.loadRunTimeline() ?: emptyList()
-                    },
-                    onExportDiagnosticBundle = {
-                        runtime?.exportDiagnosticBundle()
-                    },
-                    onValidateWorkflow = {
-                        runtime?.validateCurrentWorkflow() ?: emptyList()
-                    },
+                    onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
+                    onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
+                    onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },
                     onSaveRoleCollection = { roles ->
                         scope.launch {
                             try {
