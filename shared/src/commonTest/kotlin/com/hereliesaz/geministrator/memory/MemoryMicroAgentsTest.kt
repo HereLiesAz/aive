@@ -4,6 +4,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -66,12 +67,31 @@ class MemoryMicroAgentsTest {
     }
 
     @Test
+    fun associationLinkerMustUseEmbeddingInference() {
+        val agents = MemoryMicroAgentRouter.REQUIRED_ROLES.map { role ->
+            RecordingMicroAgent(
+                role = role,
+                sink = mutableMapOf(),
+                spec = MemoryMicroAgentModelSpec(
+                    modelId = "wrong-$role",
+                    requirements = MemoryModelRequirements.generation(),
+                ),
+            )
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            MemoryMicroAgentRouter(agents)
+        }
+    }
+
+    @Test
     fun routerConstrainsPacketsToSmallestLocalModelBudget() {
         val agents = MemoryMicroAgentRouter.REQUIRED_ROLES.mapIndexed { index, role ->
             RecordingMicroAgent(
                 role = role,
                 sink = mutableMapOf(),
-                spec = MemoryMicroAgentModelSpec(
+                spec = specFor(
+                    role = role,
                     modelId = "model-$role",
                     maxInputItems = if (index == 0) 5 else 12,
                     maxInputChars = if (index == 1) 2_048 else 8_000,
@@ -88,19 +108,39 @@ class MemoryMicroAgentsTest {
         )
 
         assertEquals(5, constrained.maxPacketItems)
-        assertEquals(2_048, constrained.maxPacketChars)
+        assertEquals(1_024, constrained.maxPacketChars)
         assertEquals(7, constrained.maxMutationsPerPacket)
     }
 
     private class RecordingMicroAgent(
         override val role: MemoryMicroAgentRole,
         private val sink: MutableMap<MemoryMicroAgentRole, MemoryWorkPacket>,
-        spec: MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec("test-$role"),
+        spec: MemoryMicroAgentModelSpec = specFor(role, "test-$role"),
     ) : MemoryMicroAgent {
         override val model: MemoryMicroAgentModelSpec = spec
         override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
             sink[role] = packet
             return MemoryMutationBatch()
         }
+    }
+
+    companion object {
+        private fun specFor(
+            role: MemoryMicroAgentRole,
+            modelId: String,
+            maxInputItems: Int = 24,
+            maxInputChars: Int = 12_000,
+            maxMutations: Int = 96,
+        ): MemoryMicroAgentModelSpec = MemoryMicroAgentModelSpec(
+            modelId = modelId,
+            maxInputItems = maxInputItems,
+            maxInputChars = maxInputChars,
+            maxMutations = maxMutations,
+            requirements = if (role == MemoryMicroAgentRole.AssociationLinker) {
+                MemoryModelRequirements.embeddings()
+            } else {
+                MemoryModelRequirements.generation()
+            },
+        )
     }
 }
