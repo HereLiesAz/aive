@@ -1,0 +1,90 @@
+name: Inspect epoch-8 memory artifacts
+
+on:
+  push:
+    branches:
+      - chore/inspect-epoch8-layout
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Download representative epoch-8 bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/epoch8
+          curl -fL --retry 3 \
+            -o /tmp/epoch8/association.tar.gz \
+            https://github.com/HereLiesAz/haive/releases/download/memory-layer-epoch8/haive-specialist_08_association_linker-onnx-epoch8.tar.gz
+          curl -fL --retry 3 \
+            -o /tmp/epoch8/noun.tar.gz \
+            https://github.com/HereLiesAz/haive/releases/download/memory-layer-epoch8/haive-specialist_03_noun_indexer-int8-epoch8.tar.gz
+          sha256sum /tmp/epoch8/*.tar.gz
+
+      - name: List and extract bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== ASSOCIATION ARCHIVE ==='
+          tar -tzf /tmp/epoch8/association.tar.gz | sed -n '1,240p'
+          echo '=== NOUN ARCHIVE ==='
+          tar -tzf /tmp/epoch8/noun.tar.gz | sed -n '1,240p'
+          mkdir -p /tmp/epoch8/association /tmp/epoch8/noun
+          tar -xzf /tmp/epoch8/association.tar.gz -C /tmp/epoch8/association
+          tar -xzf /tmp/epoch8/noun.tar.gz -C /tmp/epoch8/noun
+          echo '=== EXTRACTED FILES ==='
+          find /tmp/epoch8/association /tmp/epoch8/noun -type f -printf '%p\t%s bytes\n' | sort
+
+      - name: Inspect manifests and tokenizer metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            echo "=== $file ==="
+            sed -n '1,220p' "$file"
+          done < <(find /tmp/epoch8/association /tmp/epoch8/noun -type f \
+            \( -name '*.json' -o -name '*.txt' -o -name '*.md' \) \
+            -size -256k | sort)
+
+      - name: Inspect ONNX graph contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet 'onnx>=1.17,<2'
+          python - <<'PY'
+          from pathlib import Path
+          import onnx
+
+          roots = [Path('/tmp/epoch8/association'), Path('/tmp/epoch8/noun')]
+          for root in roots:
+              for path in sorted(root.rglob('*.onnx')):
+                  print(f'=== ONNX {path} ===')
+                  model = onnx.load(str(path), load_external_data=False)
+                  print('ir_version:', model.ir_version)
+                  print('opsets:', [(o.domain, o.version) for o in model.opset_import])
+                  print('metadata:', {p.key: p.value for p in model.metadata_props})
+                  initializer_names = {x.name for x in model.graph.initializer}
+                  print('inputs:')
+                  for value in model.graph.input:
+                      if value.name in initializer_names:
+                          continue
+                      t = value.type.tensor_type
+                      shape = []
+                      for d in t.shape.dim:
+                          shape.append(d.dim_param or d.dim_value or '?')
+                      print(' ', value.name, 'elem_type=', t.elem_type, 'shape=', shape)
+                  print('outputs:')
+                  for value in model.graph.output:
+                      t = value.type.tensor_type
+                      shape = []
+                      for d in t.shape.dim:
+                          shape.append(d.dim_param or d.dim_value or '?')
+                      print(' ', value.name, 'elem_type=', t.elem_type, 'shape=', shape)
+          PY
