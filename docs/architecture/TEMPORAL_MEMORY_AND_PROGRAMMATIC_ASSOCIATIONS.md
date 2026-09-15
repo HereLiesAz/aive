@@ -148,7 +148,7 @@ When multiple independent association edges connect the same pair of nodes, thei
 
 ## Associative strength accumulates on a saturating exponential curve
 
-Repeated supporting associations should strengthen memory indefinitely in the sense that every additional piece of evidence can increase associative strength, but the increase must have diminishing returns and approach a ceiling asymptotically.
+Repeated supporting associations should strengthen memory indefinitely in the sense that every additional independent piece of evidence can increase associative strength, while the increase has diminishing returns and approaches a ceiling asymptotically.
 
 For independent association weights `w1 ... wn`, Haive uses complementary exponential accumulation:
 
@@ -171,7 +171,9 @@ For example, repeated `0.50` evidence produces:
 4 associations -> 0.9375
 ```
 
-The first reinforcement is large, later reinforcements become progressively smaller, and the strength approaches `1.0` without linear runaway. This is deliberately **not** `sum(weights)` and not simple doubling with a hard clamp.
+The first reinforcement is large and later reinforcements become progressively smaller. Mathematically the ideal curve approaches `1.0` without linear runaway or reaching it at any finite number of sub-unit inputs; production floating-point arithmetic may round sufficiently close values to `1.0`, so `1.0` is treated as saturation rather than as a claim of certainty.
+
+This is deliberately **not** `sum(weights)` and not simple doubling with a hard clamp.
 
 This rule applies wherever multiple independent graph associations support the same relationship, including parallel deterministic/semantic evidence and inherited overlap during condensation.
 
@@ -179,7 +181,7 @@ This rule applies wherever multiple independent graph associations support the s
 
 When several highly similar memories are mechanically condensed into a more general representation, their shared associations become more important, not less.
 
-The generalized memory therefore receives direct `AssociatedWith` edges for external targets that were associated with **two or more** of the condensed source memories. The source-specific edge weights are first accumulated per source, then the independent source contributions are accumulated again with the same saturating exponential rule.
+The generalized memory therefore receives direct `AssociatedWith` support for external targets that were associated with **two or more** of the condensed source memories. Source-specific parallel evidence is first accumulated per source, then independent source contributions are accumulated again with the same saturating exponential rule.
 
 Conceptually:
 
@@ -189,10 +191,12 @@ memory B --0.50--> target X
 
 A + B -> generalized memory G
 
-G --0.75--> target X
+G --effective 0.75--> target X
 ```
 
-If a third independently condensed source also carries `0.50` support for `X`, the generalized association becomes `0.875`, not `1.25` and not a clamped `1.0`.
+If a third independently condensed source also carries `0.50` support for `X`, the generalized effective association becomes `0.875`, not `1.25` and not a simple clamped `1.0`.
+
+The implementation keeps each source's inherited support as its own append-only edge and lets the normal parallel-edge accumulation calculate the effective strength. This preserves provenance, avoids mutating old graph facts, and allows newly discovered independent support to strengthen the generalized association later.
 
 This creates the intended tradeoff:
 
