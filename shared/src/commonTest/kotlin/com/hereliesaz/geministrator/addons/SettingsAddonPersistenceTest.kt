@@ -60,4 +60,26 @@ class SettingsAddonPersistenceTest {
             persistence.getInstallations()
         }
     }
+
+    @Test
+    fun corruptedTombstoneHistoryDoesNotPartiallyRemoveActiveInstallation() {
+        val settings = MapSettings()
+        val persistence = SettingsAddonPersistence(settings)
+        val installation = AddonInstallation(
+            id = "com.example.workflow",
+            version = "1.0.0",
+            enabled = true,
+            grantedPermissions = emptySet(),
+            settings = emptyMap(),
+            importedWorkflowIds = emptyList(),
+        )
+        persistence.saveInstallation(installation)
+        settings.putString("addon_tombstones", "not-json")
+
+        assertFailsWith<AddonPersistenceCorruptionException> {
+            persistence.removeInstallation(installation.id)
+        }
+
+        assertEquals(listOf(installation), persistence.getInstallations())
+    }
 }
