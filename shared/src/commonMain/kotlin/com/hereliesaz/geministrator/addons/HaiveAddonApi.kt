@@ -1,6 +1,34 @@
 package com.hereliesaz.geministrator.addons
 
-// Host mediation types (placeholders to simulate the mediated contract pattern without raw implementations)
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class AddonRepositoryInfoDto(val id: String, val branch: String, val owner: String, val name: String)
+
+@Serializable
+data class AddonRoleDto(val id: String, val name: String, val description: String)
+
+@Serializable
+data class AddonWorkflowDefinitionDto(val id: String, val name: String)
+
+@Serializable
+data class AddonRunDto(val id: String, val status: String, val progress: Float)
+
+@Serializable
+data class AddonArtifactDto(val id: String, val name: String, val size: Long)
+
+@Serializable
+data class AddonEventDto(val id: String, val type: String, val timestamp: Long)
+
+@Serializable
+data class AddonProviderDto(val id: String, val label: String, val capabilities: List<String>)
+
+@Serializable
+data class AddonExecutorDto(val id: String, val type: String, val capabilities: List<String>)
+
+@Serializable
+data class AddonPackageDependencyDto(val id: String, val version: String, val resolved: Boolean)
+
 interface AddonAppApi {
     val version: String
 }
@@ -10,49 +38,49 @@ interface AddonProjectApi {
 }
 
 interface AddonRepositoryApi {
-    fun getInfo(): Any // Mediated DTO
-    fun requestBranchCreation(name: String)
-    fun requestReview(prId: String)
+    fun getInfo(): AddonRepositoryInfoDto?
+    fun requestBranchCreation(name: String): Boolean
+    fun requestReview(prId: String): Boolean
 }
 
 interface AddonCompanyApi {
-    fun listRoles(): List<Any> // Mediated DTO
-    fun contributeAgent(agentDef: Any) // Mediated DTO
+    fun listRoles(): List<AddonRoleDto>
+    fun contributeAgent(agentDef: AddonRoleDto): Boolean
 }
 
 interface AddonWorkflowApi {
-    fun registerDefinition(def: Any)
-    fun launch(id: String, projectId: String)
+    fun registerDefinition(def: AddonWorkflowDefinitionDto): Boolean
+    fun launch(id: String, projectId: String): Boolean
 }
 
 interface AddonRunApi {
-    fun getOwnRuns(): List<Any>
-    fun controlRun(runId: String, action: String)
+    fun getOwnRuns(): List<AddonRunDto>
+    fun controlRun(runId: String, action: String): Boolean
 }
 
 interface AddonArtifactApi {
-    fun listOwnArtifacts(runId: String): List<Any>
-    fun writeArtifact(runId: String, data: Any)
+    fun listOwnArtifacts(runId: String): List<AddonArtifactDto>
+    fun writeArtifact(runId: String, data: ByteArray): Boolean
 }
 
 interface AddonApprovalApi {
-    fun requestApproval(gateId: String)
+    fun requestApproval(gateId: String): Boolean
 }
 
 interface AddonEventApi {
-    fun getOwnEvents(): List<Any>
+    fun getOwnEvents(): List<AddonEventDto>
 }
 
 interface AddonProviderApi {
-    fun listProviders(): List<Any> // Mediated capability DTOs, no credentials
+    fun listProviders(): List<AddonProviderDto>
 }
 
 interface AddonExecutorApi {
-    fun listExecutors(): List<Any>
+    fun listExecutors(): List<AddonExecutorDto>
 }
 
 interface AddonPackageApi {
-    fun resolveDependencies(): List<Any>
+    fun resolveDependencies(): List<AddonPackageDependencyDto>
 }
 
 interface AddonSettingsApi {
