@@ -24,6 +24,54 @@ internal fun accumulateAssociationStrength(weights: Iterable<Float>): Float {
     return (1.0 - complement).toFloat().coerceIn(0f, 1f)
 }
 
+/**
+ * Accumulates graph evidence without mistaking a newer representation of the same evidence for
+ * independent reinforcement.
+ *
+ * Most edges are independent observations and therefore participate directly in the saturating
+ * accumulation curve. Edges that declare an `evidenceFamily` with `evidencePolicy=latest` are
+ * alternate time-varying representations of one fact. Only the newest edge in each such family
+ * contributes to recall. Legacy temporal edges are also recognized as the `temporal-co-bucket`
+ * family so persisted graphs created before the metadata was introduced remain correct.
+ */
+internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
+    val independent = mutableListOf<Float>()
+    val latestByFamily = linkedMapOf<String, MemoryEdge>()
+
+    edges.forEach { edge ->
+        require(edge.weight in 0f..1f) { "Association evidence weight must be normalized" }
+        val explicitFamily = edge.metadata["evidenceFamily"]?.takeIf(String::isNotBlank)
+        val isLatestFamily = edge.metadata["evidencePolicy"] == "latest"
+        val legacyTemporalFamily = edge.metadata["basis"]
+            ?.takeIf { it.startsWith("temporal:") }
+            ?.let { "temporal-co-bucket" }
+        val family = when {
+            explicitFamily != null && isLatestFamily -> explicitFamily
+            legacyTemporalFamily != null -> legacyTemporalFamily
+            else -> null
+        }
+
+        if (family == null) {
+            independent += edge.weight
+            return@forEach
+        }
+
+        val current = latestByFamily[family]
+        if (
+            current == null ||
+            edge.createdAtEpochMillis > current.createdAtEpochMillis ||
+            (
+                edge.createdAtEpochMillis == current.createdAtEpochMillis &&
+                    edge.id.value > current.id.value
+            )
+        ) {
+            latestByFamily[family] = edge
+        }
+    }
+
+    return accumulateAssociationStrength(independent + latestByFamily.values.map(MemoryEdge::weight))
+}
+
 internal fun MemoryRelationKind.isAssociativeEvidence(): Boolean =
     this == MemoryRelationKind.SimilarTo || this == MemoryRelationKind.AssociatedWith
 

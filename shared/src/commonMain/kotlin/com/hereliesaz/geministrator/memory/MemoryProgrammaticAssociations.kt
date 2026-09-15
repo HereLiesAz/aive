@@ -98,7 +98,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
      *
      * Each source contributes a separate append-only support edge. Parallel inherited support is
      * combined by GRIP using 1 - Π(1 - wi), so new independent support can strengthen the relation
-     * later without mutating or double-counting an old aggregate edge.
+     * later without mutating or double-counting an old aggregate edge. Correlated evidence families
+     * (notably temporal rebucketing) are canonicalized before a source contribution is inherited.
      */
     val condensedSourcesByGeneralized = edges
         .asSequence()
@@ -120,7 +121,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         if (sourceIds.size < 2) return@forEach
         val generalized = nodesById[generalizedId] ?: return@forEach
         val sourceIdSet = sourceIds.toHashSet()
-        val weightsByTargetAndSource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<Float>>>()
+        val evidenceByTargetAndSource =
+            linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<MemoryEdge>>>()
 
         edges.asSequence()
             .filter { it.relation.isAssociativeEvidence() }
@@ -138,15 +140,15 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
                 ) {
                     return@forEach
                 }
-                weightsByTargetAndSource
+                evidenceByTargetAndSource
                     .getOrPut(targetId) { linkedMapOf() }
-                    .getOrPut(sourceId) { mutableListOf() } += edge.weight
+                    .getOrPut(sourceId) { mutableListOf() } += edge
             }
 
-        weightsByTargetAndSource.forEach { (targetId, bySource) ->
+        evidenceByTargetAndSource.forEach { (targetId, bySource) ->
             if (bySource.size < 2) return@forEach
             val target = nodesById[targetId] ?: return@forEach
-            val sourceStrengths = bySource.mapValues { (_, weights) -> accumulateAssociationStrength(weights) }
+            val sourceStrengths = bySource.mapValues { (_, evidence) -> accumulateAssociationEvidence(evidence) }
             val combined = accumulateAssociationStrength(sourceStrengths.values)
             sourceStrengths.forEach { (sourceId, sourceStrength) ->
                 overlapContributions += CondensationOverlap(
@@ -329,7 +331,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
 
     // Active temporal buckets provide bounded recency associations without any model inference.
     // They intentionally span project IDs within this store: temporal co-presence can be useful when
-    // one orchestration is working across multiple projects at the same time.
+    // one orchestration is working across multiple projects at the same time. Different rollup
+    // levels are representations of the same temporal evidence, not independent reinforcement.
     val temporal = MemoryTemporalIndex.build(episodes)
     temporal.buckets
         .sortedWith(compareBy<MemoryTemporalBucket> { it.level.ordinal }.thenBy { it.startEpochMillis })
@@ -349,7 +352,18 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
                 .distinctBy(MemoryNode::id)
                 .zipWithNext()
                 .forEach { (left, right) ->
-                    add(left, right, "temporal:${bucket.level.name}", weight, bucket.id)
+                    add(
+                        left = left,
+                        right = right,
+                        basis = "temporal:${bucket.level.name}",
+                        weight = weight,
+                        detail = bucket.id,
+                        extraMetadata = mapOf(
+                            "evidenceFamily" to "temporal-co-bucket",
+                            "evidencePolicy" to "latest",
+                            "temporalLevel" to bucket.level.name,
+                        ),
+                    )
                 }
         }
 
