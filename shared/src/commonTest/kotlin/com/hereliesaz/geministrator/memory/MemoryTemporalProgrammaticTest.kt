@@ -33,6 +33,30 @@ class MemoryTemporalProgrammaticTest {
     }
 
     @Test
+    fun sparseLongHistoryRollsByOrderedParentGroupsWithoutLosingEpisodes() {
+        val spacing = 8L * MemoryTemporalLevel.Day.durationMillis
+        val episodes = (0 until 512).map { index ->
+            episode(
+                id = "sparse-$index",
+                timestamp = index.toLong() * spacing,
+                projectId = "project",
+            )
+        }
+
+        val index = MemoryTemporalIndex.build(episodes)
+        val represented = index.buckets.flatMap { it.episodeIds }
+
+        assertEquals(episodes.size, represented.size)
+        assertEquals(episodes.mapTo(linkedSetOf(), MemoryEpisode::id), represented.toSet())
+        assertTrue(index.buckets.count { it.level == MemoryTemporalLevel.FifteenMinutes } <= 8)
+        assertTrue(index.buckets.count { it.level == MemoryTemporalLevel.OneHour } <= 6)
+        assertTrue(index.buckets.count { it.level == MemoryTemporalLevel.SixHours } <= 3)
+        assertTrue(index.buckets.count { it.level == MemoryTemporalLevel.TwelveHours } <= 2)
+        assertTrue(index.buckets.count { it.level == MemoryTemporalLevel.Day } <= 7)
+        assertTrue(index.buckets.any { it.level == MemoryTemporalLevel.Week })
+    }
+
+    @Test
     fun eightQuarterHourBucketsRemainGranularAndNinthRollsOldestWindowUp() {
         val quarterHour = MemoryTemporalLevel.FifteenMinutes.durationMillis
         val eight = (0 until 8).map { index -> episode("e$index", index.toLong() * quarterHour, "project") }
@@ -105,7 +129,7 @@ class MemoryTemporalProgrammaticTest {
         assertTrue(deterministic.any { it.metadata["basis"] == "scope:task-run" })
         assertTrue(deterministic.any {
             it.metadata["basis"] == "exact-identifier" &&
-                it.metadata["detail"]?.contains("foo.kt", ignoreCase = true) == true
+                it.metadata["detail"]?.contains("Foo.kt") == true
         })
     }
 
