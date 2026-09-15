@@ -17,6 +17,71 @@ class MemoryAssociationIntegrationTest {
     }
 
     @Test
+    fun temporalRebucketingReplacesItsOwnEvidenceButStillCombinesWithIndependentSupport() = runBlocking {
+        val episode = MemoryEpisode(
+            id = MemoryEpisodeId("temporal-evidence"),
+            sourceSessionId = "session",
+            projectId = "project",
+            userPrompt = "remember temporal evidence",
+            chunks = emptyList(),
+            createdAtEpochMillis = 1L,
+        )
+        val seed = node("temporal-seed", MemoryNodeKind.NounTag, "temporal seed", episode.id)
+        val target = node("temporal-target", MemoryNodeKind.Summary, "temporal target", episode.id)
+
+        fun temporalEdge(id: String, basis: String, weight: Float, createdAt: Long) = MemoryEdge(
+            id = MemoryEdgeId(id),
+            from = seed.id,
+            to = target.id,
+            relation = MemoryRelationKind.AssociatedWith,
+            weight = weight,
+            createdAtEpochMillis = createdAt,
+            // Deliberately omit evidenceFamily/evidencePolicy. The legacy-basis fallback must keep
+            // already-persisted temporal edges correct after this backend upgrade.
+            metadata = mapOf("basis" to basis, "deterministic" to "true"),
+        )
+
+        val rebucketedStore = InMemoryMemoryStore(
+            MemorySnapshot(
+                episodes = listOf(episode),
+                nodes = listOf(seed, target),
+                edges = listOf(
+                    temporalEdge("fine", "temporal:FifteenMinutes", 0.88f, 10L),
+                    temporalEdge("coarse", "temporal:Week", 0.50f, 20L),
+                ),
+            ),
+        )
+
+        val rebucketedHit = GraphMemoryTool(rebucketedStore)
+            .expand(seed.id, MemoryResolution.Summary, maxResults = 1)
+            .single()
+
+        // The week edge is the newer representation of the same temporal fact. It replaces the old
+        // fine-grained representation instead of reinforcing it to 0.94.
+        assertClose(weightedTraversalScore(0.50f, 1), rebucketedHit.score)
+
+        val reinforcedStore = InMemoryMemoryStore(
+            rebucketedStore.read().copy(
+                edges = rebucketedStore.read().edges + association(
+                    id = "independent",
+                    from = seed.id,
+                    to = target.id,
+                    weight = 0.50f,
+                    createdAt = 30L,
+                    metadata = mapOf("basis" to "scope:independent"),
+                ),
+            ),
+        )
+
+        val reinforcedHit = GraphMemoryTool(reinforcedStore)
+            .expand(seed.id, MemoryResolution.Summary, maxResults = 1)
+            .single()
+
+        // The current temporal 0.50 and a genuinely independent 0.50 fact do reinforce: 0.75.
+        assertClose(weightedTraversalScore(0.75f, 1), reinforcedHit.score)
+    }
+
+    @Test
     fun condensedMemoryStrengthensSharedAssociationsWithoutPromotingUniqueOnes() = runBlocking {
         val episode = MemoryEpisode(
             id = MemoryEpisodeId("condense-integration"),
@@ -65,7 +130,22 @@ class MemoryAssociationIntegrationTest {
                         relation = MemoryRelationKind.Supersedes,
                         createdAtEpochMillis = 10L,
                     ),
-                    association("a-shared", sourceA.id, sharedTarget.id, 0.50f),
+                    association(
+                        id = "a-old-temporal",
+                        from = sourceA.id,
+                        to = sharedTarget.id,
+                        weight = 0.88f,
+                        createdAt = 3L,
+                        metadata = mapOf("basis" to "temporal:FifteenMinutes"),
+                    ),
+                    association(
+                        id = "a-current-temporal",
+                        from = sourceA.id,
+                        to = sharedTarget.id,
+                        weight = 0.50f,
+                        createdAt = 4L,
+                        metadata = mapOf("basis" to "temporal:Week"),
+                    ),
                     association("b-shared", sourceB.id, sharedTarget.id, 0.50f),
                     association("a-unique", sourceA.id, uniqueTarget.id, 0.50f),
                 ),
@@ -85,8 +165,10 @@ class MemoryAssociationIntegrationTest {
                 setOf(edge.from, edge.to) == setOf(generalized.id, uniqueTarget.id)
         }
 
-        // Each condensed source contributes independent support. GRIP combines .50 + .50 as .75.
+        // Source A contributes its current temporal representation (.50), not .88 + .50. Source B
+        // independently contributes .50, so the generalized memory receives effective .75 support.
         assertEquals(2, inheritedShared.size)
+        assertEquals(listOf(0.50f, 0.50f), inheritedShared.map { it.weight }.sorted())
         assertClose(0.75f, accumulateAssociationStrength(inheritedShared.map { it.weight }))
         assertTrue(inheritedUnique.isEmpty())
 
@@ -120,13 +202,16 @@ class MemoryAssociationIntegrationTest {
         from: MemoryNodeId,
         to: MemoryNodeId,
         weight: Float,
+        createdAt: Long = 3L,
+        metadata: Map<String, String> = emptyMap(),
     ) = MemoryEdge(
         id = MemoryEdgeId(id),
         from = from,
         to = to,
         relation = MemoryRelationKind.AssociatedWith,
         weight = weight,
-        createdAtEpochMillis = 3L,
+        createdAtEpochMillis = createdAt,
+        metadata = metadata,
     )
 
     private fun assertClose(expected: Float, actual: Float, tolerance: Float = 0.0001f) {
