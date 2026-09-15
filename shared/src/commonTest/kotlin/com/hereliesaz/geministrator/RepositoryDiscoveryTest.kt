@@ -7,7 +7,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class RepositoryDiscoveryTest {
     @Test
-    fun githubSearchRanksOwnedRepositoriesBeforeExternalSuggestions() = runTest {
+    fun githubSearchRanksOwnedRepositoriesBeforeExternalSuggestions() = runBlocking {
         val engine = MockEngine { request ->
             val body = when (request.url.encodedPath) {
                 "/user" -> """{"login":"az"}"""
@@ -51,7 +51,7 @@ class RepositoryDiscoveryTest {
     }
 
     @Test
-    fun githubBlankSearchShowsOwnedRepositoriesWithoutGlobalSearch() = runTest {
+    fun githubBlankSearchShowsOwnedRepositoriesWithoutGlobalSearch() = runBlocking {
         var globalSearchCalled = false
         val engine = MockEngine { request ->
             val body = when (request.url.encodedPath) {
@@ -79,7 +79,7 @@ class RepositoryDiscoveryTest {
     }
 
     @Test
-    fun gitlabSearchRanksOwnedProjectsBeforeOtherVisibleProjects() = runTest {
+    fun gitlabSearchRanksOwnedProjectsBeforeOtherVisibleProjects() = runBlocking {
         val engine = MockEngine { request ->
             val owned = request.url.parameters["owned"] == "true"
             val body = if (owned) {
