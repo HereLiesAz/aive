@@ -158,8 +158,8 @@ object MemoryComputeSelector {
                 }
             }
         }
-        val backendIndex = requirements.preferredBackends.indexOfFirst {
-            it.equals(device.backend, ignoreCase = true)
+        val backendIndex = requirements.preferredBackends.indexOfFirst { preferenceHint ->
+            device.backend.contains(preferenceHint, ignoreCase = true)
         }
         val backendBonus = if (backendIndex >= 0) 100 - backendIndex.coerceAtMost(99) else 0
         return deviceScore + backendBonus
