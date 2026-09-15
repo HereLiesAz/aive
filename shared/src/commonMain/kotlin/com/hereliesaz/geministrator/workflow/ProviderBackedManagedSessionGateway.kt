@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.providers.AgentEvent
@@ -21,6 +23,7 @@ class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
     private val scope: CoroutineScope,
     private val memoryObserver: MemorySessionObserver = MemoryRuntimeBridge.observer,
+    private val inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
 ) : ManagedSessionGateway {
 
     private data class SessionSnapshot(
@@ -37,11 +40,17 @@ class ProviderBackedManagedSessionGateway(
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
-        val taskRequest = request.taskRequest.withRecalledMemory()
+        val recalledRequest = request.taskRequest.withRecalledMemory()
         val provider = selectProvider(
-            request.providerSelection.copy(repository = taskRequest.repository),
+            request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
         )
+        val prepared = inferenceFabric.prepareDispatch(
+            request = recalledRequest,
+            providerId = provider.id,
+            capabilities = provider.capabilities(),
+        )
+        val taskRequest = prepared.request
         return providerOperation("Unable to start provider session") {
             val run = provider.start(taskRequest)
             val handle = ManagedSessionHandle(
@@ -126,6 +135,7 @@ class ProviderBackedManagedSessionGateway(
                     val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
                 }
+                inferenceFabric.recordTerminal(handle.taskRunId, InferenceTerminalStatus.Cancelled)
                 recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
             }
             result
@@ -179,6 +189,11 @@ class ProviderBackedManagedSessionGateway(
                             }
                         }
                         if (failed) {
+                            inferenceFabric.recordTerminal(
+                                handle.taskRunId,
+                                InferenceTerminalStatus.Failed,
+                                "Provider observation failed repeatedly",
+                            )
                             recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
                         return@launch
@@ -313,8 +328,30 @@ class ProviderBackedManagedSessionGateway(
             }
         }
         if (!changed) return
+        when (event) {
+            is AgentEvent.ArtifactProduced -> inferenceFabric.recordArtifact(handle.taskRunId, event.artifact)
+            is AgentEvent.UsageReported -> inferenceFabric.recordUsage(
+                taskRunId = handle.taskRunId,
+                providerId = handle.providerId,
+                inputTokens = event.inputTokens,
+                outputTokens = event.outputTokens,
+                costUsd = event.costUsd,
+                cacheHitFraction = event.cacheHitFraction,
+                latencyMillis = event.latencyMillis,
+            )
+            else -> Unit
+        }
         recordMemory { memoryObserver.onSessionEvent(handle, event) }
         terminalStatus?.let { status ->
+            inferenceFabric.recordTerminal(
+                taskRunId = handle.taskRunId,
+                status = if (status == ManagedSessionStatus.Completed) {
+                    InferenceTerminalStatus.Completed
+                } else {
+                    InferenceTerminalStatus.Failed
+                },
+                reason = (event as? AgentEvent.Failed)?.reason,
+            )
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }
     }
