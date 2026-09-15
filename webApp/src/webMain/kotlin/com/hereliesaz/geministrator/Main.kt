@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegrat
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import io.ktor.client.HttpClient
 import kotlinx.browser.window
 
 private const val JULES_API_KEY_STORAGE_KEY = "haive.julesApiKey"
@@ -49,6 +51,10 @@ fun main() {
         var repositoryCredentials by remember { mutableStateOf(readWebRepositoryCredentials()) }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
         var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
+        val repositoryHttpClient = remember { HttpClient() }
+        DisposableEffect(Unit) {
+            onDispose { repositoryHttpClient.close() }
+        }
         val providers = remember(credentials, repositoryCredentials) {
             configuredWebProviders(credentials, repositoryCredentials)
         }
@@ -57,6 +63,9 @@ fun main() {
                 githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID),
                 gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID),
             )
+        }
+        val repositoryDiscovery = remember(repositoryCredentials) {
+            configuredWebRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
         }
 
         val repositoryServiceId = configuringRepositoryServiceId
@@ -84,6 +93,7 @@ fun main() {
                 providers = providers,
                 executorIntegrations = executorIntegrations,
                 connectedRepositoryServiceIds = repositoryCredentials.keys,
+                onSearchRepositories = repositoryDiscovery::search,
                 onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                 onDisconnectRepositoryService = { serviceId ->
                     window.localStorage.removeItem(repositoryStorageKey(serviceId))
@@ -221,6 +231,19 @@ internal fun configuredWebExecutorIntegrations(
 
 internal fun configuredWebExecutorIntegrations(githubToken: String?): TaskExecutorIntegrationRegistry =
     configuredWebExecutorIntegrations(githubToken, null)
+
+internal fun configuredWebRepositoryDiscovery(
+    repositoryCredentials: Map<String, String>,
+    httpClient: HttpClient,
+): RemoteRepositoryDiscoveryClient {
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
+    val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    return RemoteRepositoryDiscoveryClient(
+        httpClient = httpClient,
+        githubTokenProvider = githubToken?.let { token -> RepositoryServiceTokenProvider { token } },
+        gitlabTokenProvider = gitlabToken?.let { token -> RepositoryServiceTokenProvider { token } },
+    )
+}
 
 private fun readWebProviderCredentials(): Map<String, String> = buildMap {
     ProviderCatalog.entries.forEach { entry ->
