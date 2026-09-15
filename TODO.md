@@ -50,11 +50,11 @@ Tracking issue: #35
 - [x] Attach baseline single-model compound-inference metadata to every `AgentTaskRequest`, including direct dependency artifact ancestry.
 - [x] Populate complete workflow/project/task/role coordinates before provider dispatch so genealogy is fully namespaced without fallback inference.
 - [ ] Persist the genealogy graph and expose it to verification/aggregation without turning it into a truth database.
-- [ ] Add genealogy governance for common ancestry, unsupported consensus, circular derivation, missing evidence, and independence checks.
+- [x] Add genealogy governance for common ancestry, unsupported consensus, circular derivation, missing evidence, and independence checks.
 - [x] Establish the Blueprint-style runtime fabric: model/agent registry, data registry, typed stream fabric, task/data planning boundary, and provider resource telemetry for provider-backed inference.
 - [ ] Persist/restore inference registries, streams, and resource history, and ingest non-agent executor evidence directly instead of only when it later enters model context.
 - [ ] Make task/data planning resource-aware and capable of choosing an implemented execution topology rather than only honoring the already-authorized strategy.
-- [ ] Implement centralized mixture-of-agents as a governed proposer → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
+- [x] Implement centralized mixture-of-agents as a governed proposer → genealogy gate → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
 - [ ] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
 - [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models.
 - [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner.
