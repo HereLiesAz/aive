@@ -41,6 +41,18 @@ A coarse bucket preserves the episode IDs represented by its finer source bucket
 
 Temporal compaction is therefore retrieval/index compaction, not memory deletion.
 
+## The MemoryStore is the association boundary
+
+Project IDs are memory metadata, not memory-isolation boundaries.
+
+Different saved/cloned projects use different memory-store locations. If two project IDs occur inside the same `MemoryStore`, Haive should assume that they are intentionally part of the same remembered working universe and permit associations between them.
+
+This matters when one orchestration works on two projects at once. The context switch itself, shared time window, shared task/workflow run, shared identifier, or shared semantic cue may be exactly what lets a later agent remember that the two pieces of work were connected.
+
+Therefore deterministic association must **not** reject a relationship merely because the two source episodes have different `projectId` values.
+
+`projectId` can still be used as a useful positive association signal, but never as an association firewall inside one store.
+
 ## Programmatic associations
 
 The backend should create neutral `AssociatedWith` graph edges whenever a relationship can be established mechanically.
@@ -62,6 +74,8 @@ Examples:
 - `Web Wasm` ↔ `Web Wasm`
 - `test` ↔ `test`
 - `build verification` ↔ `build verification`
+
+This identity matching applies across project IDs when those memories live in the same store.
 
 ### Exact identifiers and artifacts
 
@@ -88,18 +102,23 @@ Episode representatives can be associated from exact shared orchestration coordi
 - source session
 - task run
 - workflow run
-- task definition within a project
-- workflow definition within a project
+- task definition
+- workflow definition
+- role/project combination
 
-Project identity alone is intentionally not enough to create a dense all-to-all graph.
+Source session, task-run, and workflow-run identity intentionally remain capable of spanning project IDs. One orchestration may legitimately be touching several projects at once.
 
 ### Sequential work history
 
-Chronologically adjacent episodes in the same project can be linked as neighboring work-history events. This expresses sequence only; it does not imply causation.
+Chronologically adjacent episodes in the same memory store can be linked as neighboring work-history events. This preserves project-to-project context switches as real remembered sequence.
+
+Same-project adjacency can also be recorded as a slightly stronger bookkeeping signal.
+
+Sequence expresses temporal ordering only; it does not imply causation.
 
 ### Temporal co-bucketing
 
-Episode representatives that occupy the same active temporal bucket can be associated programmatically. The edge basis records the bucket level, such as:
+Episode representatives that occupy the same active temporal bucket can be associated programmatically even when they have different project IDs. The edge basis records the bucket level, such as:
 
 - `temporal:FifteenMinutes`
 - `temporal:OneHour`
@@ -108,7 +127,7 @@ Episode representatives that occupy the same active temporal bucket can be assoc
 - `temporal:Day`
 - `temporal:Week`
 
-Temporal proximity does not imply semantic similarity or causal relationship. It only records that the memories occurred within the same active time window.
+Temporal proximity does not imply semantic similarity or causal relationship. It only records that the memories occurred within the same active time window in the same memory store.
 
 ## Graph-density rule
 
@@ -151,4 +170,4 @@ The Attention Deficit Dial controls how readily those related cues enter active 
 
 ## Durable rule
 
-> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. Save model inference for relationships that actually require semantics.**
+> **If a relationship can be established exactly from time, provenance, orchestration metadata, sequence, or identifier identity, derive it in code. The memory store is the association universe; project IDs are context, not walls. Save model inference for relationships that actually require semantics.**
