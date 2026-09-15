@@ -58,6 +58,24 @@ GRIP(tags, resolution = Context)
 
 The tag query begins from actual matching `NounTag`, `VerbTag`, and `Category` nodes and traverses the existing graph. It is not a second retrieval system and does not reduce category/subject cues to a prose search first.
 
+## Weighted graph traversal
+
+GRIP treats association weights as retrieval evidence. `MemoryEdge.weight` must not be discarded when the graph is projected from a cue to another memory resolution.
+
+Path scoring combines cumulative edge strength with the existing hop-distance attenuation. A weak temporal association therefore remains weaker than an exact cue/provenance association at the same graph distance.
+
+When several independent traversable edges connect the same pair of nodes, GRIP first accumulates their strength with the canonical complementary-exponential curve:
+
+```text
+combined = 1 - Π(1 - wi)
+```
+
+Then path traversal multiplies the accumulated pair strengths across hops and applies the hop-distance penalty. This means repeated evidence can make a relationship easier to recall, while weak or indirect paths naturally fade.
+
+For example, two independent `0.50` associations between the same nodes produce effective pair strength `0.75`, not `1.0`. A single week-level `0.50` temporal edge remains materially weaker than a `1.0` exact-cue edge.
+
+The full accumulation/condensation semantics are normative in [`TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md).
+
 ## Deliberate banks and reminders
 
 A note to self, small plan, checkpoint, unfinished follow-up, or similar reminder is an ordinary deliberate memory bank.
@@ -109,4 +127,4 @@ Even at high attention, semantic cues remain the default payload. Increased atte
 
 ## Durable rule
 
-> **BANK deposits experience. GRIP cues recollection. Entity, action, and category/subject tags are normal memory addresses and normal first results. Deliberate banks jump next in line, then become ordinary associative memory.**
+> **BANK deposits experience. GRIP cues recollection. Entity, action, and category/subject tags are normal memory addresses and normal first results. GRIP preserves associative weight, repeated evidence accumulates with diminishing returns, and deliberate banks jump next in line before becoming ordinary associative memory.**

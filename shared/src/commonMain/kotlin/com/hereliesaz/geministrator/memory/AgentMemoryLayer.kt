@@ -6,6 +6,10 @@ package com.hereliesaz.geministrator.memory
  * The live workflow uses [sessionObserver] for lifecycle banking and [tool] for deliberate banking,
  * tag-first recall, and explicit drill-down. Consolidation remains a separate operation and is
  * available only when a Memory Manager has been configured.
+ *
+ * Deterministic temporal organization and bookkeeping associations are kept outside the Memory
+ * Clerks. They are derived programmatically from immutable episode timestamps, provenance,
+ * orchestration scope, sequence, and exact identifiers.
  */
 class AgentMemoryLayer private constructor(
     val store: MemoryStore,
@@ -13,9 +17,26 @@ class AgentMemoryLayer private constructor(
     val queue: MemoryConsolidationQueue,
     val sessionObserver: MemorySessionObserver,
     private val consolidator: MemoryConsolidator?,
+    private val programmaticAssociator: MemoryProgrammaticAssociator,
 ) {
-    suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult =
-        consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
+    suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
+        val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
+        if (result is MemoryConsolidationResult.Completed) {
+            programmaticAssociator.refresh(nowEpochMillis)
+        }
+        return result
+    }
+
+    /** Refresh exact/bookkeeping associations without invoking a model. */
+    suspend fun refreshProgrammaticAssociations(nowEpochMillis: Long): Int =
+        programmaticAssociator.refresh(nowEpochMillis)
+
+    /**
+     * Returns the active derived temporal index. Building it is deterministic and non-destructive;
+     * no model call or persistence mutation is required.
+     */
+    suspend fun temporalIndex(): MemoryTemporalIndex =
+        MemoryTemporalIndex.build(store.read().episodes)
 
     suspend fun pendingEpisodes(): List<MemoryQueueEntry> = store.read().queue
         .filter { it.status != MemoryQueueStatus.Complete }
@@ -38,6 +59,7 @@ class AgentMemoryLayer private constructor(
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
                 consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
+                programmaticAssociator = MemoryProgrammaticAssociator(store),
             )
         }
 

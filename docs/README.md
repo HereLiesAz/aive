@@ -29,9 +29,13 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/MEMORY_LOCAL_INFERENCE.md`](architecture/MEMORY_LOCAL_INFERENCE.md) defines the hardware-aware local inference boundary: separate generative and embedding workloads, accelerator discovery/selection, CPU fallback, cached ONNX Runtime sessions, and observed-execution reporting.
 
+### Temporal memory and programmatic associations
+
+[`architecture/TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](architecture/TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md) defines the deterministic temporal roll-up ladder (8×15m, 6×1h, 3×6h, 2×12h, 7×day, unlimited weeks), exact bookkeeping associations, weighted traversal, saturating associative reinforcement, and the rule that condensation loses specificity while shared associations strengthen.
+
 ### GRIP memory recall
 
-[`architecture/GRIP.md`](architecture/GRIP.md) defines the memory-tool API contract: `bank(...)` for deposits, `grip(...)` for memory-specific direct recall, CoTR tags as direct memory addresses, priority-next consolidation for deliberate banks, and tag-first results before deeper explicit recall.
+[`architecture/GRIP.md`](architecture/GRIP.md) defines the memory-tool API contract: `bank(...)` for deposits, `grip(...)` for memory-specific direct recall, CoTR tags as direct memory addresses, priority-next consolidation for deliberate banks, tag-first results before deeper explicit recall, and weighted graph traversal.
 
 ### Persistence
 

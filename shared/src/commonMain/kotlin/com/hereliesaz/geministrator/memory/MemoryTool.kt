@@ -94,7 +94,7 @@ class GraphMemoryTool(
         val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
         require(nodeId in nodesById) { "Memory node ${nodeId.value} was not found" }
         val activeIds = snapshot.activeNodes(null).mapTo(hashSetOf()) { it.id }
-        val distances = projectToKinds(
+        val paths = projectToKinds(
             start = nodeId,
             targetKinds = resolution.nodeKinds(),
             nodesById = nodesById,
@@ -102,14 +102,18 @@ class GraphMemoryTool(
             activeIds = activeIds,
             maxDepth = 6,
         )
-        return distances.entries
-            .sortedBy { it.value }
+        return paths.entries
+            .sortedWith(
+                compareByDescending<Map.Entry<MemoryNodeId, TraversalPath>> { it.value.score }
+                    .thenBy { it.value.depth }
+                    .thenBy { it.key.value },
+            )
             .take(maxResults)
-            .mapNotNull { (id, distance) ->
+            .mapNotNull { (id, path) ->
                 nodesById[id]?.let { node ->
                     MemoryRecallHit(
                         node = node,
-                        score = (1f / (1f + distance * 0.35f)).coerceIn(0f, 1f),
+                        score = path.score,
                         conflicts = if (includeConflicts) snapshot.conflictsFor(id, nodesById) else emptyList(),
                     )
                 }
@@ -147,11 +151,10 @@ private fun MemorySnapshot.recallFromSeeds(
             adjacency = adjacency,
             activeIds = activeIds,
             maxDepth = 6,
-        ).forEach { (nodeId, distance) ->
+        ).forEach { (nodeId, path) ->
             val targetNode = nodesById[nodeId] ?: return@forEach
             val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
-            val projectedScore = (score * (1f / (1f + distance * 0.35f)) + hierarchyBoost * 0.5f)
-                .coerceIn(0f, 1f)
+            val projectedScore = (score * path.score + hierarchyBoost * 0.5f).coerceIn(0f, 1f)
             projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
         }
     }
@@ -214,13 +217,32 @@ private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {
 
 private data class Neighbor(
     val id: MemoryNodeId,
-    val relation: MemoryRelationKind,
+    val weight: Float,
 )
 
-private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> = buildMap {
+/**
+ * Parallel graph facts between the same pair are independent associative evidence. Collapse them
+ * with the same saturating curve used by condensation before GRIP starts path traversal.
+ */
+private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
+    val weightsBySource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<Float>>>()
+
+    fun add(from: MemoryNodeId, to: MemoryNodeId, weight: Float) {
+        if (weight <= 0f) return
+        val byTarget = weightsBySource.getOrPut(from) { linkedMapOf() }
+        byTarget.getOrPut(to) { mutableListOf() } += weight
+    }
+
     edges.forEach { edge ->
-        put(edge.from, getOrElse(edge.from) { emptyList() } + Neighbor(edge.to, edge.relation))
-        put(edge.to, getOrElse(edge.to) { emptyList() } + Neighbor(edge.from, edge.relation))
+        if (!edge.relation.isRecallTraversable()) return@forEach
+        add(edge.from, edge.to, edge.weight)
+        add(edge.to, edge.from, edge.weight)
+    }
+
+    return weightsBySource.mapValues { (_, byTarget) ->
+        byTarget.entries.map { (target, weights) ->
+            Neighbor(target, accumulateAssociationStrength(weights))
+        }
     }
 }
 
@@ -295,6 +317,19 @@ private fun scopeAffinity(
         ?: 0f
 }
 
+private data class TraversalPath(
+    val depth: Int,
+    val cumulativeEdgeStrength: Float,
+) {
+    val score: Float
+        get() = weightedTraversalScore(cumulativeEdgeStrength, depth)
+}
+
+/**
+ * Finds the strongest weighted path to each requested node kind up to [maxDepth]. Because depth is
+ * strictly bounded, we can retain the strongest cumulative edge strength for every node at each
+ * depth without a global visited set; this avoids discarding a stronger-but-longer path too early.
+ */
 private fun projectToKinds(
     start: MemoryNodeId,
     targetKinds: Set<MemoryNodeKind>,
@@ -302,28 +337,40 @@ private fun projectToKinds(
     adjacency: Map<MemoryNodeId, List<Neighbor>>,
     activeIds: Set<MemoryNodeId>,
     maxDepth: Int,
-): Map<MemoryNodeId, Int> {
-    val result = linkedMapOf<MemoryNodeId, Int>()
-    val visited = mutableSetOf(start)
-    var frontier = listOf(start)
+): Map<MemoryNodeId, TraversalPath> {
+    val result = linkedMapOf<MemoryNodeId, TraversalPath>()
+    var frontier = linkedMapOf(start to 1f)
     var depth = 0
+
     while (frontier.isNotEmpty() && depth <= maxDepth) {
-        val next = mutableListOf<MemoryNodeId>()
-        frontier.forEach { id ->
+        frontier.forEach { (id, edgeStrength) ->
             val node = nodesById[id]
-            if (id in activeIds && node?.kind in targetKinds && id !in result) {
-                result[id] = depth
+            if (id in activeIds && node?.kind in targetKinds) {
+                val candidate = TraversalPath(depth, edgeStrength)
+                val existing = result[id]
+                if (existing == null || candidate.score > existing.score) {
+                    result[id] = candidate
+                }
             }
+        }
+
+        if (depth == maxDepth) break
+
+        val next = linkedMapOf<MemoryNodeId, Float>()
+        frontier.forEach { (id, edgeStrength) ->
             adjacency[id].orEmpty().forEach { neighbor ->
-                if (neighbor.id !in visited && neighbor.relation.isRecallTraversable()) {
-                    visited += neighbor.id
-                    next += neighbor.id
+                val cumulative = (edgeStrength * neighbor.weight).coerceIn(0f, 1f)
+                if (cumulative <= 0f) return@forEach
+                val existing = next[neighbor.id]
+                if (existing == null || cumulative > existing) {
+                    next[neighbor.id] = cumulative
                 }
             }
         }
         frontier = next
         depth += 1
     }
+
     return result
 }
 
