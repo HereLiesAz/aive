@@ -23,8 +23,8 @@ data object NoOpMemorySessionObserver : MemorySessionObserver {
 
 /**
  * Collects the useful episodic trace while a spawn is alive, then hands one immutable envelope to
- * the serialized consolidation queue. Progress heartbeats, token telemetry, and approval acks are
- * intentionally excluded before memory processing.
+ * the serialized consolidation queue. Progress heartbeats, token telemetry, approval acks, and
+ * recalled Memory context are intentionally excluded before memory processing.
  */
 class QueuedMemorySessionObserver(
     private val queue: MemoryConsolidationQueue,
@@ -65,9 +65,11 @@ class QueuedMemorySessionObserver(
         request.promptContext.stablePrefix.forEach { block ->
             initialParts += MemorySessionPart(MemorySourceKind.PromptContext, block.label, block.content)
         }
-        request.promptContext.dynamicContext.forEach { block ->
-            initialParts += MemorySessionPart(MemorySourceKind.PromptContext, block.label, block.content)
-        }
+        request.promptContext.dynamicContext
+            .filterNot { block -> block.label.equals(MEMORY_RECALL_PROMPT_LABEL, ignoreCase = true) }
+            .forEach { block ->
+                initialParts += MemorySessionPart(MemorySourceKind.PromptContext, block.label, block.content)
+            }
         request.contextArtifacts.forEach { artifact ->
             val evidence = buildString {
                 append(artifact.label)
@@ -154,6 +156,8 @@ class QueuedMemorySessionObserver(
         )
     }
 }
+
+internal const val MEMORY_RECALL_PROMPT_LABEL: String = "Relevant memory"
 
 @OptIn(ExperimentalTime::class)
 private fun systemNowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
