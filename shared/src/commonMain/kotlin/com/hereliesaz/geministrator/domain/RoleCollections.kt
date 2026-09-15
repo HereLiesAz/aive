@@ -49,7 +49,7 @@ fun roleCollectionEntries(
         .distinctBy(RoleDefinition::id)
         .map { it.copy(enabled = true) }
     val activeIds = active.mapTo(mutableSetOf(), RoleDefinition::id)
-    val historical = (BuiltInRoles.all + existingStored)
+    val historical = (existingStored + BuiltInRoles.all)
         .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
         .distinctBy(RoleDefinition::id)
         .filter { it.id !in activeIds }
