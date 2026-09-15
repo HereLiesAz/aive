@@ -55,7 +55,7 @@ data class JulesSession(
     val id: String,
     val prompt: String? = null,
     val title: String? = null,
-    val state: String,
+    val state: String? = null,
     val url: String? = null,
     val outputs: List<JulesSessionOutput> = emptyList(),
     val createTime: String? = null,
