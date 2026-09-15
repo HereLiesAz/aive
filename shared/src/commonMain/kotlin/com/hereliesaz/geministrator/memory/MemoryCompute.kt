@@ -89,11 +89,15 @@ object MemoryComputeSelector {
         devices: List<MemoryComputeDevice>,
         requirements: MemoryModelRequirements,
         preference: MemoryComputePreference = MemoryComputePreference.AUTO,
+        modelId: String? = null,
     ): MemoryComputeSelection {
         val compatible = devices
             .asSequence()
             .filter(MemoryComputeDevice::available)
             .filter { it.deviceType in requirements.allowedDeviceTypes }
+            .filter { device ->
+                modelId == null || device.supportedModels.isEmpty() || modelId in device.supportedModels
+            }
             .filter { device ->
                 val minimum = requirements.minimumDedicatedMemoryBytes
                 minimum == null || device.deviceType == MemoryComputeDeviceType.CPU ||
