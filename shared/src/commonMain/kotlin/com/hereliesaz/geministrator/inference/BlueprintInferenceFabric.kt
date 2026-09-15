@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -120,6 +121,12 @@ sealed interface InferenceStreamPayload {
         val dataIds: List<String>,
         val candidateBudget: Int,
         val aggregatorDepth: Int,
+    ) : InferenceStreamPayload
+
+    data class ProviderRunBound(
+        val providerId: AgentProviderId,
+        val providerRunId: ProviderRunId,
+        val taskRunId: TaskRunId,
     ) : InferenceStreamPayload
 
     data class ArtifactObserved(
@@ -244,6 +251,11 @@ data class PreparedInferenceDispatch(
     val plan: InferenceExecutionPlan,
 )
 
+data class InferenceProviderRunKey(
+    val providerId: AgentProviderId,
+    val providerRunId: ProviderRunId,
+)
+
 enum class InferenceTerminalStatus {
     Completed,
     Failed,
@@ -263,11 +275,22 @@ interface CompoundInferenceFabric {
         capabilities: AgentCapabilities,
     ): PreparedInferenceDispatch
 
-    suspend fun recordArtifact(taskRunId: TaskRunId, artifact: ProviderArtifact)
-
-    suspend fun recordUsage(
+    suspend fun bindProviderRun(
+        invocationId: String,
         taskRunId: TaskRunId,
         providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+    )
+
+    suspend fun recordArtifact(
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+        artifact: ProviderArtifact,
+    )
+
+    suspend fun recordUsage(
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
         inputTokens: Long?,
         outputTokens: Long?,
         costUsd: Double?,
@@ -276,7 +299,14 @@ interface CompoundInferenceFabric {
     )
 
     suspend fun recordTerminal(
-        taskRunId: TaskRunId,
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+        status: InferenceTerminalStatus,
+        reason: String? = null,
+    )
+
+    suspend fun recordTerminal(
+        invocationId: String,
         status: InferenceTerminalStatus,
         reason: String? = null,
     )
@@ -298,7 +328,7 @@ class BlueprintCompoundInferenceFabric(
     private val planner: CompoundInferenceTaskPlanner = DefaultCompoundInferenceTaskPlanner,
 ) : CompoundInferenceFabric {
     private val mutex = Mutex()
-    private val invocationByTaskRun = linkedMapOf<TaskRunId, String>()
+    private val invocationByProviderRun = linkedMapOf<InferenceProviderRunKey, String>()
     private val nextInvocationSequenceByTaskRun = linkedMapOf<TaskRunId, Long>()
 
     override suspend fun prepareDispatch(
@@ -337,9 +367,6 @@ class BlueprintCompoundInferenceFabric(
                 data = data,
             ),
         )
-        mutex.withLock {
-            invocationByTaskRun[preparedRequest.taskRunId] = plan.invocationId
-        }
         streamFabric.append(
             invocationId = plan.invocationId,
             payload = InferenceStreamPayload.DispatchPrepared(
@@ -353,8 +380,32 @@ class BlueprintCompoundInferenceFabric(
         return PreparedInferenceDispatch(request = preparedRequest, plan = plan)
     }
 
-    override suspend fun recordArtifact(taskRunId: TaskRunId, artifact: ProviderArtifact) {
-        val invocationId = invocationId(taskRunId) ?: return
+    override suspend fun bindProviderRun(
+        invocationId: String,
+        taskRunId: TaskRunId,
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+    ) {
+        val key = InferenceProviderRunKey(providerId, providerRunId)
+        mutex.withLock {
+            val existing = invocationByProviderRun[key]
+            require(existing == null || existing == invocationId) {
+                "Provider run ${providerId.value}/${providerRunId.value} is already bound to another inference invocation"
+            }
+            invocationByProviderRun[key] = invocationId
+        }
+        streamFabric.append(
+            invocationId = invocationId,
+            payload = InferenceStreamPayload.ProviderRunBound(providerId, providerRunId, taskRunId),
+        )
+    }
+
+    override suspend fun recordArtifact(
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+        artifact: ProviderArtifact,
+    ) {
+        val invocationId = invocationId(providerId, providerRunId) ?: return
         streamFabric.append(
             invocationId = invocationId,
             payload = InferenceStreamPayload.ArtifactObserved(
@@ -366,15 +417,15 @@ class BlueprintCompoundInferenceFabric(
     }
 
     override suspend fun recordUsage(
-        taskRunId: TaskRunId,
         providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
         inputTokens: Long?,
         outputTokens: Long?,
         costUsd: Double?,
         cacheHitFraction: Float?,
         latencyMillis: Long?,
     ) {
-        val invocationId = invocationId(taskRunId) ?: return
+        val invocationId = invocationId(providerId, providerRunId) ?: return
         val sample = InferenceResourceSample(
             invocationId = invocationId,
             providerId = providerId,
@@ -398,16 +449,29 @@ class BlueprintCompoundInferenceFabric(
     }
 
     override suspend fun recordTerminal(
-        taskRunId: TaskRunId,
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
         status: InferenceTerminalStatus,
         reason: String?,
     ) {
-        val invocationId = invocationId(taskRunId) ?: return
+        val invocationId = invocationId(providerId, providerRunId) ?: return
+        recordTerminal(invocationId, status, reason)
+    }
+
+    override suspend fun recordTerminal(
+        invocationId: String,
+        status: InferenceTerminalStatus,
+        reason: String?,
+    ) {
         streamFabric.append(invocationId, InferenceStreamPayload.Terminal(status, reason))
     }
 
-    private suspend fun invocationId(taskRunId: TaskRunId): String? =
-        mutex.withLock { invocationByTaskRun[taskRunId] }
+    private suspend fun invocationId(
+        providerId: AgentProviderId,
+        providerRunId: ProviderRunId,
+    ): String? = mutex.withLock {
+        invocationByProviderRun[InferenceProviderRunKey(providerId, providerRunId)]
+    }
 
     private fun ArtifactRef.toInferenceData(): InferenceDataDescriptor = InferenceDataDescriptor(
         dataId = "artifact:${id.value}",
