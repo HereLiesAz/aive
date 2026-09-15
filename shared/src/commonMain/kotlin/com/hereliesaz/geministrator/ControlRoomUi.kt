@@ -408,6 +408,11 @@ private fun MainDestination(
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.AddOns -> com.hereliesaz.geministrator.addons.AddonHostScreen(
+                installations = emptyList(),
+                onInstall = { _, _ -> },
+                onRemove = {},
+                onEnableDisable = { _, _ -> },
+                onAddAgentsToCompany = {},
                 modifier = Modifier.fillMaxSize()
             )
             ControlRoomDestination.Settings -> ProviderSettingsScreen(
