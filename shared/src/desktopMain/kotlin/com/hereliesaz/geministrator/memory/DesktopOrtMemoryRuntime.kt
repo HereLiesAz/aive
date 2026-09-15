@@ -50,6 +50,7 @@ class DesktopOrtHardwareCapabilityDetector(
             put("vendor", device.getVendor())
             put("epVendor", epDevice.getEpVendor())
             put("vendorId", device.getVendorId().toString())
+            put("hardwareIdentityVerified", "true")
         }
         val type = device.getType().toMemoryDeviceType()
         return MemoryComputeDevice(
@@ -73,7 +74,10 @@ class DesktopOrtHardwareCapabilityDetector(
             deviceName = backend.removeSuffix("ExecutionProvider"),
             deviceType = type,
             deviceId = if (type == MemoryComputeDeviceType.CPU) null else 0,
-            metadata = mapOf("syntheticDiscovery" to "true"),
+            metadata = mapOf(
+                "syntheticDiscovery" to "true",
+                "hardwareIdentityVerified" to (type == MemoryComputeDeviceType.CPU).toString(),
+            ),
         )
     }
 }
@@ -102,21 +106,24 @@ class DesktopOrtPreparedSession internal constructor(
         runCatching { profileFile.delete() }
         if (nodeProviders.isEmpty()) return report
 
-        val providers = nodeProviders.distinct()
-        val actualDevices = providers.map { providerName ->
-            discoveredDevices.firstOrNull { it.backend.equals(providerName, ignoreCase = true) }
-                ?: if (selection.device.backend.equals(providerName, ignoreCase = true)) {
-                    selection.device
-                } else {
-                    MemoryComputeDevice(
-                        backend = providerName,
-                        deviceName = providerName.removeSuffix("ExecutionProvider"),
-                        deviceType = providerType(providerName),
-                    )
-                }
+        val actualDevices = nodeProviders.distinct().mapNotNull { providerName ->
+            val discovered = discoveredDevices.firstOrNull { it.backend.equals(providerName, ignoreCase = true) }
+            when {
+                discovered?.deviceType == MemoryComputeDeviceType.CPU -> discovered
+                discovered?.metadata?.get("hardwareIdentityVerified") == "true" -> discovered
+                selection.device.backend.equals(providerName, ignoreCase = true) &&
+                    selection.device.metadata["hardwareIdentityVerified"] == "true" -> selection.device
+                else -> null
+            }
         }.distinctBy { Triple(it.backend, it.deviceId, it.deviceType) }
-        val acceleratedEvents = nodeProviders.count { providerType(it) != MemoryComputeDeviceType.CPU }
-        val fraction = acceleratedEvents.toFloat() / nodeProviders.size
+        val observedAcceleratedProviders = nodeProviders.count { providerName ->
+            discoveredDevices.any {
+                it.backend.equals(providerName, ignoreCase = true) &&
+                    it.deviceType != MemoryComputeDeviceType.CPU &&
+                    it.metadata["hardwareIdentityVerified"] == "true"
+            }
+        }
+        val fraction = observedAcceleratedProviders.toFloat() / nodeProviders.size
         val cpuFallback = selection.device.deviceType != MemoryComputeDeviceType.CPU &&
             actualDevices.any { it.deviceType == MemoryComputeDeviceType.CPU }
 
@@ -137,8 +144,8 @@ class DesktopOrtPreparedSession internal constructor(
 }
 
 /**
- * Chooses the best available provider for each model, keeps CPU as an explicit fallback policy,
- * and caches sessions by model/path/preference/workload.
+ * Chooses the best available provider for each model, tries compatible accelerators in rank order,
+ * keeps CPU as the explicit final fallback, and caches the first session that accepts the model.
  */
 class DesktopOrtMemorySessionManager(
     val computePreference: MemoryComputePreference = MemoryComputePreference.AUTO,
@@ -175,49 +182,50 @@ class DesktopOrtMemorySessionManager(
                 model.requirements.preferredBackends + platform.preferredExecutionProviders()
             ).distinct(),
         )
-        val initialSelection = MemoryComputeSelector.select(discovered, rankedRequirements, computePreference)
-        val selection = initialSelection.copy(
-            device = initialSelection.device.copy(
-                supportedModels = initialSelection.device.supportedModels + model.modelId,
-            ),
+        val attempts = MemoryComputeSelector.rank(
+            devices = discovered,
+            requirements = rankedRequirements,
+            preference = computePreference,
+            modelId = model.modelId,
         )
-        val created = createSession(modelPath, model, selection, discovered, providerOptions)
-        val previous = sessions.putIfAbsent(key, created)
+        require(attempts.isNotEmpty()) { "No compatible local compute device is available for ${model.modelId}" }
+
+        val failures = mutableListOf<Pair<MemoryComputeSelection, Throwable>>()
+        var created: DesktopOrtPreparedSession? = null
+        for (attempt in attempts) {
+            val selected = attempt.copy(
+                device = attempt.device.copy(
+                    supportedModels = attempt.device.supportedModels + model.modelId,
+                    metadata = if (attempt.device.deviceType == MemoryComputeDeviceType.CPU && failures.isNotEmpty()) {
+                        attempt.device.metadata + mapOf(
+                            "fallbackFrom" to failures.joinToString(",") { it.first.device.backend },
+                            "fallbackReason" to (failures.last().second.message
+                                ?: failures.last().second::class.simpleName.orEmpty()).take(240),
+                        )
+                    } else {
+                        attempt.device.metadata
+                    },
+                ),
+            )
+            val options = if (selected.device.deviceType == MemoryComputeDeviceType.CPU) emptyMap() else providerOptions
+            try {
+                created = createSessionAttempt(modelPath, model, selected, discovered, options)
+                break
+            } catch (failure: Throwable) {
+                failures += selected to failure
+            }
+        }
+        val usable = created ?: throw IllegalStateException(
+            "No ONNX Runtime execution provider accepted ${model.modelId}; tried " +
+                failures.joinToString { it.first.device.backend },
+            failures.lastOrNull()?.second,
+        )
+        val previous = sessions.putIfAbsent(key, usable)
         if (previous != null) {
-            created.close()
+            usable.close()
             return previous
         }
-        return created
-    }
-
-    private fun createSession(
-        modelPath: String,
-        model: MemoryMicroAgentModelSpec,
-        selection: MemoryComputeSelection,
-        discovered: List<MemoryComputeDevice>,
-        providerOptions: Map<String, String>,
-    ): DesktopOrtPreparedSession {
-        return try {
-            createSessionAttempt(modelPath, model, selection, discovered, providerOptions)
-        } catch (acceleratorFailure: Throwable) {
-            if (selection.device.deviceType == MemoryComputeDeviceType.CPU || !model.requirements.allowCpuFallback) {
-                throw acceleratorFailure
-            }
-            val cpu = discovered.firstOrNull { it.deviceType == MemoryComputeDeviceType.CPU }
-                ?: MemoryComputeDevice("CPUExecutionProvider", "CPU", MemoryComputeDeviceType.CPU)
-            val cpuSelection = MemoryComputeSelection(
-                preference = computePreference,
-                device = cpu.copy(
-                    supportedModels = cpu.supportedModels + model.modelId,
-                    metadata = cpu.metadata + mapOf(
-                        "fallbackFrom" to selection.device.backend,
-                        "fallbackReason" to (acceleratorFailure.message ?: acceleratorFailure::class.simpleName.orEmpty()).take(240),
-                    ),
-                ),
-                cpuFallbackEnabled = false,
-            )
-            createSessionAttempt(modelPath, model, cpuSelection, discovered, emptyMap())
-        }
+        return usable
     }
 
     private fun createSessionAttempt(
