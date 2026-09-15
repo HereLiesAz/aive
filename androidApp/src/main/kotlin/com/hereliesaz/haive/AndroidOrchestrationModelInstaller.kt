@@ -76,13 +76,15 @@ internal class AndroidOrchestrationModelInstaller(
                 val extracted = File(staging, "extracted")
                 extracted.mkdirs()
                 extractTarGzSafely(archive, extracted)
-                val installed = locateInstalledModel(role, extracted)
+                locateInstalledModel(role, extracted)
 
                 destination.parentFile?.mkdirs()
                 destination.deleteRecursively()
-                check(extracted.renameTo(destination)) {
+                if (!extracted.renameTo(destination)) {
                     extracted.copyRecursively(destination, overwrite = true)
-                    destination.isDirectory
+                    check(destination.isDirectory) {
+                        "Could not finalize orchestration model installation for $role"
+                    }
                 }
                 staging.deleteRecursively()
                 findInstalled(role, destination)
