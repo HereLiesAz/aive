@@ -1,7 +1,6 @@
 package com.hereliesaz.haive
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
-import ai.onnxruntime.NodeInfo
 import ai.onnxruntime.OnnxJavaType
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
@@ -16,8 +15,6 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationEpoch8ModelCatalo
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
 import com.hereliesaz.geministrator.orchestration.validateAgainst
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import java.nio.ShortBuffer
@@ -109,12 +106,12 @@ internal class AndroidOrchestrationAgentRuntime(
         val promptIds = tokenizer.encode(prompt).ids
         require(promptIds.isNotEmpty()) { "Tokenizer returned no prompt tokens" }
         val stopIds = listOf("<|im_end|>", "<|endoftext|>")
-            .mapNotNull { token -> tokenizer.encode(token).ids.firstOrNull() }
+            .mapNotNull { token -> tokenizer.encode(token).ids.singleOrNull() }
             .toSet()
         val generated = mutableListOf<Long>()
 
         var totalLength = promptIds.size
-        var previousResult: OrtSession.Result? = null
+        var activeResult: OrtSession.Result? = null
         try {
             val initialOwned = mutableListOf<OnnxTensor>()
             val initialInputs = buildInputs(
@@ -125,13 +122,16 @@ internal class AndroidOrchestrationAgentRuntime(
                 config = config,
                 owned = initialOwned,
             )
-            var result = session.run(initialInputs)
-            initialOwned.forEach(OnnxTensor::close)
-            previousResult = result
+            activeResult = try {
+                session.run(initialInputs)
+            } finally {
+                initialOwned.forEach(OnnxTensor::close)
+            }
 
-            repeat(maxNewTokens) {
-                val nextToken = argmaxLastLogit(result)
-                if (nextToken in stopIds) return@repeat
+            for (ignored in 0 until maxNewTokens) {
+                val currentResult = requireNotNull(activeResult)
+                val nextToken = argmaxLastLogit(currentResult)
+                if (nextToken in stopIds) break
                 generated += nextToken
                 totalLength += 1
 
@@ -140,18 +140,20 @@ internal class AndroidOrchestrationAgentRuntime(
                     session = session,
                     tokenIds = longArrayOf(nextToken),
                     totalLength = totalLength,
-                    previousResult = result,
+                    previousResult = currentResult,
                     config = config,
                     owned = owned,
                 )
-                val nextResult = session.run(nextInputs)
-                owned.forEach(OnnxTensor::close)
-                result.close()
-                result = nextResult
-                previousResult = result
+                val nextResult = try {
+                    session.run(nextInputs)
+                } finally {
+                    owned.forEach(OnnxTensor::close)
+                }
+                currentResult.close()
+                activeResult = nextResult
             }
         } finally {
-            previousResult?.close()
+            activeResult?.close()
         }
         return tokenizer.decode(generated.toLongArray(), true)
     }
@@ -168,6 +170,7 @@ internal class AndroidOrchestrationAgentRuntime(
         session.inputInfo.forEach { (name, nodeInfo) ->
             val tensorInfo = nodeInfo.info as? TensorInfo
                 ?: error("Unsupported non-tensor orchestration input $name")
+            val borrowsPreviousResult = name.startsWith("past_key_values.") && previousResult != null
             val tensor = when {
                 name == "input_ids" -> longTensor(tokenIds, longArrayOf(1, tokenIds.size.toLong()))
                 name == "attention_mask" -> longTensor(
@@ -205,8 +208,7 @@ internal class AndroidOrchestrationAgentRuntime(
                 else -> error("Unsupported orchestration model input $name")
             }
             inputs[name] = tensor
-            if (!name.startsWith("past_key_values.") || previousResult == null) owned += tensor
-            if (name.startsWith("past_key_values.") && previousResult != null) owned.remove(tensor)
+            if (!borrowsPreviousResult) owned += tensor
         }
         return inputs
     }
@@ -260,6 +262,7 @@ internal class AndroidOrchestrationAgentRuntime(
             ?: error("Invalid orchestration model config.json")
         val hiddenSize = objectValue.requiredInt("hidden_size")
         val attentionHeads = objectValue.requiredInt("num_attention_heads")
+        require(hiddenSize % attentionHeads == 0) { "Invalid attention geometry in model config" }
         return ModelConfig(
             numKeyValueHeads = objectValue.requiredInt("num_key_value_heads"),
             headDim = hiddenSize / attentionHeads,
