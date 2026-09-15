@@ -29,6 +29,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/MEMORY_LOCAL_INFERENCE.md`](architecture/MEMORY_LOCAL_INFERENCE.md) defines the hardware-aware local inference boundary: separate generative and embedding workloads, accelerator discovery/selection, CPU fallback, cached ONNX Runtime sessions, and observed-execution reporting.
 
+### Deterministic-first memory semantics
+
+[`architecture/MEMORY_DETERMINISTIC_SEMANTICS.md`](architecture/MEMORY_DETERMINISTIC_SEMANTICS.md) defines the deterministic-first semantic stack: strict bookkeeping facts, lexical/structural heuristic evidence, programmatic noun/verb fast paths with epoch-8 fallbacks, GRIP lexical normalization, and Specialist 08 restricted to semantic residue.
+
 ### Temporal memory and programmatic associations
 
 [`architecture/TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](architecture/TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md) defines the deterministic temporal roll-up ladder (8×15m, 6×1h, 3×6h, 2×12h, 7×day, unlimited weeks), exact bookkeeping associations, weighted traversal, saturating associative reinforcement, and the rule that condensation loses specificity while shared associations strengthen.

@@ -56,19 +56,7 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
     )
 
     fun signals(node: MemoryNode): Sequence<Signal> = analyses.getValue(node.id).features.asSequence().mapNotNull { feature ->
-        val baseWeight = when (feature.kind) {
-            MemoryLexicalFeatureKind.CodeEntity -> 0.94f
-            MemoryLexicalFeatureKind.CodeAction -> 0.90f
-            MemoryLexicalFeatureKind.NounSense -> 0.90f
-            MemoryLexicalFeatureKind.VerbSense -> 0.92f
-            MemoryLexicalFeatureKind.SubjectVerbObject -> 0.86f
-            MemoryLexicalFeatureKind.VerbObject -> 0.80f
-            MemoryLexicalFeatureKind.SubjectVerb -> 0.74f
-            MemoryLexicalFeatureKind.VerbClass -> 0.72f
-            MemoryLexicalFeatureKind.VerbLemma -> 0.70f
-            MemoryLexicalFeatureKind.NounLemma -> 0.58f
-        }
-        val weight = (baseWeight * feature.confidence).coerceIn(0f, 1f)
+        val weight = (feature.kind.semanticAssociationBaseWeight() * feature.confidence).coerceIn(0f, 1f)
         if (weight < MIN_LEXICAL_EDGE_WEIGHT) null else Signal(
             basis = "lexical:${feature.kind.name}",
             feature = feature,
@@ -103,8 +91,9 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
                 val (right, rightSignal) = rightPair
                 if (left.id == right.id) return@forEach
 
-                val first = if (left.id.value <= right.id.value) left else right
-                val second = if (first === left) right else left
+                val firstIsLeft = left.id.value <= right.id.value
+                val first = if (firstIsLeft) left else right
+                val second = if (firstIsLeft) right else left
                 val feature = leftSignal.feature
                 val evidenceKey = "${feature.kind.name}:${feature.value}".memoryLexicalIdPart()
                 val edgeId = MemoryEdgeId("lexical:$evidenceKey:${first.id.value}|${second.id.value}")
