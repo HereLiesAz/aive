@@ -26,25 +26,16 @@ class AndroidOrtHardwareCapabilityDetector(
         val discovered = epDevices.map(::toMemoryDevice).toMutableList()
         OrtEnvironment.getAvailableProviders().forEach { provider ->
             val backend = provider.getName()
-            if ("nnapi" in backend.lowercase() && Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
-                return@forEach
-            }
-            if (discovered.none { it.backend.equals(backend, ignoreCase = true) }) {
-                discovered += syntheticDevice(provider)
-            }
+            if ("nnapi" in backend.lowercase() && Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return@forEach
+            if (discovered.none { it.backend.equals(backend, ignoreCase = true) }) discovered += syntheticDevice(provider)
         }
         if (discovered.none { it.deviceType == MemoryComputeDeviceType.CPU }) {
-            discovered += MemoryComputeDevice(
-                backend = "CPUExecutionProvider",
-                deviceName = "CPU",
-                deviceType = MemoryComputeDeviceType.CPU,
-            )
+            discovered += MemoryComputeDevice("CPUExecutionProvider", "CPU", MemoryComputeDeviceType.CPU)
         }
         return discovered.distinctBy { Triple(it.backend, it.deviceId, it.deviceType) }
     }
 
-    internal fun epDevices(): List<OrtEpDevice> =
-        runCatching { environment.getEpDevices() }.getOrDefault(emptyList())
+    internal fun epDevices(): List<OrtEpDevice> = runCatching { environment.getEpDevices() }.getOrDefault(emptyList())
 
     private fun toMemoryDevice(epDevice: OrtEpDevice): MemoryComputeDevice {
         val device = epDevice.getDevice()
@@ -56,12 +47,12 @@ class AndroidOrtHardwareCapabilityDetector(
             put("epVendor", epDevice.getEpVendor())
             put("vendorId", device.getVendorId().toString())
             put("androidApi", Build.VERSION.SDK_INT.toString())
+            put("hardwareIdentityVerified", "true")
         }
         val type = device.getType().toMemoryDeviceType()
         return MemoryComputeDevice(
             backend = epDevice.getEpName(),
-            deviceName = metadata["name"]
-                ?: metadata["device_name"]
+            deviceName = metadata["name"] ?: metadata["device_name"]
                 ?: "${device.getVendor()} ${type.name} ${device.getDeviceId()}".trim(),
             deviceType = type,
             deviceId = device.getDeviceId(),
@@ -81,6 +72,7 @@ class AndroidOrtHardwareCapabilityDetector(
             deviceId = if (type == MemoryComputeDeviceType.CPU) null else 0,
             metadata = mapOf(
                 "syntheticDiscovery" to "true",
+                "hardwareIdentityVerified" to (type == MemoryComputeDeviceType.CPU).toString(),
                 "androidApi" to Build.VERSION.SDK_INT.toString(),
             ),
         )
@@ -95,7 +87,7 @@ class AndroidOrtPreparedSession internal constructor(
     private val profilingEnabled: Boolean,
 ) : AutoCloseable {
     @Volatile
-    private var report: MemoryExecutionReport = MemoryExecutionReport(
+    private var report = MemoryExecutionReport(
         selection = selection,
         verification = MemoryExecutionVerification.SessionConfigured,
     )
@@ -110,19 +102,23 @@ class AndroidOrtPreparedSession internal constructor(
         runCatching { profileFile.delete() }
         if (nodeProviders.isEmpty()) return report
 
-        val actualDevices = nodeProviders.distinct().map { providerName ->
-            discoveredDevices.firstOrNull { it.backend.equals(providerName, ignoreCase = true) }
-                ?: if (selection.device.backend.equals(providerName, ignoreCase = true)) {
-                    selection.device
-                } else {
-                    MemoryComputeDevice(
-                        backend = providerName,
-                        deviceName = providerName.removeSuffix("ExecutionProvider"),
-                        deviceType = providerType(providerName),
-                    )
-                }
+        val actualDevices = nodeProviders.distinct().mapNotNull { providerName ->
+            val discovered = discoveredDevices.firstOrNull { it.backend.equals(providerName, ignoreCase = true) }
+            when {
+                discovered?.deviceType == MemoryComputeDeviceType.CPU -> discovered
+                discovered?.metadata?.get("hardwareIdentityVerified") == "true" -> discovered
+                selection.device.backend.equals(providerName, ignoreCase = true) &&
+                    selection.device.metadata["hardwareIdentityVerified"] == "true" -> selection.device
+                else -> null
+            }
         }.distinctBy { Triple(it.backend, it.deviceId, it.deviceType) }
-        val acceleratedEvents = nodeProviders.count { providerType(it) != MemoryComputeDeviceType.CPU }
+        val acceleratedEvents = nodeProviders.count { providerName ->
+            discoveredDevices.any {
+                it.backend.equals(providerName, ignoreCase = true) &&
+                    it.deviceType != MemoryComputeDeviceType.CPU &&
+                    it.metadata["hardwareIdentityVerified"] == "true"
+            }
+        }
         report = MemoryExecutionReport(
             selection = selection,
             actualDevices = actualDevices,
@@ -147,7 +143,7 @@ class AndroidOrtMemorySessionManager(
     private val profileDirectory: File? = null,
     private val providerLibraries: Map<String, String> = emptyMap(),
 ) : AutoCloseable {
-    val platform: MemoryMicroAgentPlatform = MemoryMicroAgentPlatform.Android
+    val platform = MemoryMicroAgentPlatform.Android
     private val environment: OrtEnvironment = capabilityDetector.environment
     private val sessions = ConcurrentHashMap<String, AndroidOrtPreparedSession>()
 
@@ -174,53 +170,50 @@ class AndroidOrtMemorySessionManager(
 
         val discovered = capabilityDetector.discover()
         val rankedRequirements = model.requirements.copy(
-            preferredBackends = (
-                model.requirements.preferredBackends + platform.preferredExecutionProviders()
-            ).distinct(),
+            preferredBackends = (model.requirements.preferredBackends + platform.preferredExecutionProviders()).distinct(),
         )
-        val initialSelection = MemoryComputeSelector.select(discovered, rankedRequirements, computePreference)
-        val selection = initialSelection.copy(
-            device = initialSelection.device.copy(
-                supportedModels = initialSelection.device.supportedModels + model.modelId,
-            ),
+        val attempts = MemoryComputeSelector.rank(
+            devices = discovered,
+            requirements = rankedRequirements,
+            preference = computePreference,
+            modelId = model.modelId,
         )
-        val created = createSession(modelPath, model, selection, discovered, providerOptions)
-        val previous = sessions.putIfAbsent(key, created)
+        require(attempts.isNotEmpty()) { "No compatible local compute device is available for ${model.modelId}" }
+
+        val failures = mutableListOf<Pair<MemoryComputeSelection, Throwable>>()
+        var created: AndroidOrtPreparedSession? = null
+        for (attempt in attempts) {
+            val selected = attempt.copy(
+                device = attempt.device.copy(
+                    supportedModels = attempt.device.supportedModels + model.modelId,
+                    metadata = if (attempt.device.deviceType == MemoryComputeDeviceType.CPU && failures.isNotEmpty()) {
+                        attempt.device.metadata + mapOf(
+                            "fallbackFrom" to failures.joinToString(",") { it.first.device.backend },
+                            "fallbackReason" to (failures.last().second.message
+                                ?: failures.last().second::class.simpleName.orEmpty()).take(240),
+                        )
+                    } else attempt.device.metadata,
+                ),
+            )
+            val options = if (selected.device.deviceType == MemoryComputeDeviceType.CPU) emptyMap() else providerOptions
+            try {
+                created = createSessionAttempt(modelPath, model, selected, discovered, options)
+                break
+            } catch (failure: Throwable) {
+                failures += selected to failure
+            }
+        }
+        val usable = created ?: throw IllegalStateException(
+            "No ONNX Runtime execution provider accepted ${model.modelId}; tried " +
+                failures.joinToString { it.first.device.backend },
+            failures.lastOrNull()?.second,
+        )
+        val previous = sessions.putIfAbsent(key, usable)
         if (previous != null) {
-            created.close()
+            usable.close()
             return previous
         }
-        return created
-    }
-
-    private fun createSession(
-        modelPath: String,
-        model: MemoryMicroAgentModelSpec,
-        selection: MemoryComputeSelection,
-        discovered: List<MemoryComputeDevice>,
-        providerOptions: Map<String, String>,
-    ): AndroidOrtPreparedSession {
-        return try {
-            createSessionAttempt(modelPath, model, selection, discovered, providerOptions)
-        } catch (acceleratorFailure: Throwable) {
-            if (selection.device.deviceType == MemoryComputeDeviceType.CPU || !model.requirements.allowCpuFallback) {
-                throw acceleratorFailure
-            }
-            val cpu = discovered.firstOrNull { it.deviceType == MemoryComputeDeviceType.CPU }
-                ?: MemoryComputeDevice("CPUExecutionProvider", "CPU", MemoryComputeDeviceType.CPU)
-            val cpuSelection = MemoryComputeSelection(
-                preference = computePreference,
-                device = cpu.copy(
-                    supportedModels = cpu.supportedModels + model.modelId,
-                    metadata = cpu.metadata + mapOf(
-                        "fallbackFrom" to selection.device.backend,
-                        "fallbackReason" to (acceleratorFailure.message ?: acceleratorFailure::class.simpleName.orEmpty()).take(240),
-                    ),
-                ),
-                cpuFallbackEnabled = false,
-            )
-            createSessionAttempt(modelPath, model, cpuSelection, discovered, emptyMap())
-        }
+        return usable
     }
 
     private fun createSessionAttempt(
@@ -249,11 +242,8 @@ class AndroidOrtMemorySessionManager(
                 candidate.getEpName().equals(selection.device.backend, ignoreCase = true) &&
                     candidate.getDevice().getDeviceId() == (selection.device.deviceId ?: candidate.getDevice().getDeviceId())
             }
-            if (epDevice != null) {
-                options.addExecutionProvider(listOf(epDevice), providerOptions)
-            } else {
-                addLegacyProvider(options, selection.device, providerOptions)
-            }
+            if (epDevice != null) options.addExecutionProvider(listOf(epDevice), providerOptions)
+            else addLegacyProvider(options, selection.device, providerOptions)
         }
 
         return try {
@@ -278,11 +268,8 @@ class AndroidOrtMemorySessionManager(
         val backend = device.backend.lowercase()
         when {
             "nnapi" in backend -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    options.addNnapi(EnumSet.of(NNAPIFlags.CPU_DISABLED))
-                } else {
-                    options.addNnapi()
-                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) options.addNnapi(EnumSet.of(NNAPIFlags.CPU_DISABLED))
+                else options.addNnapi()
             }
             "qnn" in backend -> options.addQnn(providerOptions)
             "webgpu" in backend -> options.addWebGPU(providerOptions)
