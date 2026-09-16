@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
+import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
@@ -119,6 +120,7 @@ internal fun configuredWebProviders(
     repositoryCredentials: Map<String, String> = emptyMap(),
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    addAll(HostedLlmProviders.configured(credentials))
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
@@ -274,7 +276,7 @@ private fun providerStorageKey(providerId: String): String = when (providerId) {
     ProviderCatalog.ANTHROPIC_ID -> ANTHROPIC_API_KEY_STORAGE_KEY
     ProviderCatalog.GEMINI_ID -> GEMINI_API_KEY_STORAGE_KEY
     ProviderCatalog.XAI_ID -> XAI_API_KEY_STORAGE_KEY
-    else -> error("Unknown provider $providerId")
+    else -> "haive.${providerId}ApiKey"
 }
 
 private fun repositoryStorageKey(serviceId: String): String = when (serviceId) {
