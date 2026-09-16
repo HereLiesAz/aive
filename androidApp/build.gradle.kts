@@ -1,4 +1,5 @@
 import haive.build.BrandAssets
+import haive.build.BrandLoaderVerifier
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -13,11 +14,13 @@ val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
     inputs.files(brandSourceLogo, brandSourceAnimation)
     outputs.dir(generatedAndroidBrandResDir)
     doLast {
+        val outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable")
         BrandAssets.generateLoader(
             logoSource = brandSourceLogo.asFile,
             animationSource = brandSourceAnimation.asFile,
-            outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable"),
+            outputDir = outputDir,
         )
+        BrandLoaderVerifier.verify(outputDir)
     }
 }
 
