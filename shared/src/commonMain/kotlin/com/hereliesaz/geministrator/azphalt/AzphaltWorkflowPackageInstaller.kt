@@ -73,7 +73,7 @@ interface AzphaltInstallStore {
 class SettingsAzphaltInstallStore(
     private val settings: Settings = Settings(),
     private val storageKey: String = DEFAULT_STORAGE_KEY,
-    private val json: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true },
+    private val json: Json = SettingsWorkflowPersistence.defaultJson,
 ) : AzphaltInstallStore {
     private val mutex = Mutex()
 
@@ -114,6 +114,10 @@ class AzphaltWorkflowPackageInstaller(
         val pkg = verification.packageContents
         val manifest = pkg.manifest
         require(manifest.kind == "workflow") { "Azphalt package ${manifest.id} is not a workflow package" }
+        val conformanceErrors = AzphaltWorkflowConformance.validate(manifest)
+        require(conformanceErrors.isEmpty()) {
+            "Invalid Azphalt workflow package ${manifest.id}: ${conformanceErrors.joinToString("; ")}"
+        }
         require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
             "Azphalt package ${manifest.id} targets ${manifest.targetApps.joinToString()}, not $HAIVE_AZPHALT_HOST_ID"
         }
@@ -212,8 +216,6 @@ class AzphaltWorkflowPackageInstaller(
         require(!plan.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${plan.packageId}; explicit publisher-change approval is required"
         }
-        // Match the reference host policy: unsigned packages make no identity claim. A signed package
-        // whose signer cannot be anchored in trusted repository/user keys must be explicitly approved.
         require(!plan.signed || plan.trusted || allowUntrustedSigner) {
             "Signed package publisher is not trusted: ${plan.trustReason}"
         }
@@ -227,7 +229,6 @@ class AzphaltWorkflowPackageInstaller(
             }
         }
 
-        // All decoding, permission, trust, ownership and collision checks happen above this line.
         // Only definitions enter the global workflow library. Agents/fragments/screens remain scoped
         // to their package per spec/workflow.md and are resolved when that package's workflow is used.
         plan.definitions.forEach { persistence.definitions.put(it) }
