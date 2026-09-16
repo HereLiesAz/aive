@@ -71,9 +71,9 @@ internal class InstalledGeminiTextGenerationApi(
             withContext(NonCancellable + Dispatchers.Main) {
                 InstalledGeminiWindowHost.returnToHaive(context)
             }
+            InstalledGeminiBridge.reset()
         }
 
-        InstalledGeminiBridge.reset()
         return TextGenerationResult(text = response)
     }
 
@@ -92,9 +92,12 @@ internal class InstalledGeminiTextGenerationApi(
             ).orEmpty()
             val expected = ComponentName(context, InstalledGeminiAccessibilityService::class.java)
                 .flattenToString()
+            val shortSuffix = "/.${InstalledGeminiAccessibilityService::class.java.simpleName}"
+            val fullSuffix = "/${InstalledGeminiAccessibilityService::class.java.name}"
             return enabled.split(':').any { component ->
                 component.equals(expected, ignoreCase = true) ||
-                    component.endsWith("/${InstalledGeminiAccessibilityService::class.java.name}", ignoreCase = true)
+                    component.endsWith(shortSuffix, ignoreCase = true) ||
+                    component.endsWith(fullSuffix, ignoreCase = true)
             }
         }
 
