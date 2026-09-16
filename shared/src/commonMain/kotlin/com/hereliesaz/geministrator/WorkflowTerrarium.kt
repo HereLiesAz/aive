@@ -19,15 +19,17 @@ import com.hereliesaz.conveyance.h2g2.H2g2SwarmTerrarium
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import kotlinx.coroutines.launch
 
 /**
  * Production workflow view: the DAG is a living terrarium rather than a diagram.
  *
  * Habitat movement is presentation-only and persisted independently. Dropping one real task-creature
- * onto another means "dragged depends on target". The host persists the resulting definition as a
- * staged revision; the currently executing run remains immutable.
+ * onto another means "dragged depends on target". The resulting definition is staged as a draft;
+ * the currently executing run remains immutable.
  */
 @Composable
 internal fun GeministratorWorkflowTerrarium(
@@ -36,18 +38,29 @@ internal fun GeministratorWorkflowTerrarium(
     roles: Collection<RoleDefinition>,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onStageDefinition: suspend (WorkflowDefinition) -> WorkflowDefinition,
+    onStageDefinition: (suspend (WorkflowDefinition) -> WorkflowDefinition)? = null,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
+    val fallbackDraftPersistence = remember { SettingsWorkflowPersistence.createDefault() }
     val layoutDefinitionId = run.workflowDefinitionId
     var positions by remember(layoutDefinitionId) {
         mutableStateOf(layoutStore.load(layoutDefinitionId))
     }
     var stagedDefinition by remember(definition) { mutableStateOf(definition) }
     var authoringMessage by remember(definition.id) { mutableStateOf<String?>(null) }
+
+    val stageDefinition: suspend (WorkflowDefinition) -> WorkflowDefinition = onStageDefinition ?: { candidate ->
+        val draftId = WorkflowDefinitionId("${definition.id.value}--terrarium-draft")
+        val persisted = candidate.copy(
+            id = draftId,
+            name = "${definition.name} — terrarium draft",
+        )
+        fallbackDraftPersistence.definitions.put(persisted)
+        persisted
+    }
 
     val projection = remember(stagedDefinition, run, roles, positions) {
         projectWorkflowTerrarium(
@@ -90,7 +103,7 @@ internal fun GeministratorWorkflowTerrarium(
                     when (val edit = addTerrariumDependency(stagedDefinition, downstreamId, upstreamId)) {
                         is TerrariumDependencyEditResult.Applied -> {
                             scope.launch {
-                                runCatching { onStageDefinition(edit.definition) }
+                                runCatching { stageDefinition(edit.definition) }
                                     .onSuccess { persisted ->
                                         stagedDefinition = persisted
                                         authoringMessage = "Draft wiring staged: $downstreamRaw now depends on $upstreamRaw."
