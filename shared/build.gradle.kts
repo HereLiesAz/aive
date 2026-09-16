@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.Sync
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -10,6 +11,22 @@ plugins {
 }
 
 val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
+val terrariumResourceRoot = layout.buildDirectory.dir("generated/terrariumComposeResources")
+val generateTerrariumBrandResources = tasks.register<Sync>("generateTerrariumBrandResources") {
+    from(rootProject.file("branding/haive_logo.png")) {
+        into("drawable")
+        rename { "haive_orchestrator.png" }
+    }
+    into(terrariumResourceRoot)
+}
+
+compose.resources {
+    packageOfResClass = "com.hereliesaz.geministrator.generated.resources"
+    customDirectory(
+        sourceSetName = "commonMain",
+        directoryProvider = generateTerrariumBrandResources.map { terrariumResourceRoot.get() },
+    )
+}
 
 kotlin {
     androidLibrary {
@@ -46,7 +63,8 @@ kotlin {
             implementation(compose.animation)
             implementation(compose.material3)
             implementation(compose.ui)
-            implementation("com.github.HereLiesAz:conveyance-h2g2:5667da6fd07d856684048622ddf7722034f78b6b")
+            implementation(compose.components.resources)
+            implementation("com.github.HereLiesAz:conveyance-h2g2:8566a9db02d533d9534327df40424ee7b88ebe88")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)

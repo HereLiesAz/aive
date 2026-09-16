@@ -47,6 +47,11 @@ private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     ComposeViewport(viewportContainerId = "webApp") {
+        if (window.location.search.contains("terrariumPreview=1")) {
+            TerrariumVisualProofScreen()
+            return@ComposeViewport
+        }
+
         var credentials by remember { mutableStateOf(readWebProviderCredentials()) }
         var repositoryCredentials by remember { mutableStateOf(readWebRepositoryCredentials()) }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
