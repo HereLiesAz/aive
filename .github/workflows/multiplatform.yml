@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 5667da6fd07d856684048622ddf7722034f78b6b
+          ref: df9d0ee3553b5cc2694b6feda033832cb20d4e02
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
@@ -135,10 +135,10 @@ jobs:
         run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
       - name: Build Web JS
-        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:jsBrowserProductionWebpack
+        run: ./gradlew :webApp:jsBrowserProductionWebpack
 
       - name: Build Web Wasm
-        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:wasmJsBrowserProductionWebpack
+        run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
 
       - name: Stage GitHub Pages
         shell: bash
@@ -245,7 +245,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 5667da6fd07d856684048622ddf7722034f78b6b
+          ref: df9d0ee3553b5cc2694b6feda033832cb20d4e02
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
@@ -288,7 +288,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true ":desktopApp:${{ matrix.task }}"
+          ./gradlew ":desktopApp:${{ matrix.task }}"
           EXIT_CODE=$?
           if [ "$EXIT_CODE" -ne 0 ]; then
             echo "=== Native packaging diagnostics ==="
