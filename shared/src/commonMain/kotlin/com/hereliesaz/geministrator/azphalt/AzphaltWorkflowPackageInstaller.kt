@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
+import com.hereliesaz.geministrator.workflow.WorkflowFragment
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,6 +19,15 @@ data class VerifiedAzphaltPackage internal constructor(
     val signerPublicKey: String? = null,
 )
 
+@Serializable
+data class InstalledAzphaltWorkflowScreen(
+    val id: String,
+    val name: String? = null,
+    val path: String,
+    val placements: List<String> = emptyList(),
+    val payloadText: String,
+)
+
 data class AzphaltWorkflowInstallPlan(
     val packageId: String,
     val version: String,
@@ -29,10 +39,12 @@ data class AzphaltWorkflowInstallPlan(
     val publisherChanged: Boolean,
     val pinnedPublisherKey: String?,
     val definitions: List<WorkflowDefinition>,
+    val fragments: List<WorkflowFragment>,
     val roles: List<RoleDefinition>,
     val dependencies: List<AzphaltWorkflowDependency>,
-    val screens: List<AzphaltWorkflowScreenEntry>,
+    val screens: List<InstalledAzphaltWorkflowScreen>,
     val requestedHostPermissions: Set<String>,
+    val unsupportedHostPermissions: Set<String>,
 )
 
 @Serializable
@@ -41,7 +53,10 @@ data class InstalledAzphaltWorkflowPackage(
     val version: String,
     val repositoryUrl: String,
     val workflowDefinitionIds: List<String>,
-    val roleIds: List<String>,
+    /** Package-local composition primitives; never injected into the user's global role collection. */
+    val fragments: List<WorkflowFragment> = emptyList(),
+    val roles: List<RoleDefinition> = emptyList(),
+    val screens: List<InstalledAzphaltWorkflowScreen> = emptyList(),
     val dependencies: List<AzphaltWorkflowDependency> = emptyList(),
     val approvedHostPermissions: List<String> = emptyList(),
     val signed: Boolean = false,
@@ -94,7 +109,7 @@ class AzphaltWorkflowPackageInstaller(
     private val publisherPins: AzphaltPublisherPinStore = SettingsAzphaltPublisherPinStore(),
     private val json: Json = SettingsWorkflowPersistence.defaultJson,
 ) {
-    /** Validate all Haive-facing semantics and decode every referenced workflow/role before mutation. */
+    /** Validate all Haive-facing semantics and decode every referenced payload before mutation. */
     fun inspect(verification: AzphaltPackageVerification): AzphaltWorkflowInstallPlan {
         val pkg = verification.packageContents
         val manifest = pkg.manifest
@@ -110,6 +125,7 @@ class AzphaltWorkflowPackageInstaller(
         }
         require(workflow.definitions.isNotEmpty()) { "Workflow package must contain at least one definition" }
         validateEntries(workflow.definitions.map { it.id to it.path }, "workflow definition", manifest.files, pkg.payload)
+        validateEntries(workflow.fragments.map { it.id to it.path }, "workflow fragment", manifest.files, pkg.payload)
         validateEntries(workflow.agents.map { it.id to it.path }, "agent role", manifest.files, pkg.payload)
         validateEntries(workflow.screens.map { it.id to it.path }, "screen", manifest.files, pkg.payload)
 
@@ -120,6 +136,13 @@ class AzphaltWorkflowPackageInstaller(
                 }
             }
         }
+        val fragments = workflow.fragments.map { entry ->
+            decodeUtf8<WorkflowFragment>(pkg.payload.getValue(entry.path), entry.path).also { fragment ->
+                require(fragment.id.value == entry.id) {
+                    "Workflow fragment ${entry.path} id ${fragment.id.value} does not match manifest id ${entry.id}"
+                }
+            }
+        }
         val roles = workflow.agents.map { entry ->
             decodeUtf8<RoleDefinition>(pkg.payload.getValue(entry.path), entry.path).also { role ->
                 require(role.id.value == entry.id) {
@@ -127,14 +150,29 @@ class AzphaltWorkflowPackageInstaller(
                 }
             }
         }
-        require(definitions.map { it.id }.toSet().size == definitions.size) { "Workflow package contains duplicate definition ids" }
-        require(roles.map { it.id }.toSet().size == roles.size) { "Workflow package contains duplicate role ids" }
-        require(workflow.dependencies.none { it.id == manifest.id }) { "Workflow package must not depend on itself" }
-        val unsupportedPermissions = workflow.hostPermissions.toSet() - SUPPORTED_HOST_PERMISSIONS
-        require(unsupportedPermissions.isEmpty()) {
-            "Workflow package requests unsupported Haive permissions: ${unsupportedPermissions.sorted().joinToString()}"
+        val screens = workflow.screens.map { entry ->
+            val text = pkg.payload.getValue(entry.path).decodeToString()
+            if (entry.path.endsWith(".json", ignoreCase = true)) {
+                try {
+                    json.parseToJsonElement(text)
+                } catch (failure: Exception) {
+                    throw IllegalArgumentException("Invalid declarative screen JSON ${entry.path}: ${failure.message}", failure)
+                }
+            }
+            InstalledAzphaltWorkflowScreen(
+                id = entry.id,
+                name = entry.name,
+                path = entry.path,
+                placements = entry.placements,
+                payloadText = text,
+            )
         }
 
+        require(definitions.map { it.id }.toSet().size == definitions.size) { "Workflow package contains duplicate definition ids" }
+        require(fragments.map { it.id }.toSet().size == fragments.size) { "Workflow package contains duplicate fragment ids" }
+        require(roles.map { it.id }.toSet().size == roles.size) { "Workflow package contains duplicate role ids" }
+
+        val requested = workflow.hostPermissions.toSet()
         return AzphaltWorkflowInstallPlan(
             packageId = manifest.id,
             version = manifest.version,
@@ -146,16 +184,19 @@ class AzphaltWorkflowPackageInstaller(
             publisherChanged = verification.publisherChanged,
             pinnedPublisherKey = verification.pinnedPublisherKey,
             definitions = definitions,
+            fragments = fragments,
             roles = roles,
             dependencies = workflow.dependencies,
-            screens = workflow.screens,
-            requestedHostPermissions = workflow.hostPermissions.toSet(),
+            screens = screens,
+            requestedHostPermissions = requested,
+            unsupportedHostPermissions = requested - SUPPORTED_HOST_PERMISSIONS,
         )
     }
 
     /**
-     * Install a previously inspected package after explicit permission/trust decisions.
-     * `WorkflowLaunch` is recorded as approved but never auto-launches anything here.
+     * Install a previously inspected package after explicit trust and host-permission decisions.
+     * Requested permissions not present in [approvedHostPermissions] remain denied; installation
+     * itself never launches a workflow or promotes package-local agents into the user's company.
      */
     suspend fun install(
         plan: AzphaltWorkflowInstallPlan,
@@ -165,9 +206,8 @@ class AzphaltWorkflowPackageInstaller(
         allowUntrustedSigner: Boolean = false,
         allowPublisherChange: Boolean = false,
     ): InstalledAzphaltWorkflowPackage {
-        val unapproved = plan.requestedHostPermissions - approvedHostPermissions
-        require(unapproved.isEmpty()) {
-            "Host permissions still need approval: ${unapproved.sorted().joinToString()}"
+        require(approvedHostPermissions.all { it in plan.requestedHostPermissions && it in SUPPORTED_HOST_PERMISSIONS }) {
+            "Approved host permissions must be a supported subset of the package request"
         }
         require(!plan.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${plan.packageId}; explicit publisher-change approval is required"
@@ -180,30 +220,25 @@ class AzphaltWorkflowPackageInstaller(
 
         val previous = installStore.get(plan.packageId)
         val ownedDefinitions = previous?.workflowDefinitionIds.orEmpty().toSet()
-        val ownedRoles = previous?.roleIds.orEmpty().toSet()
-
         plan.definitions.forEach { definition ->
             val existing = persistence.definitions.get(definition.id)
             require(existing == null || definition.id.value in ownedDefinitions) {
                 "Workflow id ${definition.id.value} already exists and is not owned by ${plan.packageId}"
             }
         }
-        plan.roles.forEach { role ->
-            val existing = persistence.roles.get(role.id)
-            require(existing == null || role.id.value in ownedRoles) {
-                "Role id ${role.id.value} already exists and is not owned by ${plan.packageId}"
-            }
-        }
 
-        // All decoding, permissions, trust, ownership and collision checks happen above this line.
-        plan.roles.forEach { persistence.roles.put(it) }
+        // All decoding, permission, trust, ownership and collision checks happen above this line.
+        // Only definitions enter the global workflow library. Agents/fragments/screens remain scoped
+        // to their package per spec/workflow.md and are resolved when that package's workflow is used.
         plan.definitions.forEach { persistence.definitions.put(it) }
         val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
             version = plan.version,
             repositoryUrl = AzphaltRepositoryClient.normalizeRepositoryUrl(repositoryUrl),
             workflowDefinitionIds = plan.definitions.map { it.id.value },
-            roleIds = plan.roles.map { it.id.value },
+            fragments = plan.fragments,
+            roles = plan.roles,
+            screens = plan.screens,
             dependencies = plan.dependencies,
             approvedHostPermissions = approvedHostPermissions.sorted(),
             signed = plan.signed,
@@ -245,6 +280,7 @@ class AzphaltWorkflowPackageInstaller(
         fun isSafePackagePath(path: String): Boolean =
             path.isNotBlank() &&
                 !path.startsWith('/') &&
-                path.split('/').none { it == ".." || it.isBlank() }
+                '\\' !in path &&
+                path.split('/').none { it.isBlank() || it == "." || it == ".." }
     }
 }
