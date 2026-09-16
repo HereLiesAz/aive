@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">The Haive</string>
+    <string name="installed_gemini_accessibility_description">Lets The Haive send a task to the installed Gemini app and read the completed response only while an explicit Gemini handoff is running.</string>
+</resources>

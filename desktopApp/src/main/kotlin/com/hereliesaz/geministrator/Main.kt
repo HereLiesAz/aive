@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
+import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
@@ -120,6 +121,7 @@ internal fun configuredDesktopProviders(
     repositoryHttpClient: HttpClient? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    addAll(HostedLlmProviders.configured(credentials))
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
@@ -298,6 +300,18 @@ private fun environmentProviderCredentials(): Map<String, String> = buildMap {
         ProviderCatalog.ANTHROPIC_ID to "ANTHROPIC_API_KEY",
         ProviderCatalog.GEMINI_ID to "GEMINI_API_KEY",
         ProviderCatalog.XAI_ID to "XAI_API_KEY",
+        ProviderCatalog.DEEPSEEK_ID to "DEEPSEEK_API_KEY",
+        ProviderCatalog.GROQ_ID to "GROQ_API_KEY",
+        ProviderCatalog.CEREBRAS_ID to "CEREBRAS_API_KEY",
+        ProviderCatalog.MISTRAL_ID to "MISTRAL_API_KEY",
+        ProviderCatalog.HUGGING_FACE_ID to "HF_TOKEN",
+        ProviderCatalog.OPENROUTER_ID to "OPENROUTER_API_KEY",
+        ProviderCatalog.TOGETHER_ID to "TOGETHER_API_KEY",
+        ProviderCatalog.FIREWORKS_ID to "FIREWORKS_API_KEY",
+        ProviderCatalog.PERPLEXITY_ID to "PERPLEXITY_API_KEY",
+        ProviderCatalog.COHERE_ID to "COHERE_API_KEY",
+        ProviderCatalog.NVIDIA_ID to "NVIDIA_API_KEY",
+        ProviderCatalog.SAMBANOVA_ID to "SAMBANOVA_API_KEY",
     ).forEach { (providerId, environmentName) ->
         System.getenv(environmentName)
             ?.trim()
