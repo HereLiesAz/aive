@@ -36,7 +36,9 @@ android {
         versionName = providers.gradleProperty("app.versionName").get()
     }
 
-    sourceSets.getByName("main").res.srcDir(generatedAndroidBrandResDir)
+    // AGP 9.4 no longer permits Provider instances through the legacy SourceSet API.
+    // Resolve only the deterministic build-directory path here; preBuild below carries the task dependency.
+    sourceSets.getByName("main").res.srcDir(generatedAndroidBrandResDir.get().asFile)
 
     signingConfigs {
         create("release") {
