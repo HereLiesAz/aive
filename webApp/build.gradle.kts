@@ -8,14 +8,21 @@ plugins {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
 val generatedWebBrandDir = layout.buildDirectory.dir("generated/brand/web")
 val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
-    inputs.file(brandSourceLogo)
+    inputs.files(brandSourceLogo, brandSourceAnimation)
     outputs.dir(generatedWebBrandDir)
     doLast {
+        val outputDir = generatedWebBrandDir.get().asFile
         BrandAssets.generateWeb(
             source = brandSourceLogo.asFile,
-            outputDir = generatedWebBrandDir.get().asFile,
+            outputDir = outputDir,
+        )
+        BrandAssets.generateLoader(
+            logoSource = brandSourceLogo.asFile,
+            animationSource = brandSourceAnimation.asFile,
+            outputDir = outputDir,
         )
     }
 }
