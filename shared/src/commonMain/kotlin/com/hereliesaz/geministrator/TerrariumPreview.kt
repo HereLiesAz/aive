@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -192,7 +193,8 @@ private fun proofTaskRun(
                 id = ArtifactId("proof:${task.id.value}:artifact"),
                 taskRunId = taskRunId,
                 kind = ArtifactKind.TaskPlan,
-                locator = "memory://proof/${task.id.value}",
+                label = "${task.name} proof artifact",
+                uri = "memory://proof/${task.id.value}",
                 createdAtEpochMillis = 1L,
             ),
         )
@@ -203,7 +205,7 @@ private fun proofTaskRun(
         id = taskRunId,
         taskDefinitionId = task.id,
         status = status,
-        assignedRoleId = roleId?.let(::com.hereliesaz.geministrator.domain.RoleDefinitionId),
+        assignedRoleId = roleId?.let(::RoleDefinitionId),
         artifacts = artifacts,
         progress = progress,
         executor = task.executor,
