@@ -1,4 +1,5 @@
 import haive.build.BrandAssets
+import haive.build.BrandLoaderVerifier
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -37,6 +38,7 @@ val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
             animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
         )
+        BrandLoaderVerifier.verify(outputDir)
     }
 }
 
