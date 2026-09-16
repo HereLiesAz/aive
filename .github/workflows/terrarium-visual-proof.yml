@@ -81,7 +81,7 @@ jobs:
           npx --yes playwright@1.55.0 screenshot \
             --browser chromium \
             --viewport-size "1440,900" \
-            --wait-for-timeout 4000 \
+            --wait-for-timeout 1400 \
             "http://127.0.0.1:8080/?terrariumPreview=1" \
             visual-proof/haive-terrarium-wasm.png
           test -s visual-proof/haive-terrarium-wasm.png
