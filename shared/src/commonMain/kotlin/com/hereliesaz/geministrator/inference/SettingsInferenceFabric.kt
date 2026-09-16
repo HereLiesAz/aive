@@ -32,40 +32,45 @@ class SettingsInferenceStateStore(
     private val settings: Settings,
     private val storageKey: String = DEFAULT_STORAGE_KEY,
     private val json: Json = defaultJson,
-) : InferenceModelRegistry,
-    InferenceAgentRegistry,
-    InferenceDataRegistry,
-    InferenceStreamFabric,
-    InferenceResourceTelemetry {
-
-    override suspend fun register(model: InferenceModelDescriptor) = update { snapshot ->
-        snapshot.copy(models = snapshot.models.upsert(PersistedInferenceModel.fromDomain(model)) { it.logicalModelId == model.logicalModelId })
+) {
+    suspend fun registerModel(model: InferenceModelDescriptor) = update { snapshot ->
+        snapshot.copy(
+            models = snapshot.models.upsert(PersistedInferenceModel.fromDomain(model)) {
+                it.logicalModelId == model.logicalModelId
+            },
+        )
     }
 
-    override suspend fun get(logicalModelId: String): InferenceModelDescriptor? =
+    suspend fun model(logicalModelId: String): InferenceModelDescriptor? =
         read().models.firstOrNull { it.logicalModelId == logicalModelId }?.toDomain()
 
-    override suspend fun all(): List<InferenceModelDescriptor> = read().models.map(PersistedInferenceModel::toDomain)
+    suspend fun models(): List<InferenceModelDescriptor> = read().models.map(PersistedInferenceModel::toDomain)
 
-    override suspend fun register(agent: InferenceAgentDescriptor) = update { snapshot ->
-        snapshot.copy(agents = snapshot.agents.upsert(PersistedInferenceAgent.fromDomain(agent)) { it.providerId == agent.providerId.value })
+    suspend fun registerAgent(agent: InferenceAgentDescriptor) = update { snapshot ->
+        snapshot.copy(
+            agents = snapshot.agents.upsert(PersistedInferenceAgent.fromDomain(agent)) {
+                it.providerId == agent.providerId.value
+            },
+        )
     }
 
-    override suspend fun get(providerId: AgentProviderId): InferenceAgentDescriptor? =
+    suspend fun agent(providerId: AgentProviderId): InferenceAgentDescriptor? =
         read().agents.firstOrNull { it.providerId == providerId.value }?.toDomain()
 
-    suspend fun allAgents(): List<InferenceAgentDescriptor> = read().agents.map(PersistedInferenceAgent::toDomain)
+    suspend fun agents(): List<InferenceAgentDescriptor> = read().agents.map(PersistedInferenceAgent::toDomain)
 
-    override suspend fun register(data: InferenceDataDescriptor) = update { snapshot ->
-        snapshot.copy(data = snapshot.data.upsert(PersistedInferenceData.fromDomain(data)) { it.dataId == data.dataId })
+    suspend fun registerData(data: InferenceDataDescriptor) = update { snapshot ->
+        snapshot.copy(
+            data = snapshot.data.upsert(PersistedInferenceData.fromDomain(data)) { it.dataId == data.dataId },
+        )
     }
 
-    override suspend fun get(dataId: String): InferenceDataDescriptor? =
+    suspend fun data(dataId: String): InferenceDataDescriptor? =
         read().data.firstOrNull { it.dataId == dataId }?.toDomain()
 
-    suspend fun allData(): List<InferenceDataDescriptor> = read().data.map(PersistedInferenceData::toDomain)
+    suspend fun data(): List<InferenceDataDescriptor> = read().data.map(PersistedInferenceData::toDomain)
 
-    override suspend fun append(
+    suspend fun appendRecord(
         invocationId: String,
         payload: InferenceStreamPayload,
     ): InferenceStreamRecord = settingsInferenceStateMutex.withLock {
@@ -87,7 +92,7 @@ class SettingsInferenceStateStore(
         record
     }
 
-    override suspend fun records(invocationId: String): List<InferenceStreamRecord> =
+    suspend fun records(invocationId: String): List<InferenceStreamRecord> =
         read().records
             .asSequence()
             .filter { it.invocationId == invocationId }
@@ -95,11 +100,11 @@ class SettingsInferenceStateStore(
             .map(PersistedInferenceStreamRecord::toDomain)
             .toList()
 
-    override suspend fun record(sample: InferenceResourceSample) = update { snapshot ->
+    suspend fun recordResourceSample(sample: InferenceResourceSample) = update { snapshot ->
         snapshot.copy(resourceSamples = snapshot.resourceSamples + PersistedInferenceResourceSample.fromDomain(sample))
     }
 
-    override suspend fun samples(invocationId: String): List<InferenceResourceSample> =
+    suspend fun resourceSamples(invocationId: String): List<InferenceResourceSample> =
         read().resourceSamples
             .asSequence()
             .filter { it.invocationId == invocationId }
@@ -206,11 +211,37 @@ class SettingsCompoundInferenceFabric(
     private val state: SettingsInferenceStateStore = SettingsInferenceStateStore.createDefault(),
     private val planner: CompoundInferenceTaskPlanner = DefaultCompoundInferenceTaskPlanner,
 ) : CompoundInferenceFabric {
-    override val modelRegistry: InferenceModelRegistry = state
-    override val agentRegistry: InferenceAgentRegistry = state
-    override val dataRegistry: InferenceDataRegistry = state
-    override val streamFabric: InferenceStreamFabric = state
-    override val resourceTelemetry: InferenceResourceTelemetry = state
+    override val modelRegistry: InferenceModelRegistry = object : InferenceModelRegistry {
+        override suspend fun register(model: InferenceModelDescriptor) = state.registerModel(model)
+        override suspend fun get(logicalModelId: String): InferenceModelDescriptor? = state.model(logicalModelId)
+        override suspend fun all(): List<InferenceModelDescriptor> = state.models()
+    }
+
+    override val agentRegistry: InferenceAgentRegistry = object : InferenceAgentRegistry {
+        override suspend fun register(agent: InferenceAgentDescriptor) = state.registerAgent(agent)
+        override suspend fun get(providerId: AgentProviderId): InferenceAgentDescriptor? = state.agent(providerId)
+        override suspend fun all(): List<InferenceAgentDescriptor> = state.agents()
+    }
+
+    override val dataRegistry: InferenceDataRegistry = object : InferenceDataRegistry {
+        override suspend fun register(data: InferenceDataDescriptor) = state.registerData(data)
+        override suspend fun get(dataId: String): InferenceDataDescriptor? = state.data(dataId)
+        override suspend fun all(): List<InferenceDataDescriptor> = state.data()
+    }
+
+    override val streamFabric: InferenceStreamFabric = object : InferenceStreamFabric {
+        override suspend fun append(
+            invocationId: String,
+            payload: InferenceStreamPayload,
+        ): InferenceStreamRecord = state.appendRecord(invocationId, payload)
+
+        override suspend fun records(invocationId: String): List<InferenceStreamRecord> = state.records(invocationId)
+    }
+
+    override val resourceTelemetry: InferenceResourceTelemetry = object : InferenceResourceTelemetry {
+        override suspend fun record(sample: InferenceResourceSample) = state.recordResourceSample(sample)
+        override suspend fun samples(invocationId: String): List<InferenceResourceSample> = state.resourceSamples(invocationId)
+    }
 
     override suspend fun prepareDispatch(
         request: AgentTaskRequest,
@@ -425,8 +456,8 @@ private data class PersistedInferenceData(
     fun toDomain() = InferenceDataDescriptor(
         dataId = dataId,
         kind = InferenceDataKind.valueOf(kind),
-        artifactId = artifactId?.let(::ArtifactId),
-        producingTaskRunId = producingTaskRunId?.let(::TaskRunId),
+        artifactId = artifactId?.let { ArtifactId(it) },
+        producingTaskRunId = producingTaskRunId?.let { TaskRunId(it) },
         label = label,
         mediaType = mediaType,
     )
