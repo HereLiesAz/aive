@@ -88,6 +88,7 @@ class AzphaltWorkflowPackageInstallerTest {
             allowUntrustedSigner = true,
         )
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+        Unit
     }
 
     @Test
