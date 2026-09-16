@@ -21,16 +21,33 @@ kotlin {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
 val generatedDesktopBrandDir = layout.buildDirectory.dir("generated/brand/desktop")
 val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
-    inputs.file(brandSourceLogo)
+    inputs.files(brandSourceLogo, brandSourceAnimation)
     outputs.dir(generatedDesktopBrandDir)
     doLast {
+        val outputDir = generatedDesktopBrandDir.get().asFile
         BrandAssets.generateDesktop(
             source = brandSourceLogo.asFile,
-            outputDir = generatedDesktopBrandDir.get().asFile,
+            outputDir = outputDir,
+        )
+        BrandAssets.generateLoader(
+            logoSource = brandSourceLogo.asFile,
+            animationSource = brandSourceAnimation.asFile,
+            outputDir = outputDir,
         )
     }
+}
+
+sourceSets {
+    main {
+        resources.srcDir(generatedDesktopBrandDir)
+    }
+}
+
+tasks.processResources {
+    dependsOn(generateDesktopBrandAssets)
 }
 
 tasks.matching {
