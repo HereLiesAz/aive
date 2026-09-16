@@ -109,6 +109,9 @@ class AzphaltPackageVerifier(
         require(manifest.files.isNotEmpty()) { "azp: manifest.files is missing or empty" }
 
         val payload = entries.filterKeys { it != "manifest.json" && it != "signature.json" }
+        require("LICENSE" in manifest.files) { "azp: LICENSE is not listed in manifest.files" }
+        require("LICENSE" in payload) { "azp: LICENSE payload is missing" }
+        require("signature.json" !in manifest.files) { "azp: detached signature.json must not be listed in manifest.files" }
         manifest.files.forEach { (path, expected) ->
             require(AzphaltWorkflowPackageInstaller.isSafePackagePath(path)) { "Unsafe manifest path $path" }
             val data = requireNotNull(payload[path]) { "Missing payload for $path" }
