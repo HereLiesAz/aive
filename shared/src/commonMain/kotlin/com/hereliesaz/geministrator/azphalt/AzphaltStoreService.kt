@@ -128,6 +128,55 @@ class AzphaltStoreService(
         )
     }
 
+    /**
+     * Prepare a package supplied by the host (for example Android ACTION_VIEW/ACTION_SEND) without
+     * bypassing Store verification. Repository signing keys are used when reachable; an offline
+     * import remains cryptographically verified but is presented as untrusted for explicit approval.
+     */
+    suspend fun prepareLocalInstall(bytes: ByteArray): AzphaltPreparedInstall {
+        val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
+        val verification = verifier.verify(bytes, signingKeys)
+        val manifest = verification.packageContents.manifest
+        require(manifest.kind == "workflow") {
+            "Haive Store installs workflow packages; ${manifest.id} is kind ${manifest.kind}"
+        }
+        require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
+            "Package ${manifest.id} does not target $HAIVE_AZPHALT_HOST_ID"
+        }
+        val compat = azphaltCompatSatisfies(manifest.compat)
+        require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
+        require(compat) {
+            "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Haive implements $HAIVE_AZPHALT_API_VERSION"
+        }
+        val plan = installer.inspect(verification)
+        val dependencies = resolveDependencies(plan.dependencies)
+        val detail = AzphaltPackageDetail(
+            id = manifest.id,
+            name = manifest.name,
+            author = manifest.author,
+            description = manifest.description,
+            version = manifest.version,
+            latest = manifest.version,
+            kind = manifest.kind,
+            targetApps = manifest.targetApps,
+            manifest = manifest,
+            versions = listOf(
+                AzphaltPackageVersion(
+                    version = manifest.version,
+                    size = bytes.size.toLong(),
+                ),
+            ),
+        )
+        return AzphaltPreparedInstall(
+            repositoryUrl = repository.repositoryUrl,
+            detail = detail,
+            version = manifest.version,
+            verification = verification,
+            plan = plan,
+            dependencies = dependencies,
+        )
+    }
+
     suspend fun install(
         prepared: AzphaltPreparedInstall,
         approvedHostPermissions: Set<String>,
