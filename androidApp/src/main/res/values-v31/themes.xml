@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Splash theme for API 31+: uses the platform SplashScreen attributes. -->
+    <!-- API 31+ system splash: intentionally neutral so no static/legacy logo flashes before video. -->
     <style name="Theme.Haive.Splash" parent="Theme.Haive">
         <item name="android:windowSplashScreenBackground">@color/haive_icon_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/haive_icon_background</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 </resources>
