@@ -1,5 +1,6 @@
 package com.hereliesaz.haive
 
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.widget.VideoView
@@ -54,7 +55,9 @@ import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
@@ -81,13 +84,22 @@ class MainActivity : ComponentActivity() {
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
 
-        // Install the process Memory observer before App creates its provider-session gateway.
-        memoryRuntime
-
         setContent {
-            var showSplash by remember { mutableStateOf(true) }
-            if (showSplash) {
-                HaiveSplashScreen(onSplashFinished = { showSplash = false })
+            var splashFinished by remember { mutableStateOf(false) }
+            var startupReady by remember { mutableStateOf(false) }
+
+            // Let the animation become the first real app frame. Runtime initialization happens
+            // concurrently instead of blocking setContent and extending the platform splash.
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    // Install the process Memory observer before App creates its provider-session gateway.
+                    memoryRuntime
+                }
+                startupReady = true
+            }
+
+            if (!splashFinished || !startupReady) {
+                HaiveSplashScreen(onSplashFinished = { splashFinished = true })
             } else {
                 var credentials by remember { mutableStateOf(initialCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
@@ -160,33 +172,58 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(4000)
-        onSplashFinished()
+    var firstFrameRendered by remember { mutableStateOf(false) }
+
+    // Count splash time from the first frame Android actually renders, not from composition.
+    LaunchedEffect(firstFrameRendered) {
+        if (firstFrameRendered) {
+            delay(4000)
+            onSplashFinished()
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0D1026)),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         AndroidView(
             factory = { context ->
                 VideoView(context).apply {
+                    setBackgroundColor(0xFF0D1026.toInt())
                     val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.haive_animation1}")
-                    setVideoURI(uri)
+
                     setOnPreparedListener { mediaPlayer ->
                         mediaPlayer.isLooping = true
                         start()
+
+                        // Some vendor MediaPlayer implementations omit VIDEO_RENDERING_START.
+                        // Only use the fallback once playback itself reports that it is running.
+                        postDelayed({
+                            if (!firstFrameRendered && isPlaying) {
+                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                firstFrameRendered = true
+                            }
+                        }, 250L)
+                    }
+                    setOnInfoListener { _, what, _ ->
+                        if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            firstFrameRendered = true
+                        }
+                        false
                     }
                     setOnErrorListener { _, _, _ ->
                         onSplashFinished()
                         true
                     }
+
+                    // Raw APK resource: local, deterministic, and prepared as soon as the view exists.
+                    setVideoURI(uri)
                 }
             },
-            modifier = Modifier.size(280.dp)
+            modifier = Modifier.size(280.dp),
         )
     }
 }
