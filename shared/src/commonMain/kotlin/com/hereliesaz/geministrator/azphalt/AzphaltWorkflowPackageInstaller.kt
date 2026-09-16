@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.azphalt
 
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -91,10 +92,7 @@ class AzphaltWorkflowPackageInstaller(
     private val persistence: WorkflowPersistence,
     private val installStore: AzphaltInstallStore,
     private val publisherPins: AzphaltPublisherPinStore = SettingsAzphaltPublisherPinStore(),
-    private val json: Json = Json {
-        ignoreUnknownKeys = false
-        classDiscriminator = "type"
-    },
+    private val json: Json = SettingsWorkflowPersistence.defaultJson,
 ) {
     /** Validate all Haive-facing semantics and decode every referenced workflow/role before mutation. */
     fun inspect(verification: AzphaltPackageVerification): AzphaltWorkflowInstallPlan {
