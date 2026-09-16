@@ -1,7 +1,24 @@
+import haive.build.BrandAssets
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+}
+
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
+val generatedAndroidBrandResDir = layout.buildDirectory.dir("generated/brand/android/res")
+val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
+    inputs.files(brandSourceLogo, brandSourceAnimation)
+    outputs.dir(generatedAndroidBrandResDir)
+    doLast {
+        BrandAssets.generateLoader(
+            logoSource = brandSourceLogo.asFile,
+            animationSource = brandSourceAnimation.asFile,
+            outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable"),
+        )
+    }
 }
 
 android {
@@ -15,6 +32,8 @@ android {
         versionCode = providers.gradleProperty("app.versionCode").get().toInt()
         versionName = providers.gradleProperty("app.versionName").get()
     }
+
+    sourceSets.getByName("main").res.srcDir(generatedAndroidBrandResDir)
 
     signingConfigs {
         create("release") {
@@ -43,6 +62,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+tasks.named("preBuild") {
+    dependsOn(generateAndroidBrandAssets)
 }
 
 dependencies {
