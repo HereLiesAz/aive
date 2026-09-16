@@ -8,7 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,7 +37,6 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-/** Normalized habitat coordinate. Persist this in the host, not pixel coordinates. */
 data class H2g2TerrariumPosition(val x: Float, val y: Float) {
     fun clamped(): H2g2TerrariumPosition = H2g2TerrariumPosition(
         x = x.coerceIn(.05f, .95f),
@@ -48,11 +47,8 @@ data class H2g2TerrariumPosition(val x: Float, val y: Float) {
 data class H2g2TerrariumSubject(
     val node: H2g2WorkflowNode,
     val position: H2g2TerrariumPosition,
-    /** First appearance visibly emerges from this parent if the parent exists in the same habitat. */
     val birthParentId: String? = null,
-    /** Stable non-colour identity input. */
     val identitySeed: String = node.id,
-    /** Orchestrator is host-rendered canonical art; all other subjects are procedurally generated. */
     val identityKind: H2g2SwarmIdentityKind = H2g2SwarmIdentityKind.Generated,
 )
 
@@ -67,27 +63,9 @@ data class H2g2TerrariumRelationship(
     val from: String,
     val to: String,
     val kind: H2g2TerrariumRelationshipKind = H2g2TerrariumRelationshipKind.Dependency,
-    /** True only while the host runtime says the interaction is currently occurring. */
     val active: Boolean = false,
 )
 
-/**
- * A workflow as a living artificial-life terrarium.
- *
- * Every creature owns an independent decision cadence, behavioral state, personality and RNG stream
- * in [H2g2SwarmWorld]. Compose supplies one display-frame clock and renders snapshots; it does not
- * run an AI/physics engine per frame. This keeps the colony cheap while allowing behavior itself to
- * become recognizable identity.
- *
- * [orchestratorContent] is deliberately host supplied. H2G2 must never procedurally approximate the
- * Haive orchestrator: Haive injects the exact canonical logo character there.
- *
- * [adornments] are persistent visualized dependencies carried or worn by the downstream creature.
- * [serviceVisits] are transient outside actors such as the fixed USPR delivery truck.
- *
- * Dragging is presentation until drop completes. [onNodeDroppedOn] is the semantic boundary: a host
- * may rewrite an editable workflow, stage a revision for a running workflow, or reject the gesture.
- */
 @Composable
 fun H2g2SwarmTerrarium(
     subjects: List<H2g2TerrariumSubject>,
@@ -134,7 +112,6 @@ fun H2g2SwarmTerrarium(
     var draggingId by remember { mutableStateOf<String?>(null) }
     var dropTargetId by remember { mutableStateOf<String?>(null) }
 
-    // Shared renderer clock. Agent decisions remain independent inside H2g2SwarmWorld.
     LaunchedEffect(world) {
         var previousNanos = withFrameNanos { it }
         while (true) {
@@ -147,7 +124,6 @@ fun H2g2SwarmTerrarium(
         }
     }
 
-    // Host-persisted habitat anchors may change independently of the local simulation.
     LaunchedEffect(subjects.map { it.node.id to it.position }) {
         subjects.forEach { subject ->
             if (draggingId != subject.node.id && world.snapshot(subject.node.id) != null) {
@@ -157,7 +133,6 @@ fun H2g2SwarmTerrarium(
         snapshots = world.snapshots()
     }
 
-    // Runtime state changes influence behavior without replacing autonomous personality.
     LaunchedEffect(subjects.map { it.node.id to it.node.state }) {
         val activeInteractionIds = relationships
             .filter { it.active && it.kind != H2g2TerrariumRelationshipKind.Dependency }
@@ -178,7 +153,6 @@ fun H2g2SwarmTerrarium(
         snapshots = world.snapshots()
     }
 
-    // Real host relationships trigger the creature choreography.
     val interactionKey = remember(relationships) {
         relationships.map { listOf(it.from, it.to, it.kind.name, it.active.toString()) }
     }
@@ -228,7 +202,7 @@ fun H2g2SwarmTerrarium(
             .flatMap { relationship -> listOf(relationship.from to relationship, relationship.to to relationship) }
             .toMap()
 
-        Canvas(Modifier.matchParentSize()) {
+        Canvas(Modifier.fillMaxSize()) {
             drawTerrariumBackdrop()
             relationships.forEach { relationship ->
                 val fromSubject = subjectById[relationship.from] ?: return@forEach
@@ -238,18 +212,8 @@ fun H2g2SwarmTerrarium(
                 val startCenter = Offset(fromSnapshot.x * widthPx, fromSnapshot.y * heightPx)
                 val endCenter = Offset(toSnapshot.x * widthPx, toSnapshot.y * heightPx)
                 val direction = endCenter - startCenter
-                val startTerminal = terminalAnchor(
-                    subject = fromSubject,
-                    toward = direction,
-                    halfCreaturePx = halfCreaturePx,
-                    orchestratorTerminalAnchor = orchestratorTerminalAnchor,
-                )
-                val endTerminal = terminalAnchor(
-                    subject = toSubject,
-                    toward = -direction,
-                    halfCreaturePx = halfCreaturePx,
-                    orchestratorTerminalAnchor = orchestratorTerminalAnchor,
-                )
+                val startTerminal = terminalAnchor(fromSubject, direction, halfCreaturePx, orchestratorTerminalAnchor)
+                val endTerminal = terminalAnchor(toSubject, -direction, halfCreaturePx, orchestratorTerminalAnchor)
                 drawTerrariumRelationship(
                     relationship = relationship,
                     start = startCenter + startTerminal,
@@ -348,7 +312,7 @@ fun H2g2SwarmTerrarium(
                 if (isSelected || isDropTarget) {
                     Box(
                         Modifier
-                            .matchParentSize()
+                            .fillMaxSize()
                             .padding(5.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(
@@ -359,7 +323,7 @@ fun H2g2SwarmTerrarium(
                 }
 
                 if (subject.identityKind == H2g2SwarmIdentityKind.Orchestrator) {
-                    requireNotNull(orchestratorContent).invoke(subject, snapshot, Modifier.matchParentSize())
+                    requireNotNull(orchestratorContent).invoke(subject, snapshot, Modifier.fillMaxSize())
                 } else {
                     H2g2SwarmCharacter(
                         identitySeed = subject.identitySeed,
@@ -367,14 +331,14 @@ fun H2g2SwarmTerrarium(
                         active = node.state == H2g2WorkflowState.Active || draggingId == node.id,
                         contactDirection = contactDirection,
                         contactStrength = if (contact != null) 1f else 0f,
-                        modifier = Modifier.matchParentSize(),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 H2g2SwarmAdornmentLayer(
                     adornments = adornments[node.id].orEmpty(),
                     hueSeed = node.hueSeed,
-                    modifier = Modifier.matchParentSize(),
+                    modifier = Modifier.fillMaxSize(),
                 )
 
                 BasicText(
@@ -394,7 +358,7 @@ fun H2g2SwarmTerrarium(
 
         H2g2TerrariumServiceLayer(
             visits = serviceVisits,
-            modifier = Modifier.matchParentSize(),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
