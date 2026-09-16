@@ -126,4 +126,10 @@ object HostedLlmProviders {
             extraHeaders = spec.extraHeaders,
         ),
     )
+
+    /** Build every hosted provider whose credential is currently configured. */
+    fun configured(credentials: Map<String, String>): List<AgentProvider> = entries.mapNotNull { spec ->
+        val key = credentials[spec.id]?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        create(spec, LlmApiKeyProvider { key })
+    }
 }
