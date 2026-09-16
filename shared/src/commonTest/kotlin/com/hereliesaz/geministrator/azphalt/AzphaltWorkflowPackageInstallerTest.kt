@@ -22,7 +22,7 @@ class AzphaltWorkflowPackageInstallerTest {
     private val json = SettingsWorkflowPersistence.defaultJson
 
     @Test
-    fun inspectAndInstallRegistersDefinitionsAndRolesOnlyAfterPermissionApproval() = runBlocking {
+    fun installRegistersWorkflowButKeepsPackageAgentLocalAndAllowsPermissionSubset() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
         val installer = installer(persistence, store)
@@ -32,27 +32,21 @@ class AzphaltWorkflowPackageInstallerTest {
 
         assertEquals(setOf("WorkflowRegister", "WorkflowLaunch"), plan.requestedHostPermissions)
         assertNull(persistence.definitions.get(WorkflowDefinitionId("release")))
-        assertFailsWith<IllegalArgumentException> {
-            installer.install(
-                plan = plan,
-                repositoryUrl = AZPHALT_STORE_URL,
-                approvedHostPermissions = setOf("WorkflowRegister"),
-                nowEpochMillis = 50L,
-            )
-        }
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
 
         val installed = installer.install(
             plan = plan,
             repositoryUrl = AZPHALT_STORE_URL,
-            approvedHostPermissions = setOf("WorkflowRegister", "WorkflowLaunch"),
+            approvedHostPermissions = setOf("WorkflowRegister"),
             nowEpochMillis = 50L,
         )
 
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
-        assertNotNull(persistence.roles.get(RoleDefinitionId("builder")))
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
         assertEquals("com.example.release", installed.packageId)
         assertEquals(listOf("release"), installed.workflowDefinitionIds)
-        assertEquals(listOf("builder"), installed.roleIds)
+        assertEquals(listOf("builder"), installed.roles.map { it.id.value })
+        assertEquals(listOf("WorkflowRegister"), installed.approvedHostPermissions)
         assertEquals(installed, store.get("com.example.release"))
     }
 
@@ -77,13 +71,13 @@ class AzphaltWorkflowPackageInstallerTest {
         val plan = installer.inspect(untrusted)
 
         assertFailsWith<IllegalArgumentException> {
-            installer.install(plan, AZPHALT_STORE_URL, plan.requestedHostPermissions, 10L)
+            installer.install(plan, AZPHALT_STORE_URL, emptySet(), 10L)
         }
 
         installer.install(
             plan,
             AZPHALT_STORE_URL,
-            plan.requestedHostPermissions,
+            emptySet(),
             10L,
             allowUntrustedSigner = true,
         )
@@ -100,32 +94,28 @@ class AzphaltWorkflowPackageInstallerTest {
         val plan = installer.inspect(verification(packageFor()))
 
         assertFailsWith<IllegalArgumentException> {
-            installer.install(
-                plan,
-                AZPHALT_STORE_URL,
-                setOf("WorkflowRegister", "WorkflowLaunch"),
-                50L,
-            )
+            installer.install(plan, AZPHALT_STORE_URL, emptySet(), 50L)
         }
         assertEquals("Local workflow", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
     }
 
     @Test
-    fun samePackageMayUpgradeDefinitionsItAlreadyOwns() = runBlocking {
+    fun samePackageMayUpgradeDefinitionsAndLocalAgentsItAlreadyOwns() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
         val installer = installer(persistence, store)
-        val permissions = setOf("WorkflowRegister", "WorkflowLaunch")
         val firstPlan = installer.inspect(verification(packageFor(version = "1.0.0")))
-        installer.install(firstPlan, AZPHALT_STORE_URL, permissions, 10L)
+        installer.install(firstPlan, AZPHALT_STORE_URL, emptySet(), 10L)
 
         val updatedDefinition = workflow().copy(name = "Release v2")
         val update = packageFor(version = "2.0.0", workflowDefinition = updatedDefinition)
         val secondPlan = installer.inspect(verification(update))
-        installer.install(secondPlan, AZPHALT_STORE_URL, permissions, 20L)
+        installer.install(secondPlan, AZPHALT_STORE_URL, emptySet(), 20L)
 
         assertEquals("Release v2", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
         assertEquals("2.0.0", store.get("com.example.release")?.version)
+        assertEquals(listOf("builder"), store.get("com.example.release")?.roles?.map { it.id.value })
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
     }
 
     private fun installer(
