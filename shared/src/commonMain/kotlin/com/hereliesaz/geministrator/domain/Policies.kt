@@ -23,7 +23,8 @@ sealed interface VerificationPolicy {
  *
  * The default remains a single governed task. Centralized MoA is expanded into explicit workflow
  * DAG nodes before execution so normal persistence, retries, approvals, artifacts, and verification
- * remain authoritative.
+ * remain authoritative. [ResourceAware] authorizes the preparer to choose between those two
+ * implemented topologies using task structure and durable provider resource history.
  */
 @Serializable
 sealed interface CompoundInferencePolicy {
@@ -37,6 +38,43 @@ sealed interface CompoundInferencePolicy {
         init {
             require(proposerRoleIds.size in 2..MAX_PROPOSERS) {
                 "Centralized MoA requires 2..$MAX_PROPOSERS proposers"
+            }
+        }
+    }
+
+    /**
+     * Authorizes bounded automatic selection between Single and centralized MoA.
+     *
+     * At least one resource ceiling is required. If the runtime lacks enough measured history for
+     * a configured ceiling, or the estimate exceeds it, planning conservatively remains Single.
+     */
+    @Serializable
+    data class ResourceAware(
+        val proposerRoleIds: List<RoleDefinitionId>,
+        val aggregatorRoleId: RoleDefinitionId,
+        val maxEstimatedCostUsd: Double? = null,
+        val maxEstimatedLatencyMillis: Long? = null,
+        val minimumHistoricalSamplesPerProvider: Int = 2,
+        val minimumComplexityScore: Int = 3,
+    ) : CompoundInferencePolicy {
+        init {
+            require(proposerRoleIds.size in 2..MAX_PROPOSERS) {
+                "Resource-aware MoA requires 2..$MAX_PROPOSERS proposers"
+            }
+            require(maxEstimatedCostUsd != null || maxEstimatedLatencyMillis != null) {
+                "Resource-aware inference requires a cost and/or latency ceiling"
+            }
+            require(maxEstimatedCostUsd == null || (maxEstimatedCostUsd.isFinite() && maxEstimatedCostUsd >= 0.0)) {
+                "Resource-aware cost ceiling must be finite and non-negative"
+            }
+            require(maxEstimatedLatencyMillis == null || maxEstimatedLatencyMillis >= 1L) {
+                "Resource-aware latency ceiling must be positive"
+            }
+            require(minimumHistoricalSamplesPerProvider >= 1) {
+                "Resource-aware inference requires at least one historical sample per provider"
+            }
+            require(minimumComplexityScore >= 0) {
+                "Resource-aware complexity threshold must not be negative"
             }
         }
     }
