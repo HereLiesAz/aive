@@ -1,9 +1,7 @@
 package com.hereliesaz.geministrator.azphalt
 
 import com.hereliesaz.geministrator.domain.RoleDefinition
-import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
-import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -11,8 +9,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Bytes that have already passed container integrity/signature verification. */
-data class VerifiedAzphaltPackage(
+/** Bytes that have already passed container integrity and embedded-signature verification. */
+data class VerifiedAzphaltPackage internal constructor(
     val manifest: AzphaltManifest,
     val payload: Map<String, ByteArray>,
     val signed: Boolean,
@@ -25,6 +23,10 @@ data class AzphaltWorkflowInstallPlan(
     val name: String,
     val signed: Boolean,
     val signerPublicKey: String?,
+    val trusted: Boolean,
+    val trustReason: String,
+    val publisherChanged: Boolean,
+    val pinnedPublisherKey: String?,
     val definitions: List<WorkflowDefinition>,
     val roles: List<RoleDefinition>,
     val dependencies: List<AzphaltWorkflowDependency>,
@@ -88,13 +90,15 @@ class SettingsAzphaltInstallStore(
 class AzphaltWorkflowPackageInstaller(
     private val persistence: WorkflowPersistence,
     private val installStore: AzphaltInstallStore,
+    private val publisherPins: AzphaltPublisherPinStore = SettingsAzphaltPublisherPinStore(),
     private val json: Json = Json {
         ignoreUnknownKeys = false
         classDiscriminator = "type"
     },
 ) {
     /** Validate all Haive-facing semantics and decode every referenced workflow/role before mutation. */
-    fun inspect(pkg: VerifiedAzphaltPackage): AzphaltWorkflowInstallPlan {
+    fun inspect(verification: AzphaltPackageVerification): AzphaltWorkflowInstallPlan {
+        val pkg = verification.packageContents
         val manifest = pkg.manifest
         require(manifest.kind == "workflow") { "Azphalt package ${manifest.id} is not a workflow package" }
         require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
@@ -139,6 +143,10 @@ class AzphaltWorkflowPackageInstaller(
             name = manifest.name,
             signed = pkg.signed,
             signerPublicKey = pkg.signerPublicKey,
+            trusted = verification.trusted,
+            trustReason = verification.trustReason,
+            publisherChanged = verification.publisherChanged,
+            pinnedPublisherKey = verification.pinnedPublisherKey,
             definitions = definitions,
             roles = roles,
             dependencies = workflow.dependencies,
@@ -148,7 +156,7 @@ class AzphaltWorkflowPackageInstaller(
     }
 
     /**
-     * Install a previously inspected package after the user approves its host permissions.
+     * Install a previously inspected package after explicit permission/trust decisions.
      * `WorkflowLaunch` is recorded as approved but never auto-launches anything here.
      */
     suspend fun install(
@@ -156,11 +164,22 @@ class AzphaltWorkflowPackageInstaller(
         repositoryUrl: String,
         approvedHostPermissions: Set<String>,
         nowEpochMillis: Long,
+        allowUntrustedSigner: Boolean = false,
+        allowPublisherChange: Boolean = false,
     ): InstalledAzphaltWorkflowPackage {
         val unapproved = plan.requestedHostPermissions - approvedHostPermissions
         require(unapproved.isEmpty()) {
             "Host permissions still need approval: ${unapproved.sorted().joinToString()}"
         }
+        require(!plan.publisherChanged || allowPublisherChange) {
+            "Publisher key changed for ${plan.packageId}; explicit publisher-change approval is required"
+        }
+        // Match the reference host policy: unsigned packages make no identity claim. A signed package
+        // whose signer cannot be anchored in trusted repository/user keys must be explicitly approved.
+        require(!plan.signed || plan.trusted || allowUntrustedSigner) {
+            "Signed package publisher is not trusted: ${plan.trustReason}"
+        }
+
         val previous = installStore.get(plan.packageId)
         val ownedDefinitions = previous?.workflowDefinitionIds.orEmpty().toSet()
         val ownedRoles = previous?.roleIds.orEmpty().toSet()
@@ -178,10 +197,10 @@ class AzphaltWorkflowPackageInstaller(
             }
         }
 
-        // All decoding, permissions, ownership and collision checks happen above this line.
+        // All decoding, permissions, trust, ownership and collision checks happen above this line.
         plan.roles.forEach { persistence.roles.put(it) }
         plan.definitions.forEach { persistence.definitions.put(it) }
-        return InstalledAzphaltWorkflowPackage(
+        val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
             version = plan.version,
             repositoryUrl = AzphaltRepositoryClient.normalizeRepositoryUrl(repositoryUrl),
@@ -192,7 +211,12 @@ class AzphaltWorkflowPackageInstaller(
             signed = plan.signed,
             signerPublicKey = plan.signerPublicKey,
             installedAtEpochMillis = nowEpochMillis,
-        ).also { installStore.put(it) }
+        )
+        installStore.put(installed)
+        if (plan.signerPublicKey != null && (plan.pinnedPublisherKey == null || allowPublisherChange)) {
+            publisherPins.pin(plan.packageId, plan.signerPublicKey)
+        }
+        return installed
     }
 
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
