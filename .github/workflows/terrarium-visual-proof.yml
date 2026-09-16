@@ -1,0 +1,85 @@
+name: Terrarium Visual Proof
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - feature/swarm-terrarium-integration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terrarium-proof-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wasm-screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build production WASM terrarium
+        run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
+
+      - name: Stage WASM visual proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
+          if [ -z "$WASM_BUNDLE" ]; then
+            echo "::error::WASM production bundle was not found"
+            find webApp/build -type f -name 'haive.js' -print
+            exit 1
+          fi
+          WASM_DIR="$(dirname "$WASM_BUNDLE")"
+          rm -rf webApp/build/terrarium-proof
+          mkdir -p webApp/build/terrarium-proof
+          cp -R "$WASM_DIR"/. webApp/build/terrarium-proof/
+          cp -R webApp/src/webMain/resources/. webApp/build/terrarium-proof/
+          test -f webApp/build/terrarium-proof/index.html
+          test -f webApp/build/terrarium-proof/haive.js
+
+      - name: Install Chromium for visual proof
+        run: npx --yes playwright@1.55.0 install --with-deps chromium
+
+      - name: Capture real terrarium screenshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8080 --directory webApp/build/terrarium-proof > /tmp/haive-terrarium-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          mkdir -p visual-proof
+          npx --yes playwright@1.55.0 screenshot \
+            --browser chromium \
+            --viewport-size "1440,900" \
+            --wait-for-timeout 4000 \
+            "http://127.0.0.1:8080/?terrariumPreview=1" \
+            visual-proof/haive-terrarium-wasm.png
+          test -s visual-proof/haive-terrarium-wasm.png
+
+      - name: Upload terrarium screenshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: haive-terrarium-wasm-proof
+          path: visual-proof/haive-terrarium-wasm.png
+          if-no-files-found: error
