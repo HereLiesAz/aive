@@ -16,8 +16,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.conveyance.h2g2.H2g2SwarmTerrarium
+import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -70,6 +72,31 @@ internal fun GeministratorWorkflowTerrarium(
             persistedPositions = positions,
         )
     }
+    val animatedRelationships = remember(projection.relationships, run) {
+        projection.relationships.map { relationship ->
+            if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
+                relationship
+            } else {
+                val upstream = run.taskRuns[TaskDefinitionId(relationship.from)]
+                val downstream = run.taskRuns[TaskDefinitionId(relationship.to)]
+                val isTransfer = upstream?.artifacts?.isNotEmpty() == true &&
+                    downstream?.status in setOf(
+                        TaskRunStatus.Ready,
+                        TaskRunStatus.Planning,
+                        TaskRunStatus.Running,
+                        TaskRunStatus.Verifying,
+                    )
+                if (isTransfer) {
+                    relationship.copy(
+                        kind = H2g2TerrariumRelationshipKind.Transfer,
+                        active = true,
+                    )
+                } else {
+                    relationship
+                }
+            }
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
@@ -79,7 +106,7 @@ internal fun GeministratorWorkflowTerrarium(
         ) {
             H2g2SwarmTerrarium(
                 subjects = projection.subjects,
-                relationships = projection.relationships,
+                relationships = animatedRelationships,
                 adornments = projection.adornments,
                 serviceVisits = projection.serviceVisits,
                 editable = true,
