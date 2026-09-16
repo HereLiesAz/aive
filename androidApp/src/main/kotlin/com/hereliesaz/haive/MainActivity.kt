@@ -34,6 +34,7 @@ import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
+import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
@@ -197,6 +198,7 @@ internal fun configuredAndroidProviders(
     repositoryHttpClient: HttpClient? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    addAll(HostedLlmProviders.configured(credentials))
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
