@@ -29,11 +29,28 @@ body {
 }
 
 #haiveSplash img {
+    grid-area: 1 / 1;
     display: block;
     width: min(78vw, 760px);
     max-width: 100%;
     max-height: 78vh;
     object-fit: contain;
+}
+
+#haiveSplashFrame0 {
+    opacity: 1;
+}
+
+#haiveSplashAnimation {
+    opacity: 0;
+}
+
+#haiveSplashAnimation.haive-loader-running {
+    opacity: 1;
+}
+
+#haiveSplashFrame0.haive-loader-replaced {
+    opacity: 0;
 }
 
 #haiveSplash.haive-splash-ready {
@@ -44,5 +61,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
     #haiveSplash {
         transition: none;
+    }
+
+    #haiveSplashAnimation {
+        display: none;
+    }
+
+    #haiveSplashFrame0 {
+        opacity: 1;
     }
 }

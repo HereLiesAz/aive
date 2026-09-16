@@ -1,7 +1,27 @@
+import haive.build.BrandAssets
+import haive.build.BrandLoaderVerifier
+
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+}
+
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
+val generatedAndroidBrandResDir = layout.buildDirectory.dir("generated/brand/android/res")
+val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
+    inputs.files(brandSourceLogo, brandSourceAnimation)
+    outputs.dir(generatedAndroidBrandResDir)
+    doLast {
+        val outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable")
+        BrandAssets.generateLoader(
+            logoSource = brandSourceLogo.asFile,
+            animationSource = brandSourceAnimation.asFile,
+            outputDir = outputDir,
+        )
+        BrandLoaderVerifier.verify(outputDir)
+    }
 }
 
 android {
@@ -15,6 +35,10 @@ android {
         versionCode = providers.gradleProperty("app.versionCode").get().toInt()
         versionName = providers.gradleProperty("app.versionName").get()
     }
+
+    // AGP 9.4 no longer permits Provider instances through the legacy SourceSet API.
+    // Resolve only the deterministic build-directory path here; preBuild below carries the task dependency.
+    sourceSets.getByName("main").res.srcDir(generatedAndroidBrandResDir.get().asFile)
 
     signingConfigs {
         create("release") {
@@ -43,6 +67,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+tasks.named("preBuild") {
+    dependsOn(generateAndroidBrandAssets)
 }
 
 dependencies {

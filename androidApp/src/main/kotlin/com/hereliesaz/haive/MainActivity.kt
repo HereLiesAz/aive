@@ -1,9 +1,6 @@
 package com.hereliesaz.haive
 
-import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Bundle
-import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -20,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
@@ -88,11 +84,8 @@ class MainActivity : ComponentActivity() {
             var splashFinished by remember { mutableStateOf(false) }
             var startupReady by remember { mutableStateOf(false) }
 
-            // Let the animation become the first real app frame. Runtime initialization happens
-            // concurrently instead of blocking setContent and extending the platform splash.
             LaunchedEffect(Unit) {
                 withContext(Dispatchers.IO) {
-                    // Install the process Memory observer before App creates its provider-session gateway.
                     memoryRuntime
                 }
                 startupReady = true
@@ -172,14 +165,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
-    var firstFrameRendered by remember { mutableStateOf(false) }
+    var animationStarted by remember { mutableStateOf(false) }
 
-    // Count splash time from the first frame Android actually renders, not from composition.
-    LaunchedEffect(firstFrameRendered) {
-        if (firstFrameRendered) {
+    LaunchedEffect(animationStarted) {
+        if (animationStarted) {
             delay(4000)
             onSplashFinished()
         }
+    }
+    LaunchedEffect(Unit) {
+        delay(6000)
+        if (!animationStarted) onSplashFinished()
     }
 
     Box(
@@ -188,42 +184,9 @@ fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
             .background(Color(0xFF0D1026)),
         contentAlignment = Alignment.Center,
     ) {
-        AndroidView(
-            factory = { context ->
-                VideoView(context).apply {
-                    setBackgroundColor(0xFF0D1026.toInt())
-                    val uri = Uri.parse("android.resource://${context.packageName}/${R.raw.haive_animation1}")
-
-                    setOnPreparedListener { mediaPlayer ->
-                        mediaPlayer.isLooping = true
-                        start()
-
-                        // Some vendor MediaPlayer implementations omit VIDEO_RENDERING_START.
-                        // Only use the fallback once playback itself reports that it is running.
-                        postDelayed({
-                            if (!firstFrameRendered && isPlaying) {
-                                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                                firstFrameRendered = true
-                            }
-                        }, 250L)
-                    }
-                    setOnInfoListener { _, what, _ ->
-                        if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
-                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                            firstFrameRendered = true
-                        }
-                        false
-                    }
-                    setOnErrorListener { _, _, _ ->
-                        onSplashFinished()
-                        true
-                    }
-
-                    // Raw APK resource: local, deterministic, and prepared as soon as the view exists.
-                    setVideoURI(uri)
-                }
-            },
+        HaiveLoadingAnimation(
             modifier = Modifier.size(280.dp),
+            onAnimationStarted = { animationStarted = true },
         )
     }
 }
