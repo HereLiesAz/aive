@@ -69,10 +69,14 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.ktor.client.core)
+            implementation(libs.kmp.zip)
+            implementation(libs.cryptography.core)
+            implementation(libs.cryptography.provider.optimal)
         }
 
         getByName("androidMain").dependencies {
             implementation(libs.onnxruntime.android)
+            implementation(libs.cryptography.provider.jdk.bc)
         }
 
         getByName("desktopMain").dependencies {

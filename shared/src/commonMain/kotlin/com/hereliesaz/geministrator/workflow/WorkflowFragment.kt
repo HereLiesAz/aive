@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowFragmentId
+import kotlinx.serialization.Serializable
 
 /**
  * A named, reusable subgraph of tasks. Fragments are a composition primitive for
@@ -11,6 +12,7 @@ import com.hereliesaz.geministrator.domain.WorkflowFragmentId
  * exist at runtime. A fragment can reference tasks inside itself via [TaskDefinition.dependsOn];
  * connections to tasks outside the fragment are established by the caller during expansion.
  */
+@Serializable
 data class WorkflowFragment(
     val id: WorkflowFragmentId,
     val name: String,

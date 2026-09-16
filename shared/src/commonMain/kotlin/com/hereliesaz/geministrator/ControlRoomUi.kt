@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
+import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
@@ -119,6 +121,9 @@ fun ControlRoom(
     onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    azphaltStoreService: AzphaltStoreService? = null,
+    azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
+    onAzphaltPackageImportHandled: (Long) -> Unit = {},
     compact: Boolean,
     contentPadding: PaddingValues,
     runtimeState: ApplicationRuntimeState,
@@ -170,6 +175,9 @@ fun ControlRoom(
                     onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
+                    azphaltStoreService = azphaltStoreService,
+                    azphaltPackageImportRequest = azphaltPackageImportRequest,
+                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
                     connectedProviderIds = connectedProviderIds,
                     modifier = Modifier.weight(1f),
                     compact = true,
@@ -232,6 +240,9 @@ fun ControlRoom(
                     onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
+                    azphaltStoreService = azphaltStoreService,
+                    azphaltPackageImportRequest = azphaltPackageImportRequest,
+                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
                     connectedProviderIds = connectedProviderIds,
                     modifier = Modifier.weight(1f),
                     runtimeState = runtimeState,
@@ -372,6 +383,9 @@ private fun MainDestination(
     onDisconnectRepositoryService: (String) -> Unit,
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    azphaltStoreService: AzphaltStoreService? = null,
+    azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
+    onAzphaltPackageImportHandled: (Long) -> Unit = {},
     connectedProviderIds: Set<String>,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
@@ -422,13 +436,11 @@ private fun MainDestination(
                 onDisconnectService = onDisconnectRepositoryService,
                 modifier = Modifier.fillMaxSize(),
             )
-            ControlRoomDestination.AddOns -> com.hereliesaz.geministrator.addons.AddonHostScreen(
-                installations = emptyList(),
-                onInstall = { _, _ -> },
-                onRemove = {},
-                onEnableDisable = { _, _ -> },
-                onAddAgentsToCompany = {},
-                modifier = Modifier.fillMaxSize()
+            ControlRoomDestination.AddOns -> AzphaltStoreScreen(
+                service = azphaltStoreService,
+                importRequest = azphaltPackageImportRequest,
+                onImportHandled = onAzphaltPackageImportHandled,
+                modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Settings -> ProviderSettingsScreen(
                 connectedProviderIds = connectedProviderIds,
