@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
 import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
@@ -64,6 +65,7 @@ class ProviderBackedManagedSessionGateway(
                     taskRunId = taskRequest.taskRunId,
                     providerId = provider.id,
                     providerRunId = run.providerRunId,
+                    inferenceInvocationId = prepared.plan.invocationId,
                 )
                 recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
                 registerAndObserve(
@@ -305,30 +307,47 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         event: AgentEvent,
     ) {
+        val effectiveEvent = when (event) {
+            is AgentEvent.ArtifactProduced -> {
+                val invocationId = handle.inferenceInvocationId
+                if (invocationId == null) {
+                    event
+                } else {
+                    event.copy(
+                        artifact = event.artifact.copy(
+                            metadata = event.artifact.metadata +
+                                (INFERENCE_INVOCATION_ID_METADATA_KEY to invocationId),
+                        ),
+                    )
+                }
+            }
+            else -> event
+        }
+
         var changed = false
         var terminalStatus: ManagedSessionStatus? = null
         mutex.withLock {
             val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
             if (current.status.isTerminal()) return@withLock
-            val next = when (event) {
+            val next = when (effectiveEvent) {
                 is AgentEvent.PlanGenerated -> current.copy(
                     status = ManagedSessionStatus.AwaitingApproval,
                     progress = ManagedSessionProgress(
                         fraction = null,
-                        message = event.summary.takeIf(String::isNotBlank),
+                        message = effectiveEvent.summary.takeIf(String::isNotBlank),
                     ),
                 )
                 is AgentEvent.PlanApproved -> current.copy(status = ManagedSessionStatus.Running)
                 is AgentEvent.Progress -> current.copy(
                     status = ManagedSessionStatus.Running,
                     progress = ManagedSessionProgress(
-                        fraction = event.fraction,
-                        message = event.message.takeIf { it.isNotBlank() },
+                        fraction = effectiveEvent.fraction,
+                        message = effectiveEvent.message.takeIf { it.isNotBlank() },
                     ),
                 )
                 is AgentEvent.Message -> current
                 is AgentEvent.ArtifactProduced -> current.copy(
-                    artifacts = current.artifacts.upsertArtifact(event.artifact),
+                    artifacts = current.artifacts.upsertArtifact(effectiveEvent.artifact),
                 )
                 is AgentEvent.Completed -> current.copy(
                     status = ManagedSessionStatus.Completed,
@@ -340,11 +359,11 @@ class ProviderBackedManagedSessionGateway(
                 is AgentEvent.Failed -> current.copy(status = ManagedSessionStatus.Failed)
                 is AgentEvent.UsageReported -> current.copy(
                     pendingUsage = ManagedSessionUsage(
-                        inputTokens = event.inputTokens,
-                        outputTokens = event.outputTokens,
-                        costUsd = event.costUsd,
-                        cacheHitFraction = event.cacheHitFraction,
-                        latencyMillis = event.latencyMillis,
+                        inputTokens = effectiveEvent.inputTokens,
+                        outputTokens = effectiveEvent.outputTokens,
+                        costUsd = effectiveEvent.costUsd,
+                        cacheHitFraction = effectiveEvent.cacheHitFraction,
+                        latencyMillis = effectiveEvent.latencyMillis,
                     ),
                 )
             }
@@ -355,24 +374,24 @@ class ProviderBackedManagedSessionGateway(
             }
         }
         if (!changed) return
-        when (event) {
+        when (effectiveEvent) {
             is AgentEvent.ArtifactProduced -> inferenceFabric.recordArtifact(
                 handle.providerId,
                 handle.providerRunId,
-                event.artifact,
+                effectiveEvent.artifact,
             )
             is AgentEvent.UsageReported -> inferenceFabric.recordUsage(
                 providerId = handle.providerId,
                 providerRunId = handle.providerRunId,
-                inputTokens = event.inputTokens,
-                outputTokens = event.outputTokens,
-                costUsd = event.costUsd,
-                cacheHitFraction = event.cacheHitFraction,
-                latencyMillis = event.latencyMillis,
+                inputTokens = effectiveEvent.inputTokens,
+                outputTokens = effectiveEvent.outputTokens,
+                costUsd = effectiveEvent.costUsd,
+                cacheHitFraction = effectiveEvent.cacheHitFraction,
+                latencyMillis = effectiveEvent.latencyMillis,
             )
             else -> Unit
         }
-        recordMemory { memoryObserver.onSessionEvent(handle, event) }
+        recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
@@ -382,7 +401,7 @@ class ProviderBackedManagedSessionGateway(
                 } else {
                     InferenceTerminalStatus.Failed
                 },
-                reason = (event as? AgentEvent.Failed)?.reason,
+                reason = (effectiveEvent as? AgentEvent.Failed)?.reason,
             )
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }

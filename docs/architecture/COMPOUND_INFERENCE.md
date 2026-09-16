@@ -58,30 +58,44 @@ Every provider-backed `AgentTaskRequest` carries `CompoundInferenceContext` cont
 - candidate budget
 - aggregation depth
 
-The currently authorized default is `Single`. The contract also defines future strategies:
+The default provider invocation remains `Single`. The contract also defines strategies for:
 
 - `CentralizedMixtureOfAgents`
 - `ParallelIndependent`
 - `SequentialPipeline`
 - `Escalate`
 
-The planner must select a strategy based on task structure rather than assuming that more agents are always better. Strongly sequential work should normally remain single-agent or sequentially pipelined unless measured evidence justifies another topology.
+At the workflow-authoring layer, `TaskDefinition.compoundInferencePolicy` now authorizes either ordinary single execution or explicit centralized MoA materialization. Automatic strategy selection remains future work: the planner must eventually select a strategy based on task structure rather than assuming that more agents are always better. Strongly sequential work should normally remain single-agent or sequentially pipelined unless measured evidence justifies another topology.
 
 ## Genealogy-based governance
 
 Genealogy records information ancestry. It does not decide truth.
 
-Each model invocation has a stable invocation identity plus direct ancestry such as producing task runs, upstream artifacts, recalled memory addresses, tool-evidence identifiers, and later prompt/config/model/adapter/provider fingerprints.
+Each concrete model invocation has an invocation identity plus ancestry such as producing task runs, upstream artifacts, upstream inference invocations, recalled memory addresses, tool-evidence identifiers, and optional prompt/configuration fingerprints.
 
-`WorkflowEngine` supplies real project, workflow-run, workflow-definition, task, and role coordinates before provider dispatch. Dependency artifacts contribute producing task-run IDs and artifact IDs to the request genealogy.
+`WorkflowEngine` supplies real project, workflow-run, workflow-definition, task, and role coordinates before provider dispatch. Dependency artifacts contribute producing task-run IDs, artifact IDs, and, when present, the exact inference invocation IDs that produced those artifacts.
 
-Future genealogy governance will persist these relationships as a graph and expose them to verification and aggregation. Governance may flag common ancestry, unsupported consensus, circular derivation, missing evidence, or insufficient independence. It must not silently rewrite a worker's reasoning or convert memory into a truth database.
+Runtime genealogy governance is implemented. `GovernedCompoundInferenceFabric` registers every prepared concrete provider invocation in `InferenceGenealogyGovernanceRuntime` before provider execution. The deterministic evaluator can report:
+
+- missing genealogy
+- missing evidence when policy requires evidence
+- common direct or transitive ancestry
+- circular derivation
+- pairwise structural independence
+- insufficient independent members for a consensus claim
+- unsupported consensus
+
+The evaluator does not rank candidate quality, label claims true or false, resolve conflicting memories, or rewrite worker output. Its reports are structural provenance evidence only.
+
+A critical distinction applies to MoA: multiple legitimate proposers normally receive the same authorized task inputs. Shared source ancestry therefore means their agreement is **not independent evidence**, but it does not make their candidate analyses unusable. MoA governance blocks missing or circular lineage. Shared ancestry, insufficient independence, and unsupported-consensus findings remain visible to the aggregator and verifier as advisory provenance so agreement cannot be mistaken for proof.
+
+The genealogy graph is currently runtime-local. Durable persistence/restoration across process restart remains an explicit follow-up.
 
 ## Blueprint inference infrastructure
 
 The Blueprint layer is now a real runtime subsystem, not only a design target.
 
-Each `AgentProviderRegistry` owns one `BlueprintCompoundInferenceFabric`, and the `ProviderBackedManagedSessionGateway` routes every started provider-backed session through that shared fabric before `provider.start(...)`.
+Each `AgentProviderRegistry` owns one `BlueprintCompoundInferenceFabric`, wrapped by genealogy governance, and the `ProviderBackedManagedSessionGateway` routes every started provider-backed session through that shared fabric before `provider.start(...)`.
 
 The first production slice is deliberately runtime-local. Workflow state, memory, repositories, provider sessions, and durable artifacts remain authoritative in their existing stores. The inference fabric indexes and coordinates those systems rather than duplicating their payload ownership.
 
@@ -123,15 +137,18 @@ The original artifact remains authoritative in workflow persistence. Memory, rep
 `InferenceStreamFabric` provides ordered per-invocation records with typed payloads. The current stream records:
 
 - dispatch preparation and execution plan
+- provider-run binding
 - observed provider artifacts
 - provider usage/resource reports
 - terminal completion, failure, or cancellation
 
-Stream records carry the stable genealogy invocation ID. The stream does not replace workflow events; it is the inference-specific communication/observability channel that centralized MoA and later compound strategies will reuse.
+Concrete provider runs are bound to concrete invocation IDs so retry attempts and late events from older provider runs cannot cross-contaminate one another's genealogy or telemetry.
+
+The stream does not replace workflow events; it is the inference-specific communication/observability channel that compound strategies reuse.
 
 ### Task and data planner
 
-`CompoundInferenceTaskPlanner` is now invoked before every provider-backed session starts. It receives:
+`CompoundInferenceTaskPlanner` is invoked before every provider-backed session starts. It receives:
 
 - the complete `AgentTaskRequest`
 - selected provider identity
@@ -139,11 +156,11 @@ Stream records carry the stable genealogy invocation ID. The stream does not rep
 - symbolic governed data inputs
 - the authorized compound-inference context
 
-The baseline planner produces `InferenceExecutionPlan` and honors the strategy/budgets already authorized by orchestration. It intentionally does **not** select an unimplemented topology yet. Resource-aware topology selection begins only when the corresponding execution strategies are real and testable.
+The baseline planner produces `InferenceExecutionPlan` and honors the strategy/budgets already authorized by orchestration. It intentionally does **not** autonomously select a topology yet. Resource-aware topology selection begins only when the corresponding execution strategies are measured and safe to select automatically.
 
 ### Resource telemetry
 
-`InferenceResourceTelemetry` records provider-reported input/output tokens, cost, cache-hit fraction, and latency against the same invocation identity used by the stream and genealogy.
+`InferenceResourceTelemetry` records provider-reported input/output tokens, cost, cache-hit fraction, and latency against the same concrete invocation identity used by the stream and genealogy.
 
 This telemetry is diagnostic/planning input. It does not affect workflow correctness or completion claims.
 
@@ -151,39 +168,44 @@ This telemetry is diagnostic/planning input. It does not affect workflow correct
 
 The first slice is intentionally not presented as enterprise-complete:
 
-- registries, streams, and inference telemetry are runtime-local and are not yet restored after process restart
+- registries, streams, resource history, and the genealogy graph are runtime-local and are not yet restored after process restart
 - local model assets are not yet registered in the model registry
 - non-agent executor evidence enters the data registry when it becomes context for provider-backed inference, not immediately at system-executor production time
-- the planner does not yet choose among multiple implemented compound topologies
-- stream records are not yet the persisted genealogy graph
+- the planner does not yet automatically choose among multiple implemented compound topologies
 
 Those are explicit follow-up items in `TODO.md`.
 
 ## Centralized mixture of agents
 
-Centralized MoA is the next major execution strategy. It is a governed subgraph, not an unstructured swarm.
+Centralized MoA is implemented as an explicit governed workflow subgraph rather than an unstructured swarm or a hidden mini-orchestrator inside a provider call.
 
 ```text
-input
-  |
-  +--> proposer A --+
-  +--> proposer B --+--> aggregator --> verifier --> output
-  +--> proposer C --+
+                         +--> proposer A --+
+original dependencies ---+--> proposer B --+--> genealogy gate --> aggregator --> verifier --> downstream
+                         +--> proposer N --+
 ```
 
-Required properties:
+`CompoundInferencePolicy.CentralizedMixtureOfAgents` authorizes a bounded set of proposer roles and one aggregator role. `CentralizedMixtureOfAgentsExpander` materializes the policy before execution into ordinary `TaskDefinition`s so persistence, concurrency, retries, escalation, artifacts, approvals, and runtime projection continue to use the normal workflow engine.
 
-- proposer contexts are isolated unless the topology explicitly permits sharing
-- proposer outputs are typed artifacts/stream records rather than implicit transcript inheritance
-- the aggregator receives bounded, validated candidate outputs
-- genealogy preserves candidate ancestry
-- common ancestry is not mistaken for independent consensus
-- agreement is not itself verification
-- verification uses evidence and acceptance criteria
-- collaboration depth and candidate count are policy-bounded
-- strongly sequential tasks are not automatically converted into MoA
+The first production-safe form has these rules:
 
-The existing workflow DAG, concurrency limits, artifact model, Blueprint stream fabric, genealogy, and independent verification machinery are the foundation for this strategy.
+- two to eight proposer roles are allowed
+- proposers are isolated siblings and never depend on another proposer's output
+- proposer roles may not have implementation authority or require repository-write capability
+- proposers emit bounded `TaskPlan` candidate artifacts and do not mutate the repository
+- each provider artifact is tagged with `haive.inferenceInvocationId`, allowing downstream genealogy to name the exact producing invocation
+- a deterministic `haive.genealogy-governance` system-executor node runs after all proposers and before aggregation
+- the governance gate requires at least two candidate invocation records and blocks missing genealogy or circular derivation
+- shared input/evidence is recorded as common ancestry; it makes candidate agreement ineligible to count as independent consensus but does not block synthesis of the candidates
+- the original task ID becomes the aggregator task, preserving its durable workflow identity and original required outputs
+- aggregation preserves meaningful disagreement and cannot treat candidate agreement as verification
+- a separate verifier role runs after aggregation and produces a `Verification` artifact
+- downstream tasks that depended on the original task are also rewired to wait for the injected verifier
+- the genealogy-gate executor is registered centrally by `ApplicationRuntime.create()`, so Android, Desktop, JS, and Wasm share the same runtime behavior while retaining their platform-specific executor integrations
+
+This is centralized MoA **execution**, not automatic MoA selection. Tasks only become MoA when their workflow definition explicitly carries the MoA policy. Resource-aware automatic topology selection is a separate later step.
+
+The current genealogy graph is still runtime-local. Therefore process-restart durability of the genealogy graph itself remains separate work and must not be inferred from ordinary workflow persistence.
 
 ## Specialized local model and LoRA library
 
@@ -267,8 +289,8 @@ It reuses the same workflow concurrency, genealogy, stream, planning, and verifi
 
 1. Compound inference + direct genealogy foundation — implemented.
 2. Blueprint runtime fabric — first production slice implemented; persistence/resource-aware planning remain.
-3. Genealogy persistence and governance.
-4. Centralized MoA proposer/aggregator/verifier execution.
+3. Runtime genealogy governance — implemented; durable graph persistence remains.
+4. Centralized MoA proposer → genealogy gate → aggregator → verifier execution — implemented; automatic topology selection remains.
 5. Generalized local specialist/LoRA library registered into the model registry.
 6. DSPy optimization and release pipeline.
 7. Remaining local orchestration utility family.
@@ -283,7 +305,7 @@ Implemented and called by production runtime:
 - `InferenceGenealogy`
 - `CompoundInferenceContext`
 - workflow/project/task/role orchestration coordinates on provider dispatch
-- automatic dependency artifact ancestry
+- automatic dependency artifact ancestry and inference-invocation ancestry
 - `BlueprintCompoundInferenceFabric`
 - `InferenceModelRegistry`
 - `InferenceAgentRegistry`
@@ -292,19 +314,26 @@ Implemented and called by production runtime:
 - `InferenceResourceTelemetry`
 - `CompoundInferenceTaskPlanner`
 - provider-session preparation through the fabric
-- provider artifact, usage, and terminal stream recording
+- provider-run binding and retry-safe artifact/usage/terminal stream recording
+- `InferenceGenealogyGraph`
+- `InferenceGenealogyGovernanceRuntime`
+- deterministic common-ancestry, cycle, evidence, independence, and consensus governance
+- `CompoundInferencePolicy.CentralizedMixtureOfAgents`
+- `CentralizedMixtureOfAgentsExpander`
+- `GenealogyGovernanceExecutorIntegration`
+- centralized runtime registration of the genealogy gate
+- explicit proposer → governance → aggregator → verifier DAG execution
+- advisory false-consensus detection without blocking legitimate shared-input synthesis
 
 Not yet implemented:
 
-- persisted genealogy graph and governance policy
-- persisted/restored inference registries and streams
+- persisted/restored genealogy graph, inference registries, streams, and resource history
 - direct non-agent executor stream ingestion
 - resource-aware automatic topology selection
-- centralized MoA execution
 - generalized shared-base/LoRA model library integration
 - DSPy optimization pipeline
 - remaining orchestration utility models
 - BitNet runtime/model family
 - Skeleton-of-Thought execution
 
-No item above should be represented as complete until it has real callers, tests, and runtime verification appropriate to its target platform.
+Physical-device/real-provider end-to-end verification remains separate from CI and is not claimed by this document.
