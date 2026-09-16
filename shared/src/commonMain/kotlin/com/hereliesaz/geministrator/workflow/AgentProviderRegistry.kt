@@ -5,12 +5,15 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.displayName
-import com.hereliesaz.geministrator.inference.BlueprintCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
+import com.hereliesaz.geministrator.inference.SettingsCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.SettingsInferenceGenealogyGraph
+import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.russhwolf.settings.Settings
 
 data class ProviderSelectionRequest(
     val preferredProviderId: AgentProviderId? = null,
@@ -21,9 +24,11 @@ data class ProviderSelectionRequest(
 
 class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
-    inferenceFabric: CompoundInferenceFabric = BlueprintCompoundInferenceFabric(),
+    inferenceFabric: CompoundInferenceFabric = SettingsCompoundInferenceFabric(
+        SettingsInferenceStateStore(durableInferenceSettings()),
+    ),
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(
-        graph = SettingsInferenceGenealogyGraph.createDefault(),
+        graph = SettingsInferenceGenealogyGraph(durableInferenceSettings()),
     ),
 ) {
     val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
@@ -94,3 +99,11 @@ class AgentProviderRegistry(
         error("No agent provider satisfies required capabilities $required$repositorySuffix")
     }
 }
+
+private fun durableInferenceSettings(): Settings = ChunkedStringSettings(
+    delegate = Settings(),
+    chunkedKeys = setOf(
+        SettingsInferenceStateStore.DEFAULT_STORAGE_KEY,
+        SettingsInferenceGenealogyGraph.DEFAULT_STORAGE_KEY,
+    ),
+)

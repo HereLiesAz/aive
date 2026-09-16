@@ -34,23 +34,25 @@ class SettingsInferenceGenealogyGraphTest {
     }
 
     @Test
-    fun conflictingAncestryIsRejectedAfterRestart() = runBlocking {
-        val settings = MapSettings()
-        SettingsInferenceGenealogyGraph(settings).register(
-            InferenceGenealogyNode(
-                invocationId = "same-invocation",
-                upstreamArtifactIds = setOf(ArtifactId("artifact-a")),
-            ),
-        )
-
-        val recreated = SettingsInferenceGenealogyGraph(settings)
-        assertFailsWith<IllegalArgumentException> {
-            recreated.register(
+    fun conflictingAncestryIsRejectedAfterRestart() {
+        runBlocking {
+            val settings = MapSettings()
+            SettingsInferenceGenealogyGraph(settings).register(
                 InferenceGenealogyNode(
                     invocationId = "same-invocation",
-                    upstreamArtifactIds = setOf(ArtifactId("artifact-b")),
+                    upstreamArtifactIds = setOf(ArtifactId("artifact-a")),
                 ),
             )
+
+            val recreated = SettingsInferenceGenealogyGraph(settings)
+            assertFailsWith<IllegalArgumentException> {
+                recreated.register(
+                    InferenceGenealogyNode(
+                        invocationId = "same-invocation",
+                        upstreamArtifactIds = setOf(ArtifactId("artifact-b")),
+                    ),
+                )
+            }
         }
     }
 
