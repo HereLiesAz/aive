@@ -25,10 +25,10 @@ class AzphaltWorkflowPackageInstallerTest {
     fun inspectAndInstallRegistersDefinitionsAndRolesOnlyAfterPermissionApproval() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
-        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
-        val pkg = packageFor(targetApps = listOf(HAIVE_AZPHALT_HOST_ID))
+        val installer = installer(persistence, store)
+        val packageVerification = verification(packageFor(targetApps = listOf(HAIVE_AZPHALT_HOST_ID)))
 
-        val plan = installer.inspect(pkg)
+        val plan = installer.inspect(packageVerification)
 
         assertEquals(setOf("WorkflowRegister", "WorkflowLaunch"), plan.requestedHostPermissions)
         assertNull(persistence.definitions.get(WorkflowDefinitionId("release")))
@@ -59,13 +59,10 @@ class AzphaltWorkflowPackageInstallerTest {
     @Test
     fun packageScopedToAnotherHostIsRejectedBeforeAnyPersistence() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
-        val installer = AzphaltWorkflowPackageInstaller(
-            persistence,
-            SettingsAzphaltInstallStore(MapSettings()),
-        )
+        val installer = installer(persistence, SettingsAzphaltInstallStore(MapSettings()))
 
         assertFailsWith<IllegalArgumentException> {
-            installer.inspect(packageFor(targetApps = listOf("com.example.other")))
+            installer.inspect(verification(packageFor(targetApps = listOf("com.example.other"))))
         }
 
         assertEquals(emptyList(), persistence.definitions.all())
@@ -73,12 +70,33 @@ class AzphaltWorkflowPackageInstallerTest {
     }
 
     @Test
+    fun signedUntrustedPublisherNeedsExplicitApproval() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val installer = installer(persistence, SettingsAzphaltInstallStore(MapSettings()))
+        val untrusted = verification(packageFor(), trusted = false, reason = "unknown signer")
+        val plan = installer.inspect(untrusted)
+
+        assertFailsWith<IllegalArgumentException> {
+            installer.install(plan, AZPHALT_STORE_URL, plan.requestedHostPermissions, 10L)
+        }
+
+        installer.install(
+            plan,
+            AZPHALT_STORE_URL,
+            plan.requestedHostPermissions,
+            10L,
+            allowUntrustedSigner = true,
+        )
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+    }
+
+    @Test
     fun packageCannotOverwriteUnownedWorkflowId() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
-        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
+        val installer = installer(persistence, store)
         persistence.definitions.put(workflow().copy(name = "Local workflow"))
-        val plan = installer.inspect(packageFor())
+        val plan = installer.inspect(verification(packageFor()))
 
         assertFailsWith<IllegalArgumentException> {
             installer.install(
@@ -95,19 +113,39 @@ class AzphaltWorkflowPackageInstallerTest {
     fun samePackageMayUpgradeDefinitionsItAlreadyOwns() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
-        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
+        val installer = installer(persistence, store)
         val permissions = setOf("WorkflowRegister", "WorkflowLaunch")
-        val firstPlan = installer.inspect(packageFor(version = "1.0.0"))
+        val firstPlan = installer.inspect(verification(packageFor(version = "1.0.0")))
         installer.install(firstPlan, AZPHALT_STORE_URL, permissions, 10L)
 
         val updatedDefinition = workflow().copy(name = "Release v2")
         val update = packageFor(version = "2.0.0", workflowDefinition = updatedDefinition)
-        val secondPlan = installer.inspect(update)
+        val secondPlan = installer.inspect(verification(update))
         installer.install(secondPlan, AZPHALT_STORE_URL, permissions, 20L)
 
         assertEquals("Release v2", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
         assertEquals("2.0.0", store.get("com.example.release")?.version)
     }
+
+    private fun installer(
+        persistence: InMemoryWorkflowPersistence,
+        store: AzphaltInstallStore,
+    ) = AzphaltWorkflowPackageInstaller(
+        persistence = persistence,
+        installStore = store,
+        publisherPins = SettingsAzphaltPublisherPinStore(MapSettings()),
+    )
+
+    private fun verification(
+        pkg: VerifiedAzphaltPackage,
+        trusted: Boolean = true,
+        reason: String = "test trusted publisher",
+    ) = AzphaltPackageVerification(
+        packageContents = pkg,
+        trusted = trusted,
+        trustReason = reason,
+        publisherChanged = false,
+    )
 
     private fun packageFor(
         targetApps: List<String> = emptyList(),
