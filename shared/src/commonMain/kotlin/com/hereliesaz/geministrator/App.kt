@@ -13,12 +13,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
+import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -31,7 +33,10 @@ fun App(
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
+    persistence: WorkflowPersistence? = null,
     azphaltStoreService: AzphaltStoreService? = null,
+    azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
+    onAzphaltPackageImportHandled: (Long) -> Unit = {},
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
@@ -42,11 +47,12 @@ fun App(
     onDisconnectProvider: (String) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val workflowPersistence = remember(persistence) { persistence ?: SettingsWorkflowPersistence.createDefault() }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
 
-    LaunchedEffect(providers, executorIntegrations, runtimeGeneration) {
+    LaunchedEffect(providers, executorIntegrations, workflowPersistence, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -54,6 +60,7 @@ fun App(
             val created = ApplicationRuntime.create(
                 providers = providers,
                 scope = scope,
+                persistence = workflowPersistence,
                 executorIntegrations = executorIntegrations,
             )
             runtime = created
@@ -75,6 +82,12 @@ fun App(
     GeministratorTheme {
         var destination by remember { mutableStateOf(ControlRoomDestination.Settings) }
         var selectedTaskId by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(azphaltPackageImportRequest?.requestId) {
+            if (azphaltPackageImportRequest != null) {
+                destination = ControlRoomDestination.AddOns
+            }
+        }
 
         LaunchedEffect(runtimeState) {
             val live = runtimeState as? ApplicationRuntimeState.Live
@@ -257,6 +270,7 @@ fun App(
                         }
                     },
                     onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
+                    onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                     onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
                     onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },
                     onSaveRoleCollection = { roles ->
@@ -292,6 +306,8 @@ fun App(
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
                     azphaltStoreService = azphaltStoreService,
+                    azphaltPackageImportRequest = azphaltPackageImportRequest,
+                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
                     compact = maxWidth < ControlRoomBreakpoints.Wide,
                     contentPadding = paddingValues,
                     runtimeState = runtimeState,
