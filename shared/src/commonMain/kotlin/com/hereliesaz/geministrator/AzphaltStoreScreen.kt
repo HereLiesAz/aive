@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.azphalt.AzphaltDependencyStatus
+import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
@@ -36,6 +37,8 @@ import kotlin.time.ExperimentalTime
 @Composable
 internal fun AzphaltStoreScreen(
     service: AzphaltStoreService?,
+    importRequest: AzphaltPackageImportRequest? = null,
+    onImportHandled: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -71,6 +74,39 @@ internal fun AzphaltStoreScreen(
         runCatching { service.search(query).packages }
             .onSuccess { packages = it }
             .onFailure { failure -> error = failure.message ?: "Azphalt Store search failed." }
+    }
+
+    LaunchedEffect(service, importRequest?.requestId) {
+        val request = importRequest ?: return@LaunchedEffect
+        if (service == null) {
+            error = "Azphalt package import is unavailable on this host."
+            onImportHandled(request.requestId)
+            return@LaunchedEffect
+        }
+        loading = true
+        error = null
+        status = null
+        try {
+            val plan = service.prepareLocalInstall(request.bytes)
+            prepared = plan
+            selectedPackageId = plan.detail.id
+            approvedPermissions = service.installed()
+                .firstOrNull { it.packageId == plan.detail.id }
+                ?.approvedHostPermissions
+                ?.toSet()
+                .orEmpty()
+            allowUntrustedSigner = false
+            allowPublisherChange = false
+            status = request.sourceLabel
+                ?.takeIf(String::isNotBlank)
+                ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
+                ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+        } catch (failure: Exception) {
+            error = failure.message ?: "Imported Azphalt package could not be verified."
+        } finally {
+            loading = false
+            onImportHandled(request.requestId)
+        }
     }
 
     Column(
