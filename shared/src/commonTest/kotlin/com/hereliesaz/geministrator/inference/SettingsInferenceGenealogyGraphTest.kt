@@ -3,7 +3,7 @@ package com.hereliesaz.geministrator.inference
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.russhwolf.settings.MapSettings
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class SettingsInferenceGenealogyGraphTest {
     @Test
-    fun graphSurvivesRecreationWithCompleteStructuralAncestry() = runTest {
+    fun graphSurvivesRecreationWithCompleteStructuralAncestry() = runBlocking {
         val settings = MapSettings()
         val first = SettingsInferenceGenealogyGraph(settings)
         val node = InferenceGenealogyNode(
@@ -34,7 +34,7 @@ class SettingsInferenceGenealogyGraphTest {
     }
 
     @Test
-    fun conflictingAncestryIsRejectedAfterRestart() = runTest {
+    fun conflictingAncestryIsRejectedAfterRestart() = runBlocking {
         val settings = MapSettings()
         SettingsInferenceGenealogyGraph(settings).register(
             InferenceGenealogyNode(
@@ -55,7 +55,7 @@ class SettingsInferenceGenealogyGraphTest {
     }
 
     @Test
-    fun governanceUsesPersistedGraphAfterRestart() = runTest {
+    fun governanceUsesPersistedGraphAfterRestart() = runBlocking {
         val settings = MapSettings()
         val first = SettingsInferenceGenealogyGraph(settings)
         first.register(InferenceGenealogyNode(invocationId = "root", toolEvidenceIds = setOf("source")))
