@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.azphalt
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -96,8 +95,9 @@ data class AzphaltPackageVersion(
 )
 
 /**
- * The manifest surface Haive needs in order to validate and import workflow packages.
- * Unknown Azphalt fields intentionally remain forward-compatible through the client's Json settings.
+ * Manifest surface required by Haive's Azphalt host. The mutually-exclusive editor/executable root
+ * blocks are retained as JsonElement values solely so a workflow package can be rejected when any
+ * are present; Haive never interprets or executes them.
  */
 @Serializable
 data class AzphaltManifest(
@@ -111,6 +111,17 @@ data class AzphaltManifest(
     val description: String? = null,
     val author: String? = null,
     val homepage: String? = null,
+    val entry: JsonElement? = null,
+    val runtime: JsonElement? = null,
+    val capabilities: JsonElement? = null,
+    val assets: JsonElement? = null,
+    val contributes: JsonElement? = null,
+    val app: JsonElement? = null,
+    val mcp: JsonElement? = null,
+    val pack: JsonElement? = null,
+    val skill: JsonElement? = null,
+    val script: JsonElement? = null,
+    val composable: JsonElement? = null,
     val targetApps: List<String> = emptyList(),
     val visibility: String? = null,
     val maturity: String? = null,
