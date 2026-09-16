@@ -1,6 +1,8 @@
 package com.hereliesaz.haive
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -39,6 +41,7 @@ import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
+import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
@@ -58,6 +61,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
+    private var installedGeminiReady by mutableStateOf(false)
     private val memoryRuntimeDelegate = lazy {
         AndroidMemoryLayerRuntime(
             context = this,
@@ -98,9 +102,30 @@ class MainActivity : ComponentActivity() {
                 var credentials by remember { mutableStateOf(initialCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
+                var configuringGeminiApiKey by remember { mutableStateOf(false) }
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
-                val providers = remember(credentials, repositoryCredentials) {
-                    configuredAndroidProviders(credentials, repositoryCredentials, repositoryHttpClient)
+
+                val installedGeminiApi = remember(credentials, installedGeminiReady) {
+                    if (!installedGeminiReady) {
+                        null
+                    } else {
+                        val fallback = credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
+                            GeminiGenerateContentApi(LlmApiKeyProvider { key })
+                        }
+                        InstalledGeminiTextGenerationApi(this, fallback)
+                    }
+                }
+                val providers = remember(
+                    credentials,
+                    repositoryCredentials,
+                    installedGeminiApi,
+                ) {
+                    configuredAndroidProviders(
+                        credentials = credentials,
+                        repositoryCredentials = repositoryCredentials,
+                        repositoryHttpClient = repositoryHttpClient,
+                        installedGeminiApi = installedGeminiApi,
+                    )
                 }
                 val executorIntegrations = remember(repositoryCredentials) {
                     configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
@@ -121,14 +146,35 @@ class MainActivity : ComponentActivity() {
                         },
                         onCancel = { configuringRepositoryServiceId = null },
                     )
+                    providerId == ProviderCatalog.GEMINI_ID && !configuringGeminiApiKey -> AndroidGeminiProviderSetup(
+                        installedAppDetected = InstalledGeminiTextGenerationApi.isGeminiInstalled(this),
+                        accessibilityEnabled = InstalledGeminiTextGenerationApi.isAccessibilityServiceEnabled(this),
+                        onUseInstalledGemini = {
+                            InstalledGeminiPreference.setEnabled(this, true)
+                            installedGeminiReady = InstalledGeminiTextGenerationApi.isAvailable(this)
+                            configuringProviderId = null
+                            if (!installedGeminiReady) {
+                                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            }
+                        },
+                        onUseApiKey = { configuringGeminiApiKey = true },
+                        onCancel = {
+                            configuringGeminiApiKey = false
+                            configuringProviderId = null
+                        },
+                    )
                     providerId != null -> ProviderCredentialSetup(
                         providerId = providerId,
                         onSave = { key ->
                             providerCredentialStore.write(providerId, key)
                             credentials = providerCredentialStore.readAll()
+                            configuringGeminiApiKey = false
                             configuringProviderId = null
                         },
-                        onCancel = { configuringProviderId = null },
+                        onCancel = {
+                            configuringGeminiApiKey = false
+                            configuringProviderId = null
+                        },
                     )
                     else -> App(
                         providers = providers,
@@ -141,8 +187,15 @@ class MainActivity : ComponentActivity() {
                             repositoryCredentialStore.clear(serviceId)
                             repositoryCredentials = repositoryCredentialStore.readAll()
                         },
-                        onReconfigureProvider = { configuringProviderId = it },
+                        onReconfigureProvider = { id ->
+                            configuringGeminiApiKey = false
+                            configuringProviderId = id
+                        },
                         onDisconnectProvider = { disconnectedProviderId ->
+                            if (disconnectedProviderId == ProviderCatalog.GEMINI_ID) {
+                                InstalledGeminiPreference.setEnabled(this, false)
+                                installedGeminiReady = false
+                            }
                             providerCredentialStore.clear(disconnectedProviderId)
                             credentials = providerCredentialStore.readAll()
                         },
@@ -150,6 +203,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
+            InstalledGeminiTextGenerationApi.isAvailable(this)
     }
 
     override fun onDestroy() {
@@ -196,6 +255,7 @@ internal fun configuredAndroidProviders(
     credentials: Map<String, String>,
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
+    installedGeminiApi: TextGenerationApi? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     addAll(HostedLlmProviders.configured(credentials))
@@ -230,9 +290,21 @@ internal fun configuredAndroidProviders(
             httpClient = repositoryHttpClient,
         )
     }
-    credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
+
+    val geminiKey = credentials.cleanKey(ProviderCatalog.GEMINI_ID)
+    if (installedGeminiApi != null) {
+        add(
+            TextLlmProvider(
+                id = AgentProviderId(ProviderCatalog.GEMINI_ID),
+                displayName = "Gemini",
+                api = installedGeminiApi,
+            ),
+        )
+    } else if (geminiKey != null) {
+        add(GeminiProvider(LlmApiKeyProvider { geminiKey }))
+    }
+    geminiKey?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(GeminiProvider(keyProvider))
         addGitLabWorkspaceProvider(
             providerId = "gemini-gitlab-workspace",
             displayName = "Gemini / GitLab Workspace",
@@ -241,6 +313,7 @@ internal fun configuredAndroidProviders(
             httpClient = repositoryHttpClient,
         )
     }
+
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
         add(XaiProvider(keyProvider))
