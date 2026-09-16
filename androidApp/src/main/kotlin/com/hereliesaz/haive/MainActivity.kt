@@ -61,6 +61,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
+    private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
     private var installedGeminiReady by mutableStateOf(false)
     private val memoryRuntimeDelegate = lazy {
         AndroidMemoryLayerRuntime(
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
+        azphaltHost.handleIntent(intent)
 
         setContent {
             var splashFinished by remember { mutableStateOf(false) }
@@ -180,6 +182,10 @@ class MainActivity : ComponentActivity() {
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationRuntime = orchestrationRuntime,
+                        persistence = azphaltHost.persistence,
+                        azphaltStoreService = azphaltHost.service,
+                        azphaltPackageImportRequest = azphaltHost.importRequest,
+                        onAzphaltPackageImportHandled = azphaltHost::consumeImport,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         onSearchRepositories = repositoryDiscovery::search,
                         onConfigureRepositoryService = { configuringRepositoryServiceId = it },
@@ -205,6 +211,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        azphaltHost.handleIntent(intent)
+    }
+
     override fun onResume() {
         super.onResume()
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
@@ -212,6 +224,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        azphaltHost.close()
         if (orchestrationRuntimeDelegate.isInitialized()) {
             orchestrationRuntime.close()
         }
