@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.onnxruntime.android)
     implementation(libs.commons.compress)

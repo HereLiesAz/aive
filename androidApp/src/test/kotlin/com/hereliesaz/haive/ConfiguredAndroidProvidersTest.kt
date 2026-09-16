@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.RepositoryServiceCatalog
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
+import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
+import com.hereliesaz.geministrator.providers.llm.TextGenerationResult
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import kotlin.test.Test
@@ -36,6 +38,36 @@ class ConfiguredAndroidProvidersTest {
                 "${spec.displayName} should be configured from its stored credential",
             )
         }
+    }
+
+    @Test
+    fun installedGeminiTransportUsesCanonicalGeminiProviderIdWithoutApiKey() {
+        val installedApi = object : TextGenerationApi {
+            override suspend fun generate(prompt: String): TextGenerationResult =
+                TextGenerationResult(text = "installed")
+        }
+
+        val providers = configuredAndroidProviders(
+            credentials = emptyMap(),
+            installedGeminiApi = installedApi,
+        )
+
+        assertEquals(listOf(AgentProviderId(ProviderCatalog.GEMINI_ID)), providers.map { it.id })
+    }
+
+    @Test
+    fun installedGeminiDoesNotDuplicateApiGeminiProvider() {
+        val installedApi = object : TextGenerationApi {
+            override suspend fun generate(prompt: String): TextGenerationResult =
+                TextGenerationResult(text = "installed")
+        }
+
+        val providers = configuredAndroidProviders(
+            credentials = mapOf(ProviderCatalog.GEMINI_ID to "gemini-key"),
+            installedGeminiApi = installedApi,
+        )
+
+        assertEquals(1, providers.count { it.id == AgentProviderId(ProviderCatalog.GEMINI_ID) })
     }
 
     @Test
