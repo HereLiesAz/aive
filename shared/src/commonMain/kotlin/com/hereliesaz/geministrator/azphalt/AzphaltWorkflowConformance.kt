@@ -1,7 +1,5 @@
 package com.hereliesaz.geministrator.azphalt
 
-import kotlinx.serialization.json.JsonObject
-
 /** Normative structural checks from azphalt `spec/workflow.md` for kind:"workflow" packages. */
 internal object AzphaltWorkflowConformance {
     private val executableSuffix = Regex(
@@ -9,21 +7,8 @@ internal object AzphaltWorkflowConformance {
         RegexOption.IGNORE_CASE,
     )
     private val declarativeScreenSuffix = Regex("\\.(?:json|ya?ml)$", RegexOption.IGNORE_CASE)
-    private val forbiddenRootFields = setOf(
-        "entry",
-        "runtime",
-        "capabilities",
-        "assets",
-        "contributes",
-        "app",
-        "mcp",
-        "pack",
-        "skill",
-        "script",
-        "composable",
-    )
 
-    fun validate(root: JsonObject, manifest: AzphaltManifest): List<String> {
+    fun validate(manifest: AzphaltManifest): List<String> {
         if (manifest.kind != "workflow") return emptyList()
         val errors = mutableListOf<String>()
         val workflow = manifest.workflow
@@ -31,11 +16,23 @@ internal object AzphaltWorkflowConformance {
             return listOf("kind:\"workflow\" requires a workflow block")
         }
 
-        forbiddenRootFields.filter(root::containsKey).forEach { field ->
+        listOf(
+            "entry" to manifest.entry,
+            "runtime" to manifest.runtime,
+            "capabilities" to manifest.capabilities,
+            "assets" to manifest.assets,
+            "contributes" to manifest.contributes,
+            "app" to manifest.app,
+            "mcp" to manifest.mcp,
+            "pack" to manifest.pack,
+            "skill" to manifest.skill,
+            "script" to manifest.script,
+            "composable" to manifest.composable,
+        ).filter { (_, value) -> value != null }.forEach { (field, _) ->
             errors += "kind:\"workflow\" must not declare root field $field"
         }
-        if (workflow.format.isBlank()) errors += "workflow.format must be non-empty"
 
+        if (workflow.format.isBlank()) errors += "workflow.format must be non-empty"
         validatePayloadEntries("definitions", workflow.definitions, manifest.files, errors, required = true)
         validatePayloadEntries("fragments", workflow.fragments, manifest.files, errors, required = false)
         validateAgentEntries(workflow.agents, manifest.files, errors)
@@ -127,7 +124,9 @@ internal object AzphaltWorkflowConformance {
                 errors += "workflow.dependencies[$index].note must be non-empty when present"
             }
             val key = dependency.id to dependency.version
-            if (!seen.add(key)) errors += "workflow.dependencies has duplicate id/version pair ${dependency.id}@${dependency.version.orEmpty()}"
+            if (!seen.add(key)) {
+                errors += "workflow.dependencies has duplicate id/version pair ${dependency.id}@${dependency.version.orEmpty()}"
+            }
         }
     }
 
