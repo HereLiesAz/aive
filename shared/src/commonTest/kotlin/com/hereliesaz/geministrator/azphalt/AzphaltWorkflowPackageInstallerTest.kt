@@ -8,10 +8,10 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
+import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,7 +19,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class AzphaltWorkflowPackageInstallerTest {
-    private val json = Json { encodeDefaults = true; classDiscriminator = "type" }
+    private val json = SettingsWorkflowPersistence.defaultJson
 
     @Test
     fun inspectAndInstallRegistersDefinitionsAndRolesOnlyAfterPermissionApproval() = runBlocking {
