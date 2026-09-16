@@ -35,6 +35,7 @@ class AzphaltPackageRuntimeTest {
         assertFailsWith<IllegalArgumentException> {
             KmpZipAzphaltArchiveReader().read(archive)
         }
+        Unit
     }
 
     @Test
@@ -44,6 +45,7 @@ class AzphaltPackageRuntimeTest {
         assertFailsWith<IllegalArgumentException> {
             KmpZipAzphaltArchiveReader(maxEntryBytes = 32).read(archive)
         }
+        Unit
     }
 
     @Test
