@@ -1,4 +1,5 @@
 import haive.build.BrandAssets
+import haive.build.BrandLoaderVerifier
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -24,6 +25,7 @@ val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
             animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
         )
+        BrandLoaderVerifier.verify(outputDir)
     }
 }
 
