@@ -13,7 +13,34 @@
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+    <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Haive">
+        <img src="haive_splash.gif" alt="" aria-hidden="true" />
+    </div>
     <div id="webApp"></div>
+    <script>
+        (() => {
+            const app = document.getElementById("webApp");
+            const splash = document.getElementById("haiveSplash");
+            if (!app || !splash) return;
+
+            const dismissSplash = () => {
+                splash.classList.add("haive-splash-ready");
+                window.setTimeout(() => splash.remove(), 220);
+            };
+
+            if (app.childNodes.length > 0) {
+                dismissSplash();
+                return;
+            }
+
+            const observer = new MutationObserver(() => {
+                if (app.childNodes.length === 0) return;
+                observer.disconnect();
+                requestAnimationFrame(dismissSplash);
+            });
+            observer.observe(app, { childList: true });
+        })();
+    </script>
     <script src="haive.js"></script>
 </body>
 </html>

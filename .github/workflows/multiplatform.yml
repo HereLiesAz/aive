@@ -264,12 +264,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Verify desktop icons exist
+      - name: Generate and verify desktop icons
         shell: bash
         run: |
-          test -f branding/haive-icon-color.png || { echo "Missing haive-icon-color.png"; exit 1; }
-          test -f branding/haive-icon.ico || { echo "Missing haive-icon.ico"; exit 1; }
-          test -f branding/haive-icon.icns || { echo "Missing haive-icon.icns"; exit 1; }
+          set -euo pipefail
+          ./gradlew :desktopApp:generateDesktopBrandAssets
+          test -f desktopApp/build/generated/brand/desktop/haive-icon-color.png
+          test -f desktopApp/build/generated/brand/desktop/haive-icon.ico
+          test -f desktopApp/build/generated/brand/desktop/haive-icon.icns
 
       - name: Publish pinned Conveyance to Maven Local
         shell: bash

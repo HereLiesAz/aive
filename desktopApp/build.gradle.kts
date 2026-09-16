@@ -1,3 +1,4 @@
+import haive.build.BrandAssets
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -19,6 +20,27 @@ kotlin {
     jvmToolchain(17)
 }
 
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val generatedDesktopBrandDir = layout.buildDirectory.dir("generated/brand/desktop")
+val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
+    inputs.file(brandSourceLogo)
+    outputs.dir(generatedDesktopBrandDir)
+    doLast {
+        BrandAssets.generateDesktop(
+            source = brandSourceLogo.asFile,
+            outputDir = generatedDesktopBrandDir.get().asFile,
+        )
+    }
+}
+
+tasks.matching {
+    it.name.startsWith("package") ||
+        it.name == "createDistributable" ||
+        it.name == "runDistributable"
+}.configureEach {
+    dependsOn(generateDesktopBrandAssets)
+}
+
 val appVersionName = providers.gradleProperty("app.versionName").get()
 // DMG and MSI only accept MAJOR.MINOR.PATCH; strip any prerelease suffix.
 val appPackageVersion = appVersionName.substringBefore("-")
@@ -36,7 +58,7 @@ val nativePackageVersion = if (System.getProperty("os.name").startsWith("Mac", i
 
 compose.desktop {
     application {
-        mainClass = "com.hereliesaz.geministrator.MainKt"
+        mainClass = "com.hereliesaz.geministrator.DesktopLauncherKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi)
@@ -46,15 +68,13 @@ compose.desktop {
             copyright = "© 2026 HereLiesAz"
 
             linux {
-                iconFile.set(rootProject.file("branding/haive-icon-color.png"))
+                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon-color.png").asFile)
             }
             macOS {
-                val icns = rootProject.file("branding/haive-icon.icns")
-                if (icns.exists()) iconFile.set(icns)
+                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon.icns").asFile)
             }
             windows {
-                val ico = rootProject.file("branding/haive-icon.ico")
-                if (ico.exists()) iconFile.set(ico)
+                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon.ico").asFile)
                 menuGroup = "The Haive"
                 upgradeUuid = "e1d4b3c2-5f6a-4b8e-9d7c-0a1b2c3d4e5f"
             }
