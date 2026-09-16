@@ -6,6 +6,7 @@ import com.hereliesaz.conveyance.h2g2.H2g2SwarmIdentityKind
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationship
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
+import com.hereliesaz.conveyance.h2g2.H2g2TerrariumServiceVisit
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumSubject
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
@@ -29,13 +30,15 @@ internal data class WorkflowTerrariumProjection(
     val relationships: List<H2g2TerrariumRelationship>,
     /** Worn/carried dependencies keyed by the downstream creature id. */
     val adornments: Map<String, List<H2g2SwarmAdornment>>,
+    /** External/non-resident services that physically visit the terrarium and leave again. */
+    val serviceVisits: List<H2g2TerrariumServiceVisit>,
 )
 
 /**
  * Projects orchestration truth into the living terrarium without pretending every workflow node is
- * an agent. Only [TaskExecutor.RoleAgent] tasks become creatures. Mechanical/service dependencies
- * become tools or clothing on the agent that consumes them, while agent-to-agent flow stays a
- * synaptic relationship.
+ * an agent. Only [TaskExecutor.RoleAgent] tasks become creatures. Mechanical dependencies may
+ * become tools or clothing, external services become transient visiting vehicles, and agent-to-agent
+ * flow stays a synaptic relationship.
  */
 internal fun projectWorkflowTerrarium(
     definition: WorkflowDefinition,
@@ -143,9 +146,11 @@ internal fun projectWorkflowTerrarium(
             )
         }
     }
+    val subjectPositions = subjects.associate { it.node.id to it.position }
 
     val relationships = linkedMapOf<String, H2g2TerrariumRelationship>()
     val adornments = linkedMapOf<String, MutableList<H2g2SwarmAdornment>>()
+    val serviceVisits = linkedMapOf<String, H2g2TerrariumServiceVisit>()
 
     agentTasks.forEach { downstream ->
         downstream.dependsOn.forEach { dependencyId ->
@@ -154,8 +159,11 @@ internal fun projectWorkflowTerrarium(
                 downstreamAgentId = downstream.id,
                 tasksById = tasksById,
                 agentIds = agentIds,
+                run = run,
+                targetPosition = subjectPositions.getValue(downstream.id.value),
                 relationships = relationships,
                 adornments = adornments,
+                serviceVisits = serviceVisits,
                 visited = mutableSetOf(),
             )
         }
@@ -180,6 +188,7 @@ internal fun projectWorkflowTerrarium(
         subjects = subjects,
         relationships = relationships.values.toList(),
         adornments = adornments.mapValues { (_, values) -> values.distinctBy(H2g2SwarmAdornment::dependencyId) },
+        serviceVisits = serviceVisits.values.toList(),
     )
 }
 
@@ -188,8 +197,11 @@ private fun collectDependencyPresentation(
     downstreamAgentId: TaskDefinitionId,
     tasksById: Map<TaskDefinitionId, TaskDefinition>,
     agentIds: Set<TaskDefinitionId>,
+    run: WorkflowRun,
+    targetPosition: H2g2TerrariumPosition,
     relationships: MutableMap<String, H2g2TerrariumRelationship>,
     adornments: MutableMap<String, MutableList<H2g2SwarmAdornment>>,
+    serviceVisits: MutableMap<String, H2g2TerrariumServiceVisit>,
     visited: MutableSet<TaskDefinitionId>,
 ) {
     if (!visited.add(dependencyId)) return
@@ -206,11 +218,33 @@ private fun collectDependencyPresentation(
         return
     }
 
-    val manifestation = dependency.effectiveExecutor().dependencyManifestation()
-    adornments.getOrPut(downstreamAgentId.value) { mutableListOf() } += h2g2SwarmAdornment(
-        dependencyId = "${dependency.id.value}->${downstreamAgentId.value}",
-        manifestation = manifestation,
-    )
+    val executor = dependency.effectiveExecutor()
+    when (executor) {
+        is TaskExecutor.ExternalService -> addServiceVisit(
+            dependency = dependency,
+            downstreamAgentId = downstreamAgentId,
+            taskRun = run.taskRuns[dependency.id],
+            serviceName = executor.service,
+            operation = executor.operation,
+            targetPosition = targetPosition,
+            serviceVisits = serviceVisits,
+        )
+        is TaskExecutor.GitHubAction -> addServiceVisit(
+            dependency = dependency,
+            downstreamAgentId = downstreamAgentId,
+            taskRun = run.taskRuns[dependency.id],
+            serviceName = "GitHub",
+            operation = executor.workflow,
+            targetPosition = targetPosition,
+            serviceVisits = serviceVisits,
+        )
+        else -> executor.dependencyAdornmentManifestation()?.let { manifestation ->
+            adornments.getOrPut(downstreamAgentId.value) { mutableListOf() } += h2g2SwarmAdornment(
+                dependencyId = "${dependency.id.value}->${downstreamAgentId.value}",
+                manifestation = manifestation,
+            )
+        }
+    }
 
     dependency.dependsOn.forEach { upstream ->
         collectDependencyPresentation(
@@ -218,24 +252,56 @@ private fun collectDependencyPresentation(
             downstreamAgentId = downstreamAgentId,
             tasksById = tasksById,
             agentIds = agentIds,
+            run = run,
+            targetPosition = targetPosition,
             relationships = relationships,
             adornments = adornments,
+            serviceVisits = serviceVisits,
             visited = visited,
         )
     }
 }
 
-private fun TaskExecutor.dependencyManifestation(): H2g2DependencyManifestation = when (this) {
+private fun addServiceVisit(
+    dependency: TaskDefinition,
+    downstreamAgentId: TaskDefinitionId,
+    taskRun: TaskRun?,
+    serviceName: String,
+    operation: String?,
+    targetPosition: H2g2TerrariumPosition,
+    serviceVisits: MutableMap<String, H2g2TerrariumServiceVisit>,
+) {
+    val attempt = taskRun?.attempt ?: 1
+    val visitKey = "service:${dependency.id.value}:${downstreamAgentId.value}:$attempt"
+    serviceVisits[visitKey] = H2g2TerrariumServiceVisit(
+        id = visitKey,
+        serviceName = serviceName,
+        operation = operation,
+        target = targetPosition,
+        active = taskRun?.status.isServiceVisitActive(),
+    )
+}
+
+private fun TaskRunStatus?.isServiceVisitActive(): Boolean = this in setOf(
+    TaskRunStatus.Planning,
+    TaskRunStatus.Running,
+    TaskRunStatus.Verifying,
+    TaskRunStatus.Retrying,
+)
+
+private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManifestation? = when (this) {
     is TaskExecutor.HumanApproval,
     is TaskExecutor.Deployment,
     -> H2g2DependencyManifestation.Clothing
 
-    is TaskExecutor.GitHubAction,
     is TaskExecutor.TestRunner,
     is TaskExecutor.RepositoryOperation,
-    is TaskExecutor.ExternalService,
     is TaskExecutor.NestedWorkflow,
     -> H2g2DependencyManifestation.Tool
+
+    is TaskExecutor.ExternalService,
+    is TaskExecutor.GitHubAction,
+    -> null
 
     is TaskExecutor.RoleAgent -> H2g2DependencyManifestation.Synapse
 }
