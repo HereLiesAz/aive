@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.CompoundInferencePolicy
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -170,11 +171,11 @@ object ResourceAwareCompoundInferencePolicyResolver {
         profiles: Map<AgentProviderId, InferenceProviderResourceProfile>,
     ): Boolean {
         val ceiling = policy.maxEstimatedCostUsd ?: return true
-        val allProviders = proposerProviders + aggregatorProvider + verifierProvider
-        val estimated = allProviders.sumOf { providerId ->
+        var estimated = 0.0
+        for (providerId in proposerProviders + aggregatorProvider + verifierProvider) {
             val profile = profiles.getValue(providerId)
             if (profile.costSampleCount < policy.minimumHistoricalSamplesPerProvider) return false
-            profile.meanCostUsd ?: return false
+            estimated += profile.meanCostUsd ?: return false
         }
         return estimated <= ceiling
     }
@@ -195,9 +196,9 @@ object ResourceAwareCompoundInferencePolicyResolver {
         ) {
             return false
         }
-        val proposerLatency = proposerProviders.maxOf { profiles.getValue(it).meanLatencyMillis!! }
-        val aggregatorLatency = profiles.getValue(aggregatorProvider).meanLatencyMillis!!
-        val verifierLatency = profiles.getValue(verifierProvider).meanLatencyMillis!!
+        val proposerLatency = proposerProviders.maxOf { requireNotNull(profiles.getValue(it).meanLatencyMillis) }
+        val aggregatorLatency = requireNotNull(profiles.getValue(aggregatorProvider).meanLatencyMillis)
+        val verifierLatency = requireNotNull(profiles.getValue(verifierProvider).meanLatencyMillis)
         return proposerLatency + aggregatorLatency + verifierLatency <= ceiling
     }
 
@@ -236,13 +237,9 @@ private suspend fun AgentProviderRegistry.resourceProfile(
     return InferenceProviderResourceProfile(
         providerId = providerId,
         costSampleCount = costs.size,
-        meanCostUsd = costs.takeIf(List<Double>::isNotEmpty)?.average(),
+        meanCostUsd = if (costs.isEmpty()) null else costs.average(),
         latencySampleCount = latencies.size,
-        meanLatencyMillis = latencies
-            .takeIf(List<Long>::isNotEmpty)
-            ?.map(Long::toDouble)
-            ?.average()
-            ?.roundToLong(),
+        meanLatencyMillis = if (latencies.isEmpty()) null else latencies.map(Long::toDouble).average().roundToLong(),
     )
 }
 
@@ -261,6 +258,8 @@ private fun TaskDefinition.verifierRole(
         return role
     }
 
-    return activeRoles.firstOrNull { RoleAuthority.Verify in it.authorities }
+    val eligible = activeRoles.filter { RoleAuthority.Verify in it.authorities }
+    return eligible.firstOrNull { it.id == BuiltInRoles.QaEngineer.id }
+        ?: eligible.firstOrNull()
         ?: error("Resource-aware MoA requires an enabled role with Verify authority")
 }
