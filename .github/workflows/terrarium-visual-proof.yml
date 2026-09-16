@@ -31,8 +31,17 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Publish pinned Conveyance for isolated WASM build
+        run: |
+          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
+            :conveyance-core:publishToMavenLocal \
+            :conveyance-compose:publishToMavenLocal
+
+      - name: Publish pinned H2G2 for isolated WASM build
+        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
+
       - name: Build production WASM terrarium
-        run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
+        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:wasmJsBrowserProductionWebpack
 
       - name: Stage WASM visual proof
         shell: bash
