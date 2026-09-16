@@ -1,0 +1,170 @@
+package com.hereliesaz.geministrator.azphalt
+
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
+import com.russhwolf.settings.MapSettings
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+
+class AzphaltWorkflowPackageInstallerTest {
+    private val json = Json { encodeDefaults = true; classDiscriminator = "type" }
+
+    @Test
+    fun inspectAndInstallRegistersDefinitionsAndRolesOnlyAfterPermissionApproval() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val store = SettingsAzphaltInstallStore(MapSettings())
+        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
+        val pkg = packageFor(targetApps = listOf(HAIVE_AZPHALT_HOST_ID))
+
+        val plan = installer.inspect(pkg)
+
+        assertEquals(setOf("WorkflowRegister", "WorkflowLaunch"), plan.requestedHostPermissions)
+        assertNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+        assertFailsWith<IllegalArgumentException> {
+            installer.install(
+                plan = plan,
+                repositoryUrl = AZPHALT_STORE_URL,
+                approvedHostPermissions = setOf("WorkflowRegister"),
+                nowEpochMillis = 50L,
+            )
+        }
+
+        val installed = installer.install(
+            plan = plan,
+            repositoryUrl = AZPHALT_STORE_URL,
+            approvedHostPermissions = setOf("WorkflowRegister", "WorkflowLaunch"),
+            nowEpochMillis = 50L,
+        )
+
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+        assertNotNull(persistence.roles.get(RoleDefinitionId("builder")))
+        assertEquals("com.example.release", installed.packageId)
+        assertEquals(listOf("release"), installed.workflowDefinitionIds)
+        assertEquals(listOf("builder"), installed.roleIds)
+        assertEquals(installed, store.get("com.example.release"))
+    }
+
+    @Test
+    fun packageScopedToAnotherHostIsRejectedBeforeAnyPersistence() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val installer = AzphaltWorkflowPackageInstaller(
+            persistence,
+            SettingsAzphaltInstallStore(MapSettings()),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            installer.inspect(packageFor(targetApps = listOf("com.example.other")))
+        }
+
+        assertEquals(emptyList(), persistence.definitions.all())
+        assertEquals(emptyList(), persistence.roles.all())
+    }
+
+    @Test
+    fun packageCannotOverwriteUnownedWorkflowId() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val store = SettingsAzphaltInstallStore(MapSettings())
+        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
+        persistence.definitions.put(workflow().copy(name = "Local workflow"))
+        val plan = installer.inspect(packageFor())
+
+        assertFailsWith<IllegalArgumentException> {
+            installer.install(
+                plan,
+                AZPHALT_STORE_URL,
+                setOf("WorkflowRegister", "WorkflowLaunch"),
+                50L,
+            )
+        }
+        assertEquals("Local workflow", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
+    }
+
+    @Test
+    fun samePackageMayUpgradeDefinitionsItAlreadyOwns() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val store = SettingsAzphaltInstallStore(MapSettings())
+        val installer = AzphaltWorkflowPackageInstaller(persistence, store)
+        val permissions = setOf("WorkflowRegister", "WorkflowLaunch")
+        val firstPlan = installer.inspect(packageFor(version = "1.0.0"))
+        installer.install(firstPlan, AZPHALT_STORE_URL, permissions, 10L)
+
+        val updatedDefinition = workflow().copy(name = "Release v2")
+        val update = packageFor(version = "2.0.0", workflowDefinition = updatedDefinition)
+        val secondPlan = installer.inspect(update)
+        installer.install(secondPlan, AZPHALT_STORE_URL, permissions, 20L)
+
+        assertEquals("Release v2", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
+        assertEquals("2.0.0", store.get("com.example.release")?.version)
+    }
+
+    private fun packageFor(
+        targetApps: List<String> = emptyList(),
+        version: String = "1.0.0",
+        workflowDefinition: WorkflowDefinition = workflow(),
+    ): VerifiedAzphaltPackage {
+        val role = role()
+        val definitionPath = "workflows/release.json"
+        val rolePath = "agents/builder.json"
+        return VerifiedAzphaltPackage(
+            manifest = AzphaltManifest(
+                azphalt = "0.1",
+                id = "com.example.release",
+                name = "Release Workflow",
+                version = version,
+                kind = "workflow",
+                license = "MIT",
+                compat = ">=0.1",
+                targetApps = targetApps,
+                files = mapOf(
+                    definitionPath to "sha256-definition",
+                    rolePath to "sha256-role",
+                ),
+                workflow = AzphaltWorkflowManifest(
+                    format = HAIVE_WORKFLOW_FORMAT,
+                    definitions = listOf(AzphaltWorkflowPayloadEntry("release", "Release", path = definitionPath)),
+                    agents = listOf(AzphaltWorkflowAgentEntry("builder", "Builder", path = rolePath)),
+                    hostPermissions = listOf("WorkflowRegister", "WorkflowLaunch"),
+                ),
+            ),
+            payload = mapOf(
+                definitionPath to json.encodeToString(workflowDefinition).encodeToByteArray(),
+                rolePath to json.encodeToString(role).encodeToByteArray(),
+            ),
+            signed = true,
+            signerPublicKey = "publisher-key",
+        )
+    }
+
+    private fun role() = RoleDefinition(
+        id = RoleDefinitionId("builder"),
+        name = "Builder",
+        description = "Builds the thing",
+        instructions = "Implement the assigned task.",
+    )
+
+    private fun workflow() = WorkflowDefinition(
+        id = WorkflowDefinitionId("release"),
+        name = "Release",
+        tasks = listOf(
+            TaskDefinition(
+                id = TaskDefinitionId("build"),
+                name = "Build",
+                objective = "Build the release",
+                roleId = RoleDefinitionId("builder"),
+                executor = TaskExecutor.RoleAgent(RoleDefinitionId("builder")),
+            ),
+        ),
+    )
+}
