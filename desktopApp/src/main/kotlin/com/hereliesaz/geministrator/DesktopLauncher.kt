@@ -10,12 +10,12 @@ import javax.swing.SwingUtilities
 import javax.swing.Timer
 
 /**
- * Desktop bootstrap that keeps the animated brand splash visible only while Compose is starting.
- * The application runtime itself remains in MainKt.
+ * Desktop bootstrap that paints the exact logo frame immediately, then swaps in the
+ * transparent animated loader as soon as the GIF is decoded.
  */
 fun main() {
     val splash = createDesktopSplash()
-    val icon = loadImage("haive_logo.png")
+    val icon = loadImage("haive-icon-color.png")
     val windowWatcher = Timer(40, null)
     windowWatcher.addActionListener {
         val appWindow = Window.getWindows().firstOrNull { window ->
@@ -43,17 +43,35 @@ fun main() {
 
 private fun createDesktopSplash(): JWindow? {
     if (GraphicsEnvironment.isHeadless()) return null
-    val splashIcon = loadImage("haive_splash.gif") ?: return null
+    val firstFrame = loadImage("haive_loader_frame0.png") ?: return null
+    val label = JLabel(firstFrame)
     var result: JWindow? = null
     SwingUtilities.invokeAndWait {
         result = JWindow().apply {
-            contentPane.add(JLabel(splashIcon))
+            background = java.awt.Color(0x0D, 0x10, 0x26)
+            contentPane.background = background
+            contentPane.add(label)
             pack()
             setLocationRelativeTo(null)
             isAlwaysOnTop = true
             isVisible = true
         }
     }
+
+    Thread({
+        val animated = loadImage("haive_loader.gif") ?: return@Thread
+        SwingUtilities.invokeLater {
+            if (result?.isDisplayable == true) {
+                label.icon = animated
+                result?.pack()
+                result?.setLocationRelativeTo(null)
+            }
+        }
+    }, "haive-splash-loader").apply {
+        isDaemon = true
+        start()
+    }
+
     return result
 }
 
