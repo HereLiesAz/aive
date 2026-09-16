@@ -61,7 +61,7 @@ object HostedLlmProviders {
             id = HUGGING_FACE_ID,
             displayName = "Hugging Face Inference",
             baseUrl = "https://router.huggingface.co/v1",
-            defaultModel = "openai/gpt-oss-120b",
+            defaultModel = "openai/gpt-oss-120b:fastest",
         ),
         HostedLlmProviderSpec(
             id = OPENROUTER_ID,
@@ -80,7 +80,7 @@ object HostedLlmProviders {
             id = FIREWORKS_ID,
             displayName = "Fireworks AI",
             baseUrl = "https://api.fireworks.ai/inference/v1",
-            defaultModel = "accounts/fireworks/models/deepseek-v3p1",
+            defaultModel = "accounts/fireworks/models/kimi-k2p6",
         ),
         HostedLlmProviderSpec(
             id = PERPLEXITY_ID,
@@ -98,7 +98,7 @@ object HostedLlmProviders {
             id = NVIDIA_ID,
             displayName = "NVIDIA NIM",
             baseUrl = "https://integrate.api.nvidia.com/v1",
-            defaultModel = "meta/llama-3.3-70b-instruct",
+            defaultModel = "nvidia/llama-3.3-nemotron-super-49b-v1.5",
         ),
         HostedLlmProviderSpec(
             id = SAMBANOVA_ID,
