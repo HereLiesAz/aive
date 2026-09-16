@@ -9,13 +9,13 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-// The declared H2G2 revision is authoritative. A vendored checkout is only substituted when a
-// developer or CI step opts in explicitly; merely having vendor/conveyance-h2g2 present must not
-// silently replace the pinned dependency with stale source.
+// H2G2 is vendored at the exact terrarium revision used by Haive so every platform compiles the
+// same source without depending on JitPack publication timing. Set -Phaive.useLocalH2g2=false only
+// for an explicit remote-resolution check.
 val useLocalH2g2 = providers.gradleProperty("haive.useLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
-    ?: false
+    ?: true
 val useMavenLocalH2g2 = providers.gradleProperty("haive.useMavenLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
