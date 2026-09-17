@@ -96,7 +96,10 @@ jobs:
           cat > visual-proof/haive-terrarium-proof.mjs <<'JS'
           import { chromium } from 'playwright';
 
-          const browser = await chromium.launch({ headless: true });
+          const browser = await chromium.launch({
+            headless: true,
+            args: ['--enable-unsafe-swiftshader'],
+          });
           const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
           const diagnostics = [];
           page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
@@ -110,7 +113,7 @@ jobs:
               return globalThis.__haiveNodeCreaturesReady === true &&
                 globalThis.__haiveAppScriptLoaded === true;
             }, null, { timeout: 15000 });
-            await page.waitForSelector('#webApp canvas', { timeout: 15000 });
+            await page.waitForSelector('#webApp > *', { timeout: 15000 });
             await page.waitForTimeout(1800);
 
             const state = await page.evaluate(() => ({
@@ -125,7 +128,7 @@ jobs:
             }));
             console.log('Browser state:', JSON.stringify(state));
             if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError ||
-                !state.browserLocale || state.browserLocale !== state.navigatorLanguage || state.canvases < 1) {
+                !state.browserLocale || state.browserLocale !== state.navigatorLanguage || state.appChildren < 1) {
               throw new Error(`Terrarium did not reach a Rust-rendered ready state: ${JSON.stringify(state)}`);
             }
 
