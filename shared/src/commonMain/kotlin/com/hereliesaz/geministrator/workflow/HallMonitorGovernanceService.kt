@@ -36,12 +36,8 @@ private const val ORCHESTRATOR_REJECT = "REJECT"
 
 /**
  * Governs the Hall Monitor's escalation path:
- *
  * Hall Monitor report -> passing Antagonist review -> global resumable pause ->
  * governance-side Orchestrator review + human review -> explicit resume.
- *
- * Ordinary workflow work stays parked for the entire pause. The Orchestrator review is deliberately
- * executed outside the task graph so reviewing the reason for a global pause never resumes the graph.
  */
 class HallMonitorGovernanceService(
     private val persistence: WorkflowPersistence,
@@ -55,17 +51,54 @@ class HallMonitorGovernanceService(
         val human: ApprovalGate,
     )
 
+    /** Detect a completed, passing Hall Monitor/Antagonist pair and open the global pause once. */
+    suspend fun pauseIfApprovedReportReady(
+        state: WorkflowRuntimeState,
+        sessionGateway: ManagedSessionGateway,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState? {
+        val run = state.run
+        if (run.globalPause != null || run.status.isTerminal()) return null
+        val hallMonitorRuns = run.taskRuns.values.filter {
+            it.assignedRoleId == HallMonitorRole.id && it.status == TaskRunStatus.Completed
+        }
+        for (hallRun in hallMonitorRuns) {
+            val reports = hallRun.artifacts.filter { it.kind == ArtifactKind.HallMonitorReport }
+            for (report in reports) {
+                val reportId = report.metadata[HALL_MONITOR_REPORT_ID_METADATA] ?: report.id.value
+                val review = run.taskRuns.values
+                    .asSequence()
+                    .filter { it.assignedRoleId == BuiltInRoles.Antagonist.id && it.status == TaskRunStatus.Completed }
+                    .flatMap { it.artifacts.asSequence() }
+                    .firstOrNull { artifact ->
+                        artifact.kind in setOf(ArtifactKind.HallMonitorReview, ArtifactKind.Review) &&
+                            artifact.metadata[HALL_MONITOR_REVIEW_VERDICT_METADATA]
+                                .equals(HALL_MONITOR_REVIEW_PASS, ignoreCase = true) &&
+                            artifact.metadata[HALL_MONITOR_REPORT_ID_METADATA]
+                                .let { it == null || it == reportId }
+                    } ?: continue
+                return pauseAfterAntagonistPass(
+                    state = state,
+                    reportArtifactId = report.id,
+                    antagonistReviewArtifactId = review.id,
+                    sessionGateway = sessionGateway,
+                    nowEpochMillis = nowEpochMillis,
+                )
+            }
+        }
+        return null
+    }
+
     suspend fun pauseAfterAntagonistPass(
         state: WorkflowRuntimeState,
         reportArtifactId: ArtifactId,
         antagonistReviewArtifactId: ArtifactId,
+        sessionGateway: ManagedSessionGateway,
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
         val run = state.run
         require(run.globalPause == null) { "Workflow ${run.id.value} is already globally paused" }
-        require(run.status !in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled)) {
-            "Terminal workflow ${run.id.value} cannot be paused"
-        }
+        require(!run.status.isTerminal()) { "Terminal workflow ${run.id.value} cannot be paused" }
 
         val report = requireNotNull(persistence.artifacts.get(reportArtifactId)) {
             "Hall Monitor report artifact ${reportArtifactId.value} does not exist"
@@ -108,6 +141,36 @@ class HallMonitorGovernanceService(
             "Hall Monitor report must PASS the Antagonist before a global pause can open"
         }
 
+        val cancelledTaskIds = mutableSetOf<com.hereliesaz.geministrator.domain.TaskDefinitionId>()
+        val cancellationFailures = mutableListOf<String>()
+        for ((taskId, handle) in state.handles) {
+            when (val result = sessionGateway.cancel(handle)) {
+                ProviderActionResult.Accepted -> cancelledTaskIds += taskId
+                is ProviderActionResult.Rejected -> cancellationFailures +=
+                    "${taskId.value}: ${result.reason.ifBlank { "provider refused cancellation" }}"
+            }
+        }
+        if (cancellationFailures.isNotEmpty()) {
+            val recovered = run.copy(
+                taskRuns = run.taskRuns.mapValues { (taskId, taskRun) ->
+                    if (taskId !in cancelledTaskIds) taskRun else taskRun.copy(
+                        status = TaskRunStatus.Retrying,
+                        attempt = taskRun.attempt + 1,
+                        assignedProviderId = null,
+                        providerRunId = null,
+                        externalRunId = null,
+                        blockingReason = null,
+                        progress = null,
+                        progressMessage = "Provider session cancelled while global pause entry rolled back; retry scheduled",
+                    )
+                },
+                status = WorkflowRunStatus.Running,
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+            persistence.runs.put(recovered)
+            error("Global pause could not quiesce every active provider session: ${cancellationFailures.joinToString()}.")
+        }
+
         val orchestratorGateId = ApprovalGateId("hall-monitor:orchestrator:${run.id.value}:$reportId")
         val humanGateId = ApprovalGateId("hall-monitor:human:${run.id.value}:$reportId")
         val reason = "Hall Monitor report '$reportId' passed Antagonist review and requires Orchestrator and user review."
@@ -121,18 +184,15 @@ class HallMonitorGovernanceService(
                     blockingReason = taskRun.blockingReason,
                     progress = taskRun.progress,
                     progressMessage = taskRun.progressMessage,
+                    resumeAsRetry = taskRun.taskDefinitionId in cancelledTaskIds,
                 )
             }
         val parkedRuns = run.taskRuns.mapValues { (_, taskRun) ->
-            if (taskRun.status.isTerminal()) {
-                taskRun
-            } else {
-                taskRun.copy(
-                    status = TaskRunStatus.Blocked,
-                    blockingReason = BlockingReason(HALL_MONITOR_GLOBAL_PAUSE_CODE, reason),
-                    progressMessage = "Globally paused for Hall Monitor review",
-                )
-            }
+            if (taskRun.status.isTerminal()) taskRun else taskRun.copy(
+                status = TaskRunStatus.Blocked,
+                blockingReason = BlockingReason(HALL_MONITOR_GLOBAL_PAUSE_CODE, reason),
+                progressMessage = "Globally paused for Hall Monitor review",
+            )
         }
         val pausedRun = run.copy(
             status = WorkflowRunStatus.AwaitingHuman,
@@ -149,7 +209,6 @@ class HallMonitorGovernanceService(
             ),
             updatedAtEpochMillis = nowEpochMillis,
         )
-
         persistence.runs.put(pausedRun)
         ensureReviewGates(pausedRun, nowEpochMillis)
         return WorkflowRuntimeState(run = pausedRun, handles = emptyMap())
@@ -182,11 +241,6 @@ class HallMonitorGovernanceService(
         return ReviewGates(orchestrator, human)
     }
 
-    /**
-     * Starts or advances the Orchestrator's review without un-parking ordinary workflow tasks.
-     * This is intended to be called by the runtime coordinator whenever [WorkflowRun.globalPause]
-     * is present.
-     */
     suspend fun reconcileOrchestratorReview(
         project: Project,
         run: WorkflowRun,
@@ -195,9 +249,7 @@ class HallMonitorGovernanceService(
     ): WorkflowRun {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         val gates = ensureReviewGates(run, nowEpochMillis)
-        if (gates.orchestrator.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) {
-            return run
-        }
+        if (gates.orchestrator.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) return run
 
         val report = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
             "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
@@ -277,15 +329,13 @@ class HallMonitorGovernanceService(
         when (status) {
             ManagedSessionStatus.Planning,
             ManagedSessionStatus.AwaitingApproval,
-            -> {
-                if (sessionGateway.approvePlan(handle) is ProviderActionResult.Rejected) {
-                    decideOrchestratorReview(
-                        run,
-                        approved = false,
-                        note = "Orchestrator review provider could not proceed with its review plan.",
-                        nowEpochMillis = nowEpochMillis,
-                    )
-                }
+            -> if (sessionGateway.approvePlan(handle) is ProviderActionResult.Rejected) {
+                decideOrchestratorReview(
+                    run,
+                    approved = false,
+                    note = "Orchestrator review provider could not proceed with its review plan.",
+                    nowEpochMillis = nowEpochMillis,
+                )
             }
 
             ManagedSessionStatus.Completed -> {
@@ -353,7 +403,7 @@ class HallMonitorGovernanceService(
         )
     }
 
-    /** Resume after both reviews have reached a decision, regardless of whether they approved. */
+    /** Resume after both reviews reach a decision. Recommendations are never applied automatically. */
     suspend fun resumeAfterReviews(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         val gates = ensureReviewGates(run, nowEpochMillis)
@@ -367,12 +417,25 @@ class HallMonitorGovernanceService(
         val snapshots = pause.taskSnapshots.associateBy { it.taskDefinitionId }
         val restoredRuns = run.taskRuns.mapValues { (taskId, taskRun) ->
             val snapshot = snapshots[taskId] ?: return@mapValues taskRun
-            taskRun.copy(
-                status = snapshot.status,
-                blockingReason = snapshot.blockingReason,
-                progress = snapshot.progress,
-                progressMessage = snapshot.progressMessage,
-            )
+            if (snapshot.resumeAsRetry) {
+                taskRun.copy(
+                    status = TaskRunStatus.Retrying,
+                    attempt = taskRun.attempt + 1,
+                    assignedProviderId = null,
+                    providerRunId = null,
+                    externalRunId = null,
+                    blockingReason = null,
+                    progress = null,
+                    progressMessage = "Resuming after Hall Monitor global pause",
+                )
+            } else {
+                taskRun.copy(
+                    status = snapshot.status,
+                    blockingReason = snapshot.blockingReason,
+                    progress = snapshot.progress,
+                    progressMessage = snapshot.progressMessage,
+                )
+            }
         }
         val nextStatus = when {
             restoredRuns.values.all { it.status == TaskRunStatus.Completed } -> WorkflowRunStatus.Completed
