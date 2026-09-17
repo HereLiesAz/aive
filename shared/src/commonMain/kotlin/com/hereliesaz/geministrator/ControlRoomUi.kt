@@ -7,7 +7,11 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,15 +23,25 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
@@ -38,6 +52,7 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import kotlin.math.roundToInt
 
 internal object ControlRoomBreakpoints {
     val Wide: Dp = 820.dp
@@ -134,6 +149,9 @@ fun ControlRoom(
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
         (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
+    var dismissedInspectorId by remember { mutableStateOf<String?>(null) }
+    val compactInspectorVisible = inspectorVisible && selectedTaskId != dismissedInspectorId
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -147,7 +165,10 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
+                    onTaskSelected = { taskId ->
+                        dismissedInspectorId = null
+                        onTaskSelected(taskId)
+                    },
                     onLaunchWorkflow = onLaunchWorkflow,
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
@@ -183,22 +204,24 @@ fun ControlRoom(
                     compact = true,
                     runtimeState = runtimeState,
                 )
-                AnimatedVisibility(
-                    visible = inspectorVisible,
-                    enter = fadeIn(tween(150)),
-                    exit = fadeOut(tween(120)),
-                ) {
-                    selectedTaskId?.let { taskId ->
-                        TechnicalInspector(
-                            selectedTaskId = taskId,
-                            liveWorkflow = liveWorkflow,
-                            onApproveTask = onApproveTask,
-                            onRejectPlan = onRejectPlan,
-                            onResolveEscalation = onResolveEscalation,
-                            onMessageAgent = onMessageAgent,
-                            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.35f),
-                        )
-                    }
+            }
+
+            AnimatedVisibility(
+                visible = compactInspectorVisible,
+                enter = slideInVertically(animationSpec = tween(280, easing = InspectorEase)) { it } + fadeIn(tween(140)),
+                exit = slideOutVertically(animationSpec = tween(220, easing = InspectorEase)) { it } + fadeOut(tween(120)),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                selectedTaskId?.let { taskId ->
+                    CompactInspectorSheet(
+                        taskId = taskId,
+                        liveWorkflow = liveWorkflow,
+                        onDismiss = { dismissedInspectorId = taskId },
+                        onApproveTask = onApproveTask,
+                        onRejectPlan = onRejectPlan,
+                        onResolveEscalation = onResolveEscalation,
+                        onMessageAgent = onMessageAgent,
+                    )
                 }
             }
         } else {
@@ -272,6 +295,78 @@ fun ControlRoom(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompactInspectorSheet(
+    taskId: String,
+    liveWorkflow: LiveWorkflowPresentation?,
+    onDismiss: () -> Unit,
+    onApproveTask: (String) -> Unit,
+    onRejectPlan: (String) -> Unit,
+    onResolveEscalation: (String, Boolean) -> Unit,
+    onMessageAgent: suspend (String, String) -> String?,
+) {
+    val density = LocalDensity.current
+    val dismissThresholdPx = with(density) { 84.dp.toPx() }
+    var dragOffsetPx by remember(taskId) { mutableStateOf(0f) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.48f)
+            .offset { IntOffset(0, dragOffsetPx.roundToInt()) }
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(Azphalt.Ink),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(42.dp)
+                .pointerInput(taskId, dismissThresholdPx) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                        },
+                        onDragEnd = {
+                            if (dragOffsetPx >= dismissThresholdPx) {
+                                onDismiss()
+                            } else {
+                                dragOffsetPx = 0f
+                            }
+                        },
+                        onDragCancel = { dragOffsetPx = 0f },
+                    )
+                },
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(width = 54.dp, height = 5.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Azphalt.White.copy(alpha = 0.35f)),
+            )
+            Text(
+                text = "×",
+                style = AzphaltType.section,
+                color = Azphalt.White,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .clickable(onClick = onDismiss)
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
+            )
+        }
+        TechnicalInspector(
+            selectedTaskId = taskId,
+            liveWorkflow = liveWorkflow,
+            onApproveTask = onApproveTask,
+            onRejectPlan = onRejectPlan,
+            onResolveEscalation = onResolveEscalation,
+            onMessageAgent = onMessageAgent,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
     }
 }
 
