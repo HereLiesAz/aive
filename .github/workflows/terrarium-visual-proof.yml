@@ -118,11 +118,14 @@ jobs:
               bridgeReady: globalThis.__haiveNodeCreaturesReady === true,
               appScriptLoaded: globalThis.__haiveAppScriptLoaded === true,
               startupError: globalThis.__haiveStartupError || null,
+              browserLocale: globalThis.__haiveBrowserLocale || null,
+              navigatorLanguage: navigator.language || null,
               canvases: document.querySelectorAll('#webApp canvas').length,
               appChildren: document.getElementById('webApp')?.childNodes.length || 0,
             }));
             console.log('Browser state:', JSON.stringify(state));
-            if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError || state.canvases < 1) {
+            if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError ||
+                !state.browserLocale || state.browserLocale !== state.navigatorLanguage || state.canvases < 1) {
               throw new Error(`Terrarium did not reach a Rust-rendered ready state: ${JSON.stringify(state)}`);
             }
 
