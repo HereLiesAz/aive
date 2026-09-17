@@ -10,7 +10,8 @@ class RoleCollectionsTest {
     fun emptyStorageResolvesToDefaultBuiltInOrder() {
         val resolved = resolveRoleCollection(emptyList())
 
-        assertEquals(BuiltInRoles.all.map { it.id }, activeRoles(resolved).map { it.id })
+        assertEquals(haiveBuiltInRoles.map { it.id }, activeRoles(resolved).map { it.id })
+        assertTrue(activeRoles(resolved).any { it.id == HallMonitorRole.id })
     }
 
     @Test
@@ -30,6 +31,7 @@ class RoleCollectionsTest {
         val removedDefault = resolved.first { it.id == BuiltInRoles.ImplementationEngineer.id }
         assertFalse(removedDefault.enabled)
         assertTrue(resolved.any { it.id == custom.id && it.enabled })
+        assertFalse(resolved.first { it.id == HallMonitorRole.id }.enabled)
     }
 
     @Test
@@ -45,7 +47,7 @@ class RoleCollectionsTest {
         val reset = defaultRoleCollectionEntries(customized)
         val resolved = resolveRoleCollection(reset)
 
-        assertEquals(BuiltInRoles.all.map { it.id }, activeRoles(resolved).map { it.id })
+        assertEquals(haiveBuiltInRoles.map { it.id }, activeRoles(resolved).map { it.id })
         assertFalse(resolved.first { it.id == custom.id }.enabled)
     }
 }
