@@ -1,5 +1,7 @@
 mod engine;
 mod genome;
+#[cfg(not(target_arch = "wasm32"))]
+mod jni_bridge;
 mod math;
 mod protocol;
 
@@ -39,13 +41,25 @@ mod tests {
 
     #[test]
     fn role_mapping_matches_visual_grammar() {
-        assert_eq!(role_from_label("Orchestrator"), RoleArchetype::Orchestrator);
-        assert_eq!(role_from_label("Implementation Engineer"), RoleArchetype::Builder);
+        assert_eq!(
+            role_from_label("Orchestrator"),
+            RoleArchetype::Orchestrator
+        );
+        assert_eq!(
+            role_from_label("Implementation Engineer"),
+            RoleArchetype::Builder
+        );
         assert_eq!(role_from_label("Crash Test Dummy"), RoleArchetype::Tester);
         assert_eq!(role_from_label("QA Engineer"), RoleArchetype::Inspector);
-        assert_eq!(role_from_label("Code Reviewer"), RoleArchetype::Reviewer);
+        assert_eq!(
+            role_from_label("Code Reviewer"),
+            RoleArchetype::Reviewer
+        );
         assert_eq!(role_from_label("Task Planner"), RoleArchetype::Planner);
-        assert_eq!(role_from_label("Research Analyst"), RoleArchetype::Researcher);
+        assert_eq!(
+            role_from_label("Research Analyst"),
+            RoleArchetype::Researcher
+        );
     }
 
     #[test]
@@ -81,12 +95,30 @@ mod tests {
 
     #[test]
     fn active_role_exposes_semantic_work_verb() {
-        assert_eq!(activity_verb(RoleArchetype::Orchestrator, Activity::Active), "ROUTING");
-        assert_eq!(activity_verb(RoleArchetype::Builder, Activity::Active), "BUILDING");
-        assert_eq!(activity_verb(RoleArchetype::Tester, Activity::Active), "STRESS-TESTING");
-        assert_eq!(activity_verb(RoleArchetype::Inspector, Activity::Active), "VERIFYING");
-        assert_eq!(activity_verb(RoleArchetype::Reviewer, Activity::Active), "REVIEWING");
-        assert_eq!(activity_verb(RoleArchetype::Reviewer, Activity::Blocked), "BLOCKED");
+        assert_eq!(
+            activity_verb(RoleArchetype::Orchestrator, Activity::Active),
+            "ROUTING"
+        );
+        assert_eq!(
+            activity_verb(RoleArchetype::Builder, Activity::Active),
+            "BUILDING"
+        );
+        assert_eq!(
+            activity_verb(RoleArchetype::Tester, Activity::Active),
+            "STRESS-TESTING"
+        );
+        assert_eq!(
+            activity_verb(RoleArchetype::Inspector, Activity::Active),
+            "VERIFYING"
+        );
+        assert_eq!(
+            activity_verb(RoleArchetype::Reviewer, Activity::Active),
+            "REVIEWING"
+        );
+        assert_eq!(
+            activity_verb(RoleArchetype::Reviewer, Activity::Blocked),
+            "BLOCKED"
+        );
     }
 
     #[test]
@@ -95,7 +127,12 @@ mod tests {
         let active = animate(&genome, Activity::Active, 0.33);
         let blocked = animate(&genome, Activity::Blocked, 0.33);
         assert_ne!(active.antenna_bend, blocked.antenna_bend);
-        assert!(blocked.antenna_bend.iter().any(|value| value.abs() > 0.20));
+        assert!(
+            blocked
+                .antenna_bend
+                .iter()
+                .any(|value| value.abs() > 0.20)
+        );
     }
 
     #[test]
