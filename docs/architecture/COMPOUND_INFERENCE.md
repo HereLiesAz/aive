@@ -97,7 +97,7 @@ The production genealogy graph is durable. `SettingsInferenceGenealogyGraph` per
 
 The Blueprint layer is a real runtime subsystem, not only a design target.
 
-Each `AgentProviderRegistry` owns a durable `SettingsCompoundInferenceFabric`, wrapped by genealogy governance, and the provider-backed session gateway routes every started provider-backed session through that shared fabric before `provider.start(...)`.
+Each `AgentProviderRegistry` owns a durable `SettingsCompoundInferenceFabric`, bootstrapped with the reusable local-model library and then wrapped by genealogy governance. The provider-backed session gateway routes every started provider-backed session through that shared fabric before `provider.start(...)`.
 
 Workflow state, memory, repositories, provider sessions, and durable artifacts remain authoritative in their existing stores. The inference fabric indexes and coordinates those systems rather than duplicating their payload ownership.
 
@@ -113,7 +113,7 @@ Workflow state, memory, repositories, provider sessions, and durable artifacts r
 - capabilities
 - release digest
 
-The registry is durably persisted through `SettingsInferenceStateStore`, but current provider-backed agents do not expose a portable model identity, so the runtime does not fabricate one. The Epoch-8 local model families will populate this registry when the generalized local model library is wired.
+The registry is durably persisted through `SettingsInferenceStateStore`. The reusable local-model library now populates it lazily through `LocalModelBootstrapInferenceFabric`: the first model-registry read or provider dispatch registers the current local artifact catalog into the durable registry exactly once for that runtime. Provider-backed remote agents still do not fabricate portable local model identities.
 
 ### Agent registry
 
@@ -174,7 +174,8 @@ Telemetry does not affect workflow correctness, evidence truth, or completion cl
 
 The current subsystem is still intentionally bounded:
 
-- local model assets are not yet registered into a generalized runtime model library
+- local shared-base adapter execution is capability-gated and only selected when a concrete runtime explicitly reports safe adapter switching; otherwise the planner chooses a verified merged artifact
+- the existing Android ONNX production path therefore remains on merged INT8 Epoch-8 artifacts rather than assuming adapter hot-swapping
 - resource-aware selection currently chooses only between `Single` and centralized MoA; other declared strategy shapes are not selected automatically
 - resource estimates are historical means, not predictive model-based forecasts
 - topology selection falls back to `Single` rather than guessing when historical evidence is insufficient
@@ -211,13 +212,36 @@ Centralized MoA can be selected explicitly or through `ResourceAware` authorizat
 
 ## Specialized local model and LoRA library
 
-Haive already has the seed of the specialist-library architecture in the Epoch-8 memory layer.
+The Epoch-8 memory specialists are now generalized into a reusable, provider-neutral local model library rather than remaining a memory-only artifact catalog.
 
-The Memory Epoch-8 release contains FP16 specialist artifacts, INT8 specialist artifacts, LoRA specialist artifacts, and a separate embedding specialist for association. The current Android production path primarily binds role-specific INT8 ONNX artifacts.
+`LocalModelArtifactDescriptor` gives every published local asset a stable logical identity plus:
 
-The next model-library step is to generalize those assets into `InferenceModelRegistry` entries and a reusable runtime library with shared-base residency where the backend supports safe adapter switching.
+- foundation/base model identity
+- release repository and tag
+- asset filename
+- lowercase SHA-256 release digest
+- backend format
+- precision
+- artifact kind (`SharedBase`, `MergedModel`, `Adapter`, or `Standalone`)
+- versioned adapter identity when applicable
+- declared execution capabilities
 
-Target shape:
+`LocalModelSpecialistDescriptor` groups every valid execution form for one specialist. `LocalModelRuntimeCapabilities` describes what a concrete local runtime can actually load, and `LocalModelLibrary.plan(...)` selects a concrete `LocalModelLoadPlan`.
+
+Adapter execution is deliberately opt-in. A runtime must explicitly advertise `supportsSharedBaseAdapters=true`, support the adapter/base formats and precisions, and have a compatible shared base. Only then may planning return `SharedBaseAdapter`. Otherwise the library selects a compatible cryptographically identified merged model, with standalone specialist fallback where appropriate.
+
+The Epoch-8 implementation is `MemoryEpoch8LocalModelLibrary`. It catalogs:
+
+- the published shared FP16 Qwen 2.5 0.5B base
+- merged FP16 and INT8 artifacts for the generative memory specialists
+- FP16 LoRA adapters for those specialists
+- the standalone INT8 association embedding specialist
+
+All release asset identities and SHA-256 digests are encoded in the reusable descriptors. `MemoryEpoch8ModelCatalog` remains a compatibility view over the generalized library so existing Android artifact IDs and install behavior remain stable. Its production artifact selection continues to prefer merged INT8 models.
+
+`AgentProviderRegistry` installs the library into the durable inference fabric through `withLocalModelLibrary(...)`. Registration is lazy and mutex-guarded by `LocalModelBootstrapInferenceFabric`, so the first registry access or provider dispatch persists the catalog once per runtime and existing durable model identities remain stable across restarts.
+
+The shared-base residency shape is therefore available to backends that can prove safe adapter switching:
 
 ```text
 shared local base model
@@ -231,7 +255,7 @@ shared local base model
     +-- Condensation adapter
 ```
 
-The same library pattern will later serve orchestration utilities:
+The same library contract is intended to serve future orchestration utilities:
 
 - Memory Query Composer
 - Context Packer
@@ -245,7 +269,7 @@ The same library pattern will later serve orchestration utilities:
 
 Planner and Plan Repair remain a larger reasoning tier when necessary.
 
-Runtime requirements include versioned adapter identity, cryptographic artifact verification, tokenizer/base compatibility checks, merged-model fallback when hot adapter switching is unavailable or unproven, hardware-aware placement, and measured execution reporting rather than assumed accelerator use.
+Runtime artifact requirements remain versioned identity, cryptographic verification, tokenizer/base compatibility, merged-model fallback when hot adapter switching is unavailable or unproven, hardware-aware placement, and measured execution reporting rather than assumed accelerator use. The generalized catalog and load planner now enforce the identity/fallback side of that contract; backend-specific download, verification, placement, and execution remain the responsibility of the concrete local runtime.
 
 ## DSPy-optimized small models
 
@@ -294,7 +318,7 @@ It reuses the same workflow concurrency, genealogy, stream, planning, and verifi
 3. Durable runtime genealogy governance — implemented with Settings-backed structural ancestry persistence.
 4. Centralized MoA proposer → genealogy gate → aggregator → verifier execution — implemented.
 5. Resource-aware selection between implemented safe topologies — implemented with explicit authorization and conservative fallback.
-6. Generalized local specialist/LoRA library registered into the model registry.
+6. Generalized local specialist/LoRA library registered into the model registry — implemented with capability-gated shared-base adapter planning and merged-model fallback.
 7. DSPy optimization and release pipeline.
 8. Remaining local orchestration utility family.
 9. BitNet b1.58 experiments.
@@ -331,11 +355,15 @@ Implemented and called by production runtime:
 - explicit proposer → governance → aggregator → verifier DAG execution
 - advisory false-consensus detection without blocking legitimate shared-input synthesis
 - resource-aware selection using persisted cost/latency history with conservative `Single` fallback
+- `LocalModelArtifactDescriptor`, `LocalModelSpecialistDescriptor`, and `LocalModelRuntimeCapabilities`
+- `LocalModelLibrary` and capability-gated `LocalModelLoadPlan`
+- `MemoryEpoch8LocalModelLibrary` with published FP16, INT8, LoRA, shared-base, and standalone embedding assets
+- lazy durable model-registry bootstrap through `LocalModelBootstrapInferenceFabric`
+- compatibility preservation through `MemoryEpoch8ModelCatalog`
 
 Not yet implemented:
 
-- generalized shared-base/LoRA model library integration
-- DSPy optimization pipeline
+- DSPy/GEPA/MIPRO-style optimization and release pipeline
 - remaining orchestration utility models
 - BitNet runtime/model family
 - Skeleton-of-Thought execution
