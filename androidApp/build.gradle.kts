@@ -34,6 +34,7 @@ val buildAndroidNodeCreatureNative = tasks.register<Exec>("buildAndroidNodeCreat
     inputs.file(nodeCreatureManifest)
     inputs.dir(nodeCreatureSources)
     outputs.dir(generatedAndroidNodeJniDir)
+    workingDir(nodeCreatureManifest.asFile.parentFile)
 
     doFirst {
         val outputDir = generatedAndroidNodeJniDir.get().asFile
@@ -48,7 +49,6 @@ val buildAndroidNodeCreatureNative = tasks.register<Exec>("buildAndroidNodeCreat
             "-o", outputDir.absolutePath,
             "build",
             "--release",
-            "--manifest-path", nodeCreatureManifest.asFile.absolutePath,
         )
     }
 }
