@@ -62,17 +62,45 @@
     <script src="node-creatures.js"></script>
     <script>
         (() => {
+            const failStartup = (message, error) => {
+                console.error(message, error || "");
+                globalThis.__haiveStartupError = error ? `${message} ${error}` : message;
+                const splash = document.getElementById("haiveSplash");
+                if (splash) {
+                    splash.setAttribute("aria-label", "The Haive failed to start");
+                    splash.dataset.startupError = globalThis.__haiveStartupError;
+                }
+            };
+
+            const loadHaive = () => new Promise((resolve, reject) => {
+                const script = document.createElement("script");
+                script.src = "haive.js";
+                script.onload = resolve;
+                script.onerror = () => reject(new Error("Could not load haive.js."));
+                document.body.appendChild(script);
+            });
+
             const renderer = globalThis.HaiveNodeCreatures;
             if (!renderer || typeof renderer.init !== "function") {
-                console.error("Node-creature browser adapter is unavailable; Haive will expose the renderer failure in the terrarium.");
+                failStartup("Node-creature browser adapter is unavailable.");
                 return;
             }
 
-            renderer.init("haive_node_creatures.wasm").catch((error) => {
-                console.error("Rust node-creature renderer failed to initialize; Haive will expose the renderer failure in the terrarium.", error);
-            });
+            renderer.init("haive_node_creatures.wasm")
+                .then(() => {
+                    if (!renderer.ready) {
+                        throw new Error("Rust renderer initialization completed without becoming ready.");
+                    }
+                    globalThis.__haiveNodeCreaturesReady = true;
+                    return loadHaive();
+                })
+                .then(() => {
+                    globalThis.__haiveAppScriptLoaded = true;
+                })
+                .catch((error) => {
+                    failStartup("The Haive could not initialize the Rust node-creature renderer.", error);
+                });
         })();
     </script>
-    <script src="haive.js"></script>
 </body>
 </html>
