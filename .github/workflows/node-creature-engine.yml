@@ -27,9 +27,6 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Format check
-        run: cargo fmt --manifest-path native/node-creatures/Cargo.toml -- --check
-
       - name: Native tests
         run: cargo test --manifest-path native/node-creatures/Cargo.toml --all-targets
 
@@ -38,3 +35,6 @@ jobs:
 
       - name: WASM compile proof
         run: cargo build --manifest-path native/node-creatures/Cargo.toml --release --target wasm32-unknown-unknown
+
+      - name: Format check
+        run: cargo fmt --manifest-path native/node-creatures/Cargo.toml -- --check
