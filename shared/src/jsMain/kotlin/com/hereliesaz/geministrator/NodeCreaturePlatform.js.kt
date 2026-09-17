@@ -18,7 +18,7 @@ private external object HaiveNodeCreatures {
 }
 
 @OptIn(ExperimentalEncodingApi::class)
-internal actual fun platformNodeCreatureRenderEngine(): NodeCreatureRenderEngine =
+internal actual fun platformNodeCreatureRenderEngine(): NodeCreatureRenderEngine? =
     NodeCreatureRenderEngine { request ->
         check(HaiveNodeCreatures.ready) { "Rust node-creature renderer is still initializing." }
         Base64.Default.decode(
