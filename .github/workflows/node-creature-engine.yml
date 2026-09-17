@@ -1,0 +1,40 @@
+name: Node Creature Engine
+
+on:
+  pull_request:
+    paths:
+      - 'native/node-creatures/**'
+      - '.github/workflows/node-creature-engine.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/node-creatures/**'
+      - '.github/workflows/node-creature-engine.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  rust-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Format check
+        run: cargo fmt --manifest-path native/node-creatures/Cargo.toml -- --check
+
+      - name: Native tests
+        run: cargo test --manifest-path native/node-creatures/Cargo.toml --all-targets
+
+      - name: Native release build
+        run: cargo build --manifest-path native/node-creatures/Cargo.toml --release
+
+      - name: WASM compile proof
+        run: cargo build --manifest-path native/node-creatures/Cargo.toml --release --target wasm32-unknown-unknown
