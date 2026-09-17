@@ -71,7 +71,13 @@ class AzphaltCompositionLibrary(
                 }
             }
         val packageByRoleId = buildMap<String, String> {
-            packages.forEach { pkg -> pkg.roles.forEach { putIfAbsent(it.id.value, pkg.packageId) } }
+            packages.forEach { pkg ->
+                pkg.roles.forEach { role ->
+                    if (role.id.value !in this) {
+                        put(role.id.value, pkg.packageId)
+                    }
+                }
+            }
         }
         val roles = persistence.roles.all().map { role ->
             WorkflowCompositionComponent(
