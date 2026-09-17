@@ -1,28 +1,43 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ArtifactId
-import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
 import com.hereliesaz.geministrator.workflow.HallMonitorGovernanceService
-import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/**
- * Opens the Hall Monitor's run-level pause after a completed Hall Monitor report has passed a cold
- * Antagonist review. The pause is persisted before [refresh] reloads the runtime without live handles.
- */
+data class HallMonitorPauseReviewState(
+    val reason: String,
+    val reportText: String,
+    val antagonistReviewText: String,
+    val orchestratorStatus: ApprovalGateStatus,
+    val orchestratorReviewText: String?,
+    val userStatus: ApprovalGateStatus,
+    val userDecisionNote: String?,
+) {
+    val bothReviewsResolved: Boolean
+        get() = orchestratorStatus.isResolved && userStatus.isResolved
+
+    val recommendationsApproved: Boolean
+        get() = orchestratorStatus == ApprovalGateStatus.Approved && userStatus == ApprovalGateStatus.Approved
+
+    private val ApprovalGateStatus.isResolved: Boolean
+        get() = this == ApprovalGateStatus.Approved || this == ApprovalGateStatus.Rejected
+}
+
+/** Manual entry point retained for diagnostics; normal Hall Monitor workflows auto-open the pause. */
 suspend fun ApplicationRuntime.pauseForHallMonitorReview(
     reportArtifactId: ArtifactId,
     antagonistReviewArtifactId: ArtifactId,
     nowEpochMillis: Long,
 ) {
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
-    val service = HallMonitorGovernanceService(persistence)
-    service.pauseAfterAntagonistPass(
-        state = WorkflowRuntimeState(live.presentation.run),
+    val live = state.value as? ApplicationRuntimeState.Live ?: error("No active workflow is loaded")
+    val resumed = coordinator.resume(live.presentation.run.id)
+    HallMonitorGovernanceService(persistence).pauseAfterAntagonistPass(
+        state = resumed,
         reportArtifactId = reportArtifactId,
         antagonistReviewArtifactId = antagonistReviewArtifactId,
+        sessionGateway = sessionGateway,
         nowEpochMillis = nowEpochMillis,
     )
     refresh()
@@ -38,40 +53,30 @@ suspend fun ApplicationRuntime.pauseForHallMonitorReview(
     nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
 )
 
-suspend fun ApplicationRuntime.decideHallMonitorOrchestratorReview(
-    approved: Boolean,
-    note: String? = null,
-    nowEpochMillis: Long,
-) {
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
-    HallMonitorGovernanceService(persistence).decideOrchestratorReview(
-        run = live.presentation.run,
-        approved = approved,
-        note = note,
-        nowEpochMillis = nowEpochMillis,
-        decidedByRoleId = BuiltInRoles.Orchestrator.id,
+suspend fun ApplicationRuntime.loadHallMonitorPauseReviewState(): HallMonitorPauseReviewState? {
+    val live = state.value as? ApplicationRuntimeState.Live ?: return null
+    val pause = live.presentation.run.globalPause ?: return null
+    val report = persistence.artifacts.get(pause.reportArtifactId)
+    val antagonist = persistence.artifacts.get(pause.antagonistReviewArtifactId)
+    val orchestratorGate = persistence.approvalGates.get(pause.orchestratorGateId) ?: return null
+    val humanGate = persistence.approvalGates.get(pause.humanGateId) ?: return null
+    return HallMonitorPauseReviewState(
+        reason = pause.reason,
+        reportText = report?.textContent.orEmpty(),
+        antagonistReviewText = antagonist?.textContent.orEmpty(),
+        orchestratorStatus = orchestratorGate.status,
+        orchestratorReviewText = orchestratorGate.decisionNote,
+        userStatus = humanGate.status,
+        userDecisionNote = humanGate.decisionNote,
     )
-    refresh()
 }
-
-@OptIn(ExperimentalTime::class)
-suspend fun ApplicationRuntime.decideHallMonitorOrchestratorReview(
-    approved: Boolean,
-    note: String? = null,
-) = decideHallMonitorOrchestratorReview(
-    approved = approved,
-    note = note,
-    nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
-)
 
 suspend fun ApplicationRuntime.decideHallMonitorUserReview(
     approved: Boolean,
     note: String? = null,
     nowEpochMillis: Long,
 ) {
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
+    val live = state.value as? ApplicationRuntimeState.Live ?: error("No active workflow is loaded")
     HallMonitorGovernanceService(persistence).decideHumanReview(
         run = live.presentation.run,
         approved = approved,
@@ -92,13 +97,12 @@ suspend fun ApplicationRuntime.decideHallMonitorUserReview(
 )
 
 /**
- * Restores the exact task states captured at pause time. Both Hall Monitor review gates must already
- * be approved. [refresh] then reconnects provider sessions from the restored task/provider IDs.
+ * Resume the snapshotted workflow after both the Orchestrator and user have reviewed the report.
+ * A rejection means the recommendations remain unapplied; it does not trap the original workflow.
  */
 suspend fun ApplicationRuntime.resumeHallMonitorPause(nowEpochMillis: Long) {
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
-    HallMonitorGovernanceService(persistence).resumeIfFullyApproved(
+    val live = state.value as? ApplicationRuntimeState.Live ?: error("No active workflow is loaded")
+    HallMonitorGovernanceService(persistence).resumeAfterReviews(
         run = live.presentation.run,
         nowEpochMillis = nowEpochMillis,
     )
