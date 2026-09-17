@@ -1,5 +1,6 @@
 import haive.build.BrandAssets
 import haive.build.BrandLoaderVerifier
+import org.gradle.api.tasks.Exec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -42,14 +43,42 @@ val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
     }
 }
 
+val nodeCreatureManifest = rootProject.layout.projectDirectory.file("native/node-creatures/Cargo.toml")
+val nodeCreatureSources = rootProject.layout.projectDirectory.dir("native/node-creatures/src")
+val nativeLibraryName = System.mapLibraryName("haive_node_creatures")
+val generatedDesktopNodeNativeDir = layout.buildDirectory.dir("generated/node-creatures/desktop")
+val buildDesktopNodeCreatureNative = tasks.register<Exec>("buildDesktopNodeCreatureNative") {
+    group = "build"
+    description = "Builds and stages the Rust node-creature renderer for the current desktop OS."
+    inputs.file(nodeCreatureManifest)
+    inputs.dir(nodeCreatureSources)
+    outputs.file(generatedDesktopNodeNativeDir.map { it.file("node-creatures/$nativeLibraryName") })
+    commandLine(
+        "cargo",
+        "build",
+        "--release",
+        "--manifest-path", nodeCreatureManifest.asFile.absolutePath,
+    )
+    doLast {
+        val source = rootProject.layout.projectDirectory
+            .file("native/node-creatures/target/release/$nativeLibraryName")
+            .asFile
+        check(source.isFile) { "Rust node-creature library was not produced at ${source.absolutePath}" }
+        val destination = generatedDesktopNodeNativeDir.get().file("node-creatures/$nativeLibraryName").asFile
+        destination.parentFile.mkdirs()
+        source.copyTo(destination, overwrite = true)
+    }
+}
+
 sourceSets {
     main {
         resources.srcDir(generatedDesktopBrandDir)
+        resources.srcDir(generatedDesktopNodeNativeDir)
     }
 }
 
 tasks.processResources {
-    dependsOn(generateDesktopBrandAssets)
+    dependsOn(generateDesktopBrandAssets, buildDesktopNodeCreatureNative)
 }
 
 tasks.matching {
@@ -57,7 +86,7 @@ tasks.matching {
         it.name == "createDistributable" ||
         it.name == "runDistributable"
 }.configureEach {
-    dependsOn(generateDesktopBrandAssets)
+    dependsOn(generateDesktopBrandAssets, buildDesktopNodeCreatureNative)
 }
 
 val appVersionName = providers.gradleProperty("app.versionName").get()
