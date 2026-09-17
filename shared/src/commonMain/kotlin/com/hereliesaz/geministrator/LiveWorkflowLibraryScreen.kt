@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RoleDefinition
-import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
@@ -359,7 +358,7 @@ internal fun LiveWorkflowLibraryScreen(
             OutlinedTextField(
                 value = composeQuery,
                 onValueChange = { composeQuery = it },
-                label = { Text("Find workflow to add") },
+                label = { Text("Find workflow or role to add") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -369,52 +368,29 @@ internal fun LiveWorkflowLibraryScreen(
                     eyebrow = candidate.origin.name,
                     title = candidate.definition.name,
                     body = candidate.definition.description,
-                    endCap = "${candidate.definition.tasks.size} tasks",
+                    endCap = "${candidate.definition.tasks.size} task${if (candidate.definition.tasks.size == 1) "" else "s"}",
                     well = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AzphaltPill(
-                                label = "Inline after end",
-                                seed = "inline-${candidate.key}",
-                                onClick = {
-                                    mutateDraft(
-                                        currentDraft = currentDraft,
-                                        onSuccess = { next ->
-                                            draft = next
-                                            status = "Inlined ${candidate.definition.name}."
-                                        },
-                                        onFailure = { loadError = it },
-                                    ) {
-                                        WorkflowComposer.inline(
-                                            parent = currentDraft,
-                                            child = candidate.definition,
-                                            namespace = uniqueNamespace(currentDraft, candidate.definition),
-                                            connectFrom = WorkflowComposer.exitPoints(currentDraft),
-                                        )
-                                    }
-                                },
-                            )
-                            AzphaltPill(
-                                label = "Nest after end",
-                                seed = "nest-${candidate.key}",
-                                onClick = {
-                                    mutateDraft(
-                                        currentDraft = currentDraft,
-                                        onSuccess = { next ->
-                                            draft = next
-                                            status = "Nested ${candidate.definition.name}."
-                                        },
-                                        onFailure = { loadError = it },
-                                    ) {
-                                        WorkflowComposer.nest(
-                                            parent = currentDraft,
-                                            child = candidate.definition,
-                                            taskId = uniqueNestedTaskId(currentDraft, candidate.definition),
-                                            dependsOn = WorkflowComposer.exitPoints(currentDraft),
-                                        )
-                                    }
-                                },
-                            )
-                        }
+                        AzphaltPill(
+                            label = "Add after end",
+                            seed = "inline-${candidate.key}",
+                            onClick = {
+                                mutateDraft(
+                                    currentDraft = currentDraft,
+                                    onSuccess = { next ->
+                                        draft = next
+                                        status = "Added ${candidate.definition.name}."
+                                    },
+                                    onFailure = { loadError = it },
+                                ) {
+                                    WorkflowComposer.inline(
+                                        parent = currentDraft,
+                                        child = candidate.definition,
+                                        namespace = uniqueNamespace(currentDraft, candidate.definition),
+                                        connectFrom = WorkflowComposer.exitPoints(currentDraft),
+                                    )
+                                }
+                            },
+                        )
                     },
                 )
             }
@@ -472,8 +448,7 @@ private fun composableWorkflows(
 ): List<WorkflowLibraryEntry> {
     val needle = query.trim().lowercase()
     return entries.filter { entry ->
-        entry.origin != WorkflowLibraryOrigin.Role &&
-            entry.definition.id != current.id &&
+        entry.definition.id != current.id &&
             (needle.isEmpty() || listOf(
                 entry.definition.name,
                 entry.definition.id.value,
@@ -512,16 +487,4 @@ private fun uniqueNamespace(parent: WorkflowDefinition, child: WorkflowDefinitio
         suffix += 1
     }
     return candidate
-}
-
-private fun uniqueNestedTaskId(parent: WorkflowDefinition, child: WorkflowDefinition): TaskDefinitionId {
-    val base = "nested-${child.id.value.trim().replace(Regex("\\s+"), "-").ifBlank { "workflow" }}"
-    val taskIds = parent.tasks.mapTo(mutableSetOf()) { it.id.value }
-    var candidate = base
-    var suffix = 2
-    while (candidate in taskIds) {
-        candidate = "$base-$suffix"
-        suffix += 1
-    }
-    return TaskDefinitionId(candidate)
 }
