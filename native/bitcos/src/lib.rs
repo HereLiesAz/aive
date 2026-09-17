@@ -1,3 +1,6 @@
+#[cfg(not(target_arch = "wasm32"))]
+mod jni_bridge;
+
 use std::fmt;
 
 pub const BITCOS_MAGIC: [u8; 4] = *b"HBCS";
