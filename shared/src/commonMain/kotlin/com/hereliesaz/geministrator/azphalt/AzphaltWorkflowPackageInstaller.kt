@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
@@ -30,6 +31,7 @@ data class InstalledAzphaltWorkflowScreen(
 
 data class AzphaltWorkflowInstallPlan(
     val packageId: String,
+    val packageKind: String,
     val version: String,
     val name: String,
     val signed: Boolean,
@@ -50,11 +52,14 @@ data class AzphaltWorkflowInstallPlan(
 @Serializable
 data class InstalledAzphaltWorkflowPackage(
     val packageId: String,
+    /** `workflow` or `role`. Defaults for records written before standalone role packages existed. */
+    val kind: String = "workflow",
     val version: String,
     val repositoryUrl: String,
-    val workflowDefinitionIds: List<String>,
-    /** Package-local composition primitives; never injected into the user's global role collection. */
+    val workflowDefinitionIds: List<String> = emptyList(),
+    /** Reusable subgraphs exported by this package for workflow composition. */
     val fragments: List<WorkflowFragment> = emptyList(),
+    /** Roles are globally reusable after install regardless of which package kind supplied them. */
     val roles: List<RoleDefinition> = emptyList(),
     val screens: List<InstalledAzphaltWorkflowScreen> = emptyList(),
     val dependencies: List<AzphaltWorkflowDependency> = emptyList(),
@@ -96,6 +101,7 @@ class SettingsAzphaltInstallStore(
     }
 
     companion object {
+        // Kept for on-device compatibility; this store now records both workflow and role packages.
         const val DEFAULT_STORAGE_KEY = "haive.azphalt.installed-workflows.v1"
         private val ListSerializer = kotlinx.serialization.builtins.ListSerializer(
             InstalledAzphaltWorkflowPackage.serializer(),
@@ -113,72 +119,111 @@ class AzphaltWorkflowPackageInstaller(
     fun inspect(verification: AzphaltPackageVerification): AzphaltWorkflowInstallPlan {
         val pkg = verification.packageContents
         val manifest = pkg.manifest
-        require(manifest.kind == "workflow") { "Azphalt package ${manifest.id} is not a workflow package" }
-        val conformanceErrors = AzphaltWorkflowConformance.validate(manifest)
-        require(conformanceErrors.isEmpty()) {
-            "Invalid Azphalt workflow package ${manifest.id}: ${conformanceErrors.joinToString("; ")}"
+        require(manifest.kind == "workflow" || manifest.kind == "role") {
+            "Azphalt package ${manifest.id} is kind ${manifest.kind}; Haive installs workflow and role packages"
         }
         require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
             "Azphalt package ${manifest.id} targets ${manifest.targetApps.joinToString()}, not $HAIVE_AZPHALT_HOST_ID"
         }
-        val workflow = requireNotNull(manifest.workflow) {
-            "Workflow package ${manifest.id} does not contain a workflow manifest"
-        }
-        require(workflow.format == HAIVE_WORKFLOW_FORMAT) {
-            "Unsupported workflow format ${workflow.format}; expected $HAIVE_WORKFLOW_FORMAT"
-        }
-        require(workflow.definitions.isNotEmpty()) { "Workflow package must contain at least one definition" }
-        validateEntries(workflow.definitions.map { it.id to it.path }, "workflow definition", manifest.files, pkg.payload)
-        validateEntries(workflow.fragments.map { it.id to it.path }, "workflow fragment", manifest.files, pkg.payload)
-        validateEntries(workflow.agents.map { it.id to it.path }, "agent role", manifest.files, pkg.payload)
-        validateEntries(workflow.screens.map { it.id to it.path }, "screen", manifest.files, pkg.payload)
 
-        val definitions = workflow.definitions.map { entry ->
-            decodeUtf8<WorkflowDefinition>(pkg.payload.getValue(entry.path), entry.path).also { definition ->
-                require(definition.id.value == entry.id) {
-                    "Workflow payload ${entry.path} id ${definition.id.value} does not match manifest id ${entry.id}"
+        val definitions: List<WorkflowDefinition>
+        val fragments: List<WorkflowFragment>
+        val roles: List<RoleDefinition>
+        val dependencies: List<AzphaltWorkflowDependency>
+        val screens: List<InstalledAzphaltWorkflowScreen>
+        val requested: Set<String>
+
+        if (manifest.kind == "workflow") {
+            val conformanceErrors = AzphaltWorkflowConformance.validate(manifest)
+            require(conformanceErrors.isEmpty()) {
+                "Invalid Azphalt workflow package ${manifest.id}: ${conformanceErrors.joinToString("; ")}"
+            }
+            val workflow = requireNotNull(manifest.workflow) {
+                "Workflow package ${manifest.id} does not contain a workflow manifest"
+            }
+            require(workflow.format == HAIVE_WORKFLOW_FORMAT) {
+                "Unsupported workflow format ${workflow.format}; expected $HAIVE_WORKFLOW_FORMAT"
+            }
+            require(workflow.definitions.isNotEmpty()) { "Workflow package must contain at least one definition" }
+            validateEntries(workflow.definitions.map { it.id to it.path }, "workflow definition", manifest.files, pkg.payload)
+            validateEntries(workflow.fragments.map { it.id to it.path }, "workflow fragment", manifest.files, pkg.payload)
+            validateEntries(workflow.agents.map { it.id to it.path }, "agent role", manifest.files, pkg.payload)
+            validateEntries(workflow.screens.map { it.id to it.path }, "screen", manifest.files, pkg.payload)
+
+            definitions = workflow.definitions.map { entry ->
+                decodeUtf8<WorkflowDefinition>(pkg.payload.getValue(entry.path), entry.path).also { definition ->
+                    require(definition.id.value == entry.id) {
+                        "Workflow payload ${entry.path} id ${definition.id.value} does not match manifest id ${entry.id}"
+                    }
                 }
             }
-        }
-        val fragments = workflow.fragments.map { entry ->
-            decodeUtf8<WorkflowFragment>(pkg.payload.getValue(entry.path), entry.path).also { fragment ->
-                require(fragment.id.value == entry.id) {
-                    "Workflow fragment ${entry.path} id ${fragment.id.value} does not match manifest id ${entry.id}"
+            fragments = workflow.fragments.map { entry ->
+                decodeUtf8<WorkflowFragment>(pkg.payload.getValue(entry.path), entry.path).also { fragment ->
+                    require(fragment.id.value == entry.id) {
+                        "Workflow fragment ${entry.path} id ${fragment.id.value} does not match manifest id ${entry.id}"
+                    }
                 }
             }
-        }
-        val roles = workflow.agents.map { entry ->
-            decodeUtf8<RoleDefinition>(pkg.payload.getValue(entry.path), entry.path).also { role ->
-                require(role.id.value == entry.id) {
-                    "Role payload ${entry.path} id ${role.id.value} does not match manifest id ${entry.id}"
+            roles = workflow.agents.map { entry ->
+                decodeUtf8<RoleDefinition>(pkg.payload.getValue(entry.path), entry.path).also { role ->
+                    require(role.id.value == entry.id) {
+                        "Role payload ${entry.path} id ${role.id.value} does not match manifest id ${entry.id}"
+                    }
                 }
             }
-        }
-        val screens = workflow.screens.map { entry ->
-            val text = pkg.payload.getValue(entry.path).decodeToString()
-            if (entry.path.endsWith(".json", ignoreCase = true)) {
-                try {
-                    json.parseToJsonElement(text)
-                } catch (failure: Exception) {
-                    throw IllegalArgumentException("Invalid declarative screen JSON ${entry.path}: ${failure.message}", failure)
+            screens = workflow.screens.map { entry ->
+                val text = pkg.payload.getValue(entry.path).decodeToString()
+                if (entry.path.endsWith(".json", ignoreCase = true)) {
+                    try {
+                        json.parseToJsonElement(text)
+                    } catch (failure: Exception) {
+                        throw IllegalArgumentException("Invalid declarative screen JSON ${entry.path}: ${failure.message}", failure)
+                    }
+                }
+                InstalledAzphaltWorkflowScreen(
+                    id = entry.id,
+                    name = entry.name,
+                    path = entry.path,
+                    placements = entry.placements,
+                    payloadText = text,
+                )
+            }
+            dependencies = workflow.dependencies
+            requested = workflow.hostPermissions.toSet()
+        } else {
+            val conformanceErrors = AzphaltRoleConformance.validate(manifest)
+            require(conformanceErrors.isEmpty()) {
+                "Invalid Azphalt role package ${manifest.id}: ${conformanceErrors.joinToString("; ")}"
+            }
+            val roleManifest = requireNotNull(manifest.role) {
+                "Role package ${manifest.id} does not contain a role manifest"
+            }
+            require(roleManifest.format == HAIVE_ROLE_FORMAT) {
+                "Unsupported role format ${roleManifest.format}; expected $HAIVE_ROLE_FORMAT"
+            }
+            require(roleManifest.roles.isNotEmpty()) { "Role package must contain at least one role" }
+            validateEntries(roleManifest.roles.map { it.id to it.path }, "company role", manifest.files, pkg.payload)
+            roles = roleManifest.roles.map { entry ->
+                decodeUtf8<RoleDefinition>(pkg.payload.getValue(entry.path), entry.path).also { role ->
+                    require(role.id.value == entry.id) {
+                        "Role payload ${entry.path} id ${role.id.value} does not match manifest id ${entry.id}"
+                    }
                 }
             }
-            InstalledAzphaltWorkflowScreen(
-                id = entry.id,
-                name = entry.name,
-                path = entry.path,
-                placements = entry.placements,
-                payloadText = text,
-            )
+            definitions = emptyList()
+            fragments = emptyList()
+            dependencies = emptyList()
+            screens = emptyList()
+            requested = emptySet()
         }
 
-        require(definitions.map { it.id }.toSet().size == definitions.size) { "Workflow package contains duplicate definition ids" }
-        require(fragments.map { it.id }.toSet().size == fragments.size) { "Workflow package contains duplicate fragment ids" }
-        require(roles.map { it.id }.toSet().size == roles.size) { "Workflow package contains duplicate role ids" }
+        require(definitions.map { it.id }.toSet().size == definitions.size) { "Package contains duplicate definition ids" }
+        require(fragments.map { it.id }.toSet().size == fragments.size) { "Package contains duplicate fragment ids" }
+        require(roles.map { it.id }.toSet().size == roles.size) { "Package contains duplicate role ids" }
 
-        val requested = workflow.hostPermissions.toSet()
         return AzphaltWorkflowInstallPlan(
             packageId = manifest.id,
+            packageKind = manifest.kind,
             version = manifest.version,
             name = manifest.name,
             signed = pkg.signed,
@@ -190,7 +235,7 @@ class AzphaltWorkflowPackageInstaller(
             definitions = definitions,
             fragments = fragments,
             roles = roles,
-            dependencies = workflow.dependencies,
+            dependencies = dependencies,
             screens = screens,
             requestedHostPermissions = requested,
             unsupportedHostPermissions = requested - SUPPORTED_HOST_PERMISSIONS,
@@ -199,8 +244,8 @@ class AzphaltWorkflowPackageInstaller(
 
     /**
      * Install a previously inspected package after explicit trust and host-permission decisions.
-     * Requested permissions not present in [approvedHostPermissions] remain denied; installation
-     * itself never launches a workflow or promotes package-local agents into the user's company.
+     * Workflow definitions enter the shared workflow library, and every supplied role enters the
+     * shared role library so it can be assigned by any installed or authored workflow.
      */
     suspend fun install(
         plan: AzphaltWorkflowInstallPlan,
@@ -221,19 +266,22 @@ class AzphaltWorkflowPackageInstaller(
         }
 
         val previous = installStore.get(plan.packageId)
-        val ownedDefinitions = previous?.workflowDefinitionIds.orEmpty().toSet()
-        plan.definitions.forEach { definition ->
-            val existing = persistence.definitions.get(definition.id)
-            require(existing == null || definition.id.value in ownedDefinitions) {
-                "Workflow id ${definition.id.value} already exists and is not owned by ${plan.packageId}"
+        if (plan.packageKind == "workflow") {
+            val ownedDefinitions = previous?.takeIf { it.kind == "workflow" }?.workflowDefinitionIds.orEmpty().toSet()
+            plan.definitions.forEach { definition ->
+                val existing = persistence.definitions.get(definition.id)
+                require(existing == null || definition.id.value in ownedDefinitions) {
+                    "Workflow id ${definition.id.value} already exists and is not owned by ${plan.packageId}"
+                }
             }
+            plan.definitions.forEach { persistence.definitions.put(it) }
         }
 
-        // Only definitions enter the global workflow library. Agents/fragments/screens remain scoped
-        // to their package per spec/workflow.md and are resolved when that package's workflow is used.
-        plan.definitions.forEach { persistence.definitions.put(it) }
+        installReusableRoles(plan, previous)
+
         val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
+            kind = plan.packageKind,
             version = plan.version,
             repositoryUrl = AzphaltRepositoryClient.normalizeRepositoryUrl(repositoryUrl),
             workflowDefinitionIds = plan.definitions.map { it.id.value },
@@ -252,6 +300,41 @@ class AzphaltWorkflowPackageInstaller(
         }
         return installed
     }
+
+    private suspend fun installReusableRoles(
+        plan: AzphaltWorkflowInstallPlan,
+        previous: InstalledAzphaltWorkflowPackage?,
+    ) {
+        if (plan.roles.isEmpty()) return
+        val builtInsById = BuiltInRoles.all.associateBy(RoleDefinition::id)
+        val previouslyOwned = previous?.roles.orEmpty().associateBy(RoleDefinition::id)
+
+        plan.roles.forEach { role ->
+            val builtIn = builtInsById[role.id]
+            require(builtIn == null || sameReusableRole(builtIn, role)) {
+                "Role id ${role.id.value} collides with a different built-in Haive role"
+            }
+            val existing = persistence.roles.get(role.id)
+            val previousRole = previouslyOwned[role.id]
+            require(
+                existing == null ||
+                    sameReusableRole(existing, role) ||
+                    (previousRole != null && sameReusableRole(existing, previousRole))
+            ) {
+                "Role id ${role.id.value} already exists with a different reusable-role definition"
+            }
+        }
+
+        plan.roles.forEach { role ->
+            val existing = persistence.roles.get(role.id)
+            val preferredProvider = existing?.preferredProviderId ?: role.preferredProviderId
+            persistence.roles.put(role.copy(enabled = true, preferredProviderId = preferredProvider))
+        }
+    }
+
+    private fun sameReusableRole(left: RoleDefinition, right: RoleDefinition): Boolean =
+        left.copy(enabled = true, preferredProviderId = null) ==
+            right.copy(enabled = true, preferredProviderId = null)
 
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
         json.decodeFromString(bytes.decodeToString())

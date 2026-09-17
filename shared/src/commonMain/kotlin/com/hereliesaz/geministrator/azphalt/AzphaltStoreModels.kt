@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonElement
 const val AZPHALT_STORE_URL: String = "https://azphalt.store"
 const val HAIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.haive"
 const val HAIVE_WORKFLOW_FORMAT: String = "haive.workflow.v1"
+const val HAIVE_ROLE_FORMAT: String = "haive.role.v1"
 const val AZPHALT_PACKAGE_MEDIA_TYPE: String = "application/vnd.azphalt.package"
 const val AZPHALT_PACKAGE_MEDIA_TYPE_DEPRECATED: String = "application/x-azphalt"
 
@@ -95,9 +96,9 @@ data class AzphaltPackageVersion(
 )
 
 /**
- * Manifest surface required by Haive's Azphalt host. The mutually-exclusive editor/executable root
- * blocks are retained as JsonElement values solely so a workflow package can be rejected when any
- * are present; Haive never interprets or executes them.
+ * Manifest surface required by Haive's Azphalt host. Mutually-exclusive editor/executable blocks are
+ * retained as JsonElement values solely so declarative workflow/role packages can be rejected when
+ * any are present; Haive never interprets or executes those blocks.
  */
 @Serializable
 data class AzphaltManifest(
@@ -127,6 +128,7 @@ data class AzphaltManifest(
     val maturity: String? = null,
     val files: Map<String, String> = emptyMap(),
     val workflow: AzphaltWorkflowManifest? = null,
+    val role: AzphaltRoleManifest? = null,
 )
 
 @Serializable
@@ -150,6 +152,20 @@ data class AzphaltWorkflowPayloadEntry(
 
 @Serializable
 data class AzphaltWorkflowAgentEntry(
+    val id: String,
+    val name: String? = null,
+    val description: String? = null,
+    val path: String,
+)
+
+@Serializable
+data class AzphaltRoleManifest(
+    val format: String,
+    val roles: List<AzphaltRolePayloadEntry>,
+)
+
+@Serializable
+data class AzphaltRolePayloadEntry(
     val id: String,
     val name: String? = null,
     val description: String? = null,
