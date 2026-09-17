@@ -338,11 +338,21 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
                 "fp16 scale payload has odd byte length",
             ));
         }
+        if tensor.name.len() > u16::MAX as usize {
+            return Err(BitcosError::InvalidContainer(
+                "tensor name is too long for HBCS v1",
+            ));
+        }
+        if tensor.shape.len() > u16::MAX as usize {
+            return Err(BitcosError::InvalidContainer(
+                "tensor rank is too large for HBCS v1",
+            ));
+        }
         let payload = BitcosPayload::pack(&tensor.weights)?;
         directory_len = directory_len
             .checked_add(DIRECTORY_FIXED_LEN)
             .and_then(|value| value.checked_add(tensor.shape.len() * 8))
-            .and_then(|value| value.checked_add(tensor.name.as_bytes().len()))
+            .and_then(|value| value.checked_add(tensor.name.len()))
             .ok_or(BitcosError::InvalidContainer("directory length overflow"))?;
         packed.push((tensor, payload));
     }
@@ -370,7 +380,7 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
         data.extend_from_slice(&tensor.scales_f16_le);
         data_cursor += scales_len;
 
-        write_u16(&mut directory, tensor.name.as_bytes().len() as u16);
+        write_u16(&mut directory, tensor.name.len() as u16);
         write_u16(&mut directory, tensor.shape.len() as u16);
         write_u32(&mut directory, tensor.group_size);
         write_u16(
@@ -717,6 +727,12 @@ pub extern "C" fn haive_bitcos_best_decode_backend() -> u32 {
 }
 
 /// Caller-owned C ABI for native hosts. Returns 0 on success and a negative code on invalid input.
+///
+/// # Safety
+///
+/// Every non-empty input/output range must point to at least the stated number of readable/writable
+/// bytes for the duration of this call. Null pointers are accepted only when the corresponding
+/// length is zero.
 #[no_mangle]
 pub unsafe extern "C" fn haive_bitcos_decode_payload(
     element_count: u64,
@@ -734,9 +750,24 @@ pub unsafe extern "C" fn haive_bitcos_decode_payload(
         return -1;
     }
 
-    let presence = std::slice::from_raw_parts(presence_ptr, presence_len);
-    let signs = std::slice::from_raw_parts(signs_ptr, signs_len);
-    let output = std::slice::from_raw_parts_mut(output_ptr, output_len);
+    let presence = if presence_len == 0 {
+        &[]
+    } else {
+        // SAFETY: the caller contract above requires a readable range of presence_len bytes.
+        unsafe { std::slice::from_raw_parts(presence_ptr, presence_len) }
+    };
+    let signs = if signs_len == 0 {
+        &[]
+    } else {
+        // SAFETY: the caller contract above requires a readable range of signs_len bytes.
+        unsafe { std::slice::from_raw_parts(signs_ptr, signs_len) }
+    };
+    let output = if output_len == 0 {
+        &mut []
+    } else {
+        // SAFETY: the caller contract above requires a writable range of output_len bytes.
+        unsafe { std::slice::from_raw_parts_mut(output_ptr, output_len) }
+    };
     match decode_payload_into(element_count, presence, signs, output) {
         Ok(()) => 0,
         Err(BitcosError::BufferTooSmall) => -2,
