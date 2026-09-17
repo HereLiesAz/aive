@@ -1,0 +1,15 @@
+[package]
+name = "haive-node-creatures"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Deterministic 3D node-creature generator, animator, and flat-vector render core for Haive"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
