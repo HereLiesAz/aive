@@ -28,15 +28,18 @@ data class WorkflowCompositionComponent(
 /**
  * Unified palette used by workflow authoring. Installed workflows and exported fragments are
  * composable components; every role is also exposed as its implicit one-node workflow.
+ *
+ * Package discovery is injected so the same composer works for Store-backed, sideloaded, and
+ * user-authored definitions without making the workflow layer depend on repository transport.
  */
 class AzphaltCompositionLibrary(
     private val persistence: WorkflowPersistence,
-    private val installStore: AzphaltInstallStore,
+    private val installedPackages: suspend () -> List<InstalledAzphaltWorkflowPackage>,
 ) {
     suspend fun components(): List<WorkflowCompositionComponent> {
-        val installedPackages = installStore.all()
+        val packages = installedPackages()
         val packageByDefinitionId = buildMap<String, String> {
-            installedPackages
+            packages
                 .filter { it.kind == "workflow" }
                 .forEach { pkg -> pkg.workflowDefinitionIds.forEach { put(it, pkg.packageId) } }
         }
@@ -53,7 +56,7 @@ class AzphaltCompositionLibrary(
                     workflow = definition,
                 )
             }
-        val fragments = installedPackages
+        val fragments = packages
             .filter { it.kind == "workflow" }
             .flatMap { pkg ->
                 pkg.fragments.map { fragment ->
@@ -68,7 +71,7 @@ class AzphaltCompositionLibrary(
                 }
             }
         val packageByRoleId = buildMap<String, String> {
-            installedPackages.forEach { pkg -> pkg.roles.forEach { putIfAbsent(it.id.value, pkg.packageId) } }
+            packages.forEach { pkg -> pkg.roles.forEach { putIfAbsent(it.id.value, pkg.packageId) } }
         }
         val roles = persistence.roles.all().map { role ->
             WorkflowCompositionComponent(
@@ -87,7 +90,7 @@ class AzphaltCompositionLibrary(
     }
 
     suspend fun installedWorkflow(id: WorkflowDefinitionId): WorkflowDefinition? {
-        val installedIds = installStore.all()
+        val installedIds = installedPackages()
             .asSequence()
             .filter { it.kind == "workflow" }
             .flatMap { it.workflowDefinitionIds.asSequence() }
