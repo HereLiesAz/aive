@@ -28,7 +28,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 
 class ResourceAwareCompoundInferencePolicyResolverTest {
     @Test
@@ -77,7 +76,7 @@ class ResourceAwareCompoundInferencePolicyResolverTest {
         )
 
         assertEquals(1, prepared.tasks.size)
-        assertIs<CompoundInferencePolicy.Single>(prepared.tasks.single().compoundInferencePolicy)
+        assertEquals(CompoundInferencePolicy.Single, prepared.tasks.single().compoundInferencePolicy)
     }
 
     private suspend fun registryWithHistory(
