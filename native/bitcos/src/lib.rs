@@ -53,7 +53,7 @@ impl BitcosPayload {
         let mut nonzero_count = 0u64;
 
         for (index, &value) in values.iter().enumerate() {
-            if !matches!(value, -1 | 0 | 1) {
+            if !matches!(value, -1..=1) {
                 return Err(BitcosError::InvalidTernary(value));
             }
             if value == 0 {
@@ -280,7 +280,7 @@ impl<'a> BitcosContainer<'a> {
                     "sign length does not match nonzero count",
                 ));
             }
-            if scale_bits == 16 && scales_len % 2 != 0 {
+            if scale_bits == 16 && !scales_len.is_multiple_of(2) {
                 return Err(BitcosError::InvalidContainer(
                     "fp16 scale payload has odd byte length",
                 ));
@@ -333,7 +333,7 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
                 actual: tensor.weights.len(),
             });
         }
-        if tensor.scales_f16_le.len() % 2 != 0 {
+        if !tensor.scales_f16_le.len().is_multiple_of(2) {
             return Err(BitcosError::InvalidContainer(
                 "fp16 scale payload has odd byte length",
             ));
@@ -656,12 +656,12 @@ fn checked_shape_product(shape: &[u64]) -> Result<u64, BitcosError> {
     })
 }
 
-fn checked_slice<'a>(
-    bytes: &'a [u8],
+fn checked_slice(
+    bytes: &[u8],
     offset: usize,
     len: usize,
     minimum_offset: usize,
-) -> Result<&'a [u8], BitcosError> {
+) -> Result<&[u8], BitcosError> {
     if offset < minimum_offset {
         return Err(BitcosError::InvalidContainer(
             "tensor payload overlaps metadata",
