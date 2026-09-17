@@ -90,48 +90,63 @@ jobs:
           done
 
           mkdir -p visual-proof
-          PROOF_URL="http://127.0.0.1:8080/?terrariumPreview=1"
+          cat > /tmp/haive-terrarium-proof.mjs <<'JS'
+          import { chromium } from 'playwright';
 
-          dump_browser_diagnostics() {
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+          const diagnostics = [];
+          page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
+          page.on('pageerror', error => diagnostics.push(`[pageerror] ${error.stack || error.message}`));
+          page.on('requestfailed', request => diagnostics.push(`[requestfailed] ${request.url()} :: ${request.failure()?.errorText || 'unknown'}`));
+
+          try {
+            await page.goto('http://127.0.0.1:8080/?terrariumPreview=1', { waitUntil: 'domcontentloaded' });
+            await page.waitForFunction(() => {
+              if (globalThis.__haiveStartupError) throw new Error(globalThis.__haiveStartupError);
+              return globalThis.__haiveNodeCreaturesReady === true &&
+                globalThis.__haiveAppScriptLoaded === true;
+            }, null, { timeout: 15000 });
+            await page.waitForSelector('#webApp canvas', { timeout: 15000 });
+            await page.waitForTimeout(1800);
+
+            const state = await page.evaluate(() => ({
+              rustReady: globalThis.HaiveNodeCreatures?.ready === true,
+              bridgeReady: globalThis.__haiveNodeCreaturesReady === true,
+              appScriptLoaded: globalThis.__haiveAppScriptLoaded === true,
+              startupError: globalThis.__haiveStartupError || null,
+              canvases: document.querySelectorAll('#webApp canvas').length,
+              appChildren: document.getElementById('webApp')?.childNodes.length || 0,
+            }));
+            console.log('Browser state:', JSON.stringify(state));
+            if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError || state.canvases < 1) {
+              throw new Error(`Terrarium did not reach a Rust-rendered ready state: ${JSON.stringify(state)}`);
+            }
+
+            await page.screenshot({ path: 'visual-proof/haive-terrarium-wasm.png' });
+          } catch (error) {
+            console.error(error.stack || error);
+            console.error('=== Browser diagnostics ===');
+            for (const entry of diagnostics) console.error(entry);
+            console.error('=== DOM ===');
+            console.error(await page.content());
+            process.exitCode = 1;
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          if ! npx --yes --package playwright@1.55.0 node /tmp/haive-terrarium-proof.mjs; then
             echo "=== HTTP server log ==="
             cat /tmp/haive-terrarium-http.log || true
             echo "=== Staged files ==="
             find webApp/build/terrarium-proof -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
-            CHROME="$(find "$HOME/.cache/ms-playwright" -type f \( -name chrome -o -name chromium \) -perm -111 -print -quit 2>/dev/null || true)"
-            if [ -n "$CHROME" ]; then
-              echo "=== Chromium DOM / console diagnostics ==="
-              "$CHROME" \
-                --headless=new \
-                --no-sandbox \
-                --disable-gpu \
-                --enable-logging=stderr \
-                --v=1 \
-                --virtual-time-budget=5000 \
-                --dump-dom \
-                "$PROOF_URL" \
-                > /tmp/haive-terrarium-dom.html \
-                2> /tmp/haive-terrarium-browser.log || true
-              cat /tmp/haive-terrarium-browser.log || true
-              cat /tmp/haive-terrarium-dom.html || true
-            else
-              echo "Chromium executable not found for diagnostics."
-            fi
-          }
-
-          if ! npx --yes playwright@1.55.0 screenshot \
-            --browser chromium \
-            --viewport-size "1440,900" \
-            --wait-for-selector "#webApp canvas" \
-            --wait-for-timeout 1800 \
-            "$PROOF_URL" \
-            visual-proof/haive-terrarium-wasm.png; then
-            dump_browser_diagnostics
             exit 1
           fi
 
           test -s visual-proof/haive-terrarium-wasm.png
           python3 -m pip install --quiet pillow
-          if ! python3 - <<'PY'
+          python3 - <<'PY'
           from PIL import Image
           from collections import Counter
 
@@ -147,10 +162,6 @@ jobs:
                   f"{non_background} non-background pixels"
               )
           PY
-          then
-            dump_browser_diagnostics
-            exit 1
-          fi
 
       - name: Upload terrarium screenshot
         if: always()
