@@ -65,7 +65,7 @@ class AzphaltStoreService(
         page: Int = 1,
     ): AzphaltPackageSearchResponse = repository.search(
         query = query,
-        kinds = setOf("workflow"),
+        kinds = setOf("workflow", "role"),
         page = page,
     )
 
@@ -93,8 +93,8 @@ class AzphaltStoreService(
         entitlementToken: String? = null,
     ): AzphaltPreparedInstall {
         val detail = repository.detail(packageId)
-        require(detail.kind == "workflow") {
-            "Haive Store installs workflow packages; ${detail.id} is kind ${detail.kind}"
+        require(detail.kind == "workflow" || detail.kind == "role") {
+            "Haive Store installs workflow and role packages; ${detail.id} is kind ${detail.kind}"
         }
         require(detail.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in detail.targetApps) {
             "Package ${detail.id} does not target $HAIVE_AZPHALT_HOST_ID"
@@ -107,6 +107,9 @@ class AzphaltStoreService(
         val manifest = verification.packageContents.manifest
         require(manifest.id == detail.id) {
             "Downloaded package id ${manifest.id} does not match repository package ${detail.id}"
+        }
+        require(manifest.kind == detail.kind) {
+            "Downloaded package kind ${manifest.kind} does not match repository package kind ${detail.kind}"
         }
         require(manifest.version == version) {
             "Downloaded package version ${manifest.version} does not match requested version $version"
@@ -137,8 +140,8 @@ class AzphaltStoreService(
         val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
         val verification = verifier.verify(bytes, signingKeys)
         val manifest = verification.packageContents.manifest
-        require(manifest.kind == "workflow") {
-            "Haive Store installs workflow packages; ${manifest.id} is kind ${manifest.kind}"
+        require(manifest.kind == "workflow" || manifest.kind == "role") {
+            "Haive Store installs workflow and role packages; ${manifest.id} is kind ${manifest.kind}"
         }
         require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
             "Package ${manifest.id} does not target $HAIVE_AZPHALT_HOST_ID"
