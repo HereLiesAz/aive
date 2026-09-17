@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -98,221 +99,241 @@ fun App(
             }
         }
 
-        Scaffold { paddingValues ->
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                ControlRoom(
-                    destination = destination,
-                    onDestinationSelected = { destination = it },
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = { taskId ->
-                        selectedTaskId = if (selectedTaskId == taskId) null else taskId
-                    },
-                    onLaunchWorkflow = { projectName, objective, repository ->
-                        val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
-                        scope.launch {
-                            try {
-                                val activeRuntime = runtime ?: error("Runtime is unavailable")
-                                if (orchestrationRuntime != null) {
-                                    activeRuntime.launchOrchestratedWorkflow(
-                                        projectName = projectName,
-                                        objective = objective,
-                                        orchestrationRuntime = orchestrationRuntime,
-                                        repository = repository,
-                                        existingProject = existingProject,
-                                    )
-                                } else {
-                                    activeRuntime.launchStarterWorkflow(
-                                        projectName = projectName,
-                                        objective = objective,
-                                        repository = repository,
-                                        existingProject = existingProject,
-                                    )
-                                }
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Workflow launch failed")
-                            }
-                        }
-                    },
-                    onApproveTask = { taskId ->
-                        scope.launch {
-                            try {
-                                runtime?.approveTask(TaskDefinitionId(taskId))
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Approval failed")
-                            }
-                        }
-                    },
-                    onRejectPlan = { taskId ->
-                        scope.launch {
-                            try {
-                                runtime?.rejectPlan(TaskDefinitionId(taskId))
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Plan rejection failed")
-                            }
-                        }
-                    },
-                    onResolveEscalation = { taskId, approved ->
-                        scope.launch {
-                            try {
-                                val activeRuntime = runtime ?: error("Runtime is unavailable")
-                                if (approved && orchestrationRuntime != null) {
-                                    activeRuntime.repairFailureEscalation(
-                                        taskDefinitionId = TaskDefinitionId(taskId),
-                                        orchestrationRuntime = orchestrationRuntime,
-                                    )
-                                } else {
-                                    activeRuntime.decideFailureEscalation(
-                                        taskDefinitionId = TaskDefinitionId(taskId),
-                                        approved = approved,
-                                        note = if (approved) {
-                                            "Retry approved in application"
-                                        } else {
-                                            "Escalation rejected in application"
-                                        },
-                                    )
-                                }
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Escalation decision failed")
-                            }
-                        }
-                    },
-                    onMessageAgent = { taskId, message ->
-                        try {
-                            when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
-                                null -> "Runtime is unavailable"
-                                ProviderActionResult.Accepted -> null
-                                is ProviderActionResult.Rejected -> result.reason
-                            }
-                        } catch (failure: CancellationException) {
-                            throw failure
-                        } catch (failure: Exception) {
-                            failure.message?.takeIf(String::isNotBlank) ?: "Provider message failed"
-                        }
-                    },
-                    onRecoverFromCorruption = {
-                        scope.launch {
-                            try {
-                                runtime?.recoverFromCorruption()
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Recovery failed")
-                            }
-                        }
-                    },
-                    onRetryRuntime = {
-                        if (runtime == null) {
-                            runtimeGeneration += 1
-                        } else {
+        val workflowLibraryHost = WorkflowLibraryHost(
+            persistence = workflowPersistence,
+            storeService = azphaltStoreService,
+            launchWorkflow = { definition ->
+                val activeRuntime = runtime ?: error("Runtime is unavailable")
+                val existingProject = when (val state = runtimeState) {
+                    is ApplicationRuntimeState.NoRun -> state.project
+                    is ApplicationRuntimeState.Live -> state.presentation.project
+                    else -> null
+                }
+                activeRuntime.launchSavedWorkflow(
+                    definition = definition,
+                    existingProject = existingProject,
+                )
+            },
+            onPackagesChanged = { runtimeGeneration += 1 },
+        )
+
+        CompositionLocalProvider(LocalWorkflowLibraryHost provides workflowLibraryHost) {
+            Scaffold { paddingValues ->
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    ControlRoom(
+                        destination = destination,
+                        onDestinationSelected = { destination = it },
+                        selectedTaskId = selectedTaskId,
+                        onTaskSelected = { taskId ->
+                            selectedTaskId = if (selectedTaskId == taskId) null else taskId
+                        },
+                        onLaunchWorkflow = { projectName, objective, repository ->
+                            val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
                             scope.launch {
                                 try {
-                                    runtime?.refresh()
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    if (orchestrationRuntime != null) {
+                                        activeRuntime.launchOrchestratedWorkflow(
+                                            projectName = projectName,
+                                            objective = objective,
+                                            orchestrationRuntime = orchestrationRuntime,
+                                            repository = repository,
+                                            existingProject = existingProject,
+                                        )
+                                    } else {
+                                        activeRuntime.launchStarterWorkflow(
+                                            projectName = projectName,
+                                            objective = objective,
+                                            repository = repository,
+                                            existingProject = existingProject,
+                                        )
+                                    }
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Retry failed")
+                                    runtimeState = failure.toRuntimeFailureState("Workflow launch failed")
                                 }
                             }
-                        }
-                    },
-                    onCheckProviderHealth = {
-                        runtime?.checkProviderHealth()?.mapValues { (_, result) ->
-                            result.fold(
-                                onSuccess = { caps -> "Reachable · ${caps.supported.size} capabilities" },
-                                onFailure = { failure ->
-                                    "Unreachable · ${failure.message?.take(60) ?: "unknown error"}"
-                                },
-                            )
-                        } ?: emptyMap()
-                    },
-                    onClearWorkflowData = {
-                        scope.launch {
+                        },
+                        onApproveTask = { taskId ->
+                            scope.launch {
+                                try {
+                                    runtime?.approveTask(TaskDefinitionId(taskId))
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Approval failed")
+                                }
+                            }
+                        },
+                        onRejectPlan = { taskId ->
+                            scope.launch {
+                                try {
+                                    runtime?.rejectPlan(TaskDefinitionId(taskId))
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Plan rejection failed")
+                                }
+                            }
+                        },
+                        onResolveEscalation = { taskId, approved ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    if (approved && orchestrationRuntime != null) {
+                                        activeRuntime.repairFailureEscalation(
+                                            taskDefinitionId = TaskDefinitionId(taskId),
+                                            orchestrationRuntime = orchestrationRuntime,
+                                        )
+                                    } else {
+                                        activeRuntime.decideFailureEscalation(
+                                            taskDefinitionId = TaskDefinitionId(taskId),
+                                            approved = approved,
+                                            note = if (approved) {
+                                                "Retry approved in application"
+                                            } else {
+                                                "Escalation rejected in application"
+                                            },
+                                        )
+                                    }
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Escalation decision failed")
+                                }
+                            }
+                        },
+                        onMessageAgent = { taskId, message ->
                             try {
-                                (runtime?.persistence as? SettingsWorkflowPersistence)?.clearWorkflowData()
-                                runtime?.loadLatest()
+                                when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
+                                    null -> "Runtime is unavailable"
+                                    ProviderActionResult.Accepted -> null
+                                    is ProviderActionResult.Rejected -> result.reason
+                                }
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Clear failed")
+                                failure.message?.takeIf(String::isNotBlank) ?: "Provider message failed"
                             }
-                        }
-                    },
-                    onExportJson = suspend { runtime?.exportJson() },
-                    onImportJson = { encoded ->
-                        scope.launch {
-                            try {
-                                runtime?.importJson(encoded)
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Import failed")
+                        },
+                        onRecoverFromCorruption = {
+                            scope.launch {
+                                try {
+                                    runtime?.recoverFromCorruption()
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Recovery failed")
+                                }
                             }
-                        }
-                    },
-                    onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
-                    onSwitchRun = { runId ->
-                        scope.launch {
-                            try {
-                                runtime?.switchToRun(WorkflowRunId(runId))
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Switch run failed")
-                            }
-                        }
-                    },
-                    onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
-                    onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
-                    onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
-                    onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },
-                    onSaveRoleCollection = { roles ->
-                        scope.launch {
-                            try {
-                                runtime?.saveRoleCollection(roles)
+                        },
+                        onRetryRuntime = {
+                            if (runtime == null) {
                                 runtimeGeneration += 1
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Save company failed")
+                            } else {
+                                scope.launch {
+                                    try {
+                                        runtime?.refresh()
+                                    } catch (failure: CancellationException) {
+                                        throw failure
+                                    } catch (failure: Exception) {
+                                        runtimeState = failure.toRuntimeFailureState("Retry failed")
+                                    }
+                                }
                             }
-                        }
-                    },
-                    onResetRoleCollection = {
-                        scope.launch {
-                            try {
-                                runtime?.resetRoleCollection()
-                                runtimeGeneration += 1
-                            } catch (failure: CancellationException) {
-                                throw failure
-                            } catch (failure: Exception) {
-                                runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                        },
+                        onCheckProviderHealth = {
+                            runtime?.checkProviderHealth()?.mapValues { (_, result) ->
+                                result.fold(
+                                    onSuccess = { caps -> "Reachable · ${caps.supported.size} capabilities" },
+                                    onFailure = { failure ->
+                                        "Unreachable · ${failure.message?.take(60) ?: "unknown error"}"
+                                    },
+                                )
+                            } ?: emptyMap()
+                        },
+                        onClearWorkflowData = {
+                            scope.launch {
+                                try {
+                                    (runtime?.persistence as? SettingsWorkflowPersistence)?.clearWorkflowData()
+                                    runtime?.loadLatest()
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Clear failed")
+                                }
                             }
-                        }
-                    },
-                    onSearchRepositories = onSearchRepositories,
-                    availableRepositorySources = availableRepositorySources,
-                    onPickLocalRepository = onPickLocalRepository,
-                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                    onConfigureRepositoryService = onConfigureRepositoryService,
-                    onDisconnectRepositoryService = onDisconnectRepositoryService,
-                    onReconfigureProvider = onReconfigureProvider,
-                    onDisconnectProvider = onDisconnectProvider,
-                    azphaltStoreService = azphaltStoreService,
-                    azphaltPackageImportRequest = azphaltPackageImportRequest,
-                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
-                    compact = maxWidth < ControlRoomBreakpoints.Wide,
-                    contentPadding = paddingValues,
-                    runtimeState = runtimeState,
-                    connectedProviderIds = providers.map { it.id.value }.toSet(),
-                )
+                        },
+                        onExportJson = suspend { runtime?.exportJson() },
+                        onImportJson = { encoded ->
+                            scope.launch {
+                                try {
+                                    runtime?.importJson(encoded)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Import failed")
+                                }
+                            }
+                        },
+                        onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
+                        onSwitchRun = { runId ->
+                            scope.launch {
+                                try {
+                                    runtime?.switchToRun(WorkflowRunId(runId))
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Switch run failed")
+                                }
+                            }
+                        },
+                        onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
+                        onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
+                        onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
+                        onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },
+                        onSaveRoleCollection = { roles ->
+                            scope.launch {
+                                try {
+                                    runtime?.saveRoleCollection(roles)
+                                    runtimeGeneration += 1
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Save company failed")
+                                }
+                            }
+                        },
+                        onResetRoleCollection = {
+                            scope.launch {
+                                try {
+                                    runtime?.resetRoleCollection()
+                                    runtimeGeneration += 1
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                                }
+                            }
+                        },
+                        onSearchRepositories = onSearchRepositories,
+                        availableRepositorySources = availableRepositorySources,
+                        onPickLocalRepository = onPickLocalRepository,
+                        connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                        onConfigureRepositoryService = onConfigureRepositoryService,
+                        onDisconnectRepositoryService = onDisconnectRepositoryService,
+                        onReconfigureProvider = onReconfigureProvider,
+                        onDisconnectProvider = onDisconnectProvider,
+                        azphaltStoreService = azphaltStoreService,
+                        azphaltPackageImportRequest = azphaltPackageImportRequest,
+                        onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
+                        compact = maxWidth < ControlRoomBreakpoints.Wide,
+                        contentPadding = paddingValues,
+                        runtimeState = runtimeState,
+                        connectedProviderIds = providers.map { it.id.value }.toSet(),
+                    )
+                }
             }
         }
     }
