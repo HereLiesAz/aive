@@ -1,6 +1,7 @@
 mod engine;
 mod genome;
 mod math;
+mod protocol;
 
 pub use engine::{
     build_mesh, project_mesh, terminal_anchor_toward, Camera, MaterialClass, Mesh, RenderEdge,
@@ -11,6 +12,7 @@ pub use genome::{
     CreatureGenome, CreaturePose, RoleArchetype, TerminalKind,
 };
 pub use math::{Vec2, Vec3};
+pub use protocol::{encode_render_frame, HaiveBuffer, PACKET_MAGIC, PACKET_VERSION};
 
 /// Full deterministic render pass for one node creature.
 ///
@@ -125,5 +127,24 @@ mod tests {
         let left = terminal_anchor_toward(&frame, Vec2::new(-1.0, 0.0));
         assert!(right.x > 0.0);
         assert!(left.x < 0.0);
+    }
+
+    #[test]
+    fn binary_packet_is_versioned_and_self_describing() {
+        let frame = render_creature(
+            "Code Reviewer",
+            "reviewer-01",
+            Activity::Blocked,
+            0.5,
+            Camera::default(),
+        );
+        let packet = encode_render_frame(&frame);
+        assert!(packet.len() > 20);
+        assert_eq!(&packet[0..4], &PACKET_MAGIC);
+        assert_eq!(u16::from_le_bytes([packet[4], packet[5]]), PACKET_VERSION);
+        assert_eq!(
+            u32::from_le_bytes([packet[8], packet[9], packet[10], packet[11]]) as usize,
+            frame.triangles.len()
+        );
     }
 }
