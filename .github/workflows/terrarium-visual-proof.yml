@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - feature/swarm-terrarium-integration
+      - fix/terrarium-rust-visual-proof
   workflow_dispatch:
 
 permissions:
@@ -71,7 +72,7 @@ jobs:
       - name: Install Chromium for visual proof
         run: npx --yes playwright@1.55.0 install --with-deps chromium
 
-      - name: Capture real Rust-rendered terrarium screenshot
+      - name: Capture and verify real Rust-rendered terrarium
         shell: bash
         run: |
           set -euo pipefail
@@ -84,20 +85,77 @@ jobs:
             fi
             sleep 1
           done
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/node-creatures.js
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/haive_node_creatures.wasm
+          for asset in haive.js node-creatures.js haive_node_creatures.wasm; do
+            curl --fail --silent --output /dev/null "http://127.0.0.1:8080/$asset"
+          done
+
           mkdir -p visual-proof
-          npx --yes playwright@1.55.0 screenshot \
+          PROOF_URL="http://127.0.0.1:8080/?terrariumPreview=1"
+
+          dump_browser_diagnostics() {
+            echo "=== HTTP server log ==="
+            cat /tmp/haive-terrarium-http.log || true
+            echo "=== Staged files ==="
+            find webApp/build/terrarium-proof -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
+            CHROME="$(find "$HOME/.cache/ms-playwright" -type f \( -name chrome -o -name chromium \) -perm -111 -print -quit 2>/dev/null || true)"
+            if [ -n "$CHROME" ]; then
+              echo "=== Chromium DOM / console diagnostics ==="
+              "$CHROME" \
+                --headless=new \
+                --no-sandbox \
+                --disable-gpu \
+                --enable-logging=stderr \
+                --v=1 \
+                --virtual-time-budget=5000 \
+                --dump-dom \
+                "$PROOF_URL" \
+                > /tmp/haive-terrarium-dom.html \
+                2> /tmp/haive-terrarium-browser.log || true
+              cat /tmp/haive-terrarium-browser.log || true
+              cat /tmp/haive-terrarium-dom.html || true
+            else
+              echo "Chromium executable not found for diagnostics."
+            fi
+          }
+
+          if ! npx --yes playwright@1.55.0 screenshot \
             --browser chromium \
             --viewport-size "1440,900" \
+            --wait-for-selector "#webApp canvas" \
             --wait-for-timeout 1800 \
-            "http://127.0.0.1:8080/?terrariumPreview=1" \
-            visual-proof/haive-terrarium-wasm.png
+            "$PROOF_URL" \
+            visual-proof/haive-terrarium-wasm.png; then
+            dump_browser_diagnostics
+            exit 1
+          fi
+
           test -s visual-proof/haive-terrarium-wasm.png
+          python3 -m pip install --quiet pillow
+          if ! python3 - <<'PY'
+          from PIL import Image
+          from collections import Counter
+
+          image = Image.open("visual-proof/haive-terrarium-wasm.png").convert("RGB")
+          colors = Counter(image.getdata())
+          background = (18, 18, 18)
+          non_background = image.width * image.height - colors.get(background, 0)
+          distinct = len(colors)
+          print(f"Visual proof: {image.width}x{image.height}, {distinct} colors, {non_background} non-background pixels")
+          if distinct < 8 or non_background < 10000:
+              raise SystemExit(
+                  f"Terrarium visual proof is effectively blank: {distinct} colors, "
+                  f"{non_background} non-background pixels"
+              )
+          PY
+          then
+            dump_browser_diagnostics
+            exit 1
+          fi
 
       - name: Upload terrarium screenshot
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: haive-terrarium-wasm-proof
           path: visual-proof/haive-terrarium-wasm.png
-          if-no-files-found: error
+          if-no-files-found: warn
