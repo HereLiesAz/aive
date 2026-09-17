@@ -106,7 +106,7 @@ class NodeCreatureRenderPacketTest {
             add(triangle.shade.toByte())
             putU16(0)
             putF32(triangle.depth)
-            triangle.points.forEach(::putPoint)
+            triangle.points.forEach { point -> putPoint(point) }
         }
         edges.forEach { edge ->
             putF32(edge.depth)
@@ -114,7 +114,7 @@ class NodeCreatureRenderPacketTest {
             putPoint(edge.from)
             putPoint(edge.to)
         }
-        terminals.forEach(::putPoint)
+        terminals.forEach { point -> putPoint(point) }
     }.toByteArray()
 
     private fun MutableList<Byte>.putPoint(point: NodeCreaturePoint) {
