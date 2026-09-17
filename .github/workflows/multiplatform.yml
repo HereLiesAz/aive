@@ -135,12 +135,13 @@ jobs:
             ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" :androidApp:assembleRelease :androidApp:bundleRelease
           fi
 
-      - name: Verify Android node renderer packaging
+      - name: Verify Android native runtime packaging
         shell: bash
         run: |
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
             test -f "androidApp/build/generated/node-creatures/jniLibs/${abi}/libhaive_node_creatures.so"
+            test -f "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so"
           done
 
       - name: Publish pinned Conveyance for isolated web builds
@@ -328,12 +329,14 @@ jobs:
           fi
           exit "$EXIT_CODE"
 
-      - name: Verify desktop node renderer packaging
+      - name: Verify desktop native runtime packaging
         shell: bash
         run: |
           set -euo pipefail
           find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 -print
+          find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 -print
           test "$(find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
+          test "$(find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
 
       - name: Upload native installer
         uses: actions/upload-artifact@v7
