@@ -59,7 +59,7 @@ internal fun NodeCreatureVectorSurface(
                 color = Azphalt.Ink,
                 start = map(edge.from),
                 end = map(edge.to),
-                strokeWidth = (edge.weight * density).coerceAtLeast(1.2f),
+                strokeWidth = (edge.weight * density * 1.65f).coerceAtLeast(1.8f),
                 cap = StrokeCap.Round,
             )
         }
@@ -92,10 +92,7 @@ private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreatur
             body = Color(0xFF1C1D20),
             accent = Color(0xFFE3483F),
         )
-        role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
-            body = Color(0xFFF08022),
-            accent = Color(0xFF202328),
-        )
+        // Specific semantic roles must win before the broad "engineer" builder match.
         role.contains("crash") || role.contains("dummy") || role.contains("test") -> NodeCreaturePalette(
             body = Color(0xFF1D66B8),
             accent = Color(0xFF162635),
@@ -107,6 +104,10 @@ private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreatur
         role.contains("review") -> NodeCreaturePalette(
             body = Color(0xFF34363A),
             accent = Color(0xFFE24A3C),
+        )
+        role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
+            body = Color(0xFFF08022),
+            accent = Color(0xFF202328),
         )
         else -> NodeCreaturePalette(
             body = Azphalt.hue(hueSeed),
