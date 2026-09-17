@@ -117,4 +117,33 @@ tasks.matching { task ->
         task.name.contains("BrowserDevelopmentWebpack")
 }.configureEach {
     dependsOn(generateWebBrandAssets, buildWebNodeCreatureWasm)
+
+    if (name.contains("BrowserProductionWebpack") || name.contains("BrowserDevelopmentWebpack")) {
+        doLast {
+            val targetDirectory = when {
+                name.startsWith("wasmJs") -> "wasmJs"
+                name.startsWith("js") -> "js"
+                else -> error("Unsupported web target for node-creature renderer: $name")
+            }
+            val executableDirectory = if (name.contains("Production")) {
+                "productionExecutable"
+            } else {
+                "developmentExecutable"
+            }
+            val bundle = layout.buildDirectory.asFileTree.matching {
+                include("**/$targetDirectory/$executableDirectory/haive.js")
+            }.files.firstOrNull()
+                ?: error("Could not locate $targetDirectory $executableDirectory web bundle after $name")
+
+            copy {
+                from(generatedWebBrandDir)
+                into(bundle.parentFile)
+            }
+
+            val rendererWasm = bundle.parentFile.resolve("haive_node_creatures.wasm")
+            check(rendererWasm.isFile) {
+                "Rust node-creature WASM was not staged beside ${bundle.absolutePath}"
+            }
+        }
+    }
 }
