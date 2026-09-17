@@ -55,7 +55,7 @@ Tracking issue: #35
 - [x] Persist/restore inference registries, streams, and resource history, and ingest non-agent executor evidence directly instead of only when it later enters model context.
 - [x] Make task/data planning resource-aware and capable of choosing an implemented execution topology rather than only honoring the already-authorized strategy.
 - [x] Implement centralized mixture-of-agents as a governed proposer → genealogy gate → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
-- [ ] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
+- [x] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
 - [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models.
 - [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner.
 - [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them.
