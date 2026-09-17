@@ -1,0 +1,23 @@
+[package]
+name = "haive-bitcos"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "BITCOS ternary weight codec, container, converter, and runtime primitives for Haive"
+
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "haive-bitcos"
+path = "src/bin/haive-bitcos.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"
