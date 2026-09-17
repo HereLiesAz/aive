@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - feature/swarm-terrarium-integration
+      - fix/terrarium-rust-visual-proof
   workflow_dispatch:
 
 permissions:
@@ -69,9 +70,12 @@ jobs:
           test -f webApp/build/terrarium-proof/haive_node_creatures.wasm
 
       - name: Install Chromium for visual proof
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
+        shell: bash
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
 
-      - name: Capture real Rust-rendered terrarium screenshot
+      - name: Capture and verify real Rust-rendered terrarium
         shell: bash
         run: |
           set -euo pipefail
@@ -84,20 +88,94 @@ jobs:
             fi
             sleep 1
           done
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/node-creatures.js
-          curl --fail --silent --output /dev/null http://127.0.0.1:8080/haive_node_creatures.wasm
+          for asset in haive.js node-creatures.js haive_node_creatures.wasm; do
+            curl --fail --silent --output /dev/null "http://127.0.0.1:8080/$asset"
+          done
+
           mkdir -p visual-proof
-          npx --yes playwright@1.55.0 screenshot \
-            --browser chromium \
-            --viewport-size "1440,900" \
-            --wait-for-timeout 1800 \
-            "http://127.0.0.1:8080/?terrariumPreview=1" \
-            visual-proof/haive-terrarium-wasm.png
+          cat > visual-proof/haive-terrarium-proof.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser = await chromium.launch({
+            headless: true,
+            args: ['--enable-unsafe-swiftshader'],
+          });
+          const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+          const diagnostics = [];
+          page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
+          page.on('pageerror', error => diagnostics.push(`[pageerror] ${error.stack || error.message}`));
+          page.on('requestfailed', request => diagnostics.push(`[requestfailed] ${request.url()} :: ${request.failure()?.errorText || 'unknown'}`));
+
+          try {
+            await page.goto('http://127.0.0.1:8080/?terrariumPreview=1', { waitUntil: 'domcontentloaded' });
+            await page.waitForFunction(() => {
+              if (globalThis.__haiveStartupError) throw new Error(globalThis.__haiveStartupError);
+              return globalThis.__haiveNodeCreaturesReady === true &&
+                globalThis.__haiveAppScriptLoaded === true;
+            }, null, { timeout: 15000 });
+            await page.waitForSelector('#webApp > *', { timeout: 15000 });
+            await page.waitForTimeout(1800);
+
+            const state = await page.evaluate(() => ({
+              rustReady: globalThis.HaiveNodeCreatures?.ready === true,
+              bridgeReady: globalThis.__haiveNodeCreaturesReady === true,
+              appScriptLoaded: globalThis.__haiveAppScriptLoaded === true,
+              startupError: globalThis.__haiveStartupError || null,
+              browserLocale: globalThis.__haiveBrowserLocale || null,
+              navigatorLanguage: navigator.language || null,
+              canvases: document.querySelectorAll('#webApp canvas').length,
+              appChildren: document.getElementById('webApp')?.childNodes.length || 0,
+            }));
+            console.log('Browser state:', JSON.stringify(state));
+            if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError ||
+                !state.browserLocale || state.browserLocale !== state.navigatorLanguage || state.appChildren < 1) {
+              throw new Error(`Terrarium did not reach a Rust-rendered ready state: ${JSON.stringify(state)}`);
+            }
+
+            await page.screenshot({ path: 'visual-proof/haive-terrarium-wasm.png' });
+          } catch (error) {
+            console.error(error.stack || error);
+            console.error('=== Browser diagnostics ===');
+            for (const entry of diagnostics) console.error(entry);
+            console.error('=== DOM ===');
+            console.error(await page.content());
+            process.exitCode = 1;
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          if ! node visual-proof/haive-terrarium-proof.mjs; then
+            echo "=== HTTP server log ==="
+            cat /tmp/haive-terrarium-http.log || true
+            echo "=== Staged files ==="
+            find webApp/build/terrarium-proof -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
+            exit 1
+          fi
+
           test -s visual-proof/haive-terrarium-wasm.png
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from PIL import Image
+          from collections import Counter
+
+          image = Image.open("visual-proof/haive-terrarium-wasm.png").convert("RGB")
+          colors = Counter(image.getdata())
+          background = (18, 18, 18)
+          non_background = image.width * image.height - colors.get(background, 0)
+          distinct = len(colors)
+          print(f"Visual proof: {image.width}x{image.height}, {distinct} colors, {non_background} non-background pixels")
+          if distinct < 8 or non_background < 10000:
+              raise SystemExit(
+                  f"Terrarium visual proof is effectively blank: {distinct} colors, "
+                  f"{non_background} non-background pixels"
+              )
+          PY
 
       - name: Upload terrarium screenshot
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: haive-terrarium-wasm-proof
           path: visual-proof/haive-terrarium-wasm.png
-          if-no-files-found: error
+          if-no-files-found: warn
