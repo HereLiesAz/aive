@@ -29,8 +29,12 @@ object HallMonitorWorkflowFragmentFactory {
                 and workflow complexity that is no longer justified. Audit both the orchestration layer and
                 memory layer. Produce a HallMonitorReport artifact containing evidence, counter-evidence,
                 falsification criteria, at least two materially different remedies per finding, and explicit
-                orchestration-layer and memory-layer test designs. Include metadata
-                '$HALL_MONITOR_REPORT_ID_METADATA' with a stable report identifier.
+                orchestration-layer and memory-layer test designs. Every proposed solution must include
+                concrete validationTests that can be executed in an isolated counterfactual trial.
+
+                The artifact text MUST be the raw JSON serialization of the HallMonitorReport domain shape.
+                Do not wrap it in Markdown or a code fence and do not place commentary before or after it.
+                Include metadata '$HALL_MONITOR_REPORT_ID_METADATA' with a stable report identifier.
             """.trimIndent(),
             roleId = HallMonitorRole.id,
             requiredArtifacts = setOf(ArtifactKind.HallMonitorReport),
@@ -42,8 +46,9 @@ object HallMonitorWorkflowFragmentFactory {
             name = "Antagonist review of Hall Monitor report",
             objective = """
                 Audit the Hall Monitor report cold. Verify cited evidence, counter-evidence, measurements,
-                falsification criteria, proposed alternatives, and both test-design sections. Produce a
-                HallMonitorReview artifact. Copy '$HALL_MONITOR_REPORT_ID_METADATA' from the report and set
+                falsification criteria, proposed alternatives, each solution's executable validation tests,
+                and both test-design sections. Produce a HallMonitorReview artifact. Copy
+                '$HALL_MONITOR_REPORT_ID_METADATA' from the report and set
                 '$HALL_MONITOR_REVIEW_VERDICT_METADATA' to exactly 'pass', 'revise', or 'reject'. Use 'pass'
                 only if the report is sufficiently supported to justify pausing the whole workflow for
                 Orchestrator and user review. Do not soften unsupported Hall Monitor claims.
