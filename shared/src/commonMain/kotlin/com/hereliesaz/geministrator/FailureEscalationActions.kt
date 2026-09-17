@@ -58,6 +58,13 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
     approved: Boolean,
     note: String? = null,
 ) {
+    parseHallMonitorTrialActionId(taskDefinitionId.value)?.let {
+        error(
+            "Hall Monitor solution testing requires the orchestration model runtime on this platform. " +
+                "The paused workflow and recommendation were not changed.",
+        )
+    }
+
     val live = state.value as? ApplicationRuntimeState.Live
         ?: error("No active workflow is loaded")
     val taskRun = requireNotNull(live.presentation.run.taskRuns[taskDefinitionId]) {
