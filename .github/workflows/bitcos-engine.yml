@@ -55,4 +55,4 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Shared planner tests
-        run: ./gradlew :shared:jvmTest --tests '*LocalModelLibraryTest*'
+        run: ./gradlew :shared:desktopTest --tests '*LocalModelLibraryTest*'
