@@ -32,6 +32,15 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     require(cleanProjectName.isNotEmpty()) { "Project name is required" }
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
 
+    parseHallMonitorTrialLaunchObjective(cleanObjective)?.let { trial ->
+        testHallMonitorSolution(
+            findingId = trial.findingId,
+            solutionIndex = trial.solutionIndex,
+            orchestrationRuntime = orchestrationRuntime,
+        )
+        return
+    }
+
     val normalizedRepository = repository?.normalized()
     val now = Clock.System.now().toEpochMilliseconds()
     val project = existingProject?.copy(
