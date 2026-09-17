@@ -11,6 +11,8 @@ import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntim
 import com.hereliesaz.geministrator.inference.SettingsCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.SettingsInferenceGenealogyGraph
 import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
+import com.hereliesaz.geministrator.inference.withLocalModelLibrary
+import com.hereliesaz.geministrator.memory.MemoryEpoch8LocalModelLibrary
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.russhwolf.settings.Settings
@@ -26,7 +28,7 @@ class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
     inferenceFabric: CompoundInferenceFabric = SettingsCompoundInferenceFabric(
         SettingsInferenceStateStore(durableInferenceSettings()),
-    ),
+    ).withLocalModelLibrary(MemoryEpoch8LocalModelLibrary.library),
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(
         graph = SettingsInferenceGenealogyGraph(durableInferenceSettings()),
     ),
