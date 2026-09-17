@@ -1,4 +1,3 @@
-import org.gradle.api.tasks.Sync
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -11,22 +10,6 @@ plugins {
 }
 
 val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
-val terrariumResourceRoot = layout.buildDirectory.dir("generated/terrariumComposeResources")
-val generateTerrariumBrandResources = tasks.register<Sync>("generateTerrariumBrandResources") {
-    from(rootProject.file("branding/haive_logo.png")) {
-        into("drawable")
-        rename { "haive_orchestrator.png" }
-    }
-    into(terrariumResourceRoot)
-}
-
-compose.resources {
-    packageOfResClass = "com.hereliesaz.geministrator.generated.resources"
-    customDirectory(
-        sourceSetName = "commonMain",
-        directoryProvider = generateTerrariumBrandResources.map { terrariumResourceRoot.get() },
-    )
-}
 
 kotlin {
     androidLibrary {
