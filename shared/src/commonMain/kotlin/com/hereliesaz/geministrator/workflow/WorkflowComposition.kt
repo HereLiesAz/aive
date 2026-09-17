@@ -15,7 +15,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
  *
  * A role is the degenerate one-node workflow. A workflow can be nested as one node or expanded
  * inline as a namespaced task subgraph. Expanding a role-task replaces that node with any workflow,
- * preserving incoming and outgoing graph edges.
+ * preserving incoming/outgoing edges and branch conditions.
  */
 object WorkflowComposer {
     fun roleAsWorkflow(
@@ -119,8 +119,9 @@ object WorkflowComposer {
 
     /**
      * Replace one role-agent task with an orchestrated workflow. The replacement inherits the
-     * original task's prerequisites, and every former consumer waits for all replacement exits.
-     * This is the role -> orchestrated-event expansion operation.
+     * original task's prerequisites and gate condition; every former consumer waits for all
+     * replacement exits. Downstream branch conditions that named the old role task follow the
+     * replacement exit (and therefore require a single exit to remain unambiguous).
      */
     fun expandRoleTask(
         definition: WorkflowDefinition,
@@ -136,6 +137,24 @@ object WorkflowComposer {
             "Task ${taskId.value} is not a role task and cannot be expanded as a role"
         }
 
+        val cleanNamespace = requireNamespace(namespace)
+        val replacementEntries = entryPoints(replacement)
+        val replacementExits = exitPoints(replacement)
+        val conditionalConsumers = definition.tasks.filter { conditionReferences(it.condition, taskId) }
+        if (conditionalConsumers.isNotEmpty()) {
+            require(replacementExits.size == 1) {
+                "Expanding ${taskId.value} requires a single replacement exit because downstream conditions reference it"
+            }
+        }
+        if (original.condition != TaskCondition.Always) {
+            val conflictingEntries = replacement.tasks.filter {
+                it.id in replacementEntries && it.condition != TaskCondition.Always
+            }
+            require(conflictingEntries.isEmpty()) {
+                "Replacement entry tasks already have conditions and cannot also inherit ${taskId.value}'s condition"
+            }
+        }
+
         val consumers = definition.tasks.filter { taskId in it.dependsOn }.mapTo(linkedSetOf()) { it.id }
         val withoutOriginal = definition.copy(
             tasks = definition.tasks
@@ -144,13 +163,31 @@ object WorkflowComposer {
                     if (taskId in task.dependsOn) task.copy(dependsOn = task.dependsOn - taskId) else task
                 },
         )
-        return inline(
+        val expanded = inline(
             parent = withoutOriginal,
             child = replacement,
-            namespace = namespace,
+            namespace = cleanNamespace,
             connectFrom = original.dependsOn,
             connectTo = consumers,
             roleOverrides = roleOverrides,
+        )
+
+        val remappedEntries = replacementEntries.mapTo(linkedSetOf()) {
+            TaskDefinitionId("$cleanNamespace.${it.value}")
+        }
+        val remappedExit = replacementExits.singleOrNull()?.let {
+            TaskDefinitionId("$cleanNamespace.${it.value}")
+        }
+        return expanded.copy(
+            tasks = expanded.tasks.map { task ->
+                when {
+                    task.id in remappedEntries && original.condition != TaskCondition.Always ->
+                        task.copy(condition = original.condition)
+                    conditionReferences(task.condition, taskId) && remappedExit != null ->
+                        task.copy(condition = replaceConditionReference(task.condition, taskId, remappedExit))
+                    else -> task
+                }
+            },
         )
     }
 
@@ -171,10 +208,26 @@ object WorkflowComposer {
         is TaskCondition.OnFailure -> TaskCondition.OnFailure(remap.getValue(condition.ofTask))
     }
 
+    private fun conditionReferences(condition: TaskCondition, taskId: TaskDefinitionId): Boolean = when (condition) {
+        TaskCondition.Always -> false
+        is TaskCondition.OnAnyOutcome -> condition.ofTask == taskId
+        is TaskCondition.OnFailure -> condition.ofTask == taskId
+    }
+
+    private fun replaceConditionReference(
+        condition: TaskCondition,
+        from: TaskDefinitionId,
+        to: TaskDefinitionId,
+    ): TaskCondition = when (condition) {
+        TaskCondition.Always -> condition
+        is TaskCondition.OnAnyOutcome -> if (condition.ofTask == from) TaskCondition.OnAnyOutcome(to) else condition
+        is TaskCondition.OnFailure -> if (condition.ofTask == from) TaskCondition.OnFailure(to) else condition
+    }
+
     private fun requireNamespace(raw: String): String {
         val clean = raw.trim().trim('.')
         require(clean.isNotEmpty()) { "Workflow composition namespace must not be blank" }
-        require(clean.none(Char::isWhitespace)) { "Workflow composition namespace must not contain whitespace" }
+        require(clean.none { it.isWhitespace() }) { "Workflow composition namespace must not contain whitespace" }
         return clean
     }
 }
