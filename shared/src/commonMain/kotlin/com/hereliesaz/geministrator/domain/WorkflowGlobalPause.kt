@@ -20,9 +20,9 @@ data class PausedTaskSnapshot(
 /**
  * Durable run-level pause metadata.
  *
- * While this is present, all non-terminal tasks are parked in Blocked and runtime handles are
- * detached. Provider identifiers remain on the task runs so [WorkflowRuntimeCoordinator.resume]
- * can reconnect after the original statuses are restored.
+ * While this is present, all ordinary non-terminal tasks are parked in Blocked and their workflow
+ * handles are detached. The optional provider/run IDs below belong only to the governance-side
+ * Orchestrator review, which may continue while the ordinary workflow is globally paused.
  */
 @Serializable
 data class WorkflowGlobalPause(
@@ -34,11 +34,16 @@ data class WorkflowGlobalPause(
     val humanGateId: ApprovalGateId,
     val taskSnapshots: List<PausedTaskSnapshot>,
     val pausedAtEpochMillis: Long,
+    val orchestratorReviewProviderId: AgentProviderId? = null,
+    val orchestratorReviewProviderRunId: ProviderRunId? = null,
 ) {
     init {
         require(reason.isNotBlank()) { "Global pause reason must not be blank" }
         require(taskSnapshots.map { it.taskDefinitionId }.distinct().size == taskSnapshots.size) {
             "Global pause task snapshots must be unique by task definition"
         }
+        require(
+            (orchestratorReviewProviderId == null) == (orchestratorReviewProviderRunId == null),
+        ) { "Orchestrator review provider and run IDs must be present together" }
     }
 }
