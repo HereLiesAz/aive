@@ -19,10 +19,10 @@ import kotlin.math.min
 internal fun NodeCreatureVectorSurface(
     packet: NodeCreatureRenderPacket,
     hueSeed: String,
+    roleLabel: String,
     modifier: Modifier = Modifier,
 ) {
-    val body = Azphalt.hue(hueSeed)
-    val accent = Azphalt.cap(hueSeed)
+    val palette = nodeCreaturePalette(roleLabel, hueSeed)
 
     Canvas(modifier) {
         val scale = min(size.width, size.height) * 0.92f
@@ -48,8 +48,8 @@ internal fun NodeCreatureVectorSurface(
                 color = nodeCreatureMaterialColor(
                     material = triangle.material,
                     shade = triangle.shade,
-                    body = body,
-                    accent = accent,
+                    body = palette.body,
+                    accent = palette.accent,
                 ),
             )
         }
@@ -80,6 +80,41 @@ internal fun NodeCreatureRenderPacket.terminalAnchorToward(toward: NodeCreatureP
     }
 }
 
+private data class NodeCreaturePalette(
+    val body: Color,
+    val accent: Color,
+)
+
+private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette {
+    val role = roleLabel.lowercase()
+    return when {
+        role.contains("orchestrat") || role.contains("queen") -> NodeCreaturePalette(
+            body = Color(0xFF1C1D20),
+            accent = Color(0xFFE3483F),
+        )
+        role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
+            body = Color(0xFFF08022),
+            accent = Color(0xFF202328),
+        )
+        role.contains("crash") || role.contains("dummy") || role.contains("test") -> NodeCreaturePalette(
+            body = Color(0xFF1D66B8),
+            accent = Color(0xFF162635),
+        )
+        role.contains("qa") || role.contains("quality") || role.contains("verif") || role.contains("inspect") -> NodeCreaturePalette(
+            body = Color(0xFFA34779),
+            accent = Color(0xFF3A203F),
+        )
+        role.contains("review") -> NodeCreaturePalette(
+            body = Color(0xFF34363A),
+            accent = Color(0xFFE24A3C),
+        )
+        else -> NodeCreaturePalette(
+            body = Azphalt.hue(hueSeed),
+            accent = Azphalt.cap(hueSeed),
+        )
+    }
+}
+
 private fun nodeCreatureMaterialColor(
     material: NodeCreatureMaterial,
     shade: Int,
@@ -89,7 +124,7 @@ private fun nodeCreatureMaterialColor(
     val source = when (material) {
         NodeCreatureMaterial.Body -> body
         NodeCreatureMaterial.Accent -> accent
-        NodeCreatureMaterial.Eye -> Azphalt.White
+        NodeCreatureMaterial.Eye -> Color(0xFFFFF2C9)
         NodeCreatureMaterial.Limb -> Azphalt.Ink
         NodeCreatureMaterial.Terminal -> accent
     }
