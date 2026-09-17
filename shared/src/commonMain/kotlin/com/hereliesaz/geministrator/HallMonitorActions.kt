@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.HallMonitorAction
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
@@ -94,8 +95,7 @@ suspend fun ApplicationRuntime.loadHallMonitorPauseReviewState(): HallMonitorPau
     val orchestratorGate = persistence.approvalGates.get(pause.orchestratorGateId) ?: return null
     val humanGate = persistence.approvalGates.get(pause.humanGateId) ?: return null
 
-    val parser = HallMonitorSolutionTrialService(persistence, providerRegistry)
-    val parsed = runCatching { parser.decodeReport(report?.textContent.orEmpty()) }
+    val parsed = runCatching { decodeHallMonitorReportPayload(report?.textContent.orEmpty()) }
     val solutions = parsed.getOrNull()?.findings.orEmpty().flatMap { finding ->
         finding.solutions.mapIndexed { index, solution ->
             HallMonitorTestableSolution(
@@ -122,7 +122,7 @@ suspend fun ApplicationRuntime.loadHallMonitorPauseReviewState(): HallMonitorPau
             solutionTitle = trial.solutionTitle,
             workflowRunId = trial.workflowRunId,
             status = trialRun?.status,
-            completedTasks = taskRuns.count { it.status.name == "Completed" },
+            completedTasks = taskRuns.count { it.status == TaskRunStatus.Completed },
             totalTasks = taskRuns.size,
             artifactCount = taskRuns.sumOf { it.artifacts.size },
             progress = progressValues.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
