@@ -1,5 +1,6 @@
 import haive.build.BrandAssets
 import haive.build.BrandLoaderVerifier
+import org.gradle.api.tasks.Exec
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -24,6 +25,34 @@ val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
     }
 }
 
+val nodeCreatureManifest = rootProject.layout.projectDirectory.file("native/node-creatures/Cargo.toml")
+val nodeCreatureSources = rootProject.layout.projectDirectory.dir("native/node-creatures/src")
+val generatedAndroidNodeJniDir = layout.buildDirectory.dir("generated/node-creatures/jniLibs")
+val buildAndroidNodeCreatureNative = tasks.register<Exec>("buildAndroidNodeCreatureNative") {
+    group = "build"
+    description = "Builds the Rust node-creature renderer for Android ABIs."
+    inputs.file(nodeCreatureManifest)
+    inputs.dir(nodeCreatureSources)
+    outputs.dir(generatedAndroidNodeJniDir)
+
+    doFirst {
+        val outputDir = generatedAndroidNodeJniDir.get().asFile
+        outputDir.deleteRecursively()
+        outputDir.mkdirs()
+        commandLine(
+            "cargo",
+            "ndk",
+            "-t", "arm64-v8a",
+            "-t", "armeabi-v7a",
+            "-t", "x86_64",
+            "-o", outputDir.absolutePath,
+            "build",
+            "--release",
+            "--manifest-path", nodeCreatureManifest.asFile.absolutePath,
+        )
+    }
+}
+
 android {
     namespace = "com.hereliesaz.haive"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -37,8 +66,11 @@ android {
     }
 
     // AGP 9.4 no longer permits Provider instances through the legacy SourceSet API.
-    // Resolve only the deterministic build-directory path here; preBuild below carries the task dependency.
-    sourceSets.getByName("main").res.srcDir(generatedAndroidBrandResDir.get().asFile)
+    // Resolve only deterministic build-directory paths here; preBuild below carries task dependencies.
+    sourceSets.getByName("main").apply {
+        res.srcDir(generatedAndroidBrandResDir.get().asFile)
+        jniLibs.srcDir(generatedAndroidNodeJniDir.get().asFile)
+    }
 
     signingConfigs {
         create("release") {
@@ -70,7 +102,7 @@ android {
 }
 
 tasks.named("preBuild") {
-    dependsOn(generateAndroidBrandAssets)
+    dependsOn(generateAndroidBrandAssets, buildAndroidNodeCreatureNative)
 }
 
 dependencies {
