@@ -103,7 +103,7 @@ internal fun GeministratorWorkflowTerrarium(
                 .fillMaxWidth()
                 .height(if (compact) 470.dp else 620.dp),
         ) {
-            HaiveNodeTerrarium(
+            PlatformNodeTerrarium(
                 subjects = projection.subjects,
                 relationships = animatedRelationships,
                 adornments = projection.adornments,
@@ -123,7 +123,7 @@ internal fun GeministratorWorkflowTerrarium(
                 onNodeDroppedOn = { downstreamRaw, upstreamRaw ->
                     if (downstreamRaw == TERRARIUM_ORCHESTRATOR_ID || upstreamRaw == TERRARIUM_ORCHESTRATOR_ID) {
                         authoringMessage = "The orchestrator is the workflow root node and cannot be rewired as a task dependency."
-                        return@HaiveNodeTerrarium
+                        return@PlatformNodeTerrarium
                     }
                     val downstreamId = TaskDefinitionId(downstreamRaw)
                     val upstreamId = TaskDefinitionId(upstreamRaw)
