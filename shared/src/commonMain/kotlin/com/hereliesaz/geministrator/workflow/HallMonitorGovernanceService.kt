@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.AcceptanceCriterion
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -7,8 +8,10 @@ import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.PausedTaskSnapshot
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRun
+import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowGlobalPause
 import com.hereliesaz.geministrator.domain.WorkflowGlobalPauseKind
@@ -17,19 +20,28 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
+import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.IsolationHint
+import com.hereliesaz.geministrator.providers.PromptContext
+import com.hereliesaz.geministrator.providers.PromptContextBlock
+import com.hereliesaz.geministrator.providers.ProviderActionResult
 
 const val HALL_MONITOR_REPORT_ID_METADATA: String = "hall-monitor-report-id"
 const val HALL_MONITOR_REVIEW_VERDICT_METADATA: String = "hall-monitor-verdict"
 const val HALL_MONITOR_REVIEW_PASS: String = "pass"
 const val HALL_MONITOR_GLOBAL_PAUSE_CODE: String = "hall-monitor-global-pause"
+private const val ORCHESTRATOR_APPROVE = "APPROVE"
+private const val ORCHESTRATOR_REJECT = "REJECT"
 
 /**
  * Governs the Hall Monitor's escalation path:
  *
  * Hall Monitor report -> passing Antagonist review -> global resumable pause ->
- * Orchestrator review + human review -> explicit resume.
+ * governance-side Orchestrator review + human review -> explicit resume.
  *
- * This service never treats report production itself as permission to pause or mutate the swarm.
+ * Ordinary workflow work stays parked for the entire pause. The Orchestrator review is deliberately
+ * executed outside the task graph so reviewing the reason for a global pause never resumes the graph.
  */
 class HallMonitorGovernanceService(
     private val persistence: WorkflowPersistence,
@@ -87,8 +99,7 @@ class HallMonitorGovernanceService(
             "Antagonist review task must be completed before a global pause"
         }
 
-        val reportId = report.metadata[HALL_MONITOR_REPORT_ID_METADATA]
-            ?: reportArtifactId.value
+        val reportId = report.metadata[HALL_MONITOR_REPORT_ID_METADATA] ?: reportArtifactId.value
         val reviewedReportId = review.metadata[HALL_MONITOR_REPORT_ID_METADATA]
         require(reviewedReportId == null || reviewedReportId == reportId) {
             "Antagonist review targets report '$reviewedReportId', not '$reportId'"
@@ -112,7 +123,6 @@ class HallMonitorGovernanceService(
                     progressMessage = taskRun.progressMessage,
                 )
             }
-
         val parkedRuns = run.taskRuns.mapValues { (_, taskRun) ->
             if (taskRun.status.isTerminal()) {
                 taskRun
@@ -142,16 +152,10 @@ class HallMonitorGovernanceService(
 
         persistence.runs.put(pausedRun)
         ensureReviewGates(pausedRun, nowEpochMillis)
-
-        // Detach live handles. Provider IDs/run IDs remain durable on each TaskRun and are used by
-        // WorkflowRuntimeCoordinator.resume after the task states are restored.
         return WorkflowRuntimeState(run = pausedRun, handles = emptyMap())
     }
 
-    suspend fun ensureReviewGates(
-        run: WorkflowRun,
-        nowEpochMillis: Long,
-    ): ReviewGates {
+    suspend fun ensureReviewGates(run: WorkflowRun, nowEpochMillis: Long): ReviewGates {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         require(pause.kind == WorkflowGlobalPauseKind.HallMonitorReview) {
             "Workflow ${run.id.value} is paused for ${pause.kind}, not Hall Monitor review"
@@ -172,11 +176,143 @@ class HallMonitorGovernanceService(
             taskDefinitionId = null,
             kind = ApprovalGateKind.HallMonitorHumanReview,
             reason = pause.reason,
-            requiredRoleId = null,
             requiresHuman = true,
             nowEpochMillis = nowEpochMillis,
         )
         return ReviewGates(orchestrator, human)
+    }
+
+    /**
+     * Starts or advances the Orchestrator's review without un-parking ordinary workflow tasks.
+     * This is intended to be called by the runtime coordinator whenever [WorkflowRun.globalPause]
+     * is present.
+     */
+    suspend fun reconcileOrchestratorReview(
+        project: Project,
+        run: WorkflowRun,
+        sessionGateway: ManagedSessionGateway,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
+        val gates = ensureReviewGates(run, nowEpochMillis)
+        if (gates.orchestrator.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) {
+            return run
+        }
+
+        val report = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
+            "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
+        }
+        val antagonistReview = requireNotNull(persistence.artifacts.get(pause.antagonistReviewArtifactId)) {
+            "Paused Antagonist review ${pause.antagonistReviewArtifactId.value} is missing"
+        }
+        val taskRunId = TaskRunId("hall-monitor-orchestrator-review:${run.id.value}:${pause.reportArtifactId.value}")
+
+        val providerId = pause.orchestratorReviewProviderId
+        val providerRunId = pause.orchestratorReviewProviderRunId
+        if (providerId == null || providerRunId == null) {
+            val role = BuiltInRoles.Orchestrator
+            val handle = sessionGateway.createSession(
+                ManagedSessionRequest(
+                    providerSelection = ProviderSelectionRequest(
+                        preferredProviderId = role.preferredProviderId,
+                        requiredCapabilities = role.capabilitiesRequired,
+                        repository = project.repository,
+                    ),
+                    taskRequest = AgentTaskRequest(
+                        taskRunId = taskRunId,
+                        objective = """
+                            Review the attached Hall Monitor report after its Antagonist pass. Judge whether
+                            the evidence and counter-evidence justify escalating its recommendations for user
+                            consideration. Do not implement any recommendation. Your FIRST nonblank line must
+                            be exactly `VERDICT: APPROVE` or `VERDICT: REJECT`. Then provide concise reasons,
+                            unresolved counterpoints, and the specific evidence that determined the verdict.
+                        """.trimIndent(),
+                        roleInstructions = "$swarmInstructions\n\n${role.instructions}",
+                        acceptanceCriteria = listOf(
+                            AcceptanceCriterion("The first nonblank line is VERDICT: APPROVE or VERDICT: REJECT."),
+                            AcceptanceCriterion("The review addresses both evidence and counter-evidence."),
+                            AcceptanceCriterion("No model, role, workflow, or memory mutation is performed."),
+                        ),
+                        contextArtifacts = listOf(report, antagonistReview),
+                        repository = project.repository,
+                        isolationHint = IsolationHint.Repoless,
+                        requirePlanApproval = false,
+                        promptContext = PromptContext(
+                            stablePrefix = listOf(
+                                PromptContextBlock("Governance", "Ordinary workflow execution is globally paused."),
+                                PromptContextBlock("Role", role.instructions),
+                            ),
+                            dynamicContext = listOf(
+                                PromptContextBlock("Hall Monitor report", report.textContent.orEmpty()),
+                                PromptContextBlock("Antagonist review", antagonistReview.textContent.orEmpty()),
+                            ),
+                            cacheNamespace = "${run.id.value}:hall-monitor-orchestrator-review",
+                        ),
+                        orchestrationContext = AgentOrchestrationContext(
+                            projectId = project.id,
+                            workflowRunId = run.id,
+                            workflowDefinitionId = run.workflowDefinitionId,
+                            roleId = role.id,
+                        ),
+                    ),
+                ),
+            )
+            val next = run.copy(
+                globalPause = pause.copy(
+                    orchestratorReviewProviderId = handle.providerId,
+                    orchestratorReviewProviderRunId = handle.providerRunId,
+                ),
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+            persistence.runs.put(next)
+            return next
+        }
+
+        val handle = ManagedSessionHandle(taskRunId, providerId, providerRunId)
+        var status = sessionGateway.status(handle)
+        if (status == ManagedSessionStatus.Unknown) {
+            sessionGateway.reconnect(handle, ManagedSessionStatus.Running)
+            status = sessionGateway.status(handle)
+        }
+        when (status) {
+            ManagedSessionStatus.Planning,
+            ManagedSessionStatus.AwaitingApproval,
+            -> {
+                if (sessionGateway.approvePlan(handle) is ProviderActionResult.Rejected) {
+                    decideOrchestratorReview(
+                        run,
+                        approved = false,
+                        note = "Orchestrator review provider could not proceed with its review plan.",
+                        nowEpochMillis = nowEpochMillis,
+                    )
+                }
+            }
+
+            ManagedSessionStatus.Completed -> {
+                val reviewText = sessionGateway.artifacts(handle)
+                    .mapNotNull { it.textContent?.trim()?.takeIf(String::isNotEmpty) }
+                    .joinToString("\n\n")
+                val verdict = parseOrchestratorVerdict(reviewText)
+                decideOrchestratorReview(
+                    run = run,
+                    approved = verdict == ORCHESTRATOR_APPROVE,
+                    note = reviewText.ifBlank { "Orchestrator returned no review text." },
+                    nowEpochMillis = nowEpochMillis,
+                )
+            }
+
+            ManagedSessionStatus.Failed -> decideOrchestratorReview(
+                run = run,
+                approved = false,
+                note = "Orchestrator review session failed; recommendations were not approved.",
+                nowEpochMillis = nowEpochMillis,
+            )
+
+            ManagedSessionStatus.Running,
+            ManagedSessionStatus.Unknown,
+            -> Unit
+        }
+        return run
     }
 
     suspend fun decideOrchestratorReview(
@@ -217,17 +353,15 @@ class HallMonitorGovernanceService(
         )
     }
 
-    suspend fun resumeIfFullyApproved(
-        run: WorkflowRun,
-        nowEpochMillis: Long,
-    ): WorkflowRun {
+    /** Resume after both reviews have reached a decision, regardless of whether they approved. */
+    suspend fun resumeAfterReviews(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         val gates = ensureReviewGates(run, nowEpochMillis)
-        require(gates.orchestrator.status == ApprovalGateStatus.Approved) {
-            "Orchestrator has not approved the Hall Monitor report"
+        require(gates.orchestrator.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) {
+            "Orchestrator review is still pending"
         }
-        require(gates.human.status == ApprovalGateStatus.Approved) {
-            "User has not approved the Hall Monitor report"
+        require(gates.human.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) {
+            "User review is still pending"
         }
 
         val snapshots = pause.taskSnapshots.associateBy { it.taskDefinitionId }
@@ -255,5 +389,11 @@ class HallMonitorGovernanceService(
         )
         persistence.runs.put(resumed)
         return resumed
+    }
+
+    private fun parseOrchestratorVerdict(reviewText: String): String? {
+        val first = reviewText.lineSequence().map(String::trim).firstOrNull(String::isNotEmpty) ?: return null
+        val value = first.substringAfter("VERDICT:", missingDelimiterValue = "").trim().uppercase()
+        return value.takeIf { it == ORCHESTRATOR_APPROVE || it == ORCHESTRATOR_REJECT }
     }
 }
