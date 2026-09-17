@@ -57,9 +57,9 @@ data class InstalledAzphaltWorkflowPackage(
     val version: String,
     val repositoryUrl: String,
     val workflowDefinitionIds: List<String> = emptyList(),
-    /** Workflow packages keep these composition primitives local to the package. */
+    /** Reusable subgraphs exported by this package for workflow composition. */
     val fragments: List<WorkflowFragment> = emptyList(),
-    /** Workflow-package roles are local; role-package roles are also installed into Company. */
+    /** Roles are globally reusable after install regardless of which package kind supplied them. */
     val roles: List<RoleDefinition> = emptyList(),
     val screens: List<InstalledAzphaltWorkflowScreen> = emptyList(),
     val dependencies: List<AzphaltWorkflowDependency> = emptyList(),
@@ -244,7 +244,8 @@ class AzphaltWorkflowPackageInstaller(
 
     /**
      * Install a previously inspected package after explicit trust and host-permission decisions.
-     * Workflow-package roles remain local. Standalone role packages become Company roles.
+     * Workflow definitions enter the shared workflow library, and every supplied role enters the
+     * shared role library so it can be assigned by any installed or authored workflow.
      */
     suspend fun install(
         plan: AzphaltWorkflowInstallPlan,
@@ -273,22 +274,10 @@ class AzphaltWorkflowPackageInstaller(
                     "Workflow id ${definition.id.value} already exists and is not owned by ${plan.packageId}"
                 }
             }
-            // Only definitions enter the workflow library. Package agents/fragments/screens remain local.
             plan.definitions.forEach { persistence.definitions.put(it) }
-        } else {
-            val builtInRoleIds = BuiltInRoles.all.mapTo(mutableSetOf()) { it.id }
-            val ownedRoleIds = previous?.takeIf { it.kind == "role" }?.roles.orEmpty().mapTo(mutableSetOf()) { it.id }
-            plan.roles.forEach { role ->
-                require(role.id !in builtInRoleIds) {
-                    "Role id ${role.id.value} collides with a built-in Haive role"
-                }
-                val existing = persistence.roles.get(role.id)
-                require(existing == null || role.id in ownedRoleIds) {
-                    "Role id ${role.id.value} already exists and is not owned by ${plan.packageId}"
-                }
-            }
-            plan.roles.forEach { role -> persistence.roles.put(role.copy(enabled = true)) }
         }
+
+        installReusableRoles(plan, previous)
 
         val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
@@ -311,6 +300,41 @@ class AzphaltWorkflowPackageInstaller(
         }
         return installed
     }
+
+    private suspend fun installReusableRoles(
+        plan: AzphaltWorkflowInstallPlan,
+        previous: InstalledAzphaltWorkflowPackage?,
+    ) {
+        if (plan.roles.isEmpty()) return
+        val builtInsById = BuiltInRoles.all.associateBy(RoleDefinition::id)
+        val previouslyOwned = previous?.roles.orEmpty().associateBy(RoleDefinition::id)
+
+        plan.roles.forEach { role ->
+            val builtIn = builtInsById[role.id]
+            require(builtIn == null || sameReusableRole(builtIn, role)) {
+                "Role id ${role.id.value} collides with a different built-in Haive role"
+            }
+            val existing = persistence.roles.get(role.id)
+            val previousRole = previouslyOwned[role.id]
+            require(
+                existing == null ||
+                    sameReusableRole(existing, role) ||
+                    (previousRole != null && sameReusableRole(existing, previousRole))
+            ) {
+                "Role id ${role.id.value} already exists with a different reusable-role definition"
+            }
+        }
+
+        plan.roles.forEach { role ->
+            val existing = persistence.roles.get(role.id)
+            val preferredProvider = existing?.preferredProviderId ?: role.preferredProviderId
+            persistence.roles.put(role.copy(enabled = true, preferredProviderId = preferredProvider))
+        }
+    }
+
+    private fun sameReusableRole(left: RoleDefinition, right: RoleDefinition): Boolean =
+        left.copy(enabled = true, preferredProviderId = null) ==
+            right.copy(enabled = true, preferredProviderId = null)
 
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
         json.decodeFromString(bytes.decodeToString())
