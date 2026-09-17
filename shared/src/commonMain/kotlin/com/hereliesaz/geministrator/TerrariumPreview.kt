@@ -30,6 +30,11 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
  * Deterministic visual-proof fixture for WASM screenshots. It deliberately renders through the same
  * production [GeministratorWorkflowTerrarium] used by live workflows; only the runtime data is a
  * self-contained fixture. No preview-only renderer or fake animation path exists.
+ *
+ * The fixture intentionally uses the canonical five-character cast from the workflow UI review so
+ * the screenshot proves the actual Rust-generated Orchestrator, Implementation Engineer, Crash Test
+ * Dummy, QA Engineer, and Code Reviewer together. Implementation starts selected so the same proof
+ * also exercises automatic camera focus/zoom.
  */
 @Composable
 fun TerrariumVisualProofScreen(
@@ -46,7 +51,7 @@ fun TerrariumVisualProofScreen(
             definition = fixture.definition,
             run = fixture.run,
             roles = fixture.roles,
-            selectedTaskId = null,
+            selectedTaskId = "implementation",
             onTaskSelected = {},
             modifier = Modifier.fillMaxSize(),
         )
@@ -60,107 +65,71 @@ internal data class TerrariumVisualProofFixture(
 )
 
 internal fun terrariumVisualProofFixture(): TerrariumVisualProofFixture {
-    val research = TaskDefinition(
-        id = TaskDefinitionId("research"),
-        name = "Gather evidence",
-        objective = "Research the problem and return evidence to the architect.",
-        roleId = BuiltInRoles.Researcher.id,
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.Researcher.id),
-    )
-    val architecture = TaskDefinition(
-        id = TaskDefinitionId("architecture"),
-        name = "Shape the plan",
-        objective = "Turn evidence into an implementation plan.",
-        roleId = BuiltInRoles.Architect.id,
-        dependsOn = setOf(research.id),
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.Architect.id),
-    )
-    val externalReview = TaskDefinition(
-        id = TaskDefinitionId("external-review"),
-        name = "Send pull request",
-        objective = "Ask the external pull-request service to deliver the review payload.",
-        roleId = null,
-        dependsOn = setOf(architecture.id),
-        executor = TaskExecutor.ExternalService("github-pull-request", "deliver"),
-    )
-    val regressionTests = TaskDefinition(
-        id = TaskDefinitionId("regression-tests"),
-        name = "Run regression suite",
-        objective = "Run the workflow regression suite.",
-        roleId = null,
-        dependsOn = setOf(architecture.id),
-        executor = TaskExecutor.TestRunner("./gradlew test"),
+    val preCode = TaskDefinition(
+        id = TaskDefinitionId("pre-code"),
+        name = "Write the verification contract",
+        objective = "Define the pre-code tests and failure cases before implementation begins.",
+        roleId = BuiltInRoles.CrashTestDummy.id,
+        executor = TaskExecutor.RoleAgent(BuiltInRoles.CrashTestDummy.id),
     )
     val implementation = TaskDefinition(
         id = TaskDefinitionId("implementation"),
-        name = "Implement the change",
-        objective = "Implement the approved architecture using delivered review context and tests.",
+        name = "Implement the objective",
+        objective = "Implement the approved objective against the verification contract.",
         roleId = BuiltInRoles.ImplementationEngineer.id,
-        dependsOn = setOf(externalReview.id, regressionTests.id),
+        dependsOn = setOf(preCode.id),
         executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
-    )
-    val approval = TaskDefinition(
-        id = TaskDefinitionId("approval"),
-        name = "Human approval",
-        objective = "Wait for integration approval.",
-        roleId = null,
-        dependsOn = setOf(implementation.id),
-        executor = TaskExecutor.HumanApproval("Integration approval"),
     )
     val verification = TaskDefinition(
         id = TaskDefinitionId("verification"),
         name = "Verify independently",
-        objective = "Falsify completion claims against the acceptance criteria.",
+        objective = "Falsify the implementation against the approved acceptance criteria and tests.",
         roleId = BuiltInRoles.QaEngineer.id,
-        dependsOn = setOf(approval.id),
+        dependsOn = setOf(implementation.id),
         executor = TaskExecutor.RoleAgent(BuiltInRoles.QaEngineer.id),
+    )
+    val review = TaskDefinition(
+        id = TaskDefinitionId("review"),
+        name = "Review implementation",
+        objective = "Review the verified implementation for correctness and unintended side effects.",
+        roleId = BuiltInRoles.CodeReviewer.id,
+        dependsOn = setOf(verification.id),
+        executor = TaskExecutor.RoleAgent(BuiltInRoles.CodeReviewer.id),
     )
 
     val definition = WorkflowDefinition(
         id = WorkflowDefinitionId("terrarium-wasm-proof"),
         name = "Terrarium visual proof",
-        tasks = listOf(
-            research,
-            architecture,
-            externalReview,
-            regressionTests,
-            implementation,
-            approval,
-            verification,
-        ),
+        tasks = listOf(preCode, implementation, verification, review),
     )
     val run = WorkflowRun(
         id = WorkflowRunId("terrarium-wasm-proof-run"),
         projectId = ProjectId("terrarium-proof"),
         workflowDefinitionId = definition.id,
-        objective = "Demonstrate the living workflow terrarium",
+        objective = "Demonstrate the canonical semantic node-creature cast",
         status = WorkflowRunStatus.Running,
         taskRuns = mapOf(
-            research.id to proofTaskRun(
-                research,
+            preCode.id to proofTaskRun(
+                preCode,
                 TaskRunStatus.Completed,
-                BuiltInRoles.Researcher.id.value,
+                BuiltInRoles.CrashTestDummy.id.value,
                 artifact = true,
             ),
-            architecture.id to proofTaskRun(
-                architecture,
-                TaskRunStatus.Completed,
-                BuiltInRoles.Architect.id.value,
-                artifact = true,
-            ),
-            externalReview.id to proofTaskRun(externalReview, TaskRunStatus.Running, null),
-            regressionTests.id to proofTaskRun(regressionTests, TaskRunStatus.Completed, null),
             implementation.id to proofTaskRun(
                 implementation,
                 TaskRunStatus.Running,
                 BuiltInRoles.ImplementationEngineer.id.value,
                 progress = .56f,
             ),
-            approval.id to proofTaskRun(approval, TaskRunStatus.Blocked, null),
             verification.id to proofTaskRun(
                 verification,
                 TaskRunStatus.Ready,
                 BuiltInRoles.QaEngineer.id.value,
+            ),
+            review.id to proofTaskRun(
+                review,
+                TaskRunStatus.Blocked,
+                BuiltInRoles.CodeReviewer.id.value,
             ),
         ),
         createdAtEpochMillis = 1L,
@@ -171,10 +140,10 @@ internal fun terrariumVisualProofFixture(): TerrariumVisualProofFixture {
         run = run,
         roles = listOf(
             BuiltInRoles.Orchestrator,
-            BuiltInRoles.Researcher,
-            BuiltInRoles.Architect,
             BuiltInRoles.ImplementationEngineer,
+            BuiltInRoles.CrashTestDummy,
             BuiltInRoles.QaEngineer,
+            BuiltInRoles.CodeReviewer,
         ),
     )
 }
