@@ -28,6 +28,11 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Rust renderer toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
@@ -60,11 +65,13 @@ jobs:
           cp -R webApp/src/webMain/resources/. webApp/build/terrarium-proof/
           test -f webApp/build/terrarium-proof/index.html
           test -f webApp/build/terrarium-proof/haive.js
+          test -f webApp/build/terrarium-proof/node-creatures.js
+          test -f webApp/build/terrarium-proof/haive_node_creatures.wasm
 
       - name: Install Chromium for visual proof
         run: npx --yes playwright@1.55.0 install --with-deps chromium
 
-      - name: Capture real terrarium screenshot
+      - name: Capture real Rust-rendered terrarium screenshot
         shell: bash
         run: |
           set -euo pipefail
@@ -77,11 +84,13 @@ jobs:
             fi
             sleep 1
           done
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/node-creatures.js
+          curl --fail --silent --output /dev/null http://127.0.0.1:8080/haive_node_creatures.wasm
           mkdir -p visual-proof
           npx --yes playwright@1.55.0 screenshot \
             --browser chromium \
             --viewport-size "1440,900" \
-            --wait-for-timeout 1400 \
+            --wait-for-timeout 1800 \
             "http://127.0.0.1:8080/?terrariumPreview=1" \
             visual-proof/haive-terrarium-wasm.png
           test -s visual-proof/haive-terrarium-wasm.png

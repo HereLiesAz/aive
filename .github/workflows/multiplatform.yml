@@ -53,6 +53,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Rust renderer toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
@@ -125,6 +135,14 @@ jobs:
             ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" :androidApp:assembleRelease :androidApp:bundleRelease
           fi
 
+      - name: Verify Android node renderer packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            test -f "androidApp/build/generated/node-creatures/jniLibs/${abi}/libhaive_node_creatures.so"
+          done
+
       - name: Publish pinned Conveyance for isolated web builds
         run: |
           ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
@@ -166,8 +184,12 @@ jobs:
           cp -R webApp/src/webMain/resources/. webApp/build/pages/wasm/
           test -f webApp/build/pages/index.html
           test -f webApp/build/pages/haive.js
+          test -f webApp/build/pages/node-creatures.js
+          test -f webApp/build/pages/haive_node_creatures.wasm
           test -f webApp/build/pages/wasm/index.html
           test -f webApp/build/pages/wasm/haive.js
+          test -f webApp/build/pages/wasm/node-creatures.js
+          test -f webApp/build/pages/wasm/haive_node_creatures.wasm
 
       - name: Generate release notes
         if: github.event_name != 'pull_request'
@@ -261,6 +283,9 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Rust renderer toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
@@ -302,6 +327,13 @@ jobs:
             fi
           fi
           exit "$EXIT_CODE"
+
+      - name: Verify desktop node renderer packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 -print
+          test "$(find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
 
       - name: Upload native installer
         uses: actions/upload-artifact@v7

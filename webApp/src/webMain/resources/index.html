@@ -59,6 +59,29 @@
             observer.observe(app, { childList: true });
         })();
     </script>
-    <script src="haive.js"></script>
+    <script src="node-creatures.js"></script>
+    <script>
+        (() => {
+            const launchHaive = () => {
+                const script = document.createElement("script");
+                script.src = "haive.js";
+                script.async = false;
+                document.body.appendChild(script);
+            };
+
+            const renderer = globalThis.HaiveNodeCreatures;
+            if (!renderer || typeof renderer.init !== "function") {
+                console.error("Node-creature browser adapter is unavailable; Haive will expose the renderer failure in the terrarium.");
+                launchHaive();
+                return;
+            }
+
+            renderer.init("haive_node_creatures.wasm")
+                .catch((error) => {
+                    console.error("Rust node-creature renderer failed to initialize; Haive will expose the renderer failure in the terrarium.", error);
+                })
+                .finally(launchHaive);
+        })();
+    </script>
 </body>
 </html>

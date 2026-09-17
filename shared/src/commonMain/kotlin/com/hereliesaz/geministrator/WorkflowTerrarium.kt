@@ -15,7 +15,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.conveyance.h2g2.H2g2SwarmTerrarium
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -27,7 +26,7 @@ import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import kotlinx.coroutines.launch
 
 /**
- * Production workflow view: the DAG is a living terrarium rather than a diagram.
+ * Production workflow view: the DAG is a living node-creature map rather than a diagram.
  *
  * Habitat movement is presentation-only and persisted independently. Dropping one real task-creature
  * onto another means "dragged depends on target". The resulting definition is staged as a draft;
@@ -104,12 +103,13 @@ internal fun GeministratorWorkflowTerrarium(
                 .fillMaxWidth()
                 .height(if (compact) 470.dp else 620.dp),
         ) {
-            H2g2SwarmTerrarium(
+            PlatformNodeTerrarium(
                 subjects = projection.subjects,
                 relationships = animatedRelationships,
                 adornments = projection.adornments,
                 serviceVisits = projection.serviceVisits,
                 editable = true,
+                compact = compact,
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
@@ -122,8 +122,8 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 onNodeDroppedOn = { downstreamRaw, upstreamRaw ->
                     if (downstreamRaw == TERRARIUM_ORCHESTRATOR_ID || upstreamRaw == TERRARIUM_ORCHESTRATOR_ID) {
-                        authoringMessage = "The orchestrator is the queen/root visual, not a draggable workflow dependency."
-                        return@H2g2SwarmTerrarium
+                        authoringMessage = "The orchestrator is the workflow root node and cannot be rewired as a task dependency."
+                        return@PlatformNodeTerrarium
                     }
                     val downstreamId = TaskDefinitionId(downstreamRaw)
                     val upstreamId = TaskDefinitionId(upstreamRaw)
@@ -147,11 +147,6 @@ internal fun GeministratorWorkflowTerrarium(
                             authoringMessage = edit.reason
                         }
                     }
-                },
-                orchestratorContent = { _, _, childModifier ->
-                    TerrariumOrchestratorCharacter(
-                        modifier = childModifier.padding(8.dp),
-                    )
                 },
                 modifier = Modifier.fillMaxSize(),
             )
