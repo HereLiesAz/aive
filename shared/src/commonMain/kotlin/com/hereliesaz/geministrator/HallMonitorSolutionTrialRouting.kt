@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.HallMonitorReport
 import kotlinx.serialization.json.Json
 
 private const val HALL_MONITOR_TRIAL_LAUNCH_PREFIX = "__HAIVE_HALL_MONITOR_TEST_SOLUTION__"
+private const val HALL_MONITOR_TRIAL_ACTION_PREFIX = "__haive_hall_monitor_trial_action__"
 private const val HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR = "::"
 
 internal data class HallMonitorTrialLaunchRequest(
@@ -17,9 +18,21 @@ internal fun hallMonitorTrialLaunchObjective(findingId: String, solutionIndex: I
     return "$HALL_MONITOR_TRIAL_LAUNCH_PREFIX$solutionIndex$HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR$findingId"
 }
 
-internal fun parseHallMonitorTrialLaunchObjective(objective: String): HallMonitorTrialLaunchRequest? {
-    if (!objective.startsWith(HALL_MONITOR_TRIAL_LAUNCH_PREFIX)) return null
-    val payload = objective.removePrefix(HALL_MONITOR_TRIAL_LAUNCH_PREFIX)
+internal fun parseHallMonitorTrialLaunchObjective(objective: String): HallMonitorTrialLaunchRequest? =
+    parseHallMonitorTrialRequest(objective, HALL_MONITOR_TRIAL_LAUNCH_PREFIX)
+
+internal fun hallMonitorTrialActionId(findingId: String, solutionIndex: Int): String {
+    require(findingId.isNotBlank()) { "Hall Monitor finding id is required" }
+    require(solutionIndex >= 0) { "Hall Monitor solution index must not be negative" }
+    return "$HALL_MONITOR_TRIAL_ACTION_PREFIX$solutionIndex$HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR$findingId"
+}
+
+internal fun parseHallMonitorTrialActionId(actionId: String): HallMonitorTrialLaunchRequest? =
+    parseHallMonitorTrialRequest(actionId, HALL_MONITOR_TRIAL_ACTION_PREFIX)
+
+private fun parseHallMonitorTrialRequest(value: String, prefix: String): HallMonitorTrialLaunchRequest? {
+    if (!value.startsWith(prefix)) return null
+    val payload = value.removePrefix(prefix)
     val separator = payload.indexOf(HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR)
     require(separator > 0) { "Malformed Hall Monitor solution trial request" }
     val solutionIndex = payload.substring(0, separator).toIntOrNull()
