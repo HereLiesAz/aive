@@ -1,4 +1,4 @@
-use crate::genome::{Activity, CreatureGenome, CreaturePose, RoleArchetype, TerminalKind};
+use crate::genome::{CreatureGenome, CreaturePose, RoleArchetype, TerminalKind};
 use crate::math::{rotate_xyz, Vec2, Vec3};
 use core::f32::consts::{PI, TAU};
 use std::collections::HashMap;
@@ -262,7 +262,11 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
                 add_tube(
                     mesh,
                     Vec3::new(-0.58 * genome.body_radii.x, offset * genome.body_radii.y, z),
-                    Vec3::new(-0.15 * genome.body_radii.x, (offset + 0.19) * genome.body_radii.y, z),
+                    Vec3::new(
+                        -0.15 * genome.body_radii.x,
+                        (offset + 0.19) * genome.body_radii.y,
+                        z,
+                    ),
                     0.035,
                     5,
                     MaterialClass::Limb,
@@ -270,7 +274,11 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
             }
         }
         RoleArchetype::Tester => {
-            let patch = Vec3::new(0.53 * genome.body_radii.x, 0.18 * genome.body_radii.y, z + 0.02);
+            let patch = Vec3::new(
+                0.53 * genome.body_radii.x,
+                0.18 * genome.body_radii.y,
+                z + 0.02,
+            );
             add_tube(
                 mesh,
                 patch + Vec3::new(-0.13, -0.13, 0.0),
@@ -289,9 +297,24 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
             );
         }
         RoleArchetype::Inspector => {
-            let stem_root = Vec3::new(0.34 * genome.body_radii.x, -0.55 * genome.body_radii.y, 0.02);
-            let screen_center = Vec3::new(0.58 * genome.body_radii.x, -1.04 * genome.body_radii.y, 0.08);
-            add_tube(mesh, stem_root, screen_center, 0.055, 5, MaterialClass::Limb);
+            let stem_root = Vec3::new(
+                0.34 * genome.body_radii.x,
+                -0.55 * genome.body_radii.y,
+                0.02,
+            );
+            let screen_center = Vec3::new(
+                0.58 * genome.body_radii.x,
+                -1.04 * genome.body_radii.y,
+                0.08,
+            );
+            add_tube(
+                mesh,
+                stem_root,
+                screen_center,
+                0.055,
+                5,
+                MaterialClass::Limb,
+            );
             add_rect(
                 mesh,
                 Vec3::new(screen_center.x, screen_center.y, genome.body_radii.z * 0.30),
@@ -301,31 +324,59 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
             );
             add_tube(
                 mesh,
-                Vec3::new(screen_center.x - 0.13, screen_center.y, genome.body_radii.z * 0.315),
-                Vec3::new(screen_center.x - 0.04, screen_center.y - 0.05, genome.body_radii.z * 0.315),
+                Vec3::new(
+                    screen_center.x - 0.13,
+                    screen_center.y,
+                    genome.body_radii.z * 0.315,
+                ),
+                Vec3::new(
+                    screen_center.x - 0.04,
+                    screen_center.y - 0.05,
+                    genome.body_radii.z * 0.315,
+                ),
                 0.018,
                 4,
                 MaterialClass::Eye,
             );
             add_tube(
                 mesh,
-                Vec3::new(screen_center.x - 0.04, screen_center.y - 0.05, genome.body_radii.z * 0.315),
-                Vec3::new(screen_center.x + 0.05, screen_center.y + 0.04, genome.body_radii.z * 0.315),
+                Vec3::new(
+                    screen_center.x - 0.04,
+                    screen_center.y - 0.05,
+                    genome.body_radii.z * 0.315,
+                ),
+                Vec3::new(
+                    screen_center.x + 0.05,
+                    screen_center.y + 0.04,
+                    genome.body_radii.z * 0.315,
+                ),
                 0.018,
                 4,
                 MaterialClass::Eye,
             );
             add_tube(
                 mesh,
-                Vec3::new(screen_center.x + 0.05, screen_center.y + 0.04, genome.body_radii.z * 0.315),
-                Vec3::new(screen_center.x + 0.14, screen_center.y - 0.02, genome.body_radii.z * 0.315),
+                Vec3::new(
+                    screen_center.x + 0.05,
+                    screen_center.y + 0.04,
+                    genome.body_radii.z * 0.315,
+                ),
+                Vec3::new(
+                    screen_center.x + 0.14,
+                    screen_center.y - 0.02,
+                    genome.body_radii.z * 0.315,
+                ),
                 0.018,
                 4,
                 MaterialClass::Eye,
             );
         }
         RoleArchetype::Reviewer => {
-            let alert = Vec3::new(0.63 * genome.body_radii.x, -0.70 * genome.body_radii.y, z + 0.02);
+            let alert = Vec3::new(
+                0.63 * genome.body_radii.x,
+                -0.70 * genome.body_radii.y,
+                z + 0.02,
+            );
             add_tube(
                 mesh,
                 alert,
@@ -463,14 +514,7 @@ fn add_eye(
     aim: Vec2,
     large_pupil: bool,
 ) {
-    add_disc(
-        mesh,
-        center,
-        radius_x,
-        radius_y,
-        18,
-        MaterialClass::Eye,
-    );
+    add_disc(mesh, center, radius_x, radius_y, 18, MaterialClass::Eye);
     let pupil_x = center.x + aim.x * radius_x * 0.38;
     let pupil_y = center.y + aim.y * radius_y * 0.30;
     add_disc(
@@ -514,7 +558,13 @@ fn add_antennae(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
         let tip = body_surface + direction * length + tangent * bend;
 
         if antenna.terminal == TerminalKind::Coil {
-            add_coiled_antenna(mesh, body_surface, tip, antenna.radius, MaterialClass::Accent);
+            add_coiled_antenna(
+                mesh,
+                body_surface,
+                tip,
+                antenna.radius,
+                MaterialClass::Accent,
+            );
         } else {
             add_tube(
                 mesh,
@@ -608,7 +658,11 @@ fn add_limbs(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
         let side = if index % 2 == 0 { -1.0_f32 } else { 1.0_f32 };
         let row = index / 2;
         let y = -0.15 + row as f32 * 0.33;
-        let root = Vec3::new(side * genome.body_radii.x * 0.72, y * genome.body_radii.y, 0.05);
+        let root = Vec3::new(
+            side * genome.body_radii.x * 0.72,
+            y * genome.body_radii.y,
+            0.05,
+        );
         let elbow = Vec3::new(
             side * genome.body_radii.x * (1.02 + row as f32 * 0.06),
             genome.body_radii.y * (y + 0.12 + arm_swing * side),
@@ -671,9 +725,8 @@ fn add_oriented_disc(
     for side in 0..sides {
         let angle = TAU * side as f32 / sides as f32;
         ring.push(mesh.vertices.len());
-        mesh.vertices.push(
-            center + basis_a * radius_x * angle.cos() + basis_b * radius_y * angle.sin(),
-        );
+        mesh.vertices
+            .push(center + basis_a * radius_x * angle.cos() + basis_b * radius_y * angle.sin());
     }
     for side in 0..sides {
         mesh.faces.push(Face {
@@ -687,7 +740,8 @@ fn add_rect(mesh: &mut Mesh, center: Vec3, width: f32, height: f32, material: Ma
     let half_w = width * 0.5;
     let half_h = height * 0.5;
     let first = mesh.vertices.len();
-    mesh.vertices.push(center + Vec3::new(-half_w, -half_h, 0.0));
+    mesh.vertices
+        .push(center + Vec3::new(-half_w, -half_h, 0.0));
     mesh.vertices.push(center + Vec3::new(half_w, -half_h, 0.0));
     mesh.vertices.push(center + Vec3::new(half_w, half_h, 0.0));
     mesh.vertices.push(center + Vec3::new(-half_w, half_h, 0.0));
@@ -768,8 +822,18 @@ fn add_terminal(mesh: &mut Mesh, center: Vec3, direction: Vec3, kind: TerminalKi
                 mesh,
                 eye_center + direction * radius * 0.045,
                 direction,
-                radius * if kind == TerminalKind::Probe { 0.22 } else { 0.18 },
-                radius * if kind == TerminalKind::Probe { 0.30 } else { 0.24 },
+                radius
+                    * if kind == TerminalKind::Probe {
+                        0.22
+                    } else {
+                        0.18
+                    },
+                radius
+                    * if kind == TerminalKind::Probe {
+                        0.30
+                    } else {
+                        0.24
+                    },
                 10,
                 MaterialClass::Limb,
             );
@@ -831,7 +895,11 @@ fn add_terminal(mesh: &mut Mesh, center: Vec3, direction: Vec3, kind: TerminalKi
 
 fn perpendicular_basis(axis: Vec3) -> (Vec3, Vec3) {
     let axis = axis.normalized();
-    let reference = if axis.z.abs() < 0.84 { Vec3::Z } else { Vec3::Y };
+    let reference = if axis.z.abs() < 0.84 {
+        Vec3::Z
+    } else {
+        Vec3::Y
+    };
     let basis_a = axis.cross(reference).normalized();
     let basis_b = axis.cross(basis_a).normalized();
     (basis_a, basis_b)
