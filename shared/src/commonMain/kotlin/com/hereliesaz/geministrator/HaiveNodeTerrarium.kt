@@ -48,7 +48,7 @@ internal fun HaiveNodeTerrarium(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Azphalt.currentGround.page)
+            .background(Azphalt.currentGround.onPage)
             .semantics { contentDescription = detail },
         contentAlignment = Alignment.Center,
     ) {
