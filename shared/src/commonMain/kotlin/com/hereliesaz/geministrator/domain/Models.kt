@@ -161,6 +161,7 @@ data class WorkflowRun(
     val taskRuns: Map<TaskDefinitionId, TaskRun>,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    val globalPause: WorkflowGlobalPause? = null,
 ) {
     init {
         taskRuns.forEach { (key, taskRun) ->

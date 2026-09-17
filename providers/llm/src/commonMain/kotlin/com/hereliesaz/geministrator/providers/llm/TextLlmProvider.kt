@@ -15,6 +15,8 @@ import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
 import com.hereliesaz.geministrator.providers.PromptCacheMode
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
+import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REVIEW_VERDICT_METADATA
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
@@ -43,7 +45,6 @@ open class TextLlmProvider(
     private var nextSequence = 1L
 
     private companion object {
-        // Keyed by provider id prefix so sessions survive provider instance recreation.
         val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
         val sessionsMutex = Mutex()
         const val MAX_PLAN_PREVIEW_CHARS = 8_000
@@ -70,11 +71,7 @@ open class TextLlmProvider(
                 sessions[providerRunId] = Session(
                     request = request,
                     phase = MutableStateFlow(
-                        if (request.requirePlanApproval) {
-                            TextLlmSessionPhase.AwaitingApproval
-                        } else {
-                            TextLlmSessionPhase.Ready
-                        },
+                        if (request.requirePlanApproval) TextLlmSessionPhase.AwaitingApproval else TextLlmSessionPhase.Ready,
                     ),
                 )
             }
@@ -88,47 +85,18 @@ open class TextLlmProvider(
             ?: error("$displayName session ${runId.value} is not available in this process")
 
         if (session.request.requirePlanApproval) {
-            // Generate a preview plan to show the user before they approve.
             val preview = api.generate(renderPrompt(session.request))
-            emit(
-                AgentEvent.PlanGenerated(
-                    runId = runId,
-                    summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS),
-                ),
-            )
-            val phase = session.phase
-                .filter { it != TextLlmSessionPhase.AwaitingApproval }
-                .first()
+            emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
+            val phase = session.phase.filter { it != TextLlmSessionPhase.AwaitingApproval }.first()
             if (phase == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
                 return@flow
             }
             emit(AgentEvent.PlanApproved(runId))
-            // Re-generate after approval so the full response reflects confirmed intent.
             val result = api.generate(renderPrompt(session.request))
-            emit(
-                AgentEvent.ArtifactProduced(
-                    runId = runId,
-                    artifact = ProviderArtifact(
-                        kind = inferArtifactKind(session.request),
-                        label = "$displayName response",
-                        textContent = result.text,
-                        mediaType = "text/markdown",
-                        metadata = mapOf(
-                            "provider" to id.value,
-                            "taskRunId" to session.request.taskRunId.value,
-                        ),
-                    ),
-                ),
-            )
+            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
-                emit(
-                    AgentEvent.UsageReported(
-                        runId = runId,
-                        inputTokens = result.inputTokens,
-                        outputTokens = result.outputTokens,
-                    ),
-                )
+                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
             }
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
@@ -136,40 +104,18 @@ open class TextLlmProvider(
                 return@flow
             }
             val result = api.generate(renderPrompt(session.request))
-            emit(
-                AgentEvent.ArtifactProduced(
-                    runId = runId,
-                    artifact = ProviderArtifact(
-                        kind = inferArtifactKind(session.request),
-                        label = "$displayName response",
-                        textContent = result.text,
-                        mediaType = "text/markdown",
-                        metadata = mapOf(
-                            "provider" to id.value,
-                            "taskRunId" to session.request.taskRunId.value,
-                        ),
-                    ),
-                ),
-            )
+            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
-                emit(
-                    AgentEvent.UsageReported(
-                        runId = runId,
-                        inputTokens = result.inputTokens,
-                        outputTokens = result.outputTokens,
-                    ),
-                )
+                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
             }
         }
         emit(AgentEvent.Completed(runId))
     }
 
-    override suspend fun sendMessage(
-        runId: ProviderRunId,
-        message: String,
-    ): ProviderActionResult = ProviderActionResult.Rejected(
-        "$displayName uses one-shot task execution; start a new governed task for follow-up work.",
-    )
+    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
+        ProviderActionResult.Rejected(
+            "$displayName uses one-shot task execution; start a new governed task for follow-up work.",
+        )
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult {
         val sessions = providerSessions()
@@ -185,10 +131,37 @@ open class TextLlmProvider(
 
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult {
         val sessions = providerSessions()
-        val session = mutex.withLock { sessions[runId] }
-            ?: return ProviderActionResult.Accepted
+        val session = mutex.withLock { sessions[runId] } ?: return ProviderActionResult.Accepted
         session.phase.value = TextLlmSessionPhase.Cancelled
         return ProviderActionResult.Accepted
+    }
+
+    private fun responseArtifact(request: AgentTaskRequest, text: String): ProviderArtifact {
+        val kind = inferArtifactKind(request)
+        return ProviderArtifact(
+            kind = kind,
+            label = "$displayName response",
+            textContent = text,
+            mediaType = "text/markdown",
+            metadata = buildMap {
+                put("provider", id.value)
+                put("taskRunId", request.taskRunId.value)
+                when (kind) {
+                    ArtifactKind.HallMonitorReport -> {
+                        put(HALL_MONITOR_REPORT_ID_METADATA, request.taskRunId.value)
+                    }
+                    ArtifactKind.HallMonitorReview -> {
+                        request.contextArtifacts
+                            .firstOrNull { it.kind == ArtifactKind.HallMonitorReport }
+                            ?.metadata
+                            ?.get(HALL_MONITOR_REPORT_ID_METADATA)
+                            ?.let { put(HALL_MONITOR_REPORT_ID_METADATA, it) }
+                        parseHallMonitorVerdict(text)?.let { put(HALL_MONITOR_REVIEW_VERDICT_METADATA, it) }
+                    }
+                    else -> Unit
+                }
+            },
+        )
     }
 
     private fun renderPrompt(request: AgentTaskRequest): String = buildString {
@@ -222,32 +195,28 @@ open class TextLlmProvider(
         }
         val repository = request.repository
         if (repository != null) {
-            append("REPOSITORY CONTEXT\n")
-            append("Source: ")
+            append("REPOSITORY CONTEXT\nSource: ")
             append(repository.source.displayName())
             append("\nLocation: ")
             append(repository.locationLabel())
-            repository.defaultBranch?.let { branch ->
-                append("\nBranch: ")
-                append(branch)
-            }
+            repository.defaultBranch?.let { branch -> append("\nBranch: ").append(branch) }
             append("\n\n")
         }
-        val textArtifacts = request.contextArtifacts.filter { !it.textContent.isNullOrBlank() }
-        if (textArtifacts.isNotEmpty()) {
-            textArtifacts.forEach { artifact ->
-                append(artifact.label.uppercase())
-                append("\n")
-                append(artifact.textContent!!.trim())
-                append("\n\n")
-            }
+        request.contextArtifacts.filter { !it.textContent.isNullOrBlank() }.forEach { artifact ->
+            append(artifact.label.uppercase())
+            append("\n")
+            append(artifact.textContent!!.trim())
+            append("\n\n")
         }
         append("Return only the concrete work product for this assigned role. Do not claim repository access, shell execution, tests, or changes you did not actually perform.")
     }.trim()
 
     private fun inferArtifactKind(request: AgentTaskRequest): ArtifactKind {
+        val roleId = request.orchestrationContext.roleId?.value
         val signal = "${request.roleInstructions}\n${request.objective}".lowercase()
         return when {
+            roleId == "hall-monitor" -> ArtifactKind.HallMonitorReport
+            roleId == "antagonist" && "hall monitor" in signal -> ArtifactKind.HallMonitorReview
             "release" in signal -> ArtifactKind.Release
             "failure" in signal || "root cause" in signal -> ArtifactKind.FailureAnalysis
             "verify" in signal || "verification" in signal || "qa" in signal -> ArtifactKind.Verification
@@ -259,8 +228,14 @@ open class TextLlmProvider(
         }
     }
 
+    private fun parseHallMonitorVerdict(text: String): String? = text.lineSequence()
+        .map(String::trim)
+        .firstOrNull { it.startsWith("VERDICT:", ignoreCase = true) }
+        ?.substringAfter(':')
+        ?.trim()
+        ?.lowercase()
+        ?.takeIf { it in setOf("pass", "revise", "reject") }
 }
-
 
 class OpenAiProvider(
     apiKeyProvider: LlmApiKeyProvider,

@@ -15,6 +15,8 @@ enum class ApprovalGateKind {
     IntegrationApproval,
     ReleaseApproval,
     FailureEscalation,
+    HallMonitorOrchestratorReview,
+    HallMonitorHumanReview,
 }
 
 @Serializable

@@ -27,6 +27,8 @@ enum class ArtifactKind {
     Verification,
     FailureAnalysis,
     Release,
+    HallMonitorReport,
+    HallMonitorReview,
 }
 
 @Serializable
