@@ -1,11 +1,12 @@
 package com.hereliesaz.geministrator.workflow
 
-import com.hereliesaz.geministrator.domain.HallMonitorReport
+import com.hereliesaz.geministrator.decodeHallMonitorReportPayload
 import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.HallMonitorSolutionTrial
 import com.hereliesaz.geministrator.domain.IntegrationPolicy
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowGlobalPauseKind
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -19,7 +20,6 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
-import kotlinx.serialization.json.Json
 
 /**
  * Creates an executable counterfactual for one Hall Monitor recommendation while leaving the
@@ -61,7 +61,7 @@ class HallMonitorSolutionTrialService(
         val reportArtifact = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
             "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
         }
-        val report = decodeReport(reportArtifact.textContent.orEmpty())
+        val report = decodeHallMonitorReportPayload(reportArtifact.textContent.orEmpty())
         val finding = requireNotNull(report.findings.firstOrNull { it.id == findingId }) {
             "Hall Monitor report ${report.reportId} has no finding '$findingId'"
         }
@@ -78,6 +78,7 @@ class HallMonitorSolutionTrialService(
         val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
             .filterNot { it.id == HallMonitorRole.id }
         require(launchRoles.isNotEmpty()) { "No active roles are available to run a Hall Monitor solution trial" }
+        val launchRoleIds = launchRoles.mapTo(linkedSetOf()) { it.id }
 
         val roleTaskIds = sourceDefinition.tasks.mapNotNullTo(linkedSetOf()) { task ->
             val roleId = task.roleId ?: (task.executor as? TaskExecutor.RoleAgent)?.roleId
@@ -86,7 +87,7 @@ class HallMonitorSolutionTrialService(
         val currentPlan = sourceDefinition.tasks.mapNotNull { task ->
             val roleId = task.roleId ?: (task.executor as? TaskExecutor.RoleAgent)?.roleId
                 ?: return@mapNotNull null
-            if (roleId == HallMonitorRole.id || roleId !in launchRoles.map { it.id }.toSet()) return@mapNotNull null
+            if (roleId == HallMonitorRole.id || roleId !in launchRoleIds) return@mapNotNull null
             OrchestrationPlanStep(
                 id = task.id.value,
                 name = task.name,
@@ -156,6 +157,9 @@ class HallMonitorSolutionTrialService(
             name = "TEST · ${solution.title}".take(80),
             description = "Isolated Hall Monitor counterfactual for ${sourceRun.id.value}; finding ${finding.id}, solution $solutionIndex.",
             integrationPolicy = IntegrationPolicy.Manual,
+            // The trial planner is responsible for the selected solution's explicit validation tests.
+            // Avoid injecting unrelated generic pre/post test topology into the counterfactual.
+            testDesignPolicy = TestDesignPolicy.None,
         )
 
         val launchAt = nowEpochMillis + 1L
@@ -199,41 +203,5 @@ class HallMonitorSolutionTrialService(
             ),
         )
         return trial
-    }
-
-    fun decodeReport(raw: String): HallMonitorReport {
-        require(raw.isNotBlank()) { "Hall Monitor report has no machine-readable payload" }
-        val normalized = stripMarkdownFence(raw)
-        val firstBrace = normalized.indexOf('{')
-        val lastBrace = normalized.lastIndexOf('}')
-        val candidates = buildList {
-            add(normalized)
-            if (firstBrace >= 0 && lastBrace > firstBrace) add(normalized.substring(firstBrace, lastBrace + 1))
-        }.distinct()
-
-        candidates.forEach { candidate ->
-            runCatching { ReportJson.decodeFromString(HallMonitorReport.serializer(), candidate) }
-                .getOrNull()
-                ?.let { return it }
-        }
-        error(
-            "Hall Monitor report is not machine-readable HallMonitorReport JSON. " +
-                "Request a revised report before testing a proposed solution.",
-        )
-    }
-
-    private fun stripMarkdownFence(raw: String): String {
-        val trimmed = raw.trim()
-        if (!trimmed.startsWith("```")) return trimmed
-        val firstNewline = trimmed.indexOf('\n')
-        if (firstNewline < 0) return trimmed.removePrefix("```").removeSuffix("```").trim()
-        return trimmed.substring(firstNewline + 1).removeSuffix("```").trim()
-    }
-
-    private companion object {
-        val ReportJson = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-        }
     }
 }
