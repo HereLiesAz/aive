@@ -20,57 +20,26 @@ data class MemoryModelReleaseBundle(
         get() = "https://github.com/HereLiesAz/haive/releases/download/$releaseTag/$releaseAssetName"
 }
 
+/**
+ * Compatibility view used by the existing memory runtime.
+ *
+ * The reusable [MemoryEpoch8LocalModelLibrary] is authoritative for release metadata and variant
+ * selection. This view deliberately exposes the current production-safe merged INT8 artifacts so
+ * existing ONNX installers keep their stable runtime IDs while adapter-capable backends can use the
+ * richer library directly.
+ */
 object MemoryEpoch8ModelCatalog {
-    const val RELEASE_TAG: String = "memory-layer-epoch8"
+    const val RELEASE_TAG: String = MemoryEpoch8LocalModelLibrary.RELEASE_TAG
 
-    val sectioner = bundle(
-        role = MemoryMicroAgentRole.Sectioner,
-        slug = "01_sectioner",
-        sha256 = "96fcedd5c872a92298090aceae47869b05154a1a4e439197b7008199fd8e4e20",
-    )
-    val salience = bundle(
-        role = MemoryMicroAgentRole.SalienceFilter,
-        slug = "02_salience",
-        sha256 = "1edbab26ec052940b6043e593beb5662bab3e0478ff52a74cfd8052e5b052d8e",
-    )
-    val nounIndexer = bundle(
-        role = MemoryMicroAgentRole.NounTagger,
-        slug = "03_noun_indexer",
-        sha256 = "4bf6e46a48220979bde2742e686d6cd2ceb4ca91c063b7bda289d1ad752a31c2",
-    )
-    val verbIndexer = bundle(
-        role = MemoryMicroAgentRole.VerbTagger,
-        slug = "04_verb_indexer",
-        sha256 = "2a47b737abe35dca6e2ba381e293be1c310d825d3eb8d012800f9894b550f4d4",
-    )
-    val phraseSynthesizer = bundle(
-        role = MemoryMicroAgentRole.PhraseSynthesizer,
-        slug = "05_phrase_synthesizer",
-        sha256 = "3d9d7397c0c92b4369cfdf611c6dcacf8e21d2ff0833fbad8c6e9b9a33e8ccaa",
-    )
-    val summarySynthesizer = bundle(
-        role = MemoryMicroAgentRole.SummarySynthesizer,
-        slug = "06_summary_synthesizer",
-        sha256 = "a07b4adf7095e8078e7566146c68da8e997d11195c69f01f2a6ea426c26fc336",
-    )
-    val categoryClassifier = bundle(
-        role = MemoryMicroAgentRole.CategoryClassifier,
-        slug = "07_category_classifier",
-        sha256 = "73e0066f4062b8625cb80c8e4e919f502d790e39506079a42428f0afe1e3ad61",
-    )
-    val associationLinker = MemoryModelReleaseBundle(
-        role = MemoryMicroAgentRole.AssociationLinker,
-        releaseTag = RELEASE_TAG,
-        releaseAssetName = "haive-specialist_08_association_linker-onnx-epoch8.tar.gz",
-        releaseAssetSha256 = "8b348793dcee8201c4519cd846944b460c47aa85cadb5d434bb84bb088e11273",
-        runtimeArtifactId = "epoch8:08-association-linker:int8",
-        quantization = "int8",
-    )
-    val condensationRewriter = bundle(
-        role = MemoryMicroAgentRole.CondensationRewriter,
-        slug = "09_condensation_rewriter",
-        sha256 = "fe7c84731be909bbaa20f6297febc31eb78b8a9c9d5c8801d55e606526e8cec9",
-    )
+    val sectioner = bundle(MemoryMicroAgentRole.Sectioner)
+    val salience = bundle(MemoryMicroAgentRole.SalienceFilter)
+    val nounIndexer = bundle(MemoryMicroAgentRole.NounTagger)
+    val verbIndexer = bundle(MemoryMicroAgentRole.VerbTagger)
+    val phraseSynthesizer = bundle(MemoryMicroAgentRole.PhraseSynthesizer)
+    val summarySynthesizer = bundle(MemoryMicroAgentRole.SummarySynthesizer)
+    val categoryClassifier = bundle(MemoryMicroAgentRole.CategoryClassifier)
+    val associationLinker = bundle(MemoryMicroAgentRole.AssociationLinker)
+    val condensationRewriter = bundle(MemoryMicroAgentRole.CondensationRewriter)
 
     val all: List<MemoryModelReleaseBundle> = listOf(
         sectioner,
@@ -110,16 +79,15 @@ object MemoryEpoch8ModelCatalog {
         )
     }
 
-    private fun bundle(
-        role: MemoryMicroAgentRole,
-        slug: String,
-        sha256: String,
-    ): MemoryModelReleaseBundle = MemoryModelReleaseBundle(
-        role = role,
-        releaseTag = RELEASE_TAG,
-        releaseAssetName = "haive-specialist_$slug-int8-epoch8.tar.gz",
-        releaseAssetSha256 = sha256,
-        runtimeArtifactId = "epoch8:${slug.replace('_', '-')}:int8",
-        quantization = "int8",
-    )
+    private fun bundle(role: MemoryMicroAgentRole): MemoryModelReleaseBundle {
+        val artifact = MemoryEpoch8LocalModelLibrary.productionArtifactFor(role)
+        return MemoryModelReleaseBundle(
+            role = role,
+            releaseTag = artifact.releaseTag,
+            releaseAssetName = artifact.assetName,
+            releaseAssetSha256 = artifact.sha256,
+            runtimeArtifactId = artifact.logicalArtifactId,
+            quantization = artifact.precision ?: "int8",
+        )
+    }
 }
