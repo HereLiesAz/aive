@@ -79,6 +79,47 @@ mod tests {
     }
 
     #[test]
+    fn orchestrator_antennae_wrap_the_full_silhouette() {
+        let genome = generate_genome(RoleArchetype::Orchestrator, "orchestrator-radial");
+        let directions: Vec<(f32, f32)> = genome
+            .antennae
+            .iter()
+            .map(|antenna| {
+                let cos_elevation = antenna.elevation.cos();
+                (
+                    antenna.azimuth.cos() * cos_elevation,
+                    antenna.elevation.sin(),
+                )
+            })
+            .collect();
+        assert!(directions.iter().any(|(x, _)| *x > 0.55));
+        assert!(directions.iter().any(|(x, _)| *x < -0.55));
+        assert!(directions.iter().any(|(_, y)| *y > 0.55));
+        assert!(directions.iter().any(|(_, y)| *y < -0.55));
+    }
+
+    #[test]
+    fn semantic_roles_have_structurally_different_body_plans() {
+        let orchestrator = generate_genome(RoleArchetype::Orchestrator, "orchestrator");
+        let builder = generate_genome(RoleArchetype::Builder, "builder");
+        let tester = generate_genome(RoleArchetype::Tester, "tester");
+        let reviewer = generate_genome(RoleArchetype::Reviewer, "reviewer");
+
+        assert_eq!(orchestrator.arm_count, 0);
+        assert!(builder.arm_count >= 4);
+        assert!(tester
+            .antennae
+            .iter()
+            .any(|antenna| antenna.terminal == TerminalKind::Coil));
+        assert!(reviewer
+            .antennae
+            .iter()
+            .any(|antenna| matches!(antenna.terminal, TerminalKind::Loop | TerminalKind::Fork)));
+        assert_ne!(builder.body_radii, tester.body_radii);
+        assert_ne!(orchestrator.antennae, reviewer.antennae);
+    }
+
+    #[test]
     fn generation_is_deterministic_but_not_color_swap_identity() {
         let first = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
         let same = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
@@ -138,6 +179,33 @@ mod tests {
         assert_eq!(frame.terminal_anchors.len(), 7);
         assert!(frame.triangles.iter().any(|triangle| triangle.shade == 0));
         assert!(frame.triangles.iter().any(|triangle| triangle.shade == 2));
+        assert!(frame
+            .triangles
+            .iter()
+            .any(|triangle| triangle.material == MaterialClass::Eye));
+        assert!(frame
+            .triangles
+            .iter()
+            .any(|triangle| triangle.material == MaterialClass::Terminal));
+    }
+
+    #[test]
+    fn every_antenna_produces_a_real_graph_socket() {
+        for (label, role) in [
+            ("Orchestrator", RoleArchetype::Orchestrator),
+            ("Implementation Engineer", RoleArchetype::Builder),
+            ("Crash Test Dummy", RoleArchetype::Tester),
+            ("QA Engineer", RoleArchetype::Inspector),
+            ("Code Reviewer", RoleArchetype::Reviewer),
+        ] {
+            let genome = generate_genome(role, label);
+            let frame = render_creature(label, label, Activity::Active, 0.25, Camera::default());
+            assert_eq!(
+                frame.terminal_anchors.len(),
+                genome.antennae.len(),
+                "{label} lost a graph socket during render"
+            );
+        }
     }
 
     #[test]
