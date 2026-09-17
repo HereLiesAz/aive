@@ -46,7 +46,10 @@ pub extern "system" fn Java_com_hereliesaz_geministrator_inference_BitcosNativeB
         Ok(value) => value,
         Err(_) => return null_mut(),
     };
-    let bytes = decoded.into_iter().map(|value| value as u8).collect::<Vec<_>>();
+    let bytes = decoded
+        .into_iter()
+        .map(|value| value as u8)
+        .collect::<Vec<_>>();
     match env.byte_array_from_slice(&bytes) {
         Ok(array) => array.into_raw(),
         Err(_) => null_mut(),
