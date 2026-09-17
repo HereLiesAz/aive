@@ -12,10 +12,10 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out PR head
+      - name: Check out rustfmt repair branch
         uses: actions/checkout@v7
         with:
-          ref: refs/pull/284/head
+          ref: fix/node-creature-rustfmt
           fetch-depth: 0
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
@@ -24,6 +24,10 @@ jobs:
           cargo fmt --manifest-path native/node-creatures/Cargo.toml
           sed -i 's/{Activity, CreatureGenome, CreaturePose, RoleArchetype, TerminalKind}/{CreatureGenome, CreaturePose, RoleArchetype, TerminalKind}/' native/node-creatures/src/engine.rs
           cargo fmt --manifest-path native/node-creatures/Cargo.toml
+      - name: Verify renderer after formatting
+        run: |
+          cargo test --manifest-path native/node-creatures/Cargo.toml --all-targets
+          cargo fmt --manifest-path native/node-creatures/Cargo.toml -- --check
       - name: Commit formatted source
         run: |
           if git diff --quiet; then
@@ -33,4 +37,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add native/node-creatures/src/engine.rs native/node-creatures/src/genome.rs native/node-creatures/src/lib.rs
           git commit -m 'Format node creature engine'
-          git push origin HEAD:refs/heads/feature/node-creature-character-system
+          git push origin HEAD:fix/node-creature-rustfmt
