@@ -1,10 +1,10 @@
 # The Haive
 
-**The Haive** is a Compose Multiplatform control room for governed software-development workflows across people, agents, and automated executors.
+Back when ChatGPT hit the stage, before it was something OpenAI offered themselves, curious about hacking an LLM to get it to do things it wasn't supposed to, I remember being amazed by all the pseudo-GPTs and what they were able to do. Gemini popped out shortly after, having been called Bard, and it's what I had access to. Google's Agent Development Kit wasn't even heard of back then, and this project started as a way to get LLMs to legitimately talk to themselves. And with those pseudo-GPTs in mind, the idea of chaining them together to follow a production workflow came out. 
 
-> The Haive is not an agent. It is the company that hires agents.
+This project was abandoned until TMux Orchestrator hit the scene, and I realized I'd missed out on bringing that idea to life. Then the ADK hit (weirdly softly) and I picked it up again, under the name Geministrator. And Google released Jules, so I assumed there wasn't much need for this idea, turning it into what became IDEaz. But I guess I'm just slow, because immediately after I restarted, all sorts of apps like IDEaz came out, so that was abandoned too. 
 
-The Haive turns an objective into an explicit workflow, staffs or assigns its work, watches the run, enforces gates and verification, and keeps execution observable and resumable.
+Come to find out, both are now entire markets of their own, with very valuable companies in both. Shoulda stuck with it. So I've begun again--no time like the present and all--first building Geministrator into The Haive, and later I'll pick up IDEaz again.
 
 ## What it is
 
