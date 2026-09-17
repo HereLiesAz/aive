@@ -28,7 +28,16 @@ class WorkflowDefinitionPreparer(
         repository: RepositoryRef? = null,
     ): WorkflowDefinition {
         val withTestDesign = WorkflowDefinitionExpander.expand(definition, activeRoles)
-        val withCompoundInference = CentralizedMixtureOfAgentsExpander.expand(withTestDesign, activeRoles)
+        val withSelectedInferenceTopology = ResourceAwareCompoundInferencePolicyResolver.resolve(
+            definition = withTestDesign,
+            roles = activeRoles,
+            providerRegistry = providerRegistry,
+            repository = repository,
+        )
+        val withCompoundInference = CentralizedMixtureOfAgentsExpander.expand(
+            withSelectedInferenceTopology,
+            activeRoles,
+        )
         val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }
         val prepared = buildList {
             for (task in withCompoundInference.tasks) {
