@@ -66,7 +66,7 @@ android {
     }
 
     // AGP 9.4 no longer permits Provider instances through the legacy SourceSet API.
-    // Resolve only deterministic build-directory paths here; preBuild below carries task dependencies.
+    // Resolve only deterministic build-directory paths here; task dependencies are declared below.
     sourceSets.getByName("main").apply {
         res.srcDir(generatedAndroidBrandResDir.get().asFile)
         jniLibs.srcDir(generatedAndroidNodeJniDir.get().asFile)
@@ -102,7 +102,15 @@ android {
 }
 
 tasks.named("preBuild") {
-    dependsOn(generateAndroidBrandAssets, buildAndroidNodeCreatureNative)
+    dependsOn(generateAndroidBrandAssets)
+}
+
+// Building/testing shared Kotlin does not require Rust. The Rust cross-build is required exactly
+// when AGP assembles native libraries into an Android package.
+tasks.matching { task ->
+    task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
+}.configureEach {
+    dependsOn(buildAndroidNodeCreatureNative)
 }
 
 dependencies {
