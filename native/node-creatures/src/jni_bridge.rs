@@ -13,7 +13,9 @@ pub extern "system" fn Java_com_hereliesaz_geministrator_NodeCreatureNativeBridg
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_hereliesaz_geministrator_NodeCreatureNativeBridge_renderPacket<'local>(
+pub extern "system" fn Java_com_hereliesaz_geministrator_NodeCreatureNativeBridge_renderPacket<
+    'local,
+>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     role: JString<'local>,

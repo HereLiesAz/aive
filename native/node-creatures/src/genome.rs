@@ -71,19 +71,40 @@ pub struct CreaturePose {
 
 pub fn role_from_label(label: &str) -> RoleArchetype {
     let normalized = label.to_ascii_lowercase();
-    if normalized.contains("orchestrat") || normalized.contains("queen") || normalized.contains("swarm lead") {
+    if normalized.contains("orchestrat")
+        || normalized.contains("queen")
+        || normalized.contains("swarm lead")
+    {
         RoleArchetype::Orchestrator
-    } else if normalized.contains("qa") || normalized.contains("quality") || normalized.contains("verif") || normalized.contains("inspect") {
+    } else if normalized.contains("qa")
+        || normalized.contains("quality")
+        || normalized.contains("verif")
+        || normalized.contains("inspect")
+    {
         RoleArchetype::Inspector
     } else if normalized.contains("review") {
         RoleArchetype::Reviewer
-    } else if normalized.contains("crash") || normalized.contains("dummy") || normalized.contains("test") {
+    } else if normalized.contains("crash")
+        || normalized.contains("dummy")
+        || normalized.contains("test")
+    {
         RoleArchetype::Tester
-    } else if normalized.contains("implement") || normalized.contains("build") || normalized.contains("develop") || normalized.contains("coder") || normalized.contains("engineer") {
+    } else if normalized.contains("implement")
+        || normalized.contains("build")
+        || normalized.contains("develop")
+        || normalized.contains("coder")
+        || normalized.contains("engineer")
+    {
         RoleArchetype::Builder
-    } else if normalized.contains("plan") || normalized.contains("coordinat") || normalized.contains("decompos") {
+    } else if normalized.contains("plan")
+        || normalized.contains("coordinat")
+        || normalized.contains("decompos")
+    {
         RoleArchetype::Planner
-    } else if normalized.contains("research") || normalized.contains("analyst") || normalized.contains("investigat") {
+    } else if normalized.contains("research")
+        || normalized.contains("analyst")
+        || normalized.contains("investigat")
+    {
         RoleArchetype::Researcher
     } else {
         RoleArchetype::Generic
@@ -160,9 +181,8 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
     let antennae = (0..antenna_count)
         .map(|index| {
             let jitter = rng.f32();
-            let azimuth = base_rotation
-                + index as f32 / antenna_count as f32 * TAU
-                + (jitter - 0.5) * 0.22;
+            let azimuth =
+                base_rotation + index as f32 / antenna_count as f32 * TAU + (jitter - 0.5) * 0.22;
             let elevation = match role {
                 RoleArchetype::Orchestrator => -0.28 + rng.range(-0.18, 0.24),
                 RoleArchetype::Builder => -0.10 + rng.range(-0.24, 0.18),
@@ -314,10 +334,18 @@ pub fn animate(genome: &CreatureGenome, activity: Activity, time_seconds: f32) -
 fn terminal_for(role: RoleArchetype, index: usize) -> TerminalKind {
     match role {
         RoleArchetype::Orchestrator => {
-            if index % 3 == 0 { TerminalKind::Probe } else { TerminalKind::Node }
+            if index % 3 == 0 {
+                TerminalKind::Probe
+            } else {
+                TerminalKind::Node
+            }
         }
         RoleArchetype::Builder => {
-            if index % 2 == 0 { TerminalKind::Clamp } else { TerminalKind::Node }
+            if index % 2 == 0 {
+                TerminalKind::Clamp
+            } else {
+                TerminalKind::Node
+            }
         }
         RoleArchetype::Tester => match index % 3 {
             0 => TerminalKind::Coil,
@@ -325,7 +353,11 @@ fn terminal_for(role: RoleArchetype, index: usize) -> TerminalKind {
             _ => TerminalKind::Node,
         },
         RoleArchetype::Inspector => {
-            if index % 2 == 0 { TerminalKind::Probe } else { TerminalKind::Node }
+            if index % 2 == 0 {
+                TerminalKind::Probe
+            } else {
+                TerminalKind::Node
+            }
         }
         RoleArchetype::Reviewer => match index % 3 {
             0 => TerminalKind::Loop,
@@ -333,10 +365,18 @@ fn terminal_for(role: RoleArchetype, index: usize) -> TerminalKind {
             _ => TerminalKind::Node,
         },
         RoleArchetype::Planner => {
-            if index % 2 == 0 { TerminalKind::Fork } else { TerminalKind::Node }
+            if index % 2 == 0 {
+                TerminalKind::Fork
+            } else {
+                TerminalKind::Node
+            }
         }
         RoleArchetype::Researcher => {
-            if index == 0 { TerminalKind::Loop } else { TerminalKind::Probe }
+            if index == 0 {
+                TerminalKind::Loop
+            } else {
+                TerminalKind::Probe
+            }
         }
         RoleArchetype::Generic => match index % 6 {
             0 => TerminalKind::Node,

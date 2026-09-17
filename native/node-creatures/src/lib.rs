@@ -41,20 +41,14 @@ mod tests {
 
     #[test]
     fn role_mapping_matches_visual_grammar() {
-        assert_eq!(
-            role_from_label("Orchestrator"),
-            RoleArchetype::Orchestrator
-        );
+        assert_eq!(role_from_label("Orchestrator"), RoleArchetype::Orchestrator);
         assert_eq!(
             role_from_label("Implementation Engineer"),
             RoleArchetype::Builder
         );
         assert_eq!(role_from_label("Crash Test Dummy"), RoleArchetype::Tester);
         assert_eq!(role_from_label("QA Engineer"), RoleArchetype::Inspector);
-        assert_eq!(
-            role_from_label("Code Reviewer"),
-            RoleArchetype::Reviewer
-        );
+        assert_eq!(role_from_label("Code Reviewer"), RoleArchetype::Reviewer);
         assert_eq!(role_from_label("Task Planner"), RoleArchetype::Planner);
         assert_eq!(
             role_from_label("Research Analyst"),
@@ -127,12 +121,7 @@ mod tests {
         let active = animate(&genome, Activity::Active, 0.33);
         let blocked = animate(&genome, Activity::Blocked, 0.33);
         assert_ne!(active.antenna_bend, blocked.antenna_bend);
-        assert!(
-            blocked
-                .antenna_bend
-                .iter()
-                .any(|value| value.abs() > 0.20)
-        );
+        assert!(blocked.antenna_bend.iter().any(|value| value.abs() > 0.20));
     }
 
     #[test]

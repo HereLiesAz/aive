@@ -67,10 +67,26 @@ pub struct Vec3 {
 }
 
 impl Vec3 {
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
-    pub const X: Self = Self { x: 1.0, y: 0.0, z: 0.0 };
-    pub const Y: Self = Self { x: 0.0, y: 1.0, z: 0.0 };
-    pub const Z: Self = Self { x: 0.0, y: 0.0, z: 1.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     pub const fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -155,15 +171,27 @@ impl Neg for Vec3 {
 pub fn rotate_xyz(mut value: Vec3, rotation: Vec3) -> Vec3 {
     if rotation.x != 0.0 {
         let (sin, cos) = rotation.x.sin_cos();
-        value = Vec3::new(value.x, value.y * cos - value.z * sin, value.y * sin + value.z * cos);
+        value = Vec3::new(
+            value.x,
+            value.y * cos - value.z * sin,
+            value.y * sin + value.z * cos,
+        );
     }
     if rotation.y != 0.0 {
         let (sin, cos) = rotation.y.sin_cos();
-        value = Vec3::new(value.x * cos + value.z * sin, value.y, -value.x * sin + value.z * cos);
+        value = Vec3::new(
+            value.x * cos + value.z * sin,
+            value.y,
+            -value.x * sin + value.z * cos,
+        );
     }
     if rotation.z != 0.0 {
         let (sin, cos) = rotation.z.sin_cos();
-        value = Vec3::new(value.x * cos - value.y * sin, value.x * sin + value.y * cos, value.z);
+        value = Vec3::new(
+            value.x * cos - value.y * sin,
+            value.x * sin + value.y * cos,
+            value.z,
+        );
     }
     value
 }

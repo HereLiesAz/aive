@@ -159,7 +159,8 @@ pub fn terminal_anchor_toward(frame: &RenderFrame, toward: Vec2) -> Vec2 {
         .copied()
         .max_by(|left, right| {
             let left_score = left.normalized().x * direction.x + left.normalized().y * direction.y;
-            let right_score = right.normalized().x * direction.x + right.normalized().y * direction.y;
+            let right_score =
+                right.normalized().x * direction.x + right.normalized().y * direction.y;
             left_score.total_cmp(&right_score)
         })
         .unwrap_or(Vec2::ZERO)
@@ -279,9 +280,29 @@ fn add_antennae(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
         let length = antenna.length + pose.antenna_extension.get(index).copied().unwrap_or(0.0);
         let mid = body_surface + direction * (length * 0.52) + tangent * (bend * 0.42);
         let tip = body_surface + direction * length + tangent * bend;
-        add_tube(mesh, body_surface, mid, antenna.radius, 6, MaterialClass::Accent);
-        add_tube(mesh, mid, tip, antenna.radius * 0.90, 6, MaterialClass::Accent);
-        add_terminal(mesh, tip, direction, antenna.terminal, antenna.radius * 2.35);
+        add_tube(
+            mesh,
+            body_surface,
+            mid,
+            antenna.radius,
+            6,
+            MaterialClass::Accent,
+        );
+        add_tube(
+            mesh,
+            mid,
+            tip,
+            antenna.radius * 0.90,
+            6,
+            MaterialClass::Accent,
+        );
+        add_terminal(
+            mesh,
+            tip,
+            direction,
+            antenna.terminal,
+            antenna.radius * 2.35,
+        );
         mesh.terminal_points.push(tip);
     }
 }
@@ -354,7 +375,8 @@ fn add_disc(
     for side in 0..sides {
         let angle = TAU * side as f32 / sides as f32;
         ring.push(mesh.vertices.len());
-        mesh.vertices.push(center + Vec3::new(radius_x * angle.cos(), radius_y * angle.sin(), 0.012));
+        mesh.vertices
+            .push(center + Vec3::new(radius_x * angle.cos(), radius_y * angle.sin(), 0.012));
     }
     for side in 0..sides {
         mesh.faces.push(Face {
@@ -376,7 +398,11 @@ fn add_tube(
     if axis.length() <= f32::EPSILON {
         return;
     }
-    let reference = if axis.z.abs() < 0.86 { Vec3::Z } else { Vec3::Y };
+    let reference = if axis.z.abs() < 0.86 {
+        Vec3::Z
+    } else {
+        Vec3::Y
+    };
     let basis_a = axis.cross(reference).normalized();
     let basis_b = axis.cross(basis_a).normalized();
     let mut start_ring = Vec::with_capacity(sides);
@@ -417,13 +443,41 @@ fn add_terminal(mesh: &mut Mesh, center: Vec3, direction: Vec3, kind: TerminalKi
         }
         TerminalKind::Clamp => {
             let tangent = direction.cross(Vec3::Y).normalized();
-            add_tube(mesh, center, center + direction * radius * 1.45 + tangent * radius, radius * 0.28, 5, material);
-            add_tube(mesh, center, center + direction * radius * 1.45 - tangent * radius, radius * 0.28, 5, material);
+            add_tube(
+                mesh,
+                center,
+                center + direction * radius * 1.45 + tangent * radius,
+                radius * 0.28,
+                5,
+                material,
+            );
+            add_tube(
+                mesh,
+                center,
+                center + direction * radius * 1.45 - tangent * radius,
+                radius * 0.28,
+                5,
+                material,
+            );
         }
         TerminalKind::Fork => {
             let tangent = direction.cross(Vec3::Z).normalized();
-            add_tube(mesh, center, center + direction * radius * 1.35 + tangent * radius * 0.82, radius * 0.24, 5, material);
-            add_tube(mesh, center, center + direction * radius * 1.35 - tangent * radius * 0.82, radius * 0.24, 5, material);
+            add_tube(
+                mesh,
+                center,
+                center + direction * radius * 1.35 + tangent * radius * 0.82,
+                radius * 0.24,
+                5,
+                material,
+            );
+            add_tube(
+                mesh,
+                center,
+                center + direction * radius * 1.35 - tangent * radius * 0.82,
+                radius * 0.24,
+                5,
+                material,
+            );
         }
         TerminalKind::Loop => {
             let tangent = direction.cross(Vec3::Y).normalized();
@@ -432,7 +486,8 @@ fn add_terminal(mesh: &mut Mesh, center: Vec3, direction: Vec3, kind: TerminalKi
             let mut previous = center + tangent * radius;
             for segment in 1..=segments {
                 let angle = TAU * segment as f32 / segments as f32;
-                let next = center + tangent * angle.cos() * radius + bitangent * angle.sin() * radius;
+                let next =
+                    center + tangent * angle.cos() * radius + bitangent * angle.sin() * radius;
                 add_tube(mesh, previous, next, radius * 0.20, 5, material);
                 previous = next;
             }
@@ -444,7 +499,11 @@ fn transform_model_point(point: Vec3, pose: &CreaturePose) -> Vec3 {
     rotate_xyz(point.component_mul(pose.body_scale), pose.body_rotation) + pose.body_offset
 }
 
-fn extract_silhouette_edges(mesh: &Mesh, transformed: &[Vec3], projected: &[Vec2]) -> Vec<RenderEdge> {
+fn extract_silhouette_edges(
+    mesh: &Mesh,
+    transformed: &[Vec3],
+    projected: &[Vec2],
+) -> Vec<RenderEdge> {
     #[derive(Clone, Copy, Debug, Default)]
     struct EdgeInfo {
         front: usize,
@@ -465,7 +524,11 @@ fn extract_silhouette_edges(mesh: &Mesh, transformed: &[Vec3], projected: &[Vec2
             (face.indices[1], face.indices[2]),
             (face.indices[2], face.indices[0]),
         ] {
-            let key = if left < right { (left, right) } else { (right, left) };
+            let key = if left < right {
+                (left, right)
+            } else {
+                (right, left)
+            };
             let entry = edges.entry(key).or_default();
             if front_facing {
                 entry.front += 1;
