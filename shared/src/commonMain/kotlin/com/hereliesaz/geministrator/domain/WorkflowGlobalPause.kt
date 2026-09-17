@@ -26,6 +26,9 @@ data class PausedTaskSnapshot(
  * is cancelled before the pause is committed and is re-dispatched as a retry after resume. The
  * optional provider/run IDs below belong only to the governance-side Orchestrator review, which may
  * continue while the ordinary workflow is globally paused.
+ *
+ * [solutionTrials] are isolated counterfactual runs launched while this source run remains paused.
+ * They never replace the source run or count as approval of a recommendation.
  */
 @Serializable
 data class WorkflowGlobalPause(
@@ -39,6 +42,7 @@ data class WorkflowGlobalPause(
     val pausedAtEpochMillis: Long,
     val orchestratorReviewProviderId: AgentProviderId? = null,
     val orchestratorReviewProviderRunId: ProviderRunId? = null,
+    val solutionTrials: List<HallMonitorSolutionTrial> = emptyList(),
 ) {
     init {
         require(reason.isNotBlank()) { "Global pause reason must not be blank" }
@@ -48,5 +52,11 @@ data class WorkflowGlobalPause(
         require(
             (orchestratorReviewProviderId == null) == (orchestratorReviewProviderRunId == null),
         ) { "Orchestrator review provider and run IDs must be present together" }
+        require(solutionTrials.map { it.id }.distinct().size == solutionTrials.size) {
+            "Hall Monitor solution trial ids must be unique"
+        }
+        require(solutionTrials.map { it.workflowRunId }.distinct().size == solutionTrials.size) {
+            "Hall Monitor solution trial workflow runs must be unique"
+        }
     }
 }
