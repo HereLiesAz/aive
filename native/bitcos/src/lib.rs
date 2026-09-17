@@ -20,9 +20,14 @@ pub enum BitcosError {
 impl fmt::Display for BitcosError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidTernary(value) => write!(f, "invalid ternary value {value}; expected -1, 0, or +1"),
+            Self::InvalidTernary(value) => {
+                write!(f, "invalid ternary value {value}; expected -1, 0, or +1")
+            }
             Self::ShapeMismatch { expected, actual } => {
-                write!(f, "tensor shape contains {expected} elements but input has {actual}")
+                write!(
+                    f,
+                    "tensor shape contains {expected} elements but input has {actual}"
+                )
             }
             Self::InvalidContainer(message) => write!(f, "invalid BITCOS container: {message}"),
             Self::InvalidUtf8 => write!(f, "invalid UTF-8 tensor name"),
@@ -92,11 +97,7 @@ impl BitcosPayload {
     }
 
     pub fn decode(&self) -> Result<Vec<i8>, BitcosError> {
-        decode_payload(
-            self.element_count,
-            &self.presence,
-            &self.signs,
-        )
+        decode_payload(self.element_count, &self.presence, &self.signs)
     }
 
     pub fn dot_i8(&self, activations: &[i8]) -> Result<i64, BitcosError> {
@@ -140,11 +141,7 @@ pub struct BitcosTensorView<'a> {
 
 impl<'a> BitcosTensorView<'a> {
     pub fn decode(&self) -> Result<Vec<i8>, BitcosError> {
-        decode_payload(
-            self.metadata.element_count,
-            self.presence,
-            self.signs,
-        )
+        decode_payload(self.metadata.element_count, self.presence, self.signs)
     }
 
     pub fn dot_i8(&self, activations: &[i8]) -> Result<i64, BitcosError> {
@@ -210,14 +207,18 @@ impl<'a> BitcosContainer<'a> {
             .checked_add(directory_len)
             .ok_or(BitcosError::InvalidContainer("directory length overflow"))?;
         if directory_end > bytes.len() || data_offset < directory_end || data_offset > bytes.len() {
-            return Err(BitcosError::InvalidContainer("directory/data range is invalid"));
+            return Err(BitcosError::InvalidContainer(
+                "directory/data range is invalid",
+            ));
         }
 
         let mut cursor = directory_offset;
         let mut tensors = Vec::with_capacity(tensor_count);
         for _ in 0..tensor_count {
             if cursor + DIRECTORY_FIXED_LEN > directory_end {
-                return Err(BitcosError::InvalidContainer("tensor directory entry is truncated"));
+                return Err(BitcosError::InvalidContainer(
+                    "tensor directory entry is truncated",
+                ));
             }
 
             let name_len = read_u16(bytes, cursor)? as usize;
@@ -225,12 +226,16 @@ impl<'a> BitcosContainer<'a> {
             let group_size = read_u32(bytes, cursor + 4)?;
             let scale_bits = read_u16(bytes, cursor + 8)?;
             if !matches!(scale_bits, 0 | 16) {
-                return Err(BitcosError::InvalidContainer("only absent or fp16 scales are supported"));
+                return Err(BitcosError::InvalidContainer(
+                    "only absent or fp16 scales are supported",
+                ));
             }
             let element_count = read_u64(bytes, cursor + 12)?;
             let nonzero_count = read_u64(bytes, cursor + 20)?;
             if nonzero_count > element_count {
-                return Err(BitcosError::InvalidContainer("nonzero count exceeds element count"));
+                return Err(BitcosError::InvalidContainer(
+                    "nonzero count exceeds element count",
+                ));
             }
             let presence_offset = read_u64(bytes, cursor + 28)? as usize;
             let presence_len = read_u64(bytes, cursor + 36)? as usize;
@@ -244,7 +249,9 @@ impl<'a> BitcosContainer<'a> {
                 .checked_mul(8)
                 .ok_or(BitcosError::InvalidContainer("rank overflow"))?;
             if cursor + dims_len + name_len > directory_end {
-                return Err(BitcosError::InvalidContainer("tensor metadata exceeds directory"));
+                return Err(BitcosError::InvalidContainer(
+                    "tensor metadata exceeds directory",
+                ));
             }
             let mut shape = Vec::with_capacity(rank);
             for _ in 0..rank {
@@ -259,16 +266,24 @@ impl<'a> BitcosContainer<'a> {
 
             let expected_elements = checked_shape_product(&shape)?;
             if expected_elements != element_count {
-                return Err(BitcosError::InvalidContainer("shape does not match element count"));
+                return Err(BitcosError::InvalidContainer(
+                    "shape does not match element count",
+                ));
             }
             if presence_len != (element_count as usize).div_ceil(8) {
-                return Err(BitcosError::InvalidContainer("presence length does not match element count"));
+                return Err(BitcosError::InvalidContainer(
+                    "presence length does not match element count",
+                ));
             }
             if signs_len != (nonzero_count as usize).div_ceil(8) {
-                return Err(BitcosError::InvalidContainer("sign length does not match nonzero count"));
+                return Err(BitcosError::InvalidContainer(
+                    "sign length does not match nonzero count",
+                ));
             }
             if scale_bits == 16 && scales_len % 2 != 0 {
-                return Err(BitcosError::InvalidContainer("fp16 scale payload has odd byte length"));
+                return Err(BitcosError::InvalidContainer(
+                    "fp16 scale payload has odd byte length",
+                ));
             }
 
             let presence = checked_slice(bytes, presence_offset, presence_len, data_offset)?;
@@ -291,14 +306,18 @@ impl<'a> BitcosContainer<'a> {
         }
 
         if cursor != directory_end {
-            return Err(BitcosError::InvalidContainer("directory has trailing bytes"));
+            return Err(BitcosError::InvalidContainer(
+                "directory has trailing bytes",
+            ));
         }
 
         Ok(Self { tensors })
     }
 
     pub fn tensor(&self, name: &str) -> Option<&BitcosTensorView<'a>> {
-        self.tensors.iter().find(|tensor| tensor.metadata.name == name)
+        self.tensors
+            .iter()
+            .find(|tensor| tensor.metadata.name == name)
     }
 }
 
@@ -315,7 +334,9 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
             });
         }
         if tensor.scales_f16_le.len() % 2 != 0 {
-            return Err(BitcosError::InvalidContainer("fp16 scale payload has odd byte length"));
+            return Err(BitcosError::InvalidContainer(
+                "fp16 scale payload has odd byte length",
+            ));
         }
         let payload = BitcosPayload::pack(&tensor.weights)?;
         directory_len = directory_len
@@ -354,7 +375,11 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
         write_u32(&mut directory, tensor.group_size);
         write_u16(
             &mut directory,
-            if tensor.scales_f16_le.is_empty() { 0 } else { 16 },
+            if tensor.scales_f16_le.is_empty() {
+                0
+            } else {
+                16
+            },
         );
         write_u16(&mut directory, 0);
         write_u64(&mut directory, payload.element_count);
@@ -365,12 +390,17 @@ pub fn encode_container(tensors: &[BitcosTensorInput]) -> Result<Vec<u8>, Bitcos
         write_u64(&mut directory, signs_len);
         write_u64(&mut directory, scales_offset);
         write_u64(&mut directory, scales_len);
-        tensor.shape.iter().for_each(|&dim| write_u64(&mut directory, dim));
+        tensor
+            .shape
+            .iter()
+            .for_each(|&dim| write_u64(&mut directory, dim));
         directory.extend_from_slice(tensor.name.as_bytes());
     }
 
     if directory.len() != directory_len {
-        return Err(BitcosError::InvalidContainer("internal directory size mismatch"));
+        return Err(BitcosError::InvalidContainer(
+            "internal directory size mismatch",
+        ));
     }
 
     let mut output = Vec::with_capacity(data_offset + data.len());
@@ -540,11 +570,7 @@ unsafe fn decode_payload_bmi2(
     Ok(())
 }
 
-fn validate_payload(
-    element_count: u64,
-    presence: &[u8],
-    signs: &[u8],
-) -> Result<(), BitcosError> {
+fn validate_payload(element_count: u64, presence: &[u8], signs: &[u8]) -> Result<(), BitcosError> {
     let expected_presence = (element_count as usize).div_ceil(8);
     if presence.len() != expected_presence {
         return Err(BitcosError::InvalidContainer("presence length mismatch"));
@@ -604,11 +630,15 @@ fn read_bits_u64(bytes: &[u8], bit_offset: u64) -> u64 {
 
 fn checked_shape_product(shape: &[u64]) -> Result<u64, BitcosError> {
     if shape.is_empty() {
-        return Err(BitcosError::InvalidContainer("tensor rank must be at least one"));
+        return Err(BitcosError::InvalidContainer(
+            "tensor rank must be at least one",
+        ));
     }
     shape.iter().try_fold(1u64, |product, &dim| {
         if dim == 0 {
-            return Err(BitcosError::InvalidContainer("tensor dimensions must be non-zero"));
+            return Err(BitcosError::InvalidContainer(
+                "tensor dimensions must be non-zero",
+            ));
         }
         product
             .checked_mul(dim)
@@ -623,11 +653,15 @@ fn checked_slice<'a>(
     minimum_offset: usize,
 ) -> Result<&'a [u8], BitcosError> {
     if offset < minimum_offset {
-        return Err(BitcosError::InvalidContainer("tensor payload overlaps metadata"));
+        return Err(BitcosError::InvalidContainer(
+            "tensor payload overlaps metadata",
+        ));
     }
     let end = offset
         .checked_add(len)
-        .ok_or(BitcosError::InvalidContainer("tensor payload length overflow"))?;
+        .ok_or(BitcosError::InvalidContainer(
+            "tensor payload length overflow",
+        ))?;
     bytes
         .get(offset..end)
         .ok_or(BitcosError::InvalidContainer("tensor payload is truncated"))
