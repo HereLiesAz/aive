@@ -1,0 +1,129 @@
+mod engine;
+mod genome;
+mod math;
+
+pub use engine::{
+    build_mesh, project_mesh, terminal_anchor_toward, Camera, MaterialClass, Mesh, RenderEdge,
+    RenderFrame, RenderTriangle,
+};
+pub use genome::{
+    activity_verb, animate, generate_genome, role_from_label, Activity, AntennaGenome,
+    CreatureGenome, CreaturePose, RoleArchetype, TerminalKind,
+};
+pub use math::{Vec2, Vec3};
+
+/// Full deterministic render pass for one node creature.
+///
+/// This is intentionally UI-toolkit agnostic. Platform adapters may rasterize the returned vector
+/// packet with Skia, Canvas2D, WebGL/WebGPU, or a native GPU surface without changing creature
+/// generation or animation semantics.
+pub fn render_creature(
+    role_label: &str,
+    identity_seed: &str,
+    activity: Activity,
+    time_seconds: f32,
+    camera: Camera,
+) -> RenderFrame {
+    let role = role_from_label(role_label);
+    let genome = generate_genome(role, identity_seed);
+    let pose = animate(&genome, activity, time_seconds);
+    let mesh = build_mesh(&genome, &pose);
+    project_mesh(&mesh, camera)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_mapping_matches_visual_grammar() {
+        assert_eq!(role_from_label("Orchestrator"), RoleArchetype::Orchestrator);
+        assert_eq!(role_from_label("Implementation Engineer"), RoleArchetype::Builder);
+        assert_eq!(role_from_label("Crash Test Dummy"), RoleArchetype::Tester);
+        assert_eq!(role_from_label("QA Engineer"), RoleArchetype::Inspector);
+        assert_eq!(role_from_label("Code Reviewer"), RoleArchetype::Reviewer);
+        assert_eq!(role_from_label("Task Planner"), RoleArchetype::Planner);
+        assert_eq!(role_from_label("Research Analyst"), RoleArchetype::Researcher);
+    }
+
+    #[test]
+    fn every_creature_has_three_to_ten_antennae() {
+        let roles = [
+            RoleArchetype::Orchestrator,
+            RoleArchetype::Builder,
+            RoleArchetype::Tester,
+            RoleArchetype::Inspector,
+            RoleArchetype::Reviewer,
+            RoleArchetype::Planner,
+            RoleArchetype::Researcher,
+            RoleArchetype::Generic,
+        ];
+        for (index, role) in roles.into_iter().enumerate() {
+            let genome = generate_genome(role, &format!("role-{index}"));
+            assert!(
+                (3..=10).contains(&genome.antennae.len()),
+                "{role:?} produced {} antennae",
+                genome.antennae.len()
+            );
+        }
+    }
+
+    #[test]
+    fn generation_is_deterministic_but_not_color_swap_identity() {
+        let first = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
+        let same = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
+        let other = generate_genome(RoleArchetype::Reviewer, "reviewer-b");
+        assert_eq!(first, same);
+        assert_ne!(first.antennae, other.antennae);
+    }
+
+    #[test]
+    fn active_role_exposes_semantic_work_verb() {
+        assert_eq!(activity_verb(RoleArchetype::Orchestrator, Activity::Active), "ROUTING");
+        assert_eq!(activity_verb(RoleArchetype::Builder, Activity::Active), "BUILDING");
+        assert_eq!(activity_verb(RoleArchetype::Tester, Activity::Active), "STRESS-TESTING");
+        assert_eq!(activity_verb(RoleArchetype::Inspector, Activity::Active), "VERIFYING");
+        assert_eq!(activity_verb(RoleArchetype::Reviewer, Activity::Active), "REVIEWING");
+        assert_eq!(activity_verb(RoleArchetype::Reviewer, Activity::Blocked), "BLOCKED");
+    }
+
+    #[test]
+    fn blocked_reviewer_physically_changes_antenna_pose() {
+        let genome = generate_genome(RoleArchetype::Reviewer, "reviewer");
+        let active = animate(&genome, Activity::Active, 0.33);
+        let blocked = animate(&genome, Activity::Blocked, 0.33);
+        assert_ne!(active.antenna_bend, blocked.antenna_bend);
+        assert!(blocked.antenna_bend.iter().any(|value| value.abs() > 0.20));
+    }
+
+    #[test]
+    fn render_packet_is_actual_projected_3d_geometry() {
+        let frame = render_creature(
+            "QA Engineer",
+            "qa-01",
+            Activity::Active,
+            0.42,
+            Camera::default(),
+        );
+        assert!(frame.triangles.len() > 100);
+        assert!(!frame.silhouette_edges.is_empty());
+        assert_eq!(frame.terminal_anchors.len(), 7);
+        assert!(frame.triangles.iter().any(|triangle| triangle.shade == 0));
+        assert!(frame.triangles.iter().any(|triangle| triangle.shade == 2));
+    }
+
+    #[test]
+    fn graph_links_choose_real_antenna_terminals() {
+        let frame = render_creature(
+            "Implementation Engineer",
+            "builder-01",
+            Activity::Active,
+            0.0,
+            Camera::default(),
+        );
+        let right = terminal_anchor_toward(&frame, Vec2::new(1.0, 0.0));
+        let left = terminal_anchor_toward(&frame, Vec2::new(-1.0, 0.0));
+        assert!(right.x > 0.0);
+        assert!(left.x < 0.0);
+    }
+}
