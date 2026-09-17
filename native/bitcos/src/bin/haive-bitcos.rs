@@ -176,7 +176,13 @@ fn unpack(input_path: &Path, output_dir: &Path) -> Result<(), Box<dyn std::error
             .metadata
             .name
             .chars()
-            .map(|ch| if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') { ch } else { '_' })
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                    ch
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>();
         let weights = tensor
             .decode()?
