@@ -70,7 +70,10 @@ jobs:
           test -f webApp/build/terrarium-proof/haive_node_creatures.wasm
 
       - name: Install Chromium for visual proof
-        run: npx --yes playwright@1.55.0 install --with-deps chromium
+        shell: bash
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
 
       - name: Capture and verify real Rust-rendered terrarium
         shell: bash
@@ -90,7 +93,7 @@ jobs:
           done
 
           mkdir -p visual-proof
-          cat > /tmp/haive-terrarium-proof.mjs <<'JS'
+          cat > visual-proof/haive-terrarium-proof.mjs <<'JS'
           import { chromium } from 'playwright';
 
           const browser = await chromium.launch({ headless: true });
@@ -136,7 +139,7 @@ jobs:
           }
           JS
 
-          if ! npx --yes --package playwright@1.55.0 node /tmp/haive-terrarium-proof.mjs; then
+          if ! node visual-proof/haive-terrarium-proof.mjs; then
             echo "=== HTTP server log ==="
             cat /tmp/haive-terrarium-http.log || true
             echo "=== Staged files ==="
