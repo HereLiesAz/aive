@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.JsAny
 
 private external object HaiveNodeCreatures : JsAny {
@@ -18,7 +19,7 @@ private external object HaiveNodeCreatures : JsAny {
     ): String
 }
 
-@OptIn(ExperimentalEncodingApi::class)
+@OptIn(ExperimentalEncodingApi::class, ExperimentalWasmJsInterop::class)
 internal actual fun platformNodeCreatureRenderEngine(): NodeCreatureRenderEngine? =
     NodeCreatureRenderEngine { request ->
         check(HaiveNodeCreatures.ready) { "Rust node-creature renderer is still initializing." }
