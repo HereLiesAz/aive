@@ -32,6 +32,7 @@ class WorkflowRuntimeCoordinator(
     private val engine: WorkflowEngine,
     private val sessionGateway: ManagedSessionGateway,
     private val executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
+    private val remoteComputeCoordinator: RemoteComputeCoordinator? = null,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -114,6 +115,7 @@ class WorkflowRuntimeCoordinator(
         }
 
         nextRun = recoverAvailableSystemExecutors(definition, nextRun, nowEpochMillis)
+        nextRun = reconcileRemoteCompute(project, definition, nextRun, nowEpochMillis)
         ensureMissingFailureEscalationGates(nextRun, nowEpochMillis)
         ensurePlanApprovalGates(definition, nextRun, nowEpochMillis)
 
@@ -209,6 +211,7 @@ class WorkflowRuntimeCoordinator(
             )
         }
 
+        nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
         nextRun = blockUnavailableSystemExecutors(definition, nextRun, nowEpochMillis)
         ensurePlanApprovalGates(definition, nextRun, nowEpochMillis)
 
@@ -506,6 +509,7 @@ class WorkflowRuntimeCoordinator(
             if (taskRun.status != TaskRunStatus.Running && taskRun.status != TaskRunStatus.Verifying) {
                 continue
             }
+            if (remoteComputeCoordinator?.owns(taskRun) == true) continue
             val task = tasks[id] ?: continue
             val executor = taskRun.executor ?: task.effectiveExecutor()
             if (!executor.isSystemExecutor()) continue
@@ -548,6 +552,160 @@ class WorkflowRuntimeCoordinator(
             refreshed
         }
     }
+
+    private suspend fun dispatchRemoteCompute(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ): WorkflowRun {
+        val coordinator = remoteComputeCoordinator
+        val tasks = definition.tasks.associateBy { it.id }
+        var next = run
+
+        for ((id, original) in run.taskRuns) {
+            val task = tasks[id] ?: continue
+            val taskRun = next.taskRuns[id] ?: original
+            if (task.computePlacement == com.hereliesaz.geministrator.domain.ComputePlacementPolicy.LocalOnly) continue
+            if (taskRun.status != TaskRunStatus.Ready && taskRun.status != TaskRunStatus.Retrying) continue
+            if (taskRun.externalRunId != null) continue
+
+            if (coordinator == null) {
+                if (task.computePlacement.allowsLocalFallback()) continue
+                TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+                next = next.copy(
+                    taskRuns = next.taskRuns + (
+                        id to taskRun.copy(
+                            status = TaskRunStatus.Blocked,
+                            blockingReason = BlockingReason(
+                                REMOTE_COMPUTE_UNAVAILABLE,
+                                "Remote compute is required but no compute mesh is configured.",
+                            ),
+                            progress = null,
+                            progressMessage = null,
+                        )
+                    ),
+                    updatedAtEpochMillis = now,
+                )
+                continue
+            }
+
+            when (
+                val decision = coordinator.dispatch(
+                    RemoteComputeContext(
+                        project = project,
+                        definition = definition,
+                        run = next,
+                        task = task,
+                        taskRun = taskRun,
+                        nowEpochMillis = now,
+                    ),
+                )
+            ) {
+                RemoteComputeDispatch.Local -> Unit
+                is RemoteComputeDispatch.Blocked -> {
+                    TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+                    next = next.copy(
+                        taskRuns = next.taskRuns + (
+                            id to taskRun.copy(
+                                status = TaskRunStatus.Blocked,
+                                blockingReason = BlockingReason(
+                                    REMOTE_COMPUTE_UNAVAILABLE,
+                                    decision.reason,
+                                ),
+                                progress = null,
+                                progressMessage = null,
+                            )
+                        ),
+                        updatedAtEpochMillis = now,
+                    )
+                }
+                is RemoteComputeDispatch.Started -> {
+                    TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Running)
+                    next = next.copy(
+                        status = if (next.status == WorkflowRunStatus.AwaitingHuman) {
+                            next.status
+                        } else {
+                            WorkflowRunStatus.Running
+                        },
+                        taskRuns = next.taskRuns + (
+                            id to taskRun.copy(
+                                status = TaskRunStatus.Running,
+                                assignedProviderId = null,
+                                providerRunId = null,
+                                externalRunId = decision.externalRunId,
+                                blockingReason = null,
+                                progress = 0f,
+                                progressMessage = decision.progressMessage,
+                            )
+                        ),
+                        updatedAtEpochMillis = now,
+                    )
+                }
+            }
+        }
+        return next
+    }
+
+    private suspend fun reconcileRemoteCompute(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ): WorkflowRun {
+        val coordinator = remoteComputeCoordinator ?: return run
+        val tasks = definition.tasks.associateBy { it.id }
+        var next = run
+
+        for ((id, original) in run.taskRuns) {
+            val taskRun = next.taskRuns[id] ?: original
+            if (!coordinator.owns(taskRun)) continue
+            if (taskRun.status != TaskRunStatus.Running && taskRun.status != TaskRunStatus.Verifying) continue
+            val task = tasks[id] ?: continue
+            val update = coordinator.reconcile(
+                RemoteComputeContext(
+                    project = project,
+                    definition = definition,
+                    run = next,
+                    task = task,
+                    taskRun = taskRun,
+                    nowEpochMillis = now,
+                ),
+            ) ?: continue
+
+            if (update.status != taskRun.status) {
+                TaskRunTransitions.requireAllowed(taskRun.status, update.status)
+            }
+            val mergedArtifacts = if (update.artifacts.isEmpty()) {
+                taskRun.artifacts
+            } else {
+                (taskRun.artifacts + update.artifacts).distinctBy { it.id }
+            }
+            next = next.copy(
+                taskRuns = next.taskRuns + (
+                    id to taskRun.copy(
+                        status = update.status,
+                        artifacts = mergedArtifacts,
+                        blockingReason = null,
+                        progress = update.progress
+                            ?: if (update.status == TaskRunStatus.Completed) 1f else taskRun.progress,
+                        progressMessage = update.progressMessage ?: taskRun.progressMessage,
+                    )
+                ),
+                updatedAtEpochMillis = now,
+            )
+        }
+        return WorkflowRunFactory.refreshReadiness(definition, next, now)
+    }
+
+    private fun com.hereliesaz.geministrator.domain.ComputePlacementPolicy.allowsLocalFallback(): Boolean =
+        when (this) {
+            com.hereliesaz.geministrator.domain.ComputePlacementPolicy.LocalOnly -> true
+            is com.hereliesaz.geministrator.domain.ComputePlacementPolicy.RemoteAllowed -> allowLocalFallback
+            is com.hereliesaz.geministrator.domain.ComputePlacementPolicy.PreferredDevice -> allowLocalFallback
+            is com.hereliesaz.geministrator.domain.ComputePlacementPolicy.Distributed ->
+                allowSingleDeviceFallback && allowLocalParticipant
+        }
 
     private fun applyExecution(
         run: WorkflowRun,
@@ -652,6 +810,7 @@ class WorkflowRuntimeCoordinator(
             )
             if (
                 blockable &&
+                remoteComputeCoordinator?.owns(taskRun) != true &&
                 executor != null &&
                 executor.isSystemExecutor() &&
                 !executorIntegrations.isAvailable(executor)
@@ -686,6 +845,10 @@ class WorkflowRuntimeCoordinator(
         is TaskExecutor.ExternalService -> "External service executor"
         is TaskExecutor.NestedWorkflow -> "Nested workflow executor"
         else -> "System executor"
+    }
+
+    private companion object {
+        const val REMOTE_COMPUTE_UNAVAILABLE: String = "remote_compute_unavailable"
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

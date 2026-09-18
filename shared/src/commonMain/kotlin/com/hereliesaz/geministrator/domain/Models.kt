@@ -113,6 +113,7 @@ data class TaskDefinition(
     val providerConstraints: ProviderConstraints = ProviderConstraints.None,
     val environmentPlanningPolicy: EnvironmentPlanningPolicy = EnvironmentPlanningPolicy.WhenProviderRequires,
     val compoundInferencePolicy: CompoundInferencePolicy = CompoundInferencePolicy.Single,
+    val computePlacement: ComputePlacementPolicy = ComputePlacementPolicy.LocalOnly,
     val executor: TaskExecutor? = null,
 )
 
