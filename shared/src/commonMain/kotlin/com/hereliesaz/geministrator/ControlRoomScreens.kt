@@ -602,6 +602,7 @@ internal fun WorkflowTemplateScreen(
                                     is TaskExecutor.HumanApproval -> "Label: ${ex.label}"
                                     is TaskExecutor.ExternalService -> "${ex.service}${ex.operation?.let { " · $it" } ?: ""}"
                                     is TaskExecutor.NestedWorkflow -> "Workflow: ${ex.workflowDefinitionId.value}"
+                                    is TaskExecutor.Distributed -> "Remote: " + ex.delegate.displayName()
                                 }
                                 AzphaltNote("executor-type-${task.id.value}", "Executor type", executor?.displayName() ?: "Role agent")
                                 AzphaltNote("executor-detail-${task.id.value}", "Executor detail", executorDetail)
