@@ -21,7 +21,7 @@ private class JvmMeshCipher(
         require(key.size == 32)
     }
 
-    override fun seal(
+    override suspend fun seal(
         plaintext: ByteArray,
         associatedData: ByteArray,
     ): MeshSealedPayload {
@@ -39,7 +39,7 @@ private class JvmMeshCipher(
         )
     }
 
-    override fun open(
+    override suspend fun open(
         payload: MeshSealedPayload,
         associatedData: ByteArray,
     ): ByteArray {
