@@ -1,11 +1,18 @@
 package com.hereliesaz.geministrator.workflow
 
-import com.hereliesaz.geministrator.domain.HallMonitorReport
+import com.hereliesaz.geministrator.decodeHallMonitorReportPayload
+import com.hereliesaz.geministrator.domain.AcceptanceCriterion
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.EnvironmentPlanningPolicy
 import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.HallMonitorSolutionTrial
 import com.hereliesaz.geministrator.domain.IntegrationPolicy
+import com.hereliesaz.geministrator.domain.RoleAuthority
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowGlobalPauseKind
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -19,7 +26,6 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
-import kotlinx.serialization.json.Json
 
 /**
  * Creates an executable counterfactual for one Hall Monitor recommendation while leaving the
@@ -61,7 +67,7 @@ class HallMonitorSolutionTrialService(
         val reportArtifact = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
             "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
         }
-        val report = decodeReport(reportArtifact.textContent.orEmpty())
+        val report = decodeHallMonitorReportPayload(reportArtifact.textContent.orEmpty())
         val finding = requireNotNull(report.findings.firstOrNull { it.id == findingId }) {
             "Hall Monitor report ${report.reportId} has no finding '$findingId'"
         }
@@ -78,6 +84,16 @@ class HallMonitorSolutionTrialService(
         val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
             .filterNot { it.id == HallMonitorRole.id }
         require(launchRoles.isNotEmpty()) { "No active roles are available to run a Hall Monitor solution trial" }
+        val launchRoleIds = launchRoles.mapTo(linkedSetOf()) { it.id }
+        val comparisonRole = launchRoles.firstOrNull {
+            it.id == BuiltInRoles.QaEngineer.id && RoleAuthority.Verify in it.authorities
+        } ?: launchRoles.firstOrNull {
+            RoleAuthority.Verify in it.authorities
+        } ?: launchRoles.firstOrNull {
+            RoleAuthority.ReviewCode in it.authorities
+        } ?: error(
+            "Hall Monitor solution testing requires an active independent verification or review role",
+        )
 
         val roleTaskIds = sourceDefinition.tasks.mapNotNullTo(linkedSetOf()) { task ->
             val roleId = task.roleId ?: (task.executor as? TaskExecutor.RoleAgent)?.roleId
@@ -86,7 +102,7 @@ class HallMonitorSolutionTrialService(
         val currentPlan = sourceDefinition.tasks.mapNotNull { task ->
             val roleId = task.roleId ?: (task.executor as? TaskExecutor.RoleAgent)?.roleId
                 ?: return@mapNotNull null
-            if (roleId == HallMonitorRole.id || roleId !in launchRoles.map { it.id }.toSet()) return@mapNotNull null
+            if (roleId == HallMonitorRole.id || roleId !in launchRoleIds) return@mapNotNull null
             OrchestrationPlanStep(
                 id = task.id.value,
                 name = task.name,
@@ -133,9 +149,8 @@ class HallMonitorSolutionTrialService(
                 Use the current plan as the baseline. Preserve a control/baseline path whenever technically
                 feasible. Build a modified candidate that changes only what is necessary to exercise the
                 selected solution. Run the solution's declared validation tests against the candidate and,
-                where feasible, the baseline under comparable conditions. End with an explicit comparison
-                task that records observed differences, regressions, tradeoffs, and whether the finding's
-                falsification criteria were met.
+                where feasible, the baseline under comparable conditions. The runtime will append an
+                independent comparison task, so expose the measurements and artifacts it needs.
 
                 This is an experiment, not approval. Do not merge, release, deploy to production, change the
                 paused run, or silently adopt the recommendation. Repository-writing work must stay isolated
@@ -152,10 +167,44 @@ class HallMonitorSolutionTrialService(
             packet = packet,
             roles = launchRoles,
         )
+        val plannedTaskIds = planned.tasks.mapTo(linkedSetOf()) { it.id }
+        val dependedOn = planned.tasks.flatMapTo(linkedSetOf()) { it.dependsOn }
+        val exitTaskIds = plannedTaskIds - dependedOn
+        require(exitTaskIds.isNotEmpty()) { "Hall Monitor solution trial planner produced no terminal experiment task" }
+        val comparisonTaskId = uniqueComparisonTaskId(plannedTaskIds)
+        val comparisonCriteria = buildList {
+            solution.validationTests.forEach { add(AcceptanceCriterion(it)) }
+            finding.falsificationCriteria.forEach {
+                add(AcceptanceCriterion("State whether this falsification criterion was met: $it"))
+            }
+            add(
+                AcceptanceCriterion(
+                    "Compare observed candidate results with the baseline/control where available, including regressions and tradeoffs; do not approve or integrate the recommendation.",
+                ),
+            )
+        }
+        val comparisonTask = TaskDefinition(
+            id = comparisonTaskId,
+            name = "Compare Hall Monitor trial results",
+            objective = buildString {
+                append("Independently evaluate the isolated trial for '")
+                append(solution.title)
+                append("'. Use produced artifacts and measurements to compare the modified candidate against the baseline/control where available. Report every declared validation test, observed regression, tradeoff, and falsification criterion. This is evidence for the user; do not merge, deploy, release, or adopt the recommendation.")
+            },
+            roleId = comparisonRole.id,
+            executor = TaskExecutor.RoleAgent(comparisonRole.id),
+            dependsOn = exitTaskIds,
+            acceptanceCriteria = comparisonCriteria,
+            environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+        )
         val trialDefinition = planned.copy(
             name = "TEST · ${solution.title}".take(80),
             description = "Isolated Hall Monitor counterfactual for ${sourceRun.id.value}; finding ${finding.id}, solution $solutionIndex.",
+            tasks = planned.tasks + comparisonTask,
             integrationPolicy = IntegrationPolicy.Manual,
+            // The selected solution carries its own validation contract; avoid injecting unrelated
+            // generic pre/post implementation test topology into the counterfactual.
+            testDesignPolicy = TestDesignPolicy.None,
         )
 
         val launchAt = nowEpochMillis + 1L
@@ -201,39 +250,13 @@ class HallMonitorSolutionTrialService(
         return trial
     }
 
-    fun decodeReport(raw: String): HallMonitorReport {
-        require(raw.isNotBlank()) { "Hall Monitor report has no machine-readable payload" }
-        val normalized = stripMarkdownFence(raw)
-        val firstBrace = normalized.indexOf('{')
-        val lastBrace = normalized.lastIndexOf('}')
-        val candidates = buildList {
-            add(normalized)
-            if (firstBrace >= 0 && lastBrace > firstBrace) add(normalized.substring(firstBrace, lastBrace + 1))
-        }.distinct()
-
-        candidates.forEach { candidate ->
-            runCatching { ReportJson.decodeFromString(HallMonitorReport.serializer(), candidate) }
-                .getOrNull()
-                ?.let { return it }
-        }
-        error(
-            "Hall Monitor report is not machine-readable HallMonitorReport JSON. " +
-                "Request a revised report before testing a proposed solution.",
-        )
-    }
-
-    private fun stripMarkdownFence(raw: String): String {
-        val trimmed = raw.trim()
-        if (!trimmed.startsWith("```")) return trimmed
-        val firstNewline = trimmed.indexOf('\n')
-        if (firstNewline < 0) return trimmed.removePrefix("```").removeSuffix("```").trim()
-        return trimmed.substring(firstNewline + 1).removeSuffix("```").trim()
-    }
-
-    private companion object {
-        val ReportJson = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
+    private fun uniqueComparisonTaskId(existing: Set<TaskDefinitionId>): TaskDefinitionId {
+        var suffix = 0
+        while (true) {
+            val value = if (suffix == 0) "hall-monitor-trial-compare" else "hall-monitor-trial-compare-$suffix"
+            val candidate = TaskDefinitionId(value)
+            if (candidate !in existing) return candidate
+            suffix += 1
         }
     }
 }

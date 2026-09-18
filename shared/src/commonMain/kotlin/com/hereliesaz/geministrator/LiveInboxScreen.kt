@@ -20,13 +20,32 @@ internal fun LiveInboxScreen(
     modifier: Modifier = Modifier,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
-        InboxScreen(
-            runtimeState = runtimeState,
-            onApproveTask = onApproveTask,
-            onRejectPlan = onRejectPlan,
-            onResolveEscalation = onResolveEscalation,
-            modifier = modifier,
-        )
+        val presentation = runtimeState.presentation
+        when {
+            presentation.run.globalPause != null -> HallMonitorPauseInboxScreen(
+                presentation = presentation,
+                onTestSolution = { findingId, solutionIndex ->
+                    onResolveEscalation(hallMonitorTrialActionId(findingId, solutionIndex), true)
+                },
+                modifier = modifier,
+            )
+
+            isHallMonitorTrial(presentation) -> HallMonitorTrialInboxScreen(
+                presentation = presentation,
+                onApproveTask = onApproveTask,
+                onRejectPlan = onRejectPlan,
+                onResolveEscalation = onResolveEscalation,
+                modifier = modifier,
+            )
+
+            else -> InboxScreen(
+                runtimeState = runtimeState,
+                onApproveTask = onApproveTask,
+                onRejectPlan = onRejectPlan,
+                onResolveEscalation = onResolveEscalation,
+                modifier = modifier,
+            )
+        }
         return
     }
 

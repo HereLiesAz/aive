@@ -27,6 +27,15 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
     orchestrationRuntime: OrchestrationAgentRuntime,
     note: String = "Failure escalation approved; repaired plan scheduled",
 ) {
+    parseHallMonitorTrialActionId(taskDefinitionId.value)?.let { trial ->
+        testHallMonitorSolution(
+            findingId = trial.findingId,
+            solutionIndex = trial.solutionIndex,
+            orchestrationRuntime = orchestrationRuntime,
+        )
+        return
+    }
+
     val live = state.value as? ApplicationRuntimeState.Live
         ?: error("No active workflow is loaded")
     val presentation = live.presentation
