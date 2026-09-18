@@ -36,9 +36,9 @@ data class MeshSealedPayload(
 )
 
 interface MeshCipher {
-    fun seal(plaintext: ByteArray, associatedData: ByteArray): MeshSealedPayload
+    suspend fun seal(plaintext: ByteArray, associatedData: ByteArray): MeshSealedPayload
 
-    fun open(payload: MeshSealedPayload, associatedData: ByteArray): ByteArray
+    suspend fun open(payload: MeshSealedPayload, associatedData: ByteArray): ByteArray
 }
 
 internal expect fun platformMeshCipherOrNull(key: ByteArray): MeshCipher?
