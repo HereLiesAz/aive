@@ -203,6 +203,7 @@ class WorkflowEngine(
                 is TaskExecutor.RepositoryOperation,
                 is TaskExecutor.ExternalService,
                 is TaskExecutor.NestedWorkflow,
+                is TaskExecutor.Distributed,
                 -> continue
             }
         }
