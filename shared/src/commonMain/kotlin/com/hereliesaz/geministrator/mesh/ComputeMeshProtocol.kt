@@ -61,6 +61,7 @@ data class RemoteWorkLease(
 @Serializable
 data class RemoteWorkProgress(
     val leaseId: ComputeLeaseId,
+    val groupId: ComputeLeaseGroupId,
     val deviceId: ComputeDeviceId,
     val status: TaskRunStatus,
     val progress: Float? = null,
