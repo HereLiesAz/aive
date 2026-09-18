@@ -18,6 +18,14 @@ value class ComputeLeaseId(val value: String) {
 }
 
 @Serializable
+@JvmInline
+value class ComputeLeaseGroupId(val value: String) {
+    init {
+        require(value.isNotBlank()) { "Compute lease group ID must not be blank" }
+    }
+}
+
+@Serializable
 data class RemoteWorkSlice(
     val index: Int = 0,
     val count: Int = 1,
@@ -31,6 +39,7 @@ data class RemoteWorkSlice(
 @Serializable
 data class RemoteWorkLease(
     val id: ComputeLeaseId,
+    val groupId: ComputeLeaseGroupId,
     val originDeviceId: ComputeDeviceId,
     val targetDeviceId: ComputeDeviceId,
     val project: Project,
@@ -123,9 +132,9 @@ interface ComputeMeshTransport {
 
     suspend fun offerLease(lease: RemoteWorkLease): Boolean
 
-    suspend fun progress(leaseId: ComputeLeaseId): RemoteWorkProgress?
+    suspend fun progress(groupId: ComputeLeaseGroupId): List<RemoteWorkProgress>
 
-    suspend fun cancel(leaseId: ComputeLeaseId, reason: String)
+    suspend fun cancel(groupId: ComputeLeaseGroupId, reason: String)
 
     suspend fun incomingLeases(afterToken: String? = null): ComputeMeshInbox
 
