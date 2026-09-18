@@ -47,7 +47,7 @@ jobs:
         run: ./gradlew :shared:compileKotlinDesktop
 
       - name: Test shared workflow integration
-        run: ./gradlew :shared:jvmTest
+        run: ./gradlew :shared:desktopTest
 
       - name: Test relay
         run: ./gradlew :computeRelay:test
