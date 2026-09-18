@@ -25,6 +25,7 @@ class DistributedComputeExecutorIntegration(
                 run = context.run,
                 task = context.task,
                 taskRun = context.taskRun,
+                role = context.role,
                 delegatedExecutor = distributed.delegate,
                 requirements = distributed.requirements,
                 submittedAtEpochMillis = context.nowEpochMillis,
