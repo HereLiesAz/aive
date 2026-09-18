@@ -213,6 +213,7 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.HumanApproval -> label
     is TaskExecutor.ExternalService -> listOfNotNull(service, operation).joinToString(" · ")
     is TaskExecutor.NestedWorkflow -> workflowDefinitionId.value
+    is TaskExecutor.Distributed -> label ?: ("Remote · " + delegate.displayName())
 }
 
 @Composable
