@@ -53,6 +53,34 @@ val buildAndroidNodeCreatureNative = tasks.register<Exec>("buildAndroidNodeCreat
     }
 }
 
+val bitcosManifest = rootProject.layout.projectDirectory.file("native/bitcos/Cargo.toml")
+val bitcosSources = rootProject.layout.projectDirectory.dir("native/bitcos/src")
+val generatedAndroidBitcosJniDir = layout.buildDirectory.dir("generated/bitcos/jniLibs")
+val buildAndroidBitcosNative = tasks.register<Exec>("buildAndroidBitcosNative") {
+    group = "build"
+    description = "Builds the Rust BITCOS decoder for Android ABIs."
+    inputs.file(bitcosManifest)
+    inputs.dir(bitcosSources)
+    outputs.dir(generatedAndroidBitcosJniDir)
+    workingDir(bitcosManifest.asFile.parentFile)
+
+    doFirst {
+        val outputDir = generatedAndroidBitcosJniDir.get().asFile
+        outputDir.deleteRecursively()
+        outputDir.mkdirs()
+        commandLine(
+            "cargo",
+            "ndk",
+            "-t", "arm64-v8a",
+            "-t", "armeabi-v7a",
+            "-t", "x86_64",
+            "-o", outputDir.absolutePath,
+            "build",
+            "--release",
+        )
+    }
+}
+
 android {
     namespace = "com.hereliesaz.haive"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -70,6 +98,7 @@ android {
     sourceSets.getByName("main").apply {
         res.srcDir(generatedAndroidBrandResDir.get().asFile)
         jniLibs.srcDir(generatedAndroidNodeJniDir.get().asFile)
+        jniLibs.srcDir(generatedAndroidBitcosJniDir.get().asFile)
     }
 
     signingConfigs {
@@ -110,7 +139,7 @@ tasks.named("preBuild") {
 tasks.matching { task ->
     task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
 }.configureEach {
-    dependsOn(buildAndroidNodeCreatureNative)
+    dependsOn(buildAndroidNodeCreatureNative, buildAndroidBitcosNative)
 }
 
 dependencies {

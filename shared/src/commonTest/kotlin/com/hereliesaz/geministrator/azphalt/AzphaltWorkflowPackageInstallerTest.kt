@@ -122,6 +122,7 @@ class AzphaltWorkflowPackageInstallerTest {
         assertEquals(role(), persistence.roles.get(RoleDefinitionId("builder")))
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("one")))
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("two")))
+        Unit
     }
 
     @Test

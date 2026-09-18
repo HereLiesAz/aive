@@ -1,0 +1,58 @@
+name: BITCOS Engine
+
+on:
+  pull_request:
+    paths:
+      - 'native/bitcos/**'
+      - 'shared/src/commonMain/kotlin/com/hereliesaz/geministrator/inference/LocalModelLibrary.kt'
+      - 'shared/src/commonTest/kotlin/com/hereliesaz/geministrator/inference/LocalModelLibraryTest.kt'
+      - 'docs/architecture/BITCOS.md'
+      - 'docs/architecture/COMPOUND_INFERENCE.md'
+      - '.github/workflows/bitcos-engine.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/bitcos/**'
+      - 'shared/src/commonMain/kotlin/com/hereliesaz/geministrator/inference/LocalModelLibrary.kt'
+      - 'shared/src/commonTest/kotlin/com/hereliesaz/geministrator/inference/LocalModelLibraryTest.kt'
+      - 'docs/architecture/BITCOS.md'
+      - 'docs/architecture/COMPOUND_INFERENCE.md'
+      - '.github/workflows/bitcos-engine.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bitcos:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust tests
+        run: cargo test --manifest-path native/bitcos/Cargo.toml --all-targets
+
+      - name: Release build
+        run: cargo build --manifest-path native/bitcos/Cargo.toml --release
+
+      - name: Format check
+        run: cargo fmt --manifest-path native/bitcos/Cargo.toml -- --check
+
+      - name: Lint
+        run: cargo clippy --manifest-path native/bitcos/Cargo.toml --all-targets -- -D warnings
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Shared planner tests
+        run: ./gradlew :shared:desktopTest --tests '*LocalModelLibraryTest*'

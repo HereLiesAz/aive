@@ -51,6 +51,7 @@ class WorkflowCompositionServiceTest {
                 RoleDefinitionId("missing"),
             )
         }
+        Unit
     }
 
     @Test

@@ -304,6 +304,7 @@ private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManif
     -> null
 
     is TaskExecutor.RoleAgent -> H2g2DependencyManifestation.Synapse
+    is TaskExecutor.Distributed -> delegate.dependencyAdornmentManifestation()
 }
 
 private fun birthParentFor(

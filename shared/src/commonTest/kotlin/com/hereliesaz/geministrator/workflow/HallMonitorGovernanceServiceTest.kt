@@ -17,7 +17,9 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
-import kotlinx.coroutines.test.runTest
+import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,7 +29,7 @@ import kotlin.test.assertTrue
 
 class HallMonitorGovernanceServiceTest {
     @Test
-    fun passingAntagonistReviewPausesWholeRunAndResumeRestoresExactTaskState() = runTest {
+    fun passingAntagonistReviewPausesWholeRunAndResumeRestoresExactTaskState() = runBlocking {
         val fixture = fixture(verdict = "pass")
         val service = HallMonitorGovernanceService(fixture.persistence)
 
@@ -35,6 +37,7 @@ class HallMonitorGovernanceServiceTest {
             state = WorkflowRuntimeState(fixture.run),
             reportArtifactId = fixture.report.id,
             antagonistReviewArtifactId = fixture.review.id,
+            sessionGateway = NoOpSessionGateway,
             nowEpochMillis = 50L,
         )
 
@@ -57,7 +60,7 @@ class HallMonitorGovernanceServiceTest {
 
         service.decideOrchestratorReview(paused.run, true, "Proceed", 60L)
         service.decideHumanReview(paused.run, true, "Proceed", 61L)
-        val resumed = service.resumeIfFullyApproved(paused.run, 70L)
+        val resumed = service.resumeAfterReviews(paused.run, 70L)
 
         assertNull(resumed.globalPause)
         assertEquals(WorkflowRunStatus.Running, resumed.status)
@@ -71,7 +74,7 @@ class HallMonitorGovernanceServiceTest {
     }
 
     @Test
-    fun nonPassingAntagonistReviewCannotPauseWorkflow() = runTest {
+    fun nonPassingAntagonistReviewCannotPauseWorkflow() = runBlocking {
         val fixture = fixture(verdict = "revise")
         val service = HallMonitorGovernanceService(fixture.persistence)
 
@@ -80,6 +83,7 @@ class HallMonitorGovernanceServiceTest {
                 state = WorkflowRuntimeState(fixture.run),
                 reportArtifactId = fixture.report.id,
                 antagonistReviewArtifactId = fixture.review.id,
+                sessionGateway = NoOpSessionGateway,
                 nowEpochMillis = 50L,
             )
         }
@@ -90,21 +94,22 @@ class HallMonitorGovernanceServiceTest {
     }
 
     @Test
-    fun resumeRequiresBothReviews() = runTest {
+    fun resumeRequiresBothReviews() = runBlocking {
         val fixture = fixture(verdict = "pass")
         val service = HallMonitorGovernanceService(fixture.persistence)
         val paused = service.pauseAfterAntagonistPass(
-            WorkflowRuntimeState(fixture.run),
-            fixture.report.id,
-            fixture.review.id,
-            50L,
+            state = WorkflowRuntimeState(fixture.run),
+            reportArtifactId = fixture.report.id,
+            antagonistReviewArtifactId = fixture.review.id,
+            sessionGateway = NoOpSessionGateway,
+            nowEpochMillis = 50L,
         )
 
         service.decideOrchestratorReview(paused.run, true, null, 60L)
         val failure = assertFailsWith<IllegalArgumentException> {
-            service.resumeIfFullyApproved(paused.run, 70L)
+            service.resumeAfterReviews(paused.run, 70L)
         }
-        assertTrue(failure.message.orEmpty().contains("User has not approved"))
+        assertTrue(failure.message.orEmpty().contains("User review is still pending"))
     }
 
     private suspend fun fixture(verdict: String): Fixture {
@@ -186,4 +191,32 @@ class HallMonitorGovernanceServiceTest {
         val report: ArtifactRef,
         val review: ArtifactRef,
     )
+
+    private object NoOpSessionGateway : ManagedSessionGateway {
+        override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
+            AgentProviderId("provider")
+
+        override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle =
+            ManagedSessionHandle(
+                taskRunId = request.taskRequest.taskRunId,
+                providerId = AgentProviderId("provider"),
+                providerRunId = ProviderRunId("provider-run"),
+            )
+
+        override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus =
+            ManagedSessionStatus.Unknown
+
+        override suspend fun message(
+            handle: ManagedSessionHandle,
+            message: String,
+        ): ProviderActionResult = ProviderActionResult.Accepted
+
+        override suspend fun approvePlan(handle: ManagedSessionHandle): ProviderActionResult =
+            ProviderActionResult.Accepted
+
+        override suspend fun cancel(handle: ManagedSessionHandle): ProviderActionResult =
+            ProviderActionResult.Accepted
+
+        override suspend fun artifacts(handle: ManagedSessionHandle): List<ProviderArtifact> = emptyList()
+    }
 }

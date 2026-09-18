@@ -47,6 +47,23 @@ sealed interface TaskExecutor {
         val workflowDefinitionId: WorkflowDefinitionId,
         val projectId: ProjectId? = null,
     ) : TaskExecutor
+
+    /**
+     * Execute [delegate] on another authenticated Haive compute node.
+     *
+     * Distribution changes placement only; the delegated executor remains the semantic source of
+     * what the task actually does.
+     */
+    @Serializable data class Distributed(
+        val delegate: TaskExecutor,
+        val requirements: DistributedComputeRequirements = DistributedComputeRequirements(),
+        val label: String? = null,
+    ) : TaskExecutor {
+        init {
+            require(delegate !is Distributed) { "Distributed executors may not wrap another Distributed executor" }
+            require(label == null || label.isNotBlank()) { "Distributed executor label must not be blank" }
+        }
+    }
 }
 
 fun TaskDefinition.effectiveExecutor(): TaskExecutor = executor
@@ -62,6 +79,7 @@ fun TaskExecutor.displayName(): String = when (this) {
     is TaskExecutor.HumanApproval -> label
     is TaskExecutor.ExternalService -> service
     is TaskExecutor.NestedWorkflow -> "Nested Workflow"
+    is TaskExecutor.Distributed -> label ?: "Distributed ${delegate.displayName()}"
 }
 
 /**
@@ -95,6 +113,7 @@ data class TaskDefinition(
     val providerConstraints: ProviderConstraints = ProviderConstraints.None,
     val environmentPlanningPolicy: EnvironmentPlanningPolicy = EnvironmentPlanningPolicy.WhenProviderRequires,
     val compoundInferencePolicy: CompoundInferencePolicy = CompoundInferencePolicy.Single,
+    val computePlacement: ComputePlacementPolicy = ComputePlacementPolicy.LocalOnly,
     val executor: TaskExecutor? = null,
 )
 

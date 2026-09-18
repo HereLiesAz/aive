@@ -30,6 +30,8 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
+import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 
 @Composable
 internal fun CompanyProviderScreen(
@@ -279,6 +281,9 @@ internal fun ProviderSettingsScreen(
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onConfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
+    onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
+    onDisconnectDistributedCompute: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -291,6 +296,24 @@ internal fun ProviderSettingsScreen(
     var healthChecking by remember { mutableStateOf(false) }
     var exportTriggered by remember { mutableStateOf(false) }
     var diagnosticTriggered by remember { mutableStateOf(false) }
+    val computeConfiguration = distributedComputeState.configuration
+    var relayUrlDraft by remember(computeConfiguration.relayUrl) { mutableStateOf(computeConfiguration.relayUrl) }
+    var poolIdDraft by remember(computeConfiguration.poolId) { mutableStateOf(computeConfiguration.poolId) }
+    var nodeIdDraft by remember(computeConfiguration.nodeId) { mutableStateOf(computeConfiguration.nodeId) }
+    var nodeNameDraft by remember(computeConfiguration.displayName) { mutableStateOf(computeConfiguration.displayName) }
+    var tokenDraft by remember(distributedComputeState.tokenConfigured) { mutableStateOf("") }
+    var maxParallelDraft by remember(computeConfiguration.maxParallelLeases) {
+        mutableStateOf(computeConfiguration.maxParallelLeases.toString())
+    }
+    var sharingEnabledDraft by remember(computeConfiguration.sharingEnabled) {
+        mutableStateOf(computeConfiguration.sharingEnabled)
+    }
+    var allowMeteredDraft by remember(computeConfiguration.allowMeteredNetwork) {
+        mutableStateOf(computeConfiguration.allowMeteredNetwork)
+    }
+    var requirePowerDraft by remember(computeConfiguration.requireExternalPower) {
+        mutableStateOf(computeConfiguration.requireExternalPower)
+    }
 
     Column(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
@@ -360,6 +383,166 @@ internal fun ProviderSettingsScreen(
             },
             modifier = Modifier.fillMaxWidth(),
         )
+
+        ProviderSectionLabel("Compute Pool")
+        Text(
+            "Connect this device to the same Haive compute pool as your other phones and desktops. " +
+                "Every device connects outbound to the relay, so no inbound port or shared local network is required.",
+            style = AzphaltType.body,
+            color = Azphalt.currentGround.onPage,
+        )
+        AzphaltRecord(
+            seed = "distributed-compute-status",
+            eyebrow = "Distributed compute",
+            title = if (distributedComputeState.connected) "Connected" else "Not connected",
+            body = buildString {
+                append(if (distributedComputeState.ready) "Pool configured" else "Relay, pool, device identity, and token are required")
+                if (distributedComputeState.onlineNodes.isNotEmpty()) {
+                    append("\n")
+                    append(distributedComputeState.onlineNodes.size)
+                    append(" node")
+                    if (distributedComputeState.onlineNodes.size != 1) append("s")
+                    append(" online")
+                }
+                distributedComputeState.lastError?.let {
+                    append("\n")
+                    append(it)
+                }
+            },
+            endCap = when {
+                distributedComputeState.connected -> "Online"
+                distributedComputeState.ready -> "Ready"
+                else -> "Setup"
+            },
+        )
+        OutlinedTextField(
+            value = relayUrlDraft,
+            onValueChange = { relayUrlDraft = it },
+            label = { Text("Relay URL (wss://...)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = poolIdDraft,
+            onValueChange = { poolIdDraft = it },
+            label = { Text("Compute pool ID") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = nodeNameDraft,
+            onValueChange = { nodeNameDraft = it },
+            label = { Text("This device name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = nodeIdDraft,
+            onValueChange = { nodeIdDraft = it },
+            label = { Text("Stable device ID") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = tokenDraft,
+            onValueChange = { tokenDraft = it },
+            label = {
+                Text(
+                    if (distributedComputeState.tokenConfigured) {
+                        "Relay token (leave blank to keep existing)"
+                    } else {
+                        "Relay token"
+                    },
+                )
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = maxParallelDraft,
+            onValueChange = { value -> maxParallelDraft = value.filter(Char::isDigit).take(2) },
+            label = { Text("Maximum simultaneous remote jobs") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(
+                if (sharingEnabledDraft) "Sharing compute: ON" else "Sharing compute: OFF",
+                "distributed-sharing-toggle",
+                selected = sharingEnabledDraft,
+                onClick = { sharingEnabledDraft = !sharingEnabledDraft },
+            )
+            AzphaltPill(
+                if (allowMeteredDraft) "Metered: allowed" else "Metered: blocked",
+                "distributed-metered-toggle",
+                selected = allowMeteredDraft,
+                onClick = { allowMeteredDraft = !allowMeteredDraft },
+            )
+        }
+        AzphaltPill(
+            if (requirePowerDraft) "External power required" else "Battery use allowed",
+            "distributed-power-toggle",
+            selected = requirePowerDraft,
+            onClick = { requirePowerDraft = !requirePowerDraft },
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(
+                "Save & connect",
+                "distributed-save",
+                onClick = {
+                    val maxParallel = maxParallelDraft.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                    onSaveDistributedCompute(
+                        DistributedComputeConfiguration(
+                            relayUrl = relayUrlDraft.trim(),
+                            poolId = poolIdDraft.trim(),
+                            nodeId = nodeIdDraft.trim(),
+                            displayName = nodeNameDraft.trim(),
+                            sharingEnabled = sharingEnabledDraft,
+                            maxParallelLeases = maxParallel,
+                            allowMeteredNetwork = allowMeteredDraft,
+                            requireExternalPower = requirePowerDraft,
+                        ),
+                        tokenDraft.trim().takeIf(String::isNotEmpty),
+                    )
+                    tokenDraft = ""
+                },
+            )
+            if (distributedComputeState.ready) {
+                AzphaltPill(
+                    "Disconnect",
+                    "distributed-disconnect",
+                    onClick = onDisconnectDistributedCompute,
+                )
+            }
+        }
+        if (distributedComputeState.onlineNodes.isNotEmpty()) {
+            Text("ONLINE COMPUTE NODES", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            distributedComputeState.onlineNodes.sortedBy { it.displayName }.forEach { node ->
+                AzphaltRecord(
+                    seed = "compute-node-" + node.nodeId,
+                    eyebrow = node.platform.name,
+                    title = node.displayName,
+                    body = buildString {
+                        append(node.architecture)
+                        append(" · ")
+                        append(node.logicalProcessors)
+                        append(" logical CPUs · ")
+                        append(node.memoryMiB)
+                        append(" MiB")
+                        if (node.accelerators.isNotEmpty()) {
+                            append("\n")
+                            append(node.accelerators.joinToString { it.name })
+                        }
+                        if (node.installedModelIds.isNotEmpty()) {
+                            append(" · ")
+                            append(node.installedModelIds.size)
+                            append(" local model(s)")
+                        }
+                    },
+                    endCap = if (node.acceptsWork) "Available" else "Observe only",
+                )
+            }
+        }
 
         ProviderSectionLabel("Data")
         if (exportTriggered) {

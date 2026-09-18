@@ -42,6 +42,7 @@ internal fun AzphaltStoreScreen(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val workflowLibraryHost = LocalWorkflowLibraryHost.current
     var snapshot by remember(service) { mutableStateOf<AzphaltStoreSnapshot?>(null) }
     var packages by remember(service) { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
     var query by remember { mutableStateOf("") }
@@ -118,8 +119,8 @@ internal fun AzphaltStoreScreen(
     ) {
         Text("AZPHALT STORE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            snapshot?.repository?.name?.let { "$it · workflow packages for The Haive" }
-                ?: "Verified workflow packages for The Haive",
+            snapshot?.repository?.name?.let { "$it · workflows and roles for The Haive" }
+                ?: "Verified workflows and roles for The Haive",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -157,13 +158,13 @@ internal fun AzphaltStoreScreen(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search workflow packages") },
+            label = { Text("Search workflows and roles") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
 
         if (!loading && packages.isEmpty()) {
-            Text("No Haive workflow packages match this search.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text("No Haive addons match this search.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
@@ -177,7 +178,7 @@ internal fun AzphaltStoreScreen(
             val isRevoked = (item.id to item.latest) in revoked || (installed != null && (item.id to installed.version) in revoked)
             AzphaltRecord(
                 seed = "azphalt-package-${item.id}",
-                eyebrow = item.author?.takeIf(String::isNotBlank) ?: "Azphalt workflow",
+                eyebrow = item.author?.takeIf(String::isNotBlank) ?: "Azphalt ${item.kind}",
                 title = item.name,
                 body = item.description ?: item.id,
                 endCap = when {
@@ -288,9 +289,10 @@ internal fun AzphaltStoreScreen(
                                 allowPublisherChange = allowPublisherChange,
                             )
                         }.onSuccess { installed ->
-                            status = "Installed ${installed.packageId} ${installed.version}. Its workflow definitions are now available in Workflows."
+                            status = "Installed ${installed.packageId} ${installed.version}. Its workflows and roles are available immediately."
                             prepared = null
                             refreshGeneration += 1
+                            workflowLibraryHost?.packagesChanged()
                         }.onFailure { failure ->
                             error = failure.message ?: "Package installation failed."
                         }
@@ -322,7 +324,7 @@ private fun PreparedAzphaltInstall(
         body = buildString {
             append("${plan.definitions.size} workflow definition")
             if (plan.definitions.size != 1) append('s')
-            if (plan.roles.isNotEmpty()) append(" · ${plan.roles.size} package-local agent${if (plan.roles.size == 1) "" else "s"}")
+            if (plan.roles.isNotEmpty()) append(" · ${plan.roles.size} reusable role${if (plan.roles.size == 1) "" else "s"}")
             if (plan.fragments.isNotEmpty()) append(" · ${plan.fragments.size} fragment${if (plan.fragments.size == 1) "" else "s"}")
         },
         endCap = if (plan.trusted) "Trusted" else if (plan.signed) "Unknown signer" else "Unsigned",
