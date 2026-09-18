@@ -55,3 +55,5 @@ include(":providers:llm")
 include(":androidApp")
 include(":desktopApp")
 include(":webApp")
+
+include(":computeRelay")
