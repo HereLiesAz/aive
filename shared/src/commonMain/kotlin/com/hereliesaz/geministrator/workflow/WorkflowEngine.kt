@@ -53,6 +53,8 @@ class WorkflowEngine(
         require(rolesById.size == roles.size) { "Role IDs must be unique" }
     }
 
+    fun roleDefinition(roleId: RoleDefinitionId?): RoleDefinition? = roleId?.let(rolesById::get)
+
     data class DispatchResult(
         val run: WorkflowRun,
         val handles: Map<TaskDefinitionId, ManagedSessionHandle>,
@@ -203,6 +205,7 @@ class WorkflowEngine(
                 is TaskExecutor.RepositoryOperation,
                 is TaskExecutor.ExternalService,
                 is TaskExecutor.NestedWorkflow,
+                is TaskExecutor.Distributed,
                 -> continue
             }
         }

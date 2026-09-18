@@ -52,6 +52,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
             implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.websockets)
             implementation(libs.kmp.zip)
             implementation(libs.cryptography.core)
             implementation(libs.cryptography.provider.optimal)
