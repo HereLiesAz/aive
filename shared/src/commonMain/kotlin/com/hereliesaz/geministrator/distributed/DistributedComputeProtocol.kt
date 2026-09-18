@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.ComputeAccelerator
 import com.hereliesaz.geministrator.domain.ComputePlatform
 import com.hereliesaz.geministrator.domain.DistributedComputeRequirements
 import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -89,6 +90,7 @@ data class DistributedTaskEnvelope(
     val run: WorkflowRun,
     val task: TaskDefinition,
     val taskRun: TaskRun,
+    val role: RoleDefinition? = null,
     val delegatedExecutor: TaskExecutor,
     val requirements: DistributedComputeRequirements,
     val submittedAtEpochMillis: Long,
@@ -100,6 +102,11 @@ data class DistributedTaskEnvelope(
         require(leaseDurationMillis >= 5_000) { "leaseDurationMillis must be at least 5 seconds" }
         require(delegatedExecutor !is TaskExecutor.Distributed) {
             "DistributedTaskEnvelope must carry the unwrapped delegated executor"
+        }
+        if (delegatedExecutor is TaskExecutor.RoleAgent) {
+            require(role?.id == delegatedExecutor.roleId) {
+                "Distributed role-agent leases require the resolved matching role definition"
+            }
         }
     }
 }
