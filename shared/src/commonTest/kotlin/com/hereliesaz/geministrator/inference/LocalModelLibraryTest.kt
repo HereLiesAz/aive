@@ -94,4 +94,71 @@ class LocalModelLibraryTest {
         assertEquals("onnx", noun.backend)
         assertTrue("local-model" in noun.capabilities)
     }
+    @Test
+    fun bitcosArtifactRequiresExplicitRuntimeEncodingSupport() {
+        val bitcos = LocalModelArtifactDescriptor(
+            logicalArtifactId = "test:ternary:bitcos",
+            foundationModelId = "test/ternary",
+            releaseRepository = "HereLiesAz/haive",
+            releaseTag = "test",
+            assetName = "test.bitcos",
+            sha256 = "0".repeat(64),
+            format = "bitnet",
+            precision = TERNARY_PRECISION,
+            weightEncoding = BITCOS_WEIGHT_ENCODING,
+            kind = LocalModelArtifactKind.MergedModel,
+        )
+        val fallback = LocalModelArtifactDescriptor(
+            logicalArtifactId = "test:int8:onnx",
+            foundationModelId = "test/ternary",
+            releaseRepository = "HereLiesAz/haive",
+            releaseTag = "test",
+            assetName = "test.onnx",
+            sha256 = "1".repeat(64),
+            format = "onnx",
+            precision = "int8",
+            kind = LocalModelArtifactKind.MergedModel,
+        )
+        val library = LocalModelLibrary(
+            listOf(
+                LocalModelSpecialistDescriptor(
+                    specialistId = "test-specialist",
+                    mergedVariants = listOf(bitcos, fallback),
+                ),
+            ),
+        )
+
+        val unproven = library.plan(
+            specialistId = "test-specialist",
+            runtime = LocalModelRuntimeCapabilities(
+                runtimeId = "runtime-without-bitcos",
+                supportedFormats = setOf("bitnet", "onnx"),
+                supportedPrecisions = setOf(TERNARY_PRECISION, "int8"),
+            ),
+            preferredPrecisions = listOf(TERNARY_PRECISION, "int8"),
+        )
+        assertEquals(
+            "test:int8:onnx",
+            assertIs<LocalModelLoadPlan.MergedModel>(unproven).model.logicalArtifactId,
+        )
+
+        val proven = library.plan(
+            specialistId = "test-specialist",
+            runtime = LocalModelRuntimeCapabilities(
+                runtimeId = "runtime-with-bitcos",
+                supportedFormats = setOf("bitnet", "onnx"),
+                supportedPrecisions = setOf(TERNARY_PRECISION, "int8"),
+                supportedWeightEncodings = setOf(BITCOS_WEIGHT_ENCODING),
+            ),
+            preferredPrecisions = listOf(TERNARY_PRECISION, "int8"),
+        )
+        val selected = assertIs<LocalModelLoadPlan.MergedModel>(proven).model
+        assertEquals("test:ternary:bitcos", selected.logicalArtifactId)
+        assertEquals(BITCOS_WEIGHT_ENCODING, selected.weightEncoding)
+        assertTrue(
+            "weight-encoding:$BITCOS_WEIGHT_ENCODING" in
+                selected.toInferenceModelDescriptor().capabilities,
+        )
+    }
+
 }

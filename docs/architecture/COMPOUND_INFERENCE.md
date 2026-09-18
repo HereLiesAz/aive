@@ -288,13 +288,15 @@ Haive task contract
 
 Small models should be optimized against the exact structured function they perform. Optimization must preserve role authority boundaries. A Completion Gate may be optimized to demand explicit evidence; a memory clerk may not be optimized into deciding truth or contradiction.
 
-## Experimental phase: BitNet b1.58
+## Experimental phase: ternary models and BITCOS
 
-BitNet b1.58 is an experimental backend/model-family direction, not a drop-in post-training quantization flag for existing Qwen artifacts.
+BitNet b1.58 and other ternary families remain experimental backend/model-family directions, not drop-in post-training quantization flags for existing Qwen artifacts.
 
-Adoption requires BitNet-native model artifacts and benchmarking against the existing specialist family for task accuracy, latency, RAM, energy/thermals, startup time, supported hardware, and runtime portability.
+The BITCOS storage/runtime foundation is now implemented in `native/bitcos` and documented in [BITCOS.md](BITCOS.md). Haive can losslessly pack already-ternary tensors into the versioned HBCS container, inspect/unpack them, decode through Rust on Android/Desktop, and capability-gate `bitcos-v1` artifacts in `LocalModelLibrary`. Existing runtimes cannot select BITCOS unless they explicitly advertise that weight encoding.
 
-Existing Qwen/ONNX paths remain until BitNet demonstrates an actual advantage for the relevant specialist workload.
+This does not yet make a ternary family production-ready. Adoption still requires a verified released ternary checkpoint, tokenizer/transformer execution, optimized architecture-specific kernels, and benchmarking against the existing specialist family for task accuracy, latency, RAM, energy/thermals, startup time, supported hardware, and runtime portability.
+
+Existing Qwen/ONNX paths remain the production default until a ternary model demonstrates an actual advantage for the relevant specialist workload.
 
 ## Experimental phase: Skeleton-of-Thought
 
@@ -321,7 +323,7 @@ It reuses the same workflow concurrency, genealogy, stream, planning, and verifi
 6. Generalized local specialist/LoRA library registered into the model registry — implemented with capability-gated shared-base adapter planning and merged-model fallback.
 7. DSPy optimization and release pipeline.
 8. Remaining local orchestration utility family.
-9. BitNet b1.58 experiments.
+9. Ternary/BitNet experiments — BITCOS codec, native packaging, and capability-gated artifact support implemented; model-family execution and optimized kernels remain experimental.
 10. Skeleton-of-Thought experiments.
 
 ## Current implementation status
@@ -365,7 +367,7 @@ Not yet implemented:
 
 - DSPy/GEPA/MIPRO-style optimization and release pipeline
 - remaining orchestration utility models
-- BitNet runtime/model family
+- released ternary/BitNet model family with tokenizer/transformer execution and fused BITCOS compute kernels
 - Skeleton-of-Thought execution
 
 Physical-device/real-provider end-to-end verification remains separate from CI and is not claimed by this document.

@@ -8,6 +8,9 @@ enum class LocalModelArtifactKind {
     Standalone,
 }
 
+const val BITCOS_WEIGHT_ENCODING: String = "bitcos-v1"
+const val TERNARY_PRECISION: String = "ternary"
+
 /**
  * Cryptographically identified local model artifact published as a release asset.
  *
@@ -23,6 +26,7 @@ data class LocalModelArtifactDescriptor(
     val sha256: String,
     val format: String,
     val precision: String? = null,
+    val weightEncoding: String? = null,
     val kind: LocalModelArtifactKind,
     val adapterId: String? = null,
     val capabilities: Set<String> = emptySet(),
@@ -34,6 +38,7 @@ data class LocalModelArtifactDescriptor(
         require(releaseTag.isNotBlank()) { "releaseTag must not be blank" }
         require(assetName.isNotBlank()) { "assetName must not be blank" }
         require(format.isNotBlank()) { "format must not be blank" }
+        require(weightEncoding == null || weightEncoding.isNotBlank()) { "weightEncoding must not be blank" }
         require(sha256.matches(Regex("[0-9a-f]{64}"))) { "sha256 must be a lowercase SHA-256 digest" }
         require(kind == LocalModelArtifactKind.Adapter || adapterId == null) {
             "adapterId is only valid for adapter artifacts"
@@ -56,6 +61,7 @@ data class LocalModelArtifactDescriptor(
             add("local-model")
             add("artifact:${kind.name.lowercase()}")
             add("release:$releaseTag")
+            weightEncoding?.let { add("weight-encoding:$it") }
             addAll(capabilities)
         },
         releaseDigest = sha256,
@@ -103,6 +109,11 @@ data class LocalModelRuntimeCapabilities(
     val runtimeId: String,
     val supportedFormats: Set<String> = emptySet(),
     val supportedPrecisions: Set<String> = emptySet(),
+    /**
+     * Weight encodings are explicit opt-in capabilities. An empty set means the runtime has not
+     * proven support for any non-default packed encoding.
+     */
+    val supportedWeightEncodings: Set<String> = emptySet(),
     val supportsSharedBaseAdapters: Boolean = false,
 ) {
     init {
@@ -111,7 +122,8 @@ data class LocalModelRuntimeCapabilities(
 
     fun supports(artifact: LocalModelArtifactDescriptor): Boolean =
         (supportedFormats.isEmpty() || artifact.format in supportedFormats) &&
-            (artifact.precision == null || supportedPrecisions.isEmpty() || artifact.precision in supportedPrecisions)
+            (artifact.precision == null || supportedPrecisions.isEmpty() || artifact.precision in supportedPrecisions) &&
+            (artifact.weightEncoding == null || artifact.weightEncoding in supportedWeightEncodings)
 }
 
 /** Concrete load shape selected for a specialist on a particular runtime. */
