@@ -138,6 +138,13 @@ interface ComputeMeshTransport {
 
     suspend fun incomingLeases(afterToken: String? = null): ComputeMeshInbox
 
+    suspend fun respondToLease(
+        leaseId: ComputeLeaseId,
+        targetDeviceId: ComputeDeviceId,
+        accepted: Boolean,
+        reason: String? = null,
+    )
+
     suspend fun reportProgress(progress: RemoteWorkProgress)
 }
 
@@ -146,6 +153,9 @@ data class ComputeMeshInbox(
     val nextToken: String?,
 )
 
-interface RemoteWorkExecutor {
-    suspend fun execute(lease: RemoteWorkLease): RemoteWorkProgress
+fun interface RemoteWorkExecutor {
+    suspend fun execute(
+        lease: RemoteWorkLease,
+        reportProgress: suspend (RemoteWorkProgress) -> Unit,
+    ): RemoteWorkProgress
 }
