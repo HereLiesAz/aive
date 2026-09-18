@@ -52,6 +52,8 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
+import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlin.math.roundToInt
 
 internal object ControlRoomBreakpoints {
@@ -136,6 +138,9 @@ fun ControlRoom(
     onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
+    onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
+    onDisconnectDistributedCompute: () -> Unit = {},
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -196,6 +201,9 @@ fun ControlRoom(
                     onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
+                    distributedComputeState = distributedComputeState,
+                    onSaveDistributedCompute = onSaveDistributedCompute,
+                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -263,6 +271,9 @@ fun ControlRoom(
                     onDisconnectRepositoryService = onDisconnectRepositoryService,
                     onReconfigureProvider = onReconfigureProvider,
                     onDisconnectProvider = onDisconnectProvider,
+                    distributedComputeState = distributedComputeState,
+                    onSaveDistributedCompute = onSaveDistributedCompute,
+                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -478,6 +489,9 @@ private fun MainDestination(
     onDisconnectRepositoryService: (String) -> Unit,
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
+    onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
+    onDisconnectDistributedCompute: () -> Unit = {},
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -546,6 +560,9 @@ private fun MainDestination(
                 onExportDiagnosticBundle = onExportDiagnosticBundle,
                 onConfigureProvider = onReconfigureProvider,
                 onDisconnectProvider = onDisconnectProvider,
+                distributedComputeState = distributedComputeState,
+                onSaveDistributedCompute = onSaveDistributedCompute,
+                onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                 modifier = Modifier.fillMaxSize(),
             )
         }

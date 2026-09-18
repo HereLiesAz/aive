@@ -191,6 +191,7 @@ internal fun executorMotion(executor: TaskExecutor): H2g2WorkflowMotion = when (
     is TaskExecutor.HumanApproval -> H2g2WorkflowMotion.Nod
     is TaskExecutor.ExternalService -> H2g2WorkflowMotion.Hover
     is TaskExecutor.NestedWorkflow -> H2g2WorkflowMotion.Orbit
+    is TaskExecutor.Distributed -> H2g2WorkflowMotion.Orbit
     is TaskExecutor.RoleAgent -> H2g2WorkflowMotion.Breathe
 }
 
