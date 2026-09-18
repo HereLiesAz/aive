@@ -3,6 +3,7 @@ package com.hereliesaz.haive
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +28,8 @@ import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
 import com.hereliesaz.geministrator.RepositoryCredentialSetup
 import com.hereliesaz.geministrator.RepositoryServiceCatalog
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
@@ -58,6 +62,8 @@ import io.ktor.client.engine.cio.CIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collectLatest
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
@@ -85,6 +91,22 @@ class MainActivity : ComponentActivity() {
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
+        val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
+        val computeCredentialStore = AndroidDistributedComputeCredentialStore(this)
+        var initialComputeConfiguration = computeConfigurationStore.read()
+        if (initialComputeConfiguration.nodeId.isBlank() || initialComputeConfiguration.displayName.isBlank()) {
+            initialComputeConfiguration = initialComputeConfiguration.copy(
+                nodeId = initialComputeConfiguration.nodeId.ifBlank { UUID.randomUUID().toString() },
+                displayName = initialComputeConfiguration.displayName.ifBlank {
+                    listOf(Build.MANUFACTURER, Build.MODEL)
+                        .filter(String::isNotBlank)
+                        .joinToString(" ")
+                        .ifBlank { "Android device" }
+                },
+            )
+            computeConfigurationStore.write(initialComputeConfiguration)
+        }
+        val initialComputeToken = computeCredentialStore.readToken()
         azphaltHost.handleIntent(intent)
 
         setContent {
@@ -106,6 +128,8 @@ class MainActivity : ComponentActivity() {
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
                 var configuringGeminiApiKey by remember { mutableStateOf(false) }
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
+                var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
+                var computeToken by remember { mutableStateOf(initialComputeToken) }
 
                 val installedGeminiApi = remember(credentials, installedGeminiReady) {
                     if (!installedGeminiReady) {
@@ -129,9 +153,52 @@ class MainActivity : ComponentActivity() {
                         installedGeminiApi = installedGeminiApi,
                     )
                 }
-                val executorIntegrations = remember(repositoryCredentials) {
+                val baseExecutorIntegrations = remember(repositoryCredentials) {
                     configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
                 }
+                val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
+                    val token = computeToken
+                    if (computeConfiguration.configured && token != null) {
+                        AndroidDistributedComputeSession(
+                            context = this,
+                            configuration = computeConfiguration,
+                            token = token,
+                            baseIntegrations = baseExecutorIntegrations,
+                            supportedExecutorKinds = androidDistributedExecutorKinds(repositoryCredentials),
+                        )
+                    } else {
+                        null
+                    }
+                }
+                var computeConnected by remember(computeSession) { mutableStateOf(false) }
+                var computeOnlineNodes by remember(computeSession) {
+                    mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor>())
+                }
+                var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                DisposableEffect(computeSession) {
+                    computeSession?.start()
+                    onDispose { computeSession?.close() }
+                }
+                LaunchedEffect(computeSession) {
+                    computeConnected = false
+                    computeOnlineNodes = emptyList()
+                    computeError = null
+                    val session = computeSession ?: return@LaunchedEffect
+                    launch {
+                        session.client.connected.collectLatest { computeConnected = it }
+                    }
+                    launch {
+                        session.client.onlineNodes.collectLatest { nodes ->
+                            computeOnlineNodes = nodes.values.toList()
+                        }
+                    }
+                    launch {
+                        session.client.errors.collectLatest { error ->
+                            computeError = error.message
+                        }
+                    }
+                }
+                val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredAndroidRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
                 }
@@ -204,6 +271,25 @@ class MainActivity : ComponentActivity() {
                             }
                             providerCredentialStore.clear(disconnectedProviderId)
                             credentials = providerCredentialStore.readAll()
+                        },
+                        distributedComputeState = DistributedComputeUiState(
+                            configuration = computeConfiguration,
+                            tokenConfigured = computeToken != null,
+                            connected = computeConnected,
+                            onlineNodes = computeOnlineNodes,
+                            lastError = computeError,
+                        ),
+                        onSaveDistributedCompute = { configuration, token ->
+                            computeConfigurationStore.write(configuration)
+                            computeConfiguration = configuration
+                            if (token != null) {
+                                computeCredentialStore.writeToken(token)
+                                computeToken = computeCredentialStore.readToken()
+                            }
+                        },
+                        onDisconnectDistributedCompute = {
+                            computeCredentialStore.clear()
+                            computeToken = null
                         },
                     )
                 }
@@ -428,6 +514,18 @@ internal fun configuredAndroidRepositoryDiscovery(
         githubTokenProvider = githubToken?.let { token -> RepositoryServiceTokenProvider { token } },
         gitlabTokenProvider = gitlabToken?.let { token -> RepositoryServiceTokenProvider { token } },
     )
+}
+
+private fun androidDistributedExecutorKinds(
+    repositoryCredentials: Map<String, String>,
+): Set<String> = buildSet {
+    if (repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID) != null) {
+        add("github-action")
+        add("repository-operation")
+    }
+    if (repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID) != null) {
+        add("repository-operation")
+    }
 }
 
 private fun Map<String, String>.cleanKey(id: String): String? =

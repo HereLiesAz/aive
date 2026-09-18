@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -41,6 +42,7 @@ data class TaskExecutorContext(
     val taskRun: TaskRun,
     val executor: TaskExecutor,
     val nowEpochMillis: Long,
+    val role: RoleDefinition? = null,
 )
 
 data class TaskExecutorExecution(
@@ -159,6 +161,7 @@ fun TaskExecutor.isSystemExecutor(): Boolean = when (this) {
     is TaskExecutor.RepositoryOperation,
     is TaskExecutor.ExternalService,
     is TaskExecutor.NestedWorkflow,
+    is TaskExecutor.Distributed,
     -> true
     is TaskExecutor.RoleAgent,
     is TaskExecutor.HumanApproval,

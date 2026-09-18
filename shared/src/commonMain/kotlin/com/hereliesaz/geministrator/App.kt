@@ -19,6 +19,8 @@ import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
+import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
@@ -46,6 +48,9 @@ fun App(
     onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
+    distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
+    onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
+    onDisconnectDistributedCompute: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: SettingsWorkflowPersistence.createDefault() }
@@ -325,6 +330,9 @@ fun App(
                         onDisconnectRepositoryService = onDisconnectRepositoryService,
                         onReconfigureProvider = onReconfigureProvider,
                         onDisconnectProvider = onDisconnectProvider,
+                        distributedComputeState = distributedComputeState,
+                        onSaveDistributedCompute = onSaveDistributedCompute,
+                        onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
                         onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,

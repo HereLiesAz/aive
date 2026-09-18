@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,6 +12,9 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
+import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
@@ -38,13 +43,31 @@ import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import java.util.UUID
 import javax.swing.JFileChooser
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
     val initialProviderCredentials = readDesktopProviderCredentials(providerCredentialStore)
     val initialRepositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+    val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
+    val computeCredentialStore = DesktopDistributedComputeCredentialStore()
+    var initialComputeConfiguration = computeConfigurationStore.read()
+    if (initialComputeConfiguration.nodeId.isBlank() || initialComputeConfiguration.displayName.isBlank()) {
+        initialComputeConfiguration = initialComputeConfiguration.copy(
+            nodeId = initialComputeConfiguration.nodeId.ifBlank { UUID.randomUUID().toString() },
+            displayName = initialComputeConfiguration.displayName.ifBlank {
+                val osName = System.getProperty("os.name", "Desktop").trim()
+                val user = System.getProperty("user.name", "").trim()
+                listOf(user, osName).filter(String::isNotBlank).joinToString(" · ").ifBlank { "Desktop" }
+            },
+        )
+        computeConfigurationStore.write(initialComputeConfiguration)
+    }
+    val initialComputeToken = computeCredentialStore.readToken()
     val httpClient = HttpClient(CIO)
 
     try {
@@ -58,12 +81,54 @@ fun main() {
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
+                var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
+                var computeToken by remember { mutableStateOf(initialComputeToken) }
                 val providers = remember(credentials, repositoryCredentials) {
                     configuredDesktopProviders(credentials, repositoryCredentials, httpClient)
                 }
-                val executorIntegrations = remember(repositoryCredentials) {
+                val baseExecutorIntegrations = remember(repositoryCredentials) {
                     configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
                 }
+                val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
+                    val token = computeToken
+                    if (computeConfiguration.configured && token != null) {
+                        DesktopDistributedComputeSession(
+                            configuration = computeConfiguration,
+                            token = token,
+                            baseIntegrations = baseExecutorIntegrations,
+                            supportedExecutorKinds = desktopDistributedExecutorKinds(repositoryCredentials),
+                        )
+                    } else {
+                        null
+                    }
+                }
+                var computeConnected by remember(computeSession) { mutableStateOf(false) }
+                var computeOnlineNodes by remember(computeSession) { mutableStateOf(emptyList<ComputeNodeDescriptor>()) }
+                var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                DisposableEffect(computeSession) {
+                    computeSession?.start()
+                    onDispose { computeSession?.close() }
+                }
+                LaunchedEffect(computeSession) {
+                    computeConnected = false
+                    computeOnlineNodes = emptyList()
+                    computeError = null
+                    val session = computeSession ?: return@LaunchedEffect
+                    launch {
+                        session.client.connected.collectLatest { computeConnected = it }
+                    }
+                    launch {
+                        session.client.onlineNodes.collectLatest { nodes ->
+                            computeOnlineNodes = nodes.values.toList()
+                        }
+                    }
+                    launch {
+                        session.client.errors.collectLatest { error ->
+                            computeError = error.message
+                        }
+                    }
+                }
+                val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
                 }
@@ -105,6 +170,25 @@ fun main() {
                         onDisconnectProvider = { disconnectedProviderId ->
                             providerCredentialStore.clear(disconnectedProviderId)
                             credentials = readDesktopProviderCredentials(providerCredentialStore)
+                        },
+                        distributedComputeState = DistributedComputeUiState(
+                            configuration = computeConfiguration,
+                            tokenConfigured = computeToken != null,
+                            connected = computeConnected,
+                            onlineNodes = computeOnlineNodes,
+                            lastError = computeError,
+                        ),
+                        onSaveDistributedCompute = { configuration, token ->
+                            computeConfigurationStore.write(configuration)
+                            computeConfiguration = configuration
+                            if (token != null) {
+                                computeCredentialStore.writeToken(token)
+                                computeToken = computeCredentialStore.readToken()
+                            }
+                        },
+                        onDisconnectDistributedCompute = {
+                            computeCredentialStore.clear()
+                            computeToken = null
                         },
                     )
                 }
@@ -354,6 +438,15 @@ private fun pickLocalGitFolder(): String? {
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
         if (process.waitFor() == 0) output.lineSequence().lastOrNull()?.trim()?.takeIf(String::isNotEmpty) else null
     }.getOrNull()
+}
+
+private fun desktopDistributedExecutorKinds(
+    repositoryCredentials: Map<String, String>,
+): Set<String> = buildSet {
+    add("repository-operation")
+    if (repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID) != null) {
+        add("github-action")
+    }
 }
 
 private fun Map<String, String>.cleanKey(id: String): String? =
