@@ -159,6 +159,7 @@ fun TaskExecutor.isSystemExecutor(): Boolean = when (this) {
     is TaskExecutor.RepositoryOperation,
     is TaskExecutor.ExternalService,
     is TaskExecutor.NestedWorkflow,
+    is TaskExecutor.Distributed,
     -> true
     is TaskExecutor.RoleAgent,
     is TaskExecutor.HumanApproval,
