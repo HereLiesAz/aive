@@ -25,6 +25,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Check out pinned h2g2
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/conveyance-h2g2
+          ref: 8566a9db02d533d9534327df40424ee7b88ebe88
+          path: vendor/conveyance-h2g2
+
+      - name: Check out pinned Conveyance
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/Conveyance
+          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          path: vendor/conveyance-h2g2/vendor/Conveyance
+
       - name: Require live Jules credential
         shell: bash
         run: |
@@ -46,7 +60,6 @@ jobs:
       - name: Run live runtime lifecycle verification
         run: |
           ./gradlew \
-            -Phaive.useLocalH2g2=false \
             :providers:jules:desktopTest \
             --tests com.hereliesaz.geministrator.providers.jules.JulesLiveRuntimeVerificationTest \
             --no-daemon \
