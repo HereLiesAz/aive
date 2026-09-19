@@ -103,7 +103,7 @@ Tracking issue: #35
 - [x] Add provider health/capability reporting.
 - [x] Add provider-neutral token/cost/latency telemetry where providers expose it.
 - [x] Implement prompt-reuse telemetry without making cache behavior part of workflow correctness.
-- [ ] Add a second provider to prove interchangeability; choose based on the best supported API at implementation time rather than hard-coding the architecture to Gemini/OpenAI/Claude.
+- [x] Add a second provider to prove interchangeability; native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers now share the provider-neutral task contract.
 - [x] Test provider substitution for the same role/task contract.
 
 ## P1 — Persistence and recovery
