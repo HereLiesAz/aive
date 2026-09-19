@@ -19,7 +19,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 
 class HallMonitorGovernanceServiceTest {
     @Test
-    fun passingAntagonistReviewPausesWholeRunAndResumeRestoresExactTaskState() = runBlocking {
+    fun passingAntagonistReviewPausesWholeRunAndResumeRestoresExactTaskState() = runTest {
         val fixture = fixture(verdict = "pass")
         val service = HallMonitorGovernanceService(fixture.persistence)
 
@@ -74,7 +74,7 @@ class HallMonitorGovernanceServiceTest {
     }
 
     @Test
-    fun nonPassingAntagonistReviewCannotPauseWorkflow() = runBlocking {
+    fun nonPassingAntagonistReviewCannotPauseWorkflow() = runTest {
         val fixture = fixture(verdict = "revise")
         val service = HallMonitorGovernanceService(fixture.persistence)
 
@@ -94,7 +94,7 @@ class HallMonitorGovernanceServiceTest {
     }
 
     @Test
-    fun resumeRequiresBothReviews() = runBlocking {
+    fun resumeRequiresBothReviews() = runTest {
         val fixture = fixture(verdict = "pass")
         val service = HallMonitorGovernanceService(fixture.persistence)
         val paused = service.pauseAfterAntagonistPass(
