@@ -11,9 +11,9 @@ internal enum class NodeCreatureActivity(val abiCode: Int) {
 }
 
 internal data class NodeCreatureCamera(
-    val yaw: Float = -0.36f,
-    val pitch: Float = 0.18f,
-    val zoom: Float = 0.34f,
+    val yaw: Float = -0.18f,
+    val pitch: Float = 0.10f,
+    val zoom: Float = 0.33f,
 )
 
 internal data class NodeCreatureRenderRequest(
