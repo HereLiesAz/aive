@@ -50,18 +50,14 @@ internal fun CustomCompanyProviderScreen(
         initialValue = visibleRoles,
     )
     var editingRoleIdValue by rememberDurableStringState(COMPANY_EDITING_ROLE_KEY)
-    var editingRoleId: String?
-        get() = editingRoleIdValue.takeIf(String::isNotBlank)
-        set(value) { editingRoleIdValue = value.orEmpty() }
+    val editingRoleId = editingRoleIdValue.takeIf(String::isNotBlank)
     var showRoleForm by rememberDurableBooleanState(COMPANY_SHOW_ROLE_FORM_KEY)
     var roleIdDraft by rememberDurableStringState(COMPANY_ROLE_ID_KEY)
     var roleNameDraft by rememberDurableStringState(COMPANY_ROLE_NAME_KEY)
     var roleDescDraft by rememberDurableStringState(COMPANY_ROLE_DESCRIPTION_KEY)
     var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
     var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
-    var roleProviderDraft: String?
-        get() = roleProviderDraftValue.takeIf(String::isNotBlank)
-        set(value) { roleProviderDraftValue = value.orEmpty() }
+    val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
     var roleCapabilitiesDraft by rememberDurableJsonState(
         key = COMPANY_ROLE_CAPABILITIES_KEY,
         serializer = SetSerializer(AgentCapability.serializer()),
@@ -90,25 +86,25 @@ internal fun CustomCompanyProviderScreen(
     }
 
     fun clearEditor() {
-        editingRoleId = null
+        editingRoleIdValue = ""
         showRoleForm = false
         roleIdDraft = ""
         roleNameDraft = ""
         roleDescDraft = ""
         roleInstructionsDraft = ""
-        roleProviderDraft = null
+        roleProviderDraftValue = ""
         roleCapabilitiesDraft = emptySet()
         roleAuthoritiesDraft = emptySet()
     }
 
     fun editRole(role: RoleDefinition) {
-        editingRoleId = role.id.value
+        editingRoleIdValue = role.id.value
         showRoleForm = true
         roleIdDraft = role.id.value
         roleNameDraft = role.name
         roleDescDraft = role.description
         roleInstructionsDraft = role.instructions
-        roleProviderDraft = role.preferredProviderId?.value
+        roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
         roleCapabilitiesDraft = role.capabilitiesRequired
         roleAuthoritiesDraft = role.authorities
     }
@@ -232,7 +228,7 @@ internal fun CustomCompanyProviderScreen(
             CompanyProviderChoiceRow(
                 selectedProviderId = roleProviderDraft,
                 connectedProviderIds = connectedProviderIds,
-                onSelected = { roleProviderDraft = it },
+                onSelected = { roleProviderDraftValue = it.orEmpty() },
             )
 
             CompanySectionLabel("Required capabilities")
