@@ -155,9 +155,6 @@ class ApplicationRuntime private constructor(
                 val project = storedProject.copy(
                     repository = run.repositorySnapshot ?: storedProject.repository,
                 )
-                val runProject = project.copy(
-                    repository = run.repositorySnapshot ?: project.repository,
-                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -166,7 +163,7 @@ class ApplicationRuntime private constructor(
                     throw classifyResumeFailure(failure)
                 }
 
-                replaceCurrent(Current(runProject, definition, runtimeState))
+                replaceCurrent(Current(project, definition, runtimeState))
                 publishCurrent()
                 startCycling()
             } catch (failure: Throwable) {
@@ -499,6 +496,9 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
+                val runProject = project.copy(
+                    repository = run.repositorySnapshot ?: project.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -506,7 +506,7 @@ class ApplicationRuntime private constructor(
                 } catch (failure: Throwable) {
                     throw classifyResumeFailure(failure)
                 }
-                replaceCurrent(Current(project, definition, runtimeState))
+                replaceCurrent(Current(runProject, definition, runtimeState))
                 publishCurrent()
                 startCycling()
             } catch (failure: Throwable) {
