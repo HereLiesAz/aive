@@ -91,6 +91,9 @@ class TaskExecutorIntegrationRegistry(
     fun withIntegration(integration: TaskExecutorIntegration): TaskExecutorIntegrationRegistry =
         TaskExecutorIntegrationRegistry(integrations + integration, inferenceDataRegistry ?: durableExecutorEvidenceRegistry())
 
+    fun withPriorityIntegration(integration: TaskExecutorIntegration): TaskExecutorIntegrationRegistry =
+        TaskExecutorIntegrationRegistry(listOf(integration) + integrations, inferenceDataRegistry ?: durableExecutorEvidenceRegistry())
+
     /**
      * Return the same executor set with direct inference-evidence indexing enabled.
      *
