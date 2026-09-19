@@ -99,7 +99,7 @@ class LocalModelLibraryTest {
         val bitcos = LocalModelArtifactDescriptor(
             logicalArtifactId = "test:ternary:bitcos",
             foundationModelId = "test/ternary",
-            releaseRepository = "HereLiesAz/haive",
+            releaseRepository = "HereLiesAz/aive",
             releaseTag = "test",
             assetName = "test.bitcos",
             sha256 = "0".repeat(64),
@@ -111,7 +111,7 @@ class LocalModelLibraryTest {
         val fallback = LocalModelArtifactDescriptor(
             logicalArtifactId = "test:int8:onnx",
             foundationModelId = "test/ternary",
-            releaseRepository = "HereLiesAz/haive",
+            releaseRepository = "HereLiesAz/aive",
             releaseTag = "test",
             assetName = "test.onnx",
             sha256 = "1".repeat(64),
