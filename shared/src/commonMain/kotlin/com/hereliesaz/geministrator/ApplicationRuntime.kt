@@ -406,7 +406,7 @@ class ApplicationRuntime private constructor(
                         project = viewing.project,
                         definition = viewing.definition,
                         run = viewing.run,
-                        roles = roles,
+                        roles = mergedPresentationRoles(viewing.run),
                     ),
                 ),
             )
@@ -419,11 +419,15 @@ class ApplicationRuntime private constructor(
                     project = snapshot.project,
                     definition = snapshot.definition,
                     run = snapshot.state.run,
-                    roles = roles,
+                    roles = mergedPresentationRoles(snapshot.state.run),
                 ),
             ),
         )
     }
+
+    private fun mergedPresentationRoles(run: WorkflowRun): List<RoleDefinition> =
+        (run.roleSnapshot + roles)
+            .distinctBy(RoleDefinition::id)
 
     internal fun publishFailure(failure: Throwable) {
         val message = failure.message
