@@ -179,11 +179,14 @@ fun Application.computeRelayModule(
 }
 
 fun main() {
-    val token = System.getenv("HAIVE_RELAY_TOKEN")
+    val token = System.getenv("AIVE_RELAY_TOKEN")
         ?.takeIf(String::isNotBlank)
-        ?: error("HAIVE_RELAY_TOKEN is required")
+        ?: System.getenv("HAIVE_RELAY_TOKEN")
+            ?.takeIf(String::isNotBlank)
+        ?: error("AIVE_RELAY_TOKEN is required (HAIVE_RELAY_TOKEN is accepted for compatibility)")
     val port = (
         System.getenv("PORT")
+            ?: System.getenv("AIVE_RELAY_PORT")
             ?: System.getenv("HAIVE_RELAY_PORT")
             ?: "8080"
         ).toInt()
