@@ -68,6 +68,8 @@ data class AgentTaskRequest(
     val roleInstructions: String,
     val acceptanceCriteria: List<AcceptanceCriterion>,
     val contextArtifacts: List<ArtifactRef> = emptyList(),
+    /** Artifact contract declared by the workflow for this task. */
+    val requiredArtifacts: Set<ArtifactKind> = emptySet(),
     /** Capabilities the workflow selected this provider to exercise for this task. */
     val requiredCapabilities: Set<AgentCapability> = emptySet(),
     val repository: RepositoryRef? = null,
