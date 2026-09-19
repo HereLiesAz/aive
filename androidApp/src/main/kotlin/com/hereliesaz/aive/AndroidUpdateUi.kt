@@ -10,7 +10,7 @@ internal sealed interface AndroidUpdateState {
     data object Checking : AndroidUpdateState
     data class Downloading(val version: String) : AndroidUpdateState
     data class ReadyToInstall(val version: String) : AndroidUpdateState
-    data class PlayUpdateAvailable(val version: String) : AndroidUpdateState
+    data object PlayUpdateAvailable : AndroidUpdateState
     data class Error(val message: String) : AndroidUpdateState
 }
 
@@ -38,9 +38,9 @@ internal fun AndroidUpdatePrompt(
             },
         )
 
-        is AndroidUpdateState.PlayUpdateAvailable -> AlertDialog(
+        AndroidUpdateState.PlayUpdateAvailable -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("The Aive ${state.version} is available") },
+            title = { Text("A The Aive update is available") },
             text = {
                 Text("An update is available through Google Play.")
             },
