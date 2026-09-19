@@ -128,9 +128,16 @@ android {
     productFlavors {
         create("play") {
             dimension = "distribution"
+            // Google Play package identity. Package IDs are immutable once published.
+            applicationId = "com.hereliesaz.aive"
         }
         create("github") {
             dimension = "distribution"
+            // CRITICAL DATA-COMPATIBILITY INVARIANT:
+            // GitHub releases existed as com.hereliesaz.haive before the product rename.
+            // Keep this applicationId forever so Android performs an in-place update and preserves
+            // SharedPreferences, Keystore entries, workflow state, settings, roles, and tokens.
+            applicationId = "com.hereliesaz.haive"
         }
     }
 
