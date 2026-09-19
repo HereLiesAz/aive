@@ -60,6 +60,7 @@ kotlin {
 
         named("desktopTest") {
             dependencies {
+                implementation(libs.multiplatform.settings.no.arg)
                 implementation(libs.multiplatform.settings.test)
             }
         }
