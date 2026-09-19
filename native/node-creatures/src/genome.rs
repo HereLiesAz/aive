@@ -135,36 +135,36 @@ pub fn activity_verb(role: RoleArchetype, activity: Activity) -> &'static str {
 pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
     let mut rng = StableRng::new(hash64(seed));
     let antenna_count = match role {
-        RoleArchetype::Orchestrator => 10,
-        RoleArchetype::Builder => 8,
-        RoleArchetype::Tester => 7,
-        RoleArchetype::Inspector => 7,
-        RoleArchetype::Reviewer => 9,
-        RoleArchetype::Planner => 8,
-        RoleArchetype::Researcher => 6,
-        RoleArchetype::Generic => 3 + rng.usize(8),
+        RoleArchetype::Orchestrator => 8,
+        RoleArchetype::Builder => 6,
+        RoleArchetype::Tester => 6,
+        RoleArchetype::Inspector => 6,
+        RoleArchetype::Reviewer => 7,
+        RoleArchetype::Planner => 6,
+        RoleArchetype::Researcher => 5,
+        RoleArchetype::Generic => 4 + rng.usize(4),
     };
 
     let body_radii = match role {
-        RoleArchetype::Orchestrator => Vec3::new(1.02, 1.00, 0.84),
-        RoleArchetype::Builder => Vec3::new(1.04, 0.98, 0.86),
-        RoleArchetype::Tester => Vec3::new(0.95, 0.98, 0.80),
-        RoleArchetype::Inspector => Vec3::new(1.00, 0.98, 0.78),
-        RoleArchetype::Reviewer => Vec3::new(1.02, 0.96, 0.78),
-        RoleArchetype::Planner => Vec3::new(0.96, 1.04, 0.78),
-        RoleArchetype::Researcher => Vec3::new(0.94, 1.00, 0.76),
+        RoleArchetype::Orchestrator => Vec3::new(1.02, 0.96, 0.70),
+        RoleArchetype::Builder => Vec3::new(1.04, 0.92, 0.72),
+        RoleArchetype::Tester => Vec3::new(0.96, 0.96, 0.68),
+        RoleArchetype::Inspector => Vec3::new(0.98, 0.94, 0.66),
+        RoleArchetype::Reviewer => Vec3::new(1.00, 0.92, 0.66),
+        RoleArchetype::Planner => Vec3::new(0.96, 1.00, 0.66),
+        RoleArchetype::Researcher => Vec3::new(0.94, 0.98, 0.64),
         RoleArchetype::Generic => Vec3::new(
-            0.92 + rng.f32() * 0.16,
-            0.92 + rng.f32() * 0.16,
-            0.72 + rng.f32() * 0.14,
+            0.94 + rng.f32() * 0.10,
+            0.92 + rng.f32() * 0.12,
+            0.62 + rng.f32() * 0.10,
         ),
     };
 
     let body_sides = match role {
-        RoleArchetype::Builder => 14,
-        RoleArchetype::Reviewer => 13,
-        RoleArchetype::Planner => 12,
-        _ => 16,
+        RoleArchetype::Builder => 28,
+        RoleArchetype::Reviewer => 26,
+        RoleArchetype::Planner => 26,
+        _ => 30,
     };
 
     // The antennae are deliberately arranged around the projected silhouette rather than around
@@ -191,14 +191,14 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
             let elevation = direction.y.asin();
             let azimuth = direction.z.atan2(direction.x);
             let length = match role {
-                RoleArchetype::Orchestrator => 0.94 + rng.f32() * 0.34,
-                RoleArchetype::Builder => 0.82 + rng.f32() * 0.28,
-                RoleArchetype::Tester => 0.86 + rng.f32() * 0.36,
-                RoleArchetype::Inspector => 0.90 + rng.f32() * 0.34,
-                RoleArchetype::Reviewer => 0.82 + rng.f32() * 0.34,
-                RoleArchetype::Planner => 0.88 + rng.f32() * 0.34,
-                RoleArchetype::Researcher => 0.86 + rng.f32() * 0.32,
-                RoleArchetype::Generic => 0.80 + rng.f32() * 0.38,
+                RoleArchetype::Orchestrator => 0.72 + rng.f32() * 0.24,
+                RoleArchetype::Builder => 0.66 + rng.f32() * 0.22,
+                RoleArchetype::Tester => 0.68 + rng.f32() * 0.26,
+                RoleArchetype::Inspector => 0.70 + rng.f32() * 0.24,
+                RoleArchetype::Reviewer => 0.66 + rng.f32() * 0.24,
+                RoleArchetype::Planner => 0.70 + rng.f32() * 0.24,
+                RoleArchetype::Researcher => 0.68 + rng.f32() * 0.22,
+                RoleArchetype::Generic => 0.64 + rng.f32() * 0.26,
             };
             AntennaGenome {
                 azimuth,
@@ -206,10 +206,10 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
                 length,
                 bend: rng.range(-0.20, 0.20),
                 radius: match role {
-                    RoleArchetype::Builder => 0.082,
-                    RoleArchetype::Orchestrator => 0.074,
-                    RoleArchetype::Reviewer => 0.062,
-                    _ => 0.066,
+                    RoleArchetype::Builder => 0.056,
+                    RoleArchetype::Orchestrator => 0.052,
+                    RoleArchetype::Reviewer => 0.046,
+                    _ => 0.048,
                 },
                 terminal: terminal_for(role, index),
                 phase: rng.f32() * TAU,
@@ -218,14 +218,14 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
         .collect();
 
     let (eye_count, arm_count, leg_count) = match role {
-        RoleArchetype::Orchestrator => (1, 0, 3),
-        RoleArchetype::Builder => (1, 4, 4),
-        RoleArchetype::Tester => (2, 0, 3),
-        RoleArchetype::Inspector => (1, 2, 3),
-        RoleArchetype::Reviewer => (1, 2, 4),
-        RoleArchetype::Planner => (2, 0, 2),
-        RoleArchetype::Researcher => (1, 0, 2),
-        RoleArchetype::Generic => (1 + rng.usize(2), rng.usize(3), 2 + rng.usize(3)),
+        RoleArchetype::Orchestrator => (2, 0, 0),
+        RoleArchetype::Builder => (1, 2, 0),
+        RoleArchetype::Tester => (2, 0, 0),
+        RoleArchetype::Inspector => (1, 2, 0),
+        RoleArchetype::Reviewer => (1, 2, 0),
+        RoleArchetype::Planner => (2, 0, 0),
+        RoleArchetype::Researcher => (1, 0, 0),
+        RoleArchetype::Generic => (1 + rng.usize(2), rng.usize(3), rng.usize(2)),
     };
 
     CreatureGenome {
@@ -233,7 +233,7 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
         role,
         body_radii,
         body_sides,
-        depth_scale: 0.72 + rng.f32() * 0.14,
+        depth_scale: 0.62 + rng.f32() * 0.08,
         eye_count,
         arm_count,
         leg_count,
