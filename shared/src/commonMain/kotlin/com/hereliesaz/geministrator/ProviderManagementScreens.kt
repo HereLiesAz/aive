@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -32,6 +33,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CompanyProviderScreen(
@@ -278,6 +280,9 @@ internal fun ProviderSettingsScreen(
     onClearWorkflowData: () -> Unit = {},
     onExportJson: suspend () -> String? = { null },
     onImportJson: (String) -> Unit = {},
+    projectFileService: ProjectFileService? = null,
+    onExportCurrentProjectFile: suspend () -> IveProjectExport? = { null },
+    onImportProjectFile: suspend (String) -> String? = { null },
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onConfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
@@ -287,32 +292,58 @@ internal fun ProviderSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
     var exportedJson by remember { mutableStateOf<String?>(null) }
     var diagnosticBundle by remember { mutableStateOf<String?>(null) }
-    var importDraft by remember { mutableStateOf("") }
-    var importMode by remember { mutableStateOf(false) }
+    var importDraft by rememberDurableStringState("settings.import-json.draft")
+    var importMode by rememberDurableBooleanState("settings.import-json.open")
     var clearConfirm by remember { mutableStateOf(false) }
     var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
     var healthChecking by remember { mutableStateOf(false) }
     var exportTriggered by remember { mutableStateOf(false) }
     var diagnosticTriggered by remember { mutableStateOf(false) }
+    var detectedProjectFiles by remember { mutableStateOf<List<ProjectFileDescriptor>>(emptyList()) }
+    var projectFileMessage by remember { mutableStateOf<String?>(null) }
+    var projectFileRefresh by remember { mutableStateOf(0) }
     val computeConfiguration = distributedComputeState.configuration
-    var relayUrlDraft by remember(computeConfiguration.relayUrl) { mutableStateOf(computeConfiguration.relayUrl) }
-    var poolIdDraft by remember(computeConfiguration.poolId) { mutableStateOf(computeConfiguration.poolId) }
-    var nodeIdDraft by remember(computeConfiguration.nodeId) { mutableStateOf(computeConfiguration.nodeId) }
-    var nodeNameDraft by remember(computeConfiguration.displayName) { mutableStateOf(computeConfiguration.displayName) }
+    var relayUrlDraft by rememberDurableStringState(
+        "settings.compute.relay-url",
+        computeConfiguration.relayUrl,
+    )
+    var poolIdDraft by rememberDurableStringState(
+        "settings.compute.pool-id",
+        computeConfiguration.poolId,
+    )
+    var nodeIdDraft by rememberDurableStringState(
+        "settings.compute.node-id",
+        computeConfiguration.nodeId,
+    )
+    var nodeNameDraft by rememberDurableStringState(
+        "settings.compute.node-name",
+        computeConfiguration.displayName,
+    )
+    // Unsaved secret text is deliberately not copied into general Settings. Once Save is pressed,
+    // the token is synchronously committed to platform-secure credential storage.
     var tokenDraft by remember(distributedComputeState.tokenConfigured) { mutableStateOf("") }
-    var maxParallelDraft by remember(computeConfiguration.maxParallelLeases) {
-        mutableStateOf(computeConfiguration.maxParallelLeases.toString())
-    }
-    var sharingEnabledDraft by remember(computeConfiguration.sharingEnabled) {
-        mutableStateOf(computeConfiguration.sharingEnabled)
-    }
-    var allowMeteredDraft by remember(computeConfiguration.allowMeteredNetwork) {
-        mutableStateOf(computeConfiguration.allowMeteredNetwork)
-    }
-    var requirePowerDraft by remember(computeConfiguration.requireExternalPower) {
-        mutableStateOf(computeConfiguration.requireExternalPower)
+    var maxParallelDraft by rememberDurableStringState(
+        "settings.compute.max-parallel",
+        computeConfiguration.maxParallelLeases.toString(),
+    )
+    var sharingEnabledDraft by rememberDurableBooleanState(
+        "settings.compute.sharing-enabled",
+        computeConfiguration.sharingEnabled,
+    )
+    var allowMeteredDraft by rememberDurableBooleanState(
+        "settings.compute.allow-metered",
+        computeConfiguration.allowMeteredNetwork,
+    )
+    var requirePowerDraft by rememberDurableBooleanState(
+        "settings.compute.require-power",
+        computeConfiguration.requireExternalPower,
+    )
+
+    LaunchedEffect(projectFileService, projectFileRefresh) {
+        detectedProjectFiles = projectFileService?.detected().orEmpty()
     }
 
     Column(
@@ -540,6 +571,128 @@ internal fun ProviderSettingsScreen(
                         }
                     },
                     endCap = if (node.acceptsWork) "Available" else "Observe only",
+                )
+            }
+        }
+
+        ProviderSectionLabel("Projects")
+        if (projectFileService != null) {
+            Text(
+                "Project files use the .ive extension. The detected list includes Aive's project folder and files you previously selected elsewhere.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    "Save current project",
+                    "ive-save-default",
+                    onClick = {
+                        scope.launch {
+                            runCatching {
+                                val export = onExportCurrentProjectFile()
+                                    ?: error("No project is currently loaded")
+                                projectFileService.saveDefault(export.fileName, export.content)
+                            }.onSuccess { descriptor ->
+                                projectFileMessage = "Saved ${descriptor.displayName}"
+                                projectFileRefresh += 1
+                            }.onFailure { failure ->
+                                projectFileMessage = failure.message ?: "Project save failed"
+                            }
+                        }
+                    },
+                )
+                AzphaltPill(
+                    "Save project as…",
+                    "ive-save-as",
+                    onClick = {
+                        scope.launch {
+                            runCatching {
+                                val export = onExportCurrentProjectFile()
+                                    ?: error("No project is currently loaded")
+                                projectFileService.saveAs(export.fileName, export.content)
+                            }.onSuccess { descriptor ->
+                                if (descriptor != null) {
+                                    projectFileMessage = "Saved ${descriptor.displayName}"
+                                    projectFileRefresh += 1
+                                }
+                            }.onFailure { failure ->
+                                projectFileMessage = failure.message ?: "Project save failed"
+                            }
+                        }
+                    },
+                )
+            }
+            if (detectedProjectFiles.isEmpty()) {
+                Text(
+                    "No .ive project files detected yet.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            } else {
+                detectedProjectFiles.forEach { descriptor ->
+                    AzphaltRecord(
+                        seed = "ive-project-${descriptor.id}",
+                        eyebrow = "Project file",
+                        title = descriptor.displayName,
+                        body = descriptor.locationLabel,
+                        endCap = "Load",
+                        well = {
+                            AzphaltPill(
+                                "Load project",
+                                "ive-load-${descriptor.id}",
+                                onClick = {
+                                    scope.launch {
+                                        runCatching {
+                                            val opened = projectFileService.read(descriptor)
+                                                ?: error("Project file is no longer available")
+                                            onImportProjectFile(opened.content)
+                                                ?: error("Project could not be loaded")
+                                        }.onSuccess { projectName ->
+                                            projectFileMessage = "Loaded $projectName"
+                                            projectFileRefresh += 1
+                                        }.onFailure { failure ->
+                                            projectFileMessage = failure.message ?: "Project load failed"
+                                        }
+                                    }
+                                },
+                            )
+                        },
+                    )
+                }
+            }
+            AzphaltPill(
+                "Choose .ive file from another location…",
+                "ive-open-picker",
+                onClick = {
+                    scope.launch {
+                        runCatching {
+                            val opened = projectFileService.chooseAndRead() ?: return@launch
+                            onImportProjectFile(opened.content)
+                                ?: error("Project could not be loaded")
+                        }.onSuccess { projectName ->
+                            projectFileMessage = "Loaded $projectName"
+                            projectFileRefresh += 1
+                        }.onFailure { failure ->
+                            projectFileMessage = failure.message ?: "Project load failed"
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AzphaltPill(
+                "Refresh detected project files",
+                "ive-refresh",
+                onClick = { projectFileRefresh += 1 },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            projectFileMessage?.let { message ->
+                AzphaltRecord(
+                    seed = "ive-project-message",
+                    eyebrow = "Project files",
+                    title = message,
+                    body = "Portable project state remains separate from provider API keys and repository tokens.",
+                    endCap = "OK",
+                    onClick = { projectFileMessage = null },
                 )
             }
         }
