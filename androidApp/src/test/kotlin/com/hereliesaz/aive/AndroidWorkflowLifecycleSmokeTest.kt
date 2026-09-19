@@ -49,7 +49,8 @@ class AndroidWorkflowLifecycleSmokeTest {
             withTimeout(15_000L) {
                 var implementationApproved = false
                 while (true) {
-                    val live = runtime.state.value as? ApplicationRuntimeState.Live ?: run {
+                    val live = runtime.state.value as? ApplicationRuntimeState.Live
+                    if (live == null) {
                         delay(25L)
                         continue
                     }
