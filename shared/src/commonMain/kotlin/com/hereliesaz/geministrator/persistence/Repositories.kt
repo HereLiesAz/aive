@@ -42,6 +42,7 @@ interface WorkflowEventRepository {
 interface RoleRepository {
     suspend fun put(role: RoleDefinition)
     suspend fun remove(id: RoleDefinitionId)
+    suspend fun replaceAll(roles: List<RoleDefinition>)
     suspend fun get(id: RoleDefinitionId): RoleDefinition?
     suspend fun all(): List<RoleDefinition>
 }
