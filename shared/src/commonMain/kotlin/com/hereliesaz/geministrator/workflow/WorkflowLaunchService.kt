@@ -30,6 +30,7 @@ class WorkflowLaunchService(
             workflowRunId = workflowRunId,
             projectId = project.id,
             objective = objective,
+            repository = project.repository,
             nowEpochMillis = nowEpochMillis,
             taskRunIdFactory = taskRunIdFactory,
         )
