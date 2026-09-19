@@ -138,7 +138,7 @@ Tracking issue: #35
 
 ## P1 — Delivery
 
-- [ ] Keep `main` CI green across shared tests, Jules provider, Android, Desktop, JS, and Wasm.
+- [x] Keep `main` CI green across shared tests, Jules provider, Android, Desktop, JS, and Wasm.
 - [x] Confirm Android release signing from reconstructed keystore material on CI.
 - [x] Add Google Play publishing using `PLAY_SERVICE_ACCOUNT_JSON` as a separate publishing job.
 - [x] Automatically publish the desired Google Play internal-testing track after a successful release build.

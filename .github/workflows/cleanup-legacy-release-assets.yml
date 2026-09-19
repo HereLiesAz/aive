@@ -1,0 +1,29 @@
+name: Cleanup legacy rolling release assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove pre-Aive rolling assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_NAME="latest-v0.9"
+
+          gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' |
+          while IFS= read -r ASSET; do
+            case "$ASSET" in
+              TheHaive-*|thehaive_*)
+                echo "Deleting legacy asset: $ASSET"
+                gh release delete-asset "$TAG_NAME" "$ASSET" --repo "$GITHUB_REPOSITORY" --yes
+                ;;
+            esac
+          done

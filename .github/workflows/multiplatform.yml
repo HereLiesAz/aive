@@ -489,10 +489,17 @@ jobs:
           git push origin "$TAG_NAME" --force
 
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            # A rolling release represents exactly one build. Prune previous-version assets
+            # before uploading the current set so renamed/versioned files cannot accumulate.
+            while IFS= read -r EXISTING_ASSET; do
+              [ -n "$EXISTING_ASSET" ] || continue
+              gh release delete-asset "$TAG_NAME" "$EXISTING_ASSET" --yes
+            done < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
+
             gh release edit "$TAG_NAME" \
               --title "$RELEASE_TITLE" \
               --notes-file release-notes.md
-            gh release upload "$TAG_NAME" release-files/* --clobber
+            gh release upload "$TAG_NAME" release-files/*
           elif [ "$IS_PRERELEASE" = "true" ]; then
             gh release create "$TAG_NAME" release-files/* \
               --prerelease \
