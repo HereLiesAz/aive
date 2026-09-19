@@ -1,14 +1,14 @@
-# The Haive architecture
+# The Aive architecture
 
 ## Product definition
 
-The Haive is a Compose Multiplatform control room for governed software-development workflows.
+The Aive is a Compose Multiplatform control room for governed software-development workflows.
 
-> The Haive is not an agent. It is the company that hires agents.
+> The Aive is not an agent. It is the company that hires agents.
 
 Its job is to turn an objective into explicit work, establish dependency and verification structure, assign that work to appropriate executors, observe the run, and surface only the human decisions that genuinely require a person.
 
-The Haive is not an IDE. Source editing, terminals, and generic filesystem tooling are outside the product boundary.
+The Aive is not an IDE. Source editing, terminals, and generic filesystem tooling are outside the product boundary.
 
 ## First principles
 
@@ -25,7 +25,7 @@ The Haive is not an IDE. Source editing, terminals, and generic filesystem tooli
 
 ## Targets
 
-- Android — application ID and namespace `com.hereliesaz.haive`
+- Android — application ID and namespace `com.hereliesaz.aive`
 - Desktop JVM
 - Web JavaScript
 - WebAssembly
@@ -111,7 +111,7 @@ The engine owns:
 
 Progress belongs to `TaskRun`, not to agents.
 
-An executor may provide an exact fraction. When it does, the runtime preserves that value. Some executors, including the currently exposed Jules activity model, provide only qualitative progress. In that case The Haive may present lifecycle progress such as planning, running, and verifying without pretending it is an exact percentage.
+An executor may provide an exact fraction. When it does, the runtime preserves that value. Some executors, including the currently exposed Jules activity model, provide only qualitative progress. In that case The Aive may present lifecycle progress such as planning, running, and verifying without pretending it is an exact percentage.
 
 This makes the same UI capable of representing both a provider activity like “Writing tests” and an automated executor that knows “7 of 11 steps complete.”
 
