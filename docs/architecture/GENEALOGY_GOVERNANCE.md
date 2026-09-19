@@ -1,6 +1,6 @@
 # Genealogy-based inference governance
 
-Genealogy governance is the structural trust layer for compound inference in The Haive.
+Genealogy governance is the structural trust layer for compound inference in The Aive.
 
 It exists to answer questions such as:
 
