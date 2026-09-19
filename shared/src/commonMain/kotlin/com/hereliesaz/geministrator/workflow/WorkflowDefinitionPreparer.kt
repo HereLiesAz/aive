@@ -52,7 +52,7 @@ class WorkflowDefinitionPreparer(
                 }
 
                 val role = requireNotNull(rolesById[executor.roleId]) {
-                    "Role ${executor.roleId.value} is not registered in the active company"
+                    "Role ${executor.roleId.value} is not registered in the active swarm"
                 }
                 if (RoleAuthority.SelectEnvironment in role.authorities) {
                     add(task)
