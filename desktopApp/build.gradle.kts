@@ -119,8 +119,13 @@ tasks.matching {
 }
 
 val appVersionName = providers.gradleProperty("app.versionName").get()
-// DMG and MSI only accept MAJOR.MINOR.PATCH; strip any prerelease suffix.
-val appPackageVersion = appVersionName.substringBefore("-")
+val appVersionComponents = appVersionName.split('.')
+require(appVersionComponents.size == 4 && appVersionComponents.all { it.toIntOrNull() != null }) {
+    "app.versionName must use MAJOR.MINOR.PATCH.BUILD"
+}
+// Native desktop package metadata stays at MAJOR.MINOR.PATCH because jpackage/MSI/DMG impose
+// stricter version syntax. Public release identity and asset names keep all four components.
+val appPackageVersion = appVersionComponents.take(3).joinToString(".")
 val nativePackageVersion = if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
     // macOS jpackage requires the first app-version component to be greater than zero.
     // Offset only the native macOS package major so Aive's public SemVer can remain pre-1.0.
