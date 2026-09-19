@@ -290,10 +290,14 @@ class AzphaltStoreService(
         }
     }
 
-    private suspend fun requireNotRevoked(
+    private suspend fun requireNotRevoked(packageId: String, version: String) {
+        requireNotRevoked(packageId, version, revocations())
+    }
+
+    private fun requireNotRevoked(
         packageId: String,
         version: String,
-        knownRevocations: List<AzphaltRevocation> = revocations(),
+        knownRevocations: List<AzphaltRevocation>,
     ) {
         val revocation = knownRevocations.firstOrNull { it.id == packageId && it.version == version }
         require(revocation == null) {
