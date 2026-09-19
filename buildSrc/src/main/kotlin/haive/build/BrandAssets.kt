@@ -49,9 +49,11 @@ object BrandAssets {
         logoSource: File,
         animationSource: File,
         outputDir: File,
-        maxDimension: Int = 512,
+        maxDimension: Int = 320,
+        maxFrames: Int = 48,
     ) {
         require(maxDimension > 0)
+        require(maxFrames > 1)
         val logo = readSource(logoSource)
         val animation = readGif(animationSource)
         val largestDimension = maxOf(animation.width, animation.height)
@@ -59,24 +61,24 @@ object BrandAssets {
         val targetWidth = (animation.width * scale).roundToInt().coerceAtLeast(1)
         val targetHeight = (animation.height * scale).roundToInt().coerceAtLeast(1)
 
-        val outputFrames = animation.frames.mapIndexed { index, frame ->
+        val frameStep = ((animation.frames.size + maxFrames - 1) / maxFrames).coerceAtLeast(1)
+        val sampledFrames = animation.frames.chunked(frameStep)
+        val outputFrames = sampledFrames.mapIndexed { index, chunk ->
+            val sourceFrame = chunk.first()
             val image = if (index == 0) {
                 fitIntoCanvas(logo, targetWidth, targetHeight)
             } else {
-                resize(frame.image, targetWidth, targetHeight)
+                resize(sourceFrame.image, targetWidth, targetHeight)
             }
-            GifFrame(image = image, delayHundredths = frame.delayHundredths)
+            GifFrame(
+                image = image,
+                delayHundredths = chunk.sumOf(GifFrame::delayHundredths).coerceAtLeast(2),
+            )
         }
 
         outputDir.mkdirs()
-        val gifFile = outputDir.resolve("haive_loader.gif")
-        writeGif(outputFrames, gifFile)
-        // GIF encoding quantizes the palette. Derive the fallback from the encoded first frame so
-        // swapping from PNG to GIF is pixel-identical rather than merely source-identical.
-        val encodedFrame0 = requireNotNull(ImageIO.read(gifFile)) {
-            "Generated loader GIF is unreadable: ${gifFile.absolutePath}"
-        }
-        writePng(encodedFrame0, outputDir.resolve("haive_loader_frame0.png"))
+        writePng(outputFrames.first().image, outputDir.resolve("haive_loader_frame0.png"))
+        writeGif(outputFrames, outputDir.resolve("haive_loader.gif"))
     }
 
     private fun readSource(source: File): BufferedImage {

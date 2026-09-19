@@ -203,11 +203,18 @@ internal fun CustomCompanyProviderScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            val reservedRoleId = roleIdDraft.trim() == ROLE_COLLECTION_MARKER_ID
             OutlinedTextField(
                 value = roleIdDraft,
                 onValueChange = { roleIdDraft = it },
                 label = { Text("Role ID (slug)") },
                 singleLine = true,
+                isError = reservedRoleId,
+                supportingText = if (reservedRoleId) {
+                    { Text("This ID is reserved by The Aive.") }
+                } else {
+                    null
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
@@ -271,8 +278,8 @@ internal fun CustomCompanyProviderScreen(
                         }
                         if (
                             cleanId.isNotBlank() &&
-                            cleanId != ROLE_COLLECTION_MARKER_ID &&
-                            cleanName.isNotBlank()
+                            cleanName.isNotBlank() &&
+                            cleanId != ROLE_COLLECTION_MARKER_ID
                         ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),

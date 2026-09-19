@@ -23,7 +23,6 @@ interface ProjectRepository {
 
 interface WorkflowDefinitionRepository {
     suspend fun put(definition: WorkflowDefinition)
-    suspend fun remove(id: WorkflowDefinitionId)
     suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition?
     suspend fun all(): List<WorkflowDefinition>
 }
@@ -41,8 +40,6 @@ interface WorkflowEventRepository {
 
 interface RoleRepository {
     suspend fun put(role: RoleDefinition)
-    suspend fun remove(id: RoleDefinitionId)
-    suspend fun replaceAll(roles: List<RoleDefinition>)
     suspend fun get(id: RoleDefinitionId): RoleDefinition?
     suspend fun all(): List<RoleDefinition>
 }
@@ -61,4 +58,16 @@ interface WorkflowPersistence : FailureEscalationDecisionStore {
     val roles: RoleRepository
     val artifacts: ArtifactRepository
     val approvalGates: ApprovalGateRepository
+
+    /**
+     * Replace the workflow-definition and role catalogs as one logical write.
+     * Durable implementations should override this to make the replacement atomic.
+     */
+    suspend fun replaceCatalog(
+        definitions: List<WorkflowDefinition>,
+        roles: List<RoleDefinition>,
+    ) {
+        definitions.forEach { this.definitions.put(it) }
+        roles.forEach { this.roles.put(it) }
+    }
 }

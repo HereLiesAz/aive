@@ -24,7 +24,6 @@ import com.hereliesaz.geministrator.memory.MemoryMicroAgentArtifact
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
 import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
-import com.hereliesaz.geministrator.memory.MemoryPromptRecall
 import com.hereliesaz.geministrator.memory.MemoryQuery
 import com.hereliesaz.geministrator.memory.MemoryResolution
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
@@ -548,35 +547,29 @@ internal class AndroidMemoryLayerRuntime(
                 resolution = MemoryResolution.Summary,
                 maxResults = MAX_RECALL_RESULTS,
                 projectId = context.projectId?.value,
-                workflowRunId = context.workflowRunId?.value,
-                workflowDefinitionId = context.workflowDefinitionId?.value,
-                taskDefinitionId = context.taskDefinitionId?.value,
                 roleId = context.roleId?.value,
             ),
         )
         if (recall.hits.isEmpty()) {
-            MemoryPromptRecall()
+            emptyList()
         } else {
             val content = recall.hits.joinToString("\n\n") { hit ->
                 "[${"%.2f".format(hit.score)}] ${hit.node.kind.name}: ${hit.node.text}"
             }.take(MAX_RECALL_CHARS)
-            MemoryPromptRecall(
-                blocks = listOf(PromptContextBlock("Relevant memory", content)),
-                memoryAddresses = recall.hits.mapTo(linkedSetOf()) { hit ->
-                    "memory-node:${hit.node.id.value}"
-                },
-            )
+            listOf(PromptContextBlock("Relevant memory", content))
         }
     }
 
-    private var activated = false
-
-    fun activate() {
-        if (activated) return
-        activated = true
+    fun attach() {
         MemoryRuntimeBridge.observer = observer
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         scope.launch { drainConsolidationQueue() }
+    }
+
+    fun detach() {
+        if (MemoryRuntimeBridge.observer === observer) {
+            MemoryRuntimeBridge.reset()
+        }
     }
 
     @OptIn(ExperimentalTime::class)
@@ -590,9 +583,7 @@ internal class AndroidMemoryLayerRuntime(
     }
 
     override fun close() {
-        if (MemoryRuntimeBridge.observer === observer) {
-            MemoryRuntimeBridge.reset()
-        }
+        detach()
         scope.cancel()
         sessionManager.close()
     }

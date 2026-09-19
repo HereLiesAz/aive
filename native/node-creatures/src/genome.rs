@@ -162,9 +162,9 @@ pub fn generate_genome(role: RoleArchetype, seed: &str) -> CreatureGenome {
 
     let body_sides = match role {
         RoleArchetype::Builder => 18,
-        RoleArchetype::Reviewer => 18,
-        RoleArchetype::Planner => 18,
-        _ => 20,
+        RoleArchetype::Reviewer => 17,
+        RoleArchetype::Planner => 17,
+        _ => 18,
     };
 
     // The antennae are deliberately arranged around the projected silhouette rather than around

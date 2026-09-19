@@ -20,10 +20,10 @@ permissions:
   id-token: write
 
 concurrency:
-  # Main and any Play-capable manual dispatch share one publishing lane so version codes,
-  # immutable release tags, and store uploads cannot race across refs.
-  group: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_play)) && 'aive-publishing' || format('aive-{0}-{1}', github.workflow, github.ref) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Main release runs must never be cancelled after an immutable tag has been created.
+  # Keeping the ref in the key prevents unrelated PRs from blocking one another.
+  group: aive-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -80,7 +80,7 @@ jobs:
           tool: cargo-ndk
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Reconstruct and verify Android signing keystore
         id: signing
@@ -381,7 +381,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Generate and verify desktop icons
         shell: bash
@@ -607,7 +607,7 @@ jobs:
         uses: actions/deploy-pages@v5
 
   publish-play:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_play) }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_play) }}
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -623,8 +623,16 @@ jobs:
           name: aive-release-notes
           path: fastlane/metadata/android/en-US/changelogs
 
+      - name: Prepare Google Play localized release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOTES_DIR="fastlane/metadata/android/en-US/changelogs"
+          test -s "$NOTES_DIR/default.txt"
+          cp "$NOTES_DIR/default.txt" "$NOTES_DIR/whatsnew-en-US"
+
       - name: Publish to Google Play internal track
-        uses: r0adkll/upload-google-play@v1
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.hereliesaz.aive
