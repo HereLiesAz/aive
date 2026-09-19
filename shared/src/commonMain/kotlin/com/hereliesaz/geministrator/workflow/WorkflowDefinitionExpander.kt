@@ -45,7 +45,15 @@ object WorkflowDefinitionExpander {
         val expanded = buildList {
             definition.tasks.forEach { task ->
                 val role = taskRole(task)
-                if (role == null || RoleAuthority.Implement !in role.authorities) {
+                val effectiveAuthority = task.requiredRoleAuthority
+                    ?: role?.authorities?.singleOrNull()
+                val roleAgent = task.executor as? TaskExecutor.RoleAgent
+                if (
+                    role == null ||
+                    roleAgent == null ||
+                    effectiveAuthority != RoleAuthority.Implement ||
+                    RoleAuthority.Implement !in role.authorities
+                ) {
                     add(task)
                     return@forEach
                 }
@@ -64,6 +72,7 @@ object WorkflowDefinitionExpander {
                             name = "Pre-code tests: ${task.name}",
                             objective = "Derive the verification contract for '${task.name}' from approved specifications, architecture, acceptance criteria, and concepts without inspecting implementation code.",
                             roleId = testAuthor.id,
+                            requiredRoleAuthority = RoleAuthority.AuthorTests,
                             executor = TaskExecutor.RoleAgent(testAuthor.id),
                             dependsOn = task.dependsOn,
                             acceptanceCriteria = task.acceptanceCriteria,
@@ -101,6 +110,7 @@ object WorkflowDefinitionExpander {
                             name = "Post-code tests: ${task.name}",
                             objective = "Inspect the approved implementation for '${task.name}' and author regression tests, implementation-specific edge cases, and coverage-gap tests without certifying that the implementation passes them.",
                             roleId = testAuthor.id,
+                            requiredRoleAuthority = RoleAuthority.AuthorTests,
                             executor = TaskExecutor.RoleAgent(testAuthor.id),
                             dependsOn = setOf(task.id),
                             acceptanceCriteria = task.acceptanceCriteria,
