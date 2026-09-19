@@ -83,6 +83,8 @@ object CentralizedMixtureOfAgentsExpander {
                         "Cannot inject centralized MoA governance task because ${id.value} already exists"
                     }
                 }
+                val postCodeTestId = TaskDefinitionId("${task.id.value}--post-code-tests")
+                    .takeIf(reservedIds::contains)
                 val verifierId = TaskDefinitionId("${task.id.value}--moa-verifier").also { id ->
                     require(reservedIds.add(id)) {
                         "Cannot inject centralized MoA verifier because ${id.value} already exists"
@@ -110,7 +112,7 @@ object CentralizedMixtureOfAgentsExpander {
                             verificationPolicy = VerificationPolicy.None,
                             retryPolicy = task.retryPolicy,
                             escalationPolicy = task.escalationPolicy,
-                            providerConstraints = ProviderConstraints.None,
+                            providerConstraints = task.providerConstraints,
                             environmentPlanningPolicy = EnvironmentPlanningPolicy.WhenProviderRequires,
                             compoundInferencePolicy = CompoundInferencePolicy.Single,
                             executor = TaskExecutor.RoleAgent(role.id),
@@ -174,7 +176,8 @@ object CentralizedMixtureOfAgentsExpander {
                             }
                         },
                         roleId = verifierRole.id,
-                        dependsOn = task.dependsOn + proposerIds + governanceId + task.id,
+                        dependsOn = task.dependsOn + proposerIds + governanceId + task.id +
+                            postCodeTestId?.let(::setOf).orEmpty(),
                         condition = task.condition,
                         acceptanceCriteria = task.acceptanceCriteria,
                         requiredArtifacts = setOf(ArtifactKind.Verification),
@@ -182,7 +185,7 @@ object CentralizedMixtureOfAgentsExpander {
                         verificationPolicy = VerificationPolicy.None,
                         retryPolicy = task.retryPolicy,
                         escalationPolicy = task.escalationPolicy,
-                        providerConstraints = ProviderConstraints.None,
+                        providerConstraints = task.providerConstraints,
                         environmentPlanningPolicy = EnvironmentPlanningPolicy.WhenProviderRequires,
                         compoundInferencePolicy = CompoundInferencePolicy.Single,
                         executor = TaskExecutor.RoleAgent(verifierRole.id),
@@ -193,12 +196,28 @@ object CentralizedMixtureOfAgentsExpander {
 
         val rewired = expanded.map { task ->
             val additionalVerifierDependencies = task.dependsOn.mapNotNullTo(linkedSetOf()) { dependency ->
-                verifierByOriginal[dependency]?.takeUnless { verifierId -> verifierId == task.id }
+                val verifierId = verifierByOriginal[dependency] ?: return@mapNotNullTo null
+                val postCodeTaskId = TaskDefinitionId("${dependency.value}--post-code-tests")
+                verifierId.takeUnless { it == task.id || task.id == postCodeTaskId }
             }
-            if (additionalVerifierDependencies.isEmpty()) {
+            val retargetedCondition = when (val condition = task.condition) {
+                is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome ->
+                    verifierByOriginal[condition.ofTask]?.let {
+                        com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome(it)
+                    } ?: condition
+                is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure ->
+                    verifierByOriginal[condition.ofTask]?.let {
+                        com.hereliesaz.geministrator.domain.TaskCondition.OnFailure(it)
+                    } ?: condition
+                com.hereliesaz.geministrator.domain.TaskCondition.Always -> condition
+            }
+            if (additionalVerifierDependencies.isEmpty() && retargetedCondition == task.condition) {
                 task
             } else {
-                task.copy(dependsOn = task.dependsOn + additionalVerifierDependencies)
+                task.copy(
+                    dependsOn = task.dependsOn + additionalVerifierDependencies,
+                    condition = retargetedCondition,
+                )
             }
         }
 
