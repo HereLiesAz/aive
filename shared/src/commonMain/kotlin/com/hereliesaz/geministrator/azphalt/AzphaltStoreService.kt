@@ -37,6 +37,8 @@ data class AzphaltPreparedInstall(
     val verification: AzphaltPackageVerification,
     val plan: AzphaltWorkflowInstallPlan,
     val dependencies: List<AzphaltResolvedDependency>,
+    val revocationStatusVerified: Boolean = true,
+    val localImport: Boolean = false,
 ) {
     val blockingDependencies: List<AzphaltResolvedDependency>
         get() = dependencies.filter(AzphaltResolvedDependency::blocksInstall)
@@ -83,7 +85,9 @@ class AzphaltStoreService(
         val search = search(query)
         val installed = installed()
         val updates = runCatching { updates() }.getOrDefault(emptyList())
-        val revocations = runCatching { revocations() }.getOrDefault(emptyList())
+        // Revocations are security state, not optional decoration. Propagate lookup failures instead
+        // of rendering a dangerously reassuring empty list.
+        val revocations = revocations()
         return AzphaltStoreSnapshot(index, search.packages, installed, updates, revocations)
     }
 
@@ -102,6 +106,7 @@ class AzphaltStoreService(
         val version = requestedVersion?.let(AzphaltRepositoryClient::requireVersion)
             ?: detail.latest
             ?: detail.version
+        requireNotRevoked(detail.id, version)
         val bytes = repository.download(detail.id, version, entitlementToken)
         val verification = verifier.verify(bytes, repositoryIndex().signingKeys)
         val manifest = verification.packageContents.manifest
@@ -138,8 +143,21 @@ class AzphaltStoreService(
      */
     suspend fun prepareLocalInstall(bytes: ByteArray): AzphaltPreparedInstall {
         val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
-        val verification = verifier.verify(bytes, signingKeys)
-        val manifest = verification.packageContents.manifest
+        val verified = verifier.verify(bytes, signingKeys)
+        val manifest = verified.packageContents.manifest
+        val revocationResult = runCatching { revocations() }
+        revocationResult.getOrNull()?.let { known ->
+            requireNotRevoked(manifest.id, manifest.version, known)
+        }
+        val revocationStatusVerified = revocationResult.isSuccess
+        val verification = if (revocationStatusVerified) {
+            verified
+        } else {
+            verified.copy(
+                trusted = false,
+                trustReason = "${verified.trustReason}; repository revocation status unavailable",
+            )
+        }
         require(manifest.kind == "workflow" || manifest.kind == "role") {
             "Haive Store installs workflow and role packages; ${manifest.id} is kind ${manifest.kind}"
         }
@@ -177,6 +195,8 @@ class AzphaltStoreService(
             verification = verification,
             plan = plan,
             dependencies = dependencies,
+            revocationStatusVerified = revocationStatusVerified,
+            localImport = true,
         )
     }
 
@@ -187,6 +207,14 @@ class AzphaltStoreService(
         allowUntrustedSigner: Boolean = false,
         allowPublisherChange: Boolean = false,
     ): InstalledAzphaltWorkflowPackage {
+        if (prepared.revocationStatusVerified) {
+            // Re-check at the mutation boundary so a revocation published after preparation wins.
+            requireNotRevoked(prepared.plan.packageId, prepared.version)
+        } else {
+            require(prepared.localImport && allowUntrustedSigner) {
+                "Repository revocation status is unavailable; explicit offline/untrusted approval is required"
+            }
+        }
         val currentDependencies = resolveDependencies(prepared.plan.dependencies)
         val blockers = currentDependencies.filter(AzphaltResolvedDependency::blocksInstall)
         require(blockers.isEmpty()) {
@@ -259,6 +287,24 @@ class AzphaltStoreService(
                 packageName = detail.name,
                 packageKind = detail.kind,
             )
+        }
+    }
+
+    private suspend fun requireNotRevoked(
+        packageId: String,
+        version: String,
+        knownRevocations: List<AzphaltRevocation> = revocations(),
+    ) {
+        val revocation = knownRevocations.firstOrNull { it.id == packageId && it.version == version }
+        require(revocation == null) {
+            buildString {
+                append("Azphalt package ")
+                append(packageId)
+                append('@')
+                append(version)
+                append(" is revoked")
+                revocation?.reason?.takeIf(String::isNotBlank)?.let { append(": ").append(it) }
+            }
         }
     }
 
