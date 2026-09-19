@@ -539,7 +539,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.hereliesaz.haive
+          packageName: com.hereliesaz.aive
           releaseFiles: android-release/**/*.aab
           track: internal
           status: completed
