@@ -125,6 +125,26 @@ internal class LocalWorkspaceAgentProvider(
         session.observationJob = observationJob
         try {
             if (taskMode(session.request) == TaskMode.Specification) {
+                if (session.request.requirePlanApproval) {
+                    if (session.phase.value == Phase.AwaitingApproval) {
+                        emit(
+                            AgentEvent.PlanGenerated(
+                                runId,
+                                "Design a pre-code verification contract for: ${session.request.objective.trim()}".take(8_000),
+                            ),
+                        )
+                        val phase = session.phase.filter { it != Phase.AwaitingApproval }.first()
+                        if (phase == Phase.Cancelled) {
+                            emit(AgentEvent.Failed(runId, "$displayName workspace session cancelled"))
+                            return@flow
+                        }
+                    }
+                    emit(AgentEvent.PlanApproved(runId))
+                }
+                if (session.phase.value == Phase.Cancelled) {
+                    emit(AgentEvent.Failed(runId, "$displayName workspace session cancelled"))
+                    return@flow
+                }
                 emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
                 val generated = api.generate(specificationPrompt(session.request))
                 val artifactKinds = session.request.requiredArtifacts.ifEmpty {
@@ -268,7 +288,10 @@ internal class LocalWorkspaceAgentProvider(
             ArtifactKind.ContractTest,
             ArtifactKind.FailureScenario,
         )
-        return if (request.requiredArtifacts.any(specificationArtifacts::contains)) {
+        return if (
+            request.requiredArtifacts.isNotEmpty() &&
+            request.requiredArtifacts.all(specificationArtifacts::contains)
+        ) {
             TaskMode.Specification
         } else {
             TaskMode.Mutate
@@ -423,10 +446,11 @@ internal class LocalWorkspaceAgentProvider(
         trackedFiles: List<String>,
     ): Pair<WorkspacePlan, TextGenerationResult> {
         val result = api.generate(planPrompt(request, root, trackedFiles))
-        val approvedText = result.text.trim().take(8_000)
+        val fullText = result.text.trim()
+        val approvedText = fullText.take(8_000)
         return WorkspacePlan(
             text = approvedText,
-            requestedFiles = parseRequestedFiles(approvedText, trackedFiles),
+            requestedFiles = parseRequestedFiles(fullText, trackedFiles),
         ) to result
     }
 
