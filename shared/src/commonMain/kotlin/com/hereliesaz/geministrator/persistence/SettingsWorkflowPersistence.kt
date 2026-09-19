@@ -47,6 +47,10 @@ class SettingsWorkflowPersistence(
             snapshot.copy(definitions = snapshot.definitions.upsert(definition) { it.id == definition.id })
         }
 
+        override suspend fun remove(id: WorkflowDefinitionId) = update { snapshot ->
+            snapshot.copy(definitions = snapshot.definitions.filterNot { it.id == id })
+        }
+
         override suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition? =
             read().definitions.firstOrNull { it.id == id }
 
@@ -80,6 +84,10 @@ class SettingsWorkflowPersistence(
     override val roles: RoleRepository = object : RoleRepository {
         override suspend fun put(role: RoleDefinition) = update { snapshot ->
             snapshot.copy(roles = snapshot.roles.upsert(role) { it.id == role.id })
+        }
+
+        override suspend fun remove(id: RoleDefinitionId) = update { snapshot ->
+            snapshot.copy(roles = snapshot.roles.filterNot { it.id == id })
         }
 
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = read().roles.firstOrNull { it.id == id }
