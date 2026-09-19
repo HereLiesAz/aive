@@ -1,6 +1,6 @@
-# The Haive brand assets
+# The Aive brand assets
 
-This directory contains the canonical brand sources for The Haive.
+This directory contains the canonical brand sources for The Aive.
 
 ## Canonical sources
 
