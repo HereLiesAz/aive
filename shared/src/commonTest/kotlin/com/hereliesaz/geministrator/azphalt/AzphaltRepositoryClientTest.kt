@@ -34,7 +34,7 @@ class AzphaltRepositoryClientTest {
                         "latest":"1.2.0",
                         "kind":"workflow",
                         "priceStatus":"free",
-                        "targetApps":["com.hereliesaz.haive"]
+                        "targetApps":["com.hereliesaz.aive"]
                       }],
                       "total":1,
                       "page":1,
@@ -77,7 +77,7 @@ class AzphaltRepositoryClientTest {
                         "kind":"workflow",
                         "license":"MIT",
                         "compat":">=0.1",
-                        "targetApps":["com.hereliesaz.haive"],
+                        "targetApps":["com.hereliesaz.aive"],
                         "files":{"LICENSE":"sha256-a","workflows/release.json":"sha256-b"},
                         "someFutureField":{"ignored":true},
                         "workflow":{
