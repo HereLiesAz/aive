@@ -7,14 +7,18 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.install.model.UpdateAvailability
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 internal class AndroidUpdateCoordinator(
     private val activity: ComponentActivity,
 ) {
     private val context = activity.applicationContext
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val appUpdateManager = AppUpdateManagerFactory.create(activity)
 
     var state: AndroidUpdateState by mutableStateOf(AndroidUpdateState.Idle)
         private set
@@ -25,19 +29,13 @@ internal class AndroidUpdateCoordinator(
         if (!force && now - lastCheck < CHECK_INTERVAL_MILLIS) return
 
         state = AndroidUpdateState.Checking
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                val release = GithubReleaseFeed.latestAndroidRelease()
-                val current = currentVersion()
-                if (release != null && isNewerVersion(release.version, current)) release.version else null
-            }
-        }
+        val result = runCatching { isPlayUpdateAvailable() }
         preferences.edit().putLong(KEY_LAST_CHECK, now).commit()
 
         state = result.fold(
-            onSuccess = { version ->
-                if (version == null) AndroidUpdateState.Idle
-                else AndroidUpdateState.PlayUpdateAvailable(version)
+            onSuccess = { available ->
+                if (available) AndroidUpdateState.PlayUpdateAvailable
+                else AndroidUpdateState.Idle
             },
             onFailure = { failure ->
                 AndroidUpdateState.Error(failure.message ?: "Update check failed")
@@ -67,8 +65,23 @@ internal class AndroidUpdateCoordinator(
         state = AndroidUpdateState.Idle
     }
 
-    private fun currentVersion(): String =
-        activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: "0"
+    private suspend fun isPlayUpdateAvailable(): Boolean =
+        suspendCancellableCoroutine { continuation ->
+            val task = appUpdateManager.appUpdateInfo
+            task.addOnSuccessListener { info ->
+                if (continuation.isActive) {
+                    continuation.resume(
+                        info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE,
+                    )
+                }
+            }
+            task.addOnFailureListener { failure ->
+                if (continuation.isActive) continuation.resumeWithException(failure)
+            }
+            task.addOnCanceledListener {
+                continuation.cancel()
+            }
+        }
 
     private companion object {
         const val PREFERENCES_NAME = "aive.play-updater.v1"
