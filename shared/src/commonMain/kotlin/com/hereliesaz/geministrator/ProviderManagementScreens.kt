@@ -353,7 +353,7 @@ internal fun ProviderSettingsScreen(
         Text("SETTINGS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         ProviderSectionLabel("AI Providers")
         Text(
-            "Connect as many providers as you have access to. Every company role can be routed independently from the Company screen.",
+            "Connect as many providers as you have access to. Every swarm role can be routed independently from the Swarm screen.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
