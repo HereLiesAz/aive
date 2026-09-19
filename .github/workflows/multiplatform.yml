@@ -21,7 +21,9 @@ permissions:
 
 concurrency:
   group: aive-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep main/release runs serialized so a newer push cannot strand an immutable tag
+  # between tag creation and GitHub Release publication. Redundant PR runs may still cancel.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -78,7 +80,7 @@ jobs:
           tool: cargo-ndk
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Reconstruct and verify Android signing keystore
         id: signing
@@ -379,7 +381,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Generate and verify desktop icons
         shell: bash
