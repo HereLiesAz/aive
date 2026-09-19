@@ -422,7 +422,7 @@ internal fun MindMapRunScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("COMPANY EXECUTION", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage, modifier = Modifier.weight(1f))
+            Text("SWARM EXECUTION", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage, modifier = Modifier.weight(1f))
             if (activeTaskId != null) {
                 AzphaltPill(
                     label = "Jump to active",
@@ -447,7 +447,7 @@ internal fun MindMapRunScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text("COMPANY ACTIVITY", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text("SWARM ACTIVITY", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         val recentTasks = liveWorkflow.definition.tasks
             .mapNotNull { task -> run.taskRuns[task.id]?.let { taskRun -> task to taskRun } }
             .sortedByDescending { (_, taskRun) -> taskRun.status.activityRank() }
