@@ -2,7 +2,9 @@
 
 The original formatted brief is retained beside this index as `Haive_Swarm_Terrarium_Design_Brief.docx` for historical reference. The implementation direction below supersedes its earlier requirement to use the canonical Haive logo artwork directly as the orchestrator.
 
-The terrarium turns workflow execution into a living, teachable artificial-life system. The workflow nodes are **node creatures**: one dominant head/node mass, 3–10 substantial antennae/connection terminals, secondary arms and legs, and a flat-vector/cel-shaded silhouette that still implies an underlying 3D form.
+The terrarium turns workflow execution into a living, teachable artificial-life system. The workflow nodes are **node creatures**: one dominant head/node mass, 3–10 substantial antennae/connection terminals, restrained secondary appendages where the role needs them, and a flat-vector/cel-shaded silhouette that still implies an underlying 3D form.
+
+All node creatures belong to the same visual species as The Haive mark: a dark rounded core, bright perimeter/antenna color, simple ring-and-pupil facial geometry, and clean radial appendages. Role identity is expressed as a mutation of that family silhouette—not as an unrelated monster, spider, or colored polyhedron.
 
 The creatures are not decoration placed on top of a flowchart. **They are the flowchart.** Relationships attach antenna-tip to antenna-tip. Role anatomy communicates responsibility, live animation communicates current activity/state, and labels confirm rather than establish meaning.
 

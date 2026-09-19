@@ -34,9 +34,12 @@ Writes are guarded so the engine has a coherent restart-safe baseline. Failure-e
 
 Workflow truth is not the only state that must survive process death. The application also writes
 non-secret user drafts and presentation choices through `DurableUiStateStore` as they change.
-This includes project/run creation drafts, repository fields, navigation, appearance, workflow
-composition drafts, custom-company/role editing, artifact browsing state, agent-message drafts,
+This includes project/run creation drafts, repository fields, in-screen navigation state, appearance,
+workflow composition drafts, custom-swarm/role editing, artifact browsing state, agent-message drafts,
 compute-configuration drafts, and Store navigation.
+
+The top-level destination is intentionally chosen fresh on each app startup: Settings only when no
+provider is configured, otherwise Overview.
 
 Saved secrets are intentionally different: provider API keys, repository tokens, and relay tokens
 remain in their platform credential stores. On Android their writes are synchronous before the UI

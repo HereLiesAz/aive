@@ -1,17 +1,7 @@
 package com.hereliesaz.geministrator
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,12 +13,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,10 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
@@ -58,19 +46,16 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
-import kotlin.math.roundToInt
 
 internal object ControlRoomBreakpoints {
     val Wide: Dp = 820.dp
 }
 
-private val InspectorEase = CubicBezierEasing(0f, .9f, .1f, 1f)
-
 enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
     Runs("Runs"),
     Workflows("Workflows"),
-    Company("Company"),
+    Company("Swarm"),
     Artifacts("Artifacts"),
     Inbox("Inbox"),
     Repositories("Repositories"),
@@ -110,6 +95,7 @@ internal val ActiveWorkflow = listOf(
     WorkNode("release", "Release Engineer", "Approve integration and release", WorkState.Blocked, detail = "Blocked by review"),
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ControlRoom(
     destination: ControlRoomDestination,
@@ -165,8 +151,6 @@ fun ControlRoom(
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
         (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
-    var dismissedInspectorId by remember { mutableStateOf<String?>(null) }
-    val compactInspectorVisible = inspectorVisible && selectedTaskId != dismissedInspectorId
 
     Box(
         modifier = Modifier
@@ -181,10 +165,7 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     selectedTaskId = selectedTaskId,
-                    onTaskSelected = { taskId ->
-                        dismissedInspectorId = null
-                        onTaskSelected(taskId)
-                    },
+                    onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
@@ -229,25 +210,6 @@ fun ControlRoom(
                     compact = true,
                     runtimeState = runtimeState,
                 )
-            }
-
-            AnimatedVisibility(
-                visible = compactInspectorVisible,
-                enter = slideInVertically(animationSpec = tween(280, easing = InspectorEase)) { it } + fadeIn(tween(140)),
-                exit = slideOutVertically(animationSpec = tween(220, easing = InspectorEase)) { it } + fadeOut(tween(120)),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                selectedTaskId?.let { taskId ->
-                    CompactInspectorSheet(
-                        taskId = taskId,
-                        liveWorkflow = liveWorkflow,
-                        onDismiss = { dismissedInspectorId = taskId },
-                        onApproveTask = onApproveTask,
-                        onRejectPlan = onRejectPlan,
-                        onResolveEscalation = onResolveEscalation,
-                        onMessageAgent = onMessageAgent,
-                    )
-                }
             }
         } else {
             Row(Modifier.fillMaxSize()) {
@@ -304,103 +266,30 @@ fun ControlRoom(
                     modifier = Modifier.weight(1f),
                     runtimeState = runtimeState,
                 )
-                AnimatedVisibility(
-                    visible = inspectorVisible,
-                    enter = expandHorizontally(
-                        animationSpec = tween(360, easing = InspectorEase),
-                        expandFrom = Alignment.Start,
-                    ) + fadeIn(tween(150)),
-                    exit = shrinkHorizontally(
-                        animationSpec = tween(280, easing = InspectorEase),
-                        shrinkTowards = Alignment.Start,
-                    ) + fadeOut(tween(120)),
+            }
+        }
+
+        if (inspectorVisible) {
+            selectedTaskId?.let { taskId ->
+                ModalBottomSheet(
+                    onDismissRequest = { onTaskSelected(taskId) },
+                    containerColor = Azphalt.Ink,
+                    contentColor = Azphalt.White,
                 ) {
-                    selectedTaskId?.let { taskId ->
-                        TechnicalInspector(
-                            selectedTaskId = taskId,
-                            liveWorkflow = liveWorkflow,
-                            onApproveTask = onApproveTask,
-                            onRejectPlan = onRejectPlan,
-                            onResolveEscalation = onResolveEscalation,
-                            onMessageAgent = onMessageAgent,
-                            modifier = Modifier.width(310.dp).fillMaxHeight(),
-                        )
-                    }
+                    TechnicalInspector(
+                        selectedTaskId = taskId,
+                        liveWorkflow = liveWorkflow,
+                        onApproveTask = onApproveTask,
+                        onRejectPlan = onRejectPlan,
+                        onResolveEscalation = onResolveEscalation,
+                        onMessageAgent = onMessageAgent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(if (compact) 0.72f else 0.62f),
+                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CompactInspectorSheet(
-    taskId: String,
-    liveWorkflow: LiveWorkflowPresentation?,
-    onDismiss: () -> Unit,
-    onApproveTask: (String) -> Unit,
-    onRejectPlan: (String) -> Unit,
-    onResolveEscalation: (String, Boolean) -> Unit,
-    onMessageAgent: suspend (String, String) -> String?,
-) {
-    val density = LocalDensity.current
-    val dismissThresholdPx = with(density) { 84.dp.toPx() }
-    var dragOffsetPx by remember(taskId) { mutableStateOf(0f) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.48f)
-            .offset { IntOffset(0, dragOffsetPx.roundToInt()) }
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Azphalt.Ink),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(42.dp)
-                .pointerInput(taskId, dismissThresholdPx) {
-                    detectVerticalDragGestures(
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
-                        },
-                        onDragEnd = {
-                            if (dragOffsetPx >= dismissThresholdPx) {
-                                onDismiss()
-                            } else {
-                                dragOffsetPx = 0f
-                            }
-                        },
-                        onDragCancel = { dragOffsetPx = 0f },
-                    )
-                },
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(width = 54.dp, height = 5.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Azphalt.White.copy(alpha = 0.35f)),
-            )
-            Text(
-                text = "×",
-                style = AzphaltType.section,
-                color = Azphalt.White,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .clickable(onClick = onDismiss)
-                    .padding(horizontal = 18.dp, vertical = 4.dp),
-            )
-        }
-        TechnicalInspector(
-            selectedTaskId = taskId,
-            liveWorkflow = liveWorkflow,
-            onApproveTask = onApproveTask,
-            onRejectPlan = onRejectPlan,
-            onResolveEscalation = onResolveEscalation,
-            onMessageAgent = onMessageAgent,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
     }
 }
 
@@ -417,7 +306,7 @@ private fun PillNavigation(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("THE AIVE", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
-        Text("COMPANY OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         Spacer(Modifier.height(12.dp))
         ControlRoomDestination.entries.forEachIndexed { index, item ->
             AzphaltPill(
@@ -452,7 +341,7 @@ private fun CompactHeader() {
     ) {
         Column {
             Text("THE AIVE", style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
-            Text("COMPANY OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         }
         AzphaltPill("Ground", "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
     }

@@ -127,7 +127,7 @@ internal fun CustomCompanyProviderScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("COMPANY", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
             "These are Aive's semantic orchestration roles. Add, remove, reorder, rewrite, reroute, and redefine them as a collection. Deterministic system workers and repetitive programmatic executors remain fixed outside this roster.",
             style = AzphaltType.body,
@@ -148,7 +148,7 @@ internal fun CustomCompanyProviderScreen(
                 },
             )
             AzphaltPill(
-                label = "Save company",
+                label = "Save swarm",
                 seed = "company-save-collection",
                 endCap = if (dirty) "Unsaved" else "Saved",
                 onClick = { onSaveRoleCollection(draftRoles) },
@@ -165,7 +165,7 @@ internal fun CustomCompanyProviderScreen(
             AzphaltRecord(
                 seed = "company-reset-confirmation",
                 eyebrow = "Reset",
-                title = "Restore the default company?",
+                title = "Restore the default swarm?",
                 body = "This restores Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.",
                 endCap = "Confirm",
                 well = {
@@ -259,7 +259,7 @@ internal fun CustomCompanyProviderScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(
-                    label = if (editingRoleId == null) "Add to company" else "Apply changes",
+                    label = if (editingRoleId == null) "Add to swarm" else "Apply changes",
                     seed = "company-role-apply",
                     onClick = {
                         val cleanName = roleNameDraft.trim()

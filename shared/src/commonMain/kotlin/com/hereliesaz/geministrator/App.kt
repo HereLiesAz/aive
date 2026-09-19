@@ -95,15 +95,36 @@ fun App(
     }
 
     GeministratorTheme {
-        var destinationName by rememberDurableStringState(
-            key = "navigation.destination",
-            initialValue = ControlRoomDestination.Settings.name,
-        )
+        var destinationName by remember {
+            mutableStateOf(
+                startupControlRoomDestination(
+                    hasConfiguredProvider = providers.isNotEmpty(),
+                ).name,
+            )
+        }
         val destination = ControlRoomDestination.entries
             .firstOrNull { it.name == destinationName }
-            ?: ControlRoomDestination.Settings
+            ?: startupControlRoomDestination(hasConfiguredProvider = providers.isNotEmpty())
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
+        var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
+
+        PlatformBackHandler(
+            enabled = selectedTaskId != null ||
+                navigationHistory.isNotEmpty() ||
+                destination != ControlRoomDestination.Overview,
+        ) {
+            when {
+                selectedTaskId != null -> selectedTaskIdValue = ""
+                navigationHistory.isNotEmpty() -> {
+                    destinationName = navigationHistory.last().name
+                    navigationHistory = navigationHistory.dropLast(1)
+                }
+                destination != ControlRoomDestination.Overview -> {
+                    destinationName = ControlRoomDestination.Overview.name
+                }
+            }
+        }
 
         LaunchedEffect(azphaltPackageImportRequest?.requestId) {
             if (azphaltPackageImportRequest != null) {
@@ -145,7 +166,12 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
-                        onDestinationSelected = { destinationName = it.name },
+                        onDestinationSelected = { target ->
+                            if (target != destination) {
+                                navigationHistory = navigationHistory + destination
+                                destinationName = target.name
+                            }
+                        },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
@@ -334,7 +360,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Save company failed")
+                                    runtimeState = failure.toRuntimeFailureState("Save swarm failed")
                                 }
                             }
                         },
@@ -346,7 +372,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                                    runtimeState = failure.toRuntimeFailureState("Reset swarm failed")
                                 }
                             }
                         },
@@ -421,3 +447,9 @@ private fun GeministratorTheme(content: @Composable () -> Unit) {
         content = content,
     )
 }
+
+
+internal fun startupControlRoomDestination(
+    hasConfiguredProvider: Boolean,
+): ControlRoomDestination =
+    if (hasConfiguredProvider) ControlRoomDestination.Overview else ControlRoomDestination.Settings

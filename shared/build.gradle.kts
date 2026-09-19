@@ -59,6 +59,7 @@ kotlin {
         }
 
         getByName("androidMain").dependencies {
+            implementation(libs.androidx.activity.compose)
             implementation(libs.onnxruntime.android)
             implementation(libs.cryptography.provider.jdk.bc)
         }

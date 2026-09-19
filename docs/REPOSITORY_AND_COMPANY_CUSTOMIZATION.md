@@ -1,4 +1,4 @@
-# Repository search and company customization
+# Repository search and swarm customization
 
 ## Connected repository selection
 
@@ -10,9 +10,9 @@ When GitHub or GitLab credentials are connected, the repository locator on the r
 - Manual URL and `owner/repository` or `group/repository` entry remains supported.
 - Local repositories continue to use the local folder picker on platforms that support it.
 
-## Custom company roster
+## Custom swarm roster
 
-The Company screen manages the semantic orchestration roles that reason about and govern work. Deterministic system workers and repetitive programmatic executors are deliberately outside this roster.
+The Swarm screen manages the semantic orchestration roles that reason about and govern work. Deterministic system workers and repetitive programmatic executors are deliberately outside this roster.
 
 Users can add, edit, remove, reorder, reroute, and save orchestration roles. Editable role properties include identity, description, standing instructions, provider preference, required capabilities, and authorities.
 

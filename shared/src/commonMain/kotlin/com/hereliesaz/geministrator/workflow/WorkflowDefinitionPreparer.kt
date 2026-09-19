@@ -52,7 +52,7 @@ class WorkflowDefinitionPreparer(
                 }
 
                 val role = requireNotNull(rolesById[executor.roleId]) {
-                    "Role ${executor.roleId.value} is not registered in the active company"
+                    "Role ${executor.roleId.value} is not registered in the active swarm"
                 }
                 if (RoleAuthority.SelectEnvironment in role.authorities) {
                     add(task)
@@ -119,5 +119,5 @@ private fun Collection<RoleDefinition>.preferredEnvironmentPlanner(): RoleDefini
     val eligible = filter { it.enabled && RoleAuthority.SelectEnvironment in it.authorities }
     return eligible.firstOrNull { it.id == BuiltInRoles.EpaRepresentative.id }
         ?: eligible.firstOrNull()
-        ?: error("The active company has no role authorized to select execution environments")
+        ?: error("The active swarm has no role authorized to select execution environments")
 }

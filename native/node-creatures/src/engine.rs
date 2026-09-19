@@ -35,9 +35,9 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            yaw: -0.36,
-            pitch: 0.18,
-            zoom: 0.34,
+            yaw: -0.18,
+            pitch: 0.10,
+            zoom: 0.33,
         }
     }
 }
@@ -71,10 +71,11 @@ pub fn build_mesh(genome: &CreatureGenome, pose: &CreaturePose) -> Mesh {
         &mut mesh,
         Vec3::ZERO,
         genome.body_radii,
-        genome.body_sides.max(10),
-        7,
+        genome.body_sides.max(24),
+        12,
         MaterialClass::Body,
     );
+    add_logo_rim(&mut mesh, genome);
 
     add_role_surface_details(&mut mesh, genome);
     add_face(&mut mesh, genome, pose);
@@ -235,6 +236,21 @@ fn add_ellipsoid(
                 material,
             });
         }
+    }
+}
+
+fn add_logo_rim(mesh: &mut Mesh, genome: &CreatureGenome) {
+    let segments = 36;
+    let z = genome.body_radii.z * 1.025;
+    let rx = genome.body_radii.x * 1.015;
+    let ry = genome.body_radii.y * 1.015;
+    let radius = 0.034;
+    let mut previous = Vec3::new(rx, 0.0, z);
+    for segment in 1..=segments {
+        let angle = TAU * segment as f32 / segments as f32;
+        let next = Vec3::new(rx * angle.cos(), ry * angle.sin(), z);
+        add_tube(mesh, previous, next, radius, 6, MaterialClass::Accent);
+        previous = next;
     }
 }
 
@@ -588,7 +604,7 @@ fn add_antennae(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
             tip,
             direction,
             antenna.terminal,
-            antenna.radius * 2.45,
+            antenna.radius * 1.90,
         );
         mesh.terminal_points.push(tip);
     }
@@ -626,26 +642,26 @@ fn add_coiled_antenna(
 }
 
 fn add_limbs(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
-    let leg_count = genome.leg_count.max(2);
+    let leg_count = genome.leg_count;
     for index in 0..leg_count {
         let fraction = if leg_count == 1 {
             0.5
         } else {
             index as f32 / (leg_count - 1) as f32
         };
-        let x = (fraction - 0.5) * genome.body_radii.x * 1.30;
-        let gait = pose.limb_phase.sin() * 0.08 * if index % 2 == 0 { 1.0 } else { -1.0 };
-        let hip = Vec3::new(x, genome.body_radii.y * 0.66, 0.0);
-        let knee = Vec3::new(x + gait, genome.body_radii.y * 1.02, 0.04);
-        let foot = Vec3::new(x + gait * 1.3, genome.body_radii.y * 1.20, 0.14);
-        add_tube(mesh, hip, knee, 0.070, 5, MaterialClass::Limb);
-        add_tube(mesh, knee, foot, 0.062, 5, MaterialClass::Limb);
+        let x = (fraction - 0.5) * genome.body_radii.x * 0.78;
+        let gait = pose.limb_phase.sin() * 0.05 * if index % 2 == 0 { 1.0 } else { -1.0 };
+        let hip = Vec3::new(x, genome.body_radii.y * 0.70, 0.0);
+        let knee = Vec3::new(x + gait, genome.body_radii.y * 0.86, 0.04);
+        let foot = Vec3::new(x + gait * 1.2, genome.body_radii.y * 0.98, 0.10);
+        add_tube(mesh, hip, knee, 0.048, 6, MaterialClass::Limb);
+        add_tube(mesh, knee, foot, 0.042, 6, MaterialClass::Limb);
         add_ellipsoid(
             mesh,
             foot,
-            Vec3::new(0.12, 0.075, 0.08),
-            8,
-            4,
+            Vec3::new(0.09, 0.055, 0.06),
+            10,
+            5,
             MaterialClass::Limb,
         );
     }
@@ -659,22 +675,22 @@ fn add_limbs(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
         let row = index / 2;
         let y = -0.15 + row as f32 * 0.33;
         let root = Vec3::new(
-            side * genome.body_radii.x * 0.72,
+            side * genome.body_radii.x * 0.76,
             y * genome.body_radii.y,
             0.05,
         );
         let elbow = Vec3::new(
-            side * genome.body_radii.x * (1.02 + row as f32 * 0.06),
-            genome.body_radii.y * (y + 0.12 + arm_swing * side),
+            side * genome.body_radii.x * (0.92 + row as f32 * 0.04),
+            genome.body_radii.y * (y + 0.10 + arm_swing * side),
             0.10,
         );
         let hand = Vec3::new(
-            side * genome.body_radii.x * (1.26 + row as f32 * 0.08),
-            genome.body_radii.y * (y + 0.18 + arm_swing * side),
-            0.18,
+            side * genome.body_radii.x * (1.06 + row as f32 * 0.05),
+            genome.body_radii.y * (y + 0.15 + arm_swing * side),
+            0.16,
         );
-        add_tube(mesh, root, elbow, 0.068, 5, MaterialClass::Limb);
-        add_tube(mesh, elbow, hand, 0.058, 5, MaterialClass::Limb);
+        add_tube(mesh, root, elbow, 0.052, 6, MaterialClass::Limb);
+        add_tube(mesh, elbow, hand, 0.046, 6, MaterialClass::Limb);
         add_terminal(
             mesh,
             hand,
@@ -801,8 +817,8 @@ fn add_terminal(mesh: &mut Mesh, center: Vec3, direction: Vec3, kind: TerminalKi
         mesh,
         center,
         Vec3::new(radius, radius * 0.94, radius * 0.88),
-        10,
-        5,
+        14,
+        6,
         material,
     );
 
