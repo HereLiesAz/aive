@@ -202,7 +202,7 @@ class AzphaltWorkflowPackageInstaller(
                 "Unsupported role format ${roleManifest.format}; expected $HAIVE_ROLE_FORMAT"
             }
             require(roleManifest.roles.isNotEmpty()) { "Role package must contain at least one role" }
-            validateEntries(roleManifest.roles.map { it.id to it.path }, "company role", manifest.files, pkg.payload)
+            validateEntries(roleManifest.roles.map { it.id to it.path }, "swarm role", manifest.files, pkg.payload)
             roles = roleManifest.roles.map { entry ->
                 decodeUtf8<RoleDefinition>(pkg.payload.getValue(entry.path), entry.path).also { role ->
                     require(role.id.value == entry.id) {
