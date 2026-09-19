@@ -21,6 +21,8 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +43,17 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
+
+      - name: Replace legacy dependency snapshot with filtered runtime graph
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: gradle/actions/dependency-submission@v6
+        with:
+          dependency-graph: generate-and-submit
+          dependency-graph-include-projects: ':androidApp|:desktopApp|:webApp|:shared|:providers:jules'
+          dependency-graph-include-configurations: '.*[Rr]untime.*'
+          dependency-graph-continue-on-failure: false
+          additional-arguments: '-Phaive.useLocalH2g2=false'
+          cache-disabled: true
 
       - name: Upload test reports
         if: always()
