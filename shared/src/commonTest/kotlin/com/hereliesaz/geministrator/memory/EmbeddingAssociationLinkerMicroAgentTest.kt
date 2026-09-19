@@ -91,8 +91,9 @@ class EmbeddingAssociationLinkerMicroAgentTest {
             instruction = "associate",
         )
 
-        agent.process(packet)
+        val batch = agent.process(packet)
 
+        assertTrue(batch.edgesToAdd.isEmpty())
         assertEquals(1, runtime.embedCalls)
         assertEquals(2, runtime.lastTexts.size)
         assertFalse(runtime.lastTexts.any { it.startsWith("Refactor") })
@@ -148,7 +149,9 @@ class EmbeddingAssociationLinkerMicroAgentTest {
                 when {
                     "30 seconds" in text -> listOf(1f, 0f)
                     "60 seconds" in text -> listOf(0.99f, 0.01f)
-                    else -> listOf(0f, 1f)
+                    "UserRepository" in text -> listOf(1f, 0f)
+                    "weather" in text.lowercase() -> listOf(0f, 1f)
+                    else -> listOf(0.5f, 0.5f)
                 }
             }
             return MemoryEmbeddingInferenceResult(vectors = vectors)
