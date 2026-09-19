@@ -159,7 +159,8 @@ class MemoryMicroAgentRouter(
     }
 
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val batches = rolesFor(packet.stage).map { role ->
+        val roles = rolesFor(packet.stage)
+        val batches = roles.map { role ->
             val agent = requireNotNull(agentsByRole[role])
             val routed = packet
                 .withCodeSemanticHints(role)
@@ -171,7 +172,12 @@ class MemoryMicroAgentRouter(
                 validateRoleOutput(role, routed, batch)
             }
         }
-        return mergeBatches(batches)
+        val merged = mergeBatches(batches)
+        val aggregateLimit = roles.minOf { role -> requireNotNull(agentsByRole[role]).model.maxMutations }
+        require(merged.size <= aggregateLimit) {
+            "Combined ${packet.stage} output returned ${merged.size} mutations; shared limit is $aggregateLimit"
+        }
+        return merged
     }
 
     fun constrainPolicy(base: MemoryConsolidationPolicy = MemoryConsolidationPolicy()): MemoryConsolidationPolicy {
@@ -201,12 +207,12 @@ class MemoryMicroAgentRouter(
         }
         val fixedChars = instruction.length + packetKey.length
         val primaryChars = items.sumOf { it.estimatedInputChars() }
-        require(fixedChars + primaryChars <= model.maxInputChars) {
+        require(fixedChars + primaryChars <= model.maxContentChars) {
             "Primary packet exceeds ${model.modelId} input budget"
         }
 
         var remainingItems = model.maxInputItems - items.size
-        var remainingChars = model.maxInputChars - fixedChars - primaryChars
+        var remainingChars = model.maxContentChars - fixedChars - primaryChars
         val fittedNeighborhood = buildList {
             for (item in neighborhood) {
                 if (remainingItems <= 0 || remainingChars <= 0) break
@@ -222,8 +228,8 @@ class MemoryMicroAgentRouter(
 
     private fun enforceInputBudget(agent: MemoryMicroAgent, packet: MemoryWorkPacket) {
         require(packet.items.size + packet.neighborhood.size <= agent.model.maxInputItems)
-        require(packet.estimatedInputChars() <= agent.model.maxInputChars) {
-            "${agent.role} rendered packet exceeds ${agent.model.modelId} character budget"
+        require(packet.estimatedInputChars() <= agent.model.maxContentChars) {
+            "${agent.role} rendered packet exceeds ${agent.model.modelId} content budget"
         }
     }
 
@@ -239,11 +245,29 @@ class MemoryMicroAgentRouter(
         require(batch.size <= agent.model.maxMutations) {
             "${agent.role} returned ${batch.size} mutations; limit is ${agent.model.maxMutations}"
         }
-        val chars = batch.sectionsToAdd.sumOf { it.text.length } + batch.nodesToAdd.sumOf { it.text.length }
+        val chars = batch.estimatedOutputChars()
         require(chars <= agent.model.maxOutputChars) {
             "${agent.role} returned $chars text chars; ${agent.model.modelId} limit is ${agent.model.maxOutputChars}"
         }
     }
+
+    private fun MemoryMutationBatch.estimatedOutputChars(): Int =
+        sectionsToAdd.sumOf { section ->
+            section.id.value.length + section.episodeId.value.length + section.text.length +
+                section.sourceChunkIds.sumOf { it.value.length } +
+                section.metadata.entries.sumOf { (key, value) -> key.length + value.length }
+        } +
+            nodesToAdd.sumOf { node ->
+                node.id.value.length + node.kind.name.length + node.text.length +
+                    node.sourceEpisodeIds.sumOf { it.value.length } +
+                    node.sourceSectionIds.sumOf { it.value.length } +
+                    node.metadata.entries.sumOf { (key, value) -> key.length + value.length }
+            } +
+            edgesToAdd.sumOf { edge ->
+                edge.id.value.length + edge.from.value.length + edge.to.value.length +
+                    edge.relation.name.length +
+                    edge.metadata.entries.sumOf { (key, value) -> key.length + value.length }
+            }
 
     private fun validateRoleOutput(
         role: MemoryMicroAgentRole,
