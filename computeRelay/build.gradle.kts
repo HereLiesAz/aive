@@ -6,9 +6,15 @@ plugins {
 
 dependencies {
     // The relay consumes protocol/domain classes from shared, not the app/UI runtime graph.
-    // Keep UI/toolkit dependencies out of this headless distribution.
+    // Exclude only UI/toolkit families so non-UI transitive runtime dependencies remain intact.
     implementation(projects.shared) {
-        isTransitive = false
+        exclude(group = "org.jetbrains.compose.runtime")
+        exclude(group = "org.jetbrains.compose.foundation")
+        exclude(group = "org.jetbrains.compose.animation")
+        exclude(group = "org.jetbrains.compose.material3")
+        exclude(group = "org.jetbrains.compose.ui")
+        exclude(group = "org.jetbrains.compose.components")
+        exclude(group = "com.github.HereLiesAz", module = "conveyance-h2g2")
     }
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
