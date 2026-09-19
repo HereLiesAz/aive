@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
 import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
@@ -24,8 +25,14 @@ class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
     private val scope: CoroutineScope,
     private val memoryObserver: MemorySessionObserver = MemoryRuntimeBridge.observer,
-    private val inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
+    inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
 ) : ManagedSessionGateway {
+    private val inferenceFabric: CompoundInferenceFabric =
+        if (inferenceFabric is GovernedCompoundInferenceFabric) {
+            inferenceFabric
+        } else {
+            GovernedCompoundInferenceFabric(inferenceFabric, providerRegistry.genealogyGovernance)
+        }
 
     private data class SessionSnapshot(
         val status: ManagedSessionStatus,
@@ -97,16 +104,21 @@ class ProviderBackedManagedSessionGateway(
 
     private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
         val recalled = try {
-            MemoryRuntimeBridge.promptContextProvider.contextFor(this)
+            MemoryRuntimeBridge.promptContextProvider.recallFor(this)
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Throwable) {
-            emptyList()
+            com.hereliesaz.geministrator.memory.MemoryPromptRecall()
         }
-        if (recalled.isEmpty()) return this
+        if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty()) return this
         return copy(
             promptContext = promptContext.copy(
-                dynamicContext = promptContext.dynamicContext + recalled,
+                dynamicContext = promptContext.dynamicContext + recalled.blocks,
+            ),
+            compoundInference = compoundInference.copy(
+                genealogy = compoundInference.genealogy.copy(
+                    memoryAddresses = compoundInference.genealogy.memoryAddresses + recalled.memoryAddresses,
+                ),
             ),
         )
     }
