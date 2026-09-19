@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -172,7 +173,7 @@ internal class AndroidProjectFileService(
         var modifiedAt: Long? = null
         resolver.query(
             uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.LAST_MODIFIED),
+            arrayOf(OpenableColumns.DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED),
             null,
             null,
             null,
@@ -181,7 +182,7 @@ internal class AndroidProjectFileService(
                 cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     .takeIf { it >= 0 }
                     ?.let { displayName = cursor.getString(it) }
-                cursor.getColumnIndex(OpenableColumns.LAST_MODIFIED)
+                cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
                     .takeIf { it >= 0 && !cursor.isNull(it) }
                     ?.let { modifiedAt = cursor.getLong(it) }
             }
