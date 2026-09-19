@@ -103,21 +103,30 @@ class JulesLiveRuntimeVerificationTest {
         val reviewTaskId = TaskDefinitionId("review")
         val releaseTaskId = TaskDefinitionId("release-approval")
 
-        val providerRunId = try {
+        val (providerRunId, exportedProject) = try {
             val awaitingApproval = awaitLive(firstRuntime) { live ->
                 live.presentation.run.taskRuns.getValue(julesTaskId).status == TaskRunStatus.AwaitingApproval
             }
             val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(julesTaskId)
             assertEquals(WorkflowRunStatus.AwaitingHuman, awaitingApproval.presentation.run.status)
-            assertNotNull(taskRun.providerRunId)
-            taskRun.providerRunId
+            assertEquals(null, taskRun.progress, "Jules plan/progress text must not fabricate a percentage")
+            val runId = assertNotNull(taskRun.providerRunId)
+            val projectExport = assertNotNull(firstRuntime.exportCurrentProjectFile())
+            runId to projectExport.content
         } finally {
             firstRuntime.close()
             firstScope.cancel()
         }
 
-        // Reconstruct both persistence and runtime around the same durable Settings backend.
-        val resumedPersistence = SettingsWorkflowPersistence(settings, storageKey = "aive.live.runtime.verification")
+        // Import the portable .ive project into a fresh durable store, then reconstruct the runtime.
+        // This proves both project portability and provider-session resume without relying on process memory.
+        val resumedSettings = MapSettings()
+        val resumedPersistence = SettingsWorkflowPersistence(
+            resumedSettings,
+            storageKey = "aive.live.runtime.verification",
+        )
+        val importedProject = resumedPersistence.importProjectFile(exportedProject)
+        assertEquals(project.id, importedProject.id)
         val resumedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val resumedRuntime = ApplicationRuntime.create(
             providers = listOf(liveJulesProvider(apiKey)),
@@ -177,7 +186,7 @@ class JulesLiveRuntimeVerificationTest {
         val terminalRuntime = ApplicationRuntime.create(
             providers = listOf(liveJulesProvider(apiKey)),
             scope = terminalScope,
-            persistence = SettingsWorkflowPersistence(settings, storageKey = "aive.live.runtime.verification"),
+            persistence = SettingsWorkflowPersistence(resumedSettings, storageKey = "aive.live.runtime.verification"),
             executorIntegrations = executorIntegrations,
         )
         try {
