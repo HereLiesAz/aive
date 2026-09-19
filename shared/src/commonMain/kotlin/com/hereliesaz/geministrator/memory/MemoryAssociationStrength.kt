@@ -43,7 +43,13 @@ internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
         val explicitFamily = edge.metadata["evidenceFamily"]?.takeIf(String::isNotBlank)
         val isLatestFamily = edge.metadata["evidencePolicy"] == "latest"
         val legacyTemporalFamily = edge.metadata["basis"]
-            ?.takeIf { it.startsWith("temporal:") }
+            ?.takeIf {
+                it.startsWith("temporal:") &&
+                    (
+                        edge.metadata["deterministic"] == "true" ||
+                            edge.id.value.startsWith("programmatic:temporal:")
+                    )
+            }
             ?.let { "temporal-co-bucket" }
         val family = when {
             explicitFamily != null && isLatestFamily -> explicitFamily
@@ -59,11 +65,7 @@ internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
         val current = latestByFamily[family]
         if (
             current == null ||
-            edge.createdAtEpochMillis > current.createdAtEpochMillis ||
-            (
-                edge.createdAtEpochMillis == current.createdAtEpochMillis &&
-                    edge.id.value > current.id.value
-            )
+            edge.createdAtEpochMillis >= current.createdAtEpochMillis
         ) {
             latestByFamily[family] = edge
         }
