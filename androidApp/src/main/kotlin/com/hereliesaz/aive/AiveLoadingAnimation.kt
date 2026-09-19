@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +34,7 @@ fun AiveLoadingAnimation(
     onAnimationStarted: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    var animatedFrameDrawn by remember { mutableStateOf(false) }
     val movie by produceState<Movie?>(initialValue = null, context) {
         value = withContext(Dispatchers.IO) {
             context.resources.openRawResource(R.drawable.haive_loader).use(Movie::decodeStream)
@@ -38,23 +42,31 @@ fun AiveLoadingAnimation(
     }
 
     Box(modifier = modifier) {
-        Image(
-            painter = painterResource(R.drawable.haive_loader_frame0),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Fit,
-        )
+        if (!animatedFrameDrawn) {
+            Image(
+                painter = painterResource(R.drawable.haive_loader_frame0),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        }
 
         val decodedMovie = movie
         if (decodedMovie != null) {
             AndroidView(
                 factory = { viewContext ->
                     GifMovieView(viewContext).apply {
-                        setMovie(decodedMovie, onAnimationStarted)
+                        setMovie(decodedMovie) {
+                            animatedFrameDrawn = true
+                            onAnimationStarted()
+                        }
                     }
                 },
                 update = { view ->
-                    view.setMovie(decodedMovie, onAnimationStarted)
+                    view.setMovie(decodedMovie) {
+                        animatedFrameDrawn = true
+                        onAnimationStarted()
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
