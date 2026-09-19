@@ -29,6 +29,13 @@ interface TaskExecutorIntegration {
 
     fun supports(executor: TaskExecutor, project: Project): Boolean = supports(executor)
 
+    /**
+     * Whether a dispatch failure can safely be sent through the workflow retry policy.
+     * Integrations that perform non-idempotent remote mutations must opt out.
+     */
+    val retryDispatchFailures: Boolean
+        get() = true
+
     suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution
 
     suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution
@@ -122,6 +129,9 @@ private class EvidenceIndexingTaskExecutorIntegration(
 
     override fun supports(executor: TaskExecutor, project: Project): Boolean =
         delegate.supports(executor, project)
+
+    override val retryDispatchFailures: Boolean
+        get() = delegate.retryDispatchFailures
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution =
         delegate.dispatch(context).indexEvidence()
