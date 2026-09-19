@@ -104,9 +104,13 @@ internal fun ComputeDelegationScreen(
             seed = "compute-workflow-" + definition.id.value,
             eyebrow = "Workflow",
             title = definition.name,
-            body = delegatableTasks.size.toString() + " delegatable task" +
-                if (delegatableTasks.size == 1) " · " else "s · " +
-                assignmentLabel(delegatableTasks, nodes),
+            body = buildString {
+                append(delegatableTasks.size)
+                append(" delegatable task")
+                if (delegatableTasks.size != 1) append("s")
+                append(" · ")
+                append(assignmentLabel(delegatableTasks, nodes))
+            },
             endCap = "Entire graph",
             well = {
                 DelegationTargets(
