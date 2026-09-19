@@ -88,11 +88,11 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Android debug app
+      - name: Build Android debug distributions
         id: gradle-build
         run: |
           set +e
-          ./gradlew :androidApp:assembleDebug --build-cache --no-daemon > build.log 2>&1
+          ./gradlew :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug --build-cache --no-daemon > build.log 2>&1
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           cat build.log

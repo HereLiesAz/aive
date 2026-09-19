@@ -121,18 +121,20 @@ jobs:
         run: ./gradlew :providers:jules:compileKotlinWasmJs
 
       - name: Test Android provider bootstrap
-        run: ./gradlew :androidApp:testDebugUnitTest
+        run: ./gradlew :androidApp:testPlayDebugUnitTest :androidApp:testGithubDebugUnitTest
 
-      - name: Build Android (debug on PRs, release on push)
+      - name: Build Android distributions
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew :androidApp:assembleDebug
+            ./gradlew :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug
           else
-            ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" :androidApp:assembleRelease :androidApp:bundleRelease
+            ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" \
+              :androidApp:bundlePlayRelease \
+              :androidApp:assembleGithubRelease
           fi
 
       - name: Verify Android native runtime packaging
@@ -209,14 +211,58 @@ jobs:
           echo "=== Release notes ==="
           cat fastlane/metadata/android/en-US/changelogs/default.txt
 
-      - name: Upload Android release inputs
+      - name: Verify Play build excludes accessibility bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*playDebug*'
+          else
+            VARIANT_PATTERN='*playRelease*'
+          fi
+          MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
+          if [ -z "$MATCHES" ]; then
+            echo "::error::Could not find merged Play manifest for $VARIANT_PATTERN"
+            exit 1
+          fi
+          if printf '%s\n' "$MATCHES" | xargs grep -IlE 'InstalledGeminiAccessibilityService|BIND_ACCESSIBILITY_SERVICE' | grep -q .; then
+            echo "::error::Play manifest contains the installed-Gemini accessibility bridge"
+            exit 1
+          fi
+
+      - name: Verify GitHub build keeps accessibility bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*githubDebug*'
+          else
+            VARIANT_PATTERN='*githubRelease*'
+          fi
+          MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
+          if [ -z "$MATCHES" ]; then
+            echo "::error::Could not find merged GitHub manifest for $VARIANT_PATTERN"
+            exit 1
+          fi
+          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'InstalledGeminiAccessibilityService' | grep -q .; then
+            echo "::error::GitHub manifest is missing the installed-Gemini accessibility bridge"
+            exit 1
+          fi
+
+      - name: Upload GitHub Android release
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: aive-android-release
-          path: |
-            androidApp/build/outputs/apk/release/*.apk
-            androidApp/build/outputs/bundle/release/*.aab
+          name: aive-android-github-release
+          path: androidApp/build/outputs/apk/github/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload Play Android release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: aive-android-play-release
+          path: androidApp/build/outputs/bundle/playRelease/*.aab
           if-no-files-found: error
 
       - name: Upload release notes
@@ -361,10 +407,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download Android release inputs
+      - name: Download GitHub Android release
         uses: actions/download-artifact@v8
         with:
-          name: aive-android-release
+          name: aive-android-github-release
           path: release-input/android
 
       - name: Download Linux installer
@@ -530,10 +576,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Android release bundle
+      - name: Download Play Android release bundle
         uses: actions/download-artifact@v8
         with:
-          name: aive-android-release
+          name: aive-android-play-release
           path: android-release
 
       - name: Download release notes

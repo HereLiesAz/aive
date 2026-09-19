@@ -2,7 +2,6 @@ package com.hereliesaz.aive
 
 import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -217,6 +216,7 @@ class MainActivity : ComponentActivity() {
                         onCancel = { configuringRepositoryServiceId = null },
                     )
                     providerId == ProviderCatalog.GEMINI_ID && !configuringGeminiApiKey -> AndroidGeminiProviderSetup(
+                        installedBridgeSupported = InstalledGeminiPreference.isSupported,
                         installedAppDetected = InstalledGeminiTextGenerationApi.isGeminiInstalled(this),
                         accessibilityEnabled = InstalledGeminiTextGenerationApi.isAccessibilityServiceEnabled(this),
                         onUseInstalledGemini = {
@@ -224,7 +224,7 @@ class MainActivity : ComponentActivity() {
                             installedGeminiReady = InstalledGeminiTextGenerationApi.isAvailable(this)
                             configuringProviderId = null
                             if (!installedGeminiReady) {
-                                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                InstalledGeminiPreference.requestEnable(this)
                             }
                         },
                         onUseApiKey = { configuringGeminiApiKey = true },
