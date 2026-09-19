@@ -110,7 +110,7 @@ internal fun CompanyScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("COMPANY", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         AzphaltPill(
             label = if (showRoleForm) "Cancel" else "Add role",
             seed = "add-role-toggle",
@@ -263,7 +263,7 @@ internal fun CompanyScreen(
                             "Crash Test Dummy" -> "Author tests · cannot verify or approve"
                             "EPA Representative" -> "Select environment · cannot implement or verify"
                             "Implementation Engineer" -> "Implement · cannot certify own work"
-                            else -> "Company position"
+                            else -> "Swarm role"
                         },
                     )
                 }
