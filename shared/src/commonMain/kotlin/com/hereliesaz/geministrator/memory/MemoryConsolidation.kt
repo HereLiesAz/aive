@@ -287,7 +287,11 @@ class MemoryConsolidator(
                 .asSequence()
                 .filter { it.status != MemoryQueueStatus.Complete && it.id != entry.id }
                 .mapTo(linkedSetOf()) { it.episodeId }
-            val cluster = snapshot.findCondensationCluster(policy, protectedEpisodeIds) ?: return null
+            val cluster = snapshot.findCondensationCluster(
+                policy = policy,
+                protectedEpisodeIds = protectedEpisodeIds,
+                projectId = episode.projectId,
+            ) ?: return null
             val items = cluster
                 .map(MemoryNode::asWorkItem)
                 .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
@@ -452,6 +456,17 @@ class MemoryConsolidator(
                 }
                 val generalized = batch.nodesToAdd.single()
                 require(generalized.kind == plan.condensationKind)
+                val expectedSourceEpisodes = plan.packet.items
+                    .flatMap { item ->
+                        item.metadata["sourceEpisodeIds"].orEmpty()
+                            .split(',')
+                            .map(String::trim)
+                            .filter(String::isNotEmpty)
+                    }
+                    .mapTo(linkedSetOf(), ::MemoryEpisodeId)
+                require(generalized.sourceEpisodeIds.containsAll(expectedSourceEpisodes)) {
+                    "Condensation must preserve source-episode provenance from the complete cluster"
+                }
                 val sourceIds = plan.packet.items.mapTo(linkedSetOf()) { MemoryNodeId(it.id) }
                 require(sourceIds.isNotEmpty())
                 require(sourceIds.all { sourceId ->
@@ -611,13 +626,11 @@ private fun List<MemoryWorkItem>.boundedSlice(
     while (index < size && result.size < maxItems) {
         val item = this[index]
         if (result.isNotEmpty() && chars + item.text.length > maxChars) break
-        val bounded = if (result.isEmpty() && item.text.length > maxChars) {
-            item.copy(text = item.text.take(maxChars))
-        } else {
-            item
+        require(item.text.length <= maxChars) {
+            "Memory work item ${item.id} has ${item.text.length} chars; packet limit is $maxChars"
         }
-        result += bounded
-        chars += bounded.text.length
+        result += item
+        chars += item.text.length
         index += 1
     }
     return result
@@ -697,14 +710,20 @@ private fun MemorySnapshot.relatedNeighborhood(
 private fun MemorySnapshot.findCondensationCluster(
     policy: MemoryConsolidationPolicy,
     protectedEpisodeIds: Set<MemoryEpisodeId> = emptySet(),
+    projectId: String? = null,
 ): List<MemoryNode>? {
     val superseded = edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
+    val episodesById = episodes.associateBy(MemoryEpisode::id)
     val activeById = nodes
         .filter { node ->
             node.id !in superseded &&
-                node.sourceEpisodeIds.none { it in protectedEpisodeIds }
+                node.sourceEpisodeIds.none { it in protectedEpisodeIds } &&
+                node.sourceEpisodeIds.isNotEmpty() &&
+                node.sourceEpisodeIds.all { sourceEpisodeId ->
+                    episodesById[sourceEpisodeId]?.projectId == projectId
+                }
         }
         .associateBy(MemoryNode::id)
     val similarEdges = edges.filter {
