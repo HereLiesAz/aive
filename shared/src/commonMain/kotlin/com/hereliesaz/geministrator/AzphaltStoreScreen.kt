@@ -119,8 +119,8 @@ internal fun AzphaltStoreScreen(
     ) {
         Text("AZPHALT STORE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            snapshot?.repository?.name?.let { "$it · workflows and roles for The Haive" }
-                ?: "Verified workflows and roles for The Haive",
+            snapshot?.repository?.name?.let { "$it · workflows and roles for The Aive" }
+                ?: "Verified workflows and roles for The Aive",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
