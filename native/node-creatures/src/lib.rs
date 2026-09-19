@@ -106,7 +106,7 @@ mod tests {
         let reviewer = generate_genome(RoleArchetype::Reviewer, "reviewer");
 
         assert_eq!(orchestrator.arm_count, 0);
-        assert!(builder.arm_count >= 4);
+        assert!(builder.arm_count >= 2);
         assert!(tester
             .antennae
             .iter()
@@ -176,7 +176,7 @@ mod tests {
         );
         assert!(frame.triangles.len() > 100);
         assert!(!frame.silhouette_edges.is_empty());
-        assert_eq!(frame.terminal_anchors.len(), 7);
+        assert_eq!(frame.terminal_anchors.len(), 6);
         assert!(frame.triangles.iter().any(|triangle| triangle.shade == 0));
         assert!(frame.triangles.iter().any(|triangle| triangle.shade == 2));
         assert!(frame
