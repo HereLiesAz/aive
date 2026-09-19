@@ -4,7 +4,7 @@
 
 The Aive is a Compose Multiplatform control room for governed software-development workflows.
 
-> The Aive is not an agent. It is the company that hires agents.
+> The Aive is not an agent. It is the swarm that coordinates agents.
 
 Its job is to turn an objective into explicit work, establish dependency and verification structure, assign that work to appropriate executors, observe the run, and surface only the human decisions that genuinely require a person.
 
@@ -65,7 +65,7 @@ Non-agent execution does not require a fabricated employee role. A GitHub Action
 
 `TaskRun` persists the resolved executor independently from `assignedRoleId`, `assignedProviderId`, `providerRunId`, and `externalRunId`. The workflow engine dispatches provider-backed work through the provider/session boundary, moves human executors into explicit approval state, and exposes `completeTask` for externally driven system executors to report artifacts, external run IDs, and completion without pretending to be agent sessions.
 
-## Company model
+## Swarm model
 
 Built-in responsibilities include:
 
