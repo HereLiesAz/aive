@@ -61,6 +61,7 @@ fun App(
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
+    var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(providers, executorIntegrations, workflowPersistence, runtimeGeneration) {
         runtime?.close()
@@ -73,6 +74,10 @@ fun App(
                 persistence = workflowPersistence,
                 executorIntegrations = executorIntegrations,
             )
+            projectIdToOpenAfterReload?.let { projectId ->
+                created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
+                projectIdToOpenAfterReload = null
+            }
             runtime = created
             created.state.collectLatest { runtimeState = it }
         } catch (failure: CancellationException) {
@@ -298,7 +303,12 @@ fun App(
                         projectFileService = projectFileService,
                         onExportCurrentProjectFile = { runtime?.exportCurrentProjectFile() },
                         onImportProjectFile = { encoded ->
-                            runtime?.importProjectFile(encoded)?.name
+                            val imported = runtime?.importProjectFile(encoded)
+                            if (imported != null) {
+                                projectIdToOpenAfterReload = imported.id.value
+                                runtimeGeneration += 1
+                            }
+                            imported?.name
                         },
                         onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
                         onSwitchRun = { runId ->
