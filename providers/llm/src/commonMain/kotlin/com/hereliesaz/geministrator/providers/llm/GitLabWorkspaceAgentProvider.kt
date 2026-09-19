@@ -29,6 +29,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.CancellationException
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
@@ -87,9 +88,6 @@ class GitLabWorkspaceAgentProvider(
         val trackedFiles: List<String>,
     )
 
-    private val mutex = Mutex()
-    private var nextSequence = 1L
-
     private companion object {
         const val MAX_TREE_PATHS = 700
         const val MAX_TREE_PAGES = 7
@@ -124,9 +122,9 @@ class GitLabWorkspaceAgentProvider(
         require(supportsRepository(request.repository)) {
             "$displayName GitLab workspace agent requires a linked GitLab repository"
         }
-        val runId = mutex.withLock {
-            ProviderRunId("${id.value}/${request.taskRunId.value}/${nextSequence++}")
-        }
+        val runId = ProviderRunId(
+            "${id.value}/${request.taskRunId.value}/${UUID.randomUUID()}",
+        )
         sessionsMutex.withLock {
             sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[runId] = Session(
                 request = request,
@@ -141,6 +139,48 @@ class GitLabWorkspaceAgentProvider(
         try {
             if (session.phase.value == Phase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                return@flow
+            }
+
+            if (isSpecificationTask(session.request)) {
+                emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
+                val generated = api.generate(specificationPrompt(session.request))
+                val artifactKinds = session.request.requiredArtifacts.ifEmpty {
+                    setOf(
+                        ArtifactKind.AcceptanceTestPlan,
+                        ArtifactKind.BehavioralTest,
+                        ArtifactKind.ContractTest,
+                        ArtifactKind.FailureScenario,
+                    )
+                }
+                artifactKinds.forEach { kind ->
+                    emit(
+                        AgentEvent.ArtifactProduced(
+                            runId,
+                            ProviderArtifact(
+                                kind = kind,
+                                label = kind.name.replace(Regex("([a-z])([A-Z])"), "\$1 \$2"),
+                                textContent = generated.text.trim(),
+                                mediaType = "text/markdown",
+                                metadata = mapOf(
+                                    "provider" to id.value,
+                                    "source" to RepositorySource.GitLab.name,
+                                    "mode" to "pre-code-specification",
+                                ),
+                            ),
+                        ),
+                    )
+                }
+                if (generated.inputTokens != null || generated.outputTokens != null) {
+                    emit(
+                        AgentEvent.UsageReported(
+                            runId,
+                            inputTokens = generated.inputTokens,
+                            outputTokens = generated.outputTokens,
+                        ),
+                    )
+                }
+                emit(AgentEvent.Completed(runId))
                 return@flow
             }
 
@@ -305,6 +345,41 @@ class GitLabWorkspaceAgentProvider(
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult {
         sessionOrNull(runId)?.phase?.value = Phase.Cancelled
         return ProviderActionResult.Accepted
+    }
+
+    private fun isSpecificationTask(request: AgentTaskRequest): Boolean {
+        val specificationArtifacts = setOf(
+            ArtifactKind.AcceptanceTestPlan,
+            ArtifactKind.BehavioralTest,
+            ArtifactKind.ContractTest,
+            ArtifactKind.FailureScenario,
+        )
+        return request.requiredArtifacts.any(specificationArtifacts::contains)
+    }
+
+    private fun specificationPrompt(request: AgentTaskRequest): String = buildString {
+        appendLine("Design a pre-code verification contract. Do not inspect or infer implementation code.")
+        appendLine("Task: ${request.objective.trim()}")
+        appendLine("Role instructions: ${request.roleInstructions.trim()}")
+        if (request.acceptanceCriteria.isNotEmpty()) {
+            appendLine("Acceptance criteria:")
+            request.acceptanceCriteria.forEach { appendLine("- ${it.description.trim()}") }
+        }
+        val upstream = request.contextArtifacts
+            .asSequence()
+            .filter { it.kind != ArtifactKind.CodeChange && !it.textContent.isNullOrBlank() }
+            .joinToString("\n\n") { "${it.kind}: ${it.label}\n${it.textContent}" }
+            .take(MAX_CONTEXT_ARTIFACT_CHARS)
+        if (upstream.isNotBlank()) {
+            appendLine()
+            appendLine("APPROVED UPSTREAM SPECIFICATION EVIDENCE")
+            appendLine(upstream)
+        }
+        appendLine()
+        appendLine(
+            "Return concrete acceptance tests, behavioral tests, contract tests, invariants, edge cases, " +
+                "and failure scenarios. Do not claim execution or implementation inspection.",
+        )
     }
 
     private suspend fun loadRepositoryContext(request: AgentTaskRequest, token: String): RepositoryContext {
