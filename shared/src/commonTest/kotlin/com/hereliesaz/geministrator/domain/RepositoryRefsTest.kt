@@ -26,7 +26,7 @@ class RepositoryRefsTest {
     fun parsesNestedGitLabGroup() {
         val repository = parseRepositoryRef(
             source = RepositorySource.GitLab,
-            locator = "git@gitlab.com:team/platform/haive.git",
+            locator = "git@gitlab.com:team/platform/aive.git",
             defaultBranch = "develop",
         )
 
@@ -34,35 +34,35 @@ class RepositoryRefsTest {
         assertEquals("team/platform", repository.owner)
         assertEquals("aive", repository.name)
         assertEquals("develop", repository.defaultBranch)
-        assertEquals("git@gitlab.com:team/platform/haive.git", repository.remoteUrl)
-        assertEquals("https://gitlab.com/team/platform/haive", repository.remoteBrowserUrl())
+        assertEquals("git@gitlab.com:team/platform/aive.git", repository.remoteUrl)
+        assertEquals("https://gitlab.com/team/platform/aive", repository.remoteBrowserUrl())
     }
 
     @Test
     fun selfManagedGitLabSshRemoteRetainsHostForBrowserLink() {
         val repository = parseRepositoryRef(
             source = RepositorySource.GitLab,
-            locator = "ssh://git@gitlab.example.test:2222/team/platform/haive.git",
+            locator = "ssh://git@gitlab.example.test:2222/team/platform/aive.git",
             defaultBranch = "main",
         )
 
         assertEquals("team/platform", repository.owner)
         assertEquals("aive", repository.name)
-        assertEquals("https://gitlab.example.test/team/platform/haive", repository.remoteBrowserUrl())
+        assertEquals("https://gitlab.example.test/team/platform/aive", repository.remoteBrowserUrl())
     }
 
     @Test
     fun linksLocalGitFolder() {
         val repository = parseRepositoryRef(
             source = RepositorySource.Local,
-            locator = "C:\\work\\haive\\",
+            locator = "C:\\work\\aive\\",
             defaultBranch = "main",
         )
 
         assertEquals(RepositorySource.Local, repository.source)
         assertEquals("", repository.owner)
         assertEquals("aive", repository.name)
-        assertEquals("C:\\work\\haive\\", repository.localPath)
+        assertEquals("C:\\work\\aive\\", repository.localPath)
         assertEquals("main", repository.defaultBranch)
         assertNull(repository.remoteUrl)
     }

@@ -23,8 +23,8 @@ sealed interface VerificationPolicy {
  *
  * The default remains a single governed task. Centralized MoA is expanded into explicit workflow
  * DAG nodes before execution so normal persistence, retries, approvals, artifacts, and verification
- * remain authoritative. [ResourceAware] authorizes the preparer to choose between those two
- * implemented topologies using task structure and durable provider resource history.
+ * remain authoritative. [ResourceAware] authorizes the preparer to choose between the resource-selected
+ * topologies using task structure and durable provider resource history.
  */
 @Serializable
 sealed interface CompoundInferencePolicy {
@@ -38,6 +38,33 @@ sealed interface CompoundInferencePolicy {
         init {
             require(proposerRoleIds.size in 2..MAX_PROPOSERS) {
                 "Centralized MoA requires 2..$MAX_PROPOSERS proposers"
+            }
+        }
+    }
+
+    /**
+     * Authorizes a governed Skeleton-of-Thought subgraph.
+     *
+     * The skeleton and branch-expansion roles are reasoning-only. The independence reviewer checks
+     * branch overlap before parallel expansion. The original task remains the aggregator so its
+     * durable identity, authority, output contract, and downstream dependencies are preserved.
+     */
+    @Serializable
+    data class SkeletonOfThought(
+        val skeletonRoleId: RoleDefinitionId,
+        val independenceReviewerRoleId: RoleDefinitionId,
+        val expansionRoleIds: List<RoleDefinitionId>,
+        val aggregatorRoleId: RoleDefinitionId,
+    ) : CompoundInferencePolicy {
+        init {
+            require(expansionRoleIds.size in 2..MAX_PROPOSERS) {
+                "Skeleton-of-Thought requires 2..$MAX_PROPOSERS expansion branches"
+            }
+            require(independenceReviewerRoleId != skeletonRoleId) {
+                "Skeleton-of-Thought independence review must use a role distinct from the skeleton role"
+            }
+            require(independenceReviewerRoleId != aggregatorRoleId) {
+                "Skeleton-of-Thought independence review must be distinct from aggregation"
             }
         }
     }

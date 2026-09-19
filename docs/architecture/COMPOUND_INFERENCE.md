@@ -8,7 +8,7 @@ The workflow DAG remains runtime truth. Compound inference is the governed execu
 
 The existing memory architecture is intentionally preserved.
 
-Haive manages conflicting memories by keeping related traces available, surfacing them associatively into active reasoning, allowing the conscious/orchestration layer to notice and reason about the disagreement, and banking the resulting experience back into memory for later consolidation.
+The Aive manages conflicting memories by keeping related traces available, surfacing them associatively into active reasoning, allowing the conscious/orchestration layer to notice and reason about the disagreement, and banking the resulting experience back into memory for later consolidation.
 
 Memory clerks therefore continue to organize, associate, condense, and retrieve what was thought, said, observed, requested, done, or produced. They do not decide which conflicting trace is true. Genealogy and compound inference strengthen provenance and reasoning without moving epistemic authority into the memory layer.
 
@@ -61,11 +61,12 @@ Every provider-backed `AgentTaskRequest` carries `CompoundInferenceContext` cont
 The default provider invocation remains `Single`. The contract also defines strategies for:
 
 - `CentralizedMixtureOfAgents`
+- `SkeletonOfThought`
 - `ParallelIndependent`
 - `SequentialPipeline`
 - `Escalate`
 
-At the workflow-authoring layer, `TaskDefinition.compoundInferencePolicy` can authorize ordinary single execution, explicit centralized MoA materialization, or bounded resource-aware selection. `CompoundInferencePolicy.ResourceAware` never grants additional role authority. It authorizes a specific proposer set plus aggregator and requires at least one measurable resource ceiling. The resolver may select only an implemented safe topology: `Single` or centralized MoA.
+At the workflow-authoring layer, `TaskDefinition.compoundInferencePolicy` can authorize ordinary single execution, explicit centralized MoA materialization, explicit Skeleton-of-Thought materialization, or bounded resource-aware selection. `CompoundInferencePolicy.ResourceAware` never grants additional role authority. It authorizes a specific proposer set plus aggregator and requires at least one measurable resource ceiling. The resolver may select only an implemented safe topology: `Single` or centralized MoA.
 
 Resource-aware selection is deliberately conservative. It considers task complexity, provider availability, and persisted provider cost/latency history. Missing history, unavailable participants, insufficient task complexity, or a projected budget overrun falls back to `Single`. Centralized-MoA latency is estimated as the slowest parallel proposer plus aggregator plus verifier.
 
@@ -276,7 +277,7 @@ Runtime artifact requirements remain versioned identity, cryptographic verificat
 DSPy belongs in the model-development pipeline, not in workflow correctness.
 
 ```text
-Haive task contract
+The Aive task contract
     -> typed signature
     -> training/evaluation set
     -> metric and adversarial gates
@@ -292,26 +293,30 @@ Small models should be optimized against the exact structured function they perf
 
 BitNet b1.58 and other ternary families remain experimental backend/model-family directions, not drop-in post-training quantization flags for existing Qwen artifacts.
 
-The BITCOS storage/runtime foundation is now implemented in `native/bitcos` and documented in [BITCOS.md](BITCOS.md). Haive can losslessly pack already-ternary tensors into the versioned HBCS container, inspect/unpack them, decode through Rust on Android/Desktop, and capability-gate `bitcos-v1` artifacts in `LocalModelLibrary`. Existing runtimes cannot select BITCOS unless they explicitly advertise that weight encoding.
+The BITCOS storage/runtime foundation is now implemented in `native/bitcos` and documented in [BITCOS.md](BITCOS.md). The Aive can losslessly pack already-ternary tensors into the versioned HBCS container, inspect/unpack them, decode through Rust on Android/Desktop, and capability-gate `bitcos-v1` artifacts in `LocalModelLibrary`. Existing runtimes cannot select BITCOS unless they explicitly advertise that weight encoding.
 
 This does not yet make a ternary family production-ready. Adoption still requires a verified released ternary checkpoint, tokenizer/transformer execution, optimized architecture-specific kernels, and benchmarking against the existing specialist family for task accuracy, latency, RAM, energy/thermals, startup time, supported hardware, and runtime portability.
 
 Existing Qwen/ONNX paths remain the production default until a ternary model demonstrates an actual advantage for the relevant specialist workload.
 
-## Experimental phase: Skeleton-of-Thought
+## Skeleton-of-Thought
 
-Skeleton-of-Thought will be treated as another governed reasoning strategy:
+Skeleton-of-Thought is implemented as another governed workflow subgraph:
 
 ```text
 objective
    -> skeleton
-   -> branch independence analysis
+   -> branch independence review
    -> parallel branch expansion
-   -> genealogy-aware aggregation
+   -> aggregation
    -> verification
 ```
 
-It reuses the same workflow concurrency, genealogy, stream, planning, and verification contracts as centralized MoA. A skeleton branch is parallelized only when its dependencies permit it.
+`CompoundInferencePolicy.SkeletonOfThought` names the skeleton role, independence reviewer, branch-expansion roles, and aggregator. `SkeletonOfThoughtExpander` materializes those stages into ordinary durable tasks before execution.
+
+The skeleton, independence-review, and expansion roles are reasoning-only: they may not hold implementation authority or require repository-write capability. Each expansion consumes the approved skeleton and independence review but never sibling expansion output. The original task ID remains the aggregator, and downstream tasks are rewired to wait for an independent verifier. Original task conditions are copied across every injected stage so conditional branches cancel or execute as one governed unit rather than leaving hidden blocked nodes.
+
+The strategy therefore reuses normal workflow concurrency, persistence, retries, escalation, provider selection, artifact ancestry, stream telemetry, and verification instead of creating a second scheduler.
 
 ## Implementation sequence
 
@@ -324,7 +329,7 @@ It reuses the same workflow concurrency, genealogy, stream, planning, and verifi
 7. DSPy optimization and release pipeline.
 8. Remaining local orchestration utility family.
 9. Ternary/BitNet experiments — BITCOS codec, native packaging, and capability-gated artifact support implemented; model-family execution and optimized kernels remain experimental.
-10. Skeleton-of-Thought experiments.
+10. Skeleton-of-Thought governed DAG execution — implemented.
 
 ## Current implementation status
 
@@ -350,11 +355,14 @@ Implemented and called by production runtime:
 - direct non-agent executor evidence indexing
 - `CompoundInferencePolicy.CentralizedMixtureOfAgents`
 - `CompoundInferencePolicy.ResourceAware`
+- `CompoundInferencePolicy.SkeletonOfThought`
 - `ResourceAwareCompoundInferencePolicyResolver`
 - `CentralizedMixtureOfAgentsExpander`
+- `SkeletonOfThoughtExpander`
 - `GenealogyGovernanceExecutorIntegration`
 - centralized runtime registration of the genealogy gate
 - explicit proposer → governance → aggregator → verifier DAG execution
+- explicit skeleton → independence review → parallel expansion → aggregator → verifier DAG execution
 - advisory false-consensus detection without blocking legitimate shared-input synthesis
 - resource-aware selection using persisted cost/latency history with conservative `Single` fallback
 - `LocalModelArtifactDescriptor`, `LocalModelSpecialistDescriptor`, and `LocalModelRuntimeCapabilities`
@@ -368,6 +376,5 @@ Not yet implemented:
 - DSPy/GEPA/MIPRO-style optimization and release pipeline
 - remaining orchestration utility models
 - released ternary/BitNet model family with tokenizer/transformer execution and fused BITCOS compute kernels
-- Skeleton-of-Thought execution
 
 Physical-device/real-provider end-to-end verification remains separate from CI and is not claimed by this document.

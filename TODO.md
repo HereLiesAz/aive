@@ -59,7 +59,7 @@ Tracking issue: #35
 - [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models.
 - [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner.
 - [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them.
-- [ ] Implement Skeleton-of-Thought as a governed skeleton → independence analysis → parallel expansion → aggregation → verification strategy after the inference fabric is established.
+- [x] Implement Skeleton-of-Thought as a governed skeleton → independence analysis → parallel expansion → aggregation → verification strategy after the inference fabric is established.
 
 ## P0 — Make one complete workflow actually work end-to-end
 
