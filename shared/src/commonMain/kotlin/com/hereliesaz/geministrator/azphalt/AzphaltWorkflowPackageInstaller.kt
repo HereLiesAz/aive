@@ -277,9 +277,11 @@ class AzphaltWorkflowPackageInstaller(
         val previousDefinitions = plan.definitions.associate { definition ->
             definition.id to persistence.definitions.get(definition.id)
         }
-        val previousRoles = plan.roles.associate { role ->
-            role.id to persistence.roles.get(role.id)
+        val roleIdsTouched = buildSet {
+            if (plan.packageKind == "role") addAll(plan.roles.map(RoleDefinition::id))
+            if (previous?.kind == "workflow") addAll(previous.roles.map(RoleDefinition::id))
         }
+        val previousRoles = roleIdsTouched.associateWith { persistence.roles.get(it) }
 
         try {
             if (plan.packageKind == "workflow") {
@@ -293,7 +295,19 @@ class AzphaltWorkflowPackageInstaller(
                 plan.definitions.forEach { persistence.definitions.put(it) }
             }
 
-            installReusableRoles(plan, previous)
+            if (plan.packageKind == "role") {
+                installReusableRoles(plan, previous)
+            } else {
+                validateWorkflowLocalRoles(plan)
+                // Migrate packages installed by older builds: embedded workflow roles no longer
+                // belong in the user's global company roster.
+                previous?.takeIf { it.kind == "workflow" }?.roles.orEmpty().forEach { previousRole ->
+                    val existing = persistence.roles.get(previousRole.id)
+                    if (existing != null && sameReusableRole(existing, previousRole)) {
+                        persistence.roles.remove(previousRole.id)
+                    }
+                }
+            }
 
             val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
@@ -326,6 +340,21 @@ class AzphaltWorkflowPackageInstaller(
             }
             if (previous == null) installStore.remove(plan.packageId) else installStore.put(previous)
             throw failure
+        }
+    }
+
+    private suspend fun validateWorkflowLocalRoles(plan: AzphaltWorkflowInstallPlan) {
+        if (plan.roles.isEmpty()) return
+        val builtInsById = BuiltInRoles.all.associateBy(RoleDefinition::id)
+        plan.roles.forEach { role ->
+            val builtIn = builtInsById[role.id]
+            require(builtIn == null || sameReusableRole(builtIn, role)) {
+                "Workflow-package role id ${role.id.value} collides with a different built-in Haive role"
+            }
+            val global = persistence.roles.get(role.id)
+            require(global == null || sameReusableRole(global, role)) {
+                "Workflow-package role id ${role.id.value} collides with a different company role"
+            }
         }
     }
 
