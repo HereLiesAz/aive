@@ -151,7 +151,10 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
-                val (project, run) = latestProjectRun
+                val (storedProject, run) = latestProjectRun
+                val project = storedProject.copy(
+                    repository = run.repositorySnapshot ?: storedProject.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -187,8 +190,11 @@ class ApplicationRuntime private constructor(
             try {
                 val run = persistence.runs.get(runId)
                     ?: error("Run ${runId.value} not found")
-                val project = persistence.projects.get(run.projectId)
+                val storedProject = persistence.projects.get(run.projectId)
                     ?: error("Project ${run.projectId.value} not found")
+                val project = storedProject.copy(
+                    repository = run.repositorySnapshot ?: storedProject.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} not found")
                 viewingRun = ViewingRun(project, definition, run)
@@ -223,7 +229,7 @@ class ApplicationRuntime private constructor(
             val now = nowEpochMillis()
             val project = existingProject?.copy(
                 name = cleanProjectName,
-                repository = normalizedRepository ?: existingProject.repository,
+                repository = normalizedRepository,
                 updatedAtEpochMillis = now,
             ) ?: Project(
                 id = ProjectId("project-$now"),
