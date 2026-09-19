@@ -30,8 +30,12 @@ internal fun LiveArtifactBrowserScreen(
     modifier: Modifier = Modifier,
 ) {
     val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-    var query by remember { mutableStateOf("") }
-    var selectedArtifactId by remember { mutableStateOf<String?>(null) }
+    val stateScope = live?.run?.id?.value ?: "no-run"
+    var query by rememberDurableStringState("artifacts.$stateScope.query")
+    var selectedArtifactIdValue by rememberDurableStringState("artifacts.$stateScope.selected")
+    var selectedArtifactId: String?
+        get() = selectedArtifactIdValue.takeIf(String::isNotBlank)
+        set(value) { selectedArtifactIdValue = value.orEmpty() }
 
     val rows = remember(live) {
         live?.definition?.tasks.orEmpty().flatMap { task ->
