@@ -127,12 +127,12 @@ internal class DesktopProviderCredentialStore {
                 ?: return null
             return runCatching {
                 val script = """
-                    $cipher = [Console]::In.ReadToEnd().Trim()
-                    $bytes = [Convert]::FromBase64String($cipher)
-                    $plain = [Security.Cryptography.ProtectedData]::Unprotect(
-                        $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
+                    ${'$'}cipher = [Console]::In.ReadToEnd().Trim()
+                    ${'$'}bytes = [Convert]::FromBase64String(${'$'}cipher)
+                    ${'$'}plain = [Security.Cryptography.ProtectedData]::Unprotect(
+                        ${'$'}bytes, ${'$'}null, [Security.Cryptography.DataProtectionScope]::CurrentUser
                     )
-                    [Console]::Out.Write([Text.Encoding]::UTF8.GetString($plain))
+                    [Console]::Out.Write([Text.Encoding]::UTF8.GetString(${'$'}plain))
                 """.trimIndent()
                 val process = ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script).start()
                 process.outputStream.bufferedWriter().use { it.write(encoded) }
@@ -146,12 +146,12 @@ internal class DesktopProviderCredentialStore {
             if (!os.contains("win")) return false
             return runCatching {
                 val script = """
-                    $plain = [Console]::In.ReadToEnd()
-                    $bytes = [Text.Encoding]::UTF8.GetBytes($plain)
-                    $cipher = [Security.Cryptography.ProtectedData]::Protect(
-                        $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser
+                    ${'$'}plain = [Console]::In.ReadToEnd()
+                    ${'$'}bytes = [Text.Encoding]::UTF8.GetBytes(${'$'}plain)
+                    ${'$'}cipher = [Security.Cryptography.ProtectedData]::Protect(
+                        ${'$'}bytes, ${'$'}null, [Security.Cryptography.DataProtectionScope]::CurrentUser
                     )
-                    [Console]::Out.Write([Convert]::ToBase64String($cipher))
+                    [Console]::Out.Write([Convert]::ToBase64String(${'$'}cipher))
                 """.trimIndent()
                 val process = ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script).start()
                 process.outputStream.bufferedWriter().use { it.write(apiKey) }
