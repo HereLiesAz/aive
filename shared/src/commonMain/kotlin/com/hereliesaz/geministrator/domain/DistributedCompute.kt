@@ -24,6 +24,7 @@ data class DistributedComputeRequirements(
     val minLogicalProcessors: Int = 1,
     val minMemoryMiB: Long = 0,
     val requiredModelIds: Set<String> = emptySet(),
+    val requiredNodeIds: Set<String> = emptySet(),
     val preferredNodeIds: Set<String> = emptySet(),
 ) {
     init {
@@ -32,6 +33,7 @@ data class DistributedComputeRequirements(
         require(requiredCapabilities.none(String::isBlank)) { "requiredCapabilities must not contain blanks" }
         require(preferredCapabilities.none(String::isBlank)) { "preferredCapabilities must not contain blanks" }
         require(requiredModelIds.none(String::isBlank)) { "requiredModelIds must not contain blanks" }
+        require(requiredNodeIds.none(String::isBlank)) { "requiredNodeIds must not contain blanks" }
         require(preferredNodeIds.none(String::isBlank)) { "preferredNodeIds must not contain blanks" }
     }
 }
