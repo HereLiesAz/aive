@@ -104,6 +104,24 @@ fun App(
             ?: ControlRoomDestination.Settings
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
+        var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
+
+        PlatformBackHandler(
+            enabled = selectedTaskId != null ||
+                navigationHistory.isNotEmpty() ||
+                destination != ControlRoomDestination.Overview,
+        ) {
+            when {
+                selectedTaskId != null -> selectedTaskIdValue = ""
+                navigationHistory.isNotEmpty() -> {
+                    destinationName = navigationHistory.last().name
+                    navigationHistory = navigationHistory.dropLast(1)
+                }
+                destination != ControlRoomDestination.Overview -> {
+                    destinationName = ControlRoomDestination.Overview.name
+                }
+            }
+        }
 
         LaunchedEffect(azphaltPackageImportRequest?.requestId) {
             if (azphaltPackageImportRequest != null) {
@@ -145,7 +163,12 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
-                        onDestinationSelected = { destinationName = it.name },
+                        onDestinationSelected = { target ->
+                            if (target != destination) {
+                                navigationHistory = navigationHistory + destination
+                                destinationName = target.name
+                            }
+                        },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
