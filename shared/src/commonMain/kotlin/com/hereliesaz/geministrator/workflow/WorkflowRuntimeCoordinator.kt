@@ -55,13 +55,67 @@ class WorkflowRuntimeCoordinator(
         val run = requireNotNull(persistence.runs.get(workflowRunId)) {
             "Workflow run ${workflowRunId.value} was not found"
         }
+        val project = requireNotNull(persistence.projects.get(run.projectId)) {
+            "Project ${run.projectId.value} was not found"
+        }
+        val definition = requireNotNull(persistence.definitions.get(run.workflowDefinitionId)) {
+            "Workflow definition ${run.workflowDefinitionId.value} was not found"
+        }
+        val tasksById = definition.tasks.associateBy { it.id }
         val handles = buildMap {
             run.taskRuns.forEach { (taskDefinitionId, taskRun) ->
                 val providerId = taskRun.assignedProviderId ?: return@forEach
                 val providerRunId = taskRun.providerRunId ?: return@forEach
                 if (!taskRun.status.canReconnect()) return@forEach
                 val handle = ManagedSessionHandle(taskRun.id, providerId, providerRunId)
-                sessionGateway.reconnect(handle, taskRun.status.toManagedStatus())
+                val task = requireNotNull(tasksById[taskDefinitionId]) {
+                    "Task ${taskDefinitionId.value} was not found"
+                }
+                val role = taskRun.assignedRoleId?.let { persistence.roles.get(it) }
+                val dependencyArtifacts = task.dependsOn
+                    .mapNotNull(run.taskRuns::get)
+                    .flatMap(TaskRun::artifacts)
+                val request = com.hereliesaz.geministrator.providers.AgentTaskRequest(
+                    taskRunId = taskRun.id,
+                    objective = task.objective,
+                    roleInstructions = role?.instructions.orEmpty(),
+                    acceptanceCriteria = task.acceptanceCriteria,
+                    contextArtifacts = dependencyArtifacts,
+                    repository = project.repository,
+                    requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
+                    promptContext = com.hereliesaz.geministrator.providers.PromptContext(
+                        stablePrefix = listOf(
+                            com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                "Workflow objective",
+                                run.objective,
+                            ),
+                        ) + role?.let {
+                            listOf(
+                                com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                    "Role",
+                                    it.instructions,
+                                ),
+                            )
+                        }.orEmpty(),
+                        dynamicContext = listOf(
+                            com.hereliesaz.geministrator.providers.PromptContextBlock("Task", task.objective),
+                            com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                "Attempt",
+                                taskRun.attempt.toString(),
+                            ),
+                        ),
+                        reusePolicy = definition.promptReusePolicy,
+                        cacheNamespace = role?.let { "${run.id.value}:${it.id.value}" },
+                    ),
+                    orchestrationContext = com.hereliesaz.geministrator.providers.AgentOrchestrationContext(
+                        projectId = project.id,
+                        workflowRunId = run.id,
+                        workflowDefinitionId = definition.id,
+                        taskDefinitionId = task.id,
+                        roleId = role?.id,
+                    ),
+                )
+                sessionGateway.reconnect(handle, taskRun.status.toManagedStatus(), request)
                 put(taskDefinitionId, handle)
             }
         }
