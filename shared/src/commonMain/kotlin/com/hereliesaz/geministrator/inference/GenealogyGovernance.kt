@@ -27,6 +27,8 @@ data class InferenceGenealogyNode(
             "An inference invocation cannot list itself as a direct ancestor"
         }
         require(upstreamInvocationIds.none(String::isBlank)) { "Upstream invocation IDs must not be blank" }
+        require(upstreamTaskRunIds.none { it.value.isBlank() }) { "Upstream task-run IDs must not be blank" }
+        require(upstreamArtifactIds.none { it.value.isBlank() }) { "Upstream artifact IDs must not be blank" }
         require(memoryAddresses.none(String::isBlank)) { "Memory addresses must not be blank" }
         require(toolEvidenceIds.none(String::isBlank)) { "Tool evidence IDs must not be blank" }
     }
@@ -168,7 +170,25 @@ class DefaultGenealogyGovernanceEvaluator(
         val requestedNodes = request.invocationIds.mapNotNull(allNodes::get)
         val findings = mutableListOf<GenealogyGovernanceFinding>()
 
-        val missing = request.invocationIds - requestedNodes.mapTo(linkedSetOf(), InferenceGenealogyNode::invocationId)
+        val missing = linkedSetOf<String>()
+        missing += request.invocationIds - requestedNodes.mapTo(linkedSetOf(), InferenceGenealogyNode::invocationId)
+
+        // Missing transitive parents are just as important as missing requested roots: without them,
+        // two candidates can appear independent only because their real ancestry is unavailable.
+        val visitedForMissing = mutableSetOf<String>()
+        fun collectMissingAncestors(invocationId: String) {
+            if (!visitedForMissing.add(invocationId)) return
+            val node = allNodes[invocationId] ?: return
+            node.upstreamInvocationIds.forEach { parent ->
+                if (parent !in allNodes) {
+                    missing += parent
+                } else {
+                    collectMissingAncestors(parent)
+                }
+            }
+        }
+        request.invocationIds.forEach(::collectMissingAncestors)
+
         missing.sorted().forEach { invocationId ->
             findings += GenealogyGovernanceFinding(
                 kind = GenealogyGovernanceFindingKind.MissingGenealogy,
@@ -200,7 +220,9 @@ class DefaultGenealogyGovernanceEvaluator(
                     addAll(ancestors(parent, activePath + invocationId))
                 }
             }
-            ancestryCache[invocationId] = result
+            if (activePath.isEmpty()) {
+                ancestryCache[invocationId] = result
+            }
             return result
         }
 
@@ -242,7 +264,9 @@ class DefaultGenealogyGovernanceEvaluator(
                     addAll(evidenceClosure(parent, activePath + invocationId))
                 }
             }
-            evidenceClosureCache[invocationId] = evidence
+            if (activePath.isEmpty()) {
+                evidenceClosureCache[invocationId] = evidence
+            }
             return evidence
         }
 
