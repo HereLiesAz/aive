@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
 
 @Serializable
