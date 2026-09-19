@@ -119,5 +119,5 @@ private fun Collection<RoleDefinition>.preferredEnvironmentPlanner(): RoleDefini
     val eligible = filter { it.enabled && RoleAuthority.SelectEnvironment in it.authorities }
     return eligible.firstOrNull { it.id == BuiltInRoles.EpaRepresentative.id }
         ?: eligible.firstOrNull()
-        ?: error("The active company has no role authorized to select execution environments")
+        ?: error("The active swarm has no role authorized to select execution environments")
 }
