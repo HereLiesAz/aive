@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
+import com.hereliesaz.geministrator.domain.validateRoleCollectionForStarterWorkflow
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.withRoleComputeDelegation
@@ -70,7 +71,7 @@ import kotlin.time.ExperimentalTime
 
 sealed interface ApplicationRuntimeState {
     data object Loading : ApplicationRuntimeState
-    data object NoProject : ApplicationRuntimeState
+    data class NoProject(val roles: List<RoleDefinition> = emptyList()) : ApplicationRuntimeState
     data class NoRun(val project: Project, val roles: List<RoleDefinition> = emptyList()) : ApplicationRuntimeState
     data class Live(val presentation: LiveWorkflowPresentation) : ApplicationRuntimeState
     data class Disconnected(val message: String) : ApplicationRuntimeState
@@ -129,7 +130,7 @@ class ApplicationRuntime private constructor(
                 val projects = persistence.projects.all()
                 if (projects.isEmpty()) {
                     replaceCurrent(null)
-                    publisher.publish(ApplicationRuntimeState.NoProject)
+                    publisher.publish(ApplicationRuntimeState.NoProject(roles = roles))
                     return@withLock
                 }
 
@@ -518,13 +519,14 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun saveRoleCollection(activeRoleCollection: List<RoleDefinition>) {
+        validateRoleCollectionForStarterWorkflow(activeRoleCollection)
         val existing = persistence.roles.all()
-        roleCollectionEntries(activeRoleCollection, existing).forEach { persistence.roles.put(it) }
+        persistence.roles.replaceAll(roleCollectionEntries(activeRoleCollection, existing))
     }
 
     suspend fun resetRoleCollection() {
         val existing = persistence.roles.all()
-        defaultRoleCollectionEntries(existing).forEach { persistence.roles.put(it) }
+        persistence.roles.replaceAll(defaultRoleCollectionEntries(existing))
     }
 
     suspend fun assignWorkflowCompute(
