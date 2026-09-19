@@ -105,7 +105,7 @@ internal fun projectWorkflowTerrarium(
                         subtitle = definition.name,
                         hueSeed = "haive-orchestrator",
                         state = run.status.toTerrariumState(),
-                        detail = "The Haive orchestrator",
+                        detail = "The Aive orchestrator",
                     ),
                     position = persistedPositions[TERRARIUM_ORCHESTRATOR_ID]
                         ?: fallbackPositions.getValue(TERRARIUM_ORCHESTRATOR_ID),
