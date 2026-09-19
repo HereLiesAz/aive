@@ -103,7 +103,14 @@ class WorkflowApprovalServiceTest {
             name = "Workflow",
             tasks = listOf(TaskDefinition(id = taskId, name = "Task", objective = "Do it", roleId = BuiltInRoles.ImplementationEngineer.id)),
         )
-        val run = WorkflowRunFactory.create(definition, WorkflowRunId("run"), ProjectId("project"), "Objective", 0L) { TaskRunId("task-run") }
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("run"),
+            projectId = ProjectId("project"),
+            objective = "Objective",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { TaskRunId("task-run") },
+        )
         val repository = ApprovalMemoryRepository()
         val events = InMemoryWorkflowEventSink()
         val gateway = ApprovalGateway(result, failure)
