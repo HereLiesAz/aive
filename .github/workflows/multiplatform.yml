@@ -488,7 +488,17 @@ jobs:
           set -euo pipefail
 
           SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
-          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+
+          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD (for example 0.9.6.0)"
+            exit 1
+          fi
+
+          MAJOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1)
+          MINOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f2)
+          PATCH=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f3)
+          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${GITHUB_RUN_NUMBER}"
+          TAG_NAME="v${VERSION_NAME}"
+          RELEASE_TITLE="The Aive ${VERSION_NAME}"
 
           IS_PRERELEASE=false
           if [ "$MAJOR" -eq 0 ] || { [ "$MAJOR" -eq 1 ] && [ "$MINOR" -le 3 ]; }; then
@@ -548,152 +558,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Release history is immutable. A semantic version may be published exactly once.
-          # Never move a version tag, edit an existing release into a newer version, delete its
-          # assets, or upload replacement assets over it.
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Release $TAG_NAME already exists. Leaving the existing release completely unchanged."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
-            TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
-            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
-              echo "::error::Immutable tag $TAG_NAME already exists at $TAG_COMMIT; refusing to move it to $GITHUB_SHA"
-              exit 1
-            fi
-          else
-            git tag -a "$TAG_NAME" -m "The Aive ${VERSION_NAME}"
-            git push origin "$TAG_NAME"
-          fi
-
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            gh release create "$TAG_NAME" release-files/* \
-              --prerelease \
-              --verify-tag \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-          else
-            gh release create "$TAG_NAME" release-files/* \
-              --verify-tag \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-          fi
-
-  deploy-pages:
-    if: github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-
-  publish-play:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_play) }}
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Play Android release bundle
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-android-play-release
-          path: android-release
-
-      - name: Download release notes
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-release-notes
-          path: fastlane/metadata/android/en-US/changelogs
-
-      - name: Publish to Google Play internal track
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.hereliesaz.aive
-          releaseFiles: android-release/**/*.aab
-          track: internal
-          status: completed
-          whatsNewDirectory: fastlane/metadata/android/en-US/changelogs
-; then
-            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD (for example 0.9.6.0)"
-            exit 1
-          fi
-
-          MAJOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1)
-          MINOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f2)
-          PATCH=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f3)
-          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${GITHUB_RUN_NUMBER}"
-          TAG_NAME="v${VERSION_NAME}"
-          RELEASE_TITLE="The Aive ${VERSION_NAME}"
-
-          IS_PRERELEASE=false
-          if [ "$MAJOR" -eq 0 ] || { [ "$MAJOR" -eq 1 ] && [ "$MINOR" -le 3 ]; }; then
-            IS_PRERELEASE=true
-          fi
-
-          mkdir -p release-files
-
-          APK_SOURCE=$(find release-input/android -type f -name '*.apk' -print -quit)
-          DEB_SOURCE=$(find release-input/linux -type f -name '*.deb' -print -quit)
-          MSI_SOURCE=$(find release-input/windows -type f -name '*.msi' -print -quit)
-          DMG_SOURCE=$(find release-input/macos -type f -name '*.dmg' -print -quit)
-
-          for entry in \
-            "APK_SOURCE:$APK_SOURCE" \
-            "DEB_SOURCE:$DEB_SOURCE" \
-            "MSI_SOURCE:$MSI_SOURCE" \
-            "DMG_SOURCE:$DMG_SOURCE"; do
-            label=${entry%%:*}
-            value=${entry#*:}
-            if [ -z "$value" ]; then
-              echo "::error::Missing release asset: $label"
-              find release-input -type f -print
-              exit 1
-            fi
-          done
-
-          cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
-          cp "$DEB_SOURCE" "release-files/$(basename "$DEB_SOURCE")"
-          cp "$MSI_SOURCE" "release-files/$(basename "$MSI_SOURCE")"
-          cp "$DMG_SOURCE" "release-files/$(basename "$DMG_SOURCE")"
-
-          NOTES_SOURCE=$(find release-input/notes -type f -name 'default.txt' -print -quit)
-          {
-            echo "# The Aive ${VERSION_NAME}"
-            echo
-            echo "Versioned build from commit \`${GITHUB_SHA}\`."
-            if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
-              echo
-              echo "## Changes"
-              cat "$NOTES_SOURCE"
-            fi
-          } > release-notes.md
-
-          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
-          echo "RELEASE_TITLE=$RELEASE_TITLE" >> "$GITHUB_ENV"
-          echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
-
-          echo "Release assets:"
-          ls -lh release-files
-
-      - name: Publish versioned release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Release history is immutable. A semantic version may be published exactly once.
-          # Never move a version tag, edit an existing release into a newer version, delete its
-          # assets, or upload replacement assets over it.
+          # Release history is immutable. Every MAJOR.MINOR.PATCH.BUILD may be published exactly once.
+          # Never move a version tag, edit an existing release, delete its assets, or clobber uploads.
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "Release $TAG_NAME already exists. Leaving the existing release completely unchanged."
             exit 0
