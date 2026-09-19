@@ -57,9 +57,9 @@ internal fun CompanyProviderScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("COMPANY", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Assign each company role to the provider you want. AUTO lets Aive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
+            "Assign each swarm role to the provider you want. AUTO lets Aive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
