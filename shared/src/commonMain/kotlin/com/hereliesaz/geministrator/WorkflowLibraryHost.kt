@@ -30,7 +30,7 @@ class WorkflowLibraryHost(
     private val persistence: WorkflowPersistence,
     private val storeService: AzphaltStoreService?,
     private val authoredStore: AuthoredWorkflowStore = SettingsAuthoredWorkflowStore(),
-    private val launchWorkflow: suspend (WorkflowDefinition) -> Unit,
+    private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>) -> Unit,
     private val onPackagesChanged: () -> Unit,
 ) {
     private val composition = WorkflowCompositionService(persistence)
@@ -121,7 +121,17 @@ class WorkflowLibraryHost(
 
     suspend fun run(definition: WorkflowDefinition) {
         composition.validated(definition)
-        launchWorkflow(definition)
+        val neededRoleIds = definition.tasks.mapNotNullTo(linkedSetOf()) { task ->
+            task.roleId ?: (task.executor as? com.hereliesaz.geministrator.domain.TaskExecutor.RoleAgent)?.roleId
+        }
+        val packageRoles = storeService?.installed().orEmpty()
+            .asSequence()
+            .filter { it.kind == "workflow" && definition.id.value in it.workflowDefinitionIds }
+            .flatMap { it.roles.asSequence() }
+            .filter { it.id in neededRoleIds }
+            .distinctBy(RoleDefinition::id)
+            .toList()
+        launchWorkflow(definition, packageRoles)
     }
 
     fun packagesChanged() = onPackagesChanged()
