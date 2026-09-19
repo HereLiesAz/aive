@@ -5,7 +5,11 @@ plugins {
 }
 
 dependencies {
-    implementation(projects.shared)
+    // The relay consumes protocol/domain classes from shared, not the app/UI runtime graph.
+    // Keep UI/toolkit dependencies out of this headless distribution.
+    implementation(projects.shared) {
+        isTransitive = false
+    }
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.server.core)
