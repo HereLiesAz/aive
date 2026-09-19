@@ -73,7 +73,8 @@ class ConditionalBranchTest {
             projectId = ProjectId("proj"),
             objective = "test",
             nowEpochMillis = 1L,
-        ) { TaskRunId(it.value) }
+            taskRunIdFactory = { TaskRunId(it.value) },
+        )
 
         val withMainCompleted = run.copy(
             taskRuns = run.taskRuns + (mainTaskId to run.taskRuns.getValue(mainTaskId).copy(
@@ -96,7 +97,8 @@ class ConditionalBranchTest {
             projectId = ProjectId("proj"),
             objective = "test",
             nowEpochMillis = 1L,
-        ) { TaskRunId(it.value) }
+            taskRunIdFactory = { TaskRunId(it.value) },
+        )
 
         val withMainFailed = run.copy(
             taskRuns = run.taskRuns + (mainTaskId to run.taskRuns.getValue(mainTaskId).copy(
