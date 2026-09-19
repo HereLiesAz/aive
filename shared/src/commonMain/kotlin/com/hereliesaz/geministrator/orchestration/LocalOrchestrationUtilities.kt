@@ -270,10 +270,10 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         fun add(text: String, resolution: MemoryResolution, reason: String) {
             val clean = text.trim()
             if (clean.isNotEmpty() && queries.size < input.maxQueries) {
-                queries.putIfAbsent(
-                    "${resolution.name}:${clean.lowercase()}",
-                    MemoryQuerySpec(clean, resolution, reason),
-                )
+                val key = "${resolution.name}:${clean.lowercase()}"
+                if (key !in queries) {
+                    queries[key] = MemoryQuerySpec(clean, resolution, reason)
+                }
             }
         }
 
@@ -494,15 +494,14 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         val steps = linkedMapOf<String, VerificationStep>()
         fun add(operation: String, reason: String, criterion: String? = null) {
             val key = "$operation|${criterion.orEmpty()}"
-            steps.putIfAbsent(
-                key,
-                VerificationStep(
+            if (key !in steps) {
+                steps[key] = VerificationStep(
                     id = "verify-${steps.size + 1}",
                     operationClass = operation,
                     reasonCode = reason,
                     criterion = criterion,
-                ),
-            )
+                )
+            }
         }
 
         val criteria = input.acceptanceCriteria.filter(String::isNotBlank)
