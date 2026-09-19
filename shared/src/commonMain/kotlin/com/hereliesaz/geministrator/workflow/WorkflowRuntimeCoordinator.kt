@@ -84,6 +84,7 @@ class WorkflowRuntimeCoordinator(
                     roleInstructions = role?.instructions.orEmpty(),
                     acceptanceCriteria = task.acceptanceCriteria,
                     contextArtifacts = dependencyArtifacts,
+                    requiredArtifacts = task.requiredArtifacts,
                     repository = project.repository,
                     requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
                     promptContext = com.hereliesaz.geministrator.providers.PromptContext(
