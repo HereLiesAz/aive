@@ -73,6 +73,7 @@ interface AzphaltInstallStore {
     suspend fun get(packageId: String): InstalledAzphaltWorkflowPackage?
     suspend fun all(): List<InstalledAzphaltWorkflowPackage>
     suspend fun put(value: InstalledAzphaltWorkflowPackage)
+    suspend fun remove(packageId: String)
 }
 
 class SettingsAzphaltInstallStore(
@@ -92,6 +93,13 @@ class SettingsAzphaltInstallStore(
         mutex.withLock {
             val values = readUnlocked().filterNot { it.packageId == value.packageId } + value
             settings.putString(storageKey, json.encodeToString(ListSerializer, values.sortedBy { it.packageId }))
+        }
+    }
+
+    override suspend fun remove(packageId: String) {
+        mutex.withLock {
+            val values = readUnlocked().filterNot { it.packageId == packageId }
+            settings.putString(storageKey, json.encodeToString(ListSerializer, values))
         }
     }
 
@@ -266,7 +274,17 @@ class AzphaltWorkflowPackageInstaller(
         }
 
         val previous = installStore.get(plan.packageId)
-        if (plan.packageKind == "workflow") {
+        val previousDefinitions = plan.definitions.associate { definition ->
+            definition.id to persistence.definitions.get(definition.id)
+        }
+        val roleIdsTouched = buildSet {
+            if (plan.packageKind == "role") addAll(plan.roles.map(RoleDefinition::id))
+            if (previous?.kind == "workflow") addAll(previous.roles.map(RoleDefinition::id))
+        }
+        val previousRoles = roleIdsTouched.associateWith { persistence.roles.get(it) }
+
+        try {
+            if (plan.packageKind == "workflow") {
             val ownedDefinitions = previous?.takeIf { it.kind == "workflow" }?.workflowDefinitionIds.orEmpty().toSet()
             plan.definitions.forEach { definition ->
                 val existing = persistence.definitions.get(definition.id)
@@ -274,12 +292,24 @@ class AzphaltWorkflowPackageInstaller(
                     "Workflow id ${definition.id.value} already exists and is not owned by ${plan.packageId}"
                 }
             }
-            plan.definitions.forEach { persistence.definitions.put(it) }
-        }
+                plan.definitions.forEach { persistence.definitions.put(it) }
+            }
 
-        installReusableRoles(plan, previous)
+            if (plan.packageKind == "role") {
+                installReusableRoles(plan, previous)
+            } else {
+                validateWorkflowLocalRoles(plan)
+                // Migrate packages installed by older builds: embedded workflow roles no longer
+                // belong in the user's global company roster.
+                previous?.takeIf { it.kind == "workflow" }?.roles.orEmpty().forEach { previousRole ->
+                    val existing = persistence.roles.get(previousRole.id)
+                    if (existing != null && sameReusableRole(existing, previousRole)) {
+                        persistence.roles.remove(previousRole.id)
+                    }
+                }
+            }
 
-        val installed = InstalledAzphaltWorkflowPackage(
+            val installed = InstalledAzphaltWorkflowPackage(
             packageId = plan.packageId,
             kind = plan.packageKind,
             version = plan.version,
@@ -294,11 +324,38 @@ class AzphaltWorkflowPackageInstaller(
             signerPublicKey = plan.signerPublicKey,
             installedAtEpochMillis = nowEpochMillis,
         )
-        installStore.put(installed)
-        if (plan.signerPublicKey != null && (plan.pinnedPublisherKey == null || allowPublisherChange)) {
-            publisherPins.pin(plan.packageId, plan.signerPublicKey)
+            installStore.put(installed)
+            if (plan.signerPublicKey != null && (plan.pinnedPublisherKey == null || allowPublisherChange)) {
+                publisherPins.pin(plan.packageId, plan.signerPublicKey)
+            }
+            return installed
+        } catch (failure: Throwable) {
+            // Restore every mutable store touched by this install. A failed install must be
+            // indistinguishable from one that never started, including upgrades.
+            previousDefinitions.forEach { (id, value) ->
+                if (value == null) persistence.definitions.remove(id) else persistence.definitions.put(value)
+            }
+            previousRoles.forEach { (id, value) ->
+                if (value == null) persistence.roles.remove(id) else persistence.roles.put(value)
+            }
+            if (previous == null) installStore.remove(plan.packageId) else installStore.put(previous)
+            throw failure
         }
-        return installed
+    }
+
+    private suspend fun validateWorkflowLocalRoles(plan: AzphaltWorkflowInstallPlan) {
+        if (plan.roles.isEmpty()) return
+        val builtInsById = BuiltInRoles.all.associateBy(RoleDefinition::id)
+        plan.roles.forEach { role ->
+            val builtIn = builtInsById[role.id]
+            require(builtIn == null || sameReusableRole(builtIn, role)) {
+                "Workflow-package role id ${role.id.value} collides with a different built-in Haive role"
+            }
+            val global = persistence.roles.get(role.id)
+            require(global == null || sameReusableRole(global, role)) {
+                "Workflow-package role id ${role.id.value} collides with a different company role"
+            }
+        }
     }
 
     private suspend fun installReusableRoles(

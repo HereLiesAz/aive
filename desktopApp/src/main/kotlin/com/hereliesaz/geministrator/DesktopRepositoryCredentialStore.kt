@@ -53,17 +53,10 @@ internal class DesktopRepositoryCredentialStore {
                     result.waitFor()
                     output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
                 }
-                os.contains("win") -> {
-                    val result = ProcessBuilder(
-                        "powershell", "-NonInteractive", "-Command",
-                        "[System.Net.NetworkCredential]::new('', " +
-                            "(Get-StoredCredential -Target '$KEYCHAIN_SERVICE/$serviceId').Password" +
-                            ").Password",
-                    ).start()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
-                }
+                // cmdkey can write generic credentials, but Windows provides no built-in command
+                // that can read the secret back. Use the existing preference fallback symmetrically
+                // instead of depending on the third-party CredentialManager PowerShell module.
+                os.contains("win") -> null
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
                     val result = ProcessBuilder(
                         "secret-tool", "lookup",
@@ -95,13 +88,7 @@ internal class DesktopRepositoryCredentialStore {
                     ).start()
                     result.waitFor() == 0
                 }
-                os.contains("win") -> {
-                    val result = ProcessBuilder(
-                        "powershell", "-NonInteractive", "-Command",
-                        "cmdkey /generic:'$KEYCHAIN_SERVICE/$serviceId' /user:'$serviceId' /pass:'$credential'",
-                    ).start()
-                    result.waitFor() == 0
-                }
+                os.contains("win") -> false
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
                     val proc = ProcessBuilder(
                         "secret-tool", "store",

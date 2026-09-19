@@ -80,6 +80,7 @@ fun main() {
             ) {
                 var credentials by remember { mutableStateOf(initialProviderCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
+                var suppressedEnvironmentRepositoryServiceIds by remember { mutableStateOf(emptySet<String>()) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
@@ -141,7 +142,11 @@ fun main() {
                         serviceId = repositoryServiceId,
                         onSave = { credential ->
                             repositoryCredentialStore.write(repositoryServiceId, credential)
-                            repositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+                            suppressedEnvironmentRepositoryServiceIds -= repositoryServiceId
+                            repositoryCredentials = readDesktopRepositoryCredentials(
+                                repositoryCredentialStore,
+                                suppressedEnvironmentRepositoryServiceIds,
+                            )
                             configuringRepositoryServiceId = null
                         },
                         onCancel = { configuringRepositoryServiceId = null },
@@ -166,7 +171,11 @@ fun main() {
                         onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                         onDisconnectRepositoryService = { serviceId ->
                             repositoryCredentialStore.clear(serviceId)
-                            repositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
+                            suppressedEnvironmentRepositoryServiceIds += serviceId
+                            repositoryCredentials = readDesktopRepositoryCredentials(
+                                repositoryCredentialStore,
+                                suppressedEnvironmentRepositoryServiceIds,
+                            )
                         },
                         onReconfigureProvider = { configuringProviderId = it },
                         onDisconnectProvider = { disconnectedProviderId ->
@@ -374,8 +383,13 @@ private fun readDesktopProviderCredentials(store: DesktopProviderCredentialStore
     store.readAll().forEach { (providerId, key) -> put(providerId, key) }
 }
 
-private fun readDesktopRepositoryCredentials(store: DesktopRepositoryCredentialStore): Map<String, String> = buildMap {
-    environmentRepositoryCredentials().forEach { (serviceId, credential) -> put(serviceId, credential) }
+private fun readDesktopRepositoryCredentials(
+    store: DesktopRepositoryCredentialStore,
+    suppressedEnvironmentServiceIds: Set<String> = emptySet(),
+): Map<String, String> = buildMap {
+    environmentRepositoryCredentials().forEach { (serviceId, credential) ->
+        if (serviceId !in suppressedEnvironmentServiceIds) put(serviceId, credential)
+    }
     store.readAll().forEach { (serviceId, credential) -> put(serviceId, credential) }
 }
 

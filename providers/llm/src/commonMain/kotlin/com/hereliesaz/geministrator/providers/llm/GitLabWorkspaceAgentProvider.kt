@@ -29,6 +29,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.CancellationException
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
@@ -66,6 +67,11 @@ class GitLabWorkspaceAgentProvider(
         val requestedFiles: List<String>,
     )
 
+    private data class WorkspaceSnapshot(
+        val text: String,
+        val completePaths: Set<String>,
+    )
+
     private data class Session(
         val request: AgentTaskRequest,
         val phase: MutableStateFlow<Phase>,
@@ -81,9 +87,6 @@ class GitLabWorkspaceAgentProvider(
         val webUrl: String,
         val trackedFiles: List<String>,
     )
-
-    private val mutex = Mutex()
-    private var nextSequence = 1L
 
     private companion object {
         const val MAX_TREE_PATHS = 700
@@ -106,6 +109,7 @@ class GitLabWorkspaceAgentProvider(
         supported = setOf(
             AgentCapability.RepositoryRead,
             AgentCapability.RepositoryWrite,
+            AgentCapability.TestAuthoring,
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
         ),
@@ -118,9 +122,9 @@ class GitLabWorkspaceAgentProvider(
         require(supportsRepository(request.repository)) {
             "$displayName GitLab workspace agent requires a linked GitLab repository"
         }
-        val runId = mutex.withLock {
-            ProviderRunId("${id.value}/${request.taskRunId.value}/${nextSequence++}")
-        }
+        val runId = ProviderRunId(
+            "${id.value}/${request.taskRunId.value}/${UUID.randomUUID()}",
+        )
         sessionsMutex.withLock {
             sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[runId] = Session(
                 request = request,
@@ -138,7 +142,51 @@ class GitLabWorkspaceAgentProvider(
                 return@flow
             }
 
-            emit(AgentEvent.Progress(runId, "Reading linked GitLab repository"))
+            if (isSpecificationTask(session.request)) {
+                emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
+                val generated = api.generate(specificationPrompt(session.request))
+                val artifactKinds = session.request.requiredArtifacts.ifEmpty {
+                    setOf(
+                        ArtifactKind.AcceptanceTestPlan,
+                        ArtifactKind.BehavioralTest,
+                        ArtifactKind.ContractTest,
+                        ArtifactKind.FailureScenario,
+                    )
+                }
+                artifactKinds.forEach { kind ->
+                    emit(
+                        AgentEvent.ArtifactProduced(
+                            runId,
+                            ProviderArtifact(
+                                kind = kind,
+                                label = kind.name.replace(Regex("([a-z])([A-Z])"), "\$1 \$2"),
+                                textContent = generated.text.trim(),
+                                mediaType = "text/markdown",
+                                metadata = mapOf(
+                                    "provider" to id.value,
+                                    "source" to RepositorySource.GitLab.name,
+                                    "mode" to "pre-code-specification",
+                                ),
+                            ),
+                        ),
+                    )
+                }
+                if (generated.inputTokens != null || generated.outputTokens != null) {
+                    emit(
+                        AgentEvent.UsageReported(
+                            runId,
+                            inputTokens = generated.inputTokens,
+                            outputTokens = generated.outputTokens,
+                        ),
+                    )
+                }
+                emit(AgentEvent.Completed(runId))
+                return@flow
+            }
+
+            if (!session.request.requirePlanApproval) {
+                emit(AgentEvent.Progress(runId, "Reading linked GitLab repository"))
+            }
             val token = tokenProvider.requireToken()
             val context = loadRepositoryContext(session.request, token)
 
@@ -152,15 +200,17 @@ class GitLabWorkspaceAgentProvider(
             val approvedPlan = requireNotNull(plan)
 
             if (session.request.requirePlanApproval && session.phase.value == Phase.AwaitingApproval) {
-                emit(AgentEvent.PlanGenerated(runId, approvedPlan.text.take(MAX_PLAN_PREVIEW_CHARS)))
+                emit(AgentEvent.PlanGenerated(runId, approvedPlan.text))
                 val phase = session.phase.filter { it != Phase.AwaitingApproval }.first()
                 if (phase == Phase.Cancelled) {
                     emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
                     return@flow
                 }
                 emit(AgentEvent.PlanApproved(runId))
+                emit(AgentEvent.Progress(runId, "Reading linked GitLab repository"))
             } else if (session.request.requirePlanApproval) {
                 emit(AgentEvent.PlanApproved(runId))
+                emit(AgentEvent.Progress(runId, "Reading linked GitLab repository"))
             }
 
             if (session.phase.value == Phase.Cancelled) {
@@ -170,12 +220,51 @@ class GitLabWorkspaceAgentProvider(
 
             val selectedFiles = selectFiles(approvedPlan, context.trackedFiles, session.request)
             val snapshot = loadSnapshot(context, token, selectedFiles)
-            require(snapshot.isNotBlank()) { "No readable GitLab source files were selected for the workspace task" }
+            require(snapshot.text.isNotBlank()) { "No readable GitLab source files were selected for the workspace task" }
+
+            val mutationRequested =
+                session.request.requiredCapabilities.isEmpty() ||
+                    AgentCapability.RepositoryWrite in session.request.requiredCapabilities
+            if (!mutationRequested) {
+                emit(AgentEvent.Progress(runId, "Reviewing selected GitLab files"))
+                val review = api.generate(
+                    reviewPrompt(session.request, approvedPlan, context, snapshot.text),
+                )
+                emit(
+                    AgentEvent.ArtifactProduced(
+                        runId,
+                        ProviderArtifact(
+                            kind = ArtifactKind.Review,
+                            label = "GitLab repository review",
+                            uri = context.webUrl,
+                            textContent = review.text.trim(),
+                            mediaType = "text/markdown",
+                            metadata = mapOf(
+                                "provider" to id.value,
+                                "source" to RepositorySource.GitLab.name,
+                                "baseBranch" to context.defaultBranch,
+                                "repositoryUrl" to context.webUrl,
+                            ),
+                        ),
+                    ),
+                )
+                val inputTokens = listOfNotNull(session.planUsage?.inputTokens, review.inputTokens).sumOrNull()
+                val outputTokens = listOfNotNull(session.planUsage?.outputTokens, review.outputTokens).sumOrNull()
+                if (inputTokens != null || outputTokens != null) {
+                    emit(AgentEvent.UsageReported(runId, inputTokens = inputTokens, outputTokens = outputTokens))
+                }
+                emit(AgentEvent.Completed(runId))
+                return@flow
+            }
 
             emit(AgentEvent.Progress(runId, "Generating validated GitLab file changes"))
-            val generation = api.generate(changePrompt(session.request, approvedPlan, context, snapshot))
+            val generation = api.generate(changePrompt(session.request, approvedPlan, context, snapshot.text))
             val changeSet = parseChangeSet(generation.text)
-            validateChangeSet(changeSet, context.trackedFiles.toSet())
+            validateChangeSet(
+                changeSet = changeSet,
+                trackedFiles = context.trackedFiles.toSet(),
+                editablePaths = snapshot.completePaths,
+            )
 
             val branch = workspaceBranch(session.request, runId)
             emit(AgentEvent.Progress(runId, "Creating GitLab branch $branch"))
@@ -183,7 +272,13 @@ class GitLabWorkspaceAgentProvider(
 
             emit(AgentEvent.Progress(runId, "Committing ${changeSet.actions.size} GitLab file action(s)"))
             val commit = commitActions(context, token, branch, changeSet)
-            val diff = readCommitDiff(context, token, commit.id)
+            val diff = try {
+                readCommitDiff(context, token, commit.id)
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: Throwable) {
+                ""
+            }
             val compareUrl = "${context.webUrl}/-/compare/${context.defaultBranch}...$branch"
 
             emit(
@@ -252,6 +347,41 @@ class GitLabWorkspaceAgentProvider(
         return ProviderActionResult.Accepted
     }
 
+    private fun isSpecificationTask(request: AgentTaskRequest): Boolean {
+        val specificationArtifacts = setOf(
+            ArtifactKind.AcceptanceTestPlan,
+            ArtifactKind.BehavioralTest,
+            ArtifactKind.ContractTest,
+            ArtifactKind.FailureScenario,
+        )
+        return request.requiredArtifacts.any(specificationArtifacts::contains)
+    }
+
+    private fun specificationPrompt(request: AgentTaskRequest): String = buildString {
+        appendLine("Design a pre-code verification contract. Do not inspect or infer implementation code.")
+        appendLine("Task: ${request.objective.trim()}")
+        appendLine("Role instructions: ${request.roleInstructions.trim()}")
+        if (request.acceptanceCriteria.isNotEmpty()) {
+            appendLine("Acceptance criteria:")
+            request.acceptanceCriteria.forEach { appendLine("- ${it.description.trim()}") }
+        }
+        val upstream = request.contextArtifacts
+            .asSequence()
+            .filter { it.kind != ArtifactKind.CodeChange && !it.textContent.isNullOrBlank() }
+            .joinToString("\n\n") { "${it.kind}: ${it.label}\n${it.textContent}" }
+            .take(MAX_CONTEXT_ARTIFACT_CHARS)
+        if (upstream.isNotBlank()) {
+            appendLine()
+            appendLine("APPROVED UPSTREAM SPECIFICATION EVIDENCE")
+            appendLine(upstream)
+        }
+        appendLine()
+        appendLine(
+            "Return concrete acceptance tests, behavioral tests, contract tests, invariants, edge cases, " +
+                "and failure scenarios. Do not claim execution or implementation inspection.",
+        )
+    }
+
     private suspend fun loadRepositoryContext(request: AgentTaskRequest, token: String): RepositoryContext {
         val repository = requireNotNull(request.repository)
         val apiBase = repository.gitLabApiBase()
@@ -304,9 +434,10 @@ class GitLabWorkspaceAgentProvider(
         context: RepositoryContext,
     ): Pair<WorkspacePlan, TextGenerationResult> {
         val result = api.generate(planPrompt(request, context))
+        val approvedText = result.text.trim().take(MAX_PLAN_PREVIEW_CHARS)
         return WorkspacePlan(
-            text = result.text.trim(),
-            requestedFiles = parseRequestedFiles(result.text, context.trackedFiles),
+            text = approvedText,
+            requestedFiles = parseRequestedFiles(approvedText, context.trackedFiles),
         ) to result
     }
 
@@ -331,9 +462,10 @@ class GitLabWorkspaceAgentProvider(
         context: RepositoryContext,
         token: String,
         paths: List<String>,
-    ): String {
+    ): WorkspaceSnapshot {
         var remaining = MAX_SNAPSHOT_CHARS
-        return buildString {
+        val completePaths = linkedSetOf<String>()
+        val rendered = buildString {
             for (path in paths) {
                 if (remaining <= 0) break
                 val body = httpClient.get(
@@ -342,13 +474,21 @@ class GitLabWorkspaceAgentProvider(
                     gitLabHeaders(token)
                     parameter("ref", context.defaultBranch)
                 }.requireSuccessBody("read GitLab file $path")
-                val content = body.take(minOf(MAX_FILE_CHARS, remaining))
+                val limit = minOf(MAX_FILE_CHARS, remaining)
+                val complete = body.length <= limit
+                val content = body.take(limit)
                 appendLine("===== FILE: $path =====")
                 appendLine(content)
+                if (!complete) {
+                    appendLine("[TRUNCATED BY HAIVE — THIS FILE IS READ-ONLY IN THIS TASK]")
+                } else {
+                    completePaths += path
+                }
                 appendLine("===== END FILE =====")
                 remaining -= content.length
             }
         }
+        return WorkspaceSnapshot(rendered, completePaths)
     }
 
     private fun changePrompt(
@@ -377,7 +517,7 @@ class GitLabWorkspaceAgentProvider(
         }
         appendLine()
         appendLine("APPROVED PLAN")
-        appendLine(plan.text.take(16_000))
+        appendLine(plan.text)
         val artifactContext = request.contextArtifacts
             .asSequence()
             .filter { !it.textContent.isNullOrBlank() }
@@ -394,6 +534,27 @@ class GitLabWorkspaceAgentProvider(
         appendLine()
         appendLine("SELECTED FILE CONTENT")
         append(snapshot)
+    }
+
+    private fun reviewPrompt(
+        request: AgentTaskRequest,
+        plan: WorkspacePlan,
+        context: RepositoryContext,
+        snapshot: String,
+    ): String = buildString {
+        appendLine("Review the selected GitLab repository content without modifying the repository.")
+        appendLine("Repository: ${context.repository.displayName()}")
+        appendLine("Base branch: ${context.defaultBranch}")
+        appendLine("Task: ${request.objective.trim()}")
+        appendLine("Role instructions: ${request.roleInstructions.trim()}")
+        appendLine()
+        appendLine("APPROVED PLAN")
+        appendLine(plan.text)
+        appendLine()
+        appendLine("SELECTED FILE CONTENT")
+        append(snapshot)
+        appendLine()
+        appendLine("Return concise review evidence only. Do not propose or claim repository mutations.")
     }
 
     private fun selectFiles(
@@ -445,7 +606,11 @@ class GitLabWorkspaceAgentProvider(
         return json.decodeFromString(text.substring(start, end + 1))
     }
 
-    private fun validateChangeSet(changeSet: GitLabWorkspaceChangeSet, trackedFiles: Set<String>) {
+    private fun validateChangeSet(
+        changeSet: GitLabWorkspaceChangeSet,
+        trackedFiles: Set<String>,
+        editablePaths: Set<String>,
+    ) {
         require(changeSet.commitMessage.isNotBlank()) { "GitLab change set requires a commit message" }
         require(changeSet.actions.isNotEmpty()) { "GitLab change set did not contain any file actions" }
         require(changeSet.actions.size <= MAX_ACTIONS) { "GitLab change set exceeds the $MAX_ACTIONS-action limit" }
@@ -462,10 +627,18 @@ class GitLabWorkspaceAgentProvider(
                 }
                 "update" -> {
                     require(action.filePath in trackedFiles) { "GitLab update action targets a missing file: ${action.filePath}" }
+                    require(action.filePath in editablePaths) {
+                        "GitLab update action targets a file whose complete contents were not loaded: ${action.filePath}"
+                    }
                     require(action.content != null) { "GitLab update action requires content: ${action.filePath}" }
                 }
-                "delete" -> require(action.filePath in trackedFiles) {
-                    "GitLab delete action targets a missing file: ${action.filePath}"
+                "delete" -> {
+                    require(action.filePath in trackedFiles) {
+                        "GitLab delete action targets a missing file: ${action.filePath}"
+                    }
+                    require(action.filePath in editablePaths) {
+                        "GitLab delete action targets a file whose complete contents were not loaded: ${action.filePath}"
+                    }
                 }
                 else -> error("Unsupported GitLab file action '${action.action}'")
             }
@@ -574,14 +747,19 @@ private suspend fun GitLabWorkspaceTokenProvider.requireToken(): String =
 private fun RepositoryRef.gitLabApiBase(): String {
     val remote = remoteUrl.orEmpty().trim()
     val host = when {
-        remote.startsWith("http://") -> remote.substringAfter("http://").substringBefore('/')
-        remote.startsWith("https://") -> remote.substringAfter("https://").substringBefore('/')
-        remote.startsWith("git@") -> remote.substringAfter("git@").substringBefore(':')
-        remote.startsWith("ssh://") -> remote.substringAfter("ssh://").substringAfter('@').substringBefore('/').substringBefore(':')
-        else -> "gitlab.com"
-    }.ifBlank { "gitlab.com" }
-    val scheme = if (remote.startsWith("http://")) "http" else "https"
-    return "$scheme://$host/api/v4"
+        remote.startsWith("https://", ignoreCase = true) ->
+            remote.substringAfter("://").substringBefore('/').substringAfter('@').substringBefore(':')
+        remote.startsWith("git@", ignoreCase = true) ->
+            remote.substringAfter('@').substringBefore(':')
+        remote.startsWith("ssh://", ignoreCase = true) ->
+            remote.substringAfter("://").substringBefore('/').substringAfter('@').substringBefore(':')
+        remote.isBlank() -> "gitlab.com"
+        else -> error("GitLab workspace credentials require an HTTPS or SSH gitlab.com repository locator")
+    }
+    require(host.equals("gitlab.com", ignoreCase = true)) {
+        "GitLab workspace credentials are configured only for gitlab.com"
+    }
+    return "https://gitlab.com/api/v4"
 }
 
 private suspend fun HttpResponse.requireSuccessBody(operation: String): String {

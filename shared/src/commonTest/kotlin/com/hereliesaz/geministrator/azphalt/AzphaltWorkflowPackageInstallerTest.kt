@@ -22,7 +22,7 @@ class AzphaltWorkflowPackageInstallerTest {
     private val json = SettingsWorkflowPersistence.defaultJson
 
     @Test
-    fun installRegistersWorkflowAndPublishesItsRoleForReuse() = runBlocking {
+    fun installRegistersWorkflowAndKeepsEmbeddedRolePackageLocal() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
         val installer = installer(persistence, store)
@@ -42,7 +42,7 @@ class AzphaltWorkflowPackageInstallerTest {
         )
 
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
-        assertEquals(role(), persistence.roles.get(RoleDefinitionId("builder")))
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
         assertEquals("com.example.release", installed.packageId)
         assertEquals(listOf("release"), installed.workflowDefinitionIds)
         assertEquals(listOf("builder"), installed.roles.map { it.id.value })
@@ -82,7 +82,7 @@ class AzphaltWorkflowPackageInstallerTest {
             allowUntrustedSigner = true,
         )
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
-        assertNotNull(persistence.roles.get(RoleDefinitionId("builder")))
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
         Unit
     }
 
@@ -119,7 +119,7 @@ class AzphaltWorkflowPackageInstallerTest {
             20L,
         )
 
-        assertEquals(role(), persistence.roles.get(RoleDefinitionId("builder")))
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("one")))
         assertNotNull(persistence.definitions.get(WorkflowDefinitionId("two")))
         Unit
@@ -146,7 +146,7 @@ class AzphaltWorkflowPackageInstallerTest {
                 20L,
             )
         }
-        assertEquals(true, failure.message?.contains("different reusable-role definition"))
+        assertEquals(true, failure.message?.contains("different company role"))
     }
 
     @Test
@@ -168,7 +168,8 @@ class AzphaltWorkflowPackageInstallerTest {
         installer.install(secondPlan, AZPHALT_STORE_URL, emptySet(), 20L)
 
         assertEquals("Release v2", persistence.definitions.get(WorkflowDefinitionId("release"))?.name)
-        assertEquals(updatedRole, persistence.roles.get(RoleDefinitionId("builder")))
+        assertNull(persistence.roles.get(RoleDefinitionId("builder")))
+        assertEquals(updatedRole, store.get("com.example.release")?.roles?.single())
         assertEquals("2.0.0", store.get("com.example.release")?.version)
         assertEquals(listOf("builder"), store.get("com.example.release")?.roles?.map { it.id.value })
     }

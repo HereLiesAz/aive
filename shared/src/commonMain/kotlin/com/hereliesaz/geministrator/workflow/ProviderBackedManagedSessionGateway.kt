@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
 import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
@@ -24,8 +25,14 @@ class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
     private val scope: CoroutineScope,
     private val memoryObserver: MemorySessionObserver = MemoryRuntimeBridge.observer,
-    private val inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
+    inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
 ) : ManagedSessionGateway {
+    private val inferenceFabric: CompoundInferenceFabric =
+        if (inferenceFabric is GovernedCompoundInferenceFabric) {
+            inferenceFabric
+        } else {
+            GovernedCompoundInferenceFabric(inferenceFabric, providerRegistry.genealogyGovernance)
+        }
 
     private data class SessionSnapshot(
         val status: ManagedSessionStatus,
@@ -36,12 +43,22 @@ class ProviderBackedManagedSessionGateway(
 
     private val mutex = Mutex()
     private val snapshots = mutableMapOf<ManagedSessionHandle, SessionSnapshot>()
+    private val observedEventKeys = mutableMapOf<ManagedSessionHandle, MutableSet<String>>()
 
     override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
-        val recalledRequest = request.taskRequest.withRecalledMemory()
+        val requiredCapabilities = buildSet {
+            addAll(request.providerSelection.requiredCapabilities)
+            val constraints = request.providerSelection.constraints
+            if (constraints is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities) {
+                addAll(constraints.capabilities)
+            }
+        }
+        val recalledRequest = request.taskRequest
+            .copy(requiredCapabilities = requiredCapabilities)
+            .withRecalledMemory()
         val provider = selectProvider(
             request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
@@ -97,16 +114,21 @@ class ProviderBackedManagedSessionGateway(
 
     private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
         val recalled = try {
-            MemoryRuntimeBridge.promptContextProvider.contextFor(this)
+            MemoryRuntimeBridge.promptContextProvider.recallFor(this)
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Throwable) {
-            emptyList()
+            com.hereliesaz.geministrator.memory.MemoryPromptRecall()
         }
-        if (recalled.isEmpty()) return this
+        if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty()) return this
         return copy(
             promptContext = promptContext.copy(
-                dynamicContext = promptContext.dynamicContext + recalled,
+                dynamicContext = promptContext.dynamicContext + recalled.blocks,
+            ),
+            compoundInference = compoundInference.copy(
+                genealogy = compoundInference.genealogy.copy(
+                    memoryAddresses = compoundInference.genealogy.memoryAddresses + recalled.memoryAddresses,
+                ),
             ),
         )
     }
@@ -119,6 +141,15 @@ class ProviderBackedManagedSessionGateway(
         providerOperation("Unable to reconnect provider session ${handle.providerRunId.value}") {
             registerAndObserve(handle, initialStatus)
         }
+    }
+
+    override suspend fun reconnect(
+        handle: ManagedSessionHandle,
+        initialStatus: ManagedSessionStatus,
+        request: AgentTaskRequest,
+    ) {
+        recordMemory { memoryObserver.onSessionStarted(handle, request) }
+        reconnect(handle, initialStatus)
     }
 
     override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus =
@@ -307,6 +338,12 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         event: AgentEvent,
     ) {
+        val eventKey = event.memoryReplayKey()
+        val unseen = mutex.withLock {
+            observedEventKeys.getOrPut(handle) { linkedSetOf() }.add(eventKey)
+        }
+        if (!unseen) return
+
         val effectiveEvent = when (event) {
             is AgentEvent.ArtifactProduced -> {
                 val invocationId = handle.inferenceInvocationId
@@ -339,7 +376,14 @@ class ProviderBackedManagedSessionGateway(
                 )
                 is AgentEvent.PlanApproved -> current.copy(status = ManagedSessionStatus.Running)
                 is AgentEvent.Progress -> current.copy(
-                    status = ManagedSessionStatus.Running,
+                    status = if (
+                        current.status == ManagedSessionStatus.Planning ||
+                        current.status == ManagedSessionStatus.AwaitingApproval
+                    ) {
+                        current.status
+                    } else {
+                        ManagedSessionStatus.Running
+                    },
                     progress = ManagedSessionProgress(
                         fraction = effectiveEvent.fraction,
                         message = effectiveEvent.message.takeIf { it.isNotBlank() },
@@ -405,6 +449,18 @@ class ProviderBackedManagedSessionGateway(
             )
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }
+    }
+
+    private fun AgentEvent.memoryReplayKey(): String = when (this) {
+        is AgentEvent.PlanGenerated -> "plan:${runId.value}:${summary}"
+        is AgentEvent.PlanApproved -> "approved:${runId.value}"
+        is AgentEvent.Progress -> "progress:${runId.value}:${fraction}:${message}"
+        is AgentEvent.Message -> "message:${runId.value}:${content}"
+        is AgentEvent.ArtifactProduced -> "artifact:${runId.value}:${artifact.identityKey()}"
+        is AgentEvent.Completed -> "completed:${runId.value}"
+        is AgentEvent.Failed -> "failed:${runId.value}:${reason}"
+        is AgentEvent.UsageReported ->
+            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}"
     }
 
     private fun List<ProviderArtifact>.upsertArtifact(artifact: ProviderArtifact): List<ProviderArtifact> {

@@ -20,8 +20,10 @@ permissions:
   id-token: write
 
 concurrency:
-  group: aive-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Main and any Play-capable manual dispatch share one publishing lane so version codes,
+  # immutable release tags, and store uploads cannot race across refs.
+  group: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_play)) && 'aive-publishing' || format('aive-{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -78,7 +80,7 @@ jobs:
           tool: cargo-ndk
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Reconstruct and verify Android signing keystore
         id: signing
@@ -379,7 +381,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Generate and verify desktop icons
         shell: bash

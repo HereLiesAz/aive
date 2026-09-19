@@ -2,6 +2,8 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 
 sealed interface WorkflowValidationError {
@@ -15,6 +17,7 @@ sealed interface WorkflowValidationError {
         val missingTargetId: TaskDefinitionId,
     ) : WorkflowValidationError
     data class MissingExecutor(val taskId: TaskDefinitionId) : WorkflowValidationError
+    data class MissingRepositoryMutationApproval(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class SelfDependency(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class Cycle(val taskIds: Set<TaskDefinitionId>) : WorkflowValidationError
 }
@@ -28,6 +31,8 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
         "Task '${taskId.value}' has a condition referencing '${missingTargetId.value}', which doesn't exist in this workflow."
     is WorkflowValidationError.MissingExecutor ->
         "Task '${taskId.value}' has no executor or role assigned. Every task must specify who does the work."
+    is WorkflowValidationError.MissingRepositoryMutationApproval ->
+        "Repository mutation task '${taskId.value}' must depend on a human-approval task."
     is WorkflowValidationError.SelfDependency ->
         "Task '${taskId.value}' lists itself as a dependency. A task cannot depend on itself."
     is WorkflowValidationError.Cycle ->
@@ -43,6 +48,21 @@ object WorkflowGraphValidator {
         }
 
         val knownIds = grouped.keys
+        val tasksById = definition.tasks.associateBy { it.id }
+
+        fun hasHumanApprovalAncestor(taskId: TaskDefinitionId): Boolean {
+            val visited = mutableSetOf<TaskDefinitionId>()
+            fun visit(id: TaskDefinitionId): Boolean {
+                if (!visited.add(id)) return false
+                val task = tasksById[id] ?: return false
+                return task.dependsOn.any { dependencyId ->
+                    val dependency = tasksById[dependencyId] ?: return@any false
+                    dependency.effectiveExecutor() is TaskExecutor.HumanApproval || visit(dependencyId)
+                }
+            }
+            return visit(taskId)
+        }
+
         definition.tasks.forEach { task ->
             if (task.executor == null && task.roleId == null) {
                 errors += WorkflowValidationError.MissingExecutor(task.id)
@@ -60,6 +80,15 @@ object WorkflowGraphValidator {
             }
             if (conditionTarget != null && conditionTarget !in knownIds) {
                 errors += WorkflowValidationError.MissingConditionTarget(task.id, conditionTarget)
+            }
+
+            val repositoryOperation = task.effectiveExecutor() as? TaskExecutor.RepositoryOperation
+            if (
+                repositoryOperation != null &&
+                repositoryOperation.operation.trim() !in setOf("status", "fetch") &&
+                !hasHumanApprovalAncestor(task.id)
+            ) {
+                errors += WorkflowValidationError.MissingRepositoryMutationApproval(task.id)
             }
         }
 

@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
+import com.hereliesaz.geministrator.memory.MemoryPromptRecall
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
@@ -29,7 +30,12 @@ class MemoryPromptInjectionTest {
         val provider = RecordingStartProvider()
         try {
             MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider {
-                listOf(PromptContextBlock("Relevant memory", "Prior implementation used the repository gateway."))
+                MemoryPromptRecall(
+                    blocks = listOf(
+                        PromptContextBlock("Relevant memory", "Prior implementation used the repository gateway."),
+                    ),
+                    memoryAddresses = setOf("memory-node:test-recall"),
+                )
             }
             val gateway = ProviderBackedManagedSessionGateway(
                 AgentProviderRegistry(listOf(provider)),

@@ -131,7 +131,7 @@ class QueuedMemorySessionObserver(
 
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
         if (status != ManagedSessionStatus.Completed && status != ManagedSessionStatus.Failed) return
-        val capture = mutex.withLock { captures.remove(handle) } ?: return
+        val capture = mutex.withLock { captures[handle] } ?: return
         val request = capture.request
         val context = request.orchestrationContext
         val cacheNamespace = request.promptContext.cacheNamespace
@@ -150,10 +150,21 @@ class QueuedMemorySessionObserver(
                 taskDefinitionId = context.taskDefinitionId?.value,
                 roleId = context.roleId?.value ?: fallbackRoleId,
                 userPrompt = capture.userPrompt,
-                parts = capture.parts.toList(),
+                parts = capture.parts.toList() + MemorySessionPart(
+                    kind = if (status == ManagedSessionStatus.Failed) {
+                        MemorySourceKind.Failure
+                    } else {
+                        MemorySourceKind.Other
+                    },
+                    label = "Terminal status",
+                    text = status.name,
+                ),
                 closedAtEpochMillis = nowEpochMillis(),
             ),
         )
+        mutex.withLock {
+            if (captures[handle] === capture) captures.remove(handle)
+        }
     }
 }
 

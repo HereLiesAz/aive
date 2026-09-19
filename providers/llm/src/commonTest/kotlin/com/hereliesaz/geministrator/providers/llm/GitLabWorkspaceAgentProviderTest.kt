@@ -46,7 +46,7 @@ class GitLabWorkspaceAgentProviderTest {
                     respondJson("""{"name":"haive/task-1-1"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/commits") ->
                     respondJson(
-                        """{"id":"abc123def456","web_url":"https://gitlab.test/group/sub/repo/-/commit/abc123def456"}""",
+                        """{"id":"abc123def456","web_url":"https://gitlab.com/group/sub/repo/-/commit/abc123def456"}""",
                         HttpStatusCode.Created,
                     )
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/commits/abc123def456/diff") ->
@@ -54,7 +54,7 @@ class GitLabWorkspaceAgentProviderTest {
                         """[{"old_path":"README.md","new_path":"README.md","diff":"@@ -1 +1 @@\n-initial\n+changed"}]""",
                     )
                 else -> respondJson(
-                    """{"default_branch":"main","web_url":"https://gitlab.test/group/sub/repo"}""",
+                    """{"default_branch":"main","web_url":"https://gitlab.com/group/sub/repo"}""",
                 )
             }
         }
@@ -106,7 +106,7 @@ class GitLabWorkspaceAgentProviderTest {
             .single { it.kind == ArtifactKind.CodeChange }
         assertEquals("abc123def456", artifact.metadata["headCommit"])
         assertEquals("main", artifact.metadata["baseBranch"])
-        assertEquals("https://gitlab.test/group/sub/repo", artifact.metadata["repositoryUrl"])
+        assertEquals("https://gitlab.com/group/sub/repo", artifact.metadata["repositoryUrl"])
         assertTrue(artifact.metadata.getValue("compareUrl").contains("/-/compare/main...haive/"))
         assertTrue(artifact.textContent.orEmpty().contains("+changed"))
         assertTrue(events.any { event ->
@@ -127,11 +127,11 @@ class GitLabWorkspaceAgentProviderTest {
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/branches") ->
                     respondJson("""{"name":"haive/approval-task-1"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/commits") ->
-                    respondJson("""{"id":"approved123","web_url":"https://gitlab.test/group/sub/repo/-/commit/approved123"}""", HttpStatusCode.Created)
+                    respondJson("""{"id":"approved123","web_url":"https://gitlab.com/group/sub/repo/-/commit/approved123"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/commits/approved123/diff") ->
                     respondJson("""[{"old_path":"README.md","new_path":"README.md","diff":"@@ -1 +1 @@\n-initial\n+approved"}]""")
                 else -> respondJson(
-                    """{"default_branch":"main","web_url":"https://gitlab.test/group/sub/repo"}""",
+                    """{"default_branch":"main","web_url":"https://gitlab.com/group/sub/repo"}""",
                 )
             }
         }
@@ -183,7 +183,7 @@ class GitLabWorkspaceAgentProviderTest {
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/files/README.md/raw") ->
                     respondText("initial\n")
                 else -> respondJson(
-                    """{"default_branch":"main","web_url":"https://gitlab.test/group/sub/repo"}""",
+                    """{"default_branch":"main","web_url":"https://gitlab.com/group/sub/repo"}""",
                 )
             }
         }
@@ -234,7 +234,7 @@ class GitLabWorkspaceAgentProviderTest {
             name = "repo",
             defaultBranch = "main",
             source = RepositorySource.GitLab,
-            remoteUrl = "https://gitlab.test/group/sub/repo",
+            remoteUrl = "https://gitlab.com/group/sub/repo",
         ),
         requirePlanApproval = requirePlanApproval,
     )

@@ -59,6 +59,7 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
@@ -118,9 +119,17 @@ class MainActivity : ComponentActivity() {
             var startupReady by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
-                withContext(Dispatchers.IO) {
+                // Initialization uses native/model resources and is not cooperatively cancellable.
+                // Finish construction even if this Activity is destroyed, then either activate the
+                // runtime for this Activity or close it without ever publishing its global bridge.
+                val initialized = withContext(Dispatchers.IO + NonCancellable) {
                     memoryRuntime
                 }
+                if (isDestroyed) {
+                    initialized.close()
+                    return@LaunchedEffect
+                }
+                initialized.activate()
                 startupReady = true
             }
             LaunchedEffect(Unit) {

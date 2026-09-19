@@ -17,10 +17,12 @@ import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationResult
 import java.io.File
 import java.nio.file.Files
+import java.util.UUID
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -31,14 +33,16 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runInterruptible
 
 /**
  * Desktop-only coding provider for linked Local Git projects.
  *
  * The model never receives shell access. It receives a bounded repository snapshot and returns a
  * unified diff. Haive validates that diff with `git apply --check`, applies it inside an isolated
- * Git worktree, runs a bounded recognized test command, commits the resulting branch, and emits
- * the concrete patch/test evidence back into the workflow.
+ * Git worktree, and commits the resulting branch with hooks disabled. Repository code is never
+ * executed on the desktop host; verification must use a genuinely sandboxed test-capable provider.
  */
 internal class LocalWorkspaceAgentProvider(
     override val id: AgentProviderId,
@@ -46,13 +50,14 @@ internal class LocalWorkspaceAgentProvider(
     private val api: TextGenerationApi,
 ) : AgentProvider {
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
-    private enum class TaskMode { Mutate, Verify }
+    private enum class TaskMode { Specification, Mutate }
 
     private data class Session(
         val request: AgentTaskRequest,
         val phase: MutableStateFlow<Phase>,
         var plan: WorkspacePlan? = null,
         var planUsage: TextGenerationResult? = null,
+        var observationJob: Job? = null,
     )
 
     private data class WorkspacePlan(
@@ -66,18 +71,11 @@ internal class LocalWorkspaceAgentProvider(
         val timedOut: Boolean = false,
     )
 
-    private data class TestExecution(
-        val command: List<String>?,
-        val result: ProcessResult?,
-    )
-
     private data class WorkspaceOutcome(
         val artifacts: List<ProviderArtifact>,
         val generationUsage: TextGenerationResult? = null,
         val failureReason: String? = null,
     )
-
-    private val sequence = AtomicLong(1L)
 
     private companion object {
         const val MAX_TREE_PATHS = 700
@@ -86,7 +84,6 @@ internal class LocalWorkspaceAgentProvider(
         const val MAX_SNAPSHOT_CHARS = 180_000
         const val MAX_CONTEXT_ARTIFACT_CHARS = 30_000
         const val PROCESS_TIMEOUT_SECONDS = 120L
-        const val TEST_TIMEOUT_MINUTES = 12L
 
         val sessionsMutex = Mutex()
         val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
@@ -98,8 +95,6 @@ internal class LocalWorkspaceAgentProvider(
             AgentCapability.RepositoryWrite,
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
-            AgentCapability.ShellExecution,
-            AgentCapability.Testing,
             AgentCapability.TestAuthoring,
         ),
     )
@@ -111,7 +106,9 @@ internal class LocalWorkspaceAgentProvider(
         require(supportsRepository(request.repository)) {
             "$displayName workspace agent requires a linked Local Git repository"
         }
-        val runId = ProviderRunId("${id.value}/${request.taskRunId.value}/${sequence.getAndIncrement()}")
+        val runId = ProviderRunId(
+            "${id.value}/${request.taskRunId.value}/${UUID.randomUUID()}",
+        )
         val session = Session(
             request = request,
             phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
@@ -124,10 +121,53 @@ internal class LocalWorkspaceAgentProvider(
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val session = session(runId)
+        val observationJob = currentCoroutineContext().job
+        session.observationJob = observationJob
         try {
+            if (taskMode(session.request) == TaskMode.Specification) {
+                emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
+                val generated = api.generate(specificationPrompt(session.request))
+                val artifactKinds = session.request.requiredArtifacts.ifEmpty {
+                    setOf(
+                        ArtifactKind.AcceptanceTestPlan,
+                        ArtifactKind.BehavioralTest,
+                        ArtifactKind.ContractTest,
+                        ArtifactKind.FailureScenario,
+                    )
+                }
+                artifactKinds.forEach { kind ->
+                    emit(
+                        AgentEvent.ArtifactProduced(
+                            runId,
+                            ProviderArtifact(
+                                kind = kind,
+                                label = kind.name.replace(Regex("([a-z])([A-Z])"), "\$1 \$2"),
+                                textContent = generated.text.trim(),
+                                mediaType = "text/markdown",
+                                metadata = mapOf(
+                                    "provider" to id.value,
+                                    "mode" to "pre-code-specification",
+                                ),
+                            ),
+                        ),
+                    )
+                }
+                if (generated.inputTokens != null || generated.outputTokens != null) {
+                    emit(
+                        AgentEvent.UsageReported(
+                            runId,
+                            inputTokens = generated.inputTokens,
+                            outputTokens = generated.outputTokens,
+                        ),
+                    )
+                }
+                emit(AgentEvent.Completed(runId))
+                return@flow
+            }
+
             val root = repositoryRoot(session.request)
             requireCleanWorkingTree(root)
-            val baseCommit = git(root, "rev-parse", "HEAD").requireSuccess("read repository HEAD").output.trim()
+            val baseCommit = resolveBaseCommit(session.request, root)
             val trackedFiles = trackedFiles(root)
             require(trackedFiles.isNotEmpty()) { "Local Git repository has no tracked files" }
 
@@ -162,7 +202,6 @@ internal class LocalWorkspaceAgentProvider(
                 baseCommit = baseCommit,
                 trackedFiles = trackedFiles,
                 plan = approvedPlan,
-                mode = taskMode(session.request),
             )
 
             outcome.artifacts.forEach { artifact -> emit(AgentEvent.ArtifactProduced(runId, artifact)) }
@@ -193,6 +232,10 @@ internal class LocalWorkspaceAgentProvider(
                         ?: failure::class.simpleName.orEmpty().ifBlank { "Local workspace execution failed" },
                 ),
             )
+        } finally {
+            if (session.observationJob === observationJob) {
+                session.observationJob = null
+            }
         }
     }
 
@@ -212,22 +255,49 @@ internal class LocalWorkspaceAgentProvider(
     }
 
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult {
-        sessionOrNull(runId)?.phase?.value = Phase.Cancelled
+        val session = sessionOrNull(runId) ?: return ProviderActionResult.Accepted
+        session.phase.value = Phase.Cancelled
+        session.observationJob?.cancel(CancellationException("$displayName workspace session cancelled"))
         return ProviderActionResult.Accepted
     }
 
     private fun taskMode(request: AgentTaskRequest): TaskMode {
-        val instructions = request.roleInstructions.lowercase()
-        val verificationSignals = listOf("attempt to falsify", "verifies acceptance", "verify acceptance", "qa engineer")
-        val mutationSignals = listOf("implement", "author test", "test author", "write code", "modify")
-        return if (
-            verificationSignals.any(instructions::contains) &&
-            mutationSignals.none(instructions::contains)
-        ) {
-            TaskMode.Verify
+        val specificationArtifacts = setOf(
+            ArtifactKind.AcceptanceTestPlan,
+            ArtifactKind.BehavioralTest,
+            ArtifactKind.ContractTest,
+            ArtifactKind.FailureScenario,
+        )
+        return if (request.requiredArtifacts.any(specificationArtifacts::contains)) {
+            TaskMode.Specification
         } else {
             TaskMode.Mutate
         }
+    }
+
+    private fun specificationPrompt(request: AgentTaskRequest): String = buildString {
+        appendLine("Design a pre-code verification contract. Do not inspect or infer implementation code.")
+        appendLine("Task: ${request.objective.trim()}")
+        appendLine("Role instructions: ${request.roleInstructions.trim()}")
+        if (request.acceptanceCriteria.isNotEmpty()) {
+            appendLine("Acceptance criteria:")
+            request.acceptanceCriteria.forEach { appendLine("- ${it.description.trim()}") }
+        }
+        val upstream = request.contextArtifacts
+            .asSequence()
+            .filter { it.kind != ArtifactKind.CodeChange && !it.textContent.isNullOrBlank() }
+            .joinToString("\n\n") { "${it.kind}: ${it.label}\n${it.textContent}" }
+            .take(MAX_CONTEXT_ARTIFACT_CHARS)
+        if (upstream.isNotBlank()) {
+            appendLine()
+            appendLine("APPROVED UPSTREAM SPECIFICATION EVIDENCE")
+            appendLine(upstream)
+        }
+        appendLine()
+        appendLine(
+            "Return concrete acceptance tests, behavioral tests, contract tests, invariants, edge cases, " +
+                "and failure scenarios. Do not claim execution or implementation inspection.",
+        )
     }
 
     private suspend fun executeInWorktree(
@@ -236,51 +306,23 @@ internal class LocalWorkspaceAgentProvider(
         baseCommit: String,
         trackedFiles: List<String>,
         plan: WorkspacePlan,
-        mode: TaskMode,
     ): WorkspaceOutcome {
-        val branch = if (mode == TaskMode.Mutate) {
-            workspaceBranch(request)
-        } else {
-            request.repository?.defaultBranch ?: "HEAD"
-        }
+        val branch = workspaceBranch(request)
         val workspace = withContext(Dispatchers.IO) {
             Files.createTempDirectory("haive-${safeSegment(request.taskRunId.value)}-").toFile()
         }
         var worktreeAdded = false
         return try {
-            val addArgs = if (mode == TaskMode.Mutate) {
-                arrayOf("worktree", "add", "-b", branch, workspace.absolutePath, baseCommit)
-            } else {
-                arrayOf("worktree", "add", "--detach", workspace.absolutePath, baseCommit)
-            }
-            git(root, *addArgs).requireSuccess("create isolated Git worktree")
+            git(
+                root,
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                workspace.absolutePath,
+                baseCommit,
+            ).requireSuccess("create isolated Git worktree")
             worktreeAdded = true
-
-            if (mode == TaskMode.Verify) {
-                val test = runRecognizedTests(workspace)
-                if (test.command == null || test.result == null) {
-                    return WorkspaceOutcome(
-                        artifacts = listOf(
-                            ProviderArtifact(
-                                kind = ArtifactKind.TestResult,
-                                label = "No recognized test runner",
-                                textContent = "Haive could not identify a bounded test command for this Local Git project.",
-                                mediaType = "text/plain",
-                                metadata = mapOf("branch" to branch, "baseCommitId" to baseCommit),
-                            ),
-                        ),
-                        failureReason = "No recognized test runner is available for Local Git verification",
-                    )
-                }
-                return WorkspaceOutcome(
-                    artifacts = listOf(testArtifact(test, branch, baseCommit)),
-                    failureReason = if (test.result.exitCode == 0 && !test.result.timedOut) {
-                        null
-                    } else {
-                        "Local Git verification failed"
-                    },
-                )
-            }
 
             val selectedFiles = selectFiles(plan, trackedFiles, request)
             val snapshot = buildSnapshot(workspace, selectedFiles)
@@ -294,26 +336,29 @@ internal class LocalWorkspaceAgentProvider(
             val changed = git(workspace, "status", "--porcelain").requireSuccess("inspect workspace changes").output
             require(changed.isNotBlank()) { "$displayName patch did not change the working tree" }
 
-            val test = runRecognizedTests(workspace)
-            val testsPassed = test.result?.let { it.exitCode == 0 && !it.timedOut }
             val firstObjectiveLine = request.objective.trim().lineSequence().firstOrNull().orEmpty()
-            val commitMessage = if (testsPassed == false) {
-                "Haive WIP: ${firstObjectiveLine.take(64)}"
-            } else {
-                "Haive: ${firstObjectiveLine.take(68)}"
-            }.trimEnd()
+            val commitMessage = "Haive: ${firstObjectiveLine.take(68)}".trimEnd()
 
             git(workspace, "add", "--all").requireSuccess("stage workspace changes")
-            val commit = git(
-                workspace,
-                "-c",
-                "user.name=Haive",
-                "-c",
-                "user.email=haive@local.invalid",
-                "commit",
-                "-m",
-                commitMessage,
-            ).requireSuccess("commit workspace changes")
+            val hooksDir = withContext(Dispatchers.IO) {
+                Files.createTempDirectory("haive-empty-hooks-").toFile()
+            }
+            val commit = try {
+                git(
+                    workspace,
+                    "-c",
+                    "core.hooksPath=${hooksDir.absolutePath}",
+                    "-c",
+                    "user.name=Haive",
+                    "-c",
+                    "user.email=haive@local.invalid",
+                    "commit",
+                    "-m",
+                    commitMessage,
+                ).requireSuccess("commit workspace changes")
+            } finally {
+                withContext(Dispatchers.IO) { runCatching { hooksDir.deleteRecursively() } }
+            }
             val headCommit = git(workspace, "rev-parse", "HEAD").requireSuccess("read workspace commit").output.trim()
             val committedPatch = git(workspace, "show", "--format=", "--binary", headCommit)
                 .requireSuccess("capture committed patch")
@@ -337,32 +382,26 @@ internal class LocalWorkspaceAgentProvider(
                         ),
                     ),
                 )
-                if (test.command != null && test.result != null) {
-                    add(testArtifact(test, branch, baseCommit, headCommit))
-                } else {
-                    add(
-                        ProviderArtifact(
-                            kind = ArtifactKind.CommandOutput,
-                            label = "No recognized test runner",
-                            textContent = "Code was committed on $branch, but Haive did not identify a bounded test command for this project.",
-                            mediaType = "text/plain",
-                            metadata = mapOf(
-                                "branch" to branch,
-                                "baseCommitId" to baseCommit,
-                                "headCommit" to headCommit,
-                            ),
+                add(
+                    ProviderArtifact(
+                        kind = ArtifactKind.CommandOutput,
+                        label = "Host execution withheld",
+                        textContent =
+                            "Changes were committed on $branch. Repository code was not executed on the desktop host; " +
+                                "verification requires a sandboxed test-capable provider.",
+                        mediaType = "text/plain",
+                        metadata = mapOf(
+                            "branch" to branch,
+                            "baseCommitId" to baseCommit,
+                            "headCommit" to headCommit,
+                            "executionPolicy" to "no-host-repository-code",
                         ),
-                    )
-                }
+                    ),
+                )
             }
             WorkspaceOutcome(
                 artifacts = artifacts,
                 generationUsage = generation,
-                failureReason = if (testsPassed == false) {
-                    "Workspace changes were preserved on $branch, but tests failed"
-                } else {
-                    null
-                },
             )
         } finally {
             if (worktreeAdded) {
@@ -384,9 +423,10 @@ internal class LocalWorkspaceAgentProvider(
         trackedFiles: List<String>,
     ): Pair<WorkspacePlan, TextGenerationResult> {
         val result = api.generate(planPrompt(request, root, trackedFiles))
+        val approvedText = result.text.trim().take(8_000)
         return WorkspacePlan(
-            text = result.text.trim(),
-            requestedFiles = parseRequestedFiles(result.text, trackedFiles),
+            text = approvedText,
+            requestedFiles = parseRequestedFiles(approvedText, trackedFiles),
         ) to result
     }
 
@@ -429,7 +469,7 @@ internal class LocalWorkspaceAgentProvider(
         }
         appendLine()
         appendLine("APPROVED PLAN")
-        appendLine(plan.text.take(16_000))
+        appendLine(plan.text)
         val artifactContext = request.contextArtifacts
             .asSequence()
             .filter { !it.textContent.isNullOrBlank() }
@@ -511,6 +551,22 @@ internal class LocalWorkspaceAgentProvider(
         return output.split('\u0000').filter(String::isNotBlank)
     }
 
+    private suspend fun resolveBaseCommit(request: AgentTaskRequest, root: File): String {
+        val upstreamCommit = request.contextArtifacts
+            .asSequence()
+            .mapNotNull { it.metadata["headCommit"]?.takeIf(String::isNotBlank) }
+            .lastOrNull()
+        if (upstreamCommit != null) {
+            git(root, "cat-file", "-e", "$upstreamCommit^{commit}")
+                .requireSuccess("resolve upstream dependency commit $upstreamCommit")
+            return upstreamCommit
+        }
+        return git(root, "rev-parse", "HEAD")
+            .requireSuccess("read repository HEAD")
+            .output
+            .trim()
+    }
+
     private suspend fun requireCleanWorkingTree(root: File) {
         val status = git(root, "status", "--porcelain").requireSuccess("inspect Local Git working tree")
         require(status.output.isBlank()) {
@@ -560,63 +616,15 @@ internal class LocalWorkspaceAgentProvider(
                     require(!path.startsWith('/') && !path.startsWith(".git/") && ".." !in path.split('/')) {
                         "Generated diff attempts to write outside the repository: $path"
                     }
+                    require(path !in setOf(".gitattributes", ".gitmodules")) {
+                        "Generated diff may not modify Git execution-control file: $path"
+                    }
                 }
             }
     }
 
-    private suspend fun runRecognizedTests(workspace: File): TestExecution {
-        val command = recognizedTestCommand(workspace) ?: return TestExecution(null, null)
-        return TestExecution(
-            command = command,
-            result = runProcess(command, directory = workspace, timeoutMinutes = TEST_TIMEOUT_MINUTES),
-        )
-    }
-
-    private fun recognizedTestCommand(root: File): List<String>? {
-        val windows = System.getProperty("os.name", "").lowercase().contains("win")
-        return when {
-            File(root, "gradlew").isFile || File(root, "gradlew.bat").isFile -> if (windows) {
-                listOf("cmd", "/c", "gradlew.bat", "test")
-            } else {
-                listOf("sh", "gradlew", "test")
-            }
-            File(root, "mvnw").isFile || File(root, "mvnw.cmd").isFile -> if (windows) {
-                listOf("cmd", "/c", "mvnw.cmd", "test")
-            } else {
-                listOf("sh", "mvnw", "test")
-            }
-            File(root, "Cargo.toml").isFile -> listOf("cargo", "test")
-            File(root, "pyproject.toml").isFile || File(root, "pytest.ini").isFile -> listOf("python", "-m", "pytest")
-            else -> null
-        }
-    }
-
-    private fun testArtifact(
-        test: TestExecution,
-        branch: String,
-        baseCommit: String,
-        headCommit: String? = null,
-    ): ProviderArtifact {
-        val result = requireNotNull(test.result)
-        val command = requireNotNull(test.command)
-        return ProviderArtifact(
-            kind = ArtifactKind.TestResult,
-            label = if (result.exitCode == 0 && !result.timedOut) "Workspace tests passed" else "Workspace tests failed",
-            textContent = result.output.take(120_000),
-            mediaType = "text/plain",
-            metadata = buildMap {
-                put("command", command.joinToString(" "))
-                put("exitCode", result.exitCode.toString())
-                put("timedOut", result.timedOut.toString())
-                put("branch", branch)
-                put("baseCommitId", baseCommit)
-                headCommit?.let { put("headCommit", it) }
-            },
-        )
-    }
-
     private fun workspaceBranch(request: AgentTaskRequest): String =
-        "haive/${safeSegment(request.taskRunId.value).take(40)}-${sequence.getAndIncrement()}"
+        "haive/${safeSegment(request.taskRunId.value).take(40)}-${UUID.randomUUID().toString().take(12)}"
 
     private fun safeSegment(value: String): String = value
         .lowercase()
@@ -648,18 +656,32 @@ internal class LocalWorkspaceAgentProvider(
         }
         val output = async(Dispatchers.IO) { process.inputStream.bufferedReader().use { it.readText() } }
         val timeoutSeconds = timeoutMinutes?.let(TimeUnit.MINUTES::toSeconds) ?: PROCESS_TIMEOUT_SECONDS
-        val finished = withContext(Dispatchers.IO) {
-            process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        val finished = try {
+            runInterruptible(Dispatchers.IO) {
+                process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            }
+        } catch (failure: CancellationException) {
+            destroyProcessTree(process)
+            throw failure
         }
         if (!finished) {
-            process.destroyForcibly()
-            withContext(Dispatchers.IO) { process.waitFor(10, TimeUnit.SECONDS) }
+            destroyProcessTree(process)
         }
         ProcessResult(
             exitCode = if (finished) process.exitValue() else -1,
             output = output.await().trim(),
             timedOut = !finished,
         )
+    }
+
+    private fun destroyProcessTree(process: Process) {
+        runCatching {
+            process.toHandle().descendants().forEach { child ->
+                runCatching { child.destroyForcibly() }
+            }
+        }
+        runCatching { process.destroyForcibly() }
+        runCatching { process.waitFor(10, TimeUnit.SECONDS) }
     }
 
     private fun ProcessResult.requireSuccess(operation: String): ProcessResult {

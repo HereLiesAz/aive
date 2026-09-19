@@ -10,13 +10,12 @@
     <link rel="icon" type="image/png" sizes="64x64" href="haive-icon-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="haive-icon-192.png" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="preload" as="image" href="haive_loader.gif" />
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
     <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Aive">
         <img id="haiveSplashFrame0" src="haive_loader_frame0.png" alt="" aria-hidden="true" />
-        <img id="haiveSplashAnimation" src="haive_loader.gif" alt="" aria-hidden="true" />
+        <img id="haiveSplashAnimation" alt="" aria-hidden="true" />
     </div>
     <div id="webApp"></div>
     <script>
@@ -33,12 +32,13 @@
                 frame0.classList.add("haive-loader-replaced");
             };
 
-            if (animation) {
-                if (animation.complete) {
-                    revealAnimation();
-                } else {
-                    animation.addEventListener("load", revealAnimation, { once: true });
-                }
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            if (animation && !reducedMotion) {
+                animation.addEventListener("load", revealAnimation, { once: true });
+                // Assign the GIF only after the static frame and startup script exist. This avoids
+                // parser-preloading a large animation ahead of the application bundle.
+                animation.src = "haive_loader.gif";
+                if (animation.complete) revealAnimation();
             }
 
             const dismissSplash = () => {

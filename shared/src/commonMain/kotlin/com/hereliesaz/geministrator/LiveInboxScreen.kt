@@ -60,7 +60,7 @@ internal fun LiveInboxScreen(
         Text(
             when (runtimeState) {
                 ApplicationRuntimeState.Loading -> "Loading runtime…"
-                ApplicationRuntimeState.NoProject -> "No project yet. There are no workflow decisions to review."
+                is ApplicationRuntimeState.NoProject -> "No project yet. There are no workflow decisions to review."
                 is ApplicationRuntimeState.NoRun -> "No active run. There are no workflow decisions to review."
                 is ApplicationRuntimeState.Disconnected -> "Runtime disconnected: ${runtimeState.message}"
                 is ApplicationRuntimeState.ResumeFailed -> "Run unavailable: ${runtimeState.message}"

@@ -75,6 +75,28 @@ fun defaultRoleCollectionEntries(existingStored: List<RoleDefinition>): List<Rol
 fun activeRoles(roles: Collection<RoleDefinition>): List<RoleDefinition> =
     roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
 
+val starterWorkflowRequiredAuthorities: Set<RoleAuthority> = setOf(
+    RoleAuthority.Implement,
+    RoleAuthority.Verify,
+    RoleAuthority.ReviewCode,
+    RoleAuthority.ApproveRelease,
+    RoleAuthority.AuthorTests,
+)
+
+fun validateRoleCollectionForStarterWorkflow(roles: Collection<RoleDefinition>) {
+    require(roles.none { it.id.value == ROLE_COLLECTION_MARKER_ID }) {
+        "$ROLE_COLLECTION_MARKER_ID is reserved for Aive's internal role-collection record"
+    }
+    val enabled = roles.filter(RoleDefinition::enabled)
+    val missing = starterWorkflowRequiredAuthorities.filter { authority ->
+        enabled.none { authority in it.authorities }
+    }
+    require(missing.isEmpty()) {
+        "The active swarm is missing required starter-workflow authority: " +
+            missing.joinToString { it.name }
+    }
+}
+
 private fun roleCollectionMarker(order: List<RoleDefinitionId>): RoleDefinition = RoleDefinition(
     id = RoleDefinitionId(ROLE_COLLECTION_MARKER_ID),
     name = "Haive role collection",

@@ -55,13 +55,71 @@ class WorkflowRuntimeCoordinator(
         val run = requireNotNull(persistence.runs.get(workflowRunId)) {
             "Workflow run ${workflowRunId.value} was not found"
         }
+        val storedProject = requireNotNull(persistence.projects.get(run.projectId)) {
+            "Project ${run.projectId.value} was not found"
+        }
+        val project = storedProject.copy(
+            repository = run.repositorySnapshot ?: storedProject.repository,
+        )
+        val definition = requireNotNull(persistence.definitions.get(run.workflowDefinitionId)) {
+            "Workflow definition ${run.workflowDefinitionId.value} was not found"
+        }
+        val tasksById = definition.tasks.associateBy { it.id }
         val handles = buildMap {
             run.taskRuns.forEach { (taskDefinitionId, taskRun) ->
                 val providerId = taskRun.assignedProviderId ?: return@forEach
                 val providerRunId = taskRun.providerRunId ?: return@forEach
                 if (!taskRun.status.canReconnect()) return@forEach
                 val handle = ManagedSessionHandle(taskRun.id, providerId, providerRunId)
-                sessionGateway.reconnect(handle, taskRun.status.toManagedStatus())
+                val task = requireNotNull(tasksById[taskDefinitionId]) {
+                    "Task ${taskDefinitionId.value} was not found"
+                }
+                val role = engine.roleDefinition(run, taskRun.assignedRoleId)
+                val dependencyArtifacts = task.dependsOn
+                    .mapNotNull(run.taskRuns::get)
+                    .flatMap(TaskRun::artifacts)
+                val request = com.hereliesaz.geministrator.providers.AgentTaskRequest(
+                    taskRunId = taskRun.id,
+                    objective = task.objective,
+                    roleInstructions = role?.instructions.orEmpty(),
+                    acceptanceCriteria = task.acceptanceCriteria,
+                    contextArtifacts = dependencyArtifacts,
+                    requiredArtifacts = task.requiredArtifacts,
+                    repository = project.repository,
+                    requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
+                    promptContext = com.hereliesaz.geministrator.providers.PromptContext(
+                        stablePrefix = listOf(
+                            com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                "Workflow objective",
+                                run.objective,
+                            ),
+                        ) + role?.let {
+                            listOf(
+                                com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                    "Role",
+                                    it.instructions,
+                                ),
+                            )
+                        }.orEmpty(),
+                        dynamicContext = listOf(
+                            com.hereliesaz.geministrator.providers.PromptContextBlock("Task", task.objective),
+                            com.hereliesaz.geministrator.providers.PromptContextBlock(
+                                "Attempt",
+                                taskRun.attempt.toString(),
+                            ),
+                        ),
+                        reusePolicy = definition.promptReusePolicy,
+                        cacheNamespace = role?.let { "${run.id.value}:${it.id.value}" },
+                    ),
+                    orchestrationContext = com.hereliesaz.geministrator.providers.AgentOrchestrationContext(
+                        projectId = project.id,
+                        workflowRunId = run.id,
+                        workflowDefinitionId = definition.id,
+                        taskDefinitionId = task.id,
+                        roleId = role?.id,
+                    ),
+                )
+                sessionGateway.reconnect(handle, taskRun.status.toManagedStatus(), request)
                 put(taskDefinitionId, handle)
             }
         }
@@ -114,7 +172,7 @@ class WorkflowRuntimeCoordinator(
             return terminalState
         }
 
-        nextRun = recoverAvailableSystemExecutors(definition, nextRun, nowEpochMillis)
+        nextRun = recoverAvailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
         nextRun = reconcileRemoteCompute(project, definition, nextRun, nowEpochMillis)
         ensureMissingFailureEscalationGates(nextRun, nowEpochMillis)
         ensurePlanApprovalGates(definition, nextRun, nowEpochMillis)
@@ -212,14 +270,45 @@ class WorkflowRuntimeCoordinator(
         }
 
         nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
-        nextRun = blockUnavailableSystemExecutors(definition, nextRun, nowEpochMillis)
+        nextRun = blockUnavailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
         ensurePlanApprovalGates(definition, nextRun, nowEpochMillis)
 
         var nextState = WorkflowRuntimeState(nextRun, nextHandles)
         persist(project, definition, nextState)
 
+        val beforeSystemDispatch = nextRun
         nextRun = dispatchSystemExecutors(project, definition, nextRun, nowEpochMillis)
         nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
+
+        val dispatchFailedTaskIds = nextRun.taskRuns
+            .filter { (taskId, taskRun) ->
+                taskRun.status == TaskRunStatus.Failed &&
+                    beforeSystemDispatch.taskRuns[taskId]?.status != TaskRunStatus.Failed
+            }
+            .keys
+        if (dispatchFailedTaskIds.isNotEmpty() && nextRun.status == WorkflowRunStatus.Failed) {
+            nextRun = nextRun.copy(status = WorkflowRunStatus.Running)
+        }
+        for (taskId in dispatchFailedTaskIds) {
+            if (nextRun.status.isTerminal()) break
+            nextRun = engine.handleFailure(
+                definition = definition,
+                run = nextRun,
+                taskDefinitionId = taskId,
+                retryReason = RetryReason.ProviderFailure,
+                reason = nextRun.taskRuns[taskId]?.progressMessage ?: "Executor dispatch failed",
+                nowEpochMillis = nowEpochMillis,
+            )
+            if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
+                ensureFailureEscalationGate(
+                    run = nextRun,
+                    taskId = taskId,
+                    reason = nextRun.taskRuns[taskId]?.progressMessage ?: "Executor dispatch failed",
+                    now = nowEpochMillis,
+                )
+            }
+        }
+
         if (nextRun.status.isTerminal()) {
             nextRun = closeFailureEscalationsForTerminalRun(nextRun, nowEpochMillis)
             nextState = WorkflowRuntimeState(nextRun, emptyMap())
@@ -472,7 +561,7 @@ class WorkflowRuntimeCoordinator(
             ) {
                 continue
             }
-            val integration = executorIntegrations.integrationFor(executor) ?: continue
+            val integration = executorIntegrations.integrationFor(executor, project) ?: continue
             next = applyExecution(
                 run = next,
                 id = id,
@@ -487,7 +576,7 @@ class WorkflowRuntimeCoordinator(
                         taskRun = taskRun,
                         executor = executor,
                         nowEpochMillis = now,
-                        role = engine.roleDefinition(task.roleId),
+                        role = engine.roleDefinition(next, task.roleId),
                     ),
                 ),
                 now = now,
@@ -513,7 +602,7 @@ class WorkflowRuntimeCoordinator(
             val task = tasks[id] ?: continue
             val executor = taskRun.executor ?: task.effectiveExecutor()
             if (!executor.isSystemExecutor()) continue
-            val integration = executorIntegrations.integrationFor(executor) ?: continue
+            val integration = executorIntegrations.integrationFor(executor, project) ?: continue
             next = applyExecution(
                 run = next,
                 id = id,
@@ -528,7 +617,7 @@ class WorkflowRuntimeCoordinator(
                         taskRun = taskRun,
                         executor = executor,
                         nowEpochMillis = now,
-                        role = engine.roleDefinition(task.roleId),
+                        role = engine.roleDefinition(next, task.roleId),
                     ),
                 ),
                 now = now,
@@ -545,7 +634,9 @@ class WorkflowRuntimeCoordinator(
         val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, now)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
-            refreshed.taskRuns.values.all { it.status == TaskRunStatus.Completed }
+            refreshed.taskRuns.values.all {
+                it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled
+            }
         ) {
             refreshed.copy(status = WorkflowRunStatus.Completed, updatedAtEpochMillis = now)
         } else {
@@ -760,6 +851,7 @@ class WorkflowRuntimeCoordinator(
     }
 
     private fun recoverAvailableSystemExecutors(
+        project: Project,
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
@@ -774,7 +866,7 @@ class WorkflowRuntimeCoordinator(
                 return@mapValues taskRun
             }
             val executor = taskRun.executor ?: definitions[id]?.executor ?: return@mapValues taskRun
-            if (!executor.isSystemExecutor() || !executorIntegrations.isAvailable(executor)) {
+            if (!executor.isSystemExecutor() || !executorIntegrations.isAvailable(executor, project)) {
                 return@mapValues taskRun
             }
             val recovered = if (taskRun.externalRunId != null) {
@@ -794,6 +886,7 @@ class WorkflowRuntimeCoordinator(
     }
 
     private fun blockUnavailableSystemExecutors(
+        project: Project,
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
@@ -813,7 +906,7 @@ class WorkflowRuntimeCoordinator(
                 remoteComputeCoordinator?.owns(taskRun) != true &&
                 executor != null &&
                 executor.isSystemExecutor() &&
-                !executorIntegrations.isAvailable(executor)
+                !executorIntegrations.isAvailable(executor, project)
             ) {
                 TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
                 changed = true

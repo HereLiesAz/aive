@@ -63,7 +63,10 @@ class AgentMemoryLayer private constructor(
             maxChunkChars: Int = 6_000,
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
         ): AgentMemoryLayer {
-            val queue = MemoryConsolidationQueue(store, maxChunkChars)
+            val queue = MemoryConsolidationQueue(
+                store,
+                minOf(maxChunkChars, policy.maxPacketChars),
+            )
             val graphTool = GraphMemoryTool(store, queue)
             return AgentMemoryLayer(
                 store = store,
@@ -96,11 +99,12 @@ class AgentMemoryLayer private constructor(
                 agents.toList()
             }
             val router = MemoryMicroAgentRouter(routedAgents)
+            val constrainedPolicy = router.constrainPolicy(policy)
             return create(
                 store = store,
                 manager = router,
-                policy = router.constrainPolicy(policy),
-                maxChunkChars = maxChunkChars,
+                policy = constrainedPolicy,
+                maxChunkChars = minOf(maxChunkChars, constrainedPolicy.maxPacketChars),
                 lexicon = lexicon,
             )
         }

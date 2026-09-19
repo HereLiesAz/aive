@@ -72,7 +72,7 @@ internal fun LiveArtifactBrowserScreen(
                 Text(
                     when (runtimeState) {
                         ApplicationRuntimeState.Loading -> "Loading runtime…"
-                        ApplicationRuntimeState.NoProject -> "No project yet."
+                        is ApplicationRuntimeState.NoProject -> "No project yet."
                         is ApplicationRuntimeState.NoRun -> "No workflow run yet."
                         is ApplicationRuntimeState.Disconnected -> "Runtime disconnected: ${runtimeState.message}"
                         is ApplicationRuntimeState.ResumeFailed -> "Run unavailable: ${runtimeState.message}"

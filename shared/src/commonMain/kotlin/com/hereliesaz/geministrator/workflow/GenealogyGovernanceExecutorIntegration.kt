@@ -32,12 +32,35 @@ class GenealogyGovernanceExecutorIntegration(
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution = evaluate(context)
 
     private suspend fun evaluate(context: TaskExecutorContext): TaskExecutorExecution {
-        val invocationIds = context.task.dependsOn
-            .mapNotNull(context.run.taskRuns::get)
-            .flatMap { it.artifacts }
-            .mapNotNullTo(linkedSetOf()) { artifact ->
-                artifact.metadata[INFERENCE_INVOCATION_ID_METADATA_KEY]?.takeIf(String::isNotBlank)
+        val operation = (context.executor as? TaskExecutor.ExternalService)?.operation.orEmpty()
+        val proposerPrefix = operation.takeIf(String::isNotBlank)?.let { "$it--moa-proposer-" }
+        val proposerIds = context.task.dependsOn
+            .filterTo(linkedSetOf()) { dependency ->
+                proposerPrefix != null && dependency.value.startsWith(proposerPrefix)
             }
+        val candidateArtifactsByProposer = proposerIds.associateWith { proposerId ->
+            context.run.taskRuns[proposerId]
+                ?.artifacts
+                .orEmpty()
+                .filter { it.kind == ArtifactKind.TaskPlan }
+        }
+        val missingCandidateProposers = candidateArtifactsByProposer
+            .filterValues(List<ArtifactRef>::isEmpty)
+            .keys
+        val invocationByProposer = candidateArtifactsByProposer.mapValues { (_, artifacts) ->
+            artifacts.asSequence()
+                .mapNotNull { artifact ->
+                    artifact.metadata[INFERENCE_INVOCATION_ID_METADATA_KEY]?.takeIf(String::isNotBlank)
+                }
+                .firstOrNull()
+        }
+        val missingGenealogyProposers = invocationByProposer.filterValues { it == null }.keys
+        val invocationIds = invocationByProposer.values.filterNotNull().toCollection(linkedSetOf())
+
+        val lineageComplete = proposerIds.size >= 2 &&
+            missingCandidateProposers.isEmpty() &&
+            missingGenealogyProposers.isEmpty() &&
+            invocationIds.size == proposerIds.size
 
         val report = if (invocationIds.size >= 2) {
             governance.evaluate(
@@ -68,7 +91,6 @@ class GenealogyGovernanceExecutorIntegration(
             GenealogyGovernanceFindingKind.CircularDerivation,
         )
         val blockingFindings = report.findings.filter { it.kind in blockingKinds }
-        val lineageComplete = invocationIds.size >= 2
         val gatePassed = lineageComplete && blockingFindings.isEmpty()
         val structurallyIndependent = lineageComplete &&
             report.pairwiseIndependence.isNotEmpty() &&
@@ -96,8 +118,14 @@ class GenealogyGovernanceExecutorIntegration(
                 ),
             ),
             progress = if (gatePassed) 1f else null,
-            progressMessage = if (!lineageComplete) {
-                "Genealogy gate requires at least two candidate invocation records"
+            progressMessage = if (missingCandidateProposers.isNotEmpty()) {
+                "Genealogy gate requires a TaskPlan candidate from every proposer: missing " +
+                    missingCandidateProposers.joinToString { it.value }
+            } else if (missingGenealogyProposers.isNotEmpty()) {
+                "Genealogy gate requires invocation metadata from every proposer: missing " +
+                    missingGenealogyProposers.joinToString { it.value }
+            } else if (!lineageComplete) {
+                "Genealogy gate requires distinct invocation records from every proposer"
             } else if (blockingFindings.isNotEmpty()) {
                 blockingFindings.joinToString("; ") { it.message }
             } else if (structurallyIndependent) {

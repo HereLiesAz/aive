@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
+import com.hereliesaz.geministrator.domain.validateRoleCollectionForStarterWorkflow
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.withRoleComputeDelegation
@@ -70,7 +71,7 @@ import kotlin.time.ExperimentalTime
 
 sealed interface ApplicationRuntimeState {
     data object Loading : ApplicationRuntimeState
-    data object NoProject : ApplicationRuntimeState
+    data class NoProject(val roles: List<RoleDefinition> = emptyList()) : ApplicationRuntimeState
     data class NoRun(val project: Project, val roles: List<RoleDefinition> = emptyList()) : ApplicationRuntimeState
     data class Live(val presentation: LiveWorkflowPresentation) : ApplicationRuntimeState
     data class Disconnected(val message: String) : ApplicationRuntimeState
@@ -129,7 +130,7 @@ class ApplicationRuntime private constructor(
                 val projects = persistence.projects.all()
                 if (projects.isEmpty()) {
                     replaceCurrent(null)
-                    publisher.publish(ApplicationRuntimeState.NoProject)
+                    publisher.publish(ApplicationRuntimeState.NoProject(roles = roles))
                     return@withLock
                 }
 
@@ -150,7 +151,10 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
-                val (project, run) = latestProjectRun
+                val (storedProject, run) = latestProjectRun
+                val project = storedProject.copy(
+                    repository = run.repositorySnapshot ?: storedProject.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -186,8 +190,11 @@ class ApplicationRuntime private constructor(
             try {
                 val run = persistence.runs.get(runId)
                     ?: error("Run ${runId.value} not found")
-                val project = persistence.projects.get(run.projectId)
+                val storedProject = persistence.projects.get(run.projectId)
                     ?: error("Project ${run.projectId.value} not found")
+                val project = storedProject.copy(
+                    repository = run.repositorySnapshot ?: storedProject.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} not found")
                 viewingRun = ViewingRun(project, definition, run)
@@ -222,7 +229,7 @@ class ApplicationRuntime private constructor(
             val now = nowEpochMillis()
             val project = existingProject?.copy(
                 name = cleanProjectName,
-                repository = normalizedRepository ?: existingProject.repository,
+                repository = normalizedRepository,
                 updatedAtEpochMillis = now,
             ) ?: Project(
                 id = ProjectId("project-$now"),
@@ -399,7 +406,7 @@ class ApplicationRuntime private constructor(
                         project = viewing.project,
                         definition = viewing.definition,
                         run = viewing.run,
-                        roles = roles,
+                        roles = mergedPresentationRoles(viewing.run),
                     ),
                 ),
             )
@@ -412,11 +419,15 @@ class ApplicationRuntime private constructor(
                     project = snapshot.project,
                     definition = snapshot.definition,
                     run = snapshot.state.run,
-                    roles = roles,
+                    roles = mergedPresentationRoles(snapshot.state.run),
                 ),
             ),
         )
     }
+
+    private fun mergedPresentationRoles(run: WorkflowRun): List<RoleDefinition> =
+        (run.roleSnapshot + roles)
+            .distinctBy(RoleDefinition::id)
 
     internal fun publishFailure(failure: Throwable) {
         val message = failure.message
@@ -485,6 +496,9 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
+                val runProject = project.copy(
+                    repository = run.repositorySnapshot ?: project.repository,
+                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -492,7 +506,7 @@ class ApplicationRuntime private constructor(
                 } catch (failure: Throwable) {
                     throw classifyResumeFailure(failure)
                 }
-                replaceCurrent(Current(project, definition, runtimeState))
+                replaceCurrent(Current(runProject, definition, runtimeState))
                 publishCurrent()
                 startCycling()
             } catch (failure: Throwable) {
@@ -518,13 +532,14 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun saveRoleCollection(activeRoleCollection: List<RoleDefinition>) {
+        validateRoleCollectionForStarterWorkflow(activeRoleCollection)
         val existing = persistence.roles.all()
-        roleCollectionEntries(activeRoleCollection, existing).forEach { persistence.roles.put(it) }
+        persistence.roles.replaceAll(roleCollectionEntries(activeRoleCollection, existing))
     }
 
     suspend fun resetRoleCollection() {
         val existing = persistence.roles.all()
-        defaultRoleCollectionEntries(existing).forEach { persistence.roles.put(it) }
+        persistence.roles.replaceAll(defaultRoleCollectionEntries(existing))
     }
 
     suspend fun assignWorkflowCompute(
@@ -706,7 +721,7 @@ class ApplicationRuntime private constructor(
             val registry = AgentProviderRegistry(providers)
             val gateway = ProviderBackedManagedSessionGateway(registry, runtimeScope)
             val publisher = WorkflowRuntimePublisher()
-            val effectiveExecutorIntegrations = executorIntegrations.withIntegration(
+            val effectiveExecutorIntegrations = executorIntegrations.withPriorityIntegration(
                 com.hereliesaz.geministrator.workflow.GenealogyGovernanceExecutorIntegration(
                     registry.genealogyGovernance,
                 ),

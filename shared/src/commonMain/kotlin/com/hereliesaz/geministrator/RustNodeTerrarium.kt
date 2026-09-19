@@ -184,6 +184,9 @@ private fun RustNodeTerrarium(
         label = "rust-node-link-pulse",
     )
 
+    // Rust packet generation includes topology construction. Quantize creature animation to 20 Hz
+    // so link/UI animation can remain fluid without rebuilding every creature mesh on every frame.
+    val creatureFrameTime = (timeSeconds * 20f).roundToInt() / 20f
     val packetInputs = subjects.map { subject ->
         listOf(
             subject.node.id,
@@ -192,7 +195,7 @@ private fun RustNodeTerrarium(
             subject.node.state.name,
         )
     }
-    val packets = remember(packetInputs, timeSeconds) {
+    val packets = remember(packetInputs, creatureFrameTime) {
         subjects.associateNotNull { subject ->
             runCatching {
                 subject.node.id to NodeCreatureRenderPacketDecoder.decode(
@@ -201,7 +204,7 @@ private fun RustNodeTerrarium(
                             roleLabel = subject.node.label,
                             identitySeed = subject.identitySeed,
                             activity = subject.node.state.toNodeCreatureActivity(),
-                            timeSeconds = timeSeconds,
+                            timeSeconds = creatureFrameTime,
                         ),
                     ),
                 )

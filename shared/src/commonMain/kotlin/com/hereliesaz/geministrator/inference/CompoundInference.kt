@@ -42,6 +42,8 @@ data class InferenceGenealogy(
             "Inference genealogy cannot list its own invocation as a direct ancestor"
         }
         require(upstreamInvocationIds.none(String::isBlank)) { "Upstream invocation IDs must not be blank" }
+        require(upstreamTaskRunIds.none { it.value.isBlank() }) { "Upstream task-run IDs must not be blank" }
+        require(upstreamArtifactIds.none { it.value.isBlank() }) { "Upstream artifact IDs must not be blank" }
         require(memoryAddresses.none(String::isBlank)) { "Memory addresses must not be blank" }
         require(toolEvidenceIds.none(String::isBlank)) { "Tool evidence IDs must not be blank" }
     }

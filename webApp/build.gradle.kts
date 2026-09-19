@@ -25,6 +25,7 @@ val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
             logoSource = brandSourceLogo.asFile,
             animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
+            maxDimension = 256,
         )
         BrandLoaderVerifier.verify(outputDir)
     }

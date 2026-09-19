@@ -45,6 +45,7 @@ internal fun CompanyProviderScreen(
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val roles: Collection<RoleDefinition> = liveWorkflow?.roles
         ?: (runtimeState as? ApplicationRuntimeState.NoRun)?.roles
+        ?: (runtimeState as? ApplicationRuntimeState.NoProject)?.roles
         ?: emptyList()
     var showRoleForm by remember { mutableStateOf(false) }
     var roleIdDraft by remember { mutableStateOf("") }

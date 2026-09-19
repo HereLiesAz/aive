@@ -1,53 +1,78 @@
 package com.hereliesaz.geministrator.addons
 
+import java.lang.reflect.GenericArrayType
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import java.lang.reflect.WildcardType
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import kotlin.reflect.KClass
 
 class AddonArchitectureBoundaryTest {
+    private val visited = mutableSetOf<Class<*>>()
+
+    private fun checkTypeForMemory(type: Type, context: String) {
+        assertTrue(
+            !type.typeName.contains("memory", ignoreCase = true),
+            "$context must not expose memory through type ${type.typeName}.",
+        )
+
+        when (type) {
+            is Class<*> -> {
+                if (type.isArray) {
+                    checkTypeForMemory(type.componentType, "$context array component")
+                }
+                if (
+                    type.name.startsWith("com.hereliesaz.geministrator.addons.") &&
+                    visited.add(type)
+                ) {
+                    checkClassForMemory(type)
+                }
+            }
+            is ParameterizedType -> {
+                checkTypeForMemory(type.rawType, "$context raw type")
+                type.actualTypeArguments.forEachIndexed { index, argument ->
+                    checkTypeForMemory(argument, "$context generic argument $index")
+                }
+            }
+            is GenericArrayType ->
+                checkTypeForMemory(type.genericComponentType, "$context array component")
+            is WildcardType -> {
+                type.upperBounds.forEach { checkTypeForMemory(it, "$context upper bound") }
+                type.lowerBounds.forEach { checkTypeForMemory(it, "$context lower bound") }
+            }
+        }
+    }
 
     private fun checkClassForMemory(kclass: Class<*>) {
-        val nameHasMemory = kclass.simpleName?.contains("memory", ignoreCase = true) == true
-        assertTrue(!nameHasMemory, "Type ${kclass.simpleName} must not expose memory.")
+        assertTrue(
+            !kclass.name.contains("memory", ignoreCase = true),
+            "Type ${kclass.name} must not expose memory.",
+        )
 
-        for (prop in kclass.declaredFields) {
-            val propHasMemory = prop.name.contains("memory", ignoreCase = true)
-            assertTrue(!propHasMemory, "Property ${prop.name} in ${kclass.simpleName} must not expose memory.")
-            val returnHasMemory = prop.type.toString().contains("memory", ignoreCase = true)
-            assertTrue(!returnHasMemory, "Property ${prop.name} type in ${kclass.simpleName} must not expose memory.")
+        kclass.declaredFields.forEach { field ->
+            assertTrue(
+                !field.name.contains("memory", ignoreCase = true),
+                "Property ${field.name} in ${kclass.simpleName} must not expose memory.",
+            )
+            checkTypeForMemory(field.genericType, "Property ${field.name} in ${kclass.simpleName}")
         }
 
-        for (func in kclass.declaredMethods) {
-            val funcHasMemory = func.name.contains("memory", ignoreCase = true)
-            assertTrue(!funcHasMemory, "Method ${func.name} in ${kclass.simpleName} must not expose memory.")
-            val returnHasMemory = func.returnType.toString().contains("memory", ignoreCase = true)
-            assertTrue(!returnHasMemory, "Method ${func.name} return type in ${kclass.simpleName} must not expose memory.")
-            for (param in func.parameters) {
-                val paramHasMemory = param.name?.contains("memory", ignoreCase = true) == true
-                assertTrue(!paramHasMemory, "Parameter ${param.name} in ${func.name} of ${kclass.simpleName} must not expose memory.")
-                val paramTypeHasMemory = param.type.toString().contains("memory", ignoreCase = true)
-                assertTrue(!paramTypeHasMemory, "Parameter ${param.name} type in ${func.name} of ${kclass.simpleName} must not expose memory.")
+        kclass.declaredMethods.forEach { method ->
+            assertTrue(
+                !method.name.contains("memory", ignoreCase = true),
+                "Method ${method.name} in ${kclass.simpleName} must not expose memory.",
+            )
+            checkTypeForMemory(method.genericReturnType, "Return type of ${method.name} in ${kclass.simpleName}")
+            method.genericParameterTypes.forEachIndexed { index, type ->
+                checkTypeForMemory(type, "Parameter $index of ${method.name} in ${kclass.simpleName}")
             }
         }
     }
 
     @Test
-    fun testAddonApiDoesNotExposeMemory() {
+    fun addonApiObjectGraphDoesNotExposeMemory() {
+        visited.clear()
         checkClassForMemory(HaiveAddonApi::class.java)
-        checkClassForMemory(AddonAppApi::class.java)
-        checkClassForMemory(AddonProjectApi::class.java)
-        checkClassForMemory(AddonRepositoryApi::class.java)
-        checkClassForMemory(AddonCompanyApi::class.java)
-        checkClassForMemory(AddonWorkflowApi::class.java)
-        checkClassForMemory(AddonRunApi::class.java)
-        checkClassForMemory(AddonArtifactApi::class.java)
-        checkClassForMemory(AddonApprovalApi::class.java)
-        checkClassForMemory(AddonEventApi::class.java)
-        checkClassForMemory(AddonProviderApi::class.java)
-        checkClassForMemory(AddonExecutorApi::class.java)
-        checkClassForMemory(AddonPackageApi::class.java)
-        checkClassForMemory(AddonSettingsApi::class.java)
-        checkClassForMemory(AddonUiApi::class.java)
         checkClassForMemory(HaiveAddonMediator::class.java)
         checkClassForMemory(AddonInstallation::class.java)
         checkClassForMemory(AzphaltPackageManifest::class.java)

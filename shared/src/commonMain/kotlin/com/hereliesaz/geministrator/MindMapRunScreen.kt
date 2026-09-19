@@ -156,7 +156,7 @@ internal fun MindMapRunScreen(
                     )
                 }
             }
-            if (runtimeState == ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
+            if (runtimeState is ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
                 OutlinedTextField(
                     value = projectName,
                     onValueChange = { projectName = it },
@@ -225,6 +225,7 @@ internal fun MindMapRunScreen(
                                 )
                             },
                             singleLine = true,
+                            readOnly = repositorySource == RepositorySource.Local && onPickLocalRepository != null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .onFocusChanged { focus ->
@@ -261,7 +262,7 @@ internal fun MindMapRunScreen(
                                     },
                                     onClick = {
                                         repositoryLocator = suggestion.webUrl
-                                        suggestion.defaultBranch?.takeIf(String::isNotBlank)?.let { defaultBranch = it }
+                                        defaultBranch = suggestion.defaultBranch.orEmpty()
                                         repositoryError = null
                                         repositorySearchError = null
                                         repositoryMenuExpanded = false
@@ -287,6 +288,7 @@ internal fun MindMapRunScreen(
                             )
                         },
                         singleLine = true,
+                        readOnly = repositorySource == RepositorySource.Local && onPickLocalRepository != null,
                         modifier = Modifier.fillMaxWidth(),
                         isError = repositoryError != null,
                         supportingText = repositoryError?.let { message ->
@@ -479,7 +481,7 @@ internal fun MindMapRunScreen(
 private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean) {
     val (title, body) = when (state) {
         ApplicationRuntimeState.Loading -> "LOADING RUNTIME" to "Reading persisted workflow state."
-        ApplicationRuntimeState.NoProject -> "NO PROJECT" to "Create a project and define its first objective below."
+        is ApplicationRuntimeState.NoProject -> "NO PROJECT" to "Create a project and define its first objective below."
         is ApplicationRuntimeState.NoRun -> "NO ACTIVE RUN" to "${state.project.name} has no persisted workflow run. Define an objective below to start one."
         is ApplicationRuntimeState.Disconnected -> "RUNTIME DISCONNECTED" to state.message
         is ApplicationRuntimeState.ResumeFailed -> "RESUME FAILED" to state.message

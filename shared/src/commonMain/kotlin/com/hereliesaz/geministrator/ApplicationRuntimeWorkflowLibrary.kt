@@ -22,6 +22,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     projectName: String = existingProject?.name ?: definition.name,
     objective: String = definition.description ?: definition.name,
     repository: RepositoryRef? = existingProject?.repository,
+    supplementalRoles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
 ) {
     val cleanProjectName = projectName.trim()
     val cleanObjective = objective.trim()
@@ -41,12 +42,16 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         updatedAtEpochMillis = now,
     )
 
-    val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val globalLaunchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val launchRoles = (supplementalRoles + globalLaunchRoles)
+        .filter(com.hereliesaz.geministrator.domain.RoleDefinition::enabled)
+        .distinctBy(com.hereliesaz.geministrator.domain.RoleDefinition::id)
     val launchService = WorkflowLaunchService(
         preparer = WorkflowDefinitionPreparer(providerRegistry, launchRoles),
         persistence = persistence,
         eventSink = RepositoryWorkflowEventSink(persistence.events),
         roles = launchRoles,
+        rolesToPersist = globalLaunchRoles,
     )
     launchService.launch(
         project = project,
