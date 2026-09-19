@@ -125,8 +125,9 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
     override suspend fun getRun(project: Project, runId: String): ExternalExecutionRun {
         runs[runId]?.let { return it }
         val repository = project.repository
-        if (repository?.source == RepositorySource.Local && !repository.localPath.isNullOrBlank()) {
-            val root = runCatching { resolveGitRoot(repository.localPath) }.getOrNull()
+        val localPath = repository?.localPath
+        if (repository?.source == RepositorySource.Local && !localPath.isNullOrBlank()) {
+            val root = runCatching { resolveGitRoot(localPath) }.getOrNull()
             if (root != null) {
                 val marker = operationMarker(root, runId)
                 readMarker(marker, runId)?.let {
