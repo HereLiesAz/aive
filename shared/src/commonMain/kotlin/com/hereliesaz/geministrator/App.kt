@@ -95,13 +95,16 @@ fun App(
     }
 
     GeministratorTheme {
-        var destinationName by rememberDurableStringState(
-            key = "navigation.destination",
-            initialValue = ControlRoomDestination.Settings.name,
-        )
+        var destinationName by remember {
+            mutableStateOf(
+                startupControlRoomDestination(
+                    hasConfiguredProvider = providers.isNotEmpty(),
+                ).name,
+            )
+        }
         val destination = ControlRoomDestination.entries
             .firstOrNull { it.name == destinationName }
-            ?: ControlRoomDestination.Settings
+            ?: startupControlRoomDestination(hasConfiguredProvider = providers.isNotEmpty())
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
@@ -357,7 +360,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Save company failed")
+                                    runtimeState = failure.toRuntimeFailureState("Save swarm failed")
                                 }
                             }
                         },
@@ -369,7 +372,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                                    runtimeState = failure.toRuntimeFailureState("Reset swarm failed")
                                 }
                             }
                         },
@@ -444,3 +447,9 @@ private fun GeministratorTheme(content: @Composable () -> Unit) {
         content = content,
     )
 }
+
+
+internal fun startupControlRoomDestination(
+    hasConfiguredProvider: Boolean,
+): ControlRoomDestination =
+    if (hasConfiguredProvider) ControlRoomDestination.Overview else ControlRoomDestination.Settings
