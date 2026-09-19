@@ -138,6 +138,7 @@ class WorkflowEngine(
                         },
                         acceptanceCriteria = task.acceptanceCriteria,
                         contextArtifacts = dependencyArtifacts,
+                        requiredArtifacts = task.requiredArtifacts,
                         repository = project.repository,
                         requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
                         promptContext = PromptContext(
