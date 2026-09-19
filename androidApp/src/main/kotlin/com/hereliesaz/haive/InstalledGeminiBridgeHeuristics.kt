@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 /** Version-tolerant matching for the installed Gemini UI. */
 internal object InstalledGeminiBridgeHeuristics {
