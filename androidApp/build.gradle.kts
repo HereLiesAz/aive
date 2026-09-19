@@ -164,6 +164,7 @@ dependencies {
     implementation(projects.providers.jules)
     implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.fragment)
     implementation("androidx.core:core:1.17.0")
     add("playImplementation", "com.google.android.play:app-update:2.1.0")
     implementation(compose.material3)
