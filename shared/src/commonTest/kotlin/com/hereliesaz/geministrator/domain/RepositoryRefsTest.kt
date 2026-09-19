@@ -9,16 +9,16 @@ class RepositoryRefsTest {
     fun parsesGitHubUrl() {
         val repository = parseRepositoryRef(
             source = RepositorySource.GitHub,
-            locator = "https://github.com/HereLiesAz/haive.git",
+            locator = "https://github.com/HereLiesAz/aive.git",
             defaultBranch = " main ",
         )
 
         assertEquals(RepositorySource.GitHub, repository.source)
         assertEquals("HereLiesAz", repository.owner)
-        assertEquals("haive", repository.name)
+        assertEquals("aive", repository.name)
         assertEquals("main", repository.defaultBranch)
-        assertEquals("https://github.com/HereLiesAz/haive.git", repository.remoteUrl)
-        assertEquals("https://github.com/HereLiesAz/haive", repository.remoteBrowserUrl())
+        assertEquals("https://github.com/HereLiesAz/aive.git", repository.remoteUrl)
+        assertEquals("https://github.com/HereLiesAz/aive", repository.remoteBrowserUrl())
         assertNull(repository.localPath)
     }
 
@@ -32,7 +32,7 @@ class RepositoryRefsTest {
 
         assertEquals(RepositorySource.GitLab, repository.source)
         assertEquals("team/platform", repository.owner)
-        assertEquals("haive", repository.name)
+        assertEquals("aive", repository.name)
         assertEquals("develop", repository.defaultBranch)
         assertEquals("git@gitlab.com:team/platform/haive.git", repository.remoteUrl)
         assertEquals("https://gitlab.com/team/platform/haive", repository.remoteBrowserUrl())
@@ -47,7 +47,7 @@ class RepositoryRefsTest {
         )
 
         assertEquals("team/platform", repository.owner)
-        assertEquals("haive", repository.name)
+        assertEquals("aive", repository.name)
         assertEquals("https://gitlab.example.test/team/platform/haive", repository.remoteBrowserUrl())
     }
 
@@ -61,7 +61,7 @@ class RepositoryRefsTest {
 
         assertEquals(RepositorySource.Local, repository.source)
         assertEquals("", repository.owner)
-        assertEquals("haive", repository.name)
+        assertEquals("aive", repository.name)
         assertEquals("C:\\work\\haive\\", repository.localPath)
         assertEquals("main", repository.defaultBranch)
         assertNull(repository.remoteUrl)
@@ -69,10 +69,10 @@ class RepositoryRefsTest {
 
     @Test
     fun legacyRepositoryRefDefaultsToGitHub() {
-        val repository = RepositoryRef("HereLiesAz", "haive", "main")
+        val repository = RepositoryRef("HereLiesAz", "aive", "main")
 
         assertEquals(RepositorySource.GitHub, repository.source)
-        assertEquals("HereLiesAz/haive", repository.displayName())
-        assertEquals("https://github.com/HereLiesAz/haive", repository.remoteBrowserUrl())
+        assertEquals("HereLiesAz/aive", repository.displayName())
+        assertEquals("https://github.com/HereLiesAz/aive", repository.remoteBrowserUrl())
     }
 }

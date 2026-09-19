@@ -1,6 +1,6 @@
 # Compound inference architecture
 
-This document defines The Haive's compound-inference architecture derived from the ideas evaluated in `../Composite Frontier Model Architectures.md` and the current runtime contracts.
+This document defines The Aive's compound-inference architecture derived from the ideas evaluated in `../Composite Frontier Model Architectures.md` and the current runtime contracts.
 
 The workflow DAG remains runtime truth. Compound inference is the governed execution fabric used by model-backed work inside that DAG; it is not a second workflow engine.
 
@@ -15,7 +15,7 @@ Memory clerks therefore continue to organize, associate, condense, and retrieve 
 ## Target architecture
 
 ```text
-                         THE HAIVE
+                         THE AIVE
                             |
                  CompoundInferenceFabric
                             |

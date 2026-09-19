@@ -1,6 +1,6 @@
 # Local memory inference
 
-The Haive's memory clerks run locally and opportunistically use hardware acceleration. Acceleration is never a requirement for memory correctness: unsupported or failed accelerator sessions fall back to ONNX Runtime CPU unless the model explicitly disables CPU fallback.
+The Aive's memory clerks run locally and opportunistically use hardware acceleration. Acceleration is never a requirement for memory correctness: unsupported or failed accelerator sessions fall back to ONNX Runtime CPU unless the model explicitly disables CPU fallback.
 
 ## Clerical boundary
 

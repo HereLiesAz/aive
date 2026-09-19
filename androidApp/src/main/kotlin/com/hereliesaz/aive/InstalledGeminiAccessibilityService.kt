@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.accessibilityservice.AccessibilityService
 import android.content.ClipData

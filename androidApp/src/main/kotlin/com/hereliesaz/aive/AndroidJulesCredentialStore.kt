@@ -1,25 +1,24 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import com.hereliesaz.geministrator.RepositoryServiceCatalog
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-internal class AndroidRepositoryCredentialStore(context: Context) {
+internal class AndroidJulesCredentialStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
 
-    fun read(serviceId: String): String? {
-        val encrypted = preferences.getString(ciphertextKey(serviceId), null) ?: return null
-        val iv = preferences.getString(ivKey(serviceId), null) ?: return null
+    fun read(): String? {
+        val encrypted = preferences.getString(KEY_CIPHERTEXT, null) ?: return null
+        val iv = preferences.getString(KEY_IV, null) ?: return null
         return runCatching {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
@@ -34,36 +33,26 @@ internal class AndroidRepositoryCredentialStore(context: Context) {
         }.getOrNull()
     }
 
-    fun readAll(): Map<String, String> = buildMap {
-        RepositoryServiceCatalog.entries.forEach { entry ->
-            read(entry.id)?.let { put(entry.id, it) }
-        }
-    }
-
-    fun write(serviceId: String, credential: String) {
-        require(RepositoryServiceCatalog.entry(serviceId) != null) { "Unknown repository service $serviceId" }
-        val clean = credential.trim()
-        require(clean.isNotEmpty()) { "Repository credential is required" }
+    fun write(apiKey: String) {
+        val clean = apiKey.trim()
+        require(clean.isNotEmpty()) { "Jules API key is required" }
 
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
 
         preferences.edit()
-            .putString(ciphertextKey(serviceId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(ivKey(serviceId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
             .apply()
     }
 
-    fun clear(serviceId: String) {
+    fun clear() {
         preferences.edit()
-            .remove(ciphertextKey(serviceId))
-            .remove(ivKey(serviceId))
+            .remove(KEY_CIPHERTEXT)
+            .remove(KEY_IV)
             .apply()
     }
-
-    private fun ciphertextKey(serviceId: String) = "$serviceId.ciphertext"
-    private fun ivKey(serviceId: String) = "$serviceId.iv"
 
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -85,8 +74,10 @@ internal class AndroidRepositoryCredentialStore(context: Context) {
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "haive.repository.credentials"
-        const val PREFERENCES_NAME = "haive.repository.credentials"
+        const val KEY_ALIAS = "haive.jules.api-key"
+        const val PREFERENCES_NAME = "haive.credentials"
+        const val KEY_CIPHERTEXT = "jules.ciphertext"
+        const val KEY_IV = "jules.iv"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128
     }

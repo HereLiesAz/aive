@@ -82,11 +82,11 @@ val buildAndroidBitcosNative = tasks.register<Exec>("buildAndroidBitcosNative") 
 }
 
 android {
-    namespace = "com.hereliesaz.haive"
+    namespace = "com.hereliesaz.aive"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.hereliesaz.haive"
+        applicationId = "com.hereliesaz.aive"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = providers.gradleProperty("app.versionCode").get().toInt()

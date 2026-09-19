@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 const val AZPHALT_STORE_URL: String = "https://azphalt.store"
-const val HAIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.haive"
+const val HAIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.aive"
 const val HAIVE_WORKFLOW_FORMAT: String = "haive.workflow.v1"
 const val HAIVE_ROLE_FORMAT: String = "haive.role.v1"
 const val AZPHALT_PACKAGE_MEDIA_TYPE: String = "application/vnd.azphalt.package"

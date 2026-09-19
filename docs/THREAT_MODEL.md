@@ -1,6 +1,6 @@
 # Threat Model
 
-This document identifies the trust boundaries, threat actors, attack surfaces, and mitigations relevant to The Haive. It is a living document — update it when a new executor, integration, or data flow is added.
+This document identifies the trust boundaries, threat actors, attack surfaces, and mitigations relevant to The Aive. It is a living document — update it when a new executor, integration, or data flow is added.
 
 ## Trust Boundaries
 
@@ -29,7 +29,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Prompt injection: context artifacts contain `IGNORE PREVIOUS INSTRUCTIONS` style attacks directed at the provider model.
 - Payload exfiltration: task objective or artifacts contain sensitive content the user did not intend to send.
 - Fabricated completion: provider claims success without performing the actual task.
-- Compromised response: provider returns code or instructions designed to exploit the Haive runtime or downstream tasks.
+- Compromised response: provider returns code or instructions designed to exploit the Aive runtime or downstream tasks.
 
 **Mitigations in place**
 - `PayloadRedactionPolicy` allows per-definition exclusion of artifact kinds, objective, and role instructions from the provider payload.

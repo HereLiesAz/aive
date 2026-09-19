@@ -123,7 +123,7 @@ val appVersionName = providers.gradleProperty("app.versionName").get()
 val appPackageVersion = appVersionName.substringBefore("-")
 val nativePackageVersion = if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
     // macOS jpackage requires the first app-version component to be greater than zero.
-    // Offset only the native macOS package major so Haive's public SemVer can remain pre-1.0.
+    // Offset only the native macOS package major so Aive's public SemVer can remain pre-1.0.
     val components = appPackageVersion.split('.').map { it.toInt() }
     buildList {
         add((components.first() + 1).toString())
@@ -139,9 +139,9 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Dmg, TargetFormat.Msi)
-            packageName = "TheHaive"
+            packageName = "TheAive"
             packageVersion = nativePackageVersion
-            description = "The Haive — agentic workflow orchestration"
+            description = "The Aive — agentic workflow orchestration"
             copyright = "© 2026 HereLiesAz"
 
             linux {
@@ -152,7 +152,7 @@ compose.desktop {
             }
             windows {
                 iconFile.set(generatedDesktopBrandDir.get().file("haive-icon.ico").asFile)
-                menuGroup = "The Haive"
+                menuGroup = "The Aive"
                 upgradeUuid = "e1d4b3c2-5f6a-4b8e-9d7c-0a1b2c3d4e5f"
             }
         }

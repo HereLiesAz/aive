@@ -1,6 +1,6 @@
-# The Haive branding
+# The Aive branding
 
-The current Haive mark is defined by the source assets in `branding/`.
+The current Aive mark is defined by the source assets in `branding/`.
 
 ## Canonical assets
 
@@ -17,8 +17,8 @@ Android's platform-owned launch splash cannot play a GIF, so it remains a neutra
 
 ## Naming
 
-User-facing product name: **The Haive**
+User-facing product name: **The Aive**
 
-Technical/project shorthand: **Haive** / `haive`
+Technical/project shorthand: **Aive** / `aive`
 
-Android application ID and namespace: `com.hereliesaz.haive`
+Android application ID and namespace: `com.hereliesaz.aive`

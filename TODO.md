@@ -1,6 +1,6 @@
-# The Haive — TODO
+# The Aive — TODO
 
-This is the canonical near-term roadmap for The Haive. It is ordered by product dependency: make the execution model correct first, then make it genuinely usable, then broaden providers and delivery.
+This is the canonical near-term roadmap for The Aive. It is ordered by product dependency: make the execution model correct first, then make it genuinely usable, then broaden providers and delivery.
 
 Tracking issue: #35
 
@@ -134,7 +134,7 @@ Tracking issue: #35
 - [x] Artifact browser with provenance (live artifacts from task runs, grouped by task).
 - [x] Inbox for approvals, failures, escalations, and requests for human attention.
 - [x] Settings shows connected providers; static fallback when none configured.
-- [x] Surface The Haive icon/brand consistently across Android, Desktop, and Web.
+- [x] Surface The Aive icon/brand consistently across Android, Desktop, and Web.
 
 ## P1 — Delivery
 
@@ -143,7 +143,7 @@ Tracking issue: #35
 - [x] Add Google Play publishing using `PLAY_SERVICE_ACCOUNT_JSON` as a separate publishing job.
 - [x] Automatically publish the desired Google Play internal-testing track after a successful release build.
 - [x] Ensure versionCode/versionName have one clear source of truth and cannot regress.
-- [x] Verify GitHub Pages deployment after the rename to `haive` and `haive.js`.
+- [x] Verify GitHub Pages deployment after the rename to `aive` and `haive.js`.
 - [x] Package Desktop icon/metadata correctly for each supported OS.
 - [x] Add release notes/changelog generation from actual shipped changes.
 
@@ -185,4 +185,4 @@ Tracking issue: #35
 
 ## Definition of a useful alpha
 
-The Haive is ready to call an alpha when a user can open a project, give it an objective, approve the generated plan where required, watch a real mixed workflow execute in the H2G2 mindmap, leave/restart the app without losing the run, inspect evidence and failures, intervene at explicit gates, and reach a verified terminal outcome — without any non-agent executor pretending to be an AI employee.
+The Aive is ready to call an alpha when a user can open a project, give it an objective, approve the generated plan where required, watch a real mixed workflow execute in the H2G2 mindmap, leave/restart the app without losing the run, inspect evidence and failures, intervene at explicit gates, and reach a verified terminal outcome — without any non-agent executor pretending to be an AI employee.

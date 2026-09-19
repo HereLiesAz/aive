@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.content.Context
 import android.graphics.Canvas
@@ -20,13 +20,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Reusable Haive loading treatment.
+ * Reusable Aive loading treatment.
  *
  * The static frame is painted immediately. The transparent GIF is decoded off the UI thread and
  * replaces it only after decoding, so there is no blank frame while the animation becomes ready.
  */
 @Composable
-fun HaiveLoadingAnimation(
+fun AiveLoadingAnimation(
     modifier: Modifier = Modifier,
     onAnimationStarted: () -> Unit = {},
 ) {

@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator.memory
 
 /**
- * Deployable memory-model release currently published by Haive.
+ * Deployable memory-model release currently published by Aive.
  *
  * Release bundles are archives; ONNX Runtime never consumes these tarballs directly. Installers
  * download + verify a bundle, extract its ONNX payload, and bind [runtimeArtifactId] to the local
@@ -17,7 +17,7 @@ data class MemoryModelReleaseBundle(
     val quantization: String,
 ) {
     val downloadUrl: String
-        get() = "https://github.com/HereLiesAz/haive/releases/download/$releaseTag/$releaseAssetName"
+        get() = "https://github.com/HereLiesAz/aive/releases/download/$releaseTag/$releaseAssetName"
 }
 
 /**

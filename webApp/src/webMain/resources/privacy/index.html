@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0D1026" />
-    <title>Privacy Policy — The Haive</title>
+    <title>Privacy Policy — The Aive</title>
     <style>
         :root {
             --ink: #0D1026;
@@ -92,28 +92,28 @@
 <body>
 <div class="page">
     <div class="brand">
-        <a href="../">← The Haive</a>
+        <a href="../">← The Aive</a>
     </div>
 
     <h1>Privacy Policy</h1>
-    <p class="effective">Effective date: September 7, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.haive</code></p>
+    <p class="effective">Effective date: September 7, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.aive</code></p>
 
     <div class="summary-block">
         <ul>
             <li>No advertising SDKs.</li>
             <li>No third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry.</li>
-            <li>The Haive does <strong>not</strong> sell personal information.</li>
+            <li>The Aive does <strong>not</strong> sell personal information.</li>
             <li>Workflow state is stored locally unless you send it to an external service to perform work.</li>
             <li>External providers process data under their own policies.</li>
             <li>Credentials and secret values are intentionally excluded from workflow persistence.</li>
         </ul>
     </div>
 
-    <h2>What The Haive is</h2>
-    <p>The Haive is a workflow orchestration application. It stores workflow information locally and, when you choose to use an external executor or provider, sends the information needed to perform that work to the service you selected.</p>
+    <h2>What The Aive is</h2>
+    <p>The Aive is a workflow orchestration application. It stores workflow information locally and, when you choose to use an external executor or provider, sends the information needed to perform that work to the service you selected.</p>
 
     <h2>Information stored locally</h2>
-    <p>Depending on how you use the app, The Haive may store:</p>
+    <p>Depending on how you use the app, The Aive may store:</p>
     <ul>
         <li>project names and repository references</li>
         <li>workflow definitions</li>
@@ -128,36 +128,36 @@
     <p>The current persistence backend uses platform-local storage: SharedPreferences on Android, Java Preferences on Desktop/JVM, and browser localStorage on Web. This data is used to restore workflows and continue runs after restarts.</p>
 
     <h2>External providers and executors</h2>
-    <p>When you assign work to an external service, The Haive may send information required for that task, such as: task objective and instructions, repository identity, acceptance criteria, approved specifications, relevant upstream artifacts, retry/failure context, and messages or approval responses you choose to send.</p>
+    <p>When you assign work to an external service, The Aive may send information required for that task, such as: task objective and instructions, repository identity, acceptance criteria, approved specifications, relevant upstream artifacts, retry/failure context, and messages or approval responses you choose to send.</p>
     <p>The external service receives that information because you asked it to perform work. Its handling of data is governed by that service's own terms and privacy policy.</p>
 
     <h2>Source repositories</h2>
-    <p>Repository-backed work may require an external provider to access a repository already connected to that provider. The Haive requests and transmits only the repository/context needed for the selected task. It is not intended to upload an entire repository to a separate analytics or data-collection service.</p>
+    <p>Repository-backed work may require an external provider to access a repository already connected to that provider. The Aive requests and transmits only the repository/context needed for the selected task. It is not intended to upload an entire repository to a separate analytics or data-collection service.</p>
 
     <h2>Credentials and secrets</h2>
     <p>Provider API keys, OAuth tokens, passwords, keystore contents, and other secret values must not be stored in workflow persistence. A workflow may store the <strong>name</strong> of a required secret, but not its value. Where credentials are required, they are handled through platform-secure storage. Repository secrets used by GitHub Actions remain within GitHub Actions and are not part of the app's workflow persistence.</p>
 
     <h2>Analytics, advertising, and tracking</h2>
     <p>The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The public web build may be subject to ordinary infrastructure logging by its hosting platform. GitHub Pages hosting and GitHub itself are governed by GitHub's own policies.</p>
-    <p>If The Haive later adds optional diagnostics or analytics, this policy will be updated before that behavior is treated as part of the product.</p>
+    <p>If The Aive later adds optional diagnostics or analytics, this policy will be updated before that behavior is treated as part of the product.</p>
 
     <h2>Data retention and deletion</h2>
-    <p>Local workflow data remains until The Haive removes it or you clear the application's data/storage. On the web, clearing site data for The Haive removes the browser-local persistence. Deleting local data does not automatically delete data already sent to an external provider — those must be managed according to that service's own controls and retention policy.</p>
+    <p>Local workflow data remains until The Aive removes it or you clear the application's data/storage. On the web, clearing site data for The Aive removes the browser-local persistence. Deleting local data does not automatically delete data already sent to an external provider — those must be managed according to that service's own controls and retention policy.</p>
 
     <h2>Data sharing</h2>
-    <p>The Haive shares task data only as needed to use services/executors you choose. The current application does not sell personal data or share workflow content with advertisers.</p>
+    <p>The Aive shares task data only as needed to use services/executors you choose. The current application does not sell personal data or share workflow content with advertisers.</p>
 
     <h2>Children's privacy</h2>
-    <p>The Haive is a software-development tool and is not directed to children under 13. It is not designed to knowingly collect personal information from children.</p>
+    <p>The Aive is a software-development tool and is not directed to children under 13. It is not designed to knowingly collect personal information from children.</p>
 
     <h2>Security</h2>
     <p>The project is designed to separate durable workflow state from credentials and secret material. No software can guarantee absolute security. Users should avoid placing unnecessary secrets in task prompts, artifacts, or workflow content that may be sent to external providers.</p>
 
     <h2>Changes to this policy</h2>
-    <p>Material changes to The Haive's data handling will be accompanied by an update to this document and its effective date.</p>
+    <p>Material changes to The Aive's data handling will be accompanied by an update to this document and its effective date.</p>
 
     <h2>Contact</h2>
-    <p>The Haive is an open-source project maintained by <strong>HereLiesAz</strong>. Privacy questions and reports can be raised through the repository at <code>HereLiesAz/haive</code> on GitHub.</p>
+    <p>The Aive is an open-source project maintained by <strong>HereLiesAz</strong>. Privacy questions and reports can be raised through the repository at <code>HereLiesAz/aive</code> on GitHub.</p>
 </div>
 </body>
 </html>

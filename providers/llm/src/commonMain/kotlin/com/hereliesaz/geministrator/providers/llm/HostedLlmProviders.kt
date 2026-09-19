@@ -68,7 +68,7 @@ object HostedLlmProviders {
             displayName = "OpenRouter",
             baseUrl = "https://openrouter.ai/api/v1",
             defaultModel = "openrouter/free",
-            extraHeaders = mapOf("X-Title" to "Haive"),
+            extraHeaders = mapOf("X-Title" to "Aive"),
         ),
         HostedLlmProviderSpec(
             id = TOGETHER_ID,

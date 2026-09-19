@@ -47,7 +47,7 @@ class GitHubRestActionsClientTest {
 
         val run = client.dispatch(
             GitHubWorkflowDispatchRequest(
-                repository = RepositoryRef("HereLiesAz", "haive", "main"),
+                repository = RepositoryRef("HereLiesAz", "aive", "main"),
                 workflow = "ci.yml",
                 ref = "main",
             ),
@@ -58,7 +58,7 @@ class GitHubRestActionsClientTest {
         assertEquals(1, requests.size)
         val dispatch = requests.single()
         assertEquals(HttpMethod.Post, dispatch.method)
-        assertEquals("/repos/HereLiesAz/haive/actions/workflows/ci.yml/dispatches", dispatch.url.encodedPath)
+        assertEquals("/repos/HereLiesAz/aive/actions/workflows/ci.yml/dispatches", dispatch.url.encodedPath)
         assertEquals("Bearer token-123", dispatch.headers[HttpHeaders.Authorization])
         assertEquals("2026-03-10", dispatch.headers["X-GitHub-Api-Version"])
     }
@@ -92,7 +92,7 @@ class GitHubRestActionsClientTest {
             baseUrl = "https://api.github.test",
         )
 
-        val run = client.getRun(RepositoryRef("HereLiesAz", "haive", "main"), "42")
+        val run = client.getRun(RepositoryRef("HereLiesAz", "aive", "main"), "42")
 
         assertEquals(GitHubWorkflowRunStatus.Completed, run.status)
         assertEquals("success", run.progressMessage)
@@ -137,7 +137,7 @@ class GitHubRestActionsClientTest {
             baseUrl = "https://api.github.test",
         )
 
-        val run = client.getRun(RepositoryRef("HereLiesAz", "haive", "main"), "42")
+        val run = client.getRun(RepositoryRef("HereLiesAz", "aive", "main"), "42")
 
         assertEquals(GitHubWorkflowRunStatus.Failed, run.status)
     }
@@ -169,7 +169,7 @@ class GitHubRestActionsClientTest {
             baseUrl = "https://api.github.test",
         )
 
-        val run = client.getRun(RepositoryRef("HereLiesAz", "haive", "main"), "42")
+        val run = client.getRun(RepositoryRef("HereLiesAz", "aive", "main"), "42")
 
         assertEquals(GitHubWorkflowRunStatus.Running, run.status)
         assertEquals(1, run.jobs.size)
@@ -208,7 +208,7 @@ class GitHubRestActionsClientTest {
             baseUrl = "https://api.github.test",
         )
 
-        val run = client.getRun(RepositoryRef("HereLiesAz", "haive", "main"), "42")
+        val run = client.getRun(RepositoryRef("HereLiesAz", "aive", "main"), "42")
 
         assertEquals(GitHubWorkflowRunStatus.Failed, run.status)
         assertEquals("Run was cancelled", run.progressMessage)
@@ -241,7 +241,7 @@ class GitHubRestActionsClientTest {
             baseUrl = "https://api.github.test",
         )
 
-        val run = client.getRun(RepositoryRef("HereLiesAz", "haive", "main"), "42")
+        val run = client.getRun(RepositoryRef("HereLiesAz", "aive", "main"), "42")
 
         assertEquals(GitHubWorkflowRunStatus.Failed, run.status)
         assertEquals("Run timed out", run.progressMessage)

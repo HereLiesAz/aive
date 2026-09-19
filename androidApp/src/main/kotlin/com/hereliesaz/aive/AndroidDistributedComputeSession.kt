@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.app.ActivityManager
 import android.content.Context

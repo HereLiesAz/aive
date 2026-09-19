@@ -29,7 +29,7 @@ The workflow engine may prefer reuse but must behave identically when no cache e
 
 The currently exposed Jules REST activity/session model provides session continuity but does not document a first-class prompt-cache resource or exact cache-hit controls. The Jules adapter should therefore use only behavior that the API actually exposes and must not fabricate cache telemetry.
 
-For separate sessions, The Haive should still keep stable prompt structure deterministic so provider-side reuse remains possible without becoming a dependency.
+For separate sessions, The Aive should still keep stable prompt structure deterministic so provider-side reuse remains possible without becoming a dependency.
 
 ## Other providers
 
@@ -65,6 +65,6 @@ If an approved artifact changes, that is a new logical version and therefore a n
 
 ## Observability
 
-When a provider exposes cache metrics, The Haive may record operational values such as reusable input tokens, cache-hit tokens, cache writes, estimated cost difference, and latency impact.
+When a provider exposes cache metrics, The Aive may record operational values such as reusable input tokens, cache-hit tokens, cache writes, estimated cost difference, and latency impact.
 
 These metrics are diagnostic only. They must never change task correctness, approval state, or verification requirements.

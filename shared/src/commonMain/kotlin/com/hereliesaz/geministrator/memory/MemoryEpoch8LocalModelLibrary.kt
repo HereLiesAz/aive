@@ -8,7 +8,7 @@ import com.hereliesaz.geministrator.inference.LocalModelSpecialistDescriptor
 /** Reusable, cryptographically identified local-model catalog for the published Epoch-8 memory family. */
 object MemoryEpoch8LocalModelLibrary {
     const val RELEASE_TAG: String = "memory-layer-epoch8"
-    private const val RELEASE_REPOSITORY: String = "HereLiesAz/haive"
+    private const val RELEASE_REPOSITORY: String = "HereLiesAz/aive"
     private const val FOUNDATION_MODEL_ID: String = "Qwen/Qwen2.5-0.5B-Instruct"
 
     val sharedBaseFp16 = LocalModelArtifactDescriptor(

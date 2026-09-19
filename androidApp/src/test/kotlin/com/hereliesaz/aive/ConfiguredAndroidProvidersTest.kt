@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.RepositoryServiceCatalog

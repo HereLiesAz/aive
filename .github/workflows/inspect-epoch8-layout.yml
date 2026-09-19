@@ -22,10 +22,10 @@ jobs:
           mkdir -p /tmp/epoch8
           curl -fL --retry 3 \
             -o /tmp/epoch8/association.tar.gz \
-            https://github.com/HereLiesAz/haive/releases/download/memory-layer-epoch8/haive-specialist_08_association_linker-onnx-epoch8.tar.gz
+            https://github.com/HereLiesAz/aive/releases/download/memory-layer-epoch8/haive-specialist_08_association_linker-onnx-epoch8.tar.gz
           curl -fL --retry 3 \
             -o /tmp/epoch8/noun.tar.gz \
-            https://github.com/HereLiesAz/haive/releases/download/memory-layer-epoch8/haive-specialist_03_noun_indexer-int8-epoch8.tar.gz
+            https://github.com/HereLiesAz/aive/releases/download/memory-layer-epoch8/haive-specialist_03_noun_indexer-int8-epoch8.tar.gz
           sha256sum /tmp/epoch8/*.tar.gz
 
       - name: List and extract bundles

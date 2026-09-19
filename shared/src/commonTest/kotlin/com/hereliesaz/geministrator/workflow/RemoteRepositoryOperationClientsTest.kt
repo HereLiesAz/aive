@@ -116,7 +116,7 @@ class RemoteRepositoryOperationClientsTest {
             assertEquals("feature/repo-links", payload.getValue("head").jsonPrimitive.content)
             assertEquals("main", payload.getValue("base").jsonPrimitive.content)
             respondJson(
-                """{"number":23,"title":"Ship repository links","state":"open","html_url":"https://github.test/HereLiesAz/haive/pull/23"}""",
+                """{"number":23,"title":"Ship repository links","state":"open","html_url":"https://github.test/HereLiesAz/aive/pull/23"}""",
                 status = HttpStatusCode.Created,
             )
         }
@@ -136,7 +136,7 @@ class RemoteRepositoryOperationClientsTest {
         assertEquals("2026-03-10", request.headers["X-GitHub-Api-Version"])
         val artifact = run.artifacts.single()
         assertEquals(ArtifactKind.PullRequest, artifact.kind)
-        assertEquals("https://github.test/HereLiesAz/haive/pull/23", artifact.uri)
+        assertEquals("https://github.test/HereLiesAz/aive/pull/23", artifact.uri)
         assertEquals("23", artifact.metadata["reviewNumber"])
     }
 
@@ -159,10 +159,10 @@ class RemoteRepositoryOperationClientsTest {
         name = "GitHub",
         repository = RepositoryRef(
             owner = "HereLiesAz",
-            name = "haive",
+            name = "aive",
             defaultBranch = "main",
             source = RepositorySource.GitHub,
-            remoteUrl = "https://github.com/HereLiesAz/haive",
+            remoteUrl = "https://github.com/HereLiesAz/aive",
         ),
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,

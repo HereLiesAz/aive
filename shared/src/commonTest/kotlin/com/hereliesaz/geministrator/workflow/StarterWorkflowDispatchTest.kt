@@ -23,10 +23,10 @@ import kotlin.test.assertTrue
 class StarterWorkflowDispatchTest {
     @Test
     fun implementationDispatchCarriesRepositoryAndRequiresProviderPlanApproval() = runBlocking {
-        val repository = RepositoryRef("HereLiesAz", "haive", "main")
+        val repository = RepositoryRef("HereLiesAz", "aive", "main")
         val project = Project(
             id = ProjectId("project"),
-            name = "The Haive",
+            name = "The Aive",
             repository = repository,
             createdAtEpochMillis = 1L,
             updatedAtEpochMillis = 1L,

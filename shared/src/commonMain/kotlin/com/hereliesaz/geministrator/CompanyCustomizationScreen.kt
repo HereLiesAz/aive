@@ -97,7 +97,7 @@ internal fun CustomCompanyProviderScreen(
     ) {
         Text("COMPANY", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "These are Haive's semantic orchestration roles. Add, remove, reorder, rewrite, reroute, and redefine them as a collection. Deterministic system workers and repetitive programmatic executors remain fixed outside this roster.",
+            "These are Aive's semantic orchestration roles. Add, remove, reorder, rewrite, reroute, and redefine them as a collection. Deterministic system workers and repetitive programmatic executors remain fixed outside this roster.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -125,7 +125,7 @@ internal fun CustomCompanyProviderScreen(
 
         if (!resetConfirm) {
             AzphaltPill(
-                label = "Reset to Haive defaults",
+                label = "Reset to Aive defaults",
                 seed = "company-reset-enter",
                 onClick = { resetConfirm = true },
             )
@@ -134,7 +134,7 @@ internal fun CustomCompanyProviderScreen(
                 seed = "company-reset-confirmation",
                 eyebrow = "Reset",
                 title = "Restore the default company?",
-                body = "This restores Haive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.",
+                body = "This restores Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.",
                 endCap = "Confirm",
                 well = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

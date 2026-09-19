@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -28,8 +28,8 @@ internal fun AndroidGeminiProviderSetup(
         Text(
             when {
                 !installedAppDetected -> "The Gemini app was not detected. You can still connect Gemini with an API key."
-                accessibilityEnabled -> "The installed Gemini app is ready. Haive can open it in a bounded window and use it as the Gemini transport."
-                else -> "The Gemini app is installed. Enable The Haive · Gemini bridge in Android Accessibility settings to use the signed-in app without an API key."
+                accessibilityEnabled -> "The installed Gemini app is ready. Aive can open it in a bounded window and use it as the Gemini transport."
+                else -> "The Gemini app is installed. Enable The Aive · Gemini bridge in Android Accessibility settings to use the signed-in app without an API key."
             },
         )
         if (installedAppDetected) {

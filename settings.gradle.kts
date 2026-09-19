@@ -10,7 +10,7 @@ plugins {
 }
 
 // Kotlin/JS/Wasm package tasks cannot safely traverse the nested composite
-// Haive -> H2G2 -> Conveyance. Production web tasks therefore resolve the exact Maven-local
+// Aive -> H2G2 -> Conveyance. Production web tasks therefore resolve the exact Maven-local
 // publications prepared by CI. Android/Desktop and ordinary development keep compiling H2G2 source.
 val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
     task.startsWith(":webApp:") && (
@@ -45,7 +45,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "haive"
+rootProject.name = "aive"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 

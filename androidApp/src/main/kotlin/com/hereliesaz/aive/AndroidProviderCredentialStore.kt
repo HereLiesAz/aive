@@ -1,24 +1,25 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.hereliesaz.geministrator.ProviderCatalog
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-internal class AndroidDistributedComputeCredentialStore(context: Context) {
+internal class AndroidProviderCredentialStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
 
-    fun readToken(): String? {
-        val encrypted = preferences.getString(KEY_CIPHERTEXT, null) ?: return null
-        val iv = preferences.getString(KEY_IV, null) ?: return null
+    fun read(providerId: String): String? {
+        val encrypted = preferences.getString(ciphertextKey(providerId), null) ?: return null
+        val iv = preferences.getString(ivKey(providerId), null) ?: return null
         return runCatching {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
@@ -33,21 +34,36 @@ internal class AndroidDistributedComputeCredentialStore(context: Context) {
         }.getOrNull()
     }
 
-    fun writeToken(token: String) {
-        val clean = token.trim()
-        require(clean.isNotEmpty()) { "Relay token is required" }
+    fun readAll(): Map<String, String> = buildMap {
+        ProviderCatalog.entries.forEach { entry ->
+            read(entry.id)?.let { put(entry.id, it) }
+        }
+    }
+
+    fun write(providerId: String, apiKey: String) {
+        require(ProviderCatalog.entry(providerId) != null) { "Unknown provider $providerId" }
+        val clean = apiKey.trim()
+        require(clean.isNotEmpty()) { "API key is required" }
+
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
+
         preferences.edit()
-            .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+            .putString(ciphertextKey(providerId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
+            .putString(ivKey(providerId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
             .apply()
     }
 
-    fun clear() {
-        preferences.edit().remove(KEY_CIPHERTEXT).remove(KEY_IV).apply()
+    fun clear(providerId: String) {
+        preferences.edit()
+            .remove(ciphertextKey(providerId))
+            .remove(ivKey(providerId))
+            .apply()
     }
+
+    private fun ciphertextKey(providerId: String) = "$providerId.ciphertext"
+    private fun ivKey(providerId: String) = "$providerId.iv"
 
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -69,10 +85,8 @@ internal class AndroidDistributedComputeCredentialStore(context: Context) {
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "haive.distributed-compute.relay-token"
-        const val PREFERENCES_NAME = "haive.distributed-compute.credentials"
-        const val KEY_CIPHERTEXT = "relay-token.ciphertext"
-        const val KEY_IV = "relay-token.iv"
+        const val KEY_ALIAS = "haive.jules.api-key"
+        const val PREFERENCES_NAME = "haive.credentials"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128
     }

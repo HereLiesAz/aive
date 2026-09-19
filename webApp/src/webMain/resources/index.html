@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0D1026" />
-    <meta name="application-name" content="The Haive" />
-    <meta name="description" content="The Haive — governed workflow orchestration across people, agents, and automated executors." />
-    <title>The Haive</title>
+    <meta name="application-name" content="The Aive" />
+    <meta name="description" content="The Aive — governed workflow orchestration across people, agents, and automated executors." />
+    <title>The Aive</title>
     <link rel="icon" type="image/png" sizes="64x64" href="haive-icon-64.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="haive-icon-192.png" />
     <link rel="manifest" href="manifest.webmanifest" />
@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Haive">
+    <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Aive">
         <img id="haiveSplashFrame0" src="haive_loader_frame0.png" alt="" aria-hidden="true" />
         <img id="haiveSplashAnimation" src="haive_loader.gif" alt="" aria-hidden="true" />
     </div>
@@ -68,7 +68,7 @@
                 globalThis.__haiveStartupError = error ? `${message} ${error}` : message;
                 const splash = document.getElementById("haiveSplash");
                 if (splash) {
-                    splash.setAttribute("aria-label", "The Haive failed to start");
+                    splash.setAttribute("aria-label", "The Aive failed to start");
                     splash.dataset.startupError = globalThis.__haiveStartupError;
                 }
             };
@@ -140,7 +140,7 @@
                     globalThis.__haiveAppScriptLoaded = true;
                 })
                 .catch((error) => {
-                    failStartup("The Haive could not initialize the Rust node-creature renderer.", error);
+                    failStartup("The Aive could not initialize the Rust node-creature renderer.", error);
                 });
         })();
     </script>

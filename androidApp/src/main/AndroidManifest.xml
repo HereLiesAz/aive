@@ -11,14 +11,14 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="The Haive"
+        android:label="The Aive"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Haive">
 
         <meta-data
             android:name="android.content.APP_PRIVACY_POLICY"
-            android:value="https://hereliesaz.github.io/haive/privacy" />
+            android:value="https://hereliesaz.github.io/aive/privacy" />
 
         <activity
             android:name=".MainActivity"
@@ -49,7 +49,7 @@
         <service
             android:name=".InstalledGeminiAccessibilityService"
             android:exported="false"
-            android:label="The Haive · Gemini bridge"
+            android:label="The Aive · Gemini bridge"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
