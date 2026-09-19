@@ -21,6 +21,8 @@ interface RepositoryOperationClient {
 class RepositoryOperationExecutorIntegration(
     private val client: RepositoryOperationClient,
 ) : TaskExecutorIntegration {
+    override val retryDispatchFailures: Boolean = false
+
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.RepositoryOperation
 
     override fun supports(executor: TaskExecutor, project: Project): Boolean =
