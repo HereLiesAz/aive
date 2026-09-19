@@ -15,7 +15,7 @@ The engine is responsible for:
 - discrete cel-shade levels and silhouette extraction;
 - projected antenna-terminal anchors so graph edges physically plug socket-to-socket.
 
-The rendered look is intentionally a flat graphic reduction of actual animated 3D geometry: silhouettes and planes come from the model rather than being hand-faked as unrelated 2D mascots.
+The rendered look is intentionally a flat graphic reduction of actual animated 3D geometry: silhouettes and planes come from the model rather than being hand-faked as unrelated 2D mascots. The family resemblance to The Haive icon is mandatory: dark rounded body, vivid rim and antennae, compact radial proportions, and simple expressive ring-eye geometry.
 
 ## Runtime split
 
