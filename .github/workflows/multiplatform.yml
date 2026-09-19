@@ -20,9 +20,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: aive-${{ github.workflow }}-${{ github.ref }}
-  # Keep main/release runs serialized so a newer push cannot strand an immutable tag
-  # between tag creation and GitHub Release publication. Redundant PR runs may still cancel.
+  # Main and any Play-capable manual dispatch share one publishing lane so version codes,
+  # immutable release tags, and store uploads cannot race across refs.
+  group: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_play)) && 'aive-publishing' || format('aive-{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
