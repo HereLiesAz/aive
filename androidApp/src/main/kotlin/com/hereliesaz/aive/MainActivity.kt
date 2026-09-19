@@ -66,6 +66,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
+    private lateinit var updateCoordinator: AndroidUpdateCoordinator
     private val repositoryHttpClient by lazy { HttpClient(CIO) }
     private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
     private var installedGeminiReady by mutableStateOf(false)
@@ -91,6 +92,7 @@ class MainActivity : ComponentActivity() {
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
         val projectFileService = AndroidProjectFileService(this)
+        updateCoordinator = AndroidUpdateCoordinator(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
         val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
@@ -120,6 +122,9 @@ class MainActivity : ComponentActivity() {
                     memoryRuntime
                 }
                 startupReady = true
+            }
+            LaunchedEffect(Unit) {
+                updateCoordinator.checkForUpdates()
             }
 
             if (!splashFinished || !startupReady) {
@@ -298,6 +303,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+
+            if (splashFinished && startupReady) {
+                AndroidUpdatePrompt(
+                    state = updateCoordinator.state,
+                    onInstallGithubUpdate = updateCoordinator::installDownloadedUpdate,
+                    onOpenPlayStore = updateCoordinator::openPlayStore,
+                    onDismiss = updateCoordinator::dismiss,
+                )
+            }
         }
     }
 
@@ -309,6 +323,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (::updateCoordinator.isInitialized) {
+            updateCoordinator.onResume()
+        }
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
     }
