@@ -86,6 +86,13 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
             mutex.withLock { roleItems.remove(id) }
         }
 
+        override suspend fun replaceAll(roles: List<RoleDefinition>) {
+            mutex.withLock {
+                roleItems.clear()
+                roles.associateByTo(roleItems, RoleDefinition::id)
+            }
+        }
+
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = mutex.withLock { roleItems[id] }
         override suspend fun all(): List<RoleDefinition> = mutex.withLock { roleItems.values.toList() }
     }
