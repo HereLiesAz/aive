@@ -185,6 +185,8 @@ data class WorkflowRun(
     val taskRuns: Map<TaskDefinitionId, TaskRun>,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    /** Repository identity captured when this run was created, for accurate historical views. */
+    val repositorySnapshot: RepositoryRef? = null,
     val globalPause: WorkflowGlobalPause? = null,
 ) {
     init {
