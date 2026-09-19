@@ -167,7 +167,11 @@ private fun MemorySnapshot.recallFromSeeds(
             MemoryRecallHit(
                 node = node,
                 score = score.coerceIn(0f, 1f),
-                conflicts = if (query.includeConflicts) conflictsFor(node.id, nodesById) else emptyList(),
+                conflicts = if (query.includeConflicts) {
+                    conflictsFor(node.id, nodesById, activeIds)
+                } else {
+                    emptyList()
+                },
             )
         }
 
@@ -229,7 +233,6 @@ private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
     val evidenceBySource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<MemoryEdge>>>()
 
     fun add(from: MemoryNodeId, to: MemoryNodeId, edge: MemoryEdge) {
-        if (edge.weight <= 0f) return
         val byTarget = evidenceBySource.getOrPut(from) { linkedMapOf() }
         byTarget.getOrPut(to) { mutableListOf() } += edge
     }
@@ -241,8 +244,9 @@ private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
     }
 
     return evidenceBySource.mapValues { (_, byTarget) ->
-        byTarget.entries.map { (target, evidence) ->
-            Neighbor(target, accumulateAssociationEvidence(evidence))
+        byTarget.entries.mapNotNull { (target, evidence) ->
+            val strength = accumulateAssociationEvidence(evidence)
+            if (strength <= 0f) null else Neighbor(target, strength)
         }
     }
 }
@@ -393,13 +397,15 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
 private fun MemorySnapshot.conflictsFor(
     nodeId: MemoryNodeId,
     nodesById: Map<MemoryNodeId, MemoryNode>,
+    allowedNodeIds: Set<MemoryNodeId>? = null,
 ): List<MemoryNode> = edges
     .asSequence()
     .filter { edge ->
         edge.relation == MemoryRelationKind.ConflictsWith && (edge.from == nodeId || edge.to == nodeId)
     }
     .mapNotNull { edge ->
-        nodesById[if (edge.from == nodeId) edge.to else edge.from]
+        val otherId = if (edge.from == nodeId) edge.to else edge.from
+        if (allowedNodeIds != null && otherId !in allowedNodeIds) null else nodesById[otherId]
     }
     .distinctBy(MemoryNode::id)
     .toList()
@@ -412,6 +418,7 @@ private fun lexicalScore(query: String, node: MemoryNode): Float {
 
     val overlap = queryTerms.count { it in nodeTerms }.toFloat() / queryTerms.size
     val exactBonus = if (node.text.lowercase().contains(query.trim().lowercase())) 0.25f else 0f
+    if (overlap <= 0f && exactBonus <= 0f) return 0f
     val semanticWeight = (node.salience * 0.15f) + (node.confidence * 0.10f)
     return (overlap * 0.5f + exactBonus + semanticWeight).coerceIn(0f, 1f)
 }
