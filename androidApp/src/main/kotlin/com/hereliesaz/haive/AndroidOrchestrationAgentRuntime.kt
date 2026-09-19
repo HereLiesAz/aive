@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import ai.onnxruntime.OnnxJavaType
