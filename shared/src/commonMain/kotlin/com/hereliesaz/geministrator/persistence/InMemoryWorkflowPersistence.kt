@@ -43,6 +43,10 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
             mutex.withLock { definitionItems[definition.id] = definition }
         }
 
+        override suspend fun remove(id: WorkflowDefinitionId) {
+            mutex.withLock { definitionItems.remove(id) }
+        }
+
         override suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition? =
             mutex.withLock { definitionItems[id] }
 
@@ -76,6 +80,10 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
     override val roles: RoleRepository = object : RoleRepository {
         override suspend fun put(role: RoleDefinition) {
             mutex.withLock { roleItems[role.id] = role }
+        }
+
+        override suspend fun remove(id: RoleDefinitionId) {
+            mutex.withLock { roleItems.remove(id) }
         }
 
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = mutex.withLock { roleItems[id] }
