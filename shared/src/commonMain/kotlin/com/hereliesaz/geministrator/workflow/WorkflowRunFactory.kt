@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -22,6 +23,7 @@ object WorkflowRunFactory {
         workflowRunId: WorkflowRunId,
         projectId: ProjectId,
         objective: String,
+        repository: RepositoryRef? = null,
         nowEpochMillis: Long,
         taskRunIdFactory: (TaskDefinitionId) -> TaskRunId,
     ): WorkflowRun {
@@ -62,6 +64,7 @@ object WorkflowRunFactory {
             taskRuns = taskRuns,
             createdAtEpochMillis = nowEpochMillis,
             updatedAtEpochMillis = nowEpochMillis,
+            repositorySnapshot = repository,
         )
     }
 
