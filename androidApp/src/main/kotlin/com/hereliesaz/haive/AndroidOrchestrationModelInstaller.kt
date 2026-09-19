@@ -1,4 +1,4 @@
-package com.hereliesaz.haive
+package com.hereliesaz.aive
 
 import android.content.Context
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRole
