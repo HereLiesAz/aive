@@ -274,14 +274,8 @@ class AzphaltWorkflowPackageInstaller(
         }
 
         val previous = installStore.get(plan.packageId)
-        val previousDefinitions = plan.definitions.associate { definition ->
-            definition.id to persistence.definitions.get(definition.id)
-        }
-        val roleIdsTouched = buildSet {
-            if (plan.packageKind == "role") addAll(plan.roles.map(RoleDefinition::id))
-            if (previous?.kind == "workflow") addAll(previous.roles.map(RoleDefinition::id))
-        }
-        val previousRoles = roleIdsTouched.associateWith { persistence.roles.get(it) }
+        val catalogDefinitionsBefore = persistence.definitions.all()
+        val catalogRolesBefore = persistence.roles.all()
 
         try {
             if (plan.packageKind == "workflow") {
@@ -301,11 +295,22 @@ class AzphaltWorkflowPackageInstaller(
                 validateWorkflowLocalRoles(plan)
                 // Migrate packages installed by older builds: embedded workflow roles no longer
                 // belong in the user's global company roster.
-                previous?.takeIf { it.kind == "workflow" }?.roles.orEmpty().forEach { previousRole ->
-                    val existing = persistence.roles.get(previousRole.id)
-                    if (existing != null && sameReusableRole(existing, previousRole)) {
-                        persistence.roles.remove(previousRole.id)
+                val removableRoleIds = previous
+                    ?.takeIf { it.kind == "workflow" }
+                    ?.roles
+                    .orEmpty()
+                    .mapNotNull { previousRole ->
+                        val existing = persistence.roles.get(previousRole.id)
+                        previousRole.id.takeIf {
+                            existing != null && sameReusableRole(existing, previousRole)
+                        }
                     }
+                    .toSet()
+                if (removableRoleIds.isNotEmpty()) {
+                    persistence.replaceCatalog(
+                        definitions = persistence.definitions.all(),
+                        roles = persistence.roles.all().filterNot { it.id in removableRoleIds },
+                    )
                 }
             }
 
@@ -332,12 +337,10 @@ class AzphaltWorkflowPackageInstaller(
         } catch (failure: Throwable) {
             // Restore every mutable store touched by this install. A failed install must be
             // indistinguishable from one that never started, including upgrades.
-            previousDefinitions.forEach { (id, value) ->
-                if (value == null) persistence.definitions.remove(id) else persistence.definitions.put(value)
-            }
-            previousRoles.forEach { (id, value) ->
-                if (value == null) persistence.roles.remove(id) else persistence.roles.put(value)
-            }
+            persistence.replaceCatalog(
+                definitions = catalogDefinitionsBefore,
+                roles = catalogRolesBefore,
+            )
             if (previous == null) installStore.remove(plan.packageId) else installStore.put(previous)
             throw failure
         }
