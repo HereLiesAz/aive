@@ -48,7 +48,9 @@ internal fun TechnicalInspector(
     }
 
     val scope = rememberCoroutineScope()
-    var messageDraft by remember(selectedTaskId) { mutableStateOf("") }
+    var messageDraft by rememberDurableStringState(
+        key = "inspector.${liveWorkflow.run.id.value}.$selectedTaskId.message",
+    )
     var messageStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     var messageSending by remember(selectedTaskId) { mutableStateOf(false) }
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
