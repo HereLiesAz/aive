@@ -121,8 +121,13 @@ class WorkflowLibraryHost(
 
     suspend fun run(definition: WorkflowDefinition) {
         composition.validated(definition)
-        val neededRoleIds = definition.tasks.mapNotNullTo(linkedSetOf()) { task ->
-            task.roleId ?: (task.executor as? com.hereliesaz.geministrator.domain.TaskExecutor.RoleAgent)?.roleId
+        val neededRoleIds = buildSet {
+            definition.tasks.forEach { task ->
+                task.roleId?.let(::add)
+                (task.executor as? com.hereliesaz.geministrator.domain.TaskExecutor.RoleAgent)
+                    ?.roleId
+                    ?.let(::add)
+            }
         }
         val packageRoles = storeService?.installed().orEmpty()
             .asSequence()
