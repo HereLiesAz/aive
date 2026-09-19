@@ -216,6 +216,7 @@ class MainActivity : ComponentActivity() {
                         onCancel = { configuringRepositoryServiceId = null },
                     )
                     providerId == ProviderCatalog.GEMINI_ID && !configuringGeminiApiKey -> AndroidGeminiProviderSetup(
+                        installedBridgeSupported = InstalledGeminiPreference.isSupported,
                         installedAppDetected = InstalledGeminiTextGenerationApi.isGeminiInstalled(this),
                         accessibilityEnabled = InstalledGeminiTextGenerationApi.isAccessibilityServiceEnabled(this),
                         onUseInstalledGemini = {
