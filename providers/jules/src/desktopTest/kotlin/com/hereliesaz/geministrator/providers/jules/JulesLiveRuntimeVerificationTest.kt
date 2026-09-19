@@ -40,7 +40,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -105,7 +105,7 @@ class JulesLiveRuntimeVerificationTest {
         val releaseTaskId = TaskDefinitionId("release-approval")
 
         val (providerRunId, exportedProject) = try {
-            val awaitingApproval = awaitLive(firstRuntime) { live ->
+            val awaitingApproval = awaitLive(firstRuntime, "initial Jules plan approval") { live ->
                 live.presentation.run.taskRuns.getValue(julesTaskId).status == TaskRunStatus.AwaitingApproval
             }
             val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(julesTaskId)
@@ -137,7 +137,7 @@ class JulesLiveRuntimeVerificationTest {
         )
 
         try {
-            val resumed = awaitLive(resumedRuntime) { live ->
+            val resumed = awaitLive(resumedRuntime, "resumed Jules plan approval") { live ->
                 live.presentation.run.taskRuns.getValue(julesTaskId).status == TaskRunStatus.AwaitingApproval
             }
             assertEquals(
@@ -148,7 +148,7 @@ class JulesLiveRuntimeVerificationTest {
 
             resumedRuntime.approveTask(julesTaskId)
 
-            val escalated = awaitLive(resumedRuntime, timeoutMillis = 300_000L) { live ->
+            val escalated = awaitLive(resumedRuntime, "failure escalation") { live ->
                 live.presentation.run.taskRuns.getValue(failOnceTaskId).status == TaskRunStatus.Escalated
             }
             assertEquals(TaskRunStatus.Completed, escalated.presentation.run.taskRuns.getValue(julesTaskId).status)
@@ -160,7 +160,7 @@ class JulesLiveRuntimeVerificationTest {
                 note = "Live runtime verification: retry the deterministic failure",
             )
 
-            val releaseGate = awaitLive(resumedRuntime) { live ->
+            val releaseGate = awaitLive(resumedRuntime, "verification/review/release gate") { live ->
                 live.presentation.run.taskRuns.getValue(releaseTaskId).status == TaskRunStatus.AwaitingApproval
             }
             assertEquals(TaskRunStatus.Completed, releaseGate.presentation.run.taskRuns.getValue(failOnceTaskId).status)
@@ -173,7 +173,7 @@ class JulesLiveRuntimeVerificationTest {
 
             resumedRuntime.approveTask(releaseTaskId)
 
-            val completed = awaitLive(resumedRuntime) {
+            val completed = awaitLive(resumedRuntime, "terminal completion") {
                 it.presentation.run.status == WorkflowRunStatus.Completed
             }
             assertEquals(TaskRunStatus.Completed, completed.presentation.run.taskRuns.getValue(releaseTaskId).status)
@@ -191,7 +191,7 @@ class JulesLiveRuntimeVerificationTest {
             executorIntegrations = executorIntegrations,
         )
         try {
-            val restored = awaitLive(terminalRuntime) {
+            val restored = awaitLive(terminalRuntime, "terminal state restoration") {
                 it.presentation.run.status == WorkflowRunStatus.Completed
             }
             assertEquals(WorkflowRunStatus.Completed, restored.presentation.run.status)
@@ -273,15 +273,27 @@ class JulesLiveRuntimeVerificationTest {
 
     private suspend fun awaitLive(
         runtime: ApplicationRuntime,
-        timeoutMillis: Long = 120_000L,
+        label: String,
+        timeoutMillis: Long = 300_000L,
         predicate: (ApplicationRuntimeState.Live) -> Boolean,
-    ): ApplicationRuntimeState.Live = withTimeout(timeoutMillis) {
-        while (true) {
-            val live = runtime.state.value as? ApplicationRuntimeState.Live
-            if (live != null && predicate(live)) return@withTimeout live
-            delay(250L)
+    ): ApplicationRuntimeState.Live {
+        val result = withTimeoutOrNull(timeoutMillis) {
+            while (true) {
+                when (val state = runtime.state.value) {
+                    is ApplicationRuntimeState.Live -> if (predicate(state)) return@withTimeoutOrNull state
+                    is ApplicationRuntimeState.Disconnected ->
+                        error("$label failed because runtime disconnected: ${state.message}")
+                    is ApplicationRuntimeState.ResumeFailed ->
+                        error("$label failed during resume: ${state.message}")
+                    else -> Unit
+                }
+                delay(250L)
+            }
+            error("unreachable")
         }
-        error("unreachable")
+        return result ?: error(
+            "$label timed out after ${timeoutMillis}ms; last runtime state=${runtime.state.value}",
+        )
     }
 
     private class FailOnceVerificationIntegration : TaskExecutorIntegration {
