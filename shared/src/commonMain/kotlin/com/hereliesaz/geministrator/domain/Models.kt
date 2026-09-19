@@ -187,6 +187,8 @@ data class WorkflowRun(
     val updatedAtEpochMillis: Long,
     /** Repository identity captured when this run was created, for accurate historical views. */
     val repositorySnapshot: RepositoryRef? = null,
+    /** Exact role definitions used by this run, including package-local roles. */
+    val roleSnapshot: List<RoleDefinition> = emptyList(),
     val globalPause: WorkflowGlobalPause? = null,
 ) {
     init {
