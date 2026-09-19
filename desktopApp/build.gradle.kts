@@ -125,18 +125,17 @@ require(appVersionComponents.size == 4 && appVersionComponents.all { it.toIntOrN
 }
 // Native desktop package metadata stays at MAJOR.MINOR.PATCH because jpackage/MSI/DMG impose
 // stricter version syntax. Public release identity and asset names keep all four components.
-val appPackageVersion = appVersionComponents.take(3).joinToString(".")
-val nativePackageVersion = if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
-    // macOS jpackage requires the first app-version component to be greater than zero.
-    // Offset only the native macOS package major so Aive's public SemVer can remain pre-1.0.
-    val components = appPackageVersion.split('.').map { it.toInt() }
-    buildList {
-        add((components.first() + 1).toString())
-        addAll(components.drop(1).map(Int::toString))
-    }.joinToString(".")
-} else {
-    appPackageVersion
-}
+val appPackageVersionComponents = appVersionComponents.take(3).map { it.toInt() }
+val isMacPackage = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
+// Native installer versions have already shipped above the public 0.x line. Keep a permanent
+// compatibility epoch so upgrades remain monotonic after the historical 1.0-alpha -> 0.9 reset.
+// Windows/Linux use public major + 1; macOS uses public major + 2 because an earlier macOS build
+// already shipped with a 2.x package version.
+val nativeMajorOffset = if (isMacPackage) 2 else 1
+val nativePackageVersion = buildList {
+    add((appPackageVersionComponents.first() + nativeMajorOffset).toString())
+    addAll(appPackageVersionComponents.drop(1).map(Int::toString))
+}.joinToString(".")
 
 compose.desktop {
     application {
