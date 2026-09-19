@@ -249,14 +249,7 @@ fn add_logo_rim(mesh: &mut Mesh, genome: &CreatureGenome) {
     for segment in 1..=segments {
         let angle = TAU * segment as f32 / segments as f32;
         let next = Vec3::new(rx * angle.cos(), ry * angle.sin(), z);
-        add_tube(
-            mesh,
-            previous,
-            next,
-            radius,
-            6,
-            MaterialClass::Accent,
-        );
+        add_tube(mesh, previous, next, radius, 6, MaterialClass::Accent);
         previous = next;
     }
 }
