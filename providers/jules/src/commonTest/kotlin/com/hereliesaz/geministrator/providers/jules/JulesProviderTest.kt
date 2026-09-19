@@ -136,6 +136,10 @@ class JulesProviderTest {
             assertTrue(events.any { it is AgentEvent.Message && it.content == "Working on it" })
             assertTrue(events.any { it is AgentEvent.Progress && "Editing files" in it.message })
             assertTrue(
+                events.filterIsInstance<AgentEvent.Progress>().all { it.fraction == null },
+                "Jules textual progress must not invent a numeric completion fraction",
+            )
+            assertTrue(
                 events.any {
                     it is AgentEvent.ArtifactProduced &&
                         it.artifact.kind == ArtifactKind.CodeChange &&
