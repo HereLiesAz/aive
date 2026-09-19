@@ -125,17 +125,22 @@ require(appVersionComponents.size == 4 && appVersionComponents.all { it.toIntOrN
 }
 // Native desktop package metadata stays at MAJOR.MINOR.PATCH because jpackage/MSI/DMG impose
 // stricter version syntax. Public release identity and asset names keep all four components.
-val appPackageVersionComponents = appVersionComponents.take(3).map { it.toInt() }
+val appPackageVersionComponents = appVersionComponents.map { it.toInt() }
 val isMacPackage = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
 // Native installer versions have already shipped above the public 0.x line. Keep a permanent
-// compatibility epoch so upgrades remain monotonic after the historical 1.0-alpha -> 0.9 reset.
-// Windows/Linux use public major + 1; macOS uses public major + 2 because an earlier macOS build
-// already shipped with a 2.x package version.
+// compatibility epoch and use the CI BUILD number as the native patch component. GitHub's run
+// number is monotonic, so every rolling installer compares newer than the previous one even when
+// several builds share the same public MAJOR.MINOR.PATCH line.
 val nativeMajorOffset = if (isMacPackage) 2 else 1
-val nativePackageVersion = buildList {
-    add((appPackageVersionComponents.first() + nativeMajorOffset).toString())
-    addAll(appPackageVersionComponents.drop(1).map(Int::toString))
-}.joinToString(".")
+val nativeBuild = appPackageVersionComponents[3]
+require(nativeBuild in 0..65535) {
+    "Desktop native BUILD component must fit the installer patch range (0..65535)"
+}
+val nativePackageVersion = listOf(
+    (appPackageVersionComponents[0] + nativeMajorOffset).toString(),
+    appPackageVersionComponents[1].toString(),
+    nativeBuild.toString(),
+).joinToString(".")
 
 compose.desktop {
     application {
