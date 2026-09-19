@@ -77,13 +77,13 @@ Genealogy governance must never:
 - rewrite recalled content,
 - convert structural independence into an epistemic verdict.
 
-Conflicting memories continue to be handled by Haive's existing human-like architecture: preserve traces, associate them, surface them to conscious reasoning, reason about the discrepancy, and bank the resulting experience.
+Conflicting memories continue to be handled by The Aive's existing human-like architecture: preserve traces, associate them, surface them to conscious reasoning, reason about the discrepancy, and bank the resulting experience.
 
 ## Centralized MoA integration
 
 Centralized MoA is the primary consumer of this governance layer.
 
-The intended governed flow is:
+The implemented governed flow is:
 
 ```text
 objective
@@ -101,9 +101,9 @@ The governance layer itself never chooses which candidate is correct.
 
 ## Persistence status
 
-The current graph and latest governance reports are runtime-local.
+The production genealogy graph is durable. `SettingsInferenceGenealogyGraph` persists versioned structural ancestry through the same Settings-backed durability boundary used by the inference fabric, and `AgentProviderRegistry` wires that graph into the default governance runtime.
 
-Durable persistence and restoration remain required before genealogy can survive process restart and provide complete historical governance across resumed workflows. Persistence must preserve the same non-epistemic boundary; it stores derivation structure, not a truth database.
+Governance reports are derived evidence: they can be recomputed from the durable graph and task artifacts rather than becoming a second truth store. Persistence retains derivation structure only, never truth, confidence, contradiction resolution, or model conclusions.
 
 ## Current implementation
 
@@ -120,11 +120,11 @@ Implemented:
 - independent-consensus threshold evaluation
 - false-consensus detection
 - adversarial tests covering shared evidence, transitive ancestry, cycles, strict evidence requirements, independent candidates, and provider-runtime registration
+- durable genealogy persistence/restoration through `SettingsInferenceGenealogyGraph`
+- direct governance gates in centralized MoA aggregation and verification
 
 Not yet implemented:
 
-- durable genealogy persistence/restoration
-- direct governance gates in centralized MoA aggregation and verification
 - automatic escalation or candidate replacement based on governance findings
 - UI projection of genealogy reports
 - physical-device/on-runtime end-to-end validation

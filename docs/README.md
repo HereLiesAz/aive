@@ -23,11 +23,11 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 ### Compound inference
 
-[`architecture/COMPOUND_INFERENCE.md`](architecture/COMPOUND_INFERENCE.md) defines the forward compound-inference architecture: centralized mixture-of-agents as governed DAG subgraphs, genealogy-based governance, Blueprint-style inference infrastructure, the local specialist/LoRA model library, DSPy optimization, and the later ternary-model and Skeleton-of-Thought experiments. It preserves the existing human-like memory/reconsolidation authority boundary.
+[`architecture/COMPOUND_INFERENCE.md`](architecture/COMPOUND_INFERENCE.md) defines the forward compound-inference architecture: centralized mixture-of-agents as governed DAG subgraphs, genealogy-based governance, Blueprint-style inference infrastructure, the local specialist/LoRA model library, DSPy optimization, governed Skeleton-of-Thought execution, and later ternary-model experiments. It preserves the existing human-like memory/reconsolidation authority boundary.
 
 ### BITCOS ternary runtime
 
-[`architecture/BITCOS.md`](architecture/BITCOS.md) defines Haive's experimental BITCOS weight encoding, HBCS container, converter, native Rust decoder, Android/Desktop bridge, capability gating, and the remaining fused-kernel/model-family work.
+[`architecture/BITCOS.md`](architecture/BITCOS.md) defines The Aive's experimental BITCOS weight encoding, HBCS container, converter, native Rust decoder, Android/Desktop bridge, capability gating, and the remaining fused-kernel/model-family work.
 
 ### Memory banking and attention
 

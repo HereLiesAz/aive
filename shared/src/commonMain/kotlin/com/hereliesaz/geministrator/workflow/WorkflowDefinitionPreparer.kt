@@ -34,8 +34,12 @@ class WorkflowDefinitionPreparer(
             providerRegistry = providerRegistry,
             repository = repository,
         )
-        val withCompoundInference = CentralizedMixtureOfAgentsExpander.expand(
+        val withCentralizedInference = CentralizedMixtureOfAgentsExpander.expand(
             withSelectedInferenceTopology,
+            activeRoles,
+        )
+        val withCompoundInference = SkeletonOfThoughtExpander.expand(
+            withCentralizedInference,
             activeRoles,
         )
         val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }

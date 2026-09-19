@@ -43,7 +43,7 @@ class ApplicationRuntimeLaunchTest {
             val project = persistence.projects.get(live.presentation.run.projectId)
                 ?: error("Project was not persisted")
             assertEquals("The Aive", project.name)
-            assertEquals(RepositoryRef("HereLiesAz", "haive", "main"), project.repository)
+            assertEquals(RepositoryRef("HereLiesAz", "aive", "main"), project.repository)
             assertEquals(project, live.presentation.project)
             assertEquals("Ship one complete workflow", live.presentation.run.objective)
             assertEquals(
@@ -61,7 +61,7 @@ class ApplicationRuntimeLaunchTest {
     fun persistedStarterRunAndRepositoryResumeAfterRuntimeRecreation() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val firstScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val repository = RepositoryRef("HereLiesAz", "haive", "main")
+        val repository = RepositoryRef("HereLiesAz", "aive", "main")
         val firstRuntime = ApplicationRuntime.create(
             providers = emptyList(),
             scope = firstScope,
@@ -106,7 +106,7 @@ class ApplicationRuntimeLaunchTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val repository = parseRepositoryRef(
             source = RepositorySource.Local,
-            locator = "/workspace/haive",
+            locator = "/workspace/aive",
             defaultBranch = "main",
         )
 
@@ -118,7 +118,7 @@ class ApplicationRuntimeLaunchTest {
             )
 
             runtime.launchStarterWorkflow(
-                projectName = "Local Haive",
+                projectName = "Local Aive",
                 objective = "Inspect the local checkout",
                 repository = repository,
             )
@@ -126,7 +126,7 @@ class ApplicationRuntimeLaunchTest {
             val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
             assertEquals(repository, live.presentation.project.repository)
             assertEquals(RepositorySource.Local, live.presentation.project.repository?.source)
-            assertEquals("/workspace/haive", live.presentation.project.repository?.localPath)
+            assertEquals("/workspace/aive", live.presentation.project.repository?.localPath)
         } finally {
             scope.cancel()
         }

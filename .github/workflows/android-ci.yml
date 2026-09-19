@@ -5,7 +5,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ "**" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -99,7 +99,7 @@ jobs:
           exit "$EXIT_CODE"
 
       - name: Report Failure to Jules
-        if: failure() && steps.gradle-build.outcome == 'failure'
+        if: failure() && steps.gradle-build.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

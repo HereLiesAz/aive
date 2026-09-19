@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 enum class CompoundInferenceStrategy {
     Single,
     CentralizedMixtureOfAgents,
+    SkeletonOfThought,
     ParallelIndependent,
     SequentialPipeline,
     Escalate,

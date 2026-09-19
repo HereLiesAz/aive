@@ -20,7 +20,7 @@ All notable changes to **The Aive** are documented here from the current product
 ### Changed
 
 - Product renamed from Geministrator to **The Aive**.
-- Repository renamed to `haive`.
+- Repository renamed to `aive`.
 - Android application ID and namespace changed to `com.hereliesaz.aive`.
 - Progress is modeled as task-run execution data rather than agent-specific state.
 - `main` is the canonical product branch.

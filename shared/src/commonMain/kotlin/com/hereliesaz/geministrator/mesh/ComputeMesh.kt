@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.mesh
 import com.hereliesaz.geministrator.domain.ComputeAccelerator
 import com.hereliesaz.geministrator.domain.ComputePlacementPolicy
 import com.hereliesaz.geministrator.domain.ComputeRequirements
+import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
 
 @Serializable

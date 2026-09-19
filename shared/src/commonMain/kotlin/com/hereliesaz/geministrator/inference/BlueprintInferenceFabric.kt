@@ -315,9 +315,10 @@ interface CompoundInferenceFabric {
 /**
  * Blueprint-style runtime fabric shared by provider-backed inference inside one application runtime.
  *
- * The registries and streams are intentionally runtime-local in this first slice. Workflow state,
- * artifacts, memory and repositories remain authoritative in their existing stores. The fabric
- * indexes and coordinates them; it does not duplicate their payload ownership.
+ * The mutable registry implementations in this file are intentionally runtime-local. Production
+ * wiring uses the Settings-backed fabric for durable registry/stream state. Workflow state,
+ * artifacts, memory and repositories remain authoritative in their existing stores; the fabric
+ * indexes and coordinates them without duplicating payload ownership.
  */
 class BlueprintCompoundInferenceFabric(
     override val modelRegistry: InferenceModelRegistry = InMemoryInferenceModelRegistry(),

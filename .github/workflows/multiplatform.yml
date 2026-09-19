@@ -20,7 +20,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: haive-${{ github.workflow }}-${{ github.ref }}
+  group: aive-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -213,7 +213,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: haive-android-release
+          name: aive-android-release
           path: |
             androidApp/build/outputs/apk/release/*.apk
             androidApp/build/outputs/bundle/release/*.aab
@@ -223,7 +223,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: haive-release-notes
+          name: aive-release-notes
           path: fastlane/metadata/android/en-US/changelogs/
           if-no-files-found: error
 
@@ -247,17 +247,17 @@ jobs:
           - platform: linux
             runner: ubuntu-latest
             task: packageDeb
-            artifact: haive-desktop-linux
+            artifact: aive-desktop-linux
             path: desktopApp/build/compose/binaries/main/deb/*.deb
           - platform: windows
             runner: windows-latest
             task: packageMsi
-            artifact: haive-desktop-windows
+            artifact: aive-desktop-windows
             path: desktopApp/build/compose/binaries/main/msi/*.msi
           - platform: macos
             runner: macos-latest
             task: packageDmg
-            artifact: haive-desktop-macos
+            artifact: aive-desktop-macos
             path: desktopApp/build/compose/binaries/main/dmg/*.dmg
 
     steps:
@@ -364,31 +364,31 @@ jobs:
       - name: Download Android release inputs
         uses: actions/download-artifact@v8
         with:
-          name: haive-android-release
+          name: aive-android-release
           path: release-input/android
 
       - name: Download Linux installer
         uses: actions/download-artifact@v8
         with:
-          name: haive-desktop-linux
+          name: aive-desktop-linux
           path: release-input/linux
 
       - name: Download Windows installer
         uses: actions/download-artifact@v8
         with:
-          name: haive-desktop-windows
+          name: aive-desktop-windows
           path: release-input/windows
 
       - name: Download macOS installer
         uses: actions/download-artifact@v8
         with:
-          name: haive-desktop-macos
+          name: aive-desktop-macos
           path: release-input/macos
 
       - name: Download release notes
         uses: actions/download-artifact@v8
         with:
-          name: haive-release-notes
+          name: aive-release-notes
           path: release-input/notes
 
       - name: Prepare release assets
@@ -403,7 +403,7 @@ jobs:
           fi
 
           if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Haive versions must be plain numeric versions (for example 0.9.0 or 1.2.0); alpha/beta suffixes are not used"
+            echo "::error::Aive versions must be plain numeric versions (for example 0.9.0 or 1.2.0); alpha/beta suffixes are not used"
             exit 1
           fi
 
@@ -411,7 +411,7 @@ jobs:
           MINOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f2)
           MAJOR_MINOR="${MAJOR}.${MINOR}"
           TAG_NAME="latest-v${MAJOR_MINOR}"
-          RELEASE_TITLE="The Haive ${VERSION_NAME}"
+          RELEASE_TITLE="The Aive ${VERSION_NAME}"
 
           IS_PRERELEASE=false
           if [ "$MAJOR" -eq 0 ] || { [ "$MAJOR" -eq 1 ] && [ "$MINOR" -le 3 ]; }; then
@@ -439,14 +439,14 @@ jobs:
             fi
           done
 
-          cp "$APK_SOURCE" "release-files/TheHaive-${VERSION_NAME}-android.apk"
+          cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
           cp "$DEB_SOURCE" "release-files/$(basename "$DEB_SOURCE")"
           cp "$MSI_SOURCE" "release-files/$(basename "$MSI_SOURCE")"
           cp "$DMG_SOURCE" "release-files/$(basename "$DMG_SOURCE")"
 
           NOTES_SOURCE=$(find release-input/notes -type f -name 'default.txt' -print -quit)
           {
-            echo "# The Haive ${VERSION_NAME}"
+            echo "# The Aive ${VERSION_NAME}"
             echo
             echo "Rolling build from commit \`${GITHUB_SHA}\`."
             if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
@@ -485,7 +485,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa "$TAG_NAME" -m "Latest Haive ${VERSION_NAME}"
+          git tag -fa "$TAG_NAME" -m "Latest Aive ${VERSION_NAME}"
           git push origin "$TAG_NAME" --force
 
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
@@ -526,13 +526,13 @@ jobs:
       - name: Download Android release bundle
         uses: actions/download-artifact@v8
         with:
-          name: haive-android-release
+          name: aive-android-release
           path: android-release
 
       - name: Download release notes
         uses: actions/download-artifact@v8
         with:
-          name: haive-release-notes
+          name: aive-release-notes
           path: fastlane/metadata/android/en-US/changelogs
 
       - name: Publish to Google Play internal track

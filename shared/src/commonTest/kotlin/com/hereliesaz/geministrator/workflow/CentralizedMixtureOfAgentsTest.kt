@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunId
@@ -76,6 +77,58 @@ class CentralizedMixtureOfAgentsTest {
         )
         assertEquals(CompoundInferencePolicy.Single, byId.getValue(taskId).compoundInferencePolicy)
         assertEquals(CompoundInferencePolicy.Single, byId.getValue(verifier).compoundInferencePolicy)
+    }
+
+    @Test
+    fun conditionalMoaPreservesOriginalConditionAcrossInjectedStages() {
+        val triggerId = TaskDefinitionId("trigger")
+        val taskId = TaskDefinitionId("recover")
+        val condition = TaskCondition.OnFailure(triggerId)
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("conditional-moa"),
+            name = "Conditional MoA",
+            testDesignPolicy = TestDesignPolicy.None,
+            tasks = listOf(
+                TaskDefinition(
+                    id = triggerId,
+                    name = "Trigger",
+                    objective = "Attempt primary work",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                    executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
+                    environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                ),
+                TaskDefinition(
+                    id = taskId,
+                    name = "Recover",
+                    objective = "Reason about recovery",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                    executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
+                    dependsOn = setOf(triggerId),
+                    condition = condition,
+                    verificationPolicy = VerificationPolicy.Required(BuiltInRoles.QaEngineer.id),
+                    environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                    compoundInferencePolicy = CompoundInferencePolicy.CentralizedMixtureOfAgents(
+                        proposerRoleIds = listOf(BuiltInRoles.Researcher.id, BuiltInRoles.Architect.id),
+                        aggregatorRoleId = BuiltInRoles.ImplementationEngineer.id,
+                    ),
+                ),
+            ),
+        )
+
+        val expanded = CentralizedMixtureOfAgentsExpander.expand(definition, BuiltInRoles.all)
+        val byId = expanded.tasks.associateBy(TaskDefinition::id)
+        val generatedIds = listOf(
+            TaskDefinitionId("recover--moa-proposer-1"),
+            TaskDefinitionId("recover--moa-proposer-2"),
+            TaskDefinitionId("recover--moa-governance"),
+            taskId,
+            TaskDefinitionId("recover--moa-verifier"),
+        )
+
+        generatedIds.forEach { id ->
+            assertEquals(condition, byId.getValue(id).condition)
+            assertTrue(triggerId in byId.getValue(id).dependsOn)
+        }
     }
 
     @Test
