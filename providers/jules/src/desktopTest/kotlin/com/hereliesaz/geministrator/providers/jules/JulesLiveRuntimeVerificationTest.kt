@@ -100,6 +100,7 @@ class JulesLiveRuntimeVerificationTest {
         val julesTaskId = TaskDefinitionId("jules-live")
         val failOnceTaskId = TaskDefinitionId("fail-once")
         val verificationTaskId = TaskDefinitionId("verification")
+        val reviewTaskId = TaskDefinitionId("review")
         val releaseTaskId = TaskDefinitionId("release-approval")
 
         val providerRunId = try {
@@ -156,6 +157,9 @@ class JulesLiveRuntimeVerificationTest {
             val verificationRun = releaseGate.presentation.run.taskRuns.getValue(verificationTaskId)
             assertEquals(TaskRunStatus.Completed, verificationRun.status)
             assertTrue(verificationRun.artifacts.any { it.kind == ArtifactKind.Verification })
+            val reviewRun = releaseGate.presentation.run.taskRuns.getValue(reviewTaskId)
+            assertEquals(TaskRunStatus.Completed, reviewRun.status)
+            assertTrue(reviewRun.artifacts.any { it.kind == ArtifactKind.Review })
 
             resumedRuntime.approveTask(releaseTaskId)
 
@@ -199,6 +203,7 @@ class JulesLiveRuntimeVerificationTest {
         val jules = TaskDefinitionId("jules-live")
         val failOnce = TaskDefinitionId("fail-once")
         val verification = TaskDefinitionId("verification")
+        val review = TaskDefinitionId("review")
         val release = TaskDefinitionId("release-approval")
         return WorkflowDefinition(
             id = WorkflowDefinitionId("live-runtime-verification-definition"),
@@ -236,12 +241,21 @@ class JulesLiveRuntimeVerificationTest {
                     requiredArtifacts = setOf(ArtifactKind.Verification),
                 ),
                 TaskDefinition(
+                    id = review,
+                    name = "Review verified evidence",
+                    objective = "Produce explicit review evidence before terminal approval.",
+                    roleId = null,
+                    executor = TaskExecutor.ExternalService("runtime-verifier", "review"),
+                    dependsOn = setOf(verification),
+                    requiredArtifacts = setOf(ArtifactKind.Review),
+                ),
+                TaskDefinition(
                     id = release,
                     name = "Terminal approval",
-                    objective = "Approve the verified terminal outcome.",
+                    objective = "Approve the verified and reviewed terminal outcome.",
                     roleId = null,
                     executor = TaskExecutor.HumanApproval("Approve live runtime verification"),
-                    dependsOn = setOf(verification),
+                    dependsOn = setOf(review),
                 ),
             ),
         )
@@ -308,6 +322,22 @@ class JulesLiveRuntimeVerificationTest {
                     ),
                     progress = 1f,
                     progressMessage = "Runtime lifecycle verified",
+                )
+                "review" -> TaskExecutorExecution(
+                    status = TaskRunStatus.Completed,
+                    artifacts = listOf(
+                        ArtifactRef(
+                            id = ArtifactId("${context.taskRun.id.value}:review:${context.taskRun.attempt}"),
+                            kind = ArtifactKind.Review,
+                            taskRunId = context.taskRun.id,
+                            label = "Live runtime review",
+                            textContent = "Reviewed the durable verification evidence and found the acceptance path complete.",
+                            mediaType = "text/plain",
+                            createdAtEpochMillis = context.nowEpochMillis,
+                        ),
+                    ),
+                    progress = 1f,
+                    progressMessage = "Verification evidence reviewed",
                 )
                 else -> error("Unexpected runtime-verifier task ${context.task.id.value}")
             }
