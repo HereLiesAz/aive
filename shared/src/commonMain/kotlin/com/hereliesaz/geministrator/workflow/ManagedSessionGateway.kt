@@ -69,6 +69,14 @@ interface ManagedSessionGateway {
         initialStatus: ManagedSessionStatus,
     ) = Unit
 
+    suspend fun reconnect(
+        handle: ManagedSessionHandle,
+        initialStatus: ManagedSessionStatus,
+        request: AgentTaskRequest,
+    ) {
+        reconnect(handle, initialStatus)
+    }
+
     suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus
 
     suspend fun progress(handle: ManagedSessionHandle): ManagedSessionProgress? = null
