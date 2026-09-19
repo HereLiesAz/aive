@@ -468,9 +468,7 @@ class ApplicationRuntime private constructor(
     suspend fun importProjectFile(encoded: String): Project {
         val settingsPersistence = persistence as? SettingsWorkflowPersistence
             ?: error(".ive project import requires durable Settings persistence")
-        val project = settingsPersistence.importProjectFile(encoded)
-        openProject(project.id)
-        return project
+        return settingsPersistence.importProjectFile(encoded)
     }
 
     suspend fun openProject(projectId: ProjectId) {
