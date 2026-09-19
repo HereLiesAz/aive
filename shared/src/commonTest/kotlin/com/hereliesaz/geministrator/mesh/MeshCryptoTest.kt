@@ -34,5 +34,6 @@ class MeshCryptoTest {
                 cipher.open(sealed, "wrong-route".encodeToByteArray())
             }
         }
+        Unit
     }
 }

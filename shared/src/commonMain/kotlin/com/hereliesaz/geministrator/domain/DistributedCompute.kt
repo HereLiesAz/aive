@@ -3,13 +3,6 @@ package com.hereliesaz.geministrator.domain
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class ComputeAccelerator {
-    Cpu,
-    Gpu,
-    Npu,
-}
-
-@Serializable
 enum class ComputePlatform {
     Android,
     Desktop,
