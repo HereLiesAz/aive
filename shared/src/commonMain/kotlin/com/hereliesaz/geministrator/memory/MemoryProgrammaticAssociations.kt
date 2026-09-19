@@ -74,7 +74,14 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             second = left
         }
         val evidenceSuffix = evidenceKey?.let { ":evidence:$it" }.orEmpty()
-        val edgeId = MemoryEdgeId("programmatic:$basis$evidenceSuffix:${first.id.value}|${second.id.value}")
+        val versionSuffix = if (extraMetadata["evidencePolicy"] == "latest") {
+            ":version:${weight.toRawBits()}"
+        } else {
+            ""
+        }
+        val edgeId = MemoryEdgeId(
+            "programmatic:$basis$evidenceSuffix$versionSuffix:${first.id.value}|${second.id.value}",
+        )
         if (edgeId in existingIds || edgeId in candidates) return
         candidates[edgeId] = MemoryEdge(
             id = edgeId,
@@ -182,6 +189,8 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
                     "supportSourceId" to overlap.sourceId.value,
                     "supportCount" to overlap.supportCount.toString(),
                     "combinedStrength" to overlap.combinedStrength.toString(),
+                    "evidenceFamily" to "condensation-overlap:${overlap.sourceId.value}",
+                    "evidencePolicy" to "latest",
                 ),
             )
         }
