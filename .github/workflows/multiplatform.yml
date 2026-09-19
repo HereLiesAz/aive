@@ -229,6 +229,10 @@ jobs:
             echo "::error::Play manifest contains the installed-Gemini accessibility bridge"
             exit 1
           fi
+          if printf '%s\n' "$MATCHES" | xargs grep -IlE 'REQUEST_INSTALL_PACKAGES|androidx\.core\.content\.FileProvider|\.updates' | grep -q .; then
+            echo "::error::Play manifest contains GitHub self-update/sideload components"
+            exit 1
+          fi
 
       - name: Verify GitHub build keeps accessibility bridge
         shell: bash
@@ -246,6 +250,14 @@ jobs:
           fi
           if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'InstalledGeminiAccessibilityService' | grep -q .; then
             echo "::error::GitHub manifest is missing the installed-Gemini accessibility bridge"
+            exit 1
+          fi
+          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'REQUEST_INSTALL_PACKAGES' | grep -q .; then
+            echo "::error::GitHub manifest is missing package-install permission for self-update"
+            exit 1
+          fi
+          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'androidx.core.content.FileProvider' | grep -q .; then
+            echo "::error::GitHub manifest is missing update FileProvider"
             exit 1
           fi
 

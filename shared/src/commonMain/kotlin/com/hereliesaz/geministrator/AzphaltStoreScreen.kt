@@ -45,8 +45,9 @@ internal fun AzphaltStoreScreen(
     val workflowLibraryHost = LocalWorkflowLibraryHost.current
     var snapshot by remember(service) { mutableStateOf<AzphaltStoreSnapshot?>(null) }
     var packages by remember(service) { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var selectedPackageId by remember { mutableStateOf<String?>(null) }
+    var query by rememberDurableStringState("azphalt-store.query")
+    var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
+    val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
@@ -90,7 +91,7 @@ internal fun AzphaltStoreScreen(
         try {
             val plan = service.prepareLocalInstall(request.bytes)
             prepared = plan
-            selectedPackageId = plan.detail.id
+            selectedPackageIdValue = plan.detail.id
             approvedPermissions = service.installed()
                 .firstOrNull { it.packageId == plan.detail.id }
                 ?.approvedHostPermissions
@@ -190,7 +191,7 @@ internal fun AzphaltStoreScreen(
                 },
                 selected = selected,
                 onClick = {
-                    selectedPackageId = if (selected) null else item.id
+                    selectedPackageIdValue = if (selected) "" else item.id
                     prepared = prepared?.takeIf { it.detail.id == item.id }
                     error = null
                     status = null
@@ -261,7 +262,7 @@ internal fun AzphaltStoreScreen(
                         runCatching { service.prepareInstall(dependencyId, version) }
                             .onSuccess { dependencyPlan ->
                                 prepared = dependencyPlan
-                                selectedPackageId = dependencyPlan.detail.id
+                                selectedPackageIdValue = dependencyPlan.detail.id
                                 approvedPermissions = snapshot?.installed
                                     .orEmpty()
                                     .firstOrNull { it.packageId == dependencyPlan.detail.id }

@@ -39,14 +39,16 @@ internal class AndroidDistributedComputeCredentialStore(context: Context) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
-        preferences.edit()
-            .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .apply()
+        check(
+            preferences.edit()
+                .putString(KEY_CIPHERTEXT, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(KEY_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .commit(),
+        ) { "Could not persist relay token" }
     }
 
     fun clear() {
-        preferences.edit().remove(KEY_CIPHERTEXT).remove(KEY_IV).apply()
+        preferences.edit().remove(KEY_CIPHERTEXT).remove(KEY_IV).commit()
     }
 
     private fun getOrCreateKey(): SecretKey {

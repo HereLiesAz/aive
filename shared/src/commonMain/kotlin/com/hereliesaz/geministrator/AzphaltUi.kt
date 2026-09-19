@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.russhwolf.settings.Settings
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,12 +69,20 @@ internal object Azphalt {
         Ground("Pink", Color(0xFFD4728F), Color(0xFFDD879F), Color(0xFFC15D7A)),
     )
 
-    var currentGround: Ground by mutableStateOf(grounds.first())
+    private val settings = Settings()
+    private const val GROUND_STORAGE_KEY = "aive.appearance.ground.v1"
+
+    var currentGround: Ground by mutableStateOf(
+        settings.getStringOrNull(GROUND_STORAGE_KEY)
+            ?.let { saved -> grounds.firstOrNull { it.name == saved } }
+            ?: grounds.first(),
+    )
         private set
 
     fun rerollGround() {
         val currentIndex = grounds.indexOf(currentGround)
         currentGround = grounds[(currentIndex + 1) % grounds.size]
+        settings.putString(GROUND_STORAGE_KEY, currentGround.name)
     }
 
     fun hueIndex(seed: String): Int = seed.hashCode().mod(hues.size)

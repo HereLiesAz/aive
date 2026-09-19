@@ -294,4 +294,73 @@ class SettingsWorkflowPersistenceTest {
         assertTrue(restored.events.forRun(runId).isEmpty())
         assertTrue(settings.keys.none { it.startsWith("${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.") })
     }
+
+    @Test
+    fun iveProjectRoundTripPreservesProjectStateWithoutReplacingOtherProjects() = runBlocking {
+        val source = SettingsWorkflowPersistence(MapSettings())
+        val project = Project(
+            id = ProjectId("portable-project"),
+            name = "Portable Project",
+            createdAtEpochMillis = 10L,
+            updatedAtEpochMillis = 20L,
+        )
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("portable-workflow"),
+            name = "Portable Workflow",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("portable-task"),
+                    name = "Portable Task",
+                    objective = "Survive export and import",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("portable-run"),
+            projectId = project.id,
+            objective = "Portable objective",
+            nowEpochMillis = 30L,
+            taskRunIdFactory = { TaskRunId("portable-task-run") },
+        )
+        source.projects.put(project)
+        source.definitions.put(definition)
+        source.runs.put(run)
+        source.roles.put(BuiltInRoles.ImplementationEngineer)
+        source.events.append(
+            TaskStarted(
+                workflowRunId = run.id,
+                taskDefinitionId = TaskDefinitionId("portable-task"),
+                attempt = 1,
+                occurredAtEpochMillis = 31L,
+            ),
+        )
+
+        val encoded = source.exportProjectFile(project.id, savedAtEpochMillis = 40L)
+        assertTrue(encoded.contains("\"format\":\"the-aive-project\""))
+
+        val destination = SettingsWorkflowPersistence(MapSettings())
+        val existingProject = Project(
+            id = ProjectId("existing-project"),
+            name = "Existing Project",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 2L,
+        )
+        destination.projects.put(existingProject)
+
+        val imported = destination.importProjectFile(encoded)
+
+        assertEquals(project, imported)
+        assertEquals(project, destination.projects.get(project.id))
+        assertEquals(existingProject, destination.projects.get(existingProject.id))
+        assertEquals(definition, destination.definitions.get(definition.id))
+        assertEquals(run, destination.runs.get(run.id))
+        assertEquals(1, destination.events.forRun(run.id).size)
+        assertEquals(
+            BuiltInRoles.ImplementationEngineer,
+            destination.roles.get(BuiltInRoles.ImplementationEngineer.id),
+        )
+    }
+
 }

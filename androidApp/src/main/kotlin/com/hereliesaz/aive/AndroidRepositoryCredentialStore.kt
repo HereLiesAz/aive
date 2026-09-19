@@ -49,17 +49,19 @@ internal class AndroidRepositoryCredentialStore(context: Context) {
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
 
-        preferences.edit()
-            .putString(ciphertextKey(serviceId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(ivKey(serviceId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .apply()
+        check(
+            preferences.edit()
+                .putString(ciphertextKey(serviceId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(ivKey(serviceId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .commit(),
+        ) { "Could not persist repository credential" }
     }
 
     fun clear(serviceId: String) {
         preferences.edit()
             .remove(ciphertextKey(serviceId))
             .remove(ivKey(serviceId))
-            .apply()
+            .commit()
     }
 
     private fun ciphertextKey(serviceId: String) = "$serviceId.ciphertext"

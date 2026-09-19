@@ -147,12 +147,128 @@ class SettingsWorkflowPersistence(
     }
 
     suspend fun exportJson(): String = settingsWorkflowPersistenceMutex.withLock {
-        val snapshot = readUnlocked()
-        val journaledEvents = snapshot.runs.flatMap { run ->
-            readJournalEventsUnlocked(run.id)
+        json.encodeToString(PersistenceSnapshot.serializer(), fullSnapshotUnlocked())
+    }
+
+    suspend fun exportProjectFile(projectId: ProjectId, savedAtEpochMillis: Long): String =
+        settingsWorkflowPersistenceMutex.withLock {
+            val full = fullSnapshotUnlocked()
+            val project = requireNotNull(full.projects.firstOrNull { it.id == projectId }) {
+                "Project ${projectId.value} was not found"
+            }
+            val projectRuns = full.runs.filter { it.projectId == projectId }
+            val runIds = projectRuns.mapTo(linkedSetOf()) { it.id }
+
+            val definitionsById = full.definitions.associateBy { it.id }
+            val definitionIds = projectRuns.mapTo(linkedSetOf()) { it.workflowDefinitionId }
+            var expanded = true
+            while (expanded) {
+                expanded = false
+                definitionIds.toList().forEach { definitionId ->
+                    val definition = definitionsById[definitionId] ?: return@forEach
+                    definition.tasks.forEach { task ->
+                        val nestedId = task.executor?.nestedWorkflowDefinitionId()
+                        if (nestedId != null && definitionIds.add(nestedId)) {
+                            expanded = true
+                        }
+                    }
+                }
+            }
+
+            val taskRunIds = projectRuns
+                .flatMap { it.taskRuns.values }
+                .mapTo(linkedSetOf()) { it.id }
+
+            val projectSnapshot = PersistenceSnapshot(
+                version = CURRENT_SCHEMA_VERSION,
+                projects = listOf(project),
+                definitions = full.definitions.filter { it.id in definitionIds },
+                runs = projectRuns,
+                events = full.events.filter { it.workflowRunId in runIds },
+                // Role definitions are small and are part of the semantics of saved workflows.
+                // Include the whole active/custom role catalog so a project remains executable.
+                roles = full.roles,
+                artifacts = full.artifacts.filter { it.taskRunId in taskRunIds },
+                approvalGates = full.approvalGates.filter { it.workflowRunId in runIds },
+            )
+            json.encodeToString(
+                IveProjectDocument.serializer(),
+                IveProjectDocument(
+                    projectId = project.id.value,
+                    projectName = project.name,
+                    savedAtEpochMillis = savedAtEpochMillis,
+                    snapshotJson = json.encodeToString(PersistenceSnapshot.serializer(), projectSnapshot),
+                ),
+            )
         }
-        val full = snapshot.copy(events = (snapshot.events + journaledEvents).sortedBy { it.occurredAtEpochMillis })
-        json.encodeToString(PersistenceSnapshot.serializer(), full)
+
+    suspend fun importProjectFile(encoded: String): Project {
+        val document = try {
+            json.decodeFromString(IveProjectDocument.serializer(), encoded)
+        } catch (failure: Exception) {
+            throw PersistenceCorruptionException("Project file could not be parsed: ${failure.message}", failure)
+        }
+        require(document.format == IVE_PROJECT_FORMAT) {
+            "Not a The Aive project file (format=${document.format})"
+        }
+        require(document.version <= IVE_PROJECT_VERSION) {
+            "Project file version ${document.version} is not supported (max $IVE_PROJECT_VERSION)"
+        }
+
+        val decoded = try {
+            json.decodeFromString(PersistenceSnapshot.serializer(), document.snapshotJson)
+        } catch (failure: Exception) {
+            throw PersistenceCorruptionException("Project snapshot could not be parsed: ${failure.message}", failure)
+        }
+        require(decoded.version <= CURRENT_SCHEMA_VERSION) {
+            "Project snapshot schema ${decoded.version} is not supported (max $CURRENT_SCHEMA_VERSION)"
+        }
+        val imported = migrate(decoded).copy(version = CURRENT_SCHEMA_VERSION)
+        val project = requireNotNull(imported.projects.singleOrNull()) {
+            "A .ive project file must contain exactly one project"
+        }
+        require(project.id.value == document.projectId) {
+            "Project file metadata does not match the embedded project"
+        }
+
+        settingsWorkflowPersistenceMutex.withLock {
+            val current = readUnlocked()
+            val importedRunIds = imported.runs.mapTo(linkedSetOf()) { it.id }
+            val importedTaskRunIds = imported.runs
+                .flatMap { it.taskRuns.values }
+                .mapTo(linkedSetOf()) { it.id }
+
+            // Imported runs replace their own journal so repeated loads are idempotent.
+            importedRunIds.forEach { runId ->
+                val prefix = eventRunPrefix(runId)
+                settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
+            }
+
+            val merged = current.copy(
+                version = CURRENT_SCHEMA_VERSION,
+                projects = imported.projects.fold(current.projects) { values, value ->
+                    values.upsert(value) { it.id == value.id }
+                },
+                definitions = imported.definitions.fold(current.definitions) { values, value ->
+                    values.upsert(value) { it.id == value.id }
+                },
+                runs = imported.runs.fold(current.runs) { values, value ->
+                    values.upsert(value) { it.id == value.id }
+                },
+                events = current.events.filterNot { it.workflowRunId in importedRunIds } + imported.events,
+                roles = imported.roles.fold(current.roles) { values, value ->
+                    values.upsert(value) { it.id == value.id }
+                },
+                artifacts = current.artifacts.filterNot { it.taskRunId in importedTaskRunIds } + imported.artifacts,
+                approvalGates = current.approvalGates.filterNot { it.workflowRunId in importedRunIds } +
+                    imported.approvalGates,
+            )
+            settings.putString(
+                storageKey,
+                json.encodeToString(PersistenceSnapshot.serializer(), merged),
+            )
+        }
+        return project
     }
 
     suspend fun importJson(encoded: String) {
@@ -189,6 +305,18 @@ class SettingsWorkflowPersistence(
     suspend fun snapshotVersion(): Int = read().version
 
     private suspend fun read(): PersistenceSnapshot = settingsWorkflowPersistenceMutex.withLock { readUnlocked() }
+
+    private fun fullSnapshotUnlocked(): PersistenceSnapshot {
+        val snapshot = readUnlocked()
+        val journaledEvents = snapshot.runs.flatMap { run ->
+            readJournalEventsUnlocked(run.id)
+        }
+        return snapshot.copy(
+            events = (snapshot.events + journaledEvents)
+                .distinctBy { event -> event.workflowRunId to event }
+                .sortedBy { it.occurredAtEpochMillis },
+        )
+    }
 
     private suspend fun update(transform: (PersistenceSnapshot) -> PersistenceSnapshot) {
         settingsWorkflowPersistenceMutex.withLock {
@@ -380,6 +508,8 @@ class SettingsWorkflowPersistence(
         const val CURRENT_SCHEMA_VERSION: Int = 3
         const val DEFAULT_STORAGE_KEY: String = "geministrator.workflow.persistence.v2"
         internal const val LEGACY_STORAGE_KEY_V1: String = "geministrator.workflow.persistence.v1"
+        const val IVE_PROJECT_FORMAT: String = "the-aive-project"
+        const val IVE_PROJECT_VERSION: Int = 1
 
         val defaultJson: Json = Json {
             encodeDefaults = true
@@ -403,6 +533,22 @@ private data class PersistenceSnapshot(
     val artifacts: List<ArtifactRef> = emptyList(),
     val approvalGates: List<ApprovalGate> = emptyList(),
 )
+
+@Serializable
+private data class IveProjectDocument(
+    val format: String = SettingsWorkflowPersistence.IVE_PROJECT_FORMAT,
+    val version: Int = SettingsWorkflowPersistence.IVE_PROJECT_VERSION,
+    val projectId: String,
+    val projectName: String,
+    val savedAtEpochMillis: Long,
+    val snapshotJson: String,
+)
+
+private fun TaskExecutor.nestedWorkflowDefinitionId(): WorkflowDefinitionId? = when (this) {
+    is TaskExecutor.NestedWorkflow -> workflowDefinitionId
+    is TaskExecutor.Distributed -> delegate.nestedWorkflowDefinitionId()
+    else -> null
+}
 
 private inline fun <T> List<T>.upsert(value: T, matches: (T) -> Boolean): List<T> {
     val index = indexOfFirst(matches)

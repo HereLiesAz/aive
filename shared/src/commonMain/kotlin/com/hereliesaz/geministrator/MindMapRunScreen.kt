@@ -51,30 +51,47 @@ internal fun MindMapRunScreen(
     compact: Boolean,
     runtimeState: ApplicationRuntimeState,
 ) {
-    var branchIsolation by remember { mutableStateOf(false) }
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val activityEntrance = remember { AzphaltEntrance.childBand() }
-    val existingRepository = (runtimeState as? ApplicationRuntimeState.NoRun)?.project?.repository
+    val noRunProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
+    val existingRepository = noRunProject?.repository
+    val draftScope = noRunProject?.id?.value ?: "new-project"
+    var branchIsolation by rememberDurableBooleanState(
+        key = "overview.$draftScope.branch-isolation",
+        initialValue = false,
+    )
     val selectableRepositorySources = remember(availableRepositorySources, existingRepository?.source) {
         (availableRepositorySources + listOfNotNull(existingRepository?.source))
             .ifEmpty { setOf(RepositorySource.GitHub, RepositorySource.GitLab) }
             .sortedBy { it.ordinal }
     }
-    var projectName by remember(runtimeState) {
-        mutableStateOf((runtimeState as? ApplicationRuntimeState.NoRun)?.project?.name.orEmpty())
-    }
-    var repositorySource by remember(runtimeState) {
-        mutableStateOf(existingRepository?.source ?: selectableRepositorySources.first())
-    }
-    var repositoryLocator by remember(runtimeState) {
-        mutableStateOf(existingRepository?.locatorInput().orEmpty())
-    }
-    var defaultBranch by remember(runtimeState) { mutableStateOf(existingRepository?.defaultBranch.orEmpty()) }
+    var projectName by rememberDurableStringState(
+        key = "overview.$draftScope.project-name",
+        initialValue = noRunProject?.name.orEmpty(),
+    )
+    var repositorySourceName by rememberDurableStringState(
+        key = "overview.$draftScope.repository-source",
+        initialValue = (existingRepository?.source ?: selectableRepositorySources.first()).name,
+    )
+    val repositorySource = selectableRepositorySources
+        .firstOrNull { it.name == repositorySourceName }
+        ?: selectableRepositorySources.first()
+    var repositoryLocator by rememberDurableStringState(
+        key = "overview.$draftScope.repository-locator",
+        initialValue = existingRepository?.locatorInput().orEmpty(),
+    )
+    var defaultBranch by rememberDurableStringState(
+        key = "overview.$draftScope.default-branch",
+        initialValue = existingRepository?.defaultBranch.orEmpty(),
+    )
     var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySearchError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySuggestions by remember(runtimeState) { mutableStateOf<List<RepositorySuggestion>>(emptyList()) }
     var repositoryMenuExpanded by remember(runtimeState) { mutableStateOf(false) }
-    var objective by remember(runtimeState) { mutableStateOf("") }
+    var objective by rememberDurableStringState(
+        key = "overview.$draftScope.objective",
+        initialValue = "",
+    )
 
     val repositorySearchConnected = when (repositorySource) {
         RepositorySource.GitHub -> RepositoryServiceCatalog.GITHUB_ID in connectedRepositoryServiceIds
@@ -164,7 +181,7 @@ internal fun MindMapRunScreen(
                             selected = repositorySource == source,
                             onClick = {
                                 if (repositorySource != source) {
-                                    repositorySource = source
+                                    repositorySourceName = source.name
                                     repositoryLocator = ""
                                     repositoryError = null
                                     repositorySearchError = null

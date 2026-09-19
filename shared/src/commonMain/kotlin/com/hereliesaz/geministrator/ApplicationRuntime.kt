@@ -449,6 +449,59 @@ class ApplicationRuntime private constructor(
     suspend fun exportJson(): String? =
         (persistence as? SettingsWorkflowPersistence)?.exportJson()
 
+    suspend fun exportCurrentProjectFile(): IveProjectExport? {
+        val project = when (val snapshot = state.value) {
+            is ApplicationRuntimeState.NoRun -> snapshot.project
+            is ApplicationRuntimeState.Live -> snapshot.presentation.project
+            else -> runtimeMutex.withLock { viewingRun?.project ?: current?.project }
+        } ?: return null
+        val settingsPersistence = persistence as? SettingsWorkflowPersistence ?: return null
+        val encoded = settingsPersistence.exportProjectFile(project.id, nowEpochMillis())
+        return IveProjectExport(
+            projectId = project.id.value,
+            projectName = project.name,
+            fileName = (project.name + "-" + project.id.value.takeLast(8)).asIveFileName(),
+            content = encoded,
+        )
+    }
+
+    suspend fun importProjectFile(encoded: String): Project {
+        val settingsPersistence = persistence as? SettingsWorkflowPersistence
+            ?: error(".ive project import requires durable Settings persistence")
+        return settingsPersistence.importProjectFile(encoded)
+    }
+
+    suspend fun openProject(projectId: ProjectId) {
+        runtimeMutex.withLock {
+            publisher.publish(ApplicationRuntimeState.Loading)
+            try {
+                val project = persistence.projects.get(projectId)
+                    ?: error("Project ${projectId.value} was not found")
+                val run = persistence.runs.byProject(projectId)
+                    .maxByOrNull(WorkflowRun::updatedAtEpochMillis)
+                if (run == null) {
+                    replaceCurrent(null)
+                    publisher.publish(ApplicationRuntimeState.NoRun(project = project, roles = roles))
+                    return@withLock
+                }
+
+                val definition = persistence.definitions.get(run.workflowDefinitionId)
+                    ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
+                val runtimeState = try {
+                    coordinator.resume(run.id)
+                } catch (failure: Throwable) {
+                    throw classifyResumeFailure(failure)
+                }
+                replaceCurrent(Current(project, definition, runtimeState))
+                publishCurrent()
+                startCycling()
+            } catch (failure: Throwable) {
+                replaceCurrent(null)
+                publishFailure(failure)
+            }
+        }
+    }
+
     suspend fun importJson(encoded: String) {
         (persistence as? SettingsWorkflowPersistence)?.importJson(encoded)
         loadLatest()

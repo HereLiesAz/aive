@@ -27,6 +27,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.nullable
 
 private enum class WorkflowLibraryFilter(val label: String) {
     All("All"),
@@ -47,16 +48,24 @@ internal fun LiveWorkflowLibraryScreen(
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(WorkflowLibraryFilter.All) }
-    var selectedKey by remember { mutableStateOf<String?>(null) }
-    var draft by remember { mutableStateOf<WorkflowDefinition?>(null) }
-    var draftOrigin by remember { mutableStateOf<WorkflowLibraryOrigin?>(null) }
-    var selectedTaskId by remember { mutableStateOf<String?>(null) }
-    var roleQuery by remember { mutableStateOf("") }
-    var composeQuery by remember { mutableStateOf("") }
-    var saveId by remember { mutableStateOf("") }
-    var saveName by remember { mutableStateOf("") }
+    var query by rememberDurableStringState("workflows.query")
+    var filterName by rememberDurableStringState("workflows.filter", WorkflowLibraryFilter.All.name)
+    val filter = WorkflowLibraryFilter.entries.firstOrNull { it.name == filterName } ?: WorkflowLibraryFilter.All
+    var selectedKeyValue by rememberDurableStringState("workflows.selected-key")
+    val selectedKey = selectedKeyValue.takeIf(String::isNotBlank)
+    var draft by rememberDurableJsonState(
+        key = "workflows.draft",
+        serializer = WorkflowDefinition.serializer().nullable,
+        initialValue = null,
+    )
+    var draftOriginName by rememberDurableStringState("workflows.draft-origin")
+    val draftOrigin = WorkflowLibraryOrigin.entries.firstOrNull { it.name == draftOriginName }
+    var selectedTaskIdValue by rememberDurableStringState("workflows.selected-task-id")
+    val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
+    var roleQuery by rememberDurableStringState("workflows.role-query")
+    var composeQuery by rememberDurableStringState("workflows.compose-query")
+    var saveId by rememberDurableStringState("workflows.save-id")
+    var saveName by rememberDurableStringState("workflows.save-name")
     var refreshGeneration by remember { mutableStateOf(0) }
 
     LaunchedEffect(runtimeState, host, refreshGeneration) {
@@ -146,7 +155,7 @@ internal fun LiveWorkflowLibraryScreen(
                                 WorkflowLibraryFilter.Authored -> loaded.count { it.origin == WorkflowLibraryOrigin.Authored }
                                 WorkflowLibraryFilter.Roles -> loaded.count { it.origin == WorkflowLibraryOrigin.Role }
                             }.toString(),
-                            onClick = { filter = item },
+                            onClick = { filterName = item.name },
                         )
                     }
                 }
@@ -174,7 +183,7 @@ internal fun LiveWorkflowLibraryScreen(
                             ?: "${entry.definition.tasks.size} task${if (entry.definition.tasks.size == 1) "" else "s"}",
                         endCap = if (isActive) "Active" else "${entry.definition.tasks.size} task${if (entry.definition.tasks.size == 1) "" else "s"}",
                         selected = selected,
-                        onClick = { selectedKey = if (selected) null else entry.key },
+                        onClick = { selectedKeyValue = if (selected) "" else entry.key },
                         well = if (selected) {
                             {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -187,8 +196,8 @@ internal fun LiveWorkflowLibraryScreen(
                                         endCap = entry.origin.name,
                                         onClick = {
                                             draft = entry.definition
-                                            draftOrigin = entry.origin
-                                            selectedTaskId = null
+                                            draftOriginName = entry.origin.name
+                                            selectedTaskIdValue = ""
                                             status = "Loaded ${entry.definition.name}."
                                             saveId = when (entry.origin) {
                                                 WorkflowLibraryOrigin.Authored -> entry.definition.id.value
@@ -247,7 +256,7 @@ internal fun LiveWorkflowLibraryScreen(
                                     val source = entries.orEmpty().firstOrNull { it.key == selectedKey }
                                     if (source != null) {
                                         draft = source.definition
-                                        selectedTaskId = null
+                                        selectedTaskIdValue = ""
                                         status = "Reset loaded workflow."
                                     }
                                 },
@@ -268,7 +277,7 @@ internal fun LiveWorkflowLibraryScreen(
                     body = task.objective,
                     endCap = if (task.dependsOn.isEmpty()) "Entry" else "After ${task.dependsOn.size}",
                     selected = selected,
-                    onClick = { selectedTaskId = if (selected) null else task.id.value },
+                    onClick = { selectedTaskIdValue = if (selected) "" else task.id.value },
                     well = if (selected) {
                         {
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -332,7 +341,7 @@ internal fun LiveWorkflowLibraryScreen(
                                                     currentDraft = currentDraft,
                                                     onSuccess = { next ->
                                                         draft = next
-                                                        selectedTaskId = null
+                                                        selectedTaskIdValue = ""
                                                         status = "Expanded ${task.name} into ${candidate.definition.name}."
                                                     },
                                                     onFailure = { loadError = it },
@@ -425,7 +434,7 @@ internal fun LiveWorkflowLibraryScreen(
                                 )
                             }.onSuccess { saved ->
                                 draft = saved
-                                draftOrigin = WorkflowLibraryOrigin.Authored
+                                draftOriginName = WorkflowLibraryOrigin.Authored.name
                                 saveId = saved.id.value
                                 saveName = saved.name
                                 status = "Saved ${saved.name}."
