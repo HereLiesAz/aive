@@ -44,8 +44,11 @@ jobs:
       - name: Publish pinned H2G2 for isolated Wasm build
         run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
-      - name: Build production Wasm app
-        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:wasmJsBrowserProductionWebpack
+      - name: Build production JS and Wasm apps
+        run: |
+          ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true \
+            :webApp:jsBrowserProductionWebpack \
+            :webApp:wasmJsBrowserProductionWebpack
 
       - name: Stage production app
         shell: bash
@@ -54,13 +57,20 @@ jobs:
           WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
           test -n "$WASM_BUNDLE"
           WASM_DIR="$(dirname "$WASM_BUNDLE")"
-          rm -rf build/play-store-site build/play-store-captures build/play-store-assets
-          mkdir -p build/play-store-site build/play-store-captures
+          JS_BUNDLE="$(find webApp/build -type f -path '*/js/productionExecutable/haive.js' -print -quit)"
+          test -n "$JS_BUNDLE"
+          JS_DIR="$(dirname "$JS_BUNDLE")"
+          rm -rf build/play-store-site build/play-store-js-site build/play-store-captures build/play-store-assets
+          mkdir -p build/play-store-site build/play-store-js-site build/play-store-captures
           cp -R "$WASM_DIR"/. build/play-store-site/
           cp -R webApp/src/webMain/resources/. build/play-store-site/
+          cp -R "$JS_DIR"/. build/play-store-js-site/
+          cp -R webApp/src/webMain/resources/. build/play-store-js-site/
           test -f build/play-store-site/index.html
           test -f build/play-store-site/haive.js
           test -f build/play-store-site/haive_node_creatures.wasm
+          test -f build/play-store-js-site/index.html
+          test -f build/play-store-js-site/haive.js
 
       - name: Install Chromium and Pillow
         run: |
@@ -72,15 +82,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m http.server 8080 --directory build/play-store-site > /tmp/aive-store-assets-http.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          python3 -m http.server 8080 --directory build/play-store-site > /tmp/aive-store-assets-wasm-http.log 2>&1 &
+          WASM_SERVER_PID=$!
+          python3 -m http.server 8081 --directory build/play-store-js-site > /tmp/aive-store-assets-js-http.log 2>&1 &
+          JS_SERVER_PID=$!
+          trap 'kill "$WASM_SERVER_PID" "$JS_SERVER_PID" 2>/dev/null || true' EXIT
 
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null; then
-              break
-            fi
-            sleep 1
+          for port in 8080 8081; do
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent "http://127.0.0.1:$port/" >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            curl --fail --silent "http://127.0.0.1:$port/" >/dev/null
           done
 
           cat > build/capture-store-assets.mjs <<'JS'
@@ -120,7 +135,19 @@ jobs:
             }
           }
 
+          async function smoke(url) {
+            const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+            try {
+              await page.goto(url, { waitUntil: 'domcontentloaded' });
+              await page.waitForSelector('#webApp > *', { timeout: 15000 });
+              await page.waitForTimeout(500);
+            } finally {
+              await page.close();
+            }
+          }
+
           try {
+            await smoke('http://127.0.0.1:8081/');
             await capture('overview-portrait', 'http://127.0.0.1:8080/', 1080, 1920, false);
             await capture('terrarium-portrait', 'http://127.0.0.1:8080/?terrariumPreview=1', 1080, 1920, true);
             await capture('overview-landscape', 'http://127.0.0.1:8080/', 1920, 1080, false);
