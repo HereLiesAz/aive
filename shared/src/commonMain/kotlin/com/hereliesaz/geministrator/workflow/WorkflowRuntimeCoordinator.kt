@@ -74,7 +74,7 @@ class WorkflowRuntimeCoordinator(
                 val task = requireNotNull(tasksById[taskDefinitionId]) {
                     "Task ${taskDefinitionId.value} was not found"
                 }
-                val role = taskRun.assignedRoleId?.let { persistence.roles.get(it) }
+                val role = engine.roleDefinition(run, taskRun.assignedRoleId)
                 val dependencyArtifacts = task.dependsOn
                     .mapNotNull(run.taskRuns::get)
                     .flatMap(TaskRun::artifacts)
@@ -576,7 +576,7 @@ class WorkflowRuntimeCoordinator(
                         taskRun = taskRun,
                         executor = executor,
                         nowEpochMillis = now,
-                        role = engine.roleDefinition(task.roleId),
+                        role = engine.roleDefinition(next, task.roleId),
                     ),
                 ),
                 now = now,
@@ -617,7 +617,7 @@ class WorkflowRuntimeCoordinator(
                         taskRun = taskRun,
                         executor = executor,
                         nowEpochMillis = now,
-                        role = engine.roleDefinition(task.roleId),
+                        role = engine.roleDefinition(next, task.roleId),
                     ),
                 ),
                 now = now,
