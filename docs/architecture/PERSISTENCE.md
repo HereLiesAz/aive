@@ -30,6 +30,57 @@ The persisted model includes:
 
 Writes are guarded so the engine has a coherent restart-safe baseline. Failure-escalation decisions that must update the gate, run, and audit event together remain embedded in one snapshot write so those three pieces cannot recover in a split state.
 
+## Durable user-entered state
+
+Workflow truth is not the only state that must survive process death. The application also writes
+non-secret user drafts and presentation choices through `DurableUiStateStore` as they change.
+This includes project/run creation drafts, repository fields, navigation, appearance, workflow
+composition drafts, custom-company/role editing, artifact browsing state, agent-message drafts,
+compute-configuration drafts, and Store navigation.
+
+Saved secrets are intentionally different: provider API keys, repository tokens, and relay tokens
+remain in their platform credential stores. On Android their writes are synchronous before the UI
+reports the value as saved. Unsaved password/token text is never copied into the general Settings
+store.
+
+A product rename must never rename a persistence key merely for cosmetic consistency. Existing
+`haive.*` and `geministrator.*` keys are compatibility identifiers and remain valid storage
+names unless an explicit read-old/write-new migration is shipped.
+
+## Portable `.ive` project files
+
+The Aive project document extension is **`.ive`**. A project document contains a versioned wrapper
+around the same workflow persistence schema used by the runtime, scoped to one project and its run
+state, definitions, events, artifacts, approval gates, and the role definitions required to execute
+the project.
+
+Credentials and tokens are never embedded in a `.ive` file.
+
+Android and Desktop expose two load paths:
+
+- a detected list containing files in the normal Aive project directory plus previously selected
+  external project files;
+- an unrestricted platform file picker for a `.ive` file stored somewhere that was not detected.
+
+Import merges the project into local durable storage rather than clearing unrelated projects. The
+runtime is then rebuilt so imported role definitions and workflows are active before the imported
+project is reopened.
+
+## Android package identity is persistence
+
+Android application IDs define the application sandbox. Changing the application ID is not a
+rename; Android installs a different application with different preferences and Keystore access.
+
+The release identities are therefore fixed:
+
+- **GitHub flavor:** `com.hereliesaz.haive` — retained for in-place compatibility with the
+  original GitHub APK lineage and its existing data.
+- **Play flavor:** `com.hereliesaz.aive` — the Play package identity.
+
+Future branding work must not change either ID. The GitHub flavor may update itself from GitHub
+Releases and therefore requests package-install permission only in the GitHub manifest. The Play
+flavor never requests that permission; it only informs the user and links to Google Play.
+
 ## What is deliberately not persisted here
 
 `WorkflowPersistence` must not contain:
