@@ -634,7 +634,9 @@ class WorkflowRuntimeCoordinator(
         val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, now)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
-            refreshed.taskRuns.values.all { it.status == TaskRunStatus.Completed }
+            refreshed.taskRuns.values.all {
+                it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled
+            }
         ) {
             refreshed.copy(status = WorkflowRunStatus.Completed, updatedAtEpochMillis = now)
         } else {
