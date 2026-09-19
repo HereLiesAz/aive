@@ -54,7 +54,8 @@ class ApplicationRuntimeTest {
                 persistence = InMemoryWorkflowPersistence(),
             )
 
-            assertEquals(ApplicationRuntimeState.NoProject, runtime.state.value)
+            val noProject = assertIs<ApplicationRuntimeState.NoProject>(runtime.state.value)
+            assertEquals(BuiltInRoles.all.map { it.id }, noProject.roles.take(BuiltInRoles.all.size).map { it.id })
         } finally {
             scope.cancel()
         }
