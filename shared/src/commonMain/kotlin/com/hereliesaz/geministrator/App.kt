@@ -40,6 +40,7 @@ fun App(
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
     persistence: WorkflowPersistence? = null,
+    projectFileService: ProjectFileService? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -89,21 +90,30 @@ fun App(
     }
 
     GeministratorTheme {
-        var destination by remember { mutableStateOf(ControlRoomDestination.Settings) }
-        var selectedTaskId by remember { mutableStateOf<String?>(null) }
+        var destinationName by rememberDurableStringState(
+            key = "navigation.destination",
+            initialValue = ControlRoomDestination.Settings.name,
+        )
+        val destination = ControlRoomDestination.entries
+            .firstOrNull { it.name == destinationName }
+            ?: ControlRoomDestination.Settings
+        var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
+        val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
 
         LaunchedEffect(azphaltPackageImportRequest?.requestId) {
             if (azphaltPackageImportRequest != null) {
-                destination = ControlRoomDestination.AddOns
+                destinationName = ControlRoomDestination.AddOns.name
             }
         }
 
         LaunchedEffect(runtimeState) {
             val live = runtimeState as? ApplicationRuntimeState.Live
-            if (live == null) {
-                selectedTaskId = null
-            } else if (selectedTaskId != null && live.presentation.definition.tasks.none { it.id.value == selectedTaskId }) {
-                selectedTaskId = null
+            if (
+                live != null &&
+                selectedTaskId != null &&
+                live.presentation.definition.tasks.none { it.id.value == selectedTaskId }
+            ) {
+                selectedTaskIdValue = ""
             }
         }
 
@@ -130,10 +140,10 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
-                        onDestinationSelected = { destination = it },
+                        onDestinationSelected = { destinationName = it.name },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
-                            selectedTaskId = if (selectedTaskId == taskId) null else taskId
+                            selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
                         },
                         onLaunchWorkflow = { projectName, objective, repository ->
                             val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
@@ -284,6 +294,11 @@ fun App(
                                     runtimeState = failure.toRuntimeFailureState("Import failed")
                                 }
                             }
+                        },
+                        projectFileService = projectFileService,
+                        onExportCurrentProjectFile = { runtime?.exportCurrentProjectFile() },
+                        onImportProjectFile = { encoded ->
+                            runtime?.importProjectFile(encoded)?.name
                         },
                         onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
                         onSwitchRun = { runId ->
