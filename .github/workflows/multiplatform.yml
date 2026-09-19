@@ -32,6 +32,20 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Resolve four-part build version
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
+          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD"
+            exit 1
+          fi
+          BASE_VERSION=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1-3)
+          AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
+          echo "Aive build version: $AIVE_VERSION"
+
 
       - name: Check out pinned h2g2
         uses: actions/checkout@v7
@@ -102,6 +116,9 @@ jobs:
           echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "Android release versionCode: $VERSION_CODE"
 
+      - name: Verify immutable release policy
+        run: python3 .github/scripts/verify_release_immutability.py
+
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 
@@ -130,9 +147,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            ./gradlew :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug
+            ./gradlew -Papp.versionName="$AIVE_VERSION" \
+              :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug
           else
             ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" \
+              -Papp.versionName="$AIVE_VERSION" \
               :androidApp:bundlePlayRelease \
               :androidApp:assembleGithubRelease
           fi
@@ -321,6 +340,20 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
+      - name: Resolve four-part build version
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
+          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD"
+            exit 1
+          fi
+          BASE_VERSION=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1-3)
+          AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
+          echo "Aive build version: $AIVE_VERSION"
+
 
       - name: Check out pinned h2g2
         uses: actions/checkout@v7
@@ -372,7 +405,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./gradlew ":desktopApp:${{ matrix.task }}"
+          ./gradlew -Papp.versionName="$AIVE_VERSION" ":desktopApp:${{ matrix.task }}"
           EXIT_CODE=$?
           if [ "$EXIT_CODE" -ne 0 ]; then
             echo "=== Native packaging diagnostics ==="
@@ -404,7 +437,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish rolling release
+    name: Publish versioned release
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs:
       - build
@@ -454,21 +487,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          VERSION_NAME=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
-          if [ -z "$VERSION_NAME" ]; then
-            echo "::error::app.versionName is missing from gradle.properties"
+          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
+          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD (for example 0.9.6.0)"
             exit 1
           fi
 
-          if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Aive versions must be plain numeric versions (for example 0.9.0 or 1.2.0); alpha/beta suffixes are not used"
-            exit 1
-          fi
-
-          MAJOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f1)
-          MINOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f2)
-          MAJOR_MINOR="${MAJOR}.${MINOR}"
-          TAG_NAME="latest-v${MAJOR_MINOR}"
+          MAJOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1)
+          MINOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f2)
+          PATCH=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f3)
+          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${GITHUB_RUN_NUMBER}"
+          TAG_NAME="v${VERSION_NAME}"
           RELEASE_TITLE="The Aive ${VERSION_NAME}"
 
           IS_PRERELEASE=false
@@ -498,15 +527,15 @@ jobs:
           done
 
           cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
-          cp "$DEB_SOURCE" "release-files/$(basename "$DEB_SOURCE")"
-          cp "$MSI_SOURCE" "release-files/$(basename "$MSI_SOURCE")"
-          cp "$DMG_SOURCE" "release-files/$(basename "$DMG_SOURCE")"
+          cp "$DEB_SOURCE" "release-files/TheAive-${VERSION_NAME}.deb"
+          cp "$MSI_SOURCE" "release-files/TheAive-${VERSION_NAME}.msi"
+          cp "$DMG_SOURCE" "release-files/TheAive-${VERSION_NAME}.dmg"
 
           NOTES_SOURCE=$(find release-input/notes -type f -name 'default.txt' -print -quit)
           {
             echo "# The Aive ${VERSION_NAME}"
             echo
-            echo "Rolling build from commit \`${GITHUB_SHA}\`."
+            echo "Versioned build from commit \`${GITHUB_SHA}\`."
             if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
               echo
               echo "## Changes"
@@ -515,7 +544,6 @@ jobs:
           } > release-notes.md
 
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "MAJOR_MINOR=$MAJOR_MINOR" >> "$GITHUB_ENV"
           echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
           echo "RELEASE_TITLE=$RELEASE_TITLE" >> "$GITHUB_ENV"
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
@@ -523,42 +551,35 @@ jobs:
           echo "Release assets:"
           ls -lh release-files
 
-      - name: Publish rolling release
+      - name: Publish versioned release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
-          for pattern in 'latest-debug-v*' 'latest-alpha-v*' 'latest-beta-v*'; do
-            while IFS= read -r LEGACY_TAG; do
-              [ -n "$LEGACY_TAG" ] || continue
-              if gh release view "$LEGACY_TAG" >/dev/null 2>&1; then
-                gh release delete "$LEGACY_TAG" --yes --cleanup-tag
-              else
-                git push origin ":refs/tags/$LEGACY_TAG" || true
-              fi
-            done < <(git tag -l "$pattern")
-          done
+          # Release history is immutable. Every MAJOR.MINOR.PATCH.BUILD may be published exactly once.
+          # Never move a version tag, edit an existing release, delete its assets, or clobber uploads.
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists. Leaving the existing release completely unchanged."
+            exit 0
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa "$TAG_NAME" -m "Latest Aive ${VERSION_NAME}"
-          git push origin "$TAG_NAME" --force
 
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            # A rolling release represents exactly one build. Prune previous-version assets
-            # before uploading the current set so renamed/versioned files cannot accumulate.
-            while IFS= read -r EXISTING_ASSET; do
-              [ -n "$EXISTING_ASSET" ] || continue
-              gh release delete-asset "$TAG_NAME" "$EXISTING_ASSET" --yes
-            done < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
+            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
+              echo "::error::Immutable tag $TAG_NAME already exists at $TAG_COMMIT; refusing to move it to $GITHUB_SHA"
+              exit 1
+            fi
+          else
+            git tag -a "$TAG_NAME" -m "The Aive ${VERSION_NAME}"
+            git push origin "$TAG_NAME"
+          fi
 
-            gh release edit "$TAG_NAME" \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-            gh release upload "$TAG_NAME" release-files/*
-          elif [ "$IS_PRERELEASE" = "true" ]; then
+          if [ "$IS_PRERELEASE" = "true" ]; then
             gh release create "$TAG_NAME" release-files/* \
               --prerelease \
               --verify-tag \
