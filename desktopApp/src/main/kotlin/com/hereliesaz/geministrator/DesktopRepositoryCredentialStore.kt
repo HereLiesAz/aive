@@ -39,7 +39,7 @@ internal class DesktopRepositoryCredentialStore {
 
     fun clear(serviceId: String) {
         deleteFromKeychain(serviceId)
-        if (os.contains("win")) fallback.remove(windowsDpcredential(serviceId))
+        if (os.contains("win")) fallback.remove(windowsDpapiKey(serviceId))
         fallback.remove(serviceId)
         fallback.flush()
     }
@@ -115,13 +115,13 @@ internal class DesktopRepositoryCredentialStore {
         fun writeSecure(serviceId: String, credential: String): Boolean =
             if (os.contains("win")) writeWindowsDpapi(serviceId, credential) else writeToKeychain(serviceId, credential)
 
-        fun windowsDpcredential(serviceId: String): String = DPAPI_PREFIX + serviceId
+        fun windowsDpapiKey(serviceId: String): String = DPAPI_PREFIX + serviceId
 
         fun readWindowsDpapi(serviceId: String): String? {
             if (!os.contains("win")) return null
             val encoded = Preferences.userRoot()
                 .node(PREFERENCES_NODE)
-                .get(windowsDpcredential(serviceId), null)
+                .get(windowsDpapiKey(serviceId), null)
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
                 ?: return null
@@ -159,7 +159,7 @@ internal class DesktopRepositoryCredentialStore {
                 val ok = process.waitFor() == 0 && encoded.isNotEmpty()
                 if (ok) {
                     val prefs = Preferences.userRoot().node(PREFERENCES_NODE)
-                    prefs.put(windowsDpcredential(serviceId), encoded)
+                    prefs.put(windowsDpapiKey(serviceId), encoded)
                     prefs.flush()
                 }
                 ok
