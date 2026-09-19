@@ -23,6 +23,7 @@ interface ProjectRepository {
 
 interface WorkflowDefinitionRepository {
     suspend fun put(definition: WorkflowDefinition)
+    suspend fun remove(id: WorkflowDefinitionId)
     suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition?
     suspend fun all(): List<WorkflowDefinition>
 }
@@ -40,6 +41,7 @@ interface WorkflowEventRepository {
 
 interface RoleRepository {
     suspend fun put(role: RoleDefinition)
+    suspend fun remove(id: RoleDefinitionId)
     suspend fun get(id: RoleDefinitionId): RoleDefinition?
     suspend fun all(): List<RoleDefinition>
 }
