@@ -39,7 +39,7 @@ Those mappings belong inside provider adapters. Provider cache IDs never become 
 
 ## Good stable-prefix candidates
 
-- company-wide operating rules
+- swarm-wide operating rules
 - role definitions and standing instructions
 - repository conventions
 - architecture constraints
