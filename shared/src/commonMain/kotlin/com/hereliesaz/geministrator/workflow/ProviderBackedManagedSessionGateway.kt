@@ -49,7 +49,16 @@ class ProviderBackedManagedSessionGateway(
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
-        val recalledRequest = request.taskRequest.withRecalledMemory()
+        val requiredCapabilities = buildSet {
+            addAll(request.providerSelection.requiredCapabilities)
+            val constraints = request.providerSelection.constraints
+            if (constraints is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities) {
+                addAll(constraints.capabilities)
+            }
+        }
+        val recalledRequest = request.taskRequest
+            .copy(requiredCapabilities = requiredCapabilities)
+            .withRecalledMemory()
         val provider = selectProvider(
             request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
