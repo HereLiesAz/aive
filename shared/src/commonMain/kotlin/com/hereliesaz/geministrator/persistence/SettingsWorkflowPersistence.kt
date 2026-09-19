@@ -90,6 +90,10 @@ class SettingsWorkflowPersistence(
             snapshot.copy(roles = snapshot.roles.filterNot { it.id == id })
         }
 
+        override suspend fun replaceAll(roles: List<RoleDefinition>) = update { snapshot ->
+            snapshot.copy(roles = roles)
+        }
+
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = read().roles.firstOrNull { it.id == id }
         override suspend fun all(): List<RoleDefinition> = read().roles
     }
