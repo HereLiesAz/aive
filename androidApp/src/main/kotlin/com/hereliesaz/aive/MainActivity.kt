@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
+        // Register file pickers before the Activity reaches STARTED.
+        val projectFileService = AndroidProjectFileService(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
         val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
@@ -251,6 +253,7 @@ class MainActivity : ComponentActivity() {
                         executorIntegrations = executorIntegrations,
                         orchestrationRuntime = orchestrationRuntime,
                         persistence = azphaltHost.persistence,
+                        projectFileService = projectFileService,
                         azphaltStoreService = azphaltHost.service,
                         azphaltPackageImportRequest = azphaltHost.importRequest,
                         onAzphaltPackageImportHandled = azphaltHost::consumeImport,
