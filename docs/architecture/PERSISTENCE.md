@@ -48,7 +48,7 @@ Credentials belong in platform-secure storage or, where a browser cannot safely 
 
 ## Resume invariant
 
-A task with an existing executor/provider run identifier must reconnect to that existing run when possible. Restarting The Haive must not create duplicate external work merely because the local process restarted.
+A task with an existing executor/provider run identifier must reconnect to that existing run when possible. Restarting The Aive must not create duplicate external work merely because the local process restarted.
 
 `TaskRun` persists executor identity separately from responsibility and provider state:
 
