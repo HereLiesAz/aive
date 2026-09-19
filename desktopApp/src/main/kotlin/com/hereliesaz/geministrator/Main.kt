@@ -74,7 +74,7 @@ fun main() {
         application {
             Window(
                 onCloseRequest = ::exitApplication,
-                title = "The Haive",
+                title = "The Aive",
                 state = rememberWindowState(width = 1180.dp, height = 760.dp),
             ) {
                 var credentials by remember { mutableStateOf(initialProviderCredentials) }
