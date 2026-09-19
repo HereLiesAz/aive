@@ -6,6 +6,8 @@ import android.provider.Settings
 
 /** Explicit user opt-in for using the installed Gemini consumer app as a Haive transport. */
 internal object InstalledGeminiPreference {
+    const val isSupported: Boolean = true
+
     private const val PREFERENCES = "haive.external-ai"
     private const val KEY_ENABLED = "installed-gemini-enabled"
 
