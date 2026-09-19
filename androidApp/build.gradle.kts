@@ -164,6 +164,7 @@ dependencies {
     implementation(projects.providers.jules)
     implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.core:core:1.17.0")
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
     implementation(libs.kotlinx.coroutines.core)
