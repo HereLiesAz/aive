@@ -86,6 +86,18 @@ fun parseRepositoryRef(
         ).normalized()
     }
 
+    val explicitHost = remoteRepositoryHost(cleanLocator)
+    if (explicitHost != null) {
+        val expectedHost = when (source) {
+            RepositorySource.GitHub -> "github.com"
+            RepositorySource.GitLab -> "gitlab.com"
+            RepositorySource.Local -> error("Local repositories have no remote host")
+        }
+        require(explicitHost.equals(expectedHost, ignoreCase = true)) {
+            "${source.displayName()} repository URL must use $expectedHost"
+        }
+    }
+
     val repositoryPath = remoteRepositoryPath(cleanLocator)
     val parts = repositoryPath
         .trim('/')
@@ -104,10 +116,12 @@ fun parseRepositoryRef(
 
     val name = parts.last()
     val owner = parts.dropLast(1).joinToString("/")
-    val remoteUrl = when {
-        cleanLocator.startsWith("http://") || cleanLocator.startsWith("https://") || cleanLocator.startsWith("git@") || cleanLocator.startsWith("ssh://") -> cleanLocator
-        source == RepositorySource.GitHub -> "https://github.com/$owner/$name"
-        else -> "https://gitlab.com/$owner/$name"
+    // Persist only a canonical credential-free remote. User-info, tokens, query parameters, and
+    // fragments from pasted clone URLs must never enter project state or model prompts.
+    val remoteUrl = when (source) {
+        RepositorySource.GitHub -> "https://github.com/$owner/$name"
+        RepositorySource.GitLab -> "https://gitlab.com/$owner/$name"
+        RepositorySource.Local -> error("Local repositories do not have remote URLs")
     }
 
     return RepositoryRef(
@@ -117,6 +131,23 @@ fun parseRepositoryRef(
         source = source,
         remoteUrl = remoteUrl,
     ).normalized()
+}
+
+private fun remoteRepositoryHost(locator: String): String? {
+    val clean = locator.substringBefore('?').substringBefore('#').trim()
+    return when {
+        clean.startsWith("git@", ignoreCase = true) ->
+            clean.substringAfter('@').substringBefore(':').takeIf(String::isNotBlank)
+        clean.startsWith("ssh://", ignoreCase = true) -> {
+            val authority = clean.substringAfter("://").substringBefore('/')
+            authority.substringAfter('@').substringBefore(':').takeIf(String::isNotBlank)
+        }
+        "://" in clean -> {
+            val authority = clean.substringAfter("://").substringBefore('/')
+            authority.substringAfter('@').substringBefore(':').takeIf(String::isNotBlank)
+        }
+        else -> null
+    }
 }
 
 private fun remoteRepositoryPath(locator: String): String {
