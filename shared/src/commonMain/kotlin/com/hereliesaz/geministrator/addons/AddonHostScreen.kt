@@ -94,7 +94,7 @@ fun AddonHostScreen(
                     }
                     if (enableCompanyContribution) {
                         Button(onClick = { onAddAgentsToCompany(installation.id) }) {
-                            Text("Add agents to company")
+                            Text("Add agents to swarm")
                         }
                     }
                 }
