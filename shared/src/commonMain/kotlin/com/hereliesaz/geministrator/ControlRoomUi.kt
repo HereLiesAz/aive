@@ -500,7 +500,7 @@ private fun MainDestination(
 
 private fun runtimeStatusLabel(state: ApplicationRuntimeState): String = when (state) {
     ApplicationRuntimeState.Loading -> "RUNTIME · LOADING"
-    ApplicationRuntimeState.NoProject -> "RUNTIME · NO PROJECT"
+    is ApplicationRuntimeState.NoProject -> "RUNTIME · NO PROJECT"
     is ApplicationRuntimeState.NoRun -> "RUNTIME · NO RUN"
     is ApplicationRuntimeState.Live -> "RUNTIME · ${state.presentation.run.status.name.uppercase()}"
     is ApplicationRuntimeState.Disconnected -> "RUNTIME · DISCONNECTED"
