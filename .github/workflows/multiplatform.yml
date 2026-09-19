@@ -212,23 +212,39 @@ jobs:
           cat fastlane/metadata/android/en-US/changelogs/default.txt
 
       - name: Verify Play build excludes accessibility bridge
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          if find androidApp/build/intermediates -type f -path '*playRelease*' -name 'AndroidManifest.xml' \
-            -exec grep -IlE 'InstalledGeminiAccessibilityService|BIND_ACCESSIBILITY_SERVICE' {} \; | grep -q .; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*playDebug*'
+          else
+            VARIANT_PATTERN='*playRelease*'
+          fi
+          MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
+          if [ -z "$MATCHES" ]; then
+            echo "::error::Could not find merged Play manifest for $VARIANT_PATTERN"
+            exit 1
+          fi
+          if printf '%s\n' "$MATCHES" | xargs grep -IlE 'InstalledGeminiAccessibilityService|BIND_ACCESSIBILITY_SERVICE' | grep -q .; then
             echo "::error::Play manifest contains the installed-Gemini accessibility bridge"
             exit 1
           fi
 
       - name: Verify GitHub build keeps accessibility bridge
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
-          if ! find androidApp/build/intermediates -type f -path '*githubRelease*' -name 'AndroidManifest.xml' \
-            -exec grep -Il 'InstalledGeminiAccessibilityService' {} \; | grep -q .; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*githubDebug*'
+          else
+            VARIANT_PATTERN='*githubRelease*'
+          fi
+          MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
+          if [ -z "$MATCHES" ]; then
+            echo "::error::Could not find merged GitHub manifest for $VARIANT_PATTERN"
+            exit 1
+          fi
+          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'InstalledGeminiAccessibilityService' | grep -q .; then
             echo "::error::GitHub manifest is missing the installed-Gemini accessibility bridge"
             exit 1
           fi
