@@ -165,7 +165,7 @@ internal fun CustomCompanyProviderScreen(
             AzphaltRecord(
                 seed = "company-reset-confirmation",
                 eyebrow = "Reset",
-                title = "Restore the default company?",
+                title = "Restore the default swarm?",
                 body = "This restores Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.",
                 endCap = "Confirm",
                 well = {
