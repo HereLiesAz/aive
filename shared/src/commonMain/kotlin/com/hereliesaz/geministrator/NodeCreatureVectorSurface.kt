@@ -89,25 +89,25 @@ private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreatur
     val role = roleLabel.lowercase()
     return when {
         role.contains("orchestrat") || role.contains("queen") -> NodeCreaturePalette(
-            body = Color(0xFF1C1D20),
-            accent = Color(0xFFE3483F),
+            body = Color(0xFF080C18),
+            accent = Color(0xFFFF5665),
         )
         // Specific semantic roles must win before the broad "engineer" builder match.
         role.contains("crash") || role.contains("dummy") || role.contains("test") -> NodeCreaturePalette(
-            body = Color(0xFF1D66B8),
-            accent = Color(0xFF162635),
+            body = Color(0xFF08101C),
+            accent = Color(0xFF249CFF),
         )
         role.contains("qa") || role.contains("quality") || role.contains("verif") || role.contains("inspect") -> NodeCreaturePalette(
-            body = Color(0xFFA34779),
-            accent = Color(0xFF3A203F),
+            body = Color(0xFF0A1020),
+            accent = Color(0xFF7C6CFF),
         )
         role.contains("review") -> NodeCreaturePalette(
-            body = Color(0xFF34363A),
-            accent = Color(0xFFE24A3C),
+            body = Color(0xFF0B0D16),
+            accent = Color(0xFFE62D70),
         )
         role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
-            body = Color(0xFFF08022),
-            accent = Color(0xFF202328),
+            body = Color(0xFF0D1220),
+            accent = Color(0xFFFFB323),
         )
         else -> NodeCreaturePalette(
             body = Azphalt.hue(hueSeed),
@@ -125,7 +125,7 @@ private fun nodeCreatureMaterialColor(
     val source = when (material) {
         NodeCreatureMaterial.Body -> body
         NodeCreatureMaterial.Accent -> accent
-        NodeCreatureMaterial.Eye -> Color(0xFFFFF2C9)
+        NodeCreatureMaterial.Eye -> accent
         NodeCreatureMaterial.Limb -> Azphalt.Ink
         NodeCreatureMaterial.Terminal -> accent
     }
