@@ -45,8 +45,11 @@ internal fun AzphaltStoreScreen(
     val workflowLibraryHost = LocalWorkflowLibraryHost.current
     var snapshot by remember(service) { mutableStateOf<AzphaltStoreSnapshot?>(null) }
     var packages by remember(service) { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
-    var query by remember { mutableStateOf("") }
-    var selectedPackageId by remember { mutableStateOf<String?>(null) }
+    var query by rememberDurableStringState("azphalt-store.query")
+    var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
+    var selectedPackageId: String?
+        get() = selectedPackageIdValue.takeIf(String::isNotBlank)
+        set(value) { selectedPackageIdValue = value.orEmpty() }
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
