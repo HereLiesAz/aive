@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.6 — 2026-09-19
+
+- Fixed Android upgrade continuity by restoring the GitHub APK lineage to its original `com.hereliesaz.haive` application ID while keeping Google Play on `com.hereliesaz.aive`.
+- Added durable write-through persistence for user drafts, navigation, appearance, workflow composition, company-role editing, project setup, artifact browsing, agent messages, compute settings, and add-on navigation.
+- Added portable `.ive` project save/load with detected-file lists and manual file selection on Android and Desktop.
+- Made saved Android provider keys, repository tokens, and compute relay tokens synchronously durable.
+- Added GitHub-flavor automatic update checks/downloads with Android installer handoff.
+- Added Play-flavor update notifications that open Google Play without requesting sideload permissions.
+
+
 All notable changes to **The Aive** are documented here from the current product line forward.
 
 ## Unreleased
