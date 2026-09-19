@@ -22,7 +22,7 @@ class ApplicationRuntimeLaunchTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val repository = RepositoryRef(
             owner = " HereLiesAz ",
-            name = " haive ",
+            name = " aive ",
             defaultBranch = " main ",
         )
 
@@ -34,7 +34,7 @@ class ApplicationRuntimeLaunchTest {
             )
 
             runtime.launchStarterWorkflow(
-                projectName = " The Haive ",
+                projectName = " The Aive ",
                 objective = " Ship one complete workflow ",
                 repository = repository,
             )
@@ -42,7 +42,7 @@ class ApplicationRuntimeLaunchTest {
             val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
             val project = persistence.projects.get(live.presentation.run.projectId)
                 ?: error("Project was not persisted")
-            assertEquals("The Haive", project.name)
+            assertEquals("The Aive", project.name)
             assertEquals(RepositoryRef("HereLiesAz", "haive", "main"), project.repository)
             assertEquals(project, live.presentation.project)
             assertEquals("Ship one complete workflow", live.presentation.run.objective)
@@ -70,7 +70,7 @@ class ApplicationRuntimeLaunchTest {
 
         val runId = try {
             firstRuntime.launchStarterWorkflow(
-                projectName = "The Haive",
+                projectName = "The Aive",
                 objective = "Resume this run",
                 repository = repository,
             )
