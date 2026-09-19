@@ -100,5 +100,5 @@ private fun Collection<RoleDefinition>.roleFor(
     val eligible = filter { it.enabled && authority in it.authorities }
     return eligible.firstOrNull { it.id == preferredId }
         ?: eligible.firstOrNull()
-        ?: error("The active company has no role authorized for $purpose (${authority.name})")
+        ?: error("The active swarm has no role authorized for $purpose (${authority.name})")
 }
