@@ -10,6 +10,11 @@ import kotlinx.coroutines.CancellationException
 interface RepositoryOperationClient {
     fun supports(project: Project): Boolean = true
     suspend fun start(project: Project, operation: String): ExternalExecutionRun
+    suspend fun start(
+        project: Project,
+        operation: String,
+        operationIdentity: String,
+    ): ExternalExecutionRun = start(project, operation)
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
 }
 
@@ -24,7 +29,11 @@ class RepositoryOperationExecutorIntegration(
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
         return repositoryOperation("Repository operation '${executor.operation}' failed") {
-            client.start(context.project, executor.operation).toRepositoryTaskExecution(context)
+            client.start(
+                context.project,
+                executor.operation,
+                context.taskRun.id.value,
+            ).toRepositoryTaskExecution(context)
         }
     }
 
