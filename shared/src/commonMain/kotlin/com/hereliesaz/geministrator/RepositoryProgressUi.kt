@@ -34,8 +34,13 @@ internal fun RepositoryProgressRecord(
     val latestRepositoryOperation = artifacts.firstOrNull { artifact ->
         artifact.metadata["repositorySource"] != null && artifact.metadata["operation"] != null
     }
+    val activeStatuses = setOf(
+        com.hereliesaz.geministrator.domain.TaskRunStatus.Planning,
+        com.hereliesaz.geministrator.domain.TaskRunStatus.Running,
+        com.hereliesaz.geministrator.domain.TaskRunStatus.Verifying,
+    )
     val activeRepositoryTask = run.taskRuns.values.firstOrNull { taskRun ->
-        !taskRun.status.isTerminal() &&
+        taskRun.status in activeStatuses &&
             (taskRun.executor is TaskExecutor.RepositoryOperation || taskRun.executor is TaskExecutor.GitHubAction)
     }
     val repositoryFacingRoles = setOf(
@@ -46,7 +51,7 @@ internal fun RepositoryProgressRecord(
         "release-engineer",
     )
     val activeCodeTask = run.taskRuns.values.firstOrNull { taskRun ->
-        !taskRun.status.isTerminal() && taskRun.assignedRoleId?.value in repositoryFacingRoles
+        taskRun.status in activeStatuses && taskRun.assignedRoleId?.value in repositoryFacingRoles
     }
     val active = activeRepositoryTask ?: activeCodeTask
     val reportedBranch = latestRepositoryOperation?.metadata?.get("branch")
