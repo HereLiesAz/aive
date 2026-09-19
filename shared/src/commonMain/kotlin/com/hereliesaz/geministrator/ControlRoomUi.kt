@@ -55,7 +55,7 @@ enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
     Runs("Runs"),
     Workflows("Workflows"),
-    Company("Company"),
+    Company("Swarm"),
     Artifacts("Artifacts"),
     Inbox("Inbox"),
     Repositories("Repositories"),
@@ -306,7 +306,7 @@ private fun PillNavigation(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("THE AIVE", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
-        Text("COMPANY OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         Spacer(Modifier.height(12.dp))
         ControlRoomDestination.entries.forEachIndexed { index, item ->
             AzphaltPill(
@@ -341,7 +341,7 @@ private fun CompactHeader() {
     ) {
         Column {
             Text("THE AIVE", style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
-            Text("COMPANY OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         }
         AzphaltPill("Ground", "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
     }
