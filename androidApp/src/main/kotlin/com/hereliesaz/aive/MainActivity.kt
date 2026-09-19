@@ -344,7 +344,7 @@ fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
             .background(Color(0xFF0D1026)),
         contentAlignment = Alignment.Center,
     ) {
-        HaiveLoadingAnimation(
+        AiveLoadingAnimation(
             modifier = Modifier.size(280.dp),
             onAnimationStarted = { animationStarted = true },
         )
