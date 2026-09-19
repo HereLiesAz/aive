@@ -69,8 +69,14 @@ object BrandAssets {
         }
 
         outputDir.mkdirs()
-        writePng(outputFrames.first().image, outputDir.resolve("haive_loader_frame0.png"))
-        writeGif(outputFrames, outputDir.resolve("haive_loader.gif"))
+        val gifFile = outputDir.resolve("haive_loader.gif")
+        writeGif(outputFrames, gifFile)
+        // GIF encoding quantizes the palette. Derive the fallback from the encoded first frame so
+        // swapping from PNG to GIF is pixel-identical rather than merely source-identical.
+        val encodedFrame0 = requireNotNull(ImageIO.read(gifFile)) {
+            "Generated loader GIF is unreadable: ${gifFile.absolutePath}"
+        }
+        writePng(encodedFrame0, outputDir.resolve("haive_loader_frame0.png"))
     }
 
     private fun readSource(source: File): BufferedImage {
