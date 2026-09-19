@@ -102,6 +102,11 @@ data class TaskDefinition(
     val name: String,
     val objective: String,
     val roleId: RoleDefinitionId?,
+    /**
+     * The authority this task is exercising, when the workflow knows it explicitly. This prevents
+     * broad/generalist roles from making every task look like implementation work.
+     */
+    val requiredRoleAuthority: RoleAuthority? = null,
     val dependsOn: Set<TaskDefinitionId> = emptySet(),
     val condition: TaskCondition = TaskCondition.Always,
     val acceptanceCriteria: List<AcceptanceCriterion> = emptyList(),
