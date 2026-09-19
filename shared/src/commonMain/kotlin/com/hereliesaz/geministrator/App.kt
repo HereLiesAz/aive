@@ -109,18 +109,30 @@ fun App(
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
 
+        fun navigateTo(target: ControlRoomDestination) {
+            if (target == destination) return
+            navigationHistory = navigationHistory + destination
+            selectedTaskIdValue = ""
+            destinationName = target.name
+        }
+
+        val inspectorVisible = selectedTaskId != null &&
+            (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
+
         PlatformBackHandler(
-            enabled = selectedTaskId != null ||
+            enabled = inspectorVisible ||
                 navigationHistory.isNotEmpty() ||
                 destination != ControlRoomDestination.Overview,
         ) {
             when {
-                selectedTaskId != null -> selectedTaskIdValue = ""
+                inspectorVisible -> selectedTaskIdValue = ""
                 navigationHistory.isNotEmpty() -> {
+                    selectedTaskIdValue = ""
                     destinationName = navigationHistory.last().name
                     navigationHistory = navigationHistory.dropLast(1)
                 }
                 destination != ControlRoomDestination.Overview -> {
+                    selectedTaskIdValue = ""
                     destinationName = ControlRoomDestination.Overview.name
                 }
             }
@@ -128,7 +140,7 @@ fun App(
 
         LaunchedEffect(azphaltPackageImportRequest?.requestId) {
             if (azphaltPackageImportRequest != null) {
-                destinationName = ControlRoomDestination.AddOns.name
+                navigateTo(ControlRoomDestination.AddOns)
             }
         }
 
@@ -166,12 +178,7 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
-                        onDestinationSelected = { target ->
-                            if (target != destination) {
-                                navigationHistory = navigationHistory + destination
-                                destinationName = target.name
-                            }
-                        },
+                        onDestinationSelected = ::navigateTo,
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
