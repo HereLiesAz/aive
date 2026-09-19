@@ -92,7 +92,9 @@ class RemoteRepositoryDiscoveryClient(
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
         val normalizedQuery = trimmed.lowercase()
-        return (owned + searched)
+        // Fresh search records win over cached owned records so renames/default-branch changes
+        // become visible immediately while the client remains open.
+        return (searched + owned)
             .distinctBy(GitHubRepository::id)
             .map { repository ->
                 RepositorySuggestion(
@@ -152,7 +154,8 @@ class RemoteRepositoryDiscoveryClient(
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
         val normalizedQuery = trimmed.lowercase()
-        return (owned + searched)
+        // Fresh search records win over cached owned records for the same project.
+        return (searched + owned)
             .distinctBy(GitLabProject::id)
             .map { project ->
                 val path = project.pathWithNamespace.trim('/').split('/').filter(String::isNotBlank)
