@@ -1,6 +1,6 @@
 {
-  "name": "The Haive",
-  "short_name": "Haive",
+  "name": "The Aive",
+  "short_name": "Aive",
   "description": "A governed workflow control room for people, agents, and automated executors.",
   "start_url": "./",
   "display": "standalone",
