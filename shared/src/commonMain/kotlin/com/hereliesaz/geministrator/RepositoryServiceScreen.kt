@@ -31,7 +31,7 @@ internal fun RepositoryServiceScreen(
     ) {
         Text("REPOSITORY SERVICES", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Connect the repository hosts Haive may operate while workflows run. Project repository links stay separate from AI-provider credentials and role routing.",
+            "Connect the repository hosts Aive may operate while workflows run. Project repository links stay separate from AI-provider credentials and role routing.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
