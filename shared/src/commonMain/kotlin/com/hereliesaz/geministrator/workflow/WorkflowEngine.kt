@@ -55,6 +55,11 @@ class WorkflowEngine(
 
     fun roleDefinition(roleId: RoleDefinitionId?): RoleDefinition? = roleId?.let(rolesById::get)
 
+    fun roleDefinition(run: WorkflowRun, roleId: RoleDefinitionId?): RoleDefinition? {
+        val id = roleId ?: return null
+        return run.roleSnapshot.firstOrNull { it.id == id } ?: rolesById[id]
+    }
+
     data class DispatchResult(
         val run: WorkflowRun,
         val handles: Map<TaskDefinitionId, ManagedSessionHandle>,
@@ -107,8 +112,8 @@ class WorkflowEngine(
 
             when (executor) {
                 is TaskExecutor.RoleAgent -> {
-                    val role = requireNotNull(rolesById[executor.roleId]) {
-                        "Role ${executor.roleId.value} is not registered"
+                    val role = requireNotNull(roleDefinition(nextRun, executor.roleId)) {
+                        "Role ${executor.roleId.value} is not registered for this run"
                     }
                     require(role.enabled) { "Role ${role.name} is disabled" }
 
