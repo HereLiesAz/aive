@@ -33,9 +33,7 @@ internal fun LiveArtifactBrowserScreen(
     val stateScope = live?.run?.id?.value ?: "no-run"
     var query by rememberDurableStringState("artifacts.$stateScope.query")
     var selectedArtifactIdValue by rememberDurableStringState("artifacts.$stateScope.selected")
-    var selectedArtifactId: String?
-        get() = selectedArtifactIdValue.takeIf(String::isNotBlank)
-        set(value) { selectedArtifactIdValue = value.orEmpty() }
+    val selectedArtifactId = selectedArtifactIdValue.takeIf(String::isNotBlank)
 
     val rows = remember(live) {
         live?.definition?.tasks.orEmpty().flatMap { task ->
@@ -126,7 +124,7 @@ internal fun LiveArtifactBrowserScreen(
                             endCap = if (selected) "Open" else row.artifact.kind.name,
                             selected = selected,
                             onClick = {
-                                selectedArtifactId = if (selected) null else row.artifact.id.value
+                                selectedArtifactIdValue = if (selected) "" else row.artifact.id.value
                             },
                             well = if (selected) {
                                 {
