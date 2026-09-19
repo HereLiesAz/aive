@@ -14,10 +14,10 @@ data class OrchestrationModelReleaseBundle(
     val quantization: String,
 ) {
     val releaseApiUrl: String
-        get() = "https://api.github.com/repos/HereLiesAz/haive/releases/tags/$releaseTag"
+        get() = "https://api.github.com/repos/HereLiesAz/aive/releases/tags/$releaseTag"
 
     val manifestDownloadUrl: String
-        get() = "https://github.com/HereLiesAz/haive/releases/download/$releaseTag/$partsManifestName"
+        get() = "https://github.com/HereLiesAz/aive/releases/download/$releaseTag/$partsManifestName"
 }
 
 object OrchestrationEpoch8ModelCatalog {
