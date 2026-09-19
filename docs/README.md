@@ -1,10 +1,10 @@
-# The Haive documentation
+# The Aive documentation
 
 These documents describe the current product on `main`. They are not a migration diary and they are not a record of earlier Geministrator-era experiments.
 
 ## Product model
 
-The Haive is a governed workflow operating surface. A workflow is a dependency graph of work. A node is not inherently an AI agent: it can be staffed by a role, executed by a provider, run by automation, wait on a person, or represent another concrete unit of execution.
+The Aive is a governed workflow operating surface. A workflow is a dependency graph of work. A node is not inherently an AI agent: it can be staffed by a role, executed by a provider, run by automation, wait on a person, or represent another concrete unit of execution.
 
 The live H2G2 mindmap is a projection of runtime truth. It is not a second state machine.
 
@@ -63,4 +63,4 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 ## Naming
 
-The product name is **The Haive**. Technical artifact names may use `haive`. The Android application ID is `com.hereliesaz.haive`.
+The product name is **The Aive**. Technical artifact names may use `haive`. The Android application ID is `com.hereliesaz.aive`.
