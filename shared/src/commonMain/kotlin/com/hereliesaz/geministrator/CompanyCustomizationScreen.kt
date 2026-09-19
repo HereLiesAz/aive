@@ -42,6 +42,7 @@ internal fun CustomCompanyProviderScreen(
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val runtimeRoles = liveWorkflow?.roles
         ?: (runtimeState as? ApplicationRuntimeState.NoRun)?.roles
+        ?: (runtimeState as? ApplicationRuntimeState.NoProject)?.roles
         ?: emptyList()
     val visibleRoles = runtimeRoles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
     var draftRoles by rememberDurableJsonState(
@@ -268,7 +269,11 @@ internal fun CustomCompanyProviderScreen(
                                 .replace(Regex("[^a-z0-9]+"), "-")
                                 .trim('-')
                         }
-                        if (cleanId.isNotBlank() && cleanName.isNotBlank()) {
+                        if (
+                            cleanId.isNotBlank() &&
+                            cleanId != ROLE_COLLECTION_MARKER_ID &&
+                            cleanName.isNotBlank()
+                        ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
                                 name = cleanName,
