@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -165,8 +166,6 @@ fun ControlRoom(
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
         (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
-    var dismissedInspectorId by remember { mutableStateOf<String?>(null) }
-    val compactInspectorVisible = inspectorVisible && selectedTaskId != dismissedInspectorId
 
     Box(
         modifier = Modifier
@@ -181,10 +180,7 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     selectedTaskId = selectedTaskId,
-                    onTaskSelected = { taskId ->
-                        dismissedInspectorId = null
-                        onTaskSelected(taskId)
-                    },
+                    onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
@@ -229,25 +225,6 @@ fun ControlRoom(
                     compact = true,
                     runtimeState = runtimeState,
                 )
-            }
-
-            AnimatedVisibility(
-                visible = compactInspectorVisible,
-                enter = slideInVertically(animationSpec = tween(280, easing = InspectorEase)) { it } + fadeIn(tween(140)),
-                exit = slideOutVertically(animationSpec = tween(220, easing = InspectorEase)) { it } + fadeOut(tween(120)),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                selectedTaskId?.let { taskId ->
-                    CompactInspectorSheet(
-                        taskId = taskId,
-                        liveWorkflow = liveWorkflow,
-                        onDismiss = { dismissedInspectorId = taskId },
-                        onApproveTask = onApproveTask,
-                        onRejectPlan = onRejectPlan,
-                        onResolveEscalation = onResolveEscalation,
-                        onMessageAgent = onMessageAgent,
-                    )
-                }
             }
         } else {
             Row(Modifier.fillMaxSize()) {
@@ -304,28 +281,27 @@ fun ControlRoom(
                     modifier = Modifier.weight(1f),
                     runtimeState = runtimeState,
                 )
-                AnimatedVisibility(
-                    visible = inspectorVisible,
-                    enter = expandHorizontally(
-                        animationSpec = tween(360, easing = InspectorEase),
-                        expandFrom = Alignment.Start,
-                    ) + fadeIn(tween(150)),
-                    exit = shrinkHorizontally(
-                        animationSpec = tween(280, easing = InspectorEase),
-                        shrinkTowards = Alignment.Start,
-                    ) + fadeOut(tween(120)),
+            }
+        }
+
+        if (inspectorVisible) {
+            selectedTaskId?.let { taskId ->
+                ModalBottomSheet(
+                    onDismissRequest = { onTaskSelected(taskId) },
+                    containerColor = Azphalt.Ink,
+                    contentColor = Azphalt.White,
                 ) {
-                    selectedTaskId?.let { taskId ->
-                        TechnicalInspector(
-                            selectedTaskId = taskId,
-                            liveWorkflow = liveWorkflow,
-                            onApproveTask = onApproveTask,
-                            onRejectPlan = onRejectPlan,
-                            onResolveEscalation = onResolveEscalation,
-                            onMessageAgent = onMessageAgent,
-                            modifier = Modifier.width(310.dp).fillMaxHeight(),
-                        )
-                    }
+                    TechnicalInspector(
+                        selectedTaskId = taskId,
+                        liveWorkflow = liveWorkflow,
+                        onApproveTask = onApproveTask,
+                        onRejectPlan = onRejectPlan,
+                        onResolveEscalation = onResolveEscalation,
+                        onMessageAgent = onMessageAgent,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(if (compact) 0.72f else 0.62f),
+                    )
                 }
             }
         }
