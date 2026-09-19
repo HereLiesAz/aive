@@ -17,7 +17,22 @@ data class ManagedSessionHandle(
     val providerId: AgentProviderId,
     val providerRunId: ProviderRunId,
     val inferenceInvocationId: String? = null,
-)
+) {
+    // Invocation metadata is diagnostic/provenance state, not provider-session identity. Persisted
+    // handles are reconstructed without it, so equality must remain stable across reconstruction.
+    override fun equals(other: Any?): Boolean =
+        other is ManagedSessionHandle &&
+            taskRunId == other.taskRunId &&
+            providerId == other.providerId &&
+            providerRunId == other.providerRunId
+
+    override fun hashCode(): Int {
+        var result = taskRunId.hashCode()
+        result = 31 * result + providerId.hashCode()
+        result = 31 * result + providerRunId.hashCode()
+        return result
+    }
+}
 
 data class ManagedSessionProgress(
     val fraction: Float? = null,
