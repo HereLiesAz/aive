@@ -40,6 +40,10 @@ are never deleted or replaced, and uploads never use clobber semantics.
 Android `versionName` uses the full four-part version. Android `versionCode` remains a separate
 monotonic integer required by Google Play.
 
-Native desktop packaging tools impose stricter numeric-version rules, so MSI/DMG/DEB package
-metadata uses `MAJOR.MINOR.PATCH`. The downloadable release filenames and GitHub release identity
-still use the full four-part Aive version, so two builds of the same patch are never conflated.
+Native desktop packaging tools impose stricter numeric-version rules, and historical pre-release
+installers already consumed package versions above the public `0.x` line. To preserve upgrade
+monotonicity permanently, Windows/Linux package metadata uses `(MAJOR+1).MINOR.PATCH` and macOS
+uses `(MAJOR+2).MINOR.PATCH`. The extra macOS epoch preserves upgrades from an earlier 2.x package.
+
+These package-only epochs do not change The Aive's public version. Downloadable filenames, Git tags,
+and GitHub releases continue to use the full four-part `MAJOR.MINOR.PATCH.BUILD` identity.
