@@ -560,7 +560,11 @@ internal class AndroidMemoryLayerRuntime(
         }
     }
 
-    init {
+    private var activated = false
+
+    fun activate() {
+        if (activated) return
+        activated = true
         MemoryRuntimeBridge.observer = observer
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         scope.launch { drainConsolidationQueue() }
