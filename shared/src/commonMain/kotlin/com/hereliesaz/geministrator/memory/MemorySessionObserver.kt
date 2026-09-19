@@ -84,7 +84,9 @@ class QueuedMemorySessionObserver(
         }
 
         mutex.withLock {
-            captures.putIfAbsent(handle, Capture(request, workflowObjective, initialParts))
+            if (handle !in captures) {
+                captures[handle] = Capture(request, workflowObjective, initialParts)
+            }
         }
     }
 
