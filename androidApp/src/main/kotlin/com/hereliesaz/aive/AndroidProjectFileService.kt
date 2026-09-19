@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
-import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -170,28 +169,26 @@ internal class AndroidProjectFileService(
             return fileDescriptor(File(requireNotNull(uri.path)))
         }
         var displayName: String? = null
-        var modifiedAt: Long? = null
-        resolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME, DocumentsContract.Document.COLUMN_LAST_MODIFIED),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    .takeIf { it >= 0 }
-                    ?.let { displayName = cursor.getString(it) }
-                cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                    .takeIf { it >= 0 && !cursor.isNull(it) }
-                    ?.let { modifiedAt = cursor.getLong(it) }
+        runCatching {
+            resolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        .takeIf { it >= 0 }
+                        ?.let { displayName = cursor.getString(it) }
+                }
             }
         }
         return ProjectFileDescriptor(
             id = uri.toString(),
             displayName = displayName?.takeIf(String::isNotBlank) ?: "project$IVE_FILE_EXTENSION",
             locationLabel = uri.toString(),
-            modifiedAtEpochMillis = modifiedAt,
+            modifiedAtEpochMillis = null,
         )
     }
 
