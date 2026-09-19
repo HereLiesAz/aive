@@ -17,8 +17,11 @@ import androidx.compose.ui.Modifier
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
@@ -319,6 +322,39 @@ fun App(
                                     throw failure
                                 } catch (failure: Exception) {
                                     runtimeState = failure.toRuntimeFailureState("Reset company failed")
+                                }
+                            }
+                        },
+                        onAssignWorkflowCompute = { definitionId, target ->
+                            scope.launch {
+                                try {
+                                    runtime?.assignWorkflowCompute(definitionId, target)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Workflow delegation failed")
+                                }
+                            }
+                        },
+                        onAssignRoleCompute = { definitionId, roleId, target ->
+                            scope.launch {
+                                try {
+                                    runtime?.assignRoleCompute(definitionId, roleId, target)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Role delegation failed")
+                                }
+                            }
+                        },
+                        onAssignTaskCompute = { definitionId, taskId, target ->
+                            scope.launch {
+                                try {
+                                    runtime?.assignTaskCompute(definitionId, taskId, target)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState("Task delegation failed")
                                 }
                             }
                         },
