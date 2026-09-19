@@ -102,6 +102,9 @@ jobs:
           echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "Android release versionCode: $VERSION_CODE"
 
+      - name: Verify immutable release policy
+        run: python3 .github/scripts/verify_release_immutability.py
+
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 
@@ -404,7 +407,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish rolling release
+    name: Publish versioned release
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs:
       - build
@@ -467,8 +470,7 @@ jobs:
 
           MAJOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f1)
           MINOR=$(printf '%s' "$VERSION_NAME" | cut -d. -f2)
-          MAJOR_MINOR="${MAJOR}.${MINOR}"
-          TAG_NAME="latest-v${MAJOR_MINOR}"
+          TAG_NAME="v${VERSION_NAME}"
           RELEASE_TITLE="The Aive ${VERSION_NAME}"
 
           IS_PRERELEASE=false
@@ -506,7 +508,7 @@ jobs:
           {
             echo "# The Aive ${VERSION_NAME}"
             echo
-            echo "Rolling build from commit \`${GITHUB_SHA}\`."
+            echo "Versioned build from commit \`${GITHUB_SHA}\`."
             if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
               echo
               echo "## Changes"
@@ -515,7 +517,6 @@ jobs:
           } > release-notes.md
 
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "MAJOR_MINOR=$MAJOR_MINOR" >> "$GITHUB_ENV"
           echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
           echo "RELEASE_TITLE=$RELEASE_TITLE" >> "$GITHUB_ENV"
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
@@ -523,42 +524,36 @@ jobs:
           echo "Release assets:"
           ls -lh release-files
 
-      - name: Publish rolling release
+      - name: Publish versioned release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
-          for pattern in 'latest-debug-v*' 'latest-alpha-v*' 'latest-beta-v*'; do
-            while IFS= read -r LEGACY_TAG; do
-              [ -n "$LEGACY_TAG" ] || continue
-              if gh release view "$LEGACY_TAG" >/dev/null 2>&1; then
-                gh release delete "$LEGACY_TAG" --yes --cleanup-tag
-              else
-                git push origin ":refs/tags/$LEGACY_TAG" || true
-              fi
-            done < <(git tag -l "$pattern")
-          done
+          # Release history is immutable. A semantic version may be published exactly once.
+          # Never move a version tag, edit an existing release into a newer version, delete its
+          # assets, or upload replacement assets over it.
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Release $TAG_NAME already exists. Leaving the existing release completely unchanged."
+            exit 0
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa "$TAG_NAME" -m "Latest Aive ${VERSION_NAME}"
-          git push origin "$TAG_NAME" --force
 
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            # A rolling release represents exactly one build. Prune previous-version assets
-            # before uploading the current set so renamed/versioned files cannot accumulate.
-            while IFS= read -r EXISTING_ASSET; do
-              [ -n "$EXISTING_ASSET" ] || continue
-              gh release delete-asset "$TAG_NAME" "$EXISTING_ASSET" --yes
-            done < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
+            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
+              echo "::error::Immutable tag $TAG_NAME already exists at $TAG_COMMIT; refusing to move it to $GITHUB_SHA"
+              exit 1
+            fi
+          else
+            git tag -a "$TAG_NAME" -m "The Aive ${VERSION_NAME}"
+            git push origin "$TAG_NAME"
+          fi
 
-            gh release edit "$TAG_NAME" \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-            gh release upload "$TAG_NAME" release-files/*
-          elif [ "$IS_PRERELEASE" = "true" ]; then
+          if [ "$IS_PRERELEASE" = "true" ]; then
             gh release create "$TAG_NAME" release-files/* \
               --prerelease \
               --verify-tag \
