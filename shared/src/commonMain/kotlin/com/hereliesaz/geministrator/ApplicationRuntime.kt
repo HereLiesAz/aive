@@ -460,7 +460,7 @@ class ApplicationRuntime private constructor(
         return IveProjectExport(
             projectId = project.id.value,
             projectName = project.name,
-            fileName = project.name.asIveFileName(),
+            fileName = (project.name + "-" + project.id.value.takeLast(8)).asIveFileName(),
             content = encoded,
         )
     }
