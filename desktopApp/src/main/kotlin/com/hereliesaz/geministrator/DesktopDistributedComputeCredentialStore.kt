@@ -6,7 +6,8 @@ internal class DesktopDistributedComputeCredentialStore {
     private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     fun readToken(): String? =
-        System.getenv("HAIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
+        System.getenv("AIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
+            ?: System.getenv("HAIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
             ?: readFromKeychain()
             ?: fallback.get(ACCOUNT, null)?.trim()?.takeIf(String::isNotEmpty)
 
@@ -98,7 +99,7 @@ internal class DesktopDistributedComputeCredentialStore {
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
                     val process = ProcessBuilder(
                         "secret-tool", "store",
-                        "--label", "Haive distributed compute relay",
+                        "--label", "Aive distributed compute relay",
                         "service", KEYCHAIN_SERVICE,
                         "account", ACCOUNT,
                     ).start()
