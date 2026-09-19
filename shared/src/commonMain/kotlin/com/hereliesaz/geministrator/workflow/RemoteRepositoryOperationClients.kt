@@ -66,9 +66,7 @@ class GitHubRestRepositoryOperationClient(
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitHub)
-        require(repository.remoteUrl == null || repository.remoteUrl.contains("github.com")) {
-            "GitHub Enterprise repository operations require an explicit enterprise API configuration"
-        }
+        repository.requirePublicRemoteHost("github.com", "GitHub")
         val token = tokenProvider.requireToken("GitHub")
         val parsed = RemoteRepositoryOperation.parse(operation)
         val run = when (parsed) {
@@ -205,6 +203,7 @@ class GitLabRestRepositoryOperationClient(
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitLab)
+        repository.requirePublicRemoteHost("gitlab.com", "GitLab")
         val token = tokenProvider.requireToken("GitLab")
         val parsed = RemoteRepositoryOperation.parse(operation)
         val run = when (parsed) {
@@ -399,16 +398,26 @@ private suspend fun RepositoryServiceTokenProvider.requireToken(service: String)
     getToken().trim().also { require(it.isNotEmpty()) { "$service repository credential is not configured" } }
 
 private fun RepositoryRef.gitLabApiBase(): String {
-    val remote = remoteUrl.orEmpty().trim()
+    requirePublicRemoteHost("gitlab.com", "GitLab")
+    return "https://gitlab.com/api/v4"
+}
+
+private fun RepositoryRef.requirePublicRemoteHost(expectedHost: String, service: String) {
+    val remote = remoteUrl?.trim().orEmpty()
+    if (remote.isBlank()) return
+
     val host = when {
-        remote.startsWith("http://") -> remote.substringAfter("http://").substringBefore('/')
-        remote.startsWith("https://") -> remote.substringAfter("https://").substringBefore('/')
-        remote.startsWith("git@") -> remote.substringAfter("git@").substringBefore(':')
-        remote.startsWith("ssh://") -> remote.substringAfter("ssh://").substringAfter('@').substringBefore('/').substringBefore(':')
-        else -> "gitlab.com"
-    }.ifBlank { "gitlab.com" }
-    val scheme = if (remote.startsWith("http://")) "http" else "https"
-    return "$scheme://$host/api/v4"
+        remote.startsWith("https://", ignoreCase = true) ->
+            remote.substringAfter("://").substringBefore('/').substringAfter('@').substringBefore(':')
+        remote.startsWith("git@", ignoreCase = true) ->
+            remote.substringAfter('@').substringBefore(':')
+        remote.startsWith("ssh://", ignoreCase = true) ->
+            remote.substringAfter("://").substringBefore('/').substringAfter('@').substringBefore(':')
+        else -> error("$service repository credentials require an HTTPS or SSH locator")
+    }
+    require(host.equals(expectedHost, ignoreCase = true)) {
+        "$service repository credentials are configured only for $expectedHost"
+    }
 }
 
 @OptIn(ExperimentalTime::class)
