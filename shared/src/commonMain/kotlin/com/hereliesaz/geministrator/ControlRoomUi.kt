@@ -49,9 +49,13 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlin.math.roundToInt
@@ -70,6 +74,7 @@ enum class ControlRoomDestination(val label: String) {
     Artifacts("Artifacts"),
     Inbox("Inbox"),
     Repositories("Repositories"),
+    Compute("Compute"),
     AddOns("ADD-ONS"),
     Settings("Settings"),
 }
@@ -130,6 +135,9 @@ fun ControlRoom(
     onValidateWorkflow: () -> List<String> = { emptyList() },
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     onResetRoleCollection: () -> Unit = {},
+    onAssignWorkflowCompute: (WorkflowDefinitionId, ComputeDelegationTarget) -> Unit = { _, _ -> },
+    onAssignRoleCompute: (WorkflowDefinitionId, RoleDefinitionId, ComputeDelegationTarget) -> Unit = { _, _, _ -> },
+    onAssignTaskCompute: (WorkflowDefinitionId, TaskDefinitionId, ComputeDelegationTarget) -> Unit = { _, _, _ -> },
     onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
@@ -193,6 +201,9 @@ fun ControlRoom(
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRoleCollection = onSaveRoleCollection,
                     onResetRoleCollection = onResetRoleCollection,
+                    onAssignWorkflowCompute = onAssignWorkflowCompute,
+                    onAssignRoleCompute = onAssignRoleCompute,
+                    onAssignTaskCompute = onAssignTaskCompute,
                     onSearchRepositories = onSearchRepositories,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
@@ -263,6 +274,9 @@ fun ControlRoom(
                     onValidateWorkflow = onValidateWorkflow,
                     onSaveRoleCollection = onSaveRoleCollection,
                     onResetRoleCollection = onResetRoleCollection,
+                    onAssignWorkflowCompute = onAssignWorkflowCompute,
+                    onAssignRoleCompute = onAssignRoleCompute,
+                    onAssignTaskCompute = onAssignTaskCompute,
                     onSearchRepositories = onSearchRepositories,
                     availableRepositorySources = availableRepositorySources,
                     onPickLocalRepository = onPickLocalRepository,
@@ -481,6 +495,9 @@ private fun MainDestination(
     onValidateWorkflow: () -> List<String>,
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit,
     onResetRoleCollection: () -> Unit,
+    onAssignWorkflowCompute: (WorkflowDefinitionId, ComputeDelegationTarget) -> Unit,
+    onAssignRoleCompute: (WorkflowDefinitionId, RoleDefinitionId, ComputeDelegationTarget) -> Unit,
+    onAssignTaskCompute: (WorkflowDefinitionId, TaskDefinitionId, ComputeDelegationTarget) -> Unit,
     onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion>,
     availableRepositorySources: Set<RepositorySource>,
     onPickLocalRepository: (() -> String?)?,
@@ -543,6 +560,14 @@ private fun MainDestination(
                 connectedServiceIds = connectedRepositoryServiceIds,
                 onConfigureService = onConfigureRepositoryService,
                 onDisconnectService = onDisconnectRepositoryService,
+                modifier = Modifier.fillMaxSize(),
+            )
+            ControlRoomDestination.Compute -> ComputeDelegationScreen(
+                runtimeState = runtimeState,
+                distributedComputeState = distributedComputeState,
+                onAssignWorkflow = onAssignWorkflowCompute,
+                onAssignRole = onAssignRoleCompute,
+                onAssignTask = onAssignTaskCompute,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.AddOns -> AzphaltStoreScreen(

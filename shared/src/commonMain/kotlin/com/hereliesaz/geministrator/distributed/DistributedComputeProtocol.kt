@@ -56,6 +56,7 @@ data class ComputeNodeDescriptor(
         if (!accelerators.containsAll(requirements.requiredAccelerators)) return false
         if (!capabilities.containsAll(requirements.requiredCapabilities)) return false
         if (!installedModelIds.containsAll(requirements.requiredModelIds)) return false
+        if (requirements.requiredNodeIds.isNotEmpty() && nodeId !in requirements.requiredNodeIds) return false
         val kind = delegatedExecutor.distributedKind()
         return supportedExecutorKinds.isEmpty() || kind in supportedExecutorKinds
     }

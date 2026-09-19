@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -24,6 +25,10 @@ import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
+import com.hereliesaz.geministrator.distributed.withRoleComputeDelegation
+import com.hereliesaz.geministrator.distributed.withTaskComputeDelegation
+import com.hereliesaz.geministrator.distributed.withWorkflowComputeDelegation
 import com.hereliesaz.geministrator.persistence.PersistenceCorruptionException
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
@@ -467,6 +472,68 @@ class ApplicationRuntime private constructor(
     suspend fun resetRoleCollection() {
         val existing = persistence.roles.all()
         defaultRoleCollectionEntries(existing).forEach { persistence.roles.put(it) }
+    }
+
+    suspend fun assignWorkflowCompute(
+        workflowDefinitionId: WorkflowDefinitionId,
+        target: ComputeDelegationTarget,
+    ) {
+        updateComputeDelegation(workflowDefinitionId) { definition ->
+            definition.withWorkflowComputeDelegation(target)
+        }
+    }
+
+    suspend fun assignRoleCompute(
+        workflowDefinitionId: WorkflowDefinitionId,
+        roleId: RoleDefinitionId,
+        target: ComputeDelegationTarget,
+    ) {
+        updateComputeDelegation(workflowDefinitionId) { definition ->
+            definition.withRoleComputeDelegation(roleId, target)
+        }
+    }
+
+    suspend fun assignTaskCompute(
+        workflowDefinitionId: WorkflowDefinitionId,
+        taskDefinitionId: TaskDefinitionId,
+        target: ComputeDelegationTarget,
+    ) {
+        updateComputeDelegation(workflowDefinitionId) { definition ->
+            definition.withTaskComputeDelegation(taskDefinitionId, target)
+        }
+    }
+
+    private suspend fun updateComputeDelegation(
+        workflowDefinitionId: WorkflowDefinitionId,
+        transform: (WorkflowDefinition) -> WorkflowDefinition,
+    ) {
+        runtimeMutex.withLock {
+            val active = current
+            val viewed = viewingRun
+            val base = when {
+                active?.definition?.id == workflowDefinitionId -> active.definition
+                viewed?.definition?.id == workflowDefinitionId -> viewed.definition
+                else -> persistence.definitions.get(workflowDefinitionId)
+            } ?: error("Workflow definition " + workflowDefinitionId.value + " was not found")
+
+            val updated = transform(base)
+            if (updated == base) return@withLock
+            persistence.definitions.put(updated)
+
+            if (active?.definition?.id == workflowDefinitionId) {
+                currentGeneration += 1L
+                current = active.copy(definition = updated)
+            }
+            if (viewed?.definition?.id == workflowDefinitionId) {
+                viewingRun = viewed.copy(definition = updated)
+            }
+            if (
+                current?.definition?.id == workflowDefinitionId ||
+                viewingRun?.definition?.id == workflowDefinitionId
+            ) {
+                publishCurrent()
+            }
+        }
     }
 
     fun validateCurrentWorkflow(): List<String> {
