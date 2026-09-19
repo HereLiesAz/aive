@@ -57,7 +57,7 @@ internal fun CompanyProviderScreen(
     ) {
         Text("COMPANY", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Assign each company role to the provider you want. AUTO lets Haive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
+            "Assign each company role to the provider you want. AUTO lets Aive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -386,7 +386,7 @@ internal fun ProviderSettingsScreen(
 
         ProviderSectionLabel("Compute Pool")
         Text(
-            "Connect this device to the same Haive compute pool as your other phones and desktops. " +
+            "Connect this device to the same Aive compute pool as your other phones and desktops. " +
                 "Every device connects outbound to the relay, so no inbound port or shared local network is required.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
