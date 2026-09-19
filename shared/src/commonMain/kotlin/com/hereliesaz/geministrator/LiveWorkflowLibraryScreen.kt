@@ -27,6 +27,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.nullable
 
 private enum class WorkflowLibraryFilter(val label: String) {
     All("All"),
@@ -47,16 +48,30 @@ internal fun LiveWorkflowLibraryScreen(
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(WorkflowLibraryFilter.All) }
-    var selectedKey by remember { mutableStateOf<String?>(null) }
-    var draft by remember { mutableStateOf<WorkflowDefinition?>(null) }
-    var draftOrigin by remember { mutableStateOf<WorkflowLibraryOrigin?>(null) }
-    var selectedTaskId by remember { mutableStateOf<String?>(null) }
-    var roleQuery by remember { mutableStateOf("") }
-    var composeQuery by remember { mutableStateOf("") }
-    var saveId by remember { mutableStateOf("") }
-    var saveName by remember { mutableStateOf("") }
+    var query by rememberDurableStringState("workflows.query")
+    var filterName by rememberDurableStringState("workflows.filter", WorkflowLibraryFilter.All.name)
+    val filter = WorkflowLibraryFilter.entries.firstOrNull { it.name == filterName } ?: WorkflowLibraryFilter.All
+    var selectedKeyValue by rememberDurableStringState("workflows.selected-key")
+    var selectedKey: String?
+        get() = selectedKeyValue.takeIf(String::isNotBlank)
+        set(value) { selectedKeyValue = value.orEmpty() }
+    var draft by rememberDurableJsonState(
+        key = "workflows.draft",
+        serializer = WorkflowDefinition.serializer().nullable,
+        initialValue = null,
+    )
+    var draftOriginName by rememberDurableStringState("workflows.draft-origin")
+    var draftOrigin: WorkflowLibraryOrigin?
+        get() = WorkflowLibraryOrigin.entries.firstOrNull { it.name == draftOriginName }
+        set(value) { draftOriginName = value?.name.orEmpty() }
+    var selectedTaskIdValue by rememberDurableStringState("workflows.selected-task-id")
+    var selectedTaskId: String?
+        get() = selectedTaskIdValue.takeIf(String::isNotBlank)
+        set(value) { selectedTaskIdValue = value.orEmpty() }
+    var roleQuery by rememberDurableStringState("workflows.role-query")
+    var composeQuery by rememberDurableStringState("workflows.compose-query")
+    var saveId by rememberDurableStringState("workflows.save-id")
+    var saveName by rememberDurableStringState("workflows.save-name")
     var refreshGeneration by remember { mutableStateOf(0) }
 
     LaunchedEffect(runtimeState, host, refreshGeneration) {
@@ -146,7 +161,7 @@ internal fun LiveWorkflowLibraryScreen(
                                 WorkflowLibraryFilter.Authored -> loaded.count { it.origin == WorkflowLibraryOrigin.Authored }
                                 WorkflowLibraryFilter.Roles -> loaded.count { it.origin == WorkflowLibraryOrigin.Role }
                             }.toString(),
-                            onClick = { filter = item },
+                            onClick = { filterName = item.name },
                         )
                     }
                 }
