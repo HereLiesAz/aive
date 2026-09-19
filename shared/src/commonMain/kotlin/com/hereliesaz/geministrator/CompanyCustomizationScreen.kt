@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,8 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.SetSerializer
 
 @Composable
 internal fun CustomCompanyProviderScreen(
@@ -41,17 +44,50 @@ internal fun CustomCompanyProviderScreen(
         ?: (runtimeState as? ApplicationRuntimeState.NoRun)?.roles
         ?: emptyList()
     val visibleRoles = runtimeRoles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
-    var draftRoles by remember(visibleRoles) { mutableStateOf(visibleRoles) }
-    var editingRoleId by remember { mutableStateOf<String?>(null) }
-    var showRoleForm by remember { mutableStateOf(false) }
-    var roleIdDraft by remember { mutableStateOf("") }
-    var roleNameDraft by remember { mutableStateOf("") }
-    var roleDescDraft by remember { mutableStateOf("") }
-    var roleInstructionsDraft by remember { mutableStateOf("") }
-    var roleProviderDraft by remember { mutableStateOf<String?>(null) }
-    var roleCapabilitiesDraft by remember { mutableStateOf<Set<AgentCapability>>(emptySet()) }
-    var roleAuthoritiesDraft by remember { mutableStateOf<Set<RoleAuthority>>(emptySet()) }
+    var draftRoles by rememberDurableJsonState(
+        key = COMPANY_DRAFT_ROLES_KEY,
+        serializer = ListSerializer(RoleDefinition.serializer()),
+        initialValue = visibleRoles,
+    )
+    var editingRoleIdValue by rememberDurableStringState(COMPANY_EDITING_ROLE_KEY)
+    var editingRoleId: String?
+        get() = editingRoleIdValue.takeIf(String::isNotBlank)
+        set(value) { editingRoleIdValue = value.orEmpty() }
+    var showRoleForm by rememberDurableBooleanState(COMPANY_SHOW_ROLE_FORM_KEY)
+    var roleIdDraft by rememberDurableStringState(COMPANY_ROLE_ID_KEY)
+    var roleNameDraft by rememberDurableStringState(COMPANY_ROLE_NAME_KEY)
+    var roleDescDraft by rememberDurableStringState(COMPANY_ROLE_DESCRIPTION_KEY)
+    var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
+    var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
+    var roleProviderDraft: String?
+        get() = roleProviderDraftValue.takeIf(String::isNotBlank)
+        set(value) { roleProviderDraftValue = value.orEmpty() }
+    var roleCapabilitiesDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_CAPABILITIES_KEY,
+        serializer = SetSerializer(AgentCapability.serializer()),
+        initialValue = emptySet(),
+    )
+    var roleAuthoritiesDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_AUTHORITIES_KEY,
+        serializer = SetSerializer(RoleAuthority.serializer()),
+        initialValue = emptySet(),
+    )
     var resetConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
+        if (!showRoleForm && draftRoles == visibleRoles) {
+            DurableUiState.store.remove(COMPANY_DRAFT_ROLES_KEY)
+            DurableUiState.store.remove(COMPANY_EDITING_ROLE_KEY)
+            DurableUiState.store.remove(COMPANY_SHOW_ROLE_FORM_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_ID_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_NAME_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_DESCRIPTION_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_CAPABILITIES_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_AUTHORITIES_KEY)
+        }
+    }
 
     fun clearEditor() {
         editingRoleId = null
@@ -445,6 +481,17 @@ private fun RoleDefinition.companyDepartment(): String = when (id.value) {
     "release-engineer" -> "Delivery"
     else -> "Custom"
 }
+
+private const val COMPANY_DRAFT_ROLES_KEY = "company.draft-roles"
+private const val COMPANY_EDITING_ROLE_KEY = "company.editing-role"
+private const val COMPANY_SHOW_ROLE_FORM_KEY = "company.show-role-form"
+private const val COMPANY_ROLE_ID_KEY = "company.role.id"
+private const val COMPANY_ROLE_NAME_KEY = "company.role.name"
+private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
+private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
+private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
+private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
+private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
 
 private fun <T> Set<T>.toggle(value: T): Set<T> = if (value in this) this - value else this + value
 
