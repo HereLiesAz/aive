@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
-                val projectFileService = remember { DesktopProjectFileService() }
+    val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
     val initialProviderCredentials = readDesktopProviderCredentials(providerCredentialStore)
     val initialRepositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
