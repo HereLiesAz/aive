@@ -43,6 +43,7 @@ class ProviderBackedManagedSessionGateway(
 
     private val mutex = Mutex()
     private val snapshots = mutableMapOf<ManagedSessionHandle, SessionSnapshot>()
+    private val observedEventKeys = mutableMapOf<ManagedSessionHandle, MutableSet<String>>()
 
     override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
         selectProvider(selection, "No registered provider can satisfy this task").id
@@ -131,6 +132,15 @@ class ProviderBackedManagedSessionGateway(
         providerOperation("Unable to reconnect provider session ${handle.providerRunId.value}") {
             registerAndObserve(handle, initialStatus)
         }
+    }
+
+    override suspend fun reconnect(
+        handle: ManagedSessionHandle,
+        initialStatus: ManagedSessionStatus,
+        request: AgentTaskRequest,
+    ) {
+        recordMemory { memoryObserver.onSessionStarted(handle, request) }
+        reconnect(handle, initialStatus)
     }
 
     override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus =
@@ -319,6 +329,12 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         event: AgentEvent,
     ) {
+        val eventKey = event.memoryReplayKey()
+        val unseen = mutex.withLock {
+            observedEventKeys.getOrPut(handle) { linkedSetOf() }.add(eventKey)
+        }
+        if (!unseen) return
+
         val effectiveEvent = when (event) {
             is AgentEvent.ArtifactProduced -> {
                 val invocationId = handle.inferenceInvocationId
@@ -417,6 +433,18 @@ class ProviderBackedManagedSessionGateway(
             )
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }
+    }
+
+    private fun AgentEvent.memoryReplayKey(): String = when (this) {
+        is AgentEvent.PlanGenerated -> "plan:${runId.value}:${summary}"
+        is AgentEvent.PlanApproved -> "approved:${runId.value}"
+        is AgentEvent.Progress -> "progress:${runId.value}:${fraction}:${message}"
+        is AgentEvent.Message -> "message:${runId.value}:${content}"
+        is AgentEvent.ArtifactProduced -> "artifact:${runId.value}:${artifact.identityKey()}"
+        is AgentEvent.Completed -> "completed:${runId.value}"
+        is AgentEvent.Failed -> "failed:${runId.value}:${reason}"
+        is AgentEvent.UsageReported ->
+            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}"
     }
 
     private fun List<ProviderArtifact>.upsertArtifact(artifact: ProviderArtifact): List<ProviderArtifact> {
