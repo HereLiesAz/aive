@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
+                val projectFileService = remember { DesktopProjectFileService() }
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
     val initialProviderCredentials = readDesktopProviderCredentials(providerCredentialStore)
     val initialRepositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
@@ -157,6 +158,7 @@ fun main() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        projectFileService = projectFileService,
                         availableRepositorySources = RepositorySource.entries.toSet(),
                         onPickLocalRepository = ::pickLocalGitFolder,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
