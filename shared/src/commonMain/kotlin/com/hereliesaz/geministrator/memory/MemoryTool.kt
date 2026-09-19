@@ -257,7 +257,7 @@ private fun MemorySnapshot.activeNodes(query: MemoryQuery?): List<MemoryNode> {
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
 
-    if (query == null || !query.hasScopeConstraints()) {
+    if (query == null || !query.hasHardScopeConstraints()) {
         return nodes.filter { it.id !in superseded }
     }
 
@@ -266,12 +266,17 @@ private fun MemorySnapshot.activeNodes(query: MemoryQuery?): List<MemoryNode> {
         node.id !in superseded &&
             node.sourceEpisodeIds.isNotEmpty() &&
             node.sourceEpisodeIds.any { episodeId ->
-                episodesById[episodeId]?.let(query::matchesScope) == true
+                episodesById[episodeId]?.let(query::matchesHardScope) == true
             }
     }
 }
 
-private fun MemoryQuery.hasScopeConstraints(): Boolean =
+private fun MemoryQuery.hasHardScopeConstraints(): Boolean = projectId != null
+
+private fun MemoryQuery.matchesHardScope(episode: MemoryEpisode): Boolean =
+    projectId == null || projectId == episode.projectId
+
+private fun MemoryQuery.hasAffinityConstraints(): Boolean =
     projectId != null ||
         workflowRunId != null ||
         workflowDefinitionId != null ||
@@ -279,25 +284,17 @@ private fun MemoryQuery.hasScopeConstraints(): Boolean =
         taskDefinitionId != null ||
         roleId != null
 
-private fun MemoryQuery.matchesScope(episode: MemoryEpisode): Boolean =
-    (projectId == null || projectId == episode.projectId) &&
-        (workflowRunId == null || workflowRunId == episode.workflowRunId) &&
-        (workflowDefinitionId == null || workflowDefinitionId == episode.workflowDefinitionId) &&
-        (taskRunId == null || taskRunId == episode.taskRunId) &&
-        (taskDefinitionId == null || taskDefinitionId == episode.taskDefinitionId) &&
-        (roleId == null || roleId == episode.roleId)
-
 private fun scopeAffinity(
     query: MemoryQuery,
     node: MemoryNode,
     episodesById: Map<MemoryEpisodeId, MemoryEpisode>,
 ): Float {
-    if (!query.hasScopeConstraints()) return 0f
+    if (!query.hasAffinityConstraints()) return 0f
 
     return node.sourceEpisodeIds
         .asSequence()
         .mapNotNull(episodesById::get)
-        .filter(query::matchesScope)
+        .filter(query::matchesHardScope)
         .maxOfOrNull { episode ->
             var score = 0f
             if (query.projectId != null && query.projectId == episode.projectId) score += 0.05f

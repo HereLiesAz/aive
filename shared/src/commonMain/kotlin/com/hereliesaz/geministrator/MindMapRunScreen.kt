@@ -225,7 +225,6 @@ internal fun MindMapRunScreen(
                                 )
                             },
                             singleLine = true,
-                            readOnly = repositorySource == RepositorySource.Local && onPickLocalRepository != null,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .onFocusChanged { focus ->
@@ -288,7 +287,6 @@ internal fun MindMapRunScreen(
                             )
                         },
                         singleLine = true,
-                        readOnly = repositorySource == RepositorySource.Local && onPickLocalRepository != null,
                         modifier = Modifier.fillMaxWidth(),
                         isError = repositoryError != null,
                         supportingText = repositoryError?.let { message ->

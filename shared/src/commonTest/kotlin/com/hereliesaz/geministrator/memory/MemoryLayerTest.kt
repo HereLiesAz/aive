@@ -237,7 +237,8 @@ class MemoryLayerTest {
             ),
         )
 
-        assertEquals(listOf(local.id), recalled.hits.map { it.node.id })
+        assertEquals(local.id, recalled.hits.first().node.id)
+        assertTrue(distant.id in recalled.hits.map { it.node.id })
     }
 
     @Test

@@ -24,7 +24,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
-import com.hereliesaz.geministrator.domain.validateRoleCollectionForStarterWorkflow
+import com.hereliesaz.geministrator.domain.requireStarterRoleCoverage
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.withRoleComputeDelegation
@@ -130,7 +130,7 @@ class ApplicationRuntime private constructor(
                 val projects = persistence.projects.all()
                 if (projects.isEmpty()) {
                     replaceCurrent(null)
-                    publisher.publish(ApplicationRuntimeState.NoProject(roles = roles))
+                    publisher.publish(ApplicationRuntimeState.NoProject(roles))
                     return@withLock
                 }
 
@@ -151,10 +151,7 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
-                val (storedProject, run) = latestProjectRun
-                val project = storedProject.copy(
-                    repository = run.repositorySnapshot ?: storedProject.repository,
-                )
+                val (project, run) = latestProjectRun
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -190,11 +187,8 @@ class ApplicationRuntime private constructor(
             try {
                 val run = persistence.runs.get(runId)
                     ?: error("Run ${runId.value} not found")
-                val storedProject = persistence.projects.get(run.projectId)
+                val project = persistence.projects.get(run.projectId)
                     ?: error("Project ${run.projectId.value} not found")
-                val project = storedProject.copy(
-                    repository = run.repositorySnapshot ?: storedProject.repository,
-                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} not found")
                 viewingRun = ViewingRun(project, definition, run)
@@ -229,7 +223,7 @@ class ApplicationRuntime private constructor(
             val now = nowEpochMillis()
             val project = existingProject?.copy(
                 name = cleanProjectName,
-                repository = normalizedRepository,
+                repository = normalizedRepository ?: existingProject.repository,
                 updatedAtEpochMillis = now,
             ) ?: Project(
                 id = ProjectId("project-$now"),
@@ -406,7 +400,7 @@ class ApplicationRuntime private constructor(
                         project = viewing.project,
                         definition = viewing.definition,
                         run = viewing.run,
-                        roles = mergedPresentationRoles(viewing.run),
+                        roles = roles,
                     ),
                 ),
             )
@@ -419,15 +413,11 @@ class ApplicationRuntime private constructor(
                     project = snapshot.project,
                     definition = snapshot.definition,
                     run = snapshot.state.run,
-                    roles = mergedPresentationRoles(snapshot.state.run),
+                    roles = roles,
                 ),
             ),
         )
     }
-
-    private fun mergedPresentationRoles(run: WorkflowRun): List<RoleDefinition> =
-        (run.roleSnapshot + roles)
-            .distinctBy(RoleDefinition::id)
 
     internal fun publishFailure(failure: Throwable) {
         val message = failure.message
@@ -496,9 +486,6 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
-                val runProject = project.copy(
-                    repository = run.repositorySnapshot ?: project.repository,
-                )
                 val definition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
@@ -506,7 +493,7 @@ class ApplicationRuntime private constructor(
                 } catch (failure: Throwable) {
                     throw classifyResumeFailure(failure)
                 }
-                replaceCurrent(Current(runProject, definition, runtimeState))
+                replaceCurrent(Current(project, definition, runtimeState))
                 publishCurrent()
                 startCycling()
             } catch (failure: Throwable) {
@@ -532,14 +519,22 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun saveRoleCollection(activeRoleCollection: List<RoleDefinition>) {
-        validateRoleCollectionForStarterWorkflow(activeRoleCollection)
+        requireStarterRoleCoverage(activeRoleCollection)
         val existing = persistence.roles.all()
-        persistence.roles.replaceAll(roleCollectionEntries(activeRoleCollection, existing))
+        val nextRoles = roleCollectionEntries(activeRoleCollection, existing)
+        persistence.replaceCatalog(
+            definitions = persistence.definitions.all(),
+            roles = nextRoles,
+        )
     }
 
     suspend fun resetRoleCollection() {
         val existing = persistence.roles.all()
-        persistence.roles.replaceAll(defaultRoleCollectionEntries(existing))
+        val nextRoles = defaultRoleCollectionEntries(existing)
+        persistence.replaceCatalog(
+            definitions = persistence.definitions.all(),
+            roles = nextRoles,
+        )
     }
 
     suspend fun assignWorkflowCompute(
@@ -721,7 +716,7 @@ class ApplicationRuntime private constructor(
             val registry = AgentProviderRegistry(providers)
             val gateway = ProviderBackedManagedSessionGateway(registry, runtimeScope)
             val publisher = WorkflowRuntimePublisher()
-            val effectiveExecutorIntegrations = executorIntegrations.withPriorityIntegration(
+            val effectiveExecutorIntegrations = executorIntegrations.withIntegration(
                 com.hereliesaz.geministrator.workflow.GenealogyGovernanceExecutorIntegration(
                     registry.genealogyGovernance,
                 ),

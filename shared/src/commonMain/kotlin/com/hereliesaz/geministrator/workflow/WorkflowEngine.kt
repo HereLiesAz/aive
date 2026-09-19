@@ -453,6 +453,7 @@ class WorkflowEngine(
         retryReason: RetryReason,
         reason: String,
         nowEpochMillis: Long,
+        allowRetry: Boolean = true,
     ): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val task = requireNotNull(definition.tasks.firstOrNull { it.id == taskDefinitionId }) {
@@ -463,7 +464,7 @@ class WorkflowEngine(
         }
         val decision = FailurePolicyEvaluator.decide(
             taskRun = taskRun,
-            retryPolicy = task.retryPolicy,
+            retryPolicy = if (allowRetry) task.retryPolicy else task.retryPolicy.copy(retryOn = emptySet()),
             escalationPolicy = task.escalationPolicy,
             reason = retryReason,
         )

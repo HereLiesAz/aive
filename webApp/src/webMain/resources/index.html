@@ -15,7 +15,7 @@
 <body>
     <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Aive">
         <img id="haiveSplashFrame0" src="haive_loader_frame0.png" alt="" aria-hidden="true" />
-        <img id="haiveSplashAnimation" alt="" aria-hidden="true" />
+        <img id="haiveSplashAnimation" data-src="haive_loader.gif" alt="" aria-hidden="true" />
     </div>
     <div id="webApp"></div>
     <script>
@@ -32,13 +32,13 @@
                 frame0.classList.add("haive-loader-replaced");
             };
 
-            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-            if (animation && !reducedMotion) {
+            const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+            if (animation && !reduceMotion) {
                 animation.addEventListener("load", revealAnimation, { once: true });
-                // Assign the GIF only after the static frame and startup script exist. This avoids
-                // parser-preloading a large animation ahead of the application bundle.
-                animation.src = "haive_loader.gif";
+                animation.src = animation.dataset.src;
                 if (animation.complete) revealAnimation();
+            } else if (animation) {
+                animation.remove();
             }
 
             const dismissSplash = () => {

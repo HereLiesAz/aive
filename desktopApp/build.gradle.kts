@@ -123,24 +123,20 @@ val appVersionComponents = appVersionName.split('.')
 require(appVersionComponents.size == 4 && appVersionComponents.all { it.toIntOrNull() != null }) {
     "app.versionName must use MAJOR.MINOR.PATCH.BUILD"
 }
-// Native desktop package metadata stays at MAJOR.MINOR.PATCH because jpackage/MSI/DMG impose
-// stricter version syntax. Public release identity and asset names keep all four components.
-val appPackageVersionComponents = appVersionComponents.map { it.toInt() }
-val isMacPackage = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
-// Native installer versions have already shipped above the public 0.x line. Keep a permanent
-// compatibility epoch and use the CI BUILD number as the native patch component. GitHub's run
-// number is monotonic, so every rolling installer compares newer than the previous one even when
-// several builds share the same public MAJOR.MINOR.PATCH line.
-val nativeMajorOffset = if (isMacPackage) 2 else 1
-val nativeBuild = appPackageVersionComponents[3]
-require(nativeBuild in 0..65535) {
-    "Desktop native BUILD component must fit the installer patch range (0..65535)"
+// Native package formats require a three-part numeric version. Encode the public major/minor
+// release line plus CI's globally increasing build number so every installer version is monotonic
+// even when multiple builds share one patch version. A constant native major of 1 also satisfies
+// macOS without inventing a fake public 2.x version when The Aive reaches 1.x.
+val publicMajor = appVersionComponents[0].toInt()
+val publicMinor = appVersionComponents[1].toInt()
+val buildNumber = appVersionComponents[3].toInt()
+require(publicMajor in 0..2 && publicMinor in 0..99) {
+    "Native package version encoding supports public MAJOR 0..2 and MINOR 0..99"
 }
-val nativePackageVersion = listOf(
-    (appPackageVersionComponents[0] + nativeMajorOffset).toString(),
-    appPackageVersionComponents[1].toString(),
-    nativeBuild.toString(),
-).joinToString(".")
+require(buildNumber in 0..65535) {
+    "Native package build component must fit package-manager limits (0..65535)"
+}
+val nativePackageVersion = "1.${publicMajor * 100 + publicMinor}.$buildNumber"
 
 compose.desktop {
     application {

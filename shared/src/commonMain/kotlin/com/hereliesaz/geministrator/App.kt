@@ -108,39 +108,34 @@ fun App(
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
-
-        fun navigateTo(target: ControlRoomDestination) {
-            if (target == destination) return
-            navigationHistory = navigationHistory + destination
-            selectedTaskIdValue = ""
-            destinationName = target.name
-        }
-
-        val inspectorVisible = selectedTaskId != null &&
+        val taskInspectorVisible = selectedTaskId != null &&
             (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
 
         PlatformBackHandler(
-            enabled = inspectorVisible ||
+            enabled = taskInspectorVisible ||
                 navigationHistory.isNotEmpty() ||
                 destination != ControlRoomDestination.Overview,
         ) {
             when {
-                inspectorVisible -> selectedTaskIdValue = ""
+                taskInspectorVisible -> selectedTaskIdValue = ""
                 navigationHistory.isNotEmpty() -> {
-                    selectedTaskIdValue = ""
                     destinationName = navigationHistory.last().name
                     navigationHistory = navigationHistory.dropLast(1)
                 }
                 destination != ControlRoomDestination.Overview -> {
-                    selectedTaskIdValue = ""
                     destinationName = ControlRoomDestination.Overview.name
                 }
             }
         }
 
         LaunchedEffect(azphaltPackageImportRequest?.requestId) {
-            if (azphaltPackageImportRequest != null) {
-                navigateTo(ControlRoomDestination.AddOns)
+            if (
+                azphaltPackageImportRequest != null &&
+                destination != ControlRoomDestination.AddOns
+            ) {
+                navigationHistory = navigationHistory + destination
+                destinationName = ControlRoomDestination.AddOns.name
+                selectedTaskIdValue = ""
             }
         }
 
@@ -158,7 +153,7 @@ fun App(
         val workflowLibraryHost = WorkflowLibraryHost(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
-            launchWorkflow = { definition, packageRoles ->
+            launchWorkflow = { definition ->
                 val activeRuntime = runtime ?: error("Runtime is unavailable")
                 val existingProject = when (val state = runtimeState) {
                     is ApplicationRuntimeState.NoRun -> state.project
@@ -168,7 +163,6 @@ fun App(
                 activeRuntime.launchSavedWorkflow(
                     definition = definition,
                     existingProject = existingProject,
-                    supplementalRoles = packageRoles,
                 )
             },
             onPackagesChanged = { runtimeGeneration += 1 },
@@ -179,7 +173,18 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
-                        onDestinationSelected = ::navigateTo,
+                        onDestinationSelected = { target ->
+                            if (target != destination) {
+                                navigationHistory = navigationHistory + destination
+                                destinationName = target.name
+                                if (
+                                    target != ControlRoomDestination.Overview &&
+                                    target != ControlRoomDestination.Runs
+                                ) {
+                                    selectedTaskIdValue = ""
+                                }
+                            }
+                        },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId

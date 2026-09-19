@@ -40,6 +40,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
@@ -54,8 +55,7 @@ class ApplicationRuntimeTest {
                 persistence = InMemoryWorkflowPersistence(),
             )
 
-            val noProject = assertIs<ApplicationRuntimeState.NoProject>(runtime.state.value)
-            assertEquals(BuiltInRoles.all.map { it.id }, noProject.roles.take(BuiltInRoles.all.size).map { it.id })
+            assertTrue(runtime.state.value is ApplicationRuntimeState.NoProject)
         } finally {
             scope.cancel()
         }

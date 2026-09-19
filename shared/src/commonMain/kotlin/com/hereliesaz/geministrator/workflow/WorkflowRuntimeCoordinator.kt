@@ -291,6 +291,12 @@ class WorkflowRuntimeCoordinator(
         }
         for (taskId in dispatchFailedTaskIds) {
             if (nextRun.status.isTerminal()) break
+            val task = definition.tasks.firstOrNull { it.id == taskId }
+            val taskRun = nextRun.taskRuns[taskId]
+            val executor = taskRun?.executor ?: task?.effectiveExecutor()
+            val allowRetry = executor
+                ?.let { executorIntegrations.integrationFor(it, project)?.retryDispatchFailures }
+                ?: true
             nextRun = engine.handleFailure(
                 definition = definition,
                 run = nextRun,
@@ -298,6 +304,7 @@ class WorkflowRuntimeCoordinator(
                 retryReason = RetryReason.ProviderFailure,
                 reason = nextRun.taskRuns[taskId]?.progressMessage ?: "Executor dispatch failed",
                 nowEpochMillis = nowEpochMillis,
+                allowRetry = allowRetry,
             )
             if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
                 ensureFailureEscalationGate(

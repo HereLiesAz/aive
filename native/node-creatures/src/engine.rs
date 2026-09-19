@@ -71,8 +71,8 @@ pub fn build_mesh(genome: &CreatureGenome, pose: &CreaturePose) -> Mesh {
         &mut mesh,
         Vec3::ZERO,
         genome.body_radii,
-        genome.body_sides.clamp(12, 16),
-        6,
+        genome.body_sides.max(16),
+        8,
         MaterialClass::Body,
     );
     add_logo_rim(&mut mesh, genome);
@@ -240,7 +240,7 @@ fn add_ellipsoid(
 }
 
 fn add_logo_rim(mesh: &mut Mesh, genome: &CreatureGenome) {
-    let segments = 12;
+    let segments = 20;
     let z = genome.body_radii.z * 1.025;
     let rx = genome.body_radii.x * 1.015;
     let ry = genome.body_radii.y * 1.015;
@@ -249,7 +249,7 @@ fn add_logo_rim(mesh: &mut Mesh, genome: &CreatureGenome) {
     for segment in 1..=segments {
         let angle = TAU * segment as f32 / segments as f32;
         let next = Vec3::new(rx * angle.cos(), ry * angle.sin(), z);
-        add_tube(mesh, previous, next, radius, 3, MaterialClass::Accent);
+        add_tube(mesh, previous, next, radius, 4, MaterialClass::Accent);
         previous = next;
     }
 }
@@ -624,7 +624,7 @@ fn add_coiled_antenna(
     }
     let axis = axis_vector / length;
     let (basis_a, basis_b) = perpendicular_basis(axis);
-    let segments = 12;
+    let segments = 20;
     let turns = 2.6;
     let coil_radius = radius * 1.75;
     let mut previous = start;

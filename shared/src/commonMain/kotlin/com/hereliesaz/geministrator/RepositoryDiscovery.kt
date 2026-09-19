@@ -34,8 +34,6 @@ class RemoteRepositoryDiscoveryClient(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private var cachedGithubLogin: String? = null
-    private var cachedGithubOwned: List<GitHubRepository>? = null
-    private var cachedGitLabOwned: List<GitLabProject>? = null
 
     suspend fun search(
         source: RepositorySource,
@@ -58,20 +56,18 @@ class RemoteRepositoryDiscoveryClient(
             response.requireSuccess("read GitHub account")
             json.decodeFromString<GitHubUser>(response.bodyAsText()).login.also { cachedGithubLogin = it }
         }
-        val owned = cachedGithubOwned ?: run {
-            val response = httpClient.get("$githubBaseUrl/user/repos") {
-                githubHeaders(token)
-                url {
-                    parameters.append("affiliation", "owner")
-                    parameters.append("visibility", "all")
-                    parameters.append("sort", "updated")
-                    parameters.append("direction", "desc")
-                    parameters.append("per_page", "50")
-                }
+        val ownedResponse = httpClient.get("$githubBaseUrl/user/repos") {
+            githubHeaders(token)
+            url {
+                parameters.append("affiliation", "owner")
+                parameters.append("visibility", "all")
+                parameters.append("sort", "updated")
+                parameters.append("direction", "desc")
+                parameters.append("per_page", "50")
             }
-            response.requireSuccess("list GitHub repositories")
-            json.decodeFromString<List<GitHubRepository>>(response.bodyAsText()).also { cachedGithubOwned = it }
         }
+        ownedResponse.requireSuccess("list GitHub repositories")
+        val owned = json.decodeFromString<List<GitHubRepository>>(ownedResponse.bodyAsText())
 
         val trimmed = query.trim()
         val searched = if (trimmed.isEmpty()) {
@@ -92,8 +88,6 @@ class RemoteRepositoryDiscoveryClient(
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
         val normalizedQuery = trimmed.lowercase()
-        // Fresh search records win over cached owned records so renames/default-branch changes
-        // become visible immediately while the client remains open.
         return (searched + owned)
             .distinctBy(GitHubRepository::id)
             .map { repository ->
@@ -119,20 +113,18 @@ class RemoteRepositoryDiscoveryClient(
     private suspend fun searchGitLab(query: String, limit: Int): List<RepositorySuggestion> {
         val tokenProvider = gitlabTokenProvider ?: return emptyList()
         val token = tokenProvider.getToken().trim().takeIf(String::isNotEmpty) ?: return emptyList()
-        val owned = cachedGitLabOwned ?: run {
-            val response = httpClient.get("$gitlabBaseUrl/projects") {
-                gitLabHeaders(token)
-                url {
-                    parameters.append("owned", "true")
-                    parameters.append("simple", "true")
-                    parameters.append("order_by", "last_activity_at")
-                    parameters.append("sort", "desc")
-                    parameters.append("per_page", "50")
-                }
+        val ownedResponse = httpClient.get("$gitlabBaseUrl/projects") {
+            gitLabHeaders(token)
+            url {
+                parameters.append("owned", "true")
+                parameters.append("simple", "true")
+                parameters.append("order_by", "last_activity_at")
+                parameters.append("sort", "desc")
+                parameters.append("per_page", "50")
             }
-            response.requireSuccess("list GitLab repositories")
-            json.decodeFromString<List<GitLabProject>>(response.bodyAsText()).also { cachedGitLabOwned = it }
         }
+        ownedResponse.requireSuccess("list GitLab repositories")
+        val owned = json.decodeFromString<List<GitLabProject>>(ownedResponse.bodyAsText())
 
         val trimmed = query.trim()
         val searched = if (trimmed.isEmpty()) {
@@ -154,7 +146,6 @@ class RemoteRepositoryDiscoveryClient(
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
         val normalizedQuery = trimmed.lowercase()
-        // Fresh search records win over cached owned records for the same project.
         return (searched + owned)
             .distinctBy(GitLabProject::id)
             .map { project ->

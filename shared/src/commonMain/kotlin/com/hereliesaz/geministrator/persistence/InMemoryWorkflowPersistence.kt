@@ -43,10 +43,6 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
             mutex.withLock { definitionItems[definition.id] = definition }
         }
 
-        override suspend fun remove(id: WorkflowDefinitionId) {
-            mutex.withLock { definitionItems.remove(id) }
-        }
-
         override suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition? =
             mutex.withLock { definitionItems[id] }
 
@@ -82,17 +78,6 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
             mutex.withLock { roleItems[role.id] = role }
         }
 
-        override suspend fun remove(id: RoleDefinitionId) {
-            mutex.withLock { roleItems.remove(id) }
-        }
-
-        override suspend fun replaceAll(roles: List<RoleDefinition>) {
-            mutex.withLock {
-                roleItems.clear()
-                roles.associateByTo(roleItems, RoleDefinition::id)
-            }
-        }
-
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = mutex.withLock { roleItems[id] }
         override suspend fun all(): List<RoleDefinition> = mutex.withLock { roleItems.values.toList() }
     }
@@ -124,6 +109,18 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
                         (it.status == ApprovalGateStatus.Pending || it.status == ApprovalGateStatus.Applying)
                 }
             }
+    }
+
+    override suspend fun replaceCatalog(
+        definitions: List<WorkflowDefinition>,
+        roles: List<RoleDefinition>,
+    ) {
+        mutex.withLock {
+            definitionItems.clear()
+            definitions.forEach { definitionItems[it.id] = it }
+            roleItems.clear()
+            roles.forEach { roleItems[it.id] = it }
+        }
     }
 
     override suspend fun commitFailureEscalationDecision(

@@ -47,10 +47,6 @@ class SettingsWorkflowPersistence(
             snapshot.copy(definitions = snapshot.definitions.upsert(definition) { it.id == definition.id })
         }
 
-        override suspend fun remove(id: WorkflowDefinitionId) = update { snapshot ->
-            snapshot.copy(definitions = snapshot.definitions.filterNot { it.id == id })
-        }
-
         override suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition? =
             read().definitions.firstOrNull { it.id == id }
 
@@ -86,14 +82,6 @@ class SettingsWorkflowPersistence(
             snapshot.copy(roles = snapshot.roles.upsert(role) { it.id == role.id })
         }
 
-        override suspend fun remove(id: RoleDefinitionId) = update { snapshot ->
-            snapshot.copy(roles = snapshot.roles.filterNot { it.id == id })
-        }
-
-        override suspend fun replaceAll(roles: List<RoleDefinition>) = update { snapshot ->
-            snapshot.copy(roles = roles)
-        }
-
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? = read().roles.firstOrNull { it.id == id }
         override suspend fun all(): List<RoleDefinition> = read().roles
     }
@@ -108,6 +96,18 @@ class SettingsWorkflowPersistence(
         override suspend fun forRun(run: WorkflowRun): List<ArtifactRef> {
             val taskRunIds = run.taskRuns.values.mapTo(mutableSetOf()) { it.id }
             return read().artifacts.filter { it.taskRunId in taskRunIds }.sortedBy { it.createdAtEpochMillis }
+        }
+    }
+
+    override suspend fun replaceCatalog(
+        definitions: List<WorkflowDefinition>,
+        roles: List<RoleDefinition>,
+    ) {
+        update { snapshot ->
+            snapshot.copy(
+                definitions = definitions.distinctBy(WorkflowDefinition::id),
+                roles = roles.distinctBy(RoleDefinition::id),
+            )
         }
     }
 
