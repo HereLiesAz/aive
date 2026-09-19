@@ -38,7 +38,7 @@ interface ProjectFileService {
     suspend fun chooseAndRead(): ProjectFileReadResult?
 }
 
-internal fun String.asIveFileName(): String {
+fun String.asIveFileName(): String {
     val clean = trim()
         .ifEmpty { "project" }
         .replace(Regex("[\\/:*?\"<>|]+"), "-")
