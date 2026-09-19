@@ -98,6 +98,10 @@ jobs:
           cat build.log
           exit "$EXIT_CODE"
 
+      - name: Run Android release lint
+        run: |
+          ./gradlew             :androidApp:lintVitalPlayRelease             :androidApp:lintVitalGithubRelease             --build-cache --no-daemon
+
       - name: Report Failure to Jules
         if: failure() && steps.gradle-build.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/github-script@v9
