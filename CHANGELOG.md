@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **The Haive** are documented here from the current product line forward.
+All notable changes to **The Aive** are documented here from the current product line forward.
 
 ## Unreleased
 
@@ -14,14 +14,14 @@ All notable changes to **The Haive** are documented here from the current produc
 - Animated H2G2 workflow mindmap with role personality motion, inherited branch motion, engagement wobble, and node-fill progress.
 - Live workflow-to-mindmap projection and technical inspector data.
 - Android/Desktop/Web CI and GitHub Pages deployment.
-- The Haive brand and production icon system.
+- The Aive brand and production icon system.
 - Privacy policy documenting current local storage, provider data flow, credential handling, and tracking posture.
 
 ### Changed
 
-- Product renamed from Geministrator to **The Haive**.
+- Product renamed from Geministrator to **The Aive**.
 - Repository renamed to `haive`.
-- Android application ID and namespace changed to `com.hereliesaz.haive`.
+- Android application ID and namespace changed to `com.hereliesaz.aive`.
 - Progress is modeled as task-run execution data rather than agent-specific state.
 - `main` is the canonical product branch.
 
