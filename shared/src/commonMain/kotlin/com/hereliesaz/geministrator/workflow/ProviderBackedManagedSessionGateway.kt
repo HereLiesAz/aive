@@ -376,7 +376,14 @@ class ProviderBackedManagedSessionGateway(
                 )
                 is AgentEvent.PlanApproved -> current.copy(status = ManagedSessionStatus.Running)
                 is AgentEvent.Progress -> current.copy(
-                    status = ManagedSessionStatus.Running,
+                    status = if (
+                        current.status == ManagedSessionStatus.Planning ||
+                        current.status == ManagedSessionStatus.AwaitingApproval
+                    ) {
+                        current.status
+                    } else {
+                        ManagedSessionStatus.Running
+                    },
                     progress = ManagedSessionProgress(
                         fraction = effectiveEvent.fraction,
                         message = effectiveEvent.message.takeIf { it.isNotBlank() },
