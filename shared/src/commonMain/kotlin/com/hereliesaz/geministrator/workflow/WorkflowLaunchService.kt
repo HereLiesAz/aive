@@ -15,6 +15,7 @@ class WorkflowLaunchService(
     private val persistence: WorkflowPersistence,
     private val eventSink: WorkflowEventSink,
     private val roles: Collection<RoleDefinition>,
+    private val rolesToPersist: Collection<RoleDefinition> = roles,
 ) {
     suspend fun launch(
         project: Project,
@@ -30,15 +31,16 @@ class WorkflowLaunchService(
             workflowRunId = workflowRunId,
             projectId = project.id,
             objective = objective,
-            repository = project.repository,
             nowEpochMillis = nowEpochMillis,
             taskRunIdFactory = taskRunIdFactory,
+            repository = project.repository,
+            roles = roles,
         )
 
         persistence.projects.put(project)
         persistence.definitions.put(prepared)
         persistence.runs.put(run)
-        roles.forEach { persistence.roles.put(it) }
+        rolesToPersist.forEach { persistence.roles.put(it) }
         eventSink.append(
             WorkflowCreated(
                 workflowRunId = run.id,
