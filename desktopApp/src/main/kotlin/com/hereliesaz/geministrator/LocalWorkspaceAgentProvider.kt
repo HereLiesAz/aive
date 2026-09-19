@@ -41,8 +41,8 @@ import kotlinx.coroutines.runInterruptible
  *
  * The model never receives shell access. It receives a bounded repository snapshot and returns a
  * unified diff. Haive validates that diff with `git apply --check`, applies it inside an isolated
- * Git worktree, runs a bounded recognized test command, commits the resulting branch, and emits
- * the concrete patch/test evidence back into the workflow.
+ * Git worktree, and commits the resulting branch with hooks disabled. Repository code is never
+ * executed on the desktop host; verification must use a genuinely sandboxed test-capable provider.
  */
 internal class LocalWorkspaceAgentProvider(
     override val id: AgentProviderId,
@@ -84,7 +84,6 @@ internal class LocalWorkspaceAgentProvider(
         const val MAX_SNAPSHOT_CHARS = 180_000
         const val MAX_CONTEXT_ARTIFACT_CHARS = 30_000
         const val PROCESS_TIMEOUT_SECONDS = 120L
-        const val TEST_TIMEOUT_MINUTES = 12L
 
         val sessionsMutex = Mutex()
         val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
@@ -142,7 +141,7 @@ internal class LocalWorkspaceAgentProvider(
                             runId,
                             ProviderArtifact(
                                 kind = kind,
-                                label = kind.name.replace(Regex("([a-z])([A-Z])"), "$1 $2"),
+                                label = kind.name.replace(Regex("([a-z])([A-Z])"), "\$1 \$2"),
                                 textContent = generated.text.trim(),
                                 mediaType = "text/markdown",
                                 metadata = mapOf(
