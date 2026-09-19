@@ -49,17 +49,19 @@ internal class AndroidProviderCredentialStore(context: Context) {
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
 
-        preferences.edit()
-            .putString(ciphertextKey(providerId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .putString(ivKey(providerId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-            .apply()
+        check(
+            preferences.edit()
+                .putString(ciphertextKey(providerId), Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(ivKey(providerId), Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .commit(),
+        ) { "Could not persist provider credential" }
     }
 
     fun clear(providerId: String) {
         preferences.edit()
             .remove(ciphertextKey(providerId))
             .remove(ivKey(providerId))
-            .apply()
+            .commit()
     }
 
     private fun ciphertextKey(providerId: String) = "$providerId.ciphertext"
