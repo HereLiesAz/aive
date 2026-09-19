@@ -42,6 +42,13 @@ class RoutingRepositoryOperationClient(
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun =
         clientFor(project).start(project, operation)
 
+    override suspend fun start(
+        project: Project,
+        operation: String,
+        operationIdentity: String,
+    ): ExternalExecutionRun =
+        clientFor(project).start(project, operation, operationIdentity)
+
     override suspend fun getRun(project: Project, runId: String): ExternalExecutionRun =
         clientFor(project).getRun(project, runId)
 
