@@ -1,0 +1,53 @@
+name: Live Runtime Verification
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: live-runtime-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-runtime:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AIVE_LIVE_RUNTIME_VERIFICATION: "1"
+      JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Require live Jules credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${JULES_API_KEY:-}" ]; then
+            echo "::error::JULES_API_KEY is required for live runtime verification"
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run live runtime lifecycle verification
+        run: |
+          ./gradlew \
+            -Phaive.useLocalH2g2=false \
+            :providers:jules:desktopTest \
+            --tests com.hereliesaz.geministrator.providers.jules.JulesLiveRuntimeVerificationTest \
+            --no-daemon \
+            --stacktrace
