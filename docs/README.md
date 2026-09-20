@@ -51,7 +51,19 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 ### Persistence
 
-[`architecture/PERSISTENCE.md`](architecture/PERSISTENCE.md) defines what survives restarts, where it is stored, what must never enter workflow persistence, and the resume invariants.
+[`architecture/PERSISTENCE.md`](architecture/PERSISTENCE.md) defines what survives restarts, where it is stored, what must never enter workflow persistence, the provider/executor resume invariants, and how interrupted Android model downloads retain resumable partial bytes outside workflow state.
+
+### Versioning and releases
+
+[`VERSIONING.md`](VERSIONING.md) defines the four-part build identity, immutable exact-build tags, patch-grouped GitHub Releases, centralized release/version policy, desktop package-version mapping, and Google Play versionCode rules.
+
+### Workflow add-ons
+
+[`architecture/ADDONS.md`](architecture/ADDONS.md) defines the mediated Azphalt workflow/role package boundary, Aive host compatibility rules, catalog discovery behavior, and the capabilities that add-ons can never access.
+
+### Live runtime acceptance
+
+[`architecture/LIVE_RUNTIME_ACCEPTANCE.md`](architecture/LIVE_RUNTIME_ACCEPTANCE.md) defines the provider-neutral end-to-end acceptance gate, restart/resume expectations, and failure/retry behavior.
 
 ### Prompt caching
 
