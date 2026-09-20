@@ -113,7 +113,7 @@ class AgentProviderRegistry(
                             id = provider.id.value,
                             capabilities = capabilities.mapTo(linkedSetOf()) { it.name },
                             // Preserve current preferred/registration ordering unless a specialist router overrides it.
-                            estimatedCost = index.toDouble(),
+                            preferenceRank = index,
                         )
                     },
                     requiredContextType = if (request.repository == null) "task" else "repository-task",
