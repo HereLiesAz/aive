@@ -206,6 +206,7 @@ interface AgentProvider {
         request: AgentTaskRequest,
         planGenerated: Boolean,
         planApproved: Boolean,
+        planPreview: String? = null,
     ): ProviderActionResult = ProviderActionResult.Accepted
 
     fun observe(runId: ProviderRunId): Flow<AgentEvent>
