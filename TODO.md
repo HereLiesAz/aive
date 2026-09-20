@@ -176,9 +176,9 @@ Tracking issue: #35
 
 ## P2 — Brand and release polish
 
-- [ ] Final Android adaptive-icon safe-zone check at launcher sizes.
+- [x] Final Android adaptive-icon safe-zone check at launcher sizes.
 - [ ] Validate monochrome/themed Android icon on supported launchers.
-- [ ] Final Play Store icon/screenshots/feature graphic.
+- [x] Final Play Store icon/screenshots/feature graphic.
 - [x] Splash/loading treatment using the approved Haive mark.
 - [x] Make the privacy-policy URL stable for Play Store listing.
 - [x] Audit all user-facing text for leftover Geministrator branding; internal historical package names may remain only where intentionally preserved.
