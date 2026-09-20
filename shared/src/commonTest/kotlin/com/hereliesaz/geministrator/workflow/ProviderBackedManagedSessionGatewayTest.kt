@@ -105,6 +105,7 @@ class ProviderBackedManagedSessionGatewayTest {
             assertEquals(1, provider.reconnectCalls)
             assertEquals(0, provider.startCalls)
             assertEquals(request, provider.reconnectedRequest)
+            assertEquals(true, provider.planGenerated)
             assertEquals(false, provider.planApproved)
             assertEquals(ManagedSessionStatus.AwaitingApproval, gateway.status(handle))
         } finally {
@@ -230,6 +231,7 @@ private class RecordingReconnectProvider : AgentProvider {
     var reconnectCalls = 0
     var startCalls = 0
     var reconnectedRequest: AgentTaskRequest? = null
+    var planGenerated: Boolean? = null
     var planApproved: Boolean? = null
 
     override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.PlanApproval))
@@ -242,10 +244,12 @@ private class RecordingReconnectProvider : AgentProvider {
     override suspend fun reconnect(
         runId: ProviderRunId,
         request: AgentTaskRequest,
+        planGenerated: Boolean,
         planApproved: Boolean,
     ): ProviderActionResult {
         reconnectCalls += 1
         reconnectedRequest = request
+        this.planGenerated = planGenerated
         this.planApproved = planApproved
         return ProviderActionResult.Accepted
     }
