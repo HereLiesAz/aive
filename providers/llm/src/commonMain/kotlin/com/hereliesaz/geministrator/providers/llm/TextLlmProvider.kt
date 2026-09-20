@@ -39,6 +39,7 @@ open class TextLlmProvider(
     private data class Session(
         val request: AgentTaskRequest,
         val phase: MutableStateFlow<TextLlmSessionPhase>,
+        val planGenerated: MutableStateFlow<Boolean>,
     )
 
     private val mutex = Mutex()
@@ -66,6 +67,7 @@ open class TextLlmProvider(
                     phase = MutableStateFlow(
                         if (request.requirePlanApproval) TextLlmSessionPhase.AwaitingApproval else TextLlmSessionPhase.Ready,
                     ),
+                    planGenerated = MutableStateFlow(false),
                 )
             }
         }
@@ -75,6 +77,7 @@ open class TextLlmProvider(
     override suspend fun reconnect(
         runId: ProviderRunId,
         request: AgentTaskRequest,
+        planGenerated: Boolean,
         planApproved: Boolean,
     ): ProviderActionResult {
         mutex.withLock {
@@ -88,6 +91,7 @@ open class TextLlmProvider(
                             TextLlmSessionPhase.Ready
                         },
                     ),
+                    planGenerated = MutableStateFlow(planGenerated),
                 )
             }
         }
@@ -99,8 +103,11 @@ open class TextLlmProvider(
             ?: error("$displayName session ${runId.value} is not available in this process")
 
         if (session.request.requirePlanApproval) {
-            val preview = api.generate(renderPrompt(session.request))
-            emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
+            if (!session.planGenerated.value) {
+                val preview = api.generate(renderPrompt(session.request))
+                session.planGenerated.value = true
+                emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
+            }
             val phase = session.phase.filter { it != TextLlmSessionPhase.AwaitingApproval }.first()
             if (phase == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
