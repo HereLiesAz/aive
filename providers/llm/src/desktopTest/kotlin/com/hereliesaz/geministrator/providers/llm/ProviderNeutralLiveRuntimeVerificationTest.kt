@@ -51,8 +51,9 @@ import kotlin.test.assertTrue
  * Opt-in live acceptance test for the production runtime through the shared provider contract.
  *
  * Ordinary unit-test runs skip this test. Manual live verification opts in with
- * AIVE_LIVE_RUNTIME_VERIFICATION=1 and either AIVE_LIVE_PROVIDER or the first configured
- * OpenAI/Anthropic/Gemini/xAI credential.
+ * AIVE_LIVE_RUNTIME_VERIFICATION=1 and either AIVE_LIVE_PROVIDER, the first configured
+ * OpenAI/Anthropic/Gemini/xAI credential, or a real local Ollama endpoint. Central acceptance
+ * bootstraps Ollama automatically when no hosted-provider credential is configured.
  */
 class ProviderNeutralLiveRuntimeVerificationTest {
     @Test
@@ -205,10 +206,14 @@ class ProviderNeutralLiveRuntimeVerificationTest {
     private data class LiveProviderConfig(
         val providerId: AgentProviderId,
         val apiKey: String,
+        val baseUrl: String? = null,
+        val model: String? = null,
     )
 
     private fun liveProviderConfig(): LiveProviderConfig {
         val requested = System.getenv("AIVE_LIVE_PROVIDER")?.trim()?.lowercase().orEmpty()
+        if (requested == "ollama") return ollamaProviderConfig()
+
         val candidates = listOf(
             "openai" to "OPENAI_API_KEY",
             "anthropic" to "ANTHROPIC_API_KEY",
@@ -217,13 +222,13 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         )
         val selected = if (requested.isNotEmpty()) {
             candidates.firstOrNull { it.first == requested }
-                ?: error("AIVE_LIVE_PROVIDER must be one of: ${candidates.joinToString { it.first }}")
+                ?: error(
+                    "AIVE_LIVE_PROVIDER must be one of: " +
+                        (candidates.map { it.first } + "ollama").joinToString(),
+                )
         } else {
             candidates.firstOrNull { (_, envName) -> !System.getenv(envName).isNullOrBlank() }
-                ?: error(
-                    "Configure one live provider credential: " +
-                        candidates.joinToString { it.second },
-                )
+                ?: return ollamaProviderConfig()
         }
         val apiKey = System.getenv(selected.second)?.trim().orEmpty()
         check(apiKey.isNotEmpty()) {
@@ -235,6 +240,19 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         )
     }
 
+    private fun ollamaProviderConfig(): LiveProviderConfig = LiveProviderConfig(
+        providerId = AgentProviderId("ollama"),
+        apiKey = "ollama",
+        baseUrl = System.getenv("AIVE_LIVE_OLLAMA_BASE_URL")
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: "http://127.0.0.1:11434/v1",
+        model = System.getenv("AIVE_LIVE_OLLAMA_MODEL")
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: "smollm2:135m-instruct-q2_K",
+    )
+
     private fun liveProvider(config: LiveProviderConfig): AgentProvider {
         val keyProvider = LlmApiKeyProvider { config.apiKey }
         return when (config.providerId.value) {
@@ -242,6 +260,15 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             "anthropic" -> AnthropicProvider(keyProvider)
             "gemini" -> GeminiProvider(keyProvider)
             "xai" -> XaiProvider(keyProvider)
+            "ollama" -> TextLlmProvider(
+                id = config.providerId,
+                displayName = "Ollama / SmolLM2",
+                api = OpenAiCompatibleChatApi(
+                    apiKeyProvider = keyProvider,
+                    model = checkNotNull(config.model) { "Ollama model is not configured" },
+                    baseUrl = checkNotNull(config.baseUrl) { "Ollama base URL is not configured" },
+                ),
+            )
             else -> error("Unsupported live provider ${config.providerId.value}")
         }
     }
