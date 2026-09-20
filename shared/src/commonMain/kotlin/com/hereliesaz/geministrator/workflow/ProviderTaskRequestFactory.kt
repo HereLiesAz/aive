@@ -236,7 +236,7 @@ private fun buildUtilityPromptBlocks(
             artifactKinds = dependencyArtifacts.mapTo(linkedSetOf()) { it.kind } + task.requiredArtifacts,
         ),
     )
-    val verificationBlock = verification.steps.takeIf(List<*>::isNotEmpty)?.let { steps ->
+    val verificationBlock = verification.steps.takeIf { it.isNotEmpty() }?.let { steps ->
         PromptContextBlock(
             "Verification plan",
             steps.joinToString("\n") { step ->
