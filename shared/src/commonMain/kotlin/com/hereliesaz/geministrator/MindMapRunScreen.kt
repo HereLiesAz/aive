@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.locatorInput
 import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun MindMapRunScreen(
@@ -40,6 +42,8 @@ internal fun MindMapRunScreen(
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
     onLaunchWorkflow: (String, String, RepositoryRef?) -> Unit,
+    projectFileService: ProjectFileService? = null,
+    onImportProjectFile: suspend (String) -> String? = { null },
     onRecoverFromCorruption: () -> Unit = {},
     onRetryRuntime: () -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
@@ -52,7 +56,9 @@ internal fun MindMapRunScreen(
     runtimeState: ApplicationRuntimeState,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    val scope = rememberCoroutineScope()
     val activityEntrance = remember { AzphaltEntrance.childBand() }
+    var projectLoadError by remember(runtimeState) { mutableStateOf<String?>(null) }
     val noRunProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
     val existingRepository = noRunProject?.repository
     val draftScope = noRunProject?.id?.value ?: "new-project"
@@ -157,6 +163,52 @@ internal fun MindMapRunScreen(
                 }
             }
             if (runtimeState is ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
+                if (projectFileService != null) {
+                    Text(
+                        "PROJECT",
+                        style = AzphaltType.eyebrow,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                    Text(
+                        "Aive automatically reopens the last saved project it knows about.",
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                    AzphaltPill(
+                        label = "Open a different saved project…",
+                        seed = "overview-open-different-project",
+                        onClick = {
+                            scope.launch {
+                                runCatching {
+                                    val opened = projectFileService.chooseAndRead() ?: return@launch
+                                    onImportProjectFile(opened.content)
+                                        ?: error("Project could not be loaded")
+                                }.onSuccess {
+                                    projectLoadError = null
+                                }.onFailure { failure ->
+                                    projectLoadError = failure.message ?: "Project load failed"
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    projectLoadError?.let { message ->
+                        AzphaltRecord(
+                            seed = "overview-project-load-error",
+                            eyebrow = "Project load failed",
+                            title = "Could not open saved project",
+                            body = message,
+                            endCap = "Dismiss",
+                            onClick = { projectLoadError = null },
+                        )
+                    }
+                    Text(
+                        "OR CREATE A NEW PROJECT",
+                        style = AzphaltType.eyebrow,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+
                 OutlinedTextField(
                     value = projectName,
                     onValueChange = { projectName = it },

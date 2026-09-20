@@ -60,9 +60,11 @@ internal class AndroidProjectFileService(
                 ?.let { detected[it.id] = it }
         }
 
+        val lastLocation = preferences.getString(LAST_LOCATION_KEY, null)
         detected.values
             .sortedWith(
-                compareByDescending<ProjectFileDescriptor> { it.modifiedAtEpochMillis ?: Long.MIN_VALUE }
+                compareByDescending<ProjectFileDescriptor> { it.id == lastLocation }
+                    .thenByDescending { it.modifiedAtEpochMillis ?: Long.MIN_VALUE }
                     .thenBy { it.displayName.lowercase() },
             )
     }
@@ -81,7 +83,9 @@ internal class AndroidProjectFileService(
                 temporary.delete()
                 "Could not save ${destination.name}"
             }
-            fileDescriptor(destination)
+            fileDescriptor(destination).also { descriptor ->
+                rememberLocation(descriptor.id, includeRecent = false)
+            }
         }
 
     override suspend fun saveAs(fileName: String, content: String): ProjectFileDescriptor? {
@@ -201,14 +205,22 @@ internal class AndroidProjectFileService(
         preferences.getStringSet(RECENT_LOCATIONS_KEY, emptySet()).orEmpty().toSet()
 
     private fun rememberUri(uri: Uri) {
-        if (uri.scheme != "content") return
-        val next = recentLocations().toMutableSet().apply {
-            add(uri.toString())
-            while (size > MAX_RECENT_FILES) {
-                remove(first())
+        rememberLocation(uri.toString(), includeRecent = uri.scheme == "content")
+    }
+
+    private fun rememberLocation(location: String, includeRecent: Boolean) {
+        val editor = preferences.edit().putString(LAST_LOCATION_KEY, location)
+        if (includeRecent) {
+            val next = recentLocations().toMutableSet().apply {
+                remove(location)
+                add(location)
+                while (size > MAX_RECENT_FILES) {
+                    remove(first())
+                }
             }
+            editor.putStringSet(RECENT_LOCATIONS_KEY, next)
         }
-        check(preferences.edit().putStringSet(RECENT_LOCATIONS_KEY, next).commit()) {
+        check(editor.commit()) {
             "Could not persist recent project-file location"
         }
     }
@@ -216,6 +228,7 @@ internal class AndroidProjectFileService(
     private companion object {
         const val PREFERENCES_NAME = "aive.project-files.v1"
         const val RECENT_LOCATIONS_KEY = "recent"
+        const val LAST_LOCATION_KEY = "last-location"
         const val MAX_RECENT_FILES = 24
     }
 }
