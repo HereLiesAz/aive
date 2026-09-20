@@ -166,16 +166,15 @@ class GitLabWorkspaceAgentProvider(
         sessionsMutex.withLock {
             val suffix = runId.value.substringAfterLast('/').toLongOrNull()
             if (suffix != null) nextSequence = maxOf(nextSequence, suffix)
-            sessions.putIfAbsent(
-                runId,
-                Session(
+            if (runId !in sessions) {
+                sessions[runId] = Session(
                     request = request,
                     phase = MutableStateFlow(
                         if (request.requirePlanApproval && !planApproved) Phase.AwaitingApproval else Phase.Ready,
                     ),
                     plan = restoredPlan,
-                ),
-            )
+                )
+            }
         }
         return ProviderActionResult.Accepted
     }

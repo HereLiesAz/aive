@@ -85,36 +85,73 @@ private data class NodeCreaturePalette(
     val accent: Color,
 )
 
-private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette {
-    val role = roleLabel.lowercase()
-    return when {
-        role.contains("orchestrat") || role.contains("queen") -> NodeCreaturePalette(
-            body = Color(0xFF080C18),
-            accent = Color(0xFFFF5665),
+private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette =
+    when (classifyNodeCreatureRole(roleLabel)) {
+        NodeCreatureRoleKind.HallMonitor -> NodeCreaturePalette(
+            body = Color(0xFF69A9EF),
+            accent = Color(0xFF214D85),
         )
-        // Specific semantic roles must win before the broad "engineer" builder match.
-        role.contains("crash") || role.contains("dummy") || role.contains("test") -> NodeCreaturePalette(
-            body = Color(0xFF08101C),
-            accent = Color(0xFF249CFF),
+        NodeCreatureRoleKind.Antagonist -> NodeCreaturePalette(
+            body = Color(0xFF191919),
+            accent = Color(0xFFA10A5A),
         )
-        role.contains("qa") || role.contains("quality") || role.contains("verif") || role.contains("inspect") -> NodeCreaturePalette(
-            body = Color(0xFF0A1020),
-            accent = Color(0xFF7C6CFF),
+        NodeCreatureRoleKind.AdversarialReviewer -> NodeCreaturePalette(
+            body = Color(0xFFF12E3D),
+            accent = Color(0xFF721722),
         )
-        role.contains("review") -> NodeCreaturePalette(
-            body = Color(0xFF0B0D16),
-            accent = Color(0xFFE62D70),
+        NodeCreatureRoleKind.RecoveryEngineer -> NodeCreaturePalette(
+            body = Color(0xFF35B96A),
+            accent = Color(0xFFEAC58A),
         )
-        role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
-            body = Color(0xFF0D1220),
-            accent = Color(0xFFFFB323),
+        NodeCreatureRoleKind.ReleaseEngineer -> NodeCreaturePalette(
+            body = Color(0xFFA464E6),
+            accent = Color(0xFFF0A400),
         )
-        else -> NodeCreaturePalette(
+        NodeCreatureRoleKind.CodeReviewer -> NodeCreaturePalette(
+            body = Color(0xFF2F70E8),
+            accent = Color(0xFF173D7A),
+        )
+        NodeCreatureRoleKind.CrashTestDummy -> NodeCreaturePalette(
+            body = Color(0xFFFFC928),
+            accent = Color(0xFF3AA9EA),
+        )
+        NodeCreatureRoleKind.QaEngineer -> NodeCreaturePalette(
+            body = Color(0xFF39BFEA),
+            accent = Color(0xFF21395E),
+        )
+        NodeCreatureRoleKind.ImplementationEngineer -> NodeCreaturePalette(
+            body = Color(0xFFFF7A00),
+            accent = Color(0xFF5F7898),
+        )
+        NodeCreatureRoleKind.UxDesigner -> NodeCreaturePalette(
+            body = Color(0xFFF35F8A),
+            accent = Color(0xFF8A2C50),
+        )
+        NodeCreatureRoleKind.EpaRepresentative -> NodeCreaturePalette(
+            body = Color(0xFF38B84A),
+            accent = Color(0xFF1C7130),
+        )
+        NodeCreatureRoleKind.Architect -> NodeCreaturePalette(
+            body = Color(0xFF8B59E8),
+            accent = Color(0xFF5A35A7),
+        )
+        NodeCreatureRoleKind.Researcher -> NodeCreaturePalette(
+            body = Color(0xFF39A9EA),
+            accent = Color(0xFF165AA5),
+        )
+        NodeCreatureRoleKind.ProductManager -> NodeCreaturePalette(
+            body = Color(0xFFF15F89),
+            accent = Color(0xFF7A3150),
+        )
+        NodeCreatureRoleKind.Orchestrator -> NodeCreaturePalette(
+            body = Color(0xFFF5B82E),
+            accent = Color(0xFF16223C),
+        )
+        NodeCreatureRoleKind.Generic -> NodeCreaturePalette(
             body = Azphalt.hue(hueSeed),
             accent = Azphalt.cap(hueSeed),
         )
     }
-}
 
 private fun nodeCreatureMaterialColor(
     material: NodeCreatureMaterial,

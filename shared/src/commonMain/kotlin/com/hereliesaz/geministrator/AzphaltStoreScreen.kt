@@ -165,7 +165,7 @@ internal fun AzphaltStoreScreen(
         )
 
         if (!loading && packages.isEmpty()) {
-            Text("No Haive addons match this search.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text("No Aive workflow or role packages match this search.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)

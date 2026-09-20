@@ -62,6 +62,6 @@ class TextLlmProviderReconnectTest {
         assertEquals(1, calls)
 
         val nextRun = provider.start(request)
-        assertEquals("resume-provider/task-1/43", nextRun.runId.value)
+        assertEquals("resume-provider/task-1/43", nextRun.providerRunId.value)
     }
 }

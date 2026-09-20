@@ -84,3 +84,8 @@ kotlin {
         }
     }
 }
+
+
+compose.resources {
+    packageOfResClass = "com.hereliesaz.geministrator.resources"
+}

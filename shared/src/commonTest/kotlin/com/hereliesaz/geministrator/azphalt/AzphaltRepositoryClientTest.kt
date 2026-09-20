@@ -56,6 +56,65 @@ class AzphaltRepositoryClientTest {
     }
 
     @Test
+    fun emptyScopedSearchFallsBackToUnscopedCatalogAndFiltersLocally() = runBlocking {
+        val apps = mutableListOf<String?>()
+        val http = HttpClient(MockEngine { request ->
+            apps += request.url.parameters["app"]
+            if (request.url.parameters["app"] != null) {
+                respond(
+                    content = """{"packages":[],"total":0,"page":1,"pages":1}""",
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            } else {
+                respond(
+                    content = """
+                        {
+                          "packages":[
+                            {
+                              "id":"com.hereliesaz.haive.feature-delivery",
+                              "name":"Feature Delivery",
+                              "version":"1.0.0",
+                              "kind":"workflow",
+                              "targetApps":["com.hereliesaz.aive","com.hereliesaz.haive"]
+                            },
+                            {
+                              "id":"com.other.host.workflow",
+                              "name":"Other Host",
+                              "version":"1.0.0",
+                              "kind":"workflow",
+                              "targetApps":["com.other.app"]
+                            },
+                            {
+                              "id":"com.example.global.role",
+                              "name":"Global Role",
+                              "version":"1.0.0",
+                              "kind":"role",
+                              "targetApps":[]
+                            }
+                          ],
+                          "total":3,
+                          "page":1,
+                          "pages":1
+                        }
+                    """.trimIndent(),
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        })
+        val client = AzphaltRepositoryClient(http)
+
+        val result = client.search(kinds = setOf("workflow", "role"))
+
+        assertEquals(listOf(HAIVE_AZPHALT_HOST_ID, null), apps)
+        assertEquals(
+            listOf("com.hereliesaz.haive.feature-delivery", "com.example.global.role"),
+            result.packages.map { it.id },
+        )
+        assertEquals(2, result.total)
+        http.close()
+    }
+
+    @Test
     fun detailDecodesHaiveWorkflowManifestWithoutNeedingUnknownManifestFields() = runBlocking {
         val http = HttpClient(MockEngine { request ->
             assertEquals("/packages/com.example.release", request.url.encodedPath)

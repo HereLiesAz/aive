@@ -71,7 +71,7 @@ pub fn build_mesh(genome: &CreatureGenome, pose: &CreaturePose) -> Mesh {
         &mut mesh,
         Vec3::ZERO,
         genome.body_radii,
-        genome.body_sides.max(16),
+        genome.body_sides.max(9),
         8,
         MaterialClass::Body,
     );
@@ -273,7 +273,108 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
                 );
             }
         }
-        RoleArchetype::Builder => {
+        RoleArchetype::ProductManager => {
+            let center = Vec3::new(0.44 * genome.body_radii.x, -0.08 * genome.body_radii.y, z + 0.02);
+            add_rect(mesh, center, 0.40, 0.52, MaterialClass::Terminal);
+            for row in [-0.14_f32, 0.0, 0.14] {
+                add_disc(
+                    mesh,
+                    center + Vec3::new(-0.12, row, 0.025),
+                    0.035,
+                    0.035,
+                    8,
+                    MaterialClass::Eye,
+                );
+                add_tube(
+                    mesh,
+                    center + Vec3::new(-0.04, row, 0.03),
+                    center + Vec3::new(0.14, row, 0.03),
+                    0.014,
+                    4,
+                    MaterialClass::Eye,
+                );
+            }
+        }
+        RoleArchetype::Researcher => {
+            let lens = Vec3::new(0.48 * genome.body_radii.x, -0.32 * genome.body_radii.y, z + 0.03);
+            add_disc(mesh, lens, 0.17, 0.17, 16, MaterialClass::Accent);
+            add_disc(
+                mesh,
+                lens + Vec3::new(0.0, 0.0, 0.025),
+                0.105,
+                0.105,
+                14,
+                MaterialClass::Body,
+            );
+            add_tube(
+                mesh,
+                lens + Vec3::new(0.10, 0.10, 0.01),
+                lens + Vec3::new(0.28, 0.28, 0.01),
+                0.032,
+                5,
+                MaterialClass::Accent,
+            );
+        }
+        RoleArchetype::Architect => {
+            let origin = Vec3::new(-0.46 * genome.body_radii.x, -0.26 * genome.body_radii.y, z + 0.02);
+            for (dx, dy) in [(0.0_f32, 0.0_f32), (0.28, 0.15), (0.12, 0.39)] {
+                add_rect(
+                    mesh,
+                    origin + Vec3::new(dx, dy, 0.0),
+                    0.16,
+                    0.16,
+                    MaterialClass::Terminal,
+                );
+            }
+            add_tube(
+                mesh,
+                origin + Vec3::new(0.08, 0.08, 0.025),
+                origin + Vec3::new(0.28, 0.20, 0.025),
+                0.018,
+                4,
+                MaterialClass::Eye,
+            );
+            add_tube(
+                mesh,
+                origin + Vec3::new(0.26, 0.22, 0.025),
+                origin + Vec3::new(0.17, 0.39, 0.025),
+                0.018,
+                4,
+                MaterialClass::Eye,
+            );
+        }
+        RoleArchetype::EpaRepresentative => {
+            for (x, y) in [(-0.42_f32, -0.22_f32), (-0.42, 0.05), (-0.42, 0.32)] {
+                let port = Vec3::new(x * genome.body_radii.x, y * genome.body_radii.y, z + 0.02);
+                add_disc(mesh, port, 0.085, 0.085, 12, MaterialClass::Terminal);
+                add_disc(
+                    mesh,
+                    port + Vec3::new(0.0, 0.0, 0.025),
+                    0.035,
+                    0.035,
+                    10,
+                    MaterialClass::Limb,
+                );
+            }
+            add_tube(
+                mesh,
+                Vec3::new(0.28 * genome.body_radii.x, -0.37 * genome.body_radii.y, z + 0.02),
+                Vec3::new(0.50 * genome.body_radii.x, -0.19 * genome.body_radii.y, z + 0.02),
+                0.035,
+                5,
+                MaterialClass::Accent,
+            );
+        }
+        RoleArchetype::UxDesigner => {
+            let left = Vec3::new(-0.12 * genome.body_radii.x, -0.28 * genome.body_radii.y, z + 0.025);
+            let right = Vec3::new(0.12 * genome.body_radii.x, -0.28 * genome.body_radii.y, z + 0.025);
+            add_disc(mesh, left, 0.13, 0.13, 14, MaterialClass::Accent);
+            add_disc(mesh, right, 0.13, 0.13, 14, MaterialClass::Accent);
+            let tip = Vec3::new(0.0, 0.12 * genome.body_radii.y, z + 0.025);
+            add_tube(mesh, left + Vec3::new(-0.05, 0.06, 0.0), tip, 0.055, 6, MaterialClass::Accent);
+            add_tube(mesh, right + Vec3::new(0.05, 0.06, 0.0), tip, 0.055, 6, MaterialClass::Accent);
+        }
+        RoleArchetype::ImplementationEngineer => {
             for offset in [-0.32_f32, 0.0, 0.32] {
                 add_tube(
                     mesh,
@@ -289,12 +390,8 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
                 );
             }
         }
-        RoleArchetype::Tester => {
-            let patch = Vec3::new(
-                0.53 * genome.body_radii.x,
-                0.18 * genome.body_radii.y,
-                z + 0.02,
-            );
+        RoleArchetype::CrashTestDummy => {
+            let patch = Vec3::new(0.53 * genome.body_radii.x, 0.18 * genome.body_radii.y, z + 0.02);
             add_tube(
                 mesh,
                 patch + Vec3::new(-0.13, -0.13, 0.0),
@@ -312,25 +409,10 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
                 MaterialClass::Eye,
             );
         }
-        RoleArchetype::Inspector => {
-            let stem_root = Vec3::new(
-                0.34 * genome.body_radii.x,
-                -0.55 * genome.body_radii.y,
-                0.02,
-            );
-            let screen_center = Vec3::new(
-                0.58 * genome.body_radii.x,
-                -1.04 * genome.body_radii.y,
-                0.08,
-            );
-            add_tube(
-                mesh,
-                stem_root,
-                screen_center,
-                0.055,
-                5,
-                MaterialClass::Limb,
-            );
+        RoleArchetype::QaEngineer => {
+            let stem_root = Vec3::new(0.34 * genome.body_radii.x, -0.55 * genome.body_radii.y, 0.02);
+            let screen_center = Vec3::new(0.58 * genome.body_radii.x, -1.04 * genome.body_radii.y, 0.08);
+            add_tube(mesh, stem_root, screen_center, 0.055, 5, MaterialClass::Limb);
             add_rect(
                 mesh,
                 Vec3::new(screen_center.x, screen_center.y, genome.body_radii.z * 0.30),
@@ -338,79 +420,147 @@ fn add_role_surface_details(mesh: &mut Mesh, genome: &CreatureGenome) {
                 0.27,
                 MaterialClass::Terminal,
             );
-            add_tube(
-                mesh,
-                Vec3::new(
-                    screen_center.x - 0.13,
-                    screen_center.y,
-                    genome.body_radii.z * 0.315,
-                ),
-                Vec3::new(
-                    screen_center.x - 0.04,
-                    screen_center.y - 0.05,
-                    genome.body_radii.z * 0.315,
-                ),
-                0.018,
-                4,
-                MaterialClass::Eye,
-            );
-            add_tube(
-                mesh,
-                Vec3::new(
-                    screen_center.x - 0.04,
-                    screen_center.y - 0.05,
-                    genome.body_radii.z * 0.315,
-                ),
-                Vec3::new(
-                    screen_center.x + 0.05,
-                    screen_center.y + 0.04,
-                    genome.body_radii.z * 0.315,
-                ),
-                0.018,
-                4,
-                MaterialClass::Eye,
-            );
-            add_tube(
-                mesh,
-                Vec3::new(
-                    screen_center.x + 0.05,
-                    screen_center.y + 0.04,
-                    genome.body_radii.z * 0.315,
-                ),
-                Vec3::new(
-                    screen_center.x + 0.14,
-                    screen_center.y - 0.02,
-                    genome.body_radii.z * 0.315,
-                ),
-                0.018,
-                4,
-                MaterialClass::Eye,
-            );
+            for (from, to) in [
+                ((-0.13_f32, 0.00_f32), (-0.04_f32, -0.05_f32)),
+                ((-0.04, -0.05), (0.05, 0.04)),
+                ((0.05, 0.04), (0.14, -0.02)),
+            ] {
+                add_tube(
+                    mesh,
+                    Vec3::new(
+                        screen_center.x + from.0,
+                        screen_center.y + from.1,
+                        genome.body_radii.z * 0.315,
+                    ),
+                    Vec3::new(
+                        screen_center.x + to.0,
+                        screen_center.y + to.1,
+                        genome.body_radii.z * 0.315,
+                    ),
+                    0.018,
+                    4,
+                    MaterialClass::Eye,
+                );
+            }
         }
-        RoleArchetype::Reviewer => {
-            let alert = Vec3::new(
-                0.63 * genome.body_radii.x,
-                -0.70 * genome.body_radii.y,
-                z + 0.02,
-            );
-            add_tube(
-                mesh,
-                alert,
-                alert + Vec3::new(0.04, -0.18, 0.0),
-                0.035,
-                5,
-                MaterialClass::Accent,
-            );
+        RoleArchetype::AdversarialReviewer => {
+            let mark = Vec3::new(0.58 * genome.body_radii.x, -0.45 * genome.body_radii.y, z + 0.02);
+            add_tube(mesh, mark, mark + Vec3::new(-0.06, 0.29, 0.0), 0.050, 5, MaterialClass::Accent);
             add_disc(
                 mesh,
-                alert + Vec3::new(0.055, -0.25, 0.0),
-                0.045,
-                0.045,
-                8,
+                mark + Vec3::new(-0.08, 0.39, 0.0),
+                0.055,
+                0.055,
+                9,
+                MaterialClass::Accent,
+            );
+            for dy in [-0.22_f32, 0.0, 0.22] {
+                add_tube(
+                    mesh,
+                    Vec3::new(-0.58 * genome.body_radii.x, dy, z),
+                    Vec3::new(-0.76 * genome.body_radii.x, dy - 0.08, z),
+                    0.026,
+                    4,
+                    MaterialClass::Accent,
+                );
+            }
+        }
+        RoleArchetype::CodeReviewer => {
+            let left = Vec3::new(-0.20 * genome.body_radii.x, -0.10 * genome.body_radii.y, z + 0.05);
+            let right = Vec3::new(0.20 * genome.body_radii.x, -0.10 * genome.body_radii.y, z + 0.05);
+            add_disc(mesh, left, 0.17, 0.12, 14, MaterialClass::Terminal);
+            add_disc(mesh, right, 0.17, 0.12, 14, MaterialClass::Terminal);
+            add_tube(mesh, left, right, 0.025, 4, MaterialClass::Terminal);
+            add_rect(
+                mesh,
+                Vec3::new(0.48 * genome.body_radii.x, 0.26 * genome.body_radii.y, z + 0.02),
+                0.30,
+                0.38,
                 MaterialClass::Accent,
             );
         }
-        _ => {}
+        RoleArchetype::RecoveryEngineer => {
+            let center = Vec3::new(0.45 * genome.body_radii.x, 0.02, z + 0.025);
+            add_rect(mesh, center, 0.38, 0.16, MaterialClass::Terminal);
+            add_rect(mesh, center, 0.14, 0.40, MaterialClass::Terminal);
+            add_disc(
+                mesh,
+                Vec3::new(-0.48 * genome.body_radii.x, 0.24 * genome.body_radii.y, z + 0.02),
+                0.075,
+                0.075,
+                10,
+                MaterialClass::Accent,
+            );
+        }
+        RoleArchetype::ReleaseEngineer => {
+            let key_center = Vec3::new(0.42 * genome.body_radii.x, -0.25 * genome.body_radii.y, z + 0.025);
+            add_disc(mesh, key_center, 0.13, 0.13, 14, MaterialClass::Terminal);
+            add_disc(
+                mesh,
+                key_center + Vec3::new(0.0, 0.0, 0.025),
+                0.060,
+                0.060,
+                12,
+                MaterialClass::Body,
+            );
+            add_tube(
+                mesh,
+                key_center + Vec3::new(0.0, 0.12, 0.0),
+                key_center + Vec3::new(0.0, 0.43, 0.0),
+                0.040,
+                5,
+                MaterialClass::Terminal,
+            );
+            add_tube(
+                mesh,
+                key_center + Vec3::new(0.0, 0.32, 0.0),
+                key_center + Vec3::new(0.15, 0.32, 0.0),
+                0.035,
+                5,
+                MaterialClass::Terminal,
+            );
+        }
+        RoleArchetype::Antagonist => {
+            for (x, y, dx, dy) in [
+                (-0.55_f32, -0.28_f32, -0.20_f32, -0.12_f32),
+                (0.52, -0.34, 0.22, -0.14),
+                (0.55, 0.30, 0.20, 0.16),
+            ] {
+                let start = Vec3::new(x * genome.body_radii.x, y * genome.body_radii.y, z);
+                add_tube(mesh, start, start + Vec3::new(dx, dy, 0.0), 0.038, 5, MaterialClass::Accent);
+            }
+        }
+        RoleArchetype::HallMonitor => {
+            for (x, y, radius) in [
+                (-0.48_f32, -0.30_f32, 0.10_f32),
+                (0.48, -0.30, 0.10),
+                (-0.55, 0.25, 0.075),
+                (0.55, 0.25, 0.075),
+            ] {
+                let sensor = Vec3::new(x * genome.body_radii.x, y * genome.body_radii.y, z + 0.02);
+                add_disc(mesh, sensor, radius, radius, 12, MaterialClass::Eye);
+                add_disc(
+                    mesh,
+                    sensor + Vec3::new(0.0, 0.0, 0.025),
+                    radius * 0.36,
+                    radius * 0.36,
+                    10,
+                    MaterialClass::Limb,
+                );
+            }
+            for (index, height) in [0.10_f32, 0.18, 0.28].into_iter().enumerate() {
+                let x = -0.13 + index as f32 * 0.13;
+                add_tube(
+                    mesh,
+                    Vec3::new(x, 0.42 * genome.body_radii.y, z + 0.025),
+                    Vec3::new(x, 0.42 * genome.body_radii.y - height, z + 0.025),
+                    0.022,
+                    4,
+                    MaterialClass::Terminal,
+                );
+            }
+        }
+        RoleArchetype::Generic => {}
     }
 }
 
@@ -428,7 +578,44 @@ fn add_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
             );
             add_mouth(mesh, genome, MaterialClass::Accent, 0.24);
         }
-        RoleArchetype::Builder => {
+        RoleArchetype::ProductManager
+        | RoleArchetype::EpaRepresentative
+        | RoleArchetype::UxDesigner
+        | RoleArchetype::RecoveryEngineer
+        | RoleArchetype::ReleaseEngineer
+        | RoleArchetype::HallMonitor => {
+            add_two_eye_face(mesh, genome, pose, 0.24);
+            add_mouth(mesh, genome, MaterialClass::Limb, 0.18);
+        }
+        RoleArchetype::Researcher => {
+            add_eye(
+                mesh,
+                Vec3::new(0.02 * genome.body_radii.x, -0.04 * genome.body_radii.y, z),
+                genome.body_radii.x * 0.43,
+                genome.body_radii.y * 0.31,
+                pose.eye_aim,
+                true,
+            );
+            add_mouth(mesh, genome, MaterialClass::Limb, 0.14);
+        }
+        RoleArchetype::Architect => {
+            add_eye(
+                mesh,
+                Vec3::new(0.0, -0.03 * genome.body_radii.y, z),
+                genome.body_radii.x * 0.34,
+                genome.body_radii.y * 0.27,
+                pose.eye_aim,
+                false,
+            );
+            add_rect(
+                mesh,
+                Vec3::new(0.0, -0.05 * genome.body_radii.y, z + 0.032),
+                genome.body_radii.x * 0.72,
+                genome.body_radii.y * 0.16,
+                MaterialClass::Body,
+            );
+        }
+        RoleArchetype::ImplementationEngineer => {
             add_eye(
                 mesh,
                 Vec3::new(-0.12 * genome.body_radii.x, -0.03 * genome.body_radii.y, z),
@@ -439,7 +626,7 @@ fn add_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
             );
             add_mouth(mesh, genome, MaterialClass::Limb, 0.19);
         }
-        RoleArchetype::Tester => {
+        RoleArchetype::CrashTestDummy => {
             let spread = genome.body_radii.x * 0.27;
             add_eye(
                 mesh,
@@ -459,7 +646,7 @@ fn add_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
             );
             add_mouth(mesh, genome, MaterialClass::Limb, 0.16);
         }
-        RoleArchetype::Inspector => {
+        RoleArchetype::QaEngineer => {
             add_eye(
                 mesh,
                 Vec3::new(0.02 * genome.body_radii.x, 0.02 * genome.body_radii.y, z),
@@ -476,40 +663,63 @@ fn add_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
                 MaterialClass::Body,
             );
         }
-        RoleArchetype::Reviewer => {
+        RoleArchetype::AdversarialReviewer => {
             add_disc(
                 mesh,
-                Vec3::new(0.0, 0.03 * genome.body_radii.y, z),
-                genome.body_radii.x * 0.42,
-                genome.body_radii.y * 0.23,
+                Vec3::new(0.0, 0.02 * genome.body_radii.y, z),
+                genome.body_radii.x * 0.44,
+                genome.body_radii.y * 0.20,
                 16,
                 MaterialClass::Eye,
             );
             add_disc(
                 mesh,
-                Vec3::new(pose.eye_aim.x * 0.08, 0.04 * genome.body_radii.y, z + 0.022),
-                genome.body_radii.x * 0.24,
-                genome.body_radii.y * 0.17,
-                14,
-                MaterialClass::Accent,
-            );
-            add_disc(
-                mesh,
-                Vec3::new(pose.eye_aim.x * 0.11, 0.04 * genome.body_radii.y, z + 0.042),
-                genome.body_radii.x * 0.075,
-                genome.body_radii.y * 0.14,
+                Vec3::new(pose.eye_aim.x * 0.12, 0.03 * genome.body_radii.y, z + 0.035),
+                genome.body_radii.x * 0.10,
+                genome.body_radii.y * 0.13,
                 12,
                 MaterialClass::Limb,
             );
+            add_tube(
+                mesh,
+                Vec3::new(-0.30 * genome.body_radii.x, -0.20 * genome.body_radii.y, z + 0.045),
+                Vec3::new(0.28 * genome.body_radii.x, -0.28 * genome.body_radii.y, z + 0.045),
+                0.028,
+                5,
+                MaterialClass::Limb,
+            );
+        }
+        RoleArchetype::CodeReviewer => {
+            add_two_eye_face(mesh, genome, pose, 0.20);
             add_rect(
                 mesh,
-                Vec3::new(0.0, -0.12 * genome.body_radii.y, z + 0.055),
-                genome.body_radii.x * 0.88,
-                genome.body_radii.y * 0.23,
+                Vec3::new(0.0, -0.06 * genome.body_radii.y, z + 0.045),
+                genome.body_radii.x * 0.84,
+                genome.body_radii.y * 0.18,
                 MaterialClass::Body,
             );
         }
-        _ => {
+        RoleArchetype::Antagonist => {
+            let spread = genome.body_radii.x * 0.24;
+            add_eye(
+                mesh,
+                Vec3::new(-spread, -0.03 * genome.body_radii.y, z),
+                genome.body_radii.x * 0.20,
+                genome.body_radii.y * 0.24,
+                pose.eye_aim,
+                false,
+            );
+            add_eye(
+                mesh,
+                Vec3::new(spread, -0.10 * genome.body_radii.y, z),
+                genome.body_radii.x * 0.16,
+                genome.body_radii.y * 0.21,
+                pose.eye_aim,
+                false,
+            );
+            add_mouth(mesh, genome, MaterialClass::Accent, 0.20);
+        }
+        RoleArchetype::Generic => {
             add_eye(
                 mesh,
                 Vec3::new(0.0, -0.02 * genome.body_radii.y, z),
@@ -519,6 +729,21 @@ fn add_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
                 false,
             );
         }
+    }
+}
+
+fn add_two_eye_face(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose, radius: f32) {
+    let z = genome.body_radii.z * 1.055;
+    let spread = genome.body_radii.x * 0.25;
+    for x in [-spread, spread] {
+        add_eye(
+            mesh,
+            Vec3::new(x, -0.04 * genome.body_radii.y, z),
+            genome.body_radii.x * radius,
+            genome.body_radii.y * radius * 1.15,
+            pose.eye_aim,
+            false,
+        );
     }
 }
 
@@ -703,13 +928,22 @@ fn add_limbs(mesh: &mut Mesh, genome: &CreatureGenome, pose: &CreaturePose) {
 
 fn hand_terminal_for_role(role: RoleArchetype) -> TerminalKind {
     match role {
-        RoleArchetype::Builder => TerminalKind::Clamp,
-        RoleArchetype::Inspector => TerminalKind::Probe,
-        RoleArchetype::Reviewer => TerminalKind::Fork,
-        RoleArchetype::Tester => TerminalKind::Node,
-        RoleArchetype::Planner => TerminalKind::Fork,
+        RoleArchetype::Orchestrator => TerminalKind::Node,
+        RoleArchetype::ProductManager => TerminalKind::Fork,
         RoleArchetype::Researcher => TerminalKind::Loop,
-        RoleArchetype::Orchestrator | RoleArchetype::Generic => TerminalKind::Node,
+        RoleArchetype::Architect => TerminalKind::Fork,
+        RoleArchetype::EpaRepresentative => TerminalKind::Clamp,
+        RoleArchetype::UxDesigner => TerminalKind::Loop,
+        RoleArchetype::ImplementationEngineer => TerminalKind::Clamp,
+        RoleArchetype::CrashTestDummy => TerminalKind::Node,
+        RoleArchetype::QaEngineer => TerminalKind::Probe,
+        RoleArchetype::AdversarialReviewer => TerminalKind::Fork,
+        RoleArchetype::CodeReviewer => TerminalKind::Fork,
+        RoleArchetype::RecoveryEngineer => TerminalKind::Clamp,
+        RoleArchetype::ReleaseEngineer => TerminalKind::Node,
+        RoleArchetype::Antagonist => TerminalKind::Fork,
+        RoleArchetype::HallMonitor => TerminalKind::Probe,
+        RoleArchetype::Generic => TerminalKind::Node,
     }
 }
 

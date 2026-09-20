@@ -58,6 +58,7 @@ import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -67,7 +68,17 @@ import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var updateCoordinator: AndroidUpdateCoordinator
-    private val repositoryHttpClient by lazy { HttpClient(CIO) }
+    private val repositoryHttpClient by lazy {
+        HttpClient(CIO) {
+            install(HttpTimeout) {
+                // Model archives can be hundreds of megabytes on mobile networks. Individual
+                // socket stalls still fail quickly enough to resume from the retained partial.
+                requestTimeoutMillis = 30L * 60L * 1000L
+                connectTimeoutMillis = 30_000L
+                socketTimeoutMillis = 120_000L
+            }
+        }
+    }
     private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
     private var installedGeminiReady by mutableStateOf(false)
     private val memoryRuntimeDelegate = lazy {

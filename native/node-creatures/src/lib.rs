@@ -39,40 +39,43 @@ pub fn render_creature(
 mod tests {
     use super::*;
 
+    fn built_in_roles() -> [(&'static str, RoleArchetype); 15] {
+        [
+            ("Orchestrator", RoleArchetype::Orchestrator),
+            ("Product Manager", RoleArchetype::ProductManager),
+            ("Researcher", RoleArchetype::Researcher),
+            ("Architect", RoleArchetype::Architect),
+            ("EPA Representative", RoleArchetype::EpaRepresentative),
+            ("UX Designer", RoleArchetype::UxDesigner),
+            ("Implementation Engineer", RoleArchetype::ImplementationEngineer),
+            ("Crash Test Dummy", RoleArchetype::CrashTestDummy),
+            ("QA Engineer", RoleArchetype::QaEngineer),
+            ("Adversarial Reviewer", RoleArchetype::AdversarialReviewer),
+            ("Code Reviewer", RoleArchetype::CodeReviewer),
+            ("Recovery Engineer", RoleArchetype::RecoveryEngineer),
+            ("Release Engineer", RoleArchetype::ReleaseEngineer),
+            ("Antagonist", RoleArchetype::Antagonist),
+            ("Hall Monitor", RoleArchetype::HallMonitor),
+        ]
+    }
+
     #[test]
-    fn role_mapping_matches_visual_grammar() {
-        assert_eq!(role_from_label("Orchestrator"), RoleArchetype::Orchestrator);
-        assert_eq!(
-            role_from_label("Implementation Engineer"),
-            RoleArchetype::Builder
-        );
-        assert_eq!(role_from_label("Crash Test Dummy"), RoleArchetype::Tester);
-        assert_eq!(role_from_label("QA Engineer"), RoleArchetype::Inspector);
-        assert_eq!(role_from_label("Code Reviewer"), RoleArchetype::Reviewer);
-        assert_eq!(role_from_label("Task Planner"), RoleArchetype::Planner);
-        assert_eq!(
-            role_from_label("Research Analyst"),
-            RoleArchetype::Researcher
-        );
+    fn every_built_in_role_maps_to_its_own_visual_archetype() {
+        for (label, expected) in built_in_roles() {
+            assert_eq!(role_from_label(label), expected, "{label}");
+        }
+        assert_eq!(role_from_label("Task Planner"), RoleArchetype::ProductManager);
+        assert_eq!(role_from_label("Swarm Coordinator"), RoleArchetype::Orchestrator);
+        assert_eq!(role_from_label("Research Analyst"), RoleArchetype::Researcher);
     }
 
     #[test]
     fn every_creature_has_three_to_ten_antennae() {
-        let roles = [
-            RoleArchetype::Orchestrator,
-            RoleArchetype::Builder,
-            RoleArchetype::Tester,
-            RoleArchetype::Inspector,
-            RoleArchetype::Reviewer,
-            RoleArchetype::Planner,
-            RoleArchetype::Researcher,
-            RoleArchetype::Generic,
-        ];
-        for (index, role) in roles.into_iter().enumerate() {
+        for (index, (label, role)) in built_in_roles().into_iter().enumerate() {
             let genome = generate_genome(role, &format!("role-{index}"));
             assert!(
                 (3..=10).contains(&genome.antennae.len()),
-                "{role:?} produced {} antennae",
+                "{label} produced {} antennae",
                 genome.antennae.len()
             );
         }
@@ -99,70 +102,166 @@ mod tests {
     }
 
     #[test]
-    fn semantic_roles_have_structurally_different_body_plans() {
-        let orchestrator = generate_genome(RoleArchetype::Orchestrator, "orchestrator");
-        let builder = generate_genome(RoleArchetype::Builder, "builder");
-        let tester = generate_genome(RoleArchetype::Tester, "tester");
-        let reviewer = generate_genome(RoleArchetype::Reviewer, "reviewer");
+    fn role_families_have_structurally_different_body_plans() {
+        let architect = generate_genome(RoleArchetype::Architect, "architect");
+        let builder = generate_genome(RoleArchetype::ImplementationEngineer, "builder");
+        let dummy = generate_genome(RoleArchetype::CrashTestDummy, "dummy");
+        let antagonist = generate_genome(RoleArchetype::Antagonist, "antagonist");
+        let hall_monitor = generate_genome(RoleArchetype::HallMonitor, "hall-monitor");
 
-        assert_eq!(orchestrator.arm_count, 0);
-        assert!(builder.arm_count >= 2);
-        assert!(tester
+        assert_ne!(architect.body_sides, builder.body_sides);
+        assert_eq!(dummy.leg_count, 2);
+        assert_eq!(antagonist.leg_count, 2);
+        assert_eq!(hall_monitor.antennae.len(), 9);
+        assert!(builder
+            .antennae
+            .iter()
+            .any(|antenna| antenna.terminal == TerminalKind::Clamp));
+        assert!(dummy
             .antennae
             .iter()
             .any(|antenna| antenna.terminal == TerminalKind::Coil));
-        assert!(reviewer
+        assert!(antagonist
             .antennae
             .iter()
-            .any(|antenna| matches!(antenna.terminal, TerminalKind::Loop | TerminalKind::Fork)));
-        assert_ne!(builder.body_radii, tester.body_radii);
-        assert_ne!(orchestrator.antennae, reviewer.antennae);
+            .any(|antenna| antenna.terminal == TerminalKind::Fork));
+        assert_ne!(architect.body_radii, hall_monitor.body_radii);
     }
 
     #[test]
-    fn generation_is_deterministic_but_not_color_swap_identity() {
-        let first = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
-        let same = generate_genome(RoleArchetype::Reviewer, "reviewer-a");
-        let other = generate_genome(RoleArchetype::Reviewer, "reviewer-b");
+    fn generation_is_deterministic_but_identity_seed_changes_anatomy() {
+        let first = generate_genome(RoleArchetype::CodeReviewer, "reviewer-a");
+        let same = generate_genome(RoleArchetype::CodeReviewer, "reviewer-a");
+        let other = generate_genome(RoleArchetype::CodeReviewer, "reviewer-b");
         assert_eq!(first, same);
         assert_ne!(first.antennae, other.antennae);
     }
 
     #[test]
-    fn active_role_exposes_semantic_work_verb() {
+    fn every_active_role_exposes_its_semantic_work_verb() {
+        for (role, expected) in [
+            (RoleArchetype::Orchestrator, "ROUTING"),
+            (RoleArchetype::ProductManager, "CLARIFYING"),
+            (RoleArchetype::Researcher, "RESEARCHING"),
+            (RoleArchetype::Architect, "STRUCTURING"),
+            (RoleArchetype::EpaRepresentative, "PROVISIONING"),
+            (RoleArchetype::UxDesigner, "DESIGNING"),
+            (RoleArchetype::ImplementationEngineer, "BUILDING"),
+            (RoleArchetype::CrashTestDummy, "STRESS-TESTING"),
+            (RoleArchetype::QaEngineer, "VERIFYING"),
+            (RoleArchetype::AdversarialReviewer, "CHALLENGING"),
+            (RoleArchetype::CodeReviewer, "REVIEWING CODE"),
+            (RoleArchetype::RecoveryEngineer, "RECOVERING"),
+            (RoleArchetype::ReleaseEngineer, "RELEASING"),
+            (RoleArchetype::Antagonist, "FINDING FLAWS"),
+            (RoleArchetype::HallMonitor, "MONITORING"),
+        ] {
+            assert_eq!(activity_verb(role, Activity::Active), expected);
+        }
         assert_eq!(
-            activity_verb(RoleArchetype::Orchestrator, Activity::Active),
-            "ROUTING"
-        );
-        assert_eq!(
-            activity_verb(RoleArchetype::Builder, Activity::Active),
-            "BUILDING"
-        );
-        assert_eq!(
-            activity_verb(RoleArchetype::Tester, Activity::Active),
-            "STRESS-TESTING"
-        );
-        assert_eq!(
-            activity_verb(RoleArchetype::Inspector, Activity::Active),
-            "VERIFYING"
-        );
-        assert_eq!(
-            activity_verb(RoleArchetype::Reviewer, Activity::Active),
-            "REVIEWING"
-        );
-        assert_eq!(
-            activity_verb(RoleArchetype::Reviewer, Activity::Blocked),
+            activity_verb(RoleArchetype::AdversarialReviewer, Activity::Blocked),
             "BLOCKED"
         );
     }
 
     #[test]
-    fn blocked_reviewer_physically_changes_antenna_pose() {
-        let genome = generate_genome(RoleArchetype::Reviewer, "reviewer");
-        let active = animate(&genome, Activity::Active, 0.33);
-        let blocked = animate(&genome, Activity::Blocked, 0.33);
-        assert_ne!(active.antenna_bend, blocked.antenna_bend);
-        assert!(blocked.antenna_bend.iter().any(|value| value.abs() > 0.20));
+    fn all_workflow_states_change_the_creature_pose() {
+        for (index, (label, role)) in built_in_roles().into_iter().enumerate() {
+            let genome = generate_genome(role, &format!("state-{index}"));
+            let queued = animate(&genome, Activity::Queued, 0.33);
+            let ready = animate(&genome, Activity::Ready, 0.33);
+            let active = animate(&genome, Activity::Active, 0.33);
+            let blocked = animate(&genome, Activity::Blocked, 0.33);
+            let failed = animate(&genome, Activity::Failed, 0.33);
+            let complete = animate(&genome, Activity::Complete, 0.33);
+            let gate = animate(&genome, Activity::Gate, 0.33);
+
+            assert_ne!(queued, ready, "{label} has no ready pose");
+            assert_ne!(queued, active, "{label} has no active pose");
+            assert_ne!(active, blocked, "{label} has no blocked pose");
+            assert_ne!(blocked, failed, "{label} has no failed pose");
+            assert_ne!(queued, complete, "{label} has no complete pose");
+            assert_ne!(queued, gate, "{label} has no gate pose");
+        }
+    }
+
+    #[test]
+    fn every_role_and_state_is_continuous_at_the_twelve_second_clock_boundary() {
+        fn close(left: f32, right: f32, context: &str) {
+            assert!(
+                (left - right).abs() < 0.0005,
+                "{context}: {left} != {right}"
+            );
+        }
+
+        fn pose_loops(start: &CreaturePose, end: &CreaturePose, context: &str) {
+            for (name, left, right) in [
+                ("body_offset.x", start.body_offset.x, end.body_offset.x),
+                ("body_offset.y", start.body_offset.y, end.body_offset.y),
+                ("body_offset.z", start.body_offset.z, end.body_offset.z),
+                ("body_rotation.x", start.body_rotation.x, end.body_rotation.x),
+                ("body_rotation.y", start.body_rotation.y, end.body_rotation.y),
+                ("body_rotation.z", start.body_rotation.z, end.body_rotation.z),
+                ("body_scale.x", start.body_scale.x, end.body_scale.x),
+                ("body_scale.y", start.body_scale.y, end.body_scale.y),
+                ("body_scale.z", start.body_scale.z, end.body_scale.z),
+                ("eye_aim.x", start.eye_aim.x, end.eye_aim.x),
+                ("eye_aim.y", start.eye_aim.y, end.eye_aim.y),
+                ("limb_phase.sin", start.limb_phase.sin(), end.limb_phase.sin()),
+            ] {
+                close(left, right, &format!("{context} {name}"));
+            }
+            assert_eq!(start.antenna_extension.len(), end.antenna_extension.len());
+            assert_eq!(start.antenna_bend.len(), end.antenna_bend.len());
+            for (index, (left, right)) in start
+                .antenna_extension
+                .iter()
+                .zip(end.antenna_extension.iter())
+                .enumerate()
+            {
+                close(*left, *right, &format!("{context} antenna_extension[{index}]"));
+            }
+            for (index, (left, right)) in start
+                .antenna_bend
+                .iter()
+                .zip(end.antenna_bend.iter())
+                .enumerate()
+            {
+                close(*left, *right, &format!("{context} antenna_bend[{index}]"));
+            }
+        }
+
+        for (role_index, (label, role)) in built_in_roles().into_iter().enumerate() {
+            let genome = generate_genome(role, &format!("loop-{role_index}"));
+            for activity in [
+                Activity::Queued,
+                Activity::Ready,
+                Activity::Active,
+                Activity::Blocked,
+                Activity::Failed,
+                Activity::Complete,
+                Activity::Gate,
+            ] {
+                let start = animate(&genome, activity, 0.0);
+                let end = animate(&genome, activity, 12.0);
+                pose_loops(&start, &end, &format!("{label} {activity:?}"));
+            }
+        }
+    }
+
+    #[test]
+    fn blocked_adversarial_roles_physically_tangle_their_antennae() {
+        for role in [
+            RoleArchetype::AdversarialReviewer,
+            RoleArchetype::CodeReviewer,
+            RoleArchetype::Antagonist,
+        ] {
+            let genome = generate_genome(role, "skeptic");
+            let active = animate(&genome, Activity::Active, 0.33);
+            let blocked = animate(&genome, Activity::Blocked, 0.33);
+            assert_ne!(active.antenna_bend, blocked.antenna_bend);
+            assert!(blocked.antenna_bend.iter().any(|value| value.abs() > 0.20));
+        }
     }
 
     #[test]
@@ -190,14 +289,8 @@ mod tests {
     }
 
     #[test]
-    fn every_antenna_produces_a_real_graph_socket() {
-        for (label, role) in [
-            ("Orchestrator", RoleArchetype::Orchestrator),
-            ("Implementation Engineer", RoleArchetype::Builder),
-            ("Crash Test Dummy", RoleArchetype::Tester),
-            ("QA Engineer", RoleArchetype::Inspector),
-            ("Code Reviewer", RoleArchetype::Reviewer),
-        ] {
+    fn every_antenna_of_every_role_produces_a_real_graph_socket() {
+        for (label, role) in built_in_roles() {
             let genome = generate_genome(role, label);
             let frame = render_creature(label, label, Activity::Active, 0.25, Camera::default());
             assert_eq!(
