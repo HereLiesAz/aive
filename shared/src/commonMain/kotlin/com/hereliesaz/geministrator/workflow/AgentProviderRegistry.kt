@@ -65,10 +65,6 @@ class AgentProviderRegistry(
         val repositoryAccessRequired =
             AgentCapability.RepositoryRead in required || AgentCapability.RepositoryWrite in required
 
-        suspend fun eligible(provider: AgentProvider): Boolean =
-            provider.capabilities().supported.containsAll(required) &&
-                (request.repository == null || provider.supportsRepository(request.repository))
-
         when (val constraints = request.constraints) {
             is ProviderConstraints.RequireProvider -> {
                 val provider = providersById[constraints.providerId]
