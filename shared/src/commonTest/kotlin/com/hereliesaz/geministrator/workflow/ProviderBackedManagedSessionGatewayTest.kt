@@ -78,6 +78,43 @@ class ProviderBackedManagedSessionGatewayTest {
     }
 
     @Test
+    fun requestAwareReconnectReconstructsProviderLocalSessionWithoutRedispatch() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = RecordingReconnectProvider()
+        val taskRunId = TaskRunId("resume-task")
+        val handle = ManagedSessionHandle(
+            taskRunId = taskRunId,
+            providerId = provider.id,
+            providerRunId = ProviderRunId("resume-run"),
+        )
+        val request = AgentTaskRequest(
+            taskRunId = taskRunId,
+            objective = "Resume the persisted provider task",
+            roleInstructions = "Return a concise result.",
+            acceptanceCriteria = emptyList(),
+            requirePlanApproval = true,
+        )
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider)),
+                scope,
+            )
+
+            gateway.reconnect(handle, ManagedSessionStatus.AwaitingApproval, request, "Approved plan preview")
+
+            assertEquals(1, provider.reconnectCalls)
+            assertEquals(0, provider.startCalls)
+            assertEquals(request, provider.reconnectedRequest)
+            assertEquals(true, provider.planGenerated)
+            assertEquals(false, provider.planApproved)
+            assertEquals("Approved plan preview", provider.planPreview)
+            assertEquals(ManagedSessionStatus.AwaitingApproval, gateway.status(handle))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun observerTransportFailurePreservesRemoteRunAndRetriesObservation() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = RetryingObserverProvider()
@@ -185,6 +222,43 @@ private class PlanPreviewProvider : AgentProvider {
             ),
         )
     }
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
+}
+
+private class RecordingReconnectProvider : AgentProvider {
+    override val id = AgentProviderId("recording-reconnect")
+    var reconnectCalls = 0
+    var startCalls = 0
+    var reconnectedRequest: AgentTaskRequest? = null
+    var planGenerated: Boolean? = null
+    var planApproved: Boolean? = null
+    var planPreview: String? = null
+
+    override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.PlanApproval))
+
+    override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
+        startCalls += 1
+        return AgentRunHandle(ProviderRunId("unexpected-start"))
+    }
+
+    override suspend fun reconnect(
+        runId: ProviderRunId,
+        request: AgentTaskRequest,
+        planGenerated: Boolean,
+        planApproved: Boolean,
+        planPreview: String?,
+    ): ProviderActionResult {
+        reconnectCalls += 1
+        reconnectedRequest = request
+        this.planGenerated = planGenerated
+        this.planApproved = planApproved
+        this.planPreview = planPreview
+        return ProviderActionResult.Accepted
+    }
+
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = emptyFlow()
     override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
     override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
     override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted

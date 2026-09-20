@@ -67,8 +67,8 @@ Tracking issue: #35
 - [ ] Define an objective.
 - [ ] Materialize a workflow definition.
 - [ ] Approve any required plan/specification gates.
-- [ ] Dispatch Jules-backed work.
-- [ ] Reconcile Jules progress without fabricating percentages.
+- [ ] Dispatch provider-backed work through a configured real provider.
+- [ ] Reconcile provider progress without fabricating percentages.
 - [ ] Persist and resume the run after process/browser restart.
 - [ ] Collect artifacts.
 - [ ] Run verification/review stages.

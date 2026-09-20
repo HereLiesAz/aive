@@ -73,6 +73,7 @@ interface ManagedSessionGateway {
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
         request: AgentTaskRequest,
+        providerPlan: String? = null,
     ) {
         reconnect(handle, initialStatus)
     }

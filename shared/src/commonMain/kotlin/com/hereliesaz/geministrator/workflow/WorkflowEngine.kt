@@ -249,6 +249,7 @@ class WorkflowEngine(
                         blockingReason = null,
                         progress = null,
                         progressMessage = null,
+                        providerPlan = null,
                     )
                 ),
                 updatedAtEpochMillis = nowEpochMillis,
@@ -432,6 +433,14 @@ class WorkflowEngine(
                             providerProgress?.fraction ?: taskRun.progress
                         },
                         progressMessage = providerProgress?.message ?: taskRun.progressMessage,
+                        providerPlan = if (
+                            safeStatus == TaskRunStatus.AwaitingApproval &&
+                            !providerProgress?.message.isNullOrBlank()
+                        ) {
+                            providerProgress?.message
+                        } else {
+                            taskRun.providerPlan
+                        },
                     )
                 ),
                 updatedAtEpochMillis = nowEpochMillis,
@@ -488,6 +497,7 @@ class WorkflowEngine(
                             blockingReason = null,
                             progress = null,
                             progressMessage = null,
+                            providerPlan = null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
