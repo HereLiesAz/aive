@@ -154,6 +154,7 @@ class ProviderBackedManagedSessionGateway(
                 val result = provider.reconnect(
                     runId = handle.providerRunId,
                     request = request,
+                    planGenerated = initialStatus != ManagedSessionStatus.Planning,
                     planApproved = initialStatus !in setOf(
                         ManagedSessionStatus.Planning,
                         ManagedSessionStatus.AwaitingApproval,
