@@ -44,6 +44,8 @@ class ProviderBackedManagedSessionGateway(
     private companion object {
         const val MAX_MEMORY_QUERIES = 6
         const val APPROXIMATE_CHARS_PER_TOKEN = 4
+        const val OBSERVER_RETRY_MILLIS = 1_000L
+        const val MAX_OBSERVER_FAILURES = 10
     }
 
     private data class SessionSnapshot(
@@ -543,8 +545,4 @@ class ProviderBackedManagedSessionGateway(
         label,
     ).joinToString("\u001f")
 
-    private companion object {
-        const val OBSERVER_RETRY_MILLIS = 1_000L
-        const val MAX_OBSERVER_FAILURES = 10
-    }
 }
