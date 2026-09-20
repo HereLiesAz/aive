@@ -57,7 +57,7 @@ object WorkflowGraphValidator {
                 val task = tasksById[id] ?: return false
                 return task.dependsOn.any { dependencyId ->
                     val dependency = tasksById[dependencyId] ?: return@any false
-                    dependency.effectiveExecutor() is TaskExecutor.HumanApproval || visit(dependencyId)
+                    dependency.executor is TaskExecutor.HumanApproval || visit(dependencyId)
                 }
             }
             return visit(taskId)
@@ -82,7 +82,7 @@ object WorkflowGraphValidator {
                 errors += WorkflowValidationError.MissingConditionTarget(task.id, conditionTarget)
             }
 
-            val repositoryOperation = task.effectiveExecutor() as? TaskExecutor.RepositoryOperation
+            val repositoryOperation = task.executor as? TaskExecutor.RepositoryOperation
             if (
                 repositoryOperation != null &&
                 repositoryOperation.operation.trim() !in setOf("status", "fetch") &&

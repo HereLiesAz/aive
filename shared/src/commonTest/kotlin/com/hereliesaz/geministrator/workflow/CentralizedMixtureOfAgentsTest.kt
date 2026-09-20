@@ -229,8 +229,8 @@ class CentralizedMixtureOfAgentsTest {
         firstInvocationId: String,
         secondInvocationId: String,
     ): TaskExecutorContext {
-        val firstId = TaskDefinitionId("candidate-1")
-        val secondId = TaskDefinitionId("candidate-2")
+        val firstId = TaskDefinitionId("target--moa-proposer-1")
+        val secondId = TaskDefinitionId("target--moa-proposer-2")
         val gateId = TaskDefinitionId("gate")
         val firstRun = TaskRun(
             id = TaskRunId("candidate-run-1"),
@@ -255,7 +255,10 @@ class CentralizedMixtureOfAgentsTest {
             roleId = null,
             dependsOn = setOf(firstId, secondId),
             environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
-            executor = TaskExecutor.ExternalService(GENEALOGY_GOVERNANCE_SERVICE),
+            executor = TaskExecutor.ExternalService(
+                service = GENEALOGY_GOVERNANCE_SERVICE,
+                operation = "target",
+            ),
         )
         val gateRun = TaskRun(
             id = TaskRunId("gate-run"),

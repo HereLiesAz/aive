@@ -1,0 +1,177 @@
+name: Play Store Assets
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: play-store-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Rust renderer toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Publish pinned Conveyance for isolated Wasm build
+        run: |
+          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
+            :conveyance-core:publishToMavenLocal \
+            :conveyance-compose:publishToMavenLocal
+
+      - name: Publish pinned H2G2 for isolated Wasm build
+        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
+
+      - name: Build production JS and Wasm apps
+        run: |
+          ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true \
+            :webApp:jsBrowserProductionWebpack \
+            :webApp:wasmJsBrowserProductionWebpack
+
+      - name: Stage production app
+        shell: bash
+        run: |
+          set -euo pipefail
+          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
+          test -n "$WASM_BUNDLE"
+          WASM_DIR="$(dirname "$WASM_BUNDLE")"
+          JS_BUNDLE="$(find webApp/build -type f -path '*/js/productionExecutable/haive.js' -print -quit)"
+          test -n "$JS_BUNDLE"
+          JS_DIR="$(dirname "$JS_BUNDLE")"
+          rm -rf build/play-store-site build/play-store-js-site build/play-store-captures build/play-store-assets
+          mkdir -p build/play-store-site build/play-store-js-site build/play-store-captures
+          cp -R "$WASM_DIR"/. build/play-store-site/
+          cp -R webApp/src/webMain/resources/. build/play-store-site/
+          cp -R "$JS_DIR"/. build/play-store-js-site/
+          cp -R webApp/src/webMain/resources/. build/play-store-js-site/
+          test -f build/play-store-site/index.html
+          test -f build/play-store-site/haive.js
+          test -f build/play-store-site/haive_node_creatures.wasm
+          test -f build/play-store-js-site/index.html
+          test -f build/play-store-js-site/haive.js
+
+      - name: Install Chromium and Pillow
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m pip install --quiet pillow
+
+      - name: Capture real production UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8080 --directory build/play-store-site > /tmp/aive-store-assets-wasm-http.log 2>&1 &
+          WASM_SERVER_PID=$!
+          python3 -m http.server 8081 --directory build/play-store-js-site > /tmp/aive-store-assets-js-http.log 2>&1 &
+          JS_SERVER_PID=$!
+          trap 'kill "$WASM_SERVER_PID" "$JS_SERVER_PID" 2>/dev/null || true' EXIT
+
+          for port in 8080 8081; do
+            for attempt in $(seq 1 30); do
+              if curl --fail --silent "http://127.0.0.1:$port/" >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            curl --fail --silent "http://127.0.0.1:$port/" >/dev/null
+          done
+
+          cat > build/capture-store-assets.mjs <<'JS'
+          import { chromium } from 'playwright';
+
+          const browser = await chromium.launch({
+            headless: true,
+            args: ['--enable-unsafe-swiftshader'],
+          });
+
+          async function capture(name, url, width, height, terrarium = false) {
+            const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+            const diagnostics = [];
+            page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
+            page.on('pageerror', error => diagnostics.push(`[pageerror] ${error.stack || error.message}`));
+            try {
+              await page.goto(url, { waitUntil: 'domcontentloaded' });
+              if (terrarium) {
+                await page.waitForFunction(() => {
+                  if (globalThis.__haiveStartupError) throw new Error(globalThis.__haiveStartupError);
+                  return globalThis.__haiveNodeCreaturesReady === true &&
+                    globalThis.__haiveAppScriptLoaded === true;
+                }, null, { timeout: 15000 });
+              }
+              await page.waitForSelector('#webApp > *', { timeout: 15000 });
+              await page.waitForTimeout(1800);
+              await page.screenshot({
+                path: `build/play-store-captures/${name}.png`,
+                fullPage: false,
+              });
+            } catch (error) {
+              console.error(`${name}: ${error.stack || error}`);
+              diagnostics.forEach(entry => console.error(entry));
+              throw error;
+            } finally {
+              await page.close();
+            }
+          }
+
+          async function smoke(url) {
+            const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+            try {
+              await page.goto(url, { waitUntil: 'domcontentloaded' });
+              await page.waitForSelector('#webApp > *', { timeout: 15000 });
+              await page.waitForTimeout(500);
+            } finally {
+              await page.close();
+            }
+          }
+
+          try {
+            await smoke('http://127.0.0.1:8081/');
+            await capture('overview-portrait', 'http://127.0.0.1:8080/', 1080, 1920, false);
+            await capture('terrarium-portrait', 'http://127.0.0.1:8080/?terrariumPreview=1', 1080, 1920, true);
+            await capture('overview-landscape', 'http://127.0.0.1:8080/', 1920, 1080, false);
+            await capture('terrarium-landscape', 'http://127.0.0.1:8080/?terrariumPreview=1', 1920, 1080, true);
+          } finally {
+            await browser.close();
+          }
+          JS
+
+          node build/capture-store-assets.mjs
+
+      - name: Generate and validate listing graphics
+        run: |
+          python3 tools/play_store_assets.py \
+            --repo . \
+            --output-dir build/play-store-assets \
+            --screenshot build/play-store-captures/overview-portrait.png \
+            --screenshot build/play-store-captures/terrarium-portrait.png \
+            --screenshot build/play-store-captures/overview-landscape.png \
+            --screenshot build/play-store-captures/terrarium-landscape.png
+
+      - name: Upload final Google Play asset set
+        uses: actions/upload-artifact@v7
+        with:
+          name: google-play-store-assets
+          path: build/play-store-assets/
+          if-no-files-found: error

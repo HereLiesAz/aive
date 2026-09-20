@@ -51,7 +51,9 @@ class GraphMemoryTool(
             .mapNotNull { node ->
                 val lexical = lexicalScore(query.text, node)
                 if (lexical <= 0f) return@mapNotNull null
-                val score = (lexical + scopeAffinity(query, node, episodesById)).coerceIn(0f, 1f)
+                // Keep affinity as a ranking signal even when lexical relevance is already 1.0.
+                // Returned recall scores are normalized later; this internal score may exceed 1.
+                val score = lexical + scopeAffinity(query, node, episodesById)
                 node to score
             }
             .sortedWith(memorySeedComparator())
@@ -73,7 +75,8 @@ class GraphMemoryTool(
             .mapNotNull { node ->
                 val match = tagAddressScore(query.tags, node)
                 if (match <= 0f) return@mapNotNull null
-                val score = (match + scopeAffinity(normalizedQuery, node, episodesById)).coerceIn(0f, 1f)
+                // Do not clamp before sorting or exact tag matches would erase scope affinity.
+                val score = match + scopeAffinity(normalizedQuery, node, episodesById)
                 node to score
             }
             .sortedWith(memorySeedComparator())

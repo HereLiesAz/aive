@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class MemoryBackendHardeningTest {
     @Test
-    fun gripEnforcesEveryNonNullScopeDimension() = runBlocking {
+    fun gripKeepsProjectAsHardBoundaryAndUsesRunTaskRoleAsAffinity() = runBlocking {
         val local = episode(
             id = "local",
             projectId = "project",
@@ -63,7 +63,14 @@ class MemoryBackendHardeningTest {
             ),
         )
 
-        assertEquals(listOf(MemoryNodeId("tag-local")), recalled.hits.map { it.node.id })
+        val recalledIds = recalled.hits.map { it.node.id }
+        assertEquals(MemoryNodeId("tag-local"), recalledIds.first())
+        assertFalse(MemoryNodeId("tag-wrong-project") in recalledIds)
+        assertTrue(MemoryNodeId("tag-wrong-workflow-run") in recalledIds)
+        assertTrue(MemoryNodeId("tag-wrong-workflow-definition") in recalledIds)
+        assertTrue(MemoryNodeId("tag-wrong-task-run") in recalledIds)
+        assertTrue(MemoryNodeId("tag-wrong-task-definition") in recalledIds)
+        assertTrue(MemoryNodeId("tag-wrong-role") in recalledIds)
     }
 
     @Test

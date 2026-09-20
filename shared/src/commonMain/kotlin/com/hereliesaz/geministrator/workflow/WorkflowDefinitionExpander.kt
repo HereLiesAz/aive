@@ -47,7 +47,8 @@ object WorkflowDefinitionExpander {
                 val role = taskRole(task)
                 val effectiveAuthority = task.requiredRoleAuthority
                     ?: role?.authorities?.singleOrNull()
-                val roleAgent = task.executor as? TaskExecutor.RoleAgent
+                val roleAgent = (task.executor ?: task.roleId?.let(TaskExecutor::RoleAgent))
+                    as? TaskExecutor.RoleAgent
                 if (
                     role == null ||
                     roleAgent == null ||

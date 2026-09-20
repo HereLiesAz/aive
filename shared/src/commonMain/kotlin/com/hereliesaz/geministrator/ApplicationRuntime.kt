@@ -710,10 +710,11 @@ class ApplicationRuntime private constructor(
             scope: CoroutineScope,
             persistence: WorkflowPersistence = SettingsWorkflowPersistence.createDefault(),
             executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
+            providerRegistry: AgentProviderRegistry? = null,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
-            val registry = AgentProviderRegistry(providers)
+            val registry = providerRegistry ?: AgentProviderRegistry(providers)
             val gateway = ProviderBackedManagedSessionGateway(registry, runtimeScope)
             val publisher = WorkflowRuntimePublisher()
             val effectiveExecutorIntegrations = executorIntegrations.withIntegration(

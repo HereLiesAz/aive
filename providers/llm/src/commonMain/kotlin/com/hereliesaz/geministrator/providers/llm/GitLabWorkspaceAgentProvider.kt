@@ -29,7 +29,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.CancellationException
-import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
@@ -103,6 +102,7 @@ class GitLabWorkspaceAgentProvider(
 
         val sessionsMutex = Mutex()
         val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
+        val nextSequenceByProvider = mutableMapOf<String, Long>()
     }
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
@@ -122,14 +122,15 @@ class GitLabWorkspaceAgentProvider(
         require(supportsRepository(request.repository)) {
             "$displayName GitLab workspace agent requires a linked GitLab repository"
         }
-        val runId = ProviderRunId(
-            "${id.value}/${request.taskRunId.value}/${UUID.randomUUID()}",
-        )
-        sessionsMutex.withLock {
-            sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[runId] = Session(
+        val runId = sessionsMutex.withLock {
+            val nextSequence = (nextSequenceByProvider[id.value] ?: 0L) + 1L
+            nextSequenceByProvider[id.value] = nextSequence
+            ProviderRunId("${id.value}/${request.taskRunId.value}/$nextSequence").also { providerRunId ->
+                sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[providerRunId] = Session(
                 request = request,
-                phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
-            )
+                    phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
+                )
+            }
         }
         return AgentRunHandle(runId)
     }

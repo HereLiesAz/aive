@@ -1,0 +1,72 @@
+name: Live Runtime Verification
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: live-runtime-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-runtime:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AIVE_LIVE_RUNTIME_VERIFICATION: "1"
+      JULES_API_KEY: ${{ secrets.JULES_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Check out pinned h2g2
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/conveyance-h2g2
+          ref: 8566a9db02d533d9534327df40424ee7b88ebe88
+          path: vendor/conveyance-h2g2
+
+      - name: Check out pinned Conveyance
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/Conveyance
+          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          path: vendor/conveyance-h2g2/vendor/Conveyance
+
+      - name: Require live Jules credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${JULES_API_KEY:-}" ]; then
+            echo "::error::JULES_API_KEY is required for live runtime verification"
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run live runtime lifecycle verification
+        run: |
+          ./gradlew \
+            :providers:jules:desktopTest \
+            --tests com.hereliesaz.geministrator.providers.jules.JulesLiveRuntimeVerificationTest \
+            --no-daemon \
+            --stacktrace
+
+      - name: Print live verification report on failure
+        if: failure()
+        shell: bash
+        run: |
+          find providers/jules/build/test-results -type f -name '*.xml' -print -exec cat {} \; || true
