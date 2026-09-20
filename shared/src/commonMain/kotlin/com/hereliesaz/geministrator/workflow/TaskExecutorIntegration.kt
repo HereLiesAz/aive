@@ -147,10 +147,11 @@ class TaskExecutorIntegrationRegistry(
         val route = orchestrationUtilities.routeTool(
             ToolRoutingInput(
                 operationClass = operationClass,
-                capabilities = ids.map { id ->
+                capabilities = ids.mapIndexed { index, id ->
                     ToolCapability(
                         id = id,
                         operationClasses = setOf(operationClass),
+                        preferenceRank = index,
                     )
                 },
             ),
