@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.*
 import org.jetbrains.compose.resources.DrawableResource
 
 internal enum class NodeArmVariant {
