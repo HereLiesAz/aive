@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,6 +66,25 @@ class NodeArmAssetsTest {
         )
         assertEquals(2f, atTwoHundredPercent.scaleX, 0.0001f)
         assertEquals(2f, atTwoHundredPercent.scaleY, 0.0001f)
+    }
+
+    @Test
+    fun armRoleAliasesStayAlignedWithCreatureAliases() {
+        assertEquals(NodeArmRole.QaEngineer, NodeArmAssets.roleFor("Inspector"))
+        assertEquals(NodeArmRole.ImplementationEngineer, NodeArmAssets.roleFor("Developer"))
+        assertEquals(NodeArmRole.ImplementationEngineer, NodeArmAssets.roleFor("Coder"))
+        assertEquals(NodeArmRole.ReleaseEngineer, NodeArmAssets.roleFor("Publisher"))
+        assertEquals(NodeArmRole.HallMonitor, NodeArmAssets.roleFor("Systems Monitor"))
+    }
+
+    @Test
+    fun everyArmRoleHasExplicitBodyAndSocketColors() {
+        NodeArmRole.entries.forEach { role ->
+            assertEquals(1f, nodeArmColor(role).alpha)
+            assertEquals(1f, nodeArmDarkColor(role).alpha)
+        }
+        assertEquals(Color(0xFFF5B82E), nodeArmColor(NodeArmRole.Orchestrator))
+        assertEquals(Color(0xFF050505), nodeArmDarkColor(NodeArmRole.Antagonist))
     }
 
     @Test
