@@ -86,28 +86,67 @@ private data class NodeCreaturePalette(
 )
 
 private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette {
-    val role = roleLabel.lowercase()
+    val role = roleLabel.trim().lowercase()
     return when {
-        role.contains("orchestrat") || role.contains("queen") -> NodeCreaturePalette(
-            body = Color(0xFF080C18),
-            accent = Color(0xFFFF5665),
+        "hall monitor" in role || "hall-monitor" in role -> NodeCreaturePalette(
+            body = Color(0xFF69A9EF),
+            accent = Color(0xFF214D85),
         )
-        // Specific semantic roles must win before the broad "engineer" builder match.
-        role.contains("crash") || role.contains("dummy") || role.contains("test") -> NodeCreaturePalette(
-            body = Color(0xFF08101C),
-            accent = Color(0xFF249CFF),
+        "antagonist" in role -> NodeCreaturePalette(
+            body = Color(0xFF191919),
+            accent = Color(0xFFA10A5A),
         )
-        role.contains("qa") || role.contains("quality") || role.contains("verif") || role.contains("inspect") -> NodeCreaturePalette(
-            body = Color(0xFF0A1020),
-            accent = Color(0xFF7C6CFF),
+        "adversarial" in role -> NodeCreaturePalette(
+            body = Color(0xFFF12E3D),
+            accent = Color(0xFF721722),
         )
-        role.contains("review") -> NodeCreaturePalette(
-            body = Color(0xFF0B0D16),
-            accent = Color(0xFFE62D70),
+        "recovery" in role -> NodeCreaturePalette(
+            body = Color(0xFF35B96A),
+            accent = Color(0xFFEAC58A),
         )
-        role.contains("implement") || role.contains("build") || role.contains("engineer") -> NodeCreaturePalette(
-            body = Color(0xFF0D1220),
-            accent = Color(0xFFFFB323),
+        "release" in role -> NodeCreaturePalette(
+            body = Color(0xFFA464E6),
+            accent = Color(0xFFF0A400),
+        )
+        "code review" in role || "code-review" in role -> NodeCreaturePalette(
+            body = Color(0xFF2F70E8),
+            accent = Color(0xFF173D7A),
+        )
+        "crash" in role || "dummy" in role || "stress test" in role -> NodeCreaturePalette(
+            body = Color(0xFFFFC928),
+            accent = Color(0xFF3AA9EA),
+        )
+        role == "qa" || "qa engineer" in role || "quality" in role || "inspect" in role -> NodeCreaturePalette(
+            body = Color(0xFF39BFEA),
+            accent = Color(0xFF21395E),
+        )
+        "implementation" in role || "implementer" in role || "builder" in role -> NodeCreaturePalette(
+            body = Color(0xFFFF7A00),
+            accent = Color(0xFF5F7898),
+        )
+        "ux" in role || "user experience" in role -> NodeCreaturePalette(
+            body = Color(0xFFF35F8A),
+            accent = Color(0xFF8A2C50),
+        )
+        "epa" in role || "environment" in role -> NodeCreaturePalette(
+            body = Color(0xFF38B84A),
+            accent = Color(0xFF1C7130),
+        )
+        "architect" in role -> NodeCreaturePalette(
+            body = Color(0xFF8B59E8),
+            accent = Color(0xFF5A35A7),
+        )
+        "research" in role || "analyst" in role || "investigat" in role -> NodeCreaturePalette(
+            body = Color(0xFF39A9EA),
+            accent = Color(0xFF165AA5),
+        )
+        "product" in role || "requirements" in role || "planner" in role -> NodeCreaturePalette(
+            body = Color(0xFFF15F89),
+            accent = Color(0xFF7A3150),
+        )
+        "orchestrat" in role || "coordinat" in role || "queen" in role -> NodeCreaturePalette(
+            body = Color(0xFFF5B82E),
+            accent = Color(0xFF16223C),
         )
         else -> NodeCreaturePalette(
             body = Azphalt.hue(hueSeed),
