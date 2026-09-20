@@ -40,6 +40,7 @@ class ProviderTaskRequestFactoryTest {
             taskRunId = TaskRunId("dependency-run"),
             label = "Sensitive review",
             textContent = "do not send",
+            createdAtEpochMillis = 1L,
         )
         val allowedArtifact = ArtifactRef(
             id = ArtifactId("allowed"),
@@ -47,6 +48,7 @@ class ProviderTaskRequestFactoryTest {
             taskRunId = TaskRunId("dependency-run"),
             label = "Allowed change",
             textContent = "safe",
+            createdAtEpochMillis = 1L,
         )
         val definition = WorkflowDefinition(
             id = WorkflowDefinitionId("definition"),
