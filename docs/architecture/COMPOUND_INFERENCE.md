@@ -240,6 +240,12 @@ The Epoch-8 implementation is `MemoryEpoch8LocalModelLibrary`. It catalogs:
 
 All release asset identities and SHA-256 digests are encoded in the reusable descriptors. `MemoryEpoch8ModelCatalog` remains a compatibility view over the generalized library so existing Android artifact IDs and install behavior remain stable. Its production artifact selection continues to prefer merged INT8 models.
 
+On Android, release-asset installation is resumable. Large memory/orchestration archives and split
+parts retain `.download` files across transport failures, refresh the stable GitHub release URL on
+each retry, resume with HTTP byte ranges when supported, restart safely if the origin ignores Range,
+and promote bytes only after final size/SHA-256 verification. This makes transport recovery part of
+the concrete local runtime without weakening the descriptor's cryptographic identity contract.
+
 `AgentProviderRegistry` installs the library into the durable inference fabric through `withLocalModelLibrary(...)`. Registration is lazy and mutex-guarded by `LocalModelBootstrapInferenceFabric`, so the first registry access or provider dispatch persists the catalog once per runtime and existing durable model identities remain stable across restarts.
 
 The shared-base residency shape is therefore available to backends that can prove safe adapter switching:
