@@ -75,49 +75,16 @@ class WorkflowRuntimeCoordinator(
                     "Task ${taskDefinitionId.value} was not found"
                 }
                 val role = engine.roleDefinition(run, taskRun.assignedRoleId)
-                val dependencyArtifacts = task.dependsOn
-                    .mapNotNull(run.taskRuns::get)
-                    .flatMap(TaskRun::artifacts)
-                val request = com.hereliesaz.geministrator.providers.AgentTaskRequest(
-                    taskRunId = taskRun.id,
-                    objective = task.objective,
-                    roleInstructions = role?.instructions.orEmpty(),
-                    acceptanceCriteria = task.acceptanceCriteria,
-                    contextArtifacts = dependencyArtifacts,
-                    requiredArtifacts = task.requiredArtifacts,
-                    repository = project.repository,
-                    requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
-                    promptContext = com.hereliesaz.geministrator.providers.PromptContext(
-                        stablePrefix = listOf(
-                            com.hereliesaz.geministrator.providers.PromptContextBlock(
-                                "Workflow objective",
-                                run.objective,
-                            ),
-                        ) + role?.let {
-                            listOf(
-                                com.hereliesaz.geministrator.providers.PromptContextBlock(
-                                    "Role",
-                                    it.instructions,
-                                ),
-                            )
-                        }.orEmpty(),
-                        dynamicContext = listOf(
-                            com.hereliesaz.geministrator.providers.PromptContextBlock("Task", task.objective),
-                            com.hereliesaz.geministrator.providers.PromptContextBlock(
-                                "Attempt",
-                                taskRun.attempt.toString(),
-                            ),
-                        ),
-                        reusePolicy = definition.promptReusePolicy,
-                        cacheNamespace = role?.let { "${run.id.value}:${it.id.value}" },
-                    ),
-                    orchestrationContext = com.hereliesaz.geministrator.providers.AgentOrchestrationContext(
-                        projectId = project.id,
-                        workflowRunId = run.id,
-                        workflowDefinitionId = definition.id,
-                        taskDefinitionId = task.id,
-                        roleId = role?.id,
-                    ),
+                val resolvedRole = requireNotNull(role) {
+                    "Provider-backed task ${taskDefinitionId.value} has no role definition"
+                }
+                val request = buildProviderTaskRequest(
+                    project = project,
+                    definition = definition,
+                    run = run,
+                    task = task,
+                    taskRun = taskRun,
+                    role = resolvedRole,
                 )
                 sessionGateway.reconnect(
                     handle,
