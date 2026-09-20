@@ -8,7 +8,7 @@ Come to find out, both are now entire markets of their own, with very valuable c
 
 ## What it is
 
-The Haive is an AI swarm orchestration manager featuring living workflows: an H2G2-inspired UI with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
+The Aive is an AI swarm orchestration manager featuring living workflows: an H2G2-inspired UI with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
 
 Workflow nodes may be performed by AI providers such as specialized model agents, LLMs, coordinated sub-workflow roles, by people, or by systems like GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
 
@@ -34,6 +34,9 @@ Start with [`docs/README.md`](docs/README.md).
 
 - [Architecture](docs/architecture/ARCHITECTURE.md)
 - [Persistence](docs/architecture/PERSISTENCE.md)
+- [Versioning and grouped releases](docs/VERSIONING.md)
+- [Workflow add-ons / Azphalt](docs/architecture/ADDONS.md)
+- [Live runtime acceptance](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
