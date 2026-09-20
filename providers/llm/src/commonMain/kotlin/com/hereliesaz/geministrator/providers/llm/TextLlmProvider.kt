@@ -42,18 +42,12 @@ open class TextLlmProvider(
     )
 
     private val mutex = Mutex()
+    private val sessions = mutableMapOf<ProviderRunId, Session>()
     private var nextSequence = 1L
 
     private companion object {
-        val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
-        val sessionsMutex = Mutex()
         const val MAX_PLAN_PREVIEW_CHARS = 8_000
     }
-
-    private suspend fun providerSessions(): MutableMap<ProviderRunId, Session> =
-        sessionsMutex.withLock {
-            sessionsByProvider.getOrPut(id.value) { mutableMapOf() }
-        }
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
         supported = setOf(
@@ -64,7 +58,6 @@ open class TextLlmProvider(
     )
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
-        val sessions = providerSessions()
         val runId = mutex.withLock {
             val sequence = nextSequence++
             ProviderRunId("${id.value}/${request.taskRunId.value}/$sequence").also { providerRunId ->
@@ -84,7 +77,6 @@ open class TextLlmProvider(
         request: AgentTaskRequest,
         planApproved: Boolean,
     ): ProviderActionResult {
-        val sessions = providerSessions()
         mutex.withLock {
             if (runId !in sessions) {
                 sessions[runId] = Session(
@@ -103,7 +95,6 @@ open class TextLlmProvider(
     }
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
-        val sessions = providerSessions()
         val session = mutex.withLock { sessions[runId] }
             ?: error("$displayName session ${runId.value} is not available in this process")
 
@@ -141,7 +132,6 @@ open class TextLlmProvider(
         )
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult {
-        val sessions = providerSessions()
         val session = mutex.withLock { sessions[runId] }
             ?: return ProviderActionResult.Rejected("$displayName session ${runId.value} is not available")
         if (!session.request.requirePlanApproval) return ProviderActionResult.Accepted
@@ -153,7 +143,6 @@ open class TextLlmProvider(
     }
 
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult {
-        val sessions = providerSessions()
         val session = mutex.withLock { sessions[runId] } ?: return ProviderActionResult.Accepted
         session.phase.value = TextLlmSessionPhase.Cancelled
         return ProviderActionResult.Accepted
