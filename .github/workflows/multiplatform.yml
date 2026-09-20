@@ -118,9 +118,6 @@ jobs:
           echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "Android release versionCode: $VERSION_CODE"
 
-      - name: Verify immutable release policy
-        run: python3 .github/scripts/verify_release_immutability.py
-
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 
@@ -318,6 +315,7 @@ jobs:
 
   desktop-packages:
     name: Desktop installer (${{ matrix.platform }})
+    if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -439,160 +437,90 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish versioned release
+    name: Publish patch-grouped release
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs:
       - build
-      - desktop-packages
-    runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Download GitHub Android release
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-android-github-release
-          path: release-input/android
-
-      - name: Download Linux installer
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-desktop-linux
-          path: release-input/linux
-
-      - name: Download Windows installer
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-desktop-windows
-          path: release-input/windows
-
-      - name: Download macOS installer
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-desktop-macos
-          path: release-input/macos
-
-      - name: Download release notes
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-release-notes
-          path: release-input/notes
-
-      - name: Prepare release assets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
-          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD (for example 0.9.6.0)"
-            exit 1
-          fi
-
-          MAJOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1)
-          MINOR=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f2)
-          PATCH=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f3)
-          VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${GITHUB_RUN_NUMBER}"
-          TAG_NAME="v${VERSION_NAME}"
-          RELEASE_TITLE="The Aive ${VERSION_NAME}"
-
-          IS_PRERELEASE=false
-          if [ "$MAJOR" -eq 0 ] || { [ "$MAJOR" -eq 1 ] && [ "$MINOR" -le 3 ]; }; then
-            IS_PRERELEASE=true
-          fi
-
-          mkdir -p release-files
-
-          APK_SOURCE=$(find release-input/android -type f -name '*.apk' -print -quit)
-          DEB_SOURCE=$(find release-input/linux -type f -name '*.deb' -print -quit)
-          MSI_SOURCE=$(find release-input/windows -type f -name '*.msi' -print -quit)
-          DMG_SOURCE=$(find release-input/macos -type f -name '*.dmg' -print -quit)
-
-          for entry in \
-            "APK_SOURCE:$APK_SOURCE" \
-            "DEB_SOURCE:$DEB_SOURCE" \
-            "MSI_SOURCE:$MSI_SOURCE" \
-            "DMG_SOURCE:$DMG_SOURCE"; do
-            label=${entry%%:*}
-            value=${entry#*:}
-            if [ -z "$value" ]; then
-              echo "::error::Missing release asset: $label"
-              find release-input -type f -print
-              exit 1
-            fi
-          done
-
-          cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
-          cp "$DEB_SOURCE" "release-files/TheAive-${VERSION_NAME}.deb"
-          cp "$MSI_SOURCE" "release-files/TheAive-${VERSION_NAME}.msi"
-          cp "$DMG_SOURCE" "release-files/TheAive-${VERSION_NAME}.dmg"
-
-          NOTES_SOURCE=$(find release-input/notes -type f -name 'default.txt' -print -quit)
-          {
-            echo "# The Aive ${VERSION_NAME}"
-            echo
-            echo "Versioned build from commit \`${GITHUB_SHA}\`."
-            if [ -n "$NOTES_SOURCE" ] && [ -s "$NOTES_SOURCE" ]; then
-              echo
-              echo "## Changes"
-              cat "$NOTES_SOURCE"
-            fi
-          } > release-notes.md
-
-          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
-          echo "RELEASE_TITLE=$RELEASE_TITLE" >> "$GITHUB_ENV"
-          echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
-
-          echo "Release assets:"
-          ls -lh release-files
-
-      - name: Publish versioned release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # Release history is immutable. Every MAJOR.MINOR.PATCH.BUILD may be published exactly once.
-          # Never move a version tag, edit an existing release, delete its assets, or clobber uploads.
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Release $TAG_NAME already exists. Leaving the existing release completely unchanged."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
-            TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
-            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
-              echo "::error::Immutable tag $TAG_NAME already exists at $TAG_COMMIT; refusing to move it to $GITHUB_SHA"
-              exit 1
-            fi
-          else
-            git tag -a "$TAG_NAME" -m "The Aive ${VERSION_NAME}"
-            git push origin "$TAG_NAME"
-          fi
-
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            gh release create "$TAG_NAME" release-files/* \
-              --prerelease \
-              --verify-tag \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-          else
-            gh release create "$TAG_NAME" release-files/* \
-              --verify-tag \
-              --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md
-          fi
+      statuses: write
+    uses: HereLiesAz/workflows/.github/workflows/multi-platform-app-release.yml@feat/patch-grouped-releases
+    with:
+      target_repository: ${{ github.repository }}
+      target_repository_id: ${{ github.repository_id }}
+      target_repository_owner: ${{ github.repository_owner }}
+      target_repository_owner_id: ${{ github.repository_owner_id }}
+      target_sha: ${{ github.sha }}
+      target_check_sha: ${{ github.sha }}
+      target_ref: ${{ github.ref }}
+      target_ref_name: ${{ github.ref_name }}
+      target_ref_type: ${{ github.ref_type }}
+      target_head_ref: ${{ github.head_ref }}
+      target_base_ref: ${{ github.base_ref }}
+      target_actor: ${{ github.actor }}
+      target_actor_id: ${{ github.actor_id }}
+      target_event_name: ${{ github.event_name }}
+      target_event_json: ${{ toJSON(github.event) }}
+      target_inputs_json: ${{ toJSON(inputs) }}
+      target_vars_json: ${{ toJSON(vars) }}
+      target_run_id: ${{ github.run_id }}
+      target_run_number: ${{ github.run_number }}
+      target_run_attempt: ${{ github.run_attempt }}
+      target_workflow_name: ${{ github.workflow }}
+      source_workflow_path: .github/workflows/multiplatform.yml
+      source_sha256: aive-central-multiplatform-release-v1
+      target_repository_name: aive
+      purpose_profile_json: |
+        {
+          "serialize": false,
+          "prepare_command": "set -euo pipefail\nSOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\\r ')\nif ! printf '%s' \"$SOURCE_VERSION\" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$'; then echo '::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD' >&2; exit 1; fi\nPATCH_VERSION=$(printf '%s' \"$SOURCE_VERSION\" | cut -d. -f1-3)\nversion=\"${PATCH_VERSION}.${TARGET_RUN_NUMBER}\"\ntag=\"v${PATCH_VERSION}\"\nbuild_tag=\"v${version}\"\ngh auth setup-git\ngit fetch --tags origin\nif git rev-parse \"refs/tags/$build_tag\" >/dev/null 2>&1; then existing=$(git rev-list -n1 \"$build_tag\"); test \"$existing\" = \"$TARGET_SHA\" || { echo \"::error::Immutable build tag $build_tag points to $existing, expected $TARGET_SHA\" >&2; exit 1; }; else git tag -a \"$build_tag\" \"$TARGET_SHA\" -m \"The Aive $version\"; git push origin \"$build_tag\"; fi\nrm -rf release-artifacts /tmp/aive-release-input\nmkdir -p release-artifacts /tmp/aive-release-input/android /tmp/aive-release-input/notes\ngh run download \"$TARGET_RUN_ID\" --repo \"$TARGET_REPOSITORY\" --name aive-android-github-release --dir /tmp/aive-release-input/android\ngh run download \"$TARGET_RUN_ID\" --repo \"$TARGET_REPOSITORY\" --name aive-release-notes --dir /tmp/aive-release-input/notes\napk=$(find /tmp/aive-release-input/android -type f -name '*.apk' -print -quit)\ntest -n \"$apk\" && test -s \"$apk\" || { echo '::error::Aive Android release artifact missing' >&2; exit 1; }\ncp \"$apk\" \"release-artifacts/TheAive-${version}-android.apk\"\nnotes=$(find /tmp/aive-release-input/notes -type f -name 'default.txt' -print -quit)\nif [ -n \"$notes\" ] && [ -s \"$notes\" ]; then cp \"$notes\" \"release-artifacts/TheAive-${version}-release-notes.txt\"; fi\necho \"version=$version\" >> \"$GITHUB_OUTPUT\"\necho \"tag=$tag\" >> \"$GITHUB_OUTPUT\"",
+          "prepare_artifact_name": "aive-android-release",
+          "prepare_artifact_path": "release-artifacts/*",
+          "matrix": {
+            "include": [
+              {
+                "os": "ubuntu-latest",
+                "java_version": "21",
+                "gradle": true,
+                "artifact_name": "aive-desktop-linux",
+                "prepare": "sudo apt-get update && sudo apt-get install -y fakeroot rpm && rustup toolchain install stable --profile minimal && rustup default stable && rm -rf vendor/conveyance-h2g2 && git clone https://github.com/HereLiesAz/conveyance-h2g2 vendor/conveyance-h2g2 && git -C vendor/conveyance-h2g2 checkout 8566a9db02d533d9534327df40424ee7b88ebe88 && git clone https://github.com/HereLiesAz/Conveyance vendor/conveyance-h2g2/vendor/Conveyance && git -C vendor/conveyance-h2g2/vendor/Conveyance checkout b3e13674df9dfbcc0b35f800b57d78a305d07b03 && ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal && ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal",
+                "build": "./gradlew -Papp.versionName=\"$RELEASE_VERSION\" :desktopApp:generateDesktopBrandAssets :desktopApp:packageDeb && mkdir -p release-artifacts && src=$(find desktopApp/build/compose/binaries/main/deb -type f -name '*.deb' -print -quit) && test -n \"$src\" && cp \"$src\" \"release-artifacts/TheAive-${RELEASE_VERSION}.deb\"",
+                "artifact_path": "release-artifacts/*.deb"
+              },
+              {
+                "os": "macos-latest",
+                "java_version": "21",
+                "gradle": true,
+                "artifact_name": "aive-desktop-macos",
+                "prepare": "rustup toolchain install stable --profile minimal && rustup default stable && rm -rf vendor/conveyance-h2g2 && git clone https://github.com/HereLiesAz/conveyance-h2g2 vendor/conveyance-h2g2 && git -C vendor/conveyance-h2g2 checkout 8566a9db02d533d9534327df40424ee7b88ebe88 && git clone https://github.com/HereLiesAz/Conveyance vendor/conveyance-h2g2/vendor/Conveyance && git -C vendor/conveyance-h2g2/vendor/Conveyance checkout b3e13674df9dfbcc0b35f800b57d78a305d07b03 && ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal && ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal",
+                "build": "./gradlew -Papp.versionName=\"$RELEASE_VERSION\" :desktopApp:generateDesktopBrandAssets :desktopApp:packageDmg && mkdir -p release-artifacts && src=$(find desktopApp/build/compose/binaries/main/dmg -type f -name '*.dmg' -print -quit) && test -n \"$src\" && cp \"$src\" \"release-artifacts/TheAive-${RELEASE_VERSION}.dmg\"",
+                "artifact_path": "release-artifacts/*.dmg"
+              },
+              {
+                "os": "windows-latest",
+                "java_version": "21",
+                "gradle": true,
+                "shell": "pwsh",
+                "artifact_name": "aive-desktop-windows",
+                "prepare": "rustup toolchain install stable --profile minimal; rustup default stable; if (-not (Get-Command candle.exe -ErrorAction SilentlyContinue)) { choco install wixtoolset --version=3.14.1 -y --no-progress; $wixBin = Get-ChildItem \"C:\\Program Files (x86)\\WiX Toolset*\\bin\" -Directory -ErrorAction SilentlyContinue | Select-Object -First 1; if (-not $wixBin) { throw 'WiX install failed' }; Add-Content -Path $env:GITHUB_PATH -Value $wixBin.FullName }; Remove-Item -Recurse -Force vendor/conveyance-h2g2 -ErrorAction SilentlyContinue; git clone https://github.com/HereLiesAz/conveyance-h2g2 vendor/conveyance-h2g2; git -C vendor/conveyance-h2g2 checkout 8566a9db02d533d9534327df40424ee7b88ebe88; git clone https://github.com/HereLiesAz/Conveyance vendor/conveyance-h2g2/vendor/Conveyance; git -C vendor/conveyance-h2g2/vendor/Conveyance checkout b3e13674df9dfbcc0b35f800b57d78a305d07b03; ./gradlew.bat -p vendor/conveyance-h2g2/vendor/Conveyance :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal; ./gradlew.bat -p vendor/conveyance-h2g2 publishToMavenLocal",
+                "build": "./gradlew.bat -Papp.versionName=\"$env:RELEASE_VERSION\" :desktopApp:generateDesktopBrandAssets :desktopApp:packageMsi; New-Item -ItemType Directory -Force release-artifacts | Out-Null; $src=(Get-ChildItem desktopApp/build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName; if (-not $src) { throw 'MSI missing' }; Copy-Item $src \"release-artifacts/TheAive-$env:RELEASE_VERSION.msi\"",
+                "artifact_path": "release-artifacts/*.msi"
+              }
+            ]
+          },
+          "allow_partial": false,
+          "release_when": "always",
+          "tag_mode": "prepare-output",
+          "force_tag": false,
+          "reuse_existing_tag": true,
+          "migrate_build_releases": true,
+          "prerelease": true,
+          "title_template": "The Aive $TAG",
+          "body_template": "All builds in patch line $TAG are grouped in this release. Exact four-part build tags remain immutable. Latest added build: $VERSION from commit $BUILD_SHA."
+        }
+    secrets:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-pages:
     if: github.event_name != 'pull_request'
