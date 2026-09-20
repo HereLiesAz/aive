@@ -79,6 +79,29 @@ open class TextLlmProvider(
         return AgentRunHandle(runId)
     }
 
+    override suspend fun reconnect(
+        runId: ProviderRunId,
+        request: AgentTaskRequest,
+        planApproved: Boolean,
+    ): ProviderActionResult {
+        val sessions = providerSessions()
+        mutex.withLock {
+            if (runId !in sessions) {
+                sessions[runId] = Session(
+                    request = request,
+                    phase = MutableStateFlow(
+                        if (request.requirePlanApproval && !planApproved) {
+                            TextLlmSessionPhase.AwaitingApproval
+                        } else {
+                            TextLlmSessionPhase.Ready
+                        },
+                    ),
+                )
+            }
+        }
+        return ProviderActionResult.Accepted
+    }
+
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val sessions = providerSessions()
         val session = mutex.withLock { sessions[runId] }
