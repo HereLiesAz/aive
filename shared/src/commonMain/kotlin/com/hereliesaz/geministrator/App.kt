@@ -90,8 +90,15 @@ fun App(
 
     LaunchedEffect(runtimeState, projectFileService, automaticProjectRestoreAttempted) {
         if (automaticProjectRestoreAttempted) return@LaunchedEffect
-        if (runtimeState !is ApplicationRuntimeState.NoProject) return@LaunchedEffect
-        val fileService = projectFileService ?: return@LaunchedEffect
+        if (runtimeState is ApplicationRuntimeState.Loading) return@LaunchedEffect
+        if (runtimeState !is ApplicationRuntimeState.NoProject) {
+            automaticProjectRestoreAttempted = true
+            return@LaunchedEffect
+        }
+        val fileService = projectFileService ?: run {
+            automaticProjectRestoreAttempted = true
+            return@LaunchedEffect
+        }
         automaticProjectRestoreAttempted = true
 
         for (descriptor in runCatching { fileService.detected() }.getOrDefault(emptyList())) {
