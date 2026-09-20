@@ -46,9 +46,49 @@ class AzphaltRepositoryClient(
         sort: String = "popular",
     ): AzphaltPackageSearchResponse {
         require(page > 0) { "page must be positive" }
+
+        val scoped = searchRequest(
+            query = query,
+            kinds = kinds,
+            page = page,
+            sort = sort,
+            appId = hostAppId,
+        )
+        if (scoped.packages.isNotEmpty() || page != 1) return scoped
+
+        // Some deployed Repository API frontends have historically returned an empty page for
+        // app-scoped searches while their unscoped catalog was healthy. Do not turn that server-side
+        // indexing drift into an apparently empty Aive Store: retry without ?app=, then enforce the
+        // exact same app-scope rule locally from each summary's targetApps metadata.
+        val unscoped = searchRequest(
+            query = query,
+            kinds = kinds,
+            page = page,
+            sort = sort,
+            appId = null,
+        )
+        val acceptedHostIds = setOf(hostAppId, LEGACY_HAIVE_AZPHALT_HOST_ID)
+        val compatible = unscoped.packages.filter { summary ->
+            summary.targetApps.isEmpty() || summary.targetApps.any(acceptedHostIds::contains)
+        }
+        return unscoped.copy(
+            packages = compatible,
+            total = compatible.size,
+            page = 1,
+            pages = 1,
+        )
+    }
+
+    private suspend fun searchRequest(
+        query: String,
+        kinds: Set<String>,
+        page: Int,
+        sort: String,
+        appId: String?,
+    ): AzphaltPackageSearchResponse {
         val response = httpClient.get("$repositoryUrl/packages") {
             url {
-                parameters.append("app", hostAppId)
+                appId?.trim()?.takeIf(String::isNotEmpty)?.let { parameters.append("app", it) }
                 query.trim().takeIf(String::isNotEmpty)?.let { parameters.append("q", it) }
                 if (kinds.isNotEmpty()) parameters.append("kind", kinds.sorted().joinToString(","))
                 parameters.append("page", page.toString())

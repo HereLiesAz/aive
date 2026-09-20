@@ -22,8 +22,10 @@ prove the complete durable lifecycle:
 14. reconstruct the runtime again and prove the terminal result remains completed.
 
 The workflow is intentionally provider-neutral. It may use OpenAI, Anthropic, Gemini, or xAI when
-the corresponding credential is configured in the central `aive` environment. Jules is not part of
-this acceptance requirement.
+the corresponding credential is configured. When no hosted-provider credential is available, the
+central acceptance workflow bootstraps a real local Ollama server and exercises Aive's existing
+OpenAI-compatible provider transport against SmolLM2. Jules is not part of this acceptance
+requirement.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching P0 roadmap items are marked complete.

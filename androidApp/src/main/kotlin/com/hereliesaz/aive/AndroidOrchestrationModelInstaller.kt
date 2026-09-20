@@ -6,10 +6,8 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationEpoch8ModelCatalo
 import com.hereliesaz.geministrator.orchestration.OrchestrationModelReleaseBundle
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.ktor.utils.io.readAvailable
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -40,6 +38,7 @@ internal class AndroidOrchestrationModelInstaller(
 ) {
     private val installRoot = File(context.filesDir, "haive/orchestration")
     private val json = Json { ignoreUnknownKeys = true }
+    private val downloader = AndroidResumableFileDownloader(httpClient)
 
     suspend fun ensureInstalled(role: OrchestrationAgentRole): InstalledOrchestrationModel =
         withContext(Dispatchers.IO) {
@@ -48,7 +47,6 @@ internal class AndroidOrchestrationModelInstaller(
             findInstalled(role, destination)?.let { return@withContext it }
 
             val staging = File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}")
-            staging.deleteRecursively()
             staging.mkdirs()
 
             try {
@@ -74,6 +72,7 @@ internal class AndroidOrchestrationModelInstaller(
                 verifySha256(archive, expectedArchiveSha)
 
                 val extracted = File(staging, "extracted")
+                extracted.deleteRecursively()
                 extracted.mkdirs()
                 extractTarGzSafely(archive, extracted)
                 locateInstalledModel(role, extracted)
@@ -90,7 +89,8 @@ internal class AndroidOrchestrationModelInstaller(
                 findInstalled(role, destination)
                     ?: error("Installed orchestration model could not be resolved for $role")
             } catch (failure: Throwable) {
-                staging.deleteRecursively()
+                // Preserve completed parts and .download partials. Retry Runtime can resume the
+                // exact GitHub release part instead of restarting a 900 MB transfer.
                 throw failure
             }
         }
@@ -112,7 +112,8 @@ internal class AndroidOrchestrationModelInstaller(
             val name = asset["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
             val url = asset["browser_download_url"]?.jsonPrimitive?.content ?: return@mapNotNull null
             val digest = asset["digest"]?.jsonPrimitive?.content
-            ReleaseAsset(name = name, downloadUrl = url, digest = digest)
+            val size = asset["size"]?.jsonPrimitive?.content?.toLongOrNull()
+            ReleaseAsset(name = name, downloadUrl = url, digest = digest, size = size)
         }
     }
 
@@ -122,34 +123,12 @@ internal class AndroidOrchestrationModelInstaller(
             ?.lowercase()
             ?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
             ?: error("Release asset ${asset.name} is missing a SHA-256 digest")
-        val output = File(destination, asset.name)
-        if (output.isFile && sha256(output) == expectedSha) return output
-
-        val temporary = File(destination, "${asset.name}.download")
-        temporary.delete()
-        val response = httpClient.get(asset.downloadUrl)
-        check(response.status.isSuccess()) { "Download failed for ${asset.name}: ${response.status}" }
-        val digest = MessageDigest.getInstance("SHA-256")
-        response.bodyAsChannel().let { channel ->
-            FileOutputStream(temporary).buffered().use { stream ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (!channel.isClosedForRead) {
-                    val count = channel.readAvailable(buffer, 0, buffer.size)
-                    if (count > 0) {
-                        stream.write(buffer, 0, count)
-                        digest.update(buffer, 0, count)
-                    }
-                }
-            }
-        }
-        val actualSha = digest.digest().toHex()
-        check(actualSha == expectedSha) {
-            temporary.delete()
-            "SHA-256 mismatch for ${asset.name}: expected $expectedSha, got $actualSha"
-        }
-        output.delete()
-        check(temporary.renameTo(output)) { "Could not finalize ${asset.name}" }
-        return output
+        return downloader.downloadVerified(
+            url = asset.downloadUrl,
+            output = File(destination, asset.name),
+            expectedSha256 = expectedSha,
+            expectedSize = asset.size,
+        )
     }
 
     private suspend fun downloadText(url: String): String {
@@ -232,5 +211,6 @@ internal class AndroidOrchestrationModelInstaller(
         val name: String,
         val downloadUrl: String,
         val digest: String?,
+        val size: Long?,
     )
 }

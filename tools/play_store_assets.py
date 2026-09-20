@@ -17,8 +17,8 @@ CORAL = (241, 90, 67)
 ORANGE = (255, 157, 46)
 CREAM = (245, 241, 232)
 ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
-SAFE_ZONE_LOCAL_MIN = 0.0
-SAFE_ZONE_LOCAL_MAX = 66.0
+SAFE_ZONE_CENTER = 33.0
+SAFE_ZONE_RADIUS = 33.0
 PATH_TOKEN_RE = re.compile(
     r"[A-Za-z]|[-+]?(?:[0-9]+(?:[.][0-9]*)?|[.][0-9]+)(?:[eE][-+]?[0-9]+)?"
 )
@@ -94,7 +94,140 @@ def generate_feature_graphic(output: Path) -> None:
     image.save(output, optimize=True)
 
 
-def generate_themed_previews(output_dir: Path) -> None:
+def vector_safe_group(root: ET.Element, name: str) -> ET.Element:
+    children = list(root)
+    assert len(children) == 1 and children[0].tag == "group", (
+        f"{name} must contain exactly one top-level safe-zone group and no drawable siblings"
+    )
+    group = children[0]
+    assert list(group), f"{name} contains no artwork"
+    assert all(child.tag == "path" for child in group), (
+        f"{name} safe-zone group may contain paths only; nested groups/clips can bypass proof"
+    )
+    return group
+
+
+def flatten_path(
+    segments: list[tuple[str, list[float]]],
+    curve_steps: int = 24,
+) -> list[tuple[list[tuple[float, float]], bool]]:
+    subpaths: list[tuple[list[tuple[float, float]], bool]] = []
+    points: list[tuple[float, float]] = []
+    current = (0.0, 0.0)
+    start = (0.0, 0.0)
+
+    def flush(closed: bool = False) -> None:
+        nonlocal points
+        if points:
+            subpaths.append((points, closed))
+            points = []
+
+    for command, operands in segments:
+        if command == "M":
+            flush()
+            current = (operands[0], operands[1])
+            start = current
+            points = [current]
+        elif command == "L":
+            current = (operands[0], operands[1])
+            points.append(current)
+        elif command == "C":
+            x0, y0 = current
+            x1, y1, x2, y2, x3, y3 = operands
+            for step in range(1, curve_steps + 1):
+                t = step / curve_steps
+                mt = 1.0 - t
+                points.append(
+                    (
+                        mt**3 * x0 + 3 * mt**2 * t * x1 + 3 * mt * t**2 * x2 + t**3 * x3,
+                        mt**3 * y0 + 3 * mt**2 * t * y1 + 3 * mt * t**2 * y2 + t**3 * y3,
+                    )
+                )
+            current = (x3, y3)
+        elif command == "Q":
+            x0, y0 = current
+            x1, y1, x2, y2 = operands
+            for step in range(1, curve_steps + 1):
+                t = step / curve_steps
+                mt = 1.0 - t
+                points.append(
+                    (
+                        mt**2 * x0 + 2 * mt * t * x1 + t**2 * x2,
+                        mt**2 * y0 + 2 * mt * t * y1 + t**2 * y2,
+                    )
+                )
+            current = (x2, y2)
+        elif command == "Z":
+            if points and points[-1] != start:
+                points.append(start)
+            current = start
+            flush(closed=True)
+        else:
+            raise AssertionError(f"Unsupported path command {command!r}")
+
+    flush()
+    return subpaths
+
+
+def rasterize_monochrome_vector(root: ET.Element, size: int = 512) -> Image.Image:
+    group = vector_safe_group(root, "ic_launcher_monochrome.xml")
+    viewport = float(root.attrib[ANDROID_NS + "viewportWidth"])
+    translate_x = float(group.attrib.get(ANDROID_NS + "translateX", "0"))
+    translate_y = float(group.attrib.get(ANDROID_NS + "translateY", "0"))
+    supersample = 4
+    raster_size = size * supersample
+    scale = raster_size / viewport
+    mask = Image.new("L", (raster_size, raster_size), 0)
+    draw = ImageDraw.Draw(mask)
+
+    def pixel_point(point: tuple[float, float]) -> tuple[float, float]:
+        return (
+            (point[0] + translate_x) * scale,
+            (point[1] + translate_y) * scale,
+        )
+
+    for index, path in enumerate(group.findall("path")):
+        segments = parse_safe_path(
+            path.attrib.get(ANDROID_NS + "pathData", ""),
+            "ic_launcher_monochrome.xml",
+            index,
+        )
+        subpaths = flatten_path(segments)
+        fill = path.attrib.get(ANDROID_NS + "fillColor")
+        fill_alpha = float(path.attrib.get(ANDROID_NS + "fillAlpha", "1"))
+        stroke = path.attrib.get(ANDROID_NS + "strokeColor")
+        stroke_alpha = float(path.attrib.get(ANDROID_NS + "strokeAlpha", "1"))
+        stroke_width = float(path.attrib.get(ANDROID_NS + "strokeWidth", "0"))
+
+        if fill == "#FFFFFFFF" and fill_alpha > 0:
+            value = round(255 * fill_alpha)
+            for points, closed in subpaths:
+                if closed and len(points) >= 3:
+                    draw.polygon([pixel_point(point) for point in points], fill=value)
+
+        if stroke == "#FFFFFFFF" and stroke_alpha > 0 and stroke_width > 0:
+            value = round(255 * stroke_alpha)
+            width = max(1, round(stroke_width * scale))
+            radius = width / 2.0
+            for points, closed in subpaths:
+                rendered = [pixel_point(point) for point in points]
+                if len(rendered) < 2:
+                    continue
+                draw.line(rendered, fill=value, width=width, joint="curve")
+                if not closed and path.attrib.get(ANDROID_NS + "strokeLineCap") == "round":
+                    for x, y in (rendered[0], rendered[-1]):
+                        draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill=value)
+
+    return mask.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def generate_themed_previews(repo: Path, output_dir: Path) -> None:
+    monochrome = ET.parse(
+        repo / "androidApp/src/main/res/drawable/ic_launcher_monochrome.xml"
+    ).getroot()
+    mask = rasterize_monochrome_vector(monochrome)
+    assert mask.getbbox() is not None, "monochrome resource rasterized to an empty mask"
+
     themes = {
         "themed-icon-light.png": ((239, 228, 255), (82, 55, 110)),
         "themed-icon-dark.png": ((37, 30, 48), (219, 190, 255)),
@@ -102,8 +235,8 @@ def generate_themed_previews(output_dir: Path) -> None:
     }
     for name, (background, foreground) in themes.items():
         image = Image.new("RGB", (512, 512), background)
-        draw = ImageDraw.Draw(image)
-        draw_mark(draw, 256, 256, 0.92, monochrome=foreground)
+        foreground_layer = Image.new("RGB", image.size, foreground)
+        image.paste(foreground_layer, (0, 0), mask)
         image.save(output_dir / name, optimize=True)
 
 
@@ -141,21 +274,17 @@ def parse_safe_path(path_data: str, name: str, index: int) -> list[tuple[str, li
 
 
 def validate_vector_safe_zone(root: ET.Element, name: str) -> None:
-    groups = root.findall("group")
-    assert len(groups) == 1, f"{name} must use exactly one safe-zone group"
-    group = groups[0]
+    group = vector_safe_group(root, name)
     assert group.attrib[ANDROID_NS + "translateX"] == "21"
     assert group.attrib[ANDROID_NS + "translateY"] == "21"
 
     for attribute in ("scaleX", "scaleY", "rotation", "pivotX", "pivotY"):
         assert ANDROID_NS + attribute not in group.attrib, (
             f"{name} safe-zone group must not apply {attribute}; "
-            "critical artwork coordinates are validated directly in the 66x66dp local box"
+            "critical artwork coordinates are validated directly in the circular 66dp box"
         )
 
-    paths = group.findall("path")
-    assert paths, f"{name} contains no artwork"
-    for index, path in enumerate(paths):
+    for index, path in enumerate(group.findall("path")):
         path_data = path.attrib.get(ANDROID_NS + "pathData", "")
         assert path_data, f"{name} path {index} is missing pathData"
         segments = parse_safe_path(path_data, name, index)
@@ -170,35 +299,32 @@ def validate_vector_safe_zone(root: ET.Element, name: str) -> None:
         )
         if visible_stroke:
             assert path.attrib.get(ANDROID_NS + "strokeLineJoin") == "round", (
-                f"{name} path {index} must use round joins so half-stroke safe-zone padding is exact"
+                f"{name} path {index} must use round joins for circular safe-zone proof"
+            )
+            assert path.attrib.get(ANDROID_NS + "strokeLineCap") == "round", (
+                f"{name} path {index} must use round caps for circular safe-zone proof"
             )
 
         margin = stroke_width / 2.0 if visible_stroke else 0.0
-        safe_min = SAFE_ZONE_LOCAL_MIN + margin
-        safe_max = SAFE_ZONE_LOCAL_MAX - margin
+        allowed_radius = SAFE_ZONE_RADIUS - margin
 
-        # Absolute line endpoints and Bézier control points all lie in the padded box.
-        # Line segments remain in that box, and quadratic/cubic Béziers remain in the
-        # convex hull of their control points, so the complete rendered centerline is
-        # inside it. Round stroke joins/caps then expand by at most half the stroke width.
+        # A circle is convex. Lines and quadratic/cubic Béziers remain inside the convex hull
+        # of their endpoints/control points, so proving every operand point is inside the
+        # stroke-padded circle proves the complete rendered geometry is inside it.
         for command, operands in segments:
             if command == "Z":
                 continue
-            points = list(zip(operands[0::2], operands[1::2]))
-            for x, y in points:
-                assert safe_min - 1e-6 <= x <= safe_max + 1e-6, (
-                    f"{name} path {index} {command} x={x} escapes the "
-                    f"{safe_min}..{safe_max} padded safe-zone bounds"
-                )
-                assert safe_min - 1e-6 <= y <= safe_max + 1e-6, (
-                    f"{name} path {index} {command} y={y} escapes the "
-                    f"{safe_min}..{safe_max} padded safe-zone bounds"
+            for x, y in zip(operands[0::2], operands[1::2]):
+                radius = math.hypot(x - SAFE_ZONE_CENTER, y - SAFE_ZONE_CENTER)
+                assert radius <= allowed_radius + 1e-6, (
+                    f"{name} path {index} {command} point ({x},{y}) is {radius:.3f}dp "
+                    f"from center; maximum is {allowed_radius:.3f}dp"
                 )
 
 
 def validate_monochrome_vector(root: ET.Element) -> None:
     allowed = {"#FFFFFFFF", "@android:color/transparent"}
-    group = root.findall("group")[0]
+    group = vector_safe_group(root, "ic_launcher_monochrome.xml")
     visible_paint = False
 
     for index, path in enumerate(group.findall("path")):
@@ -260,7 +386,7 @@ def validate_launcher_resources(repo: Path) -> None:
     assert "M0,0h108v108" not in foreground_text, "foreground must not paint the background layer"
 
 
-def validate_play_assets(output_dir: Path) -> None:
+def validate_play_assets(repo: Path, output_dir: Path) -> None:
     icon = Image.open(output_dir / "play-icon-512.png")
     assert icon.size == (512, 512)
     assert icon.mode == "RGBA"
@@ -270,13 +396,25 @@ def validate_play_assets(output_dir: Path) -> None:
     assert feature.size == (1024, 500)
     assert feature.mode == "RGB"
 
-    themed_previews = [output_dir / name for name in THEMED_PREVIEW_NAMES]
-    for path in themed_previews:
+    monochrome_root = ET.parse(
+        repo / "androidApp/src/main/res/drawable/ic_launcher_monochrome.xml"
+    ).getroot()
+    monochrome_mask = rasterize_monochrome_vector(monochrome_root)
+    themes = {
+        "themed-icon-light.png": ((239, 228, 255), (82, 55, 110)),
+        "themed-icon-dark.png": ((37, 30, 48), (219, 190, 255)),
+        "themed-icon-warm.png": ((255, 228, 202), (112, 55, 20)),
+    }
+    for name, (background, foreground) in themes.items():
+        path = output_dir / name
         image = Image.open(path)
         assert image.size == (512, 512), f"{path.name} must be 512x512"
         assert image.mode == "RGB", f"{path.name} must be 24-bit RGB"
-        colors = image.getcolors(maxcolors=512 * 512 + 1)
-        assert colors is not None and len(colors) >= 2, f"{path.name} must contain foreground and background"
+        expected = Image.new("RGB", image.size, background)
+        expected.paste(Image.new("RGB", image.size, foreground), (0, 0), monochrome_mask)
+        assert list(image.getdata()) == list(expected.getdata()), (
+            f"{path.name} must be rendered from ic_launcher_monochrome.xml"
+        )
 
     screenshots = sorted(output_dir.glob("screenshot-*.png"))
     assert len(screenshots) == 4, "Final Google Play proof requires exactly four production screenshots"
@@ -322,14 +460,16 @@ def write_validation_report(repo: Path, output_dir: Path) -> None:
     report = {
         "adaptiveIcon": {
             "viewportDp": [108, 108],
-            "safeZoneDp": {"left": 21, "top": 21, "right": 87, "bottom": 87},
-            "localSafeZoneDp": [SAFE_ZONE_LOCAL_MIN, SAFE_ZONE_LOCAL_MAX],
+            "safeZoneDp": {"centerX": 54, "centerY": 54, "radius": SAFE_ZONE_RADIUS},
+            "localSafeZoneCenterDp": [SAFE_ZONE_CENTER, SAFE_ZONE_CENTER],
+            "localSafeZoneRadiusDp": SAFE_ZONE_RADIUS,
             "foreground": "@drawable/ic_launcher_foreground",
             "monochrome": "@drawable/ic_launcher_monochrome",
             "manifestIcon": "@mipmap/ic_launcher",
             "manifestRoundIcon": "@mipmap/ic_launcher_round",
-            "pathDataValidatedInsideSafeZone": True,
+            "pathDataValidatedInsideCircularSafeZone": True,
             "monochromeSingleColorValidated": True,
+            "themedPreviewsDerivedFromMonochromeResource": True,
         },
         "googlePlay": {
             "icon": {"file": "play-icon-512.png", "width": 512, "height": 512, "mode": "RGBA"},
@@ -363,12 +503,12 @@ def main() -> int:
     validate_launcher_resources(args.repo)
     generate_play_icon(output / "play-icon-512.png")
     generate_feature_graphic(output / "feature-graphic-1024x500.png")
-    generate_themed_previews(output)
+    generate_themed_previews(args.repo, output)
 
     for index, source in enumerate(args.screenshot, start=1):
         normalize_screenshot(source, output / f"screenshot-{index:02d}.png")
 
-    validate_play_assets(output)
+    validate_play_assets(args.repo, output)
     write_validation_report(args.repo, output)
     print(f"Validated Google Play asset set in {output}")
     return 0
