@@ -113,6 +113,27 @@ A task with an existing executor/provider run identifier must reconnect to that 
 
 This separation lets an external build, deployment, repository operation, approval, or nested workflow resume without pretending to be an agent session.
 
+## Resumable local-model downloads
+
+Large Android memory/orchestration model assets are durable installation state, but they are **not**
+part of `WorkflowPersistence`. They are staged under the app's private files directory.
+
+The Android artifact downloader keeps a sibling `.download` file when a transfer fails. A retry:
+
+1. requests the stable release-asset URL again so an expired GitHub signed redirect is refreshed;
+2. sends `Range: bytes=<partial-size>-` when partial bytes exist;
+3. appends only when the origin returns a matching `206 Partial Content` / `Content-Range`;
+4. safely restarts from byte zero when the origin ignores the range and returns `200`;
+5. checks the expected size when known; and
+6. verifies the complete SHA-256 before an archive can be installed.
+
+A timeout or interrupted mobile connection therefore does not require discarding hundreds of
+megabytes that were already received. `Retry Runtime` can resume the retained part. Corrupt,
+oversized, or digest-mismatched completed data is never promoted into the install directory.
+
+These partial files follow normal application-private-storage lifecycle rules. Clearing app data
+removes them.
+
 ## Schema versioning
 
 The current persistence schema is **3**.
