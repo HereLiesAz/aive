@@ -169,6 +169,9 @@ class LocalModelLibrary(
 
     fun allSpecialists(): List<LocalModelSpecialistDescriptor> = specialistsById.values.toList()
 
+    fun combinedWith(other: LocalModelLibrary): LocalModelLibrary =
+        LocalModelLibrary(allSpecialists() + other.allSpecialists())
+
     fun allArtifacts(): List<LocalModelArtifactDescriptor> = buildList {
         specialistsById.values.forEach { specialist ->
             addAll(specialist.sharedBaseVariants)
