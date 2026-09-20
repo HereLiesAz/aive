@@ -176,4 +176,5 @@ dependencies {
     implementation(libs.djl.huggingface.tokenizers)
     runtimeOnly(libs.djl.android.tokenizer.native)
     testImplementation(kotlin("test-junit"))
+    testImplementation(libs.ktor.client.mock)
 }

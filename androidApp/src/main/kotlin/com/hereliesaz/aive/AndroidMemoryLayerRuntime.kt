@@ -37,10 +37,6 @@ import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
 import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.readAvailable
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -49,7 +45,6 @@ import java.io.FileOutputStream
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
 import java.nio.ShortBuffer
-import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +73,7 @@ internal class AndroidMemoryModelInstaller(
 ) {
     private val installRoot = File(context.filesDir, "haive/memory")
     private val installedByArtifactId = ConcurrentHashMap<String, InstalledMemoryModel>()
+    private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()
 
     suspend fun ensureInstalled(role: MemoryMicroAgentRole): InstalledMemoryModel = mutex.withLock {
@@ -93,12 +89,12 @@ internal class AndroidMemoryModelInstaller(
         }
 
         val staging = File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}")
-        staging.deleteRecursively()
         staging.mkdirs()
         try {
             val archive = File(staging, bundle.releaseAssetName)
-            downloadVerified(bundle.downloadUrl, archive, bundle.releaseAssetSha256)
+            downloader.downloadVerified(bundle.downloadUrl, archive, bundle.releaseAssetSha256)
             val extracted = File(staging, "extracted")
+            extracted.deleteRecursively()
             extracted.mkdirs()
             extractTarGzSafely(archive, extracted)
             locateInstalledModel(role, bundle, extracted)
@@ -115,7 +111,8 @@ internal class AndroidMemoryModelInstaller(
             installedByArtifactId[bundle.runtimeArtifactId] = installed
             installed
         } catch (failure: Throwable) {
-            staging.deleteRecursively()
+            // Keep verified parts and .download partials so Retry Runtime resumes instead of
+            // throwing away hundreds of megabytes and restarting from byte zero.
             throw failure
         }
     }
@@ -127,35 +124,6 @@ internal class AndroidMemoryModelInstaller(
         val bundle = MemoryEpoch8ModelCatalog.all.singleOrNull { it.runtimeArtifactId == artifact.artifactId }
             ?: error("Unknown Epoch-8 memory artifact ${artifact.artifactId}")
         return ensureInstalled(bundle.role)
-    }
-
-    private suspend fun downloadVerified(url: String, output: File, expectedSha: String) {
-        val normalizedExpected = expectedSha.lowercase()
-        check(normalizedExpected.matches(Regex("[0-9a-f]{64}"))) { "Invalid SHA-256 for ${output.name}" }
-        if (output.isFile && sha256(output) == normalizedExpected) return
-        val temporary = File(output.parentFile, "${output.name}.download")
-        temporary.delete()
-        val response = httpClient.get(url)
-        check(response.status.isSuccess()) { "Download failed for ${output.name}: ${response.status}" }
-        val digest = MessageDigest.getInstance("SHA-256")
-        val channel = response.bodyAsChannel()
-        FileOutputStream(temporary).buffered().use { stream ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (!channel.isClosedForRead) {
-                val count = channel.readAvailable(buffer, 0, buffer.size)
-                if (count > 0) {
-                    stream.write(buffer, 0, count)
-                    digest.update(buffer, 0, count)
-                }
-            }
-        }
-        val actual = digest.digest().toHex()
-        check(actual == normalizedExpected) {
-            temporary.delete()
-            "SHA-256 mismatch for ${output.name}: expected $normalizedExpected, got $actual"
-        }
-        output.delete()
-        check(temporary.renameTo(output)) { "Could not finalize ${output.name}" }
     }
 
     private fun extractTarGzSafely(archive: File, destination: File) {
@@ -204,20 +172,6 @@ internal class AndroidMemoryModelInstaller(
         return InstalledMemoryModel(role, bundle, root, onnx, tokenizer)
     }
 
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        BufferedInputStream(FileInputStream(file)).use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (count > 0) digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().toHex()
-    }
-
-    private fun ByteArray.toHex(): String = joinToString("") { byte -> "%02x".format(byte) }
 }
 
 internal class InstallingAndroidMemoryArtifactResolver(
