@@ -99,7 +99,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             executorIntegrations = executorIntegrations,
         )
 
-        val providerTaskId = TaskDefinitionId("jules-live")
+        val providerTaskId = TaskDefinitionId("provider-live")
         val failOnceTaskId = TaskDefinitionId("fail-once")
         val verificationTaskId = TaskDefinitionId("verification")
         val reviewTaskId = TaskDefinitionId("review")
@@ -111,7 +111,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             }
             val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(providerTaskId)
             assertEquals(WorkflowRunStatus.AwaitingHuman, awaitingApproval.presentation.run.status)
-            assertEquals(null, taskRun.progress, "Jules plan/progress text must not fabricate a percentage")
+            assertEquals(null, taskRun.progress, "Provider plan/progress text must not fabricate a percentage")
             val runId = assertNotNull(taskRun.providerRunId)
             val projectExport = assertNotNull(firstRuntime.exportCurrentProjectFile())
             runId to projectExport.content
