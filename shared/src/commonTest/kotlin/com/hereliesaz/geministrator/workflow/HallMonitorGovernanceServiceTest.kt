@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.HallMonitorRole
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -17,6 +18,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.test.runTest
@@ -71,6 +73,51 @@ class HallMonitorGovernanceServiceTest {
         assertNull(restoredWorker.blockingReason)
         assertEquals(AgentProviderId("provider"), restoredWorker.assignedProviderId)
         assertEquals(ProviderRunId("provider-run"), restoredWorker.providerRunId)
+    }
+
+    @Test
+    fun orchestratorReviewReconstructsProviderSessionAfterRestart() = runTest {
+        val fixture = fixture(verdict = "pass")
+        val service = HallMonitorGovernanceService(fixture.persistence)
+        val paused = service.pauseAfterAntagonistPass(
+            state = WorkflowRuntimeState(fixture.run),
+            reportArtifactId = fixture.report.id,
+            antagonistReviewArtifactId = fixture.review.id,
+            sessionGateway = NoOpSessionGateway,
+            nowEpochMillis = 50L,
+        )
+        val project = Project(
+            id = fixture.run.projectId,
+            name = "Project",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L,
+        )
+
+        val withReviewSession = service.reconcileOrchestratorReview(
+            project = project,
+            run = paused.run,
+            sessionGateway = NoOpSessionGateway,
+            nowEpochMillis = 60L,
+        )
+        val persistedPause = assertNotNull(withReviewSession.globalPause)
+        assertNotNull(persistedPause.orchestratorReviewProviderId)
+        assertNotNull(persistedPause.orchestratorReviewProviderRunId)
+
+        val restartedGateway = RecordingReconnectSessionGateway()
+        service.reconcileOrchestratorReview(
+            project = project,
+            run = withReviewSession,
+            sessionGateway = restartedGateway,
+            nowEpochMillis = 70L,
+        )
+
+        val request = assertNotNull(restartedGateway.reconnectedRequest)
+        assertEquals(false, request.requirePlanApproval)
+        assertEquals(
+            setOf(fixture.report.id, fixture.review.id),
+            request.contextArtifacts.map { it.id }.toSet(),
+        )
+        assertEquals(ManagedSessionStatus.Running, restartedGateway.reconnectedStatus)
     }
 
     @Test
@@ -191,6 +238,41 @@ class HallMonitorGovernanceServiceTest {
         val report: ArtifactRef,
         val review: ArtifactRef,
     )
+
+    private class RecordingReconnectSessionGateway : ManagedSessionGateway {
+        var reconnectedRequest: AgentTaskRequest? = null
+        var reconnectedStatus: ManagedSessionStatus? = null
+        private var status: ManagedSessionStatus = ManagedSessionStatus.Unknown
+
+        override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
+            AgentProviderId("provider")
+
+        override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle =
+            error("restart must reconnect the persisted Hall Monitor review session")
+
+        override suspend fun reconnect(
+            handle: ManagedSessionHandle,
+            initialStatus: ManagedSessionStatus,
+            request: AgentTaskRequest,
+            providerPlan: String?,
+        ) {
+            reconnectedRequest = request
+            reconnectedStatus = initialStatus
+            status = initialStatus
+        }
+
+        override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus = status
+
+        override suspend fun message(
+            handle: ManagedSessionHandle,
+            message: String,
+        ): ProviderActionResult = ProviderActionResult.Accepted
+
+        override suspend fun approvePlan(handle: ManagedSessionHandle): ProviderActionResult =
+            ProviderActionResult.Accepted
+
+        override suspend fun artifacts(handle: ManagedSessionHandle): List<ProviderArtifact> = emptyList()
+    }
 
     private object NoOpSessionGateway : ManagedSessionGateway {
         override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
