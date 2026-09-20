@@ -148,8 +148,24 @@ class ProviderBackedManagedSessionGateway(
         initialStatus: ManagedSessionStatus,
         request: AgentTaskRequest,
     ) {
-        recordMemory { memoryObserver.onSessionStarted(handle, request) }
-        reconnect(handle, initialStatus)
+        val provider = providerFor(handle)
+        providerOperation("Unable to reconstruct provider session ${handle.providerRunId.value}") {
+            when (
+                val result = provider.reconnect(
+                    runId = handle.providerRunId,
+                    request = request,
+                    planApproved = initialStatus !in setOf(
+                        ManagedSessionStatus.Planning,
+                        ManagedSessionStatus.AwaitingApproval,
+                    ),
+                )
+            ) {
+                ProviderActionResult.Accepted -> Unit
+                is ProviderActionResult.Rejected -> error(result.reason)
+            }
+            recordMemory { memoryObserver.onSessionStarted(handle, request) }
+            registerAndObserve(handle, initialStatus)
+        }
     }
 
     override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus =
