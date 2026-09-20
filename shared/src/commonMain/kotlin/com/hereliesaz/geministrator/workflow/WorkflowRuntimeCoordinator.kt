@@ -16,6 +16,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.ProviderArtifact
@@ -33,6 +35,8 @@ class WorkflowRuntimeCoordinator(
     private val sessionGateway: ManagedSessionGateway,
     private val executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     private val remoteComputeCoordinator: RemoteComputeCoordinator? = null,
+    private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
+        DeterministicLocalOrchestrationUtilities,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -85,6 +89,7 @@ class WorkflowRuntimeCoordinator(
                     task = task,
                     taskRun = taskRun,
                     role = resolvedRole,
+                    orchestrationUtilities = orchestrationUtilities,
                 )
                 sessionGateway.reconnect(
                     handle,
