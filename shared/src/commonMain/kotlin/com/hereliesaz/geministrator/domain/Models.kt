@@ -167,6 +167,8 @@ data class TaskRun(
     val blockingReason: BlockingReason? = null,
     val progress: Float? = null,
     val progressMessage: String? = null,
+    /** Durable provider plan/specification preview that was presented for approval. */
+    val providerPlan: String? = null,
     val executor: TaskExecutor? = null,
     val externalRunId: String? = null,
 ) {
