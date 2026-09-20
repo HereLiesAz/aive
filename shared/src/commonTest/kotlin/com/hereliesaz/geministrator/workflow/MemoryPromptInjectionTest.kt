@@ -29,7 +29,7 @@ class MemoryPromptInjectionTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = RecordingStartProvider()
         try {
-            MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider {
+            MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider { _, _ ->
                 MemoryPromptRecall(
                     blocks = listOf(
                         PromptContextBlock("Relevant memory", "Prior implementation used the repository gateway."),
