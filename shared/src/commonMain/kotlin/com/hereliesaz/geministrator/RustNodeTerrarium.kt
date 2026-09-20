@@ -759,8 +759,7 @@ private fun DrawScope.drawDetachedNodeArm(asset: NodeArmAsset) {
         NodeArmRole.ImplementationEngineer,
         NodeArmRole.CodeReviewer,
         NodeArmRole.AdversarialReviewer,
-        NodeArmRole.Antagonist,
-        -> angularMain(asset.variant)
+        NodeArmRole.Antagonist -> angularMain(asset.variant)
         NodeArmRole.CrashTestDummy -> waveMain(asset.variant)
         else -> curvedMain(asset.variant)
     }
@@ -780,8 +779,7 @@ private fun DrawScope.drawDetachedNodeArm(asset: NodeArmAsset) {
             }
         }
         NodeArmRole.ProductManager,
-        NodeArmRole.UxDesigner,
-        -> {
+        NodeArmRole.UxDesigner -> {
             heart(126f, if (asset.variant == NodeArmVariant.A) 28f else 34f)
             branch(110f, 52f, 154f, 80f)
             circle(154f, 80f, 5f)
@@ -796,8 +794,7 @@ private fun DrawScope.drawDetachedNodeArm(asset: NodeArmAsset) {
         }
         NodeArmRole.Architect,
         NodeArmRole.ImplementationEngineer,
-        NodeArmRole.CodeReviewer,
-        -> {
+        NodeArmRole.CodeReviewer -> {
             square(82f, if (asset.variant == NodeArmVariant.A) 35f else 69f)
             square(135f, if (asset.variant == NodeArmVariant.A) 31f else 17f)
             if (asset.variant == NodeArmVariant.A) {
@@ -806,8 +803,7 @@ private fun DrawScope.drawDetachedNodeArm(asset: NodeArmAsset) {
             }
         }
         NodeArmRole.EpaRepresentative,
-        NodeArmRole.RecoveryEngineer,
-        -> {
+        NodeArmRole.RecoveryEngineer -> {
             branch(102f, 50f, 128f, 17f)
             branch(115f, 52f, 156f, 81f)
             circle(128f, 17f, 6f, color)
