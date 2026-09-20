@@ -7,6 +7,11 @@ import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_K
 import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
+import com.hereliesaz.geministrator.orchestration.ContextEvidence
+import com.hereliesaz.geministrator.orchestration.ContextPackingInput
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
+import com.hereliesaz.geministrator.orchestration.MemoryQueryInput
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -26,6 +31,8 @@ class ProviderBackedManagedSessionGateway(
     private val scope: CoroutineScope,
     private val memoryObserver: MemorySessionObserver = MemoryRuntimeBridge.observer,
     inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
+    private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
+        DeterministicLocalOrchestrationUtilities,
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -33,6 +40,11 @@ class ProviderBackedManagedSessionGateway(
         } else {
             GovernedCompoundInferenceFabric(inferenceFabric, providerRegistry.genealogyGovernance)
         }
+
+    private companion object {
+        const val MAX_MEMORY_QUERIES = 6
+        const val APPROXIMATE_CHARS_PER_TOKEN = 4
+    }
 
     private data class SessionSnapshot(
         val status: ManagedSessionStatus,
@@ -113,17 +125,46 @@ class ProviderBackedManagedSessionGateway(
     }
 
     private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
+        val queryPlan = orchestrationUtilities.composeMemoryQueries(
+            MemoryQueryInput(
+                objective = objective,
+                maxQueries = MAX_MEMORY_QUERIES,
+            ),
+        )
+        if (queryPlan.enoughEvidence || queryPlan.queries.isEmpty()) return this
+
         val recalled = try {
-            MemoryRuntimeBridge.promptContextProvider.recallFor(this)
+            MemoryRuntimeBridge.promptContextProvider.recallFor(this, queryPlan)
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Throwable) {
             com.hereliesaz.geministrator.memory.MemoryPromptRecall()
         }
         if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty()) return this
+
+        val evidence = recalled.blocks.mapIndexed { index, block ->
+            ContextEvidence(
+                id = "memory-context-$index",
+                estimatedTokens = approximateTokens(block.content),
+                priority = recalled.blocks.size - index,
+            )
+        }
+        val budget = recalled.maxContextTokens
+            ?: evidence.sumOf(ContextEvidence::estimatedTokens)
+        val packing = orchestrationUtilities.packContext(
+            ContextPackingInput(
+                tokenBudget = budget,
+                evidence = evidence,
+            ),
+        )
+        val selectedIds = packing.selectedEvidenceIds.toSet()
+        val selectedBlocks = recalled.blocks.filterIndexed { index, _ ->
+            "memory-context-$index" in selectedIds
+        }
+
         return copy(
             promptContext = promptContext.copy(
-                dynamicContext = promptContext.dynamicContext + recalled.blocks,
+                dynamicContext = promptContext.dynamicContext + selectedBlocks,
             ),
             compoundInference = compoundInference.copy(
                 genealogy = compoundInference.genealogy.copy(
@@ -132,6 +173,9 @@ class ProviderBackedManagedSessionGateway(
             ),
         )
     }
+
+    private fun approximateTokens(text: String): Int =
+        ((text.length + APPROXIMATE_CHARS_PER_TOKEN - 1) / APPROXIMATE_CHARS_PER_TOKEN).coerceAtLeast(1)
 
     override suspend fun reconnect(
         handle: ManagedSessionHandle,
