@@ -56,13 +56,13 @@ class ProviderTaskRequestFactoryTest {
             tasks = listOf(
                 TaskDefinition(
                     id = dependencyId,
-                    name = "Dependency",
+                    name = "TOP SECRET DEPENDENCY NAME",
                     objective = "Dependency",
                     roleId = role.id,
                 ),
                 TaskDefinition(
                     id = targetId,
-                    name = "Target",
+                    name = "TOP SECRET TARGET NAME",
                     objective = "TOP SECRET TASK OBJECTIVE",
                     roleId = role.id,
                     dependsOn = setOf(dependencyId),
