@@ -77,6 +77,8 @@ data class AgentRouteCandidate(
     val estimatedCost: Double = 0.0,
     val contextLimitTokens: Int = Int.MAX_VALUE,
     val available: Boolean = true,
+    /** Lower values preserve explicit/preferred routing order without pretending rank is monetary cost. */
+    val preferenceRank: Int = Int.MAX_VALUE,
 )
 
 @Serializable
@@ -104,6 +106,8 @@ data class ToolCapability(
     val id: String,
     val operationClasses: Set<String>,
     val available: Boolean = true,
+    /** Lower values preserve executor-integration priority. */
+    val preferenceRank: Int = Int.MAX_VALUE,
 )
 
 @Serializable
@@ -338,7 +342,11 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
                     candidate.contextLimitTokens >= input.requiredContextTokens &&
                     candidate.capabilities.containsAll(input.requiredCapabilities)
             }
-            .sortedWith(compareBy<AgentRouteCandidate> { it.estimatedCost }.thenBy { it.id })
+            .sortedWith(
+                compareBy<AgentRouteCandidate> { it.preferenceRank }
+                    .thenBy { it.estimatedCost }
+                    .thenBy { it.id },
+            )
 
         if (eligible.isEmpty()) {
             return AgentRoute(
@@ -366,7 +374,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         }
         val tool = input.capabilities
             .filter { it.available && operation in it.operationClasses }
-            .minByOrNull { it.id }
+            .minWithOrNull(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
             ?: return ToolRoute(
                 decision = ToolRouteDecision.UnavailableCapability,
                 operationClass = operation,
