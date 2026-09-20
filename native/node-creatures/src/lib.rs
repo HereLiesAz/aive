@@ -186,6 +186,70 @@ mod tests {
     }
 
     #[test]
+    fn every_role_and_state_is_continuous_at_the_twelve_second_clock_boundary() {
+        fn close(left: f32, right: f32, context: &str) {
+            assert!(
+                (left - right).abs() < 0.0005,
+                "{context}: {left} != {right}"
+            );
+        }
+
+        fn pose_loops(start: &CreaturePose, end: &CreaturePose, context: &str) {
+            for (name, left, right) in [
+                ("body_offset.x", start.body_offset.x, end.body_offset.x),
+                ("body_offset.y", start.body_offset.y, end.body_offset.y),
+                ("body_offset.z", start.body_offset.z, end.body_offset.z),
+                ("body_rotation.x", start.body_rotation.x, end.body_rotation.x),
+                ("body_rotation.y", start.body_rotation.y, end.body_rotation.y),
+                ("body_rotation.z", start.body_rotation.z, end.body_rotation.z),
+                ("body_scale.x", start.body_scale.x, end.body_scale.x),
+                ("body_scale.y", start.body_scale.y, end.body_scale.y),
+                ("body_scale.z", start.body_scale.z, end.body_scale.z),
+                ("eye_aim.x", start.eye_aim.x, end.eye_aim.x),
+                ("eye_aim.y", start.eye_aim.y, end.eye_aim.y),
+                ("limb_phase.sin", start.limb_phase.sin(), end.limb_phase.sin()),
+            ] {
+                close(left, right, &format!("{context} {name}"));
+            }
+            assert_eq!(start.antenna_extension.len(), end.antenna_extension.len());
+            assert_eq!(start.antenna_bend.len(), end.antenna_bend.len());
+            for (index, (left, right)) in start
+                .antenna_extension
+                .iter()
+                .zip(end.antenna_extension.iter())
+                .enumerate()
+            {
+                close(*left, *right, &format!("{context} antenna_extension[{index}]"));
+            }
+            for (index, (left, right)) in start
+                .antenna_bend
+                .iter()
+                .zip(end.antenna_bend.iter())
+                .enumerate()
+            {
+                close(*left, *right, &format!("{context} antenna_bend[{index}]"));
+            }
+        }
+
+        for (role_index, (label, role)) in built_in_roles().into_iter().enumerate() {
+            let genome = generate_genome(role, &format!("loop-{role_index}"));
+            for activity in [
+                Activity::Queued,
+                Activity::Ready,
+                Activity::Active,
+                Activity::Blocked,
+                Activity::Failed,
+                Activity::Complete,
+                Activity::Gate,
+            ] {
+                let start = animate(&genome, activity, 0.0);
+                let end = animate(&genome, activity, 12.0);
+                pose_loops(&start, &end, &format!("{label} {activity:?}"));
+            }
+        }
+    }
+
+    #[test]
     fn blocked_adversarial_roles_physically_tangle_their_antennae() {
         for role in [
             RoleArchetype::AdversarialReviewer,

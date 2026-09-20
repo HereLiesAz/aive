@@ -950,7 +950,7 @@ private fun H2g2WorkflowState.nodeCreatureStateColor() = when (this) {
     H2g2WorkflowState.Pending -> Azphalt.hues[10]
 }
 
-private fun nodeCreatureActivityLabel(roleLabel: String, state: H2g2WorkflowState): String {
+internal fun nodeCreatureActivityLabel(roleLabel: String, state: H2g2WorkflowState): String {
     if (state == H2g2WorkflowState.Blocked) return "BLOCKED"
     if (state == H2g2WorkflowState.Failed) return "FAILED"
     if (state == H2g2WorkflowState.Complete) return "COMPLETE"
@@ -958,24 +958,6 @@ private fun nodeCreatureActivityLabel(roleLabel: String, state: H2g2WorkflowStat
     if (state == H2g2WorkflowState.Ready) return "READY"
     if (state == H2g2WorkflowState.Pending) return "QUEUED"
 
-    val role = roleLabel.trim().lowercase()
-    return when {
-        "hall monitor" in role || "hall-monitor" in role -> "MONITORING"
-        "antagonist" in role -> "FINDING FLAWS"
-        "adversarial" in role -> "CHALLENGING"
-        "recovery" in role -> "RECOVERING"
-        "release" in role -> "RELEASING"
-        "code review" in role || "code-review" in role -> "REVIEWING CODE"
-        "crash" in role || "dummy" in role || "stress test" in role -> "STRESS-TESTING"
-        role == "qa" || "qa engineer" in role || "quality" in role || "verif" in role -> "VERIFYING"
-        "implementation" in role || "implementer" in role || "builder" in role -> "BUILDING"
-        "ux" in role || "user experience" in role -> "DESIGNING"
-        "epa" in role || "environment" in role -> "PROVISIONING"
-        "architect" in role -> "STRUCTURING"
-        "research" in role || "analyst" in role || "investigat" in role -> "RESEARCHING"
-        "product" in role || "requirements" in role || "planner" in role -> "CLARIFYING"
-        "orchestrat" in role || "coordinat" in role || "queen" in role -> "ROUTING"
-        else -> "WORKING"
-    }
+    return classifyNodeCreatureRole(roleLabel).activeLabel()
 }
 
