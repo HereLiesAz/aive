@@ -85,9 +85,10 @@ internal class LocalWorkspaceAgentProvider(
         const val MAX_CONTEXT_ARTIFACT_CHARS = 30_000
         const val PROCESS_TIMEOUT_SECONDS = 120L
 
-        val sessionsMutex = Mutex()
-        val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
     }
+
+    private val sessionsMutex = Mutex()
+    private val sessions = mutableMapOf<ProviderRunId, Session>()
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
         supported = setOf(
@@ -114,9 +115,52 @@ internal class LocalWorkspaceAgentProvider(
             phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
         )
         sessionsMutex.withLock {
-            sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[runId] = session
+            sessions[runId] = session
         }
         return AgentRunHandle(runId)
+    }
+
+    override suspend fun reconnect(
+        runId: ProviderRunId,
+        request: AgentTaskRequest,
+        planGenerated: Boolean,
+        planApproved: Boolean,
+        planPreview: String?,
+    ): ProviderActionResult {
+        if (!supportsRepository(request.repository)) {
+            return ProviderActionResult.Rejected(
+                "$displayName workspace agent cannot resume without its linked Local Git repository",
+            )
+        }
+        if (request.requirePlanApproval && planGenerated && planPreview.isNullOrBlank()) {
+            return ProviderActionResult.Rejected(
+                "$displayName cannot safely resume provider run ${runId.value}: the approved plan was not persisted",
+            )
+        }
+
+        val restoredPlan = if (planGenerated && !planPreview.isNullOrBlank() && taskMode(request) != TaskMode.Specification) {
+            val root = repositoryRoot(request)
+            val tracked = trackedFiles(root)
+            WorkspacePlan(
+                text = planPreview,
+                requestedFiles = parseRequestedFiles(planPreview, tracked),
+            )
+        } else {
+            null
+        }
+        sessionsMutex.withLock {
+            sessions.putIfAbsent(
+                runId,
+                Session(
+                    request = request,
+                    phase = MutableStateFlow(
+                        if (request.requirePlanApproval && !planApproved) Phase.AwaitingApproval else Phase.Ready,
+                    ),
+                    plan = restoredPlan,
+                ),
+            )
+        }
+        return ProviderActionResult.Accepted
     }
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
@@ -450,7 +494,7 @@ internal class LocalWorkspaceAgentProvider(
         val approvedText = fullText.take(8_000)
         return WorkspacePlan(
             text = approvedText,
-            requestedFiles = parseRequestedFiles(fullText, trackedFiles),
+            requestedFiles = parseRequestedFiles(approvedText, trackedFiles),
         ) to result
     }
 
@@ -720,7 +764,7 @@ internal class LocalWorkspaceAgentProvider(
         sessionOrNull(runId) ?: error("$displayName workspace session ${runId.value} is not available")
 
     private suspend fun sessionOrNull(runId: ProviderRunId): Session? = sessionsMutex.withLock {
-        sessionsByProvider[id.value]?.get(runId)
+        sessions[runId]
     }
 
     private fun List<Long>.sumOrNull(): Long? = if (isEmpty()) null else sum()
