@@ -29,3 +29,18 @@ requirement.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching P0 roadmap items are marked complete.
+
+
+## Android runtime recovery expectations
+
+A runtime retry must not restart a large local-model transfer from byte zero. Memory and
+orchestration artifacts use the resumable Android downloader described in
+[`PERSISTENCE.md`](PERSISTENCE.md): retained `.download` bytes are resumed with HTTP Range
+requests and the final file is accepted only after size/digest verification.
+
+The acceptance surface should distinguish provider/runtime state failure from artifact transport
+failure. A transport message such as a request timeout or incomplete `Content-Length` is actionable
+download state; it must not be misreported as a completed model install or an empty workflow run.
+
+The Inbox likewise reflects runtime truth. It may report the download/runtime failure, but a partial
+asset is not a task artifact and is never evidence of task completion.

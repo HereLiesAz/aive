@@ -8,6 +8,10 @@
 - Made saved Android provider keys, repository tokens, and compute relay tokens synchronously durable.
 - Added GitHub-flavor automatic update checks/downloads with Android installer handoff.
 - Added Play-flavor update notifications that open Google Play without requesting sideload permissions.
+- Added resumable, SHA-verified Android downloads for large local memory/orchestration release assets, including retained partial files and HTTP Range resume.
+- Added Azphalt catalog recovery when an app-scoped workflow/role search incorrectly returns empty, with local `targetApps` filtering for current and legacy Aive host IDs.
+- Grouped all `0.9.6.x` build assets under one `v0.9.6` GitHub Release while preserving immutable four-part build tags.
+- Moved four-part build-version derivation and patch-grouped GitHub Release policy into `HereLiesAz/workflows`.
 
 
 All notable changes to **The Aive** are documented here from the current product line forward.
@@ -34,6 +38,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Android application ID and namespace changed to `com.hereliesaz.aive`.
 - Progress is modeled as task-run execution data rather than agent-specific state.
 - `main` is the canonical product branch.
+- GitHub Release containers are patch-scoped; exact build identity remains in immutable four-part tags and artifact filenames.
 
 ### Removed
 

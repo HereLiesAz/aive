@@ -188,6 +188,8 @@ Pushes to `main`:
 - build a Desktop distribution
 - build JS and Wasm web targets
 - upload Android and Desktop artifacts
+- derive the four-part public build version through the centralized `HereLiesAz/workflows` version action
+- publish exact-build assets into the patch-grouped GitHub Release through the centralized release action
 - deploy the JS production bundle to GitHub Pages after a successful build
 
 The composite build currently runs on JDK 21 because the pinned H2G2 renderer is compiled with a Java 21 toolchain. Android-facing Haive bytecode may still target JVM 17. Haive and the pinned renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
@@ -201,4 +203,12 @@ Yarn can try to download a local library from the npm registry. Rebuild the pinn
 publications before using this option locally; their native version alone does not identify
 the source revision.
 
-Android signing is used when signing secrets are available. Play publishing is a separate delivery step and will use the repository Play service-account secret when enabled.
+Android signing is used when signing secrets are available. Play publishing is a separate delivery
+step and uses the repository Play service-account secret when enabled.
+
+The checked-in release line remains four-part (`MAJOR.MINOR.PATCH.BUILD`). Exact builds keep
+immutable four-part Git tags, while GitHub Release objects are grouped by patch: all `0.9.6.x`
+artifacts, for example, live under `v0.9.6`. Asset filenames retain the exact build number so
+multiple builds coexist safely. The version calculation, patch grouping, legacy-release migration,
+and collision policy live in `HereLiesAz/workflows`; Aive's workflow only produces Aive-specific
+artifacts and delegates those semantics.
