@@ -258,11 +258,48 @@ class HallMonitorGovernanceService(
             "Paused Antagonist review ${pause.antagonistReviewArtifactId.value} is missing"
         }
         val taskRunId = TaskRunId("hall-monitor-orchestrator-review:${run.id.value}:${pause.reportArtifactId.value}")
+        val role = BuiltInRoles.Orchestrator
+        val reviewRequest = AgentTaskRequest(
+            taskRunId = taskRunId,
+            objective = """
+                Review the attached Hall Monitor report after its Antagonist pass. Judge whether
+                the evidence and counter-evidence justify escalating its recommendations for user
+                consideration. Do not implement any recommendation. Your FIRST nonblank line must
+                be exactly `VERDICT: APPROVE` or `VERDICT: REJECT`. Then provide concise reasons,
+                unresolved counterpoints, and the specific evidence that determined the verdict.
+            """.trimIndent(),
+            roleInstructions = "$swarmInstructions\n\n${role.instructions}",
+            acceptanceCriteria = listOf(
+                AcceptanceCriterion("The first nonblank line is VERDICT: APPROVE or VERDICT: REJECT."),
+                AcceptanceCriterion("The review addresses both evidence and counter-evidence."),
+                AcceptanceCriterion("No model, role, workflow, or memory mutation is performed."),
+            ),
+            contextArtifacts = listOf(report, antagonistReview),
+            repository = project.repository,
+            isolationHint = IsolationHint.Repoless,
+            requirePlanApproval = false,
+            promptContext = PromptContext(
+                stablePrefix = listOf(
+                    PromptContextBlock("Governance", "Ordinary workflow execution is globally paused."),
+                    PromptContextBlock("Role", role.instructions),
+                ),
+                dynamicContext = listOf(
+                    PromptContextBlock("Hall Monitor report", report.textContent.orEmpty()),
+                    PromptContextBlock("Antagonist review", antagonistReview.textContent.orEmpty()),
+                ),
+                cacheNamespace = "${run.id.value}:hall-monitor-orchestrator-review",
+            ),
+            orchestrationContext = AgentOrchestrationContext(
+                projectId = project.id,
+                workflowRunId = run.id,
+                workflowDefinitionId = run.workflowDefinitionId,
+                roleId = role.id,
+            ),
+        )
 
         val providerId = pause.orchestratorReviewProviderId
         val providerRunId = pause.orchestratorReviewProviderRunId
         if (providerId == null || providerRunId == null) {
-            val role = BuiltInRoles.Orchestrator
             val handle = sessionGateway.createSession(
                 ManagedSessionRequest(
                     providerSelection = ProviderSelectionRequest(
@@ -270,43 +307,7 @@ class HallMonitorGovernanceService(
                         requiredCapabilities = role.capabilitiesRequired,
                         repository = project.repository,
                     ),
-                    taskRequest = AgentTaskRequest(
-                        taskRunId = taskRunId,
-                        objective = """
-                            Review the attached Hall Monitor report after its Antagonist pass. Judge whether
-                            the evidence and counter-evidence justify escalating its recommendations for user
-                            consideration. Do not implement any recommendation. Your FIRST nonblank line must
-                            be exactly `VERDICT: APPROVE` or `VERDICT: REJECT`. Then provide concise reasons,
-                            unresolved counterpoints, and the specific evidence that determined the verdict.
-                        """.trimIndent(),
-                        roleInstructions = "$swarmInstructions\n\n${role.instructions}",
-                        acceptanceCriteria = listOf(
-                            AcceptanceCriterion("The first nonblank line is VERDICT: APPROVE or VERDICT: REJECT."),
-                            AcceptanceCriterion("The review addresses both evidence and counter-evidence."),
-                            AcceptanceCriterion("No model, role, workflow, or memory mutation is performed."),
-                        ),
-                        contextArtifacts = listOf(report, antagonistReview),
-                        repository = project.repository,
-                        isolationHint = IsolationHint.Repoless,
-                        requirePlanApproval = false,
-                        promptContext = PromptContext(
-                            stablePrefix = listOf(
-                                PromptContextBlock("Governance", "Ordinary workflow execution is globally paused."),
-                                PromptContextBlock("Role", role.instructions),
-                            ),
-                            dynamicContext = listOf(
-                                PromptContextBlock("Hall Monitor report", report.textContent.orEmpty()),
-                                PromptContextBlock("Antagonist review", antagonistReview.textContent.orEmpty()),
-                            ),
-                            cacheNamespace = "${run.id.value}:hall-monitor-orchestrator-review",
-                        ),
-                        orchestrationContext = AgentOrchestrationContext(
-                            projectId = project.id,
-                            workflowRunId = run.id,
-                            workflowDefinitionId = run.workflowDefinitionId,
-                            roleId = role.id,
-                        ),
-                    ),
+                    taskRequest = reviewRequest,
                 ),
             )
             val next = run.copy(
@@ -323,7 +324,12 @@ class HallMonitorGovernanceService(
         val handle = ManagedSessionHandle(taskRunId, providerId, providerRunId)
         var status = sessionGateway.status(handle)
         if (status == ManagedSessionStatus.Unknown) {
-            sessionGateway.reconnect(handle, ManagedSessionStatus.Running)
+            sessionGateway.reconnect(
+                handle = handle,
+                initialStatus = ManagedSessionStatus.Running,
+                request = reviewRequest,
+                providerPlan = null,
+            )
             status = sessionGateway.status(handle)
         }
         when (status) {

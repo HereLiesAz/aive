@@ -128,43 +128,13 @@ class WorkflowEngine(
                     val providerActive = activeByProvider[providerId] ?: 0
                     if (providerActive >= providerLimit) continue
 
-                    val redaction = definition.payloadRedactionPolicy
-                    val dependencyArtifacts = task.dependsOn
-                        .mapNotNull(nextRun.taskRuns::get)
-                        .flatMap(TaskRun::artifacts)
-                        .filter { it.kind !in redaction.excludedArtifactKinds }
-                    val request = AgentTaskRequest(
-                        taskRunId = taskRun.id,
-                        objective = if (redaction.redactObjective) "[redacted]" else task.objective,
-                        roleInstructions = if (redaction.redactRoleInstructions) {
-                            swarmInstructions
-                        } else {
-                            "$swarmInstructions\n\n${role.instructions}"
-                        },
-                        acceptanceCriteria = task.acceptanceCriteria,
-                        contextArtifacts = dependencyArtifacts,
-                        requiredArtifacts = task.requiredArtifacts,
-                        repository = project.repository,
-                        requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
-                        promptContext = PromptContext(
-                            stablePrefix = listOf(
-                                PromptContextBlock("Workflow objective", nextRun.objective),
-                                PromptContextBlock("Role", role.instructions),
-                            ),
-                            dynamicContext = listOf(
-                                PromptContextBlock("Task", task.objective),
-                                PromptContextBlock("Attempt", taskRun.attempt.toString()),
-                            ),
-                            reusePolicy = definition.promptReusePolicy,
-                            cacheNamespace = "${nextRun.id.value}:${role.id.value}",
-                        ),
-                        orchestrationContext = AgentOrchestrationContext(
-                            projectId = project.id,
-                            workflowRunId = nextRun.id,
-                            workflowDefinitionId = definition.id,
-                            taskDefinitionId = task.id,
-                            roleId = role.id,
-                        ),
+                    val request = buildProviderTaskRequest(
+                        project = project,
+                        definition = definition,
+                        run = nextRun,
+                        task = task,
+                        taskRun = taskRun,
+                        role = role,
                     )
                     pendingAgentDispatches += PendingAgentDispatch(
                         taskRun = taskRun,

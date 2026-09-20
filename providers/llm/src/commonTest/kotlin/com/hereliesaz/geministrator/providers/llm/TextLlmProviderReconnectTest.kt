@@ -60,5 +60,8 @@ class TextLlmProviderReconnectTest {
         assertTrue(events.any { it is AgentEvent.UsageReported })
         assertIs<AgentEvent.Completed>(events.last())
         assertEquals(1, calls)
+
+        val nextRun = provider.start(request)
+        assertEquals("resume-provider/task-1/43", nextRun.runId.value)
     }
 }
