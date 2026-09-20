@@ -98,6 +98,7 @@ class ProviderTaskRequestFactoryTest {
             updatedAtEpochMillis = 1L,
         )
 
+        val utilities = RecordingLocalOrchestrationUtilities()
         val request = buildProviderTaskRequest(
             project = Project(
                 id = run.projectId,
@@ -110,6 +111,7 @@ class ProviderTaskRequestFactoryTest {
             task = definition.tasks.last(),
             taskRun = targetRun,
             role = role,
+            orchestrationUtilities = utilities,
         )
 
         assertEquals("[redacted]", request.objective)
@@ -119,5 +121,14 @@ class ProviderTaskRequestFactoryTest {
             .joinToString("\n") { it.content }
         assertFalse(promptText.contains("TOP SECRET"))
         assertTrue(promptText.contains("[redacted]"))
+        assertTrue(request.promptContext.dynamicContext.any { it.label == "Execution state" })
+        assertTrue(request.promptContext.dynamicContext.any { it.label == "Handoff" })
+        assertTrue(request.promptContext.dynamicContext.any { it.label == "Local control assessment" })
+        assertTrue(request.promptContext.dynamicContext.any { it.label == "Verification plan" })
+        assertEquals(1, utilities.executionSummaryCalls)
+        assertEquals(1, utilities.handoffCalls)
+        assertEquals(1, utilities.completionCalls)
+        assertEquals(1, utilities.escalationCalls)
+        assertEquals(1, utilities.verificationPlanningCalls)
     }
 }
