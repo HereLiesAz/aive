@@ -194,6 +194,21 @@ interface AgentProvider {
 
     suspend fun start(request: AgentTaskRequest): AgentRunHandle
 
+    /**
+     * Reconstruct provider-local session state for a persisted run after process restart.
+     *
+     * Remote-session providers may keep the default no-op behavior because [runId] is already
+     * sufficient to reconnect. Stateless/one-shot providers can rebuild the local request envelope
+     * and resume observation without allocating a new provider run.
+     */
+    suspend fun reconnect(
+        runId: ProviderRunId,
+        request: AgentTaskRequest,
+        planGenerated: Boolean,
+        planApproved: Boolean,
+        planPreview: String? = null,
+    ): ProviderActionResult = ProviderActionResult.Accepted
+
     fun observe(runId: ProviderRunId): Flow<AgentEvent>
 
     suspend fun sendMessage(

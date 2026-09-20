@@ -1,5 +1,8 @@
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/terrarium-visual-proof.yml
+# central-source-sha256: c22b3cf5990dc65072edaa770e536030df703758aecfcaedf3446594de276c69
+# This file intentionally contains no repository secrets.
 name: Terrarium Visual Proof
-
 on:
   pull_request:
     branches: [main]
@@ -8,174 +11,21 @@ on:
       - feature/swarm-terrarium-integration
       - fix/terrarium-rust-visual-proof
   workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: terrarium-proof-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+  id-token: write
 jobs:
-  wasm-screenshot:
+  central-dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Rust renderer toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Publish pinned Conveyance for isolated WASM build
-        run: |
-          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
-            :conveyance-core:publishToMavenLocal \
-            :conveyance-compose:publishToMavenLocal
-
-      - name: Publish pinned H2G2 for isolated WASM build
-        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
-
-      - name: Build production WASM terrarium
-        run: ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true :webApp:wasmJsBrowserProductionWebpack
-
-      - name: Stage WASM visual proof
+      - name: Dispatch to HereLiesAz/workflows
+        env:
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/terrarium-visual-proof.yml
+          SOURCE_SHA256: c22b3cf5990dc65072edaa770e536030df703758aecfcaedf3446594de276c69
         shell: bash
-        run: |
-          set -euo pipefail
-          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
-          if [ -z "$WASM_BUNDLE" ]; then
-            echo "::error::WASM production bundle was not found"
-            find webApp/build -type f -name 'haive.js' -print
-            exit 1
-          fi
-          WASM_DIR="$(dirname "$WASM_BUNDLE")"
-          rm -rf webApp/build/terrarium-proof
-          mkdir -p webApp/build/terrarium-proof
-          cp -R "$WASM_DIR"/. webApp/build/terrarium-proof/
-          cp -R webApp/src/webMain/resources/. webApp/build/terrarium-proof/
-          test -f webApp/build/terrarium-proof/index.html
-          test -f webApp/build/terrarium-proof/haive.js
-          test -f webApp/build/terrarium-proof/node-creatures.js
-          test -f webApp/build/terrarium-proof/haive_node_creatures.wasm
-
-      - name: Install Chromium for visual proof
-        shell: bash
-        run: |
-          npm install --no-save --package-lock=false playwright@1.55.0
-          npx playwright install --with-deps chromium
-
-      - name: Capture and verify real Rust-rendered terrarium
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m http.server 8080 --directory webApp/build/terrarium-proof > /tmp/haive-terrarium-http.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          for asset in haive.js node-creatures.js haive_node_creatures.wasm; do
-            curl --fail --silent --output /dev/null "http://127.0.0.1:8080/$asset"
-          done
-
-          mkdir -p visual-proof
-          cat > visual-proof/haive-terrarium-proof.mjs <<'JS'
-          import { chromium } from 'playwright';
-
-          const browser = await chromium.launch({
-            headless: true,
-            args: ['--enable-unsafe-swiftshader'],
-          });
-          const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-          const diagnostics = [];
-          page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
-          page.on('pageerror', error => diagnostics.push(`[pageerror] ${error.stack || error.message}`));
-          page.on('requestfailed', request => diagnostics.push(`[requestfailed] ${request.url()} :: ${request.failure()?.errorText || 'unknown'}`));
-
-          try {
-            await page.goto('http://127.0.0.1:8080/?terrariumPreview=1', { waitUntil: 'domcontentloaded' });
-            await page.waitForFunction(() => {
-              if (globalThis.__haiveStartupError) throw new Error(globalThis.__haiveStartupError);
-              return globalThis.__haiveNodeCreaturesReady === true &&
-                globalThis.__haiveAppScriptLoaded === true;
-            }, null, { timeout: 15000 });
-            await page.waitForSelector('#webApp > *', { timeout: 15000 });
-            await page.waitForTimeout(1800);
-
-            const state = await page.evaluate(() => ({
-              rustReady: globalThis.HaiveNodeCreatures?.ready === true,
-              bridgeReady: globalThis.__haiveNodeCreaturesReady === true,
-              appScriptLoaded: globalThis.__haiveAppScriptLoaded === true,
-              startupError: globalThis.__haiveStartupError || null,
-              browserLocale: globalThis.__haiveBrowserLocale || null,
-              navigatorLanguage: navigator.language || null,
-              canvases: document.querySelectorAll('#webApp canvas').length,
-              appChildren: document.getElementById('webApp')?.childNodes.length || 0,
-            }));
-            console.log('Browser state:', JSON.stringify(state));
-            if (!state.rustReady || !state.bridgeReady || !state.appScriptLoaded || state.startupError ||
-                !state.browserLocale || state.browserLocale !== state.navigatorLanguage || state.appChildren < 1) {
-              throw new Error(`Terrarium did not reach a Rust-rendered ready state: ${JSON.stringify(state)}`);
-            }
-
-            await page.screenshot({ path: 'visual-proof/haive-terrarium-wasm.png' });
-          } catch (error) {
-            console.error(error.stack || error);
-            console.error('=== Browser diagnostics ===');
-            for (const entry of diagnostics) console.error(entry);
-            console.error('=== DOM ===');
-            console.error(await page.content());
-            process.exitCode = 1;
-          } finally {
-            await browser.close();
-          }
-          JS
-
-          if ! node visual-proof/haive-terrarium-proof.mjs; then
-            echo "=== HTTP server log ==="
-            cat /tmp/haive-terrarium-http.log || true
-            echo "=== Staged files ==="
-            find webApp/build/terrarium-proof -maxdepth 1 -type f -printf '%f %s bytes\n' | sort || true
-            exit 1
-          fi
-
-          test -s visual-proof/haive-terrarium-wasm.png
-          python3 -m pip install --quiet pillow
-          python3 - <<'PY'
-          from PIL import Image
-          from collections import Counter
-
-          image = Image.open("visual-proof/haive-terrarium-wasm.png").convert("RGB")
-          colors = Counter(image.getdata())
-          background = (18, 18, 18)
-          non_background = image.width * image.height - colors.get(background, 0)
-          distinct = len(colors)
-          print(f"Visual proof: {image.width}x{image.height}, {distinct} colors, {non_background} non-background pixels")
-          if distinct < 8 or non_background < 10000:
-              raise SystemExit(
-                  f"Terrarium visual proof is effectively blank: {distinct} colors, "
-                  f"{non_background} non-background pixels"
-              )
-          PY
-
-      - name: Upload terrarium screenshot
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: haive-terrarium-wasm-proof
-          path: visual-proof/haive-terrarium-wasm.png
-          if-no-files-found: warn
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\nif [[ \"$GITHUB_EVENT_NAME\" == \"pull_request\" || \"$GITHUB_EVENT_NAME\" == \"pull_request_target\" ]]; then\n  DISPATCH_EVENT_JSON=\"$(jq -c '{\n    action,\n    number,\n    pull_request: {\n      number: .pull_request.number,\n      base: {\n        ref: .pull_request.base.ref,\n        sha: .pull_request.base.sha\n      },\n      head: {\n        ref: .pull_request.head.ref,\n        sha: .pull_request.head.sha,\n        repo: {\n          full_name: .pull_request.head.repo.full_name,\n          fork: (.pull_request.head.repo.fork // false)\n        }\n      }\n    }\n  }' <<<\"$EVENT_JSON\")\"\nelse\n  DISPATCH_EVENT_JSON=\"$EVENT_JSON\"\nfi\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$DISPATCH_EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
+    name: Dispatch

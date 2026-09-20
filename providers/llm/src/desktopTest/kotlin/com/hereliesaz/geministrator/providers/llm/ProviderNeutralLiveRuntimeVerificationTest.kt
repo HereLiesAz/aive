@@ -1,4 +1,4 @@
-package com.hereliesaz.geministrator.providers.jules
+package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ApplicationRuntime
 import com.hereliesaz.geministrator.ApplicationRuntimeState
@@ -26,6 +26,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.decideFailureEscalation
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
+import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
@@ -47,25 +48,25 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Opt-in live acceptance test for the production runtime/Jules integration.
+ * Opt-in live acceptance test for the production runtime through the shared provider contract.
  *
- * Disabled from the normal live-runtime verification path. This legacy provider-specific probe
- * runs only when AIVE_LIVE_JULES_RUNTIME_VERIFICATION=1 is explicitly supplied.
+ * Ordinary unit-test runs skip this test. Manual live verification opts in with
+ * AIVE_LIVE_RUNTIME_VERIFICATION=1 and either AIVE_LIVE_PROVIDER or the first configured
+ * OpenAI/Anthropic/Gemini/xAI credential.
  */
-class JulesLiveRuntimeVerificationTest {
+class ProviderNeutralLiveRuntimeVerificationTest {
     @Test
     fun launchApproveExecuteEscalateRestartResumeAndComplete() = runBlocking {
         if (System.getenv(OPT_IN_ENV) != "1") return@runBlocking
 
-        val apiKey = System.getenv("JULES_API_KEY")?.trim().orEmpty()
-        check(apiKey.isNotEmpty()) { "JULES_API_KEY is required when $OPT_IN_ENV=1" }
+        val providerConfig = liveProviderConfig()
 
         val settings = MapSettings()
         val persistence = SettingsWorkflowPersistence(settings, storageKey = "aive.live.runtime.verification")
         val verifierIntegration = FailOnceVerificationIntegration()
         val executorIntegrations = TaskExecutorIntegrationRegistry(listOf(verifierIntegration))
-        val firstProvider = liveJulesProvider(apiKey)
-        val definition = verificationWorkflow()
+        val firstProvider = liveProvider(providerConfig)
+        val definition = verificationWorkflow(providerConfig.providerId)
         val project = Project(
             id = ProjectId("live-runtime-verification"),
             name = "Live runtime verification",
@@ -85,7 +86,7 @@ class JulesLiveRuntimeVerificationTest {
             project = project,
             definition = definition,
             workflowRunId = WorkflowRunId("live-runtime-verification-run"),
-            objective = "Verify the real Aive runtime lifecycle against Jules",
+            objective = "Verify the real Aive runtime lifecycle through ${providerConfig.providerId.value}",
             nowEpochMillis = 1L,
             taskRunIdFactory = { TaskRunId("live-${it.value}") },
         )
@@ -98,19 +99,19 @@ class JulesLiveRuntimeVerificationTest {
             executorIntegrations = executorIntegrations,
         )
 
-        val julesTaskId = TaskDefinitionId("jules-live")
+        val providerTaskId = TaskDefinitionId("provider-live")
         val failOnceTaskId = TaskDefinitionId("fail-once")
         val verificationTaskId = TaskDefinitionId("verification")
         val reviewTaskId = TaskDefinitionId("review")
         val releaseTaskId = TaskDefinitionId("release-approval")
 
         val (providerRunId, exportedProject) = try {
-            val awaitingApproval = awaitLive(firstRuntime, "initial Jules plan approval") { live ->
-                live.presentation.run.taskRuns.getValue(julesTaskId).status == TaskRunStatus.AwaitingApproval
+            val awaitingApproval = awaitLive(firstRuntime, "initial provider plan approval") { live ->
+                live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
-            val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(julesTaskId)
+            val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(providerTaskId)
             assertEquals(WorkflowRunStatus.AwaitingHuman, awaitingApproval.presentation.run.status)
-            assertEquals(null, taskRun.progress, "Jules plan/progress text must not fabricate a percentage")
+            assertEquals(null, taskRun.progress, "Provider plan/progress text must not fabricate a percentage")
             val runId = assertNotNull(taskRun.providerRunId)
             val projectExport = assertNotNull(firstRuntime.exportCurrentProjectFile())
             runId to projectExport.content
@@ -130,28 +131,28 @@ class JulesLiveRuntimeVerificationTest {
         assertEquals(project.id, importedProject.id)
         val resumedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val resumedRuntime = ApplicationRuntime.create(
-            providers = listOf(liveJulesProvider(apiKey)),
+            providers = listOf(liveProvider(providerConfig)),
             scope = resumedScope,
             persistence = resumedPersistence,
             executorIntegrations = executorIntegrations,
         )
 
         try {
-            val resumed = awaitLive(resumedRuntime, "resumed Jules plan approval") { live ->
-                live.presentation.run.taskRuns.getValue(julesTaskId).status == TaskRunStatus.AwaitingApproval
+            val resumed = awaitLive(resumedRuntime, "resumed provider plan approval") { live ->
+                live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
             assertEquals(
                 providerRunId,
-                resumed.presentation.run.taskRuns.getValue(julesTaskId).providerRunId,
-                "Restart must reconnect the same Jules session instead of redispatching work",
+                resumed.presentation.run.taskRuns.getValue(providerTaskId).providerRunId,
+                "Restart must reconnect the same provider run instead of allocating a replacement",
             )
 
-            resumedRuntime.approveTask(julesTaskId)
+            resumedRuntime.approveTask(providerTaskId)
 
             val escalated = awaitLive(resumedRuntime, "failure escalation") { live ->
                 live.presentation.run.taskRuns.getValue(failOnceTaskId).status == TaskRunStatus.Escalated
             }
-            assertEquals(TaskRunStatus.Completed, escalated.presentation.run.taskRuns.getValue(julesTaskId).status)
+            assertEquals(TaskRunStatus.Completed, escalated.presentation.run.taskRuns.getValue(providerTaskId).status)
             assertEquals(WorkflowRunStatus.AwaitingHuman, escalated.presentation.run.status)
 
             resumedRuntime.decideFailureEscalation(
@@ -185,7 +186,7 @@ class JulesLiveRuntimeVerificationTest {
         // A terminal result must remain terminal after another runtime reconstruction.
         val terminalScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val terminalRuntime = ApplicationRuntime.create(
-            providers = listOf(liveJulesProvider(apiKey)),
+            providers = listOf(liveProvider(providerConfig)),
             scope = terminalScope,
             persistence = SettingsWorkflowPersistence(resumedSettings, storageKey = "aive.live.runtime.verification"),
             executorIntegrations = executorIntegrations,
@@ -201,16 +202,52 @@ class JulesLiveRuntimeVerificationTest {
         }
     }
 
-    private fun liveJulesProvider(apiKey: String): JulesProvider = JulesProvider(
-        api = JulesRestApi(JulesApiKeyProvider { apiKey }),
-        config = JulesProviderConfig(
-            pollIntervalMillis = 250L,
-            autoCreatePullRequests = false,
-        ),
+    private data class LiveProviderConfig(
+        val providerId: AgentProviderId,
+        val apiKey: String,
     )
 
-    private fun verificationWorkflow(): WorkflowDefinition {
-        val jules = TaskDefinitionId("jules-live")
+    private fun liveProviderConfig(): LiveProviderConfig {
+        val requested = System.getenv("AIVE_LIVE_PROVIDER")?.trim()?.lowercase().orEmpty()
+        val candidates = listOf(
+            "openai" to "OPENAI_API_KEY",
+            "anthropic" to "ANTHROPIC_API_KEY",
+            "gemini" to "GEMINI_API_KEY",
+            "xai" to "XAI_API_KEY",
+        )
+        val selected = if (requested.isNotEmpty()) {
+            candidates.firstOrNull { it.first == requested }
+                ?: error("AIVE_LIVE_PROVIDER must be one of: ${candidates.joinToString { it.first }}")
+        } else {
+            candidates.firstOrNull { (_, envName) -> !System.getenv(envName).isNullOrBlank() }
+                ?: error(
+                    "Configure one live provider credential: " +
+                        candidates.joinToString { it.second },
+                )
+        }
+        val apiKey = System.getenv(selected.second)?.trim().orEmpty()
+        check(apiKey.isNotEmpty()) {
+            "${selected.second} is required for AIVE_LIVE_PROVIDER=${selected.first}"
+        }
+        return LiveProviderConfig(
+            providerId = AgentProviderId(selected.first),
+            apiKey = apiKey,
+        )
+    }
+
+    private fun liveProvider(config: LiveProviderConfig): AgentProvider {
+        val keyProvider = LlmApiKeyProvider { config.apiKey }
+        return when (config.providerId.value) {
+            "openai" -> OpenAiProvider(keyProvider)
+            "anthropic" -> AnthropicProvider(keyProvider)
+            "gemini" -> GeminiProvider(keyProvider)
+            "xai" -> XaiProvider(keyProvider)
+            else -> error("Unsupported live provider ${config.providerId.value}")
+        }
+    }
+
+    private fun verificationWorkflow(providerId: AgentProviderId): WorkflowDefinition {
+        val providerTask = TaskDefinitionId("provider-live")
         val failOnce = TaskDefinitionId("fail-once")
         val verification = TaskDefinitionId("verification")
         val review = TaskDefinitionId("review")
@@ -221,15 +258,15 @@ class JulesLiveRuntimeVerificationTest {
             testDesignPolicy = TestDesignPolicy.None,
             tasks = listOf(
                 TaskDefinition(
-                    id = jules,
-                    name = "Live Jules execution",
+                    id = providerTask,
+                    name = "Live provider execution",
                     objective = "Create a short two-step plan for this runtime smoke test. After approval, complete the task. Do not access or modify a repository.",
                     roleId = BuiltInRoles.ImplementationEngineer.id,
                     executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
                     approvalPolicy = ApprovalPolicy.HumanApproval,
                     retryPolicy = RetryPolicy(maxAttempts = 1),
                     escalationPolicy = EscalationPolicy.FailWorkflow,
-                    providerConstraints = ProviderConstraints.RequireProvider(AgentProviderId("jules")),
+                    providerConstraints = ProviderConstraints.RequireProvider(providerId),
                 ),
                 TaskDefinition(
                     id = failOnce,
@@ -237,7 +274,7 @@ class JulesLiveRuntimeVerificationTest {
                     objective = "Fail once, require a human escalation decision, then succeed on retry.",
                     roleId = null,
                     executor = TaskExecutor.ExternalService("runtime-verifier", "fail-once"),
-                    dependsOn = setOf(jules),
+                    dependsOn = setOf(providerTask),
                     retryPolicy = RetryPolicy(maxAttempts = 1),
                     escalationPolicy = EscalationPolicy.RequireHumanDecision,
                 ),
@@ -337,7 +374,7 @@ class JulesLiveRuntimeVerificationTest {
                             kind = ArtifactKind.Verification,
                             taskRunId = context.taskRun.id,
                             label = "Live runtime verification",
-                            textContent = "Jules approval, execution, escalation recovery, restart/resume, artifact collection, and terminal persistence all completed.",
+                            textContent = "Provider approval, execution, escalation recovery, restart/resume, artifact collection, and terminal persistence all completed.",
                             mediaType = "text/plain",
                             createdAtEpochMillis = context.nowEpochMillis,
                         ),
@@ -376,6 +413,6 @@ class JulesLiveRuntimeVerificationTest {
     }
 
     private companion object {
-        const val OPT_IN_ENV = "AIVE_LIVE_JULES_RUNTIME_VERIFICATION"
+        const val OPT_IN_ENV = "AIVE_LIVE_RUNTIME_VERIFICATION"
     }
 }

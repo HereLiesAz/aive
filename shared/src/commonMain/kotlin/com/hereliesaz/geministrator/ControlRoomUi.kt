@@ -425,6 +425,8 @@ private fun MainDestination(
                 selectedTaskId = selectedTaskId,
                 onTaskSelected = onTaskSelected,
                 onLaunchWorkflow = onLaunchWorkflow,
+                projectFileService = projectFileService,
+                onImportProjectFile = onImportProjectFile,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
                 onReconfigureProvider = onReconfigureProvider,

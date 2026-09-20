@@ -56,9 +56,9 @@ Tracking issue: #35
 - [x] Make task/data planning resource-aware and capable of choosing an implemented execution topology rather than only honoring the already-authorized strategy.
 - [x] Implement centralized mixture-of-agents as a governed proposer → genealogy gate → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
 - [x] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
-- [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models.
-- [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner.
-- [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them.
+- [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models. Prompt/program optimization, held-out/adversarial gates, manifests, and bundles exist; remaining work is specialist training/export, catalog registration, and runtime consumption.
+- [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner. Contracts, deterministic baselines, and unit tests exist; remaining work is production runtime wiring and specialist-model integration.
+- [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them. Deployment-readiness gates are documented; the remaining benchmark requires task-equivalent BitNet specialists and same-machine quality/performance measurements.
 - [x] Implement Skeleton-of-Thought as a governed skeleton → independence analysis → parallel expansion → aggregation → verification strategy after the inference fabric is established.
 
 ## P0 — Make one complete workflow actually work end-to-end
@@ -67,8 +67,8 @@ Tracking issue: #35
 - [ ] Define an objective.
 - [ ] Materialize a workflow definition.
 - [ ] Approve any required plan/specification gates.
-- [ ] Dispatch Jules-backed work.
-- [ ] Reconcile Jules progress without fabricating percentages.
+- [ ] Dispatch provider-backed work through a configured real provider.
+- [ ] Reconcile provider progress without fabricating percentages.
 - [ ] Persist and resume the run after process/browser restart.
 - [ ] Collect artifacts.
 - [ ] Run verification/review stages.

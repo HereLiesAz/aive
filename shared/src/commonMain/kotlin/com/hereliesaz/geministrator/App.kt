@@ -62,6 +62,7 @@ fun App(
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
+    var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
     LaunchedEffect(providers, executorIntegrations, workflowPersistence, runtimeGeneration) {
         runtime?.close()
@@ -84,6 +85,30 @@ fun App(
             throw failure
         } catch (failure: Exception) {
             runtimeState = failure.toRuntimeFailureState("Runtime bootstrap failed")
+        }
+    }
+
+    LaunchedEffect(runtimeState, projectFileService, automaticProjectRestoreAttempted) {
+        if (automaticProjectRestoreAttempted) return@LaunchedEffect
+        if (runtimeState is ApplicationRuntimeState.Loading) return@LaunchedEffect
+        if (runtimeState !is ApplicationRuntimeState.NoProject) {
+            automaticProjectRestoreAttempted = true
+            return@LaunchedEffect
+        }
+        val fileService = projectFileService ?: run {
+            automaticProjectRestoreAttempted = true
+            return@LaunchedEffect
+        }
+        automaticProjectRestoreAttempted = true
+
+        for (descriptor in runCatching { fileService.detected() }.getOrDefault(emptyList())) {
+            val opened = runCatching { fileService.read(descriptor) }.getOrNull() ?: continue
+            val imported = runCatching { runtime?.importProjectFile(opened.content) }.getOrNull() ?: continue
+            if (imported != null) {
+                projectIdToOpenAfterReload = imported.id.value
+                runtimeGeneration += 1
+                break
+            }
         }
     }
 

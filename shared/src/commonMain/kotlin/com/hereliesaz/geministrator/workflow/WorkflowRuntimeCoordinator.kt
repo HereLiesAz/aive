@@ -119,7 +119,12 @@ class WorkflowRuntimeCoordinator(
                         roleId = role?.id,
                     ),
                 )
-                sessionGateway.reconnect(handle, taskRun.status.toManagedStatus(), request)
+                sessionGateway.reconnect(
+                    handle,
+                    taskRun.status.toManagedStatus(),
+                    request,
+                    taskRun.providerPlan,
+                )
                 put(taskDefinitionId, handle)
             }
         }
