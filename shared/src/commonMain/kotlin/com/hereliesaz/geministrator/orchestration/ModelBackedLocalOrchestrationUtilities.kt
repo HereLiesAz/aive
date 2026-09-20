@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.orchestration
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -131,7 +132,7 @@ class GuardedModelBackedOrchestrationUtilities(
                     operation.isNotEmpty() &&
                     operation in selected.operationClasses &&
                     candidate.operationClass == operation &&
-                    candidate.requiredInputs.all(input.requiredInputs.toSet()::contains)
+                    candidate.requiredInputs.toSet() == input.requiredInputs.toSet()
             }
         }
     }
@@ -177,8 +178,11 @@ class GuardedModelBackedOrchestrationUtilities(
             baseline,
         ) { candidate ->
             candidate.evidenceIds.all(knownEvidence::contains) &&
-                (baseline.decision == CompletionDecision.Complete ||
-                    candidate.decision != CompletionDecision.Complete) &&
+                (candidate.decision != CompletionDecision.Complete ||
+                    (
+                        baseline.decision == CompletionDecision.Complete &&
+                            candidate.evidenceIds.toSet() == knownEvidence
+                    )) &&
                 (baseline.unsatisfiedCriteria.isEmpty() ||
                     candidate.unsatisfiedCriteria.containsAll(baseline.unsatisfiedCriteria))
         }
