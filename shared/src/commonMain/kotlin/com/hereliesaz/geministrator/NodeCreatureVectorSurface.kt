@@ -85,75 +85,73 @@ private data class NodeCreaturePalette(
     val accent: Color,
 )
 
-private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette {
-    val role = roleLabel.trim().lowercase()
-    return when {
-        "hall monitor" in role || "hall-monitor" in role -> NodeCreaturePalette(
+private fun nodeCreaturePalette(roleLabel: String, hueSeed: String): NodeCreaturePalette =
+    when (classifyNodeCreatureRole(roleLabel)) {
+        NodeCreatureRoleKind.HallMonitor -> NodeCreaturePalette(
             body = Color(0xFF69A9EF),
             accent = Color(0xFF214D85),
         )
-        "antagonist" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.Antagonist -> NodeCreaturePalette(
             body = Color(0xFF191919),
             accent = Color(0xFFA10A5A),
         )
-        "adversarial" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.AdversarialReviewer -> NodeCreaturePalette(
             body = Color(0xFFF12E3D),
             accent = Color(0xFF721722),
         )
-        "recovery" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.RecoveryEngineer -> NodeCreaturePalette(
             body = Color(0xFF35B96A),
             accent = Color(0xFFEAC58A),
         )
-        "release" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.ReleaseEngineer -> NodeCreaturePalette(
             body = Color(0xFFA464E6),
             accent = Color(0xFFF0A400),
         )
-        "code review" in role || "code-review" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.CodeReviewer -> NodeCreaturePalette(
             body = Color(0xFF2F70E8),
             accent = Color(0xFF173D7A),
         )
-        "crash" in role || "dummy" in role || "stress test" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.CrashTestDummy -> NodeCreaturePalette(
             body = Color(0xFFFFC928),
             accent = Color(0xFF3AA9EA),
         )
-        role == "qa" || "qa engineer" in role || "quality" in role || "inspect" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.QaEngineer -> NodeCreaturePalette(
             body = Color(0xFF39BFEA),
             accent = Color(0xFF21395E),
         )
-        "implementation" in role || "implementer" in role || "builder" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.ImplementationEngineer -> NodeCreaturePalette(
             body = Color(0xFFFF7A00),
             accent = Color(0xFF5F7898),
         )
-        "ux" in role || "user experience" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.UxDesigner -> NodeCreaturePalette(
             body = Color(0xFFF35F8A),
             accent = Color(0xFF8A2C50),
         )
-        "epa" in role || "environment" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.EpaRepresentative -> NodeCreaturePalette(
             body = Color(0xFF38B84A),
             accent = Color(0xFF1C7130),
         )
-        "architect" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.Architect -> NodeCreaturePalette(
             body = Color(0xFF8B59E8),
             accent = Color(0xFF5A35A7),
         )
-        "research" in role || "analyst" in role || "investigat" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.Researcher -> NodeCreaturePalette(
             body = Color(0xFF39A9EA),
             accent = Color(0xFF165AA5),
         )
-        "product" in role || "requirements" in role || "planner" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.ProductManager -> NodeCreaturePalette(
             body = Color(0xFFF15F89),
             accent = Color(0xFF7A3150),
         )
-        "orchestrat" in role || "coordinat" in role || "queen" in role -> NodeCreaturePalette(
+        NodeCreatureRoleKind.Orchestrator -> NodeCreaturePalette(
             body = Color(0xFFF5B82E),
             accent = Color(0xFF16223C),
         )
-        else -> NodeCreaturePalette(
+        NodeCreatureRoleKind.Generic -> NodeCreaturePalette(
             body = Azphalt.hue(hueSeed),
             accent = Azphalt.cap(hueSeed),
         )
     }
-}
 
 private fun nodeCreatureMaterialColor(
     material: NodeCreatureMaterial,
