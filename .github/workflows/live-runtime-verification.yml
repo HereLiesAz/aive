@@ -64,3 +64,9 @@ jobs:
             --tests com.hereliesaz.geministrator.providers.jules.JulesLiveRuntimeVerificationTest \
             --no-daemon \
             --stacktrace
+
+      - name: Print live verification report on failure
+        if: failure()
+        shell: bash
+        run: |
+          find providers/jules/build/test-results -type f -name '*.xml' -print -exec cat {} \; || true
