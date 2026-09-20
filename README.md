@@ -8,9 +8,9 @@ Come to find out, both are now entire markets of their own, with very valuable c
 
 ## What it is
 
-The Aive is an orchestration product, not an IDE. It does not own source editing, terminals, or a generic file explorer. Its primary interface is the live workflow itself: an H2G2-inspired animated mindmap whose nodes represent real work and whose state comes from the runtime.
+The Haive is an AI swarm orchestration manager featuring living workflows: an H2G2-inspired with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
 
-Workflow nodes may be performed by AI providers such as Jules, by people, or by systems such as GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
+Workflow nodes may be performed by AI providers such as specialized model agents, LLMs, coordinated sub-workflow roles, by people, or by systems such as GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
 
 ## Targets
 
