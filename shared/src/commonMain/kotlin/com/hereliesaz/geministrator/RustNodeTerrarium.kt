@@ -55,12 +55,9 @@ import com.hereliesaz.conveyance.h2g2.H2g2TerrariumServiceVisit
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumSubject
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
-import kotlin.math.PI
-import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /**
  * Production node-creature host.
@@ -561,43 +558,33 @@ private fun DetachedNodeArmSprite(
     val baseHeight = 72.dp
     val baseWidthPx = with(density) { baseWidth.toPx() }
     val baseHeightPx = with(density) { baseHeight.toPx() }
-    val direction = toward - socket
-    val distance = direction.getDistance()
-    if (distance <= 0.5f) return
-
-    // The source art runs from x=20 to terminal x=188 in a 200-wide viewBox. Use those
-    // actual pivots instead of the image edge so paired arms meet exactly at the midpoint.
-    val sourceSpanPx = baseWidthPx * (asset.terminalPivotX - asset.socketPivotX)
-    val uniformScale = zoom.coerceAtLeast(0.01f)
-    val longitudinalStretch = (
-        distance / (sourceSpanPx * uniformScale).coerceAtLeast(1f)
-        ).coerceIn(0.22f, 6f)
-    val angle = (
-        atan2(direction.y.toDouble(), direction.x.toDouble()) * 180.0 / PI
-        ).toFloat()
-    val wave = sin((pulse * (2f * PI.toFloat())).toDouble()).toFloat()
-    val wobble = when {
-        blocked -> wave * 2.4f
-        active -> wave * 1.25f
-        else -> 0f
-    }
-    val breathe = if (active) 1f + wave * 0.035f else 1f
+    val transform = calculateNodeArmTransform(
+        asset = asset,
+        socket = socket,
+        toward = toward,
+        baseWidthPx = baseWidthPx,
+        baseHeightPx = baseHeightPx,
+        zoom = zoom,
+        pulse = pulse,
+        active = active,
+        blocked = blocked,
+    ) ?: return
 
     Canvas(
         modifier = Modifier
             .offset {
                 IntOffset(
-                    x = (socket.x - baseWidthPx * asset.socketPivotX).roundToInt(),
-                    y = (socket.y - baseHeightPx * asset.socketPivotY).roundToInt(),
+                    x = transform.leftPx.roundToInt(),
+                    y = transform.topPx.roundToInt(),
                 )
             }
             .size(baseWidth, baseHeight)
             .graphicsLayer {
                 transformOrigin = TransformOrigin(asset.socketPivotX, asset.socketPivotY)
-                rotationZ = angle + wobble
-                scaleX = uniformScale * longitudinalStretch
-                scaleY = uniformScale * breathe
-                alpha = if (blocked) 0.72f else 0.96f
+                rotationZ = transform.rotationDegrees
+                scaleX = transform.scaleX
+                scaleY = transform.scaleY
+                alpha = transform.alpha
             },
     ) {
         drawDetachedNodeArm(asset)
