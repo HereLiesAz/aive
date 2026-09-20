@@ -176,7 +176,7 @@ class RemoteRepositoryOperationClientsTest {
             name = "app",
             defaultBranch = "main",
             source = RepositorySource.GitLab,
-            remoteUrl = "https://gitlab.test/team/app",
+            remoteUrl = "https://gitlab.com/team/app",
         ),
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,
