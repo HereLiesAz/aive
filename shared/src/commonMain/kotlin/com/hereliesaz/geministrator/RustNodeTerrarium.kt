@@ -562,8 +562,10 @@ private fun DetachedNodeArmSprite(
 
     val usableWidth = baseWidthPx * (1f - asset.socketPivotX)
     val stretch = (distance / usableWidth.coerceAtLeast(1f)).coerceIn(0.22f, 6f)
-    val angle = atan2(direction.y, direction.x) * 180f / PI.toFloat()
-    val wave = sin(pulse * (2f * PI.toFloat()))
+    val angle = (
+        atan2(direction.y.toDouble(), direction.x.toDouble()) * 180.0 / PI
+        ).toFloat()
+    val wave = sin((pulse * (2f * PI.toFloat())).toDouble()).toFloat()
     val wobble = when {
         blocked -> wave * 2.4f
         active -> wave * 1.25f
