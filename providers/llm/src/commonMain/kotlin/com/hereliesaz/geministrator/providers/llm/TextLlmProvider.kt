@@ -82,6 +82,9 @@ open class TextLlmProvider(
         planPreview: String?,
     ): ProviderActionResult {
         mutex.withLock {
+            runId.value.substringAfterLast('/').toLongOrNull()?.let { recoveredSequence ->
+                nextSequence = maxOf(nextSequence, recoveredSequence + 1L)
+            }
             if (runId !in sessions) {
                 sessions[runId] = Session(
                     request = request,
