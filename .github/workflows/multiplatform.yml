@@ -35,18 +35,13 @@ jobs:
         with:
           fetch-depth: 0
       - name: Resolve four-part build version
-        shell: bash
-        run: |
-          set -euo pipefail
-          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
-          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD"
-            exit 1
-          fi
-          BASE_VERSION=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1-3)
-          AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
-          echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
-          echo "Aive build version: $AIVE_VERSION"
+        uses: HereLiesAz/workflows/.github/actions/four-part-version@main
+        with:
+          source-version-file: gradle.properties
+          source-version-key: app.versionName
+          build-number: ${{ github.run_number }}
+          prerelease-major-max: "0"
+          environment-variable: AIVE_VERSION
 
 
       - name: Check out pinned h2g2
