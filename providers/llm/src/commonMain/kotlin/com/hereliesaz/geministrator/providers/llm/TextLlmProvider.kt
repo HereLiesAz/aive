@@ -79,6 +79,7 @@ open class TextLlmProvider(
         request: AgentTaskRequest,
         planGenerated: Boolean,
         planApproved: Boolean,
+        planPreview: String?,
     ): ProviderActionResult {
         mutex.withLock {
             if (runId !in sessions) {
