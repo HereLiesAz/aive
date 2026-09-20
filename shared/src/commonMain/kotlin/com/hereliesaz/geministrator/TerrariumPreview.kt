@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -31,10 +32,9 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
  * production [GeministratorWorkflowTerrarium] used by live workflows; only the runtime data is a
  * self-contained fixture. No preview-only renderer or fake animation path exists.
  *
- * The fixture intentionally uses the canonical five-character cast from the workflow UI review so
- * the screenshot proves the actual Rust-generated Orchestrator, Implementation Engineer, Crash Test
- * Dummy, QA Engineer, and Code Reviewer together. Implementation starts selected so the same proof
- * also exercises automatic camera focus/zoom.
+ * The fixture intentionally renders the complete fifteen-role cast so the visual proof exercises
+ * every production Rust archetype, several workflow states, the detached relationship arms, and the
+ * automatic camera focus/zoom path in one deterministic screen.
  */
 @Composable
 fun TerrariumVisualProofScreen(
@@ -65,86 +65,174 @@ internal data class TerrariumVisualProofFixture(
 )
 
 internal fun terrariumVisualProofFixture(): TerrariumVisualProofFixture {
-    val preCode = TaskDefinition(
-        id = TaskDefinitionId("pre-code"),
-        name = "Write the verification contract",
-        objective = "Define the pre-code tests and failure cases before implementation begins.",
-        roleId = BuiltInRoles.CrashTestDummy.id,
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.CrashTestDummy.id),
-    )
-    val implementation = TaskDefinition(
-        id = TaskDefinitionId("implementation"),
-        name = "Implement the objective",
-        objective = "Implement the approved objective against the verification contract.",
-        roleId = BuiltInRoles.ImplementationEngineer.id,
-        dependsOn = setOf(preCode.id),
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
-    )
-    val verification = TaskDefinition(
-        id = TaskDefinitionId("verification"),
-        name = "Verify independently",
-        objective = "Falsify the implementation against the approved acceptance criteria and tests.",
-        roleId = BuiltInRoles.QaEngineer.id,
-        dependsOn = setOf(implementation.id),
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.QaEngineer.id),
-    )
-    val review = TaskDefinition(
-        id = TaskDefinitionId("review"),
-        name = "Review implementation",
-        objective = "Review the verified implementation for correctness and unintended side effects.",
-        roleId = BuiltInRoles.CodeReviewer.id,
-        dependsOn = setOf(verification.id),
-        executor = TaskExecutor.RoleAgent(BuiltInRoles.CodeReviewer.id),
+    fun agentTask(
+        id: String,
+        name: String,
+        role: RoleDefinition,
+        vararg dependsOn: TaskDefinition,
+    ): TaskDefinition = TaskDefinition(
+        id = TaskDefinitionId(id),
+        name = name,
+        objective = "Visual proof for ${role.name}.",
+        roleId = role.id,
+        dependsOn = dependsOn.mapTo(linkedSetOf()) { it.id },
+        executor = TaskExecutor.RoleAgent(role.id),
     )
 
+    val product = agentTask("product", "Clarify the objective", BuiltInRoles.ProductManager)
+    val research = agentTask("research", "Collect evidence", BuiltInRoles.Researcher)
+    val environment = agentTask("environment", "Select environment", BuiltInRoles.EpaRepresentative)
+
+    val architecture = agentTask(
+        "architecture",
+        "Shape the architecture",
+        BuiltInRoles.Architect,
+        product,
+        research,
+    )
+    val ux = agentTask(
+        "ux",
+        "Shape the experience",
+        BuiltInRoles.UxDesigner,
+        product,
+    )
+    val hallMonitor = agentTask(
+        "hall-monitor",
+        "Observe system behavior",
+        HallMonitorRole.definition,
+        research,
+        environment,
+    )
+
+    val preCode = agentTask(
+        "pre-code",
+        "Write the verification contract",
+        BuiltInRoles.CrashTestDummy,
+        architecture,
+        ux,
+    )
+    val adversarial = agentTask(
+        "adversarial",
+        "Challenge the plan",
+        BuiltInRoles.AdversarialReviewer,
+        architecture,
+        hallMonitor,
+    )
+    val implementation = agentTask(
+        "implementation",
+        "Implement the objective",
+        BuiltInRoles.ImplementationEngineer,
+        preCode,
+        adversarial,
+        environment,
+    )
+
+    val verification = agentTask(
+        "verification",
+        "Verify independently",
+        BuiltInRoles.QaEngineer,
+        implementation,
+    )
+    val review = agentTask(
+        "review",
+        "Review implementation",
+        BuiltInRoles.CodeReviewer,
+        implementation,
+    )
+    val antagonist = agentTask(
+        "antagonist",
+        "Audit the claims",
+        BuiltInRoles.Antagonist,
+        implementation,
+    )
+
+    val recovery = agentTask(
+        "recovery",
+        "Recover a bounded failure",
+        BuiltInRoles.RecoveryEngineer,
+        verification,
+        review,
+    )
+    val release = agentTask(
+        "release",
+        "Open the release gate",
+        BuiltInRoles.ReleaseEngineer,
+        verification,
+        review,
+        antagonist,
+        recovery,
+    )
+
+    val tasks = listOf(
+        product,
+        research,
+        environment,
+        architecture,
+        ux,
+        hallMonitor,
+        preCode,
+        adversarial,
+        implementation,
+        verification,
+        review,
+        antagonist,
+        recovery,
+        release,
+    )
     val definition = WorkflowDefinition(
         id = WorkflowDefinitionId("terrarium-wasm-proof"),
-        name = "Terrarium visual proof",
-        tasks = listOf(preCode, implementation, verification, review),
+        name = "Terrarium full-cast visual proof",
+        tasks = tasks,
     )
+
+    val stateByTask = mapOf(
+        product.id to TaskRunStatus.Created,
+        research.id to TaskRunStatus.Ready,
+        environment.id to TaskRunStatus.Running,
+        architecture.id to TaskRunStatus.AwaitingApproval,
+        ux.id to TaskRunStatus.Blocked,
+        hallMonitor.id to TaskRunStatus.Completed,
+        preCode.id to TaskRunStatus.Completed,
+        adversarial.id to TaskRunStatus.AwaitingApproval,
+        implementation.id to TaskRunStatus.Running,
+        verification.id to TaskRunStatus.Verifying,
+        review.id to TaskRunStatus.Blocked,
+        antagonist.id to TaskRunStatus.Failed,
+        recovery.id to TaskRunStatus.Retrying,
+        release.id to TaskRunStatus.Ready,
+    )
+    val roleByTask = tasks.associate { task ->
+        task.id to requireNotNull(task.roleId).value
+    }
+
     val run = WorkflowRun(
         id = WorkflowRunId("terrarium-wasm-proof-run"),
         projectId = ProjectId("terrarium-proof"),
         workflowDefinitionId = definition.id,
-        objective = "Demonstrate the canonical semantic node-creature cast",
+        objective = "Demonstrate the complete semantic node-creature cast",
         status = WorkflowRunStatus.Running,
-        taskRuns = mapOf(
-            preCode.id to proofTaskRun(
-                preCode,
-                TaskRunStatus.Completed,
-                BuiltInRoles.CrashTestDummy.id.value,
-                artifact = true,
-            ),
-            implementation.id to proofTaskRun(
-                implementation,
-                TaskRunStatus.Running,
-                BuiltInRoles.ImplementationEngineer.id.value,
-                progress = .56f,
-            ),
-            verification.id to proofTaskRun(
-                verification,
-                TaskRunStatus.Ready,
-                BuiltInRoles.QaEngineer.id.value,
-            ),
-            review.id to proofTaskRun(
-                review,
-                TaskRunStatus.Blocked,
-                BuiltInRoles.CodeReviewer.id.value,
-            ),
-        ),
+        taskRuns = tasks.associate { task ->
+            task.id to proofTaskRun(
+                task = task,
+                status = stateByTask.getValue(task.id),
+                roleId = roleByTask.getValue(task.id),
+                artifact = task.id == preCode.id,
+                progress = when (task.id) {
+                    implementation.id -> .56f
+                    verification.id -> .72f
+                    recovery.id -> .38f
+                    else -> null
+                },
+            )
+        },
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 2L,
     )
+
     return TerrariumVisualProofFixture(
         definition = definition,
         run = run,
-        roles = listOf(
-            BuiltInRoles.Orchestrator,
-            BuiltInRoles.ImplementationEngineer,
-            BuiltInRoles.CrashTestDummy,
-            BuiltInRoles.QaEngineer,
-            BuiltInRoles.CodeReviewer,
-        ),
+        roles = BuiltInRoles.all + HallMonitorRole.definition,
     )
 }
 
