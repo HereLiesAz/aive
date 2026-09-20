@@ -26,6 +26,7 @@ import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
 import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
 import com.hereliesaz.geministrator.memory.MemoryPromptRecall
 import com.hereliesaz.geministrator.memory.MemoryQuery
+import com.hereliesaz.geministrator.memory.MemoryRecallHit
 import com.hereliesaz.geministrator.memory.MemoryResolution
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
@@ -540,27 +541,57 @@ internal class AndroidMemoryLayerRuntime(
         }
     }
 
-    private val promptContextProvider = MemoryPromptContextProvider { request ->
+    private val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
         val context = request.orchestrationContext
-        val recall = layer.tool.grip(
-            MemoryQuery(
-                text = request.objective,
-                resolution = MemoryResolution.Summary,
-                maxResults = MAX_RECALL_RESULTS,
-                projectId = context.projectId?.value,
-                roleId = context.roleId?.value,
-            ),
-        )
-        if (recall.hits.isEmpty()) {
+        val hitsById = linkedMapOf<String, MemoryRecallHit>()
+
+        queryPlan.queries.forEach { querySpec ->
+            val resolution = when (querySpec.resolution) {
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.Category -> MemoryResolution.Category
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.Summary -> MemoryResolution.Summary
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.Phrase -> MemoryResolution.Phrase
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.Entity,
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.Action,
+                -> MemoryResolution.Tag
+                com.hereliesaz.geministrator.orchestration.MemoryResolution.GranularEvidence -> MemoryResolution.Context
+            }
+            val recall = layer.tool.grip(
+                MemoryQuery(
+                    text = querySpec.text,
+                    resolution = resolution,
+                    maxResults = MAX_RECALL_RESULTS,
+                    projectId = context.projectId?.value,
+                    workflowRunId = context.workflowRunId?.value,
+                    workflowDefinitionId = context.workflowDefinitionId?.value,
+                    taskRunId = request.taskRunId.value,
+                    taskDefinitionId = context.taskDefinitionId?.value,
+                    roleId = context.roleId?.value,
+                ),
+            )
+            recall.hits.forEach { hit ->
+                val key = hit.node.id.value
+                val current = hitsById[key]
+                if (current == null || hit.score > current.score) {
+                    hitsById[key] = hit
+                }
+            }
+        }
+
+        val hits = hitsById.values
+            .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
+            .take(MAX_RECALL_RESULTS)
+
+        if (hits.isEmpty()) {
             MemoryPromptRecall()
         } else {
-            val content = recall.hits.joinToString("\n\n") { hit ->
+            val content = hits.joinToString("\n\n") { hit ->
                 "[${"%.2f".format(hit.score)}] ${hit.node.kind.name}: ${hit.node.text}"
             }.take(MAX_RECALL_CHARS)
             MemoryPromptRecall(
                 blocks = listOf(PromptContextBlock("Relevant memory", content)),
-                memoryAddresses = recall.hits
+                memoryAddresses = hits
                     .mapTo(linkedSetOf()) { hit -> "memory-node:${hit.node.id.value}" },
+                maxContextTokens = MAX_RECALL_CHARS / APPROXIMATE_CHARS_PER_TOKEN,
             )
         }
     }
@@ -596,5 +627,6 @@ internal class AndroidMemoryLayerRuntime(
     private companion object {
         const val MAX_RECALL_RESULTS = 6
         const val MAX_RECALL_CHARS = 6_000
+        const val APPROXIMATE_CHARS_PER_TOKEN = 4
     }
 }
