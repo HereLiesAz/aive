@@ -29,8 +29,10 @@ internal class DesktopProjectFileService : ProjectFileService {
                 ?.let(::descriptor)
                 ?.let { detected[it.id] = it }
         }
+        val lastPath = preferences.get(LAST_KEY, "").trim()
         return detected.values.sortedWith(
-            compareByDescending<ProjectFileDescriptor> { it.modifiedAtEpochMillis ?: Long.MIN_VALUE }
+            compareByDescending<ProjectFileDescriptor> { it.id == lastPath }
+                .thenByDescending { it.modifiedAtEpochMillis ?: Long.MIN_VALUE }
                 .thenBy { it.displayName.lowercase() },
         )
     }
@@ -40,6 +42,7 @@ internal class DesktopProjectFileService : ProjectFileService {
         Files.createDirectories(directory)
         val destination = directory.resolve(fileName.asIveFileName())
         writeAtomically(destination, content)
+        remember(destination)
         return requireNotNull(descriptor(destination))
     }
 
@@ -131,12 +134,14 @@ internal class DesktopProjectFileService : ProjectFileService {
             while (size > MAX_RECENT_FILES) remove(first())
         }
         preferences.put(RECENT_KEY, next.joinToString("\n"))
+        preferences.put(LAST_KEY, path.toAbsolutePath().normalize().toString())
         preferences.flush()
     }
 
     private companion object {
         const val PREFERENCES_NODE = "com/hereliesaz/aive/project-files"
         const val RECENT_KEY = "recent"
+        const val LAST_KEY = "last"
         const val MAX_RECENT_FILES = 24
     }
 }
