@@ -43,17 +43,21 @@ class TextLlmProviderReconnectTest {
 
         assertEquals(
             ProviderActionResult.Accepted,
-            provider.reconnect(runId, request, planApproved = true),
+            provider.reconnect(
+                runId,
+                request,
+                planGenerated = true,
+                planApproved = true,
+            ),
         )
 
         val events = provider.observe(runId).toList()
 
         assertEquals(runId, events.first().runId)
-        assertIs<AgentEvent.PlanGenerated>(events[0])
-        assertIs<AgentEvent.PlanApproved>(events[1])
+        assertIs<AgentEvent.PlanApproved>(events[0])
         assertTrue(events.any { it is AgentEvent.ArtifactProduced })
         assertTrue(events.any { it is AgentEvent.UsageReported })
         assertIs<AgentEvent.Completed>(events.last())
-        assertEquals(2, calls)
+        assertEquals(1, calls)
     }
 }
