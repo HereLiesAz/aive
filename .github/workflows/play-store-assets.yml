@@ -1,177 +1,27 @@
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/play-store-assets.yml
+# central-source-sha256: e5bd3db4adb5187c7ceb3486a6e51a68f9c15b9fd0025ce3c9ae8306ee9b3ed6
+# This file intentionally contains no repository secrets.
 name: Play Store Assets
-
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: play-store-assets-${{ github.ref }}
-  cancel-in-progress: true
-
+  id-token: write
 jobs:
-  generate:
+  central-dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Rust renderer toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Publish pinned Conveyance for isolated Wasm build
-        run: |
-          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
-            :conveyance-core:publishToMavenLocal \
-            :conveyance-compose:publishToMavenLocal
-
-      - name: Publish pinned H2G2 for isolated Wasm build
-        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
-
-      - name: Build production JS and Wasm apps
-        run: |
-          ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true \
-            :webApp:jsBrowserProductionWebpack \
-            :webApp:wasmJsBrowserProductionWebpack
-
-      - name: Stage production app
+      - name: Dispatch to HereLiesAz/workflows
+        env:
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/play-store-assets.yml
+          SOURCE_SHA256: e5bd3db4adb5187c7ceb3486a6e51a68f9c15b9fd0025ce3c9ae8306ee9b3ed6
         shell: bash
-        run: |
-          set -euo pipefail
-          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
-          test -n "$WASM_BUNDLE"
-          WASM_DIR="$(dirname "$WASM_BUNDLE")"
-          JS_BUNDLE="$(find webApp/build -type f -path '*/js/productionExecutable/haive.js' -print -quit)"
-          test -n "$JS_BUNDLE"
-          JS_DIR="$(dirname "$JS_BUNDLE")"
-          rm -rf build/play-store-site build/play-store-js-site build/play-store-captures build/play-store-assets
-          mkdir -p build/play-store-site build/play-store-js-site build/play-store-captures
-          cp -R "$WASM_DIR"/. build/play-store-site/
-          cp -R webApp/src/webMain/resources/. build/play-store-site/
-          cp -R "$JS_DIR"/. build/play-store-js-site/
-          cp -R webApp/src/webMain/resources/. build/play-store-js-site/
-          test -f build/play-store-site/index.html
-          test -f build/play-store-site/haive.js
-          test -f build/play-store-site/haive_node_creatures.wasm
-          test -f build/play-store-js-site/index.html
-          test -f build/play-store-js-site/haive.js
-
-      - name: Install Chromium and Pillow
-        run: |
-          npm install --no-save --package-lock=false playwright@1.55.0
-          npx playwright install --with-deps chromium
-          python3 -m pip install --quiet pillow
-
-      - name: Capture real production UI
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m http.server 8080 --directory build/play-store-site > /tmp/aive-store-assets-wasm-http.log 2>&1 &
-          WASM_SERVER_PID=$!
-          python3 -m http.server 8081 --directory build/play-store-js-site > /tmp/aive-store-assets-js-http.log 2>&1 &
-          JS_SERVER_PID=$!
-          trap 'kill "$WASM_SERVER_PID" "$JS_SERVER_PID" 2>/dev/null || true' EXIT
-
-          for port in 8080 8081; do
-            for attempt in $(seq 1 30); do
-              if curl --fail --silent "http://127.0.0.1:$port/" >/dev/null; then
-                break
-              fi
-              sleep 1
-            done
-            curl --fail --silent "http://127.0.0.1:$port/" >/dev/null
-          done
-
-          cat > build/capture-store-assets.mjs <<'JS'
-          import { chromium } from 'playwright';
-
-          const browser = await chromium.launch({
-            headless: true,
-            args: ['--enable-unsafe-swiftshader'],
-          });
-
-          async function capture(name, url, width, height, terrarium = false) {
-            const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
-            const diagnostics = [];
-            page.on('console', message => diagnostics.push(`[console:${message.type()}] ${message.text()}`));
-            page.on('pageerror', error => diagnostics.push(`[pageerror] ${error.stack || error.message}`));
-            try {
-              await page.goto(url, { waitUntil: 'domcontentloaded' });
-              if (terrarium) {
-                await page.waitForFunction(() => {
-                  if (globalThis.__haiveStartupError) throw new Error(globalThis.__haiveStartupError);
-                  return globalThis.__haiveNodeCreaturesReady === true &&
-                    globalThis.__haiveAppScriptLoaded === true;
-                }, null, { timeout: 15000 });
-              }
-              await page.waitForSelector('#webApp > *', { timeout: 15000 });
-              await page.waitForTimeout(1800);
-              await page.screenshot({
-                path: `build/play-store-captures/${name}.png`,
-                fullPage: false,
-              });
-            } catch (error) {
-              console.error(`${name}: ${error.stack || error}`);
-              diagnostics.forEach(entry => console.error(entry));
-              throw error;
-            } finally {
-              await page.close();
-            }
-          }
-
-          async function smoke(url) {
-            const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-            try {
-              await page.goto(url, { waitUntil: 'domcontentloaded' });
-              await page.waitForSelector('#webApp > *', { timeout: 15000 });
-              await page.waitForTimeout(500);
-            } finally {
-              await page.close();
-            }
-          }
-
-          try {
-            await smoke('http://127.0.0.1:8081/');
-            await capture('overview-portrait', 'http://127.0.0.1:8080/', 1080, 1920, false);
-            await capture('terrarium-portrait', 'http://127.0.0.1:8080/?terrariumPreview=1', 1080, 1920, true);
-            await capture('overview-landscape', 'http://127.0.0.1:8080/', 1920, 1080, false);
-            await capture('terrarium-landscape', 'http://127.0.0.1:8080/?terrariumPreview=1', 1920, 1080, true);
-          } finally {
-            await browser.close();
-          }
-          JS
-
-          node build/capture-store-assets.mjs
-
-      - name: Generate and validate listing graphics
-        run: |
-          python3 tools/play_store_assets.py \
-            --repo . \
-            --output-dir build/play-store-assets \
-            --screenshot build/play-store-captures/overview-portrait.png \
-            --screenshot build/play-store-captures/terrarium-portrait.png \
-            --screenshot build/play-store-captures/overview-landscape.png \
-            --screenshot build/play-store-captures/terrarium-landscape.png
-
-      - name: Upload final Google Play asset set
-        uses: actions/upload-artifact@v7
-        with:
-          name: google-play-store-assets
-          path: build/play-store-assets/
-          if-no-files-found: error
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\nif [[ \"$GITHUB_EVENT_NAME\" == \"pull_request\" || \"$GITHUB_EVENT_NAME\" == \"pull_request_target\" ]]; then\n  DISPATCH_EVENT_JSON=\"$(jq -c '{\n    action,\n    number,\n    pull_request: {\n      number: .pull_request.number,\n      base: {\n        ref: .pull_request.base.ref,\n        sha: .pull_request.base.sha\n      },\n      head: {\n        ref: .pull_request.head.ref,\n        sha: .pull_request.head.sha,\n        repo: {\n          full_name: .pull_request.head.repo.full_name,\n          fork: (.pull_request.head.repo.fork // false)\n        }\n      }\n    }\n  }' <<<\"$EVENT_JSON\")\"\nelse\n  DISPATCH_EVENT_JSON=\"$EVENT_JSON\"\nfi\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$DISPATCH_EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
+    name: Dispatch
