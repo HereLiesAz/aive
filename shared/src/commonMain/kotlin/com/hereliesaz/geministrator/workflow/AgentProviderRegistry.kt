@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
+import com.hereliesaz.geministrator.inference.LocalModelLibrary
 import com.hereliesaz.geministrator.inference.SettingsCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.SettingsInferenceGenealogyGraph
 import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
@@ -33,15 +34,16 @@ class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
     inferenceFabric: CompoundInferenceFabric = SettingsCompoundInferenceFabric(
         SettingsInferenceStateStore(durableInferenceSettings()),
-    ).withLocalModelLibrary(MemoryEpoch8LocalModelLibrary.library),
+    ),
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(
         graph = SettingsInferenceGenealogyGraph(durableInferenceSettings()),
     ),
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
+    localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
 ) {
     val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
-        delegate = inferenceFabric,
+        delegate = inferenceFabric.withLocalModelLibrary(localModelLibrary),
         governance = genealogyGovernance,
     )
     private val providersById = providers.associateBy { it.id }
