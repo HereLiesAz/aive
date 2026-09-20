@@ -474,6 +474,16 @@ pub fn animate(genome: &CreatureGenome, activity: Activity, time_seconds: f32) -
         }
     }
 
+    apply_state_personality(
+        genome.role,
+        activity,
+        wave,
+        &mut body_offset,
+        &mut body_rotation,
+        &mut body_scale,
+        &mut eye_aim,
+    );
+
     let mut antenna_extension = Vec::with_capacity(genome.antennae.len());
     let mut antenna_bend = Vec::with_capacity(genome.antennae.len());
     for (index, antenna) in genome.antennae.iter().enumerate() {
@@ -515,6 +525,135 @@ pub fn animate(genome: &CreatureGenome, activity: Activity, time_seconds: f32) -
         antenna_extension,
         antenna_bend,
         limb_phase: wave,
+    }
+}
+
+fn apply_state_personality(
+    role: RoleArchetype,
+    activity: Activity,
+    wave: f32,
+    body_offset: &mut Vec3,
+    body_rotation: &mut Vec3,
+    body_scale: &mut Vec3,
+    eye_aim: &mut Vec2,
+) {
+    match (role, activity) {
+        (RoleArchetype::Orchestrator, Activity::Gate) => {
+            eye_aim.x += (wave * 0.65).sin() * 0.18;
+        }
+        (RoleArchetype::Orchestrator, Activity::Complete) => {
+            body_rotation.y += (wave * 0.70).sin() * 0.07;
+        }
+        (RoleArchetype::ProductManager, Activity::Blocked) => {
+            body_rotation.z -= 0.055;
+            eye_aim.x += (wave * 0.82).sin() * 0.24;
+        }
+        (RoleArchetype::ProductManager, Activity::Complete) => {
+            body_rotation.z += (wave * 0.55).sin() * 0.045;
+        }
+        (RoleArchetype::Researcher, Activity::Blocked) => {
+            eye_aim.x += (wave * 1.10).sin() * 0.34;
+            eye_aim.y += (wave * 0.73).cos() * 0.12;
+        }
+        (RoleArchetype::Researcher, Activity::Complete) => {
+            body_offset.y -= (wave * 0.85).sin().abs() * 0.025;
+            body_scale.x *= 1.025;
+        }
+        (RoleArchetype::Architect, Activity::Blocked) => {
+            body_rotation.z += 0.065;
+            body_scale.x *= 0.97;
+        }
+        (RoleArchetype::Architect, Activity::Complete) => {
+            body_rotation.z *= 0.30;
+            body_scale.x *= 1.025;
+            body_scale.y *= 1.025;
+        }
+        (RoleArchetype::EpaRepresentative, Activity::Gate) => {
+            body_rotation.y += (wave * 0.72).sin() * 0.06;
+            eye_aim.x += (wave * 0.58).sin() * 0.20;
+        }
+        (RoleArchetype::EpaRepresentative, Activity::Complete) => {
+            body_rotation.z += (wave * 0.48).sin() * 0.04;
+        }
+        (RoleArchetype::UxDesigner, Activity::Blocked) => {
+            body_rotation.z -= 0.045;
+            body_scale.y *= 0.97;
+        }
+        (RoleArchetype::UxDesigner, Activity::Complete) => {
+            body_rotation.z += (wave * 0.70).sin() * 0.075;
+            body_offset.y -= (wave * 0.70).sin().abs() * 0.025;
+        }
+        (RoleArchetype::ImplementationEngineer, Activity::Blocked) => {
+            body_rotation.z += (wave * 2.20).sin() * 0.035;
+        }
+        (RoleArchetype::ImplementationEngineer, Activity::Complete) => {
+            body_scale.x *= 1.0 + (wave * 1.15).sin().abs() * 0.035;
+        }
+        (RoleArchetype::CrashTestDummy, Activity::Failed) => {
+            body_scale.y *= 0.78;
+            body_scale.x *= 1.10;
+            body_rotation.z += (wave * 3.20).sin() * 0.08;
+        }
+        (RoleArchetype::CrashTestDummy, Activity::Complete) => {
+            body_offset.y -= (wave * 1.60).sin().abs() * 0.065;
+            body_rotation.z += (wave * 1.15).sin() * 0.09;
+        }
+        (RoleArchetype::QaEngineer, Activity::Gate) => {
+            eye_aim.x += (wave * 1.05).sin() * 0.30;
+        }
+        (RoleArchetype::QaEngineer, Activity::Complete) => {
+            body_rotation.y += (wave * 0.48).sin() * 0.035;
+            body_scale.x *= 1.02;
+        }
+        (RoleArchetype::AdversarialReviewer, Activity::Blocked) => {
+            body_rotation.z -= 0.075;
+            eye_aim.x += (wave * 1.20).sin() * 0.24;
+        }
+        (RoleArchetype::AdversarialReviewer, Activity::Complete) => {
+            body_rotation.z += 0.025 + (wave * 0.30).sin() * 0.018;
+        }
+        (RoleArchetype::CodeReviewer, Activity::Gate) => {
+            eye_aim.x += (wave * 0.82).sin() * 0.24;
+        }
+        (RoleArchetype::CodeReviewer, Activity::Complete) => {
+            body_rotation.z += (wave * 0.38).sin() * 0.025;
+        }
+        (RoleArchetype::RecoveryEngineer, Activity::Failed) => {
+            body_rotation.z += (wave * 1.75).sin() * 0.055;
+            eye_aim.x += (wave * 1.20).sin() * 0.25;
+        }
+        (RoleArchetype::RecoveryEngineer, Activity::Complete) => {
+            body_scale.x *= 1.035;
+            body_scale.y *= 1.035;
+        }
+        (RoleArchetype::ReleaseEngineer, Activity::Gate) => {
+            body_offset.y += (wave * 0.16).sin() * 0.008;
+            eye_aim.x += (wave * 0.36).sin() * 0.16;
+        }
+        (RoleArchetype::ReleaseEngineer, Activity::Complete) => {
+            body_offset.y -= (wave * 0.66).sin().abs() * 0.055;
+            body_rotation.y += (wave * 0.50).sin() * 0.06;
+        }
+        (RoleArchetype::Antagonist, Activity::Blocked) => {
+            body_rotation.z += (wave * 2.40).sin() * 0.09;
+            body_offset.x += (wave * 2.10).sin() * 0.045;
+        }
+        (RoleArchetype::Antagonist, Activity::Complete) => {
+            body_rotation.z += 0.055 + (wave * 0.62).sin() * 0.04;
+            body_offset.y -= (wave * 0.72).sin().abs() * 0.028;
+        }
+        (RoleArchetype::HallMonitor, Activity::Blocked) => {
+            eye_aim.x += (wave * 1.25).sin() * 0.38;
+            eye_aim.y += (wave * 0.84).cos() * 0.13;
+        }
+        (RoleArchetype::HallMonitor, Activity::Gate) => {
+            eye_aim.x += (wave * 0.74).sin() * 0.32;
+        }
+        (RoleArchetype::HallMonitor, Activity::Complete) => {
+            body_rotation.y += (wave * 0.28).sin() * 0.025;
+            body_scale.x *= 1.02;
+        }
+        _ => {}
     }
 }
 
