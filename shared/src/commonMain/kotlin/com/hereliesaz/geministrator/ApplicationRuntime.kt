@@ -26,6 +26,8 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
 import com.hereliesaz.geministrator.domain.requireStarterRoleCoverage
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.inference.LocalModelLibrary
+import com.hereliesaz.geministrator.memory.MemoryEpoch8LocalModelLibrary
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.withRoleComputeDelegation
 import com.hereliesaz.geministrator.distributed.withTaskComputeDelegation
@@ -715,12 +717,14 @@ class ApplicationRuntime private constructor(
             providerRegistry: AgentProviderRegistry? = null,
             orchestrationUtilities: LocalOrchestrationUtilityFamily =
                 DeterministicLocalOrchestrationUtilities,
+            localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
             val registry = providerRegistry ?: AgentProviderRegistry(
                 providers = providers,
                 orchestrationUtilities = orchestrationUtilities,
+                localModelLibrary = localModelLibrary,
             )
             val gateway = ProviderBackedManagedSessionGateway(
                 providerRegistry = registry,
