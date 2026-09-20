@@ -13,6 +13,11 @@ import com.hereliesaz.geministrator.inference.SettingsInferenceGenealogyGraph
 import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
 import com.hereliesaz.geministrator.inference.withLocalModelLibrary
 import com.hereliesaz.geministrator.memory.MemoryEpoch8LocalModelLibrary
+import com.hereliesaz.geministrator.orchestration.AgentRouteCandidate
+import com.hereliesaz.geministrator.orchestration.AgentRouteDecision
+import com.hereliesaz.geministrator.orchestration.AgentRoutingInput
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.russhwolf.settings.Settings
@@ -32,6 +37,8 @@ class AgentProviderRegistry(
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(
         graph = SettingsInferenceGenealogyGraph(durableInferenceSettings()),
     ),
+    private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
+        DeterministicLocalOrchestrationUtilities,
 ) {
     val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
         delegate = inferenceFabric,
@@ -58,10 +65,6 @@ class AgentProviderRegistry(
         val repositoryAccessRequired =
             AgentCapability.RepositoryRead in required || AgentCapability.RepositoryWrite in required
 
-        suspend fun eligible(provider: AgentProvider): Boolean =
-            provider.capabilities().supported.containsAll(required) &&
-                (request.repository == null || provider.supportsRepository(request.repository))
-
         when (val constraints = request.constraints) {
             is ProviderConstraints.RequireProvider -> {
                 val provider = providersById[constraints.providerId]
@@ -85,8 +88,39 @@ class AgentProviderRegistry(
             providersById.values.forEach { provider -> if (provider !in this) add(provider) }
         }
 
+        val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
         for (provider in ordered) {
-            if (eligible(provider)) return provider
+            val capabilities = provider.capabilities().supported
+            if (
+                capabilities.containsAll(required) &&
+                (request.repository == null || provider.supportsRepository(request.repository))
+            ) {
+                eligibleProviders += provider to capabilities
+            }
+        }
+
+        if (eligibleProviders.isNotEmpty()) {
+            val route = orchestrationUtilities.routeAgent(
+                AgentRoutingInput(
+                    requiredCapabilities = required.mapTo(linkedSetOf()) { it.name },
+                    requiredContextTokens = 0,
+                    candidates = eligibleProviders.mapIndexed { index, (provider, capabilities) ->
+                        AgentRouteCandidate(
+                            id = provider.id.value,
+                            capabilities = capabilities.mapTo(linkedSetOf()) { it.name },
+                            // Preserve current preferred/registration ordering unless a specialist router overrides it.
+                            preferenceRank = index,
+                        )
+                    },
+                    requiredContextType = if (request.repository == null) "task" else "repository-task",
+                ),
+            )
+            if (route.decision == AgentRouteDecision.Local) {
+                val selected = route.selectedAgent
+                    ?: error("Local agent routing returned no selected provider")
+                return eligibleProviders.firstOrNull { (provider, _) -> provider.id.value == selected }?.first
+                    ?: error("Local agent routing selected unavailable provider $selected")
+            }
         }
 
         val repositorySuffix = if (request.repository != null) {

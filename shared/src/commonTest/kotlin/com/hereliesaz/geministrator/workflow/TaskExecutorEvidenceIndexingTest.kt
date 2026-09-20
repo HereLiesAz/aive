@@ -99,7 +99,9 @@ class TaskExecutorEvidenceIndexingTest {
                 progress = 1f,
             )
         }
+        val utilities = RecordingLocalOrchestrationUtilities()
         val registry = TaskExecutorIntegrationRegistry(listOf(integration))
+            .withOrchestrationUtilities(utilities)
             .withInferenceDataRegistry(dataRegistry)
         val indexed = requireNotNull(registry.integrationFor(executor, project))
 
@@ -114,5 +116,6 @@ class TaskExecutorEvidenceIndexingTest {
         assertEquals(taskRunId, evidence.single().producingTaskRunId)
         assertEquals("CI result", evidence.single().label)
         assertEquals("text/plain", evidence.single().mediaType)
+        assertEquals(1, utilities.toolRoutingCalls)
     }
 }

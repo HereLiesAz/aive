@@ -30,7 +30,11 @@ class AgentProviderRegistryRepositoryTest {
             id = AgentProviderId("gitlab"),
             supportedSources = setOf(RepositorySource.GitLab),
         )
-        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable))
+        val utilities = RecordingLocalOrchestrationUtilities()
+        val registry = AgentProviderRegistry(
+            providers = listOf(githubOnly, gitLabCapable),
+            orchestrationUtilities = utilities,
+        )
 
         val selected = registry.select(
             ProviderSelectionRequest(
@@ -45,6 +49,7 @@ class AgentProviderRegistryRepositoryTest {
         )
 
         assertEquals(gitLabCapable.id, selected.id)
+        assertEquals(1, utilities.agentRoutingCalls)
     }
 
     @Test

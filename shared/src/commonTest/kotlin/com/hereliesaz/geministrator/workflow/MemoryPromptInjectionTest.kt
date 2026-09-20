@@ -28,18 +28,23 @@ class MemoryPromptInjectionTest {
     fun recalledMemoryIsInjectedBeforeProviderStart() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = RecordingStartProvider()
+        val utilities = RecordingLocalOrchestrationUtilities()
+        var plannedQueries = 0
         try {
-            MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider {
+            MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider { _, queryPlan ->
+                plannedQueries = queryPlan.queries.size
                 MemoryPromptRecall(
                     blocks = listOf(
                         PromptContextBlock("Relevant memory", "Prior implementation used the repository gateway."),
                     ),
                     memoryAddresses = setOf("memory-node:test-recall"),
+                    maxContextTokens = 1_500,
                 )
             }
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
-                scope,
+                providerRegistry = AgentProviderRegistry(listOf(provider)),
+                scope = scope,
+                orchestrationUtilities = utilities,
             )
             gateway.createSession(
                 ManagedSessionRequest(
@@ -56,6 +61,9 @@ class MemoryPromptInjectionTest {
             val block = requireNotNull(provider.startedRequest)
                 .promptContext.dynamicContext.single { it.label == "Relevant memory" }
             assertEquals("Prior implementation used the repository gateway.", block.content)
+            assertEquals(1, utilities.memoryQueryCalls)
+            assertEquals(1, utilities.contextPackingCalls)
+            assertEquals(1, plannedQueries)
         } finally {
             MemoryRuntimeBridge.reset()
             scope.cancel()

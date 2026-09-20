@@ -15,6 +15,11 @@ import com.hereliesaz.geministrator.inference.InferenceDataRegistry
 import com.hereliesaz.geministrator.inference.SettingsCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.SettingsInferenceGenealogyGraph
 import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
+import com.hereliesaz.geministrator.orchestration.ToolCapability
+import com.hereliesaz.geministrator.orchestration.ToolRouteDecision
+import com.hereliesaz.geministrator.orchestration.ToolRoutingInput
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 
@@ -25,6 +30,10 @@ import com.russhwolf.settings.Settings
  * workflow runtime never has to pretend an undriven executor is running.
  */
 interface TaskExecutorIntegration {
+    /** Stable human-readable identifier exposed to the local Tool Router. */
+    val orchestrationToolId: String
+        get() = "task-executor-integration"
+
     fun supports(executor: TaskExecutor): Boolean
 
     fun supports(executor: TaskExecutor, project: Project): Boolean = supports(executor)
@@ -80,14 +89,16 @@ class TaskExecutorIntegrationRegistry(
     integrations: Collection<TaskExecutorIntegration> = emptyList(),
     private val inferenceDataRegistry: InferenceDataRegistry? =
         integrations.takeIf(Collection<TaskExecutorIntegration>::isNotEmpty)?.let { durableExecutorEvidenceRegistry() },
+    private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
+        DeterministicLocalOrchestrationUtilities,
 ) {
     private val integrations = integrations.toList()
 
     fun integrationFor(executor: TaskExecutor): TaskExecutorIntegration? =
-        integrations.firstOrNull { it.supports(executor) }?.withEvidenceIndexing()
+        routeIntegration(executor, integrations.filter { it.supports(executor) })?.withEvidenceIndexing()
 
     fun integrationFor(executor: TaskExecutor, project: Project): TaskExecutorIntegration? =
-        integrations.firstOrNull { it.supports(executor, project) }?.withEvidenceIndexing()
+        routeIntegration(executor, integrations.filter { it.supports(executor, project) })?.withEvidenceIndexing()
 
     fun isAvailable(executor: TaskExecutor): Boolean =
         integrations.any { it.supports(executor) }
@@ -96,10 +107,18 @@ class TaskExecutorIntegrationRegistry(
         integrations.any { it.supports(executor, project) }
 
     fun withIntegration(integration: TaskExecutorIntegration): TaskExecutorIntegrationRegistry =
-        TaskExecutorIntegrationRegistry(integrations + integration, inferenceDataRegistry ?: durableExecutorEvidenceRegistry())
+        TaskExecutorIntegrationRegistry(
+            integrations + integration,
+            inferenceDataRegistry ?: durableExecutorEvidenceRegistry(),
+            orchestrationUtilities,
+        )
 
     fun withPriorityIntegration(integration: TaskExecutorIntegration): TaskExecutorIntegrationRegistry =
-        TaskExecutorIntegrationRegistry(listOf(integration) + integrations, inferenceDataRegistry ?: durableExecutorEvidenceRegistry())
+        TaskExecutorIntegrationRegistry(
+            listOf(integration) + integrations,
+            inferenceDataRegistry ?: durableExecutorEvidenceRegistry(),
+            orchestrationUtilities,
+        )
 
     /**
      * Return the same executor set with direct inference-evidence indexing enabled.
@@ -109,7 +128,38 @@ class TaskExecutorIntegrationRegistry(
      * reports them, without fabricating an agent/provider invocation.
      */
     fun withInferenceDataRegistry(registry: InferenceDataRegistry): TaskExecutorIntegrationRegistry =
-        TaskExecutorIntegrationRegistry(integrations, registry)
+        TaskExecutorIntegrationRegistry(integrations, registry, orchestrationUtilities)
+
+    fun withOrchestrationUtilities(
+        utilities: LocalOrchestrationUtilityFamily,
+    ): TaskExecutorIntegrationRegistry =
+        TaskExecutorIntegrationRegistry(integrations, inferenceDataRegistry, utilities)
+
+    private fun routeIntegration(
+        executor: TaskExecutor,
+        candidates: List<TaskExecutorIntegration>,
+    ): TaskExecutorIntegration? {
+        if (candidates.isEmpty()) return null
+        val operationClass = executor.orchestrationOperationClass()
+        val ids = candidates.mapIndexed { index, integration ->
+            "tool-${index.toString().padStart(4, '0')}:${integration.orchestrationToolId}"
+        }
+        val route = orchestrationUtilities.routeTool(
+            ToolRoutingInput(
+                operationClass = operationClass,
+                capabilities = ids.mapIndexed { index, id ->
+                    ToolCapability(
+                        id = id,
+                        operationClasses = setOf(operationClass),
+                        preferenceRank = index,
+                    )
+                },
+            ),
+        )
+        if (route.decision != ToolRouteDecision.Tool) return null
+        val selectedIndex = ids.indexOf(route.tool)
+        return candidates.getOrNull(selectedIndex)
+    }
 
     private fun TaskExecutorIntegration.withEvidenceIndexing(): TaskExecutorIntegration {
         val registry = inferenceDataRegistry ?: return this
@@ -117,7 +167,11 @@ class TaskExecutorIntegrationRegistry(
     }
 
     companion object {
-        val Empty = TaskExecutorIntegrationRegistry(emptyList(), null)
+        val Empty = TaskExecutorIntegrationRegistry(
+            emptyList(),
+            null,
+            DeterministicLocalOrchestrationUtilities,
+        )
     }
 }
 
@@ -154,6 +208,19 @@ private class EvidenceIndexingTaskExecutorIntegration(
         }
         return this
     }
+}
+
+
+private fun TaskExecutor.orchestrationOperationClass(): String = when (this) {
+    is TaskExecutor.GitHubAction -> "github-action"
+    is TaskExecutor.TestRunner -> "test"
+    is TaskExecutor.Deployment -> "deploy"
+    is TaskExecutor.RepositoryOperation -> "repository-operation"
+    is TaskExecutor.ExternalService -> "external-service"
+    is TaskExecutor.NestedWorkflow -> "nested-workflow"
+    is TaskExecutor.Distributed -> "distributed"
+    is TaskExecutor.RoleAgent -> "agent"
+    is TaskExecutor.HumanApproval -> "human-approval"
 }
 
 private fun durableExecutorEvidenceRegistry(): InferenceDataRegistry {

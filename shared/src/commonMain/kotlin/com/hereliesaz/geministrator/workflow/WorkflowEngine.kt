@@ -34,6 +34,8 @@ import com.hereliesaz.geministrator.events.WorkflowCancelled
 import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.events.WorkflowEventSink
 import com.hereliesaz.geministrator.events.WorkflowFailed
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
@@ -46,6 +48,8 @@ class WorkflowEngine(
     private val sessionGateway: ManagedSessionGateway,
     roles: Collection<RoleDefinition>,
     private val eventSink: WorkflowEventSink = NoOpWorkflowEventSink,
+    private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
+        DeterministicLocalOrchestrationUtilities,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -135,6 +139,7 @@ class WorkflowEngine(
                         task = task,
                         taskRun = taskRun,
                         role = role,
+                        orchestrationUtilities = orchestrationUtilities,
                     )
                     pendingAgentDispatches += PendingAgentDispatch(
                         taskRun = taskRun,
