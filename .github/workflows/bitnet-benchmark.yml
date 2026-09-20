@@ -1,0 +1,118 @@
+name: BitNet Pre-Adoption Benchmark
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "tools/bitnet_benchmark/**"
+      - ".github/workflows/bitnet-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bitnet-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out Aive
+        uses: actions/checkout@v7
+
+      - name: Check out pinned bitnet.cpp
+        uses: actions/checkout@v7
+        with:
+          repository: microsoft/BitNet
+          ref: 0b341e582afbf9e1011f24744b554c96a3477eb5
+          path: vendor/BitNet
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+
+      - name: Install benchmark dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r vendor/BitNet/requirements.txt
+          python -m pip install \
+            'numpy>=1.26,<3' \
+            'onnxruntime>=1.23,<2' \
+            'transformers>=4.57,<5' \
+            'tokenizers>=0.22,<1' \
+            'huggingface_hub>=0.35,<2'
+
+      - name: Test benchmark scoring contract
+        working-directory: tools/bitnet_benchmark
+        run: python -m unittest -v test_benchmark.py
+
+      - name: Download verified Epoch-8 Qwen control
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/qwen-control build/downloads
+          curl -fL --retry 4 --retry-delay 2 \
+            -o build/downloads/qwen-noun-int8.tar.gz \
+            https://github.com/HereLiesAz/aive/releases/download/memory-layer-epoch8/haive-specialist_03_noun_indexer-int8-epoch8.tar.gz
+          printf '%s  %s\n' \
+            '4bf6e46a48220979bde2742e686d6cd2ceb4ca91c063b7bda289d1ad752a31c2' \
+            'build/downloads/qwen-noun-int8.tar.gz' | sha256sum -c -
+          tar -xzf build/downloads/qwen-noun-int8.tar.gz -C build/qwen-control
+          test -n "$(find build/qwen-control -type f -name '*.onnx' -print -quit)"
+          test -n "$(find build/qwen-control -type f -name 'tokenizer.json' -print -quit)"
+
+      - name: Download official native BitNet candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/BitNet-b1.58-2B-4T
+          python - <<'PY'
+          from huggingface_hub import hf_hub_download
+          path = hf_hub_download(
+              repo_id="microsoft/bitnet-b1.58-2B-4T-gguf",
+              filename="ggml-model-i2_s.gguf",
+              local_dir="build/BitNet-b1.58-2B-4T",
+          )
+          print(path)
+          PY
+          test -s build/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf
+
+      - name: Build pinned bitnet.cpp for the candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd vendor/BitNet
+            python setup_env.py \
+              -md "$GITHUB_WORKSPACE/build/BitNet-b1.58-2B-4T" \
+              -q i2_s
+          )
+          test -x vendor/BitNet/build/bin/llama-cli
+
+      - name: Run representative specialist benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/bitnet-benchmark
+          {
+            uname -a
+            echo
+            lscpu
+          } > build/bitnet-benchmark/runner.txt
+          python tools/bitnet_benchmark/benchmark.py \
+            --qwen-root build/qwen-control \
+            --bitnet-cli vendor/BitNet/build/bin/llama-cli \
+            --bitnet-model build/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf \
+            --output build/bitnet-benchmark/bitnet-benchmark-report.json
+
+      - name: Upload benchmark evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: bitnet-pre-adoption-benchmark
+          path: build/bitnet-benchmark/
+          if-no-files-found: error
