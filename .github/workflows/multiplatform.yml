@@ -20,10 +20,10 @@ permissions:
   id-token: write
 
 concurrency:
-  # Main release runs must never be cancelled after an immutable tag has been created.
-  # Keeping the ref in the key prevents unrelated PRs from blocking one another.
+  # Main/release runs must never be cancelled after an immutable tag has been created.
+  # Pull-request runs may cancel stale commits so review CI does not starve the release runners.
   group: aive-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
