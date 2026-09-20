@@ -204,6 +204,7 @@ interface AgentProvider {
     suspend fun reconnect(
         runId: ProviderRunId,
         request: AgentTaskRequest,
+        planGenerated: Boolean,
         planApproved: Boolean,
     ): ProviderActionResult = ProviderActionResult.Accepted
 
