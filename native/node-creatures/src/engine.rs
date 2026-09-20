@@ -71,7 +71,7 @@ pub fn build_mesh(genome: &CreatureGenome, pose: &CreaturePose) -> Mesh {
         &mut mesh,
         Vec3::ZERO,
         genome.body_radii,
-        genome.body_sides.max(16),
+        genome.body_sides.max(9),
         8,
         MaterialClass::Body,
     );
