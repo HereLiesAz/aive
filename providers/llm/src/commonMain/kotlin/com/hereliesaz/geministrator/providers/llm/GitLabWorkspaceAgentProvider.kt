@@ -100,10 +100,11 @@ class GitLabWorkspaceAgentProvider(
         const val MAX_CONTEXT_ARTIFACT_CHARS = 30_000
         const val MAX_PLAN_PREVIEW_CHARS = 8_000
 
-        val sessionsMutex = Mutex()
-        val sessionsByProvider = mutableMapOf<String, MutableMap<ProviderRunId, Session>>()
-        val nextSequenceByProvider = mutableMapOf<String, Long>()
     }
+
+    private val sessionsMutex = Mutex()
+    private val sessions = mutableMapOf<ProviderRunId, Session>()
+    private var nextSequence = 0L
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
         supported = setOf(
@@ -123,16 +124,60 @@ class GitLabWorkspaceAgentProvider(
             "$displayName GitLab workspace agent requires a linked GitLab repository"
         }
         val runId = sessionsMutex.withLock {
-            val nextSequence = (nextSequenceByProvider[id.value] ?: 0L) + 1L
-            nextSequenceByProvider[id.value] = nextSequence
+            nextSequence += 1L
             ProviderRunId("${id.value}/${request.taskRunId.value}/$nextSequence").also { providerRunId ->
-                sessionsByProvider.getOrPut(id.value) { mutableMapOf() }[providerRunId] = Session(
-                request = request,
+                sessions[providerRunId] = Session(
+                    request = request,
                     phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
                 )
             }
         }
         return AgentRunHandle(runId)
+    }
+
+    override suspend fun reconnect(
+        runId: ProviderRunId,
+        request: AgentTaskRequest,
+        planGenerated: Boolean,
+        planApproved: Boolean,
+        planPreview: String?,
+    ): ProviderActionResult {
+        if (!supportsRepository(request.repository)) {
+            return ProviderActionResult.Rejected(
+                "$displayName GitLab workspace agent cannot resume without its linked GitLab repository",
+            )
+        }
+        if (request.requirePlanApproval && planGenerated && planPreview.isNullOrBlank()) {
+            return ProviderActionResult.Rejected(
+                "$displayName cannot safely resume provider run ${runId.value}: the approved plan was not persisted",
+            )
+        }
+
+        val restoredPlan = if (planGenerated && !planPreview.isNullOrBlank() && !isSpecificationTask(request)) {
+            val token = tokenProvider.requireToken()
+            val context = loadRepositoryContext(request, token)
+            WorkspacePlan(
+                text = planPreview,
+                requestedFiles = parseRequestedFiles(planPreview, context.trackedFiles),
+            )
+        } else {
+            null
+        }
+        sessionsMutex.withLock {
+            val suffix = runId.value.substringAfterLast('/').toLongOrNull()
+            if (suffix != null) nextSequence = maxOf(nextSequence, suffix)
+            sessions.putIfAbsent(
+                runId,
+                Session(
+                    request = request,
+                    phase = MutableStateFlow(
+                        if (request.requirePlanApproval && !planApproved) Phase.AwaitingApproval else Phase.Ready,
+                    ),
+                    plan = restoredPlan,
+                ),
+            )
+        }
+        return ProviderActionResult.Accepted
     }
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
@@ -460,7 +505,7 @@ class GitLabWorkspaceAgentProvider(
         val approvedText = fullText.take(MAX_PLAN_PREVIEW_CHARS)
         return WorkspacePlan(
             text = approvedText,
-            requestedFiles = parseRequestedFiles(fullText, context.trackedFiles),
+            requestedFiles = parseRequestedFiles(approvedText, context.trackedFiles),
         ) to result
     }
 
@@ -753,7 +798,7 @@ class GitLabWorkspaceAgentProvider(
         sessionOrNull(runId) ?: error("$displayName GitLab workspace session ${runId.value} is not available")
 
     private suspend fun sessionOrNull(runId: ProviderRunId): Session? = sessionsMutex.withLock {
-        sessionsByProvider[id.value]?.get(runId)
+        sessions[runId]
     }
 
     private fun HttpRequestBuilder.gitLabHeaders(token: String) {
