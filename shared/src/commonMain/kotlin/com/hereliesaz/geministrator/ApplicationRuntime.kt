@@ -711,13 +711,23 @@ class ApplicationRuntime private constructor(
             persistence: WorkflowPersistence = SettingsWorkflowPersistence.createDefault(),
             executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
             providerRegistry: AgentProviderRegistry? = null,
+            orchestrationUtilities: LocalOrchestrationUtilityFamily =
+                DeterministicLocalOrchestrationUtilities,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
-            val registry = providerRegistry ?: AgentProviderRegistry(providers)
-            val gateway = ProviderBackedManagedSessionGateway(registry, runtimeScope)
+            val registry = providerRegistry ?: AgentProviderRegistry(
+                providers = providers,
+                orchestrationUtilities = orchestrationUtilities,
+            )
+            val gateway = ProviderBackedManagedSessionGateway(
+                providerRegistry = registry,
+                scope = runtimeScope,
+                orchestrationUtilities = orchestrationUtilities,
+            )
             val publisher = WorkflowRuntimePublisher()
             val effectiveExecutorIntegrations = executorIntegrations
+                .withOrchestrationUtilities(orchestrationUtilities)
                 .withInferenceDataRegistry(registry.inferenceFabric.dataRegistry)
                 .withIntegration(
                     com.hereliesaz.geministrator.workflow.GenealogyGovernanceExecutorIntegration(
@@ -730,12 +740,14 @@ class ApplicationRuntime private constructor(
                     sessionGateway = gateway,
                     roles = roles,
                     eventSink = RepositoryWorkflowEventSink(persistence.events),
+                    orchestrationUtilities = orchestrationUtilities,
                 )
                 val coordinator = WorkflowRuntimeCoordinator(
                     persistence = persistence,
                     engine = engine,
                     sessionGateway = gateway,
                     executorIntegrations = effectiveExecutorIntegrations,
+                    orchestrationUtilities = orchestrationUtilities,
                 )
                 return ApplicationRuntime(
                     persistence,
