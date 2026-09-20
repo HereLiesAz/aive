@@ -17,7 +17,7 @@ class RepositoryRefsTest {
         assertEquals("HereLiesAz", repository.owner)
         assertEquals("aive", repository.name)
         assertEquals("main", repository.defaultBranch)
-        assertEquals("https://github.com/HereLiesAz/aive.git", repository.remoteUrl)
+        assertEquals("https://github.com/HereLiesAz/aive", repository.remoteUrl)
         assertEquals("https://github.com/HereLiesAz/aive", repository.remoteBrowserUrl())
         assertNull(repository.localPath)
     }
@@ -34,21 +34,19 @@ class RepositoryRefsTest {
         assertEquals("team/platform", repository.owner)
         assertEquals("aive", repository.name)
         assertEquals("develop", repository.defaultBranch)
-        assertEquals("git@gitlab.com:team/platform/aive.git", repository.remoteUrl)
+        assertEquals("https://gitlab.com/team/platform/aive", repository.remoteUrl)
         assertEquals("https://gitlab.com/team/platform/aive", repository.remoteBrowserUrl())
     }
 
     @Test
-    fun selfManagedGitLabSshRemoteRetainsHostForBrowserLink() {
-        val repository = parseRepositoryRef(
-            source = RepositorySource.GitLab,
-            locator = "ssh://git@gitlab.example.test:2222/team/platform/aive.git",
-            defaultBranch = "main",
-        )
-
-        assertEquals("team/platform", repository.owner)
-        assertEquals("aive", repository.name)
-        assertEquals("https://gitlab.example.test/team/platform/aive", repository.remoteBrowserUrl())
+    fun selfManagedGitLabRemoteIsRejectedBeforeCredentialsCanBeRouted() {
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            parseRepositoryRef(
+                source = RepositorySource.GitLab,
+                locator = "ssh://git@gitlab.example.test:2222/team/platform/aive.git",
+                defaultBranch = "main",
+            )
+        }
     }
 
     @Test
