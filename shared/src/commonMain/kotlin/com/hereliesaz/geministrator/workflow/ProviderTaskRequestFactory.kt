@@ -128,11 +128,19 @@ private fun buildUtilityPromptBlocks(
     val executionBlock = PromptContextBlock(
         "Execution state",
         buildString {
-            appendLine("Completed: ${execution.completedSteps.joinToString().ifBlank { "none" }}")
-            appendLine("Active: ${execution.activeSteps.joinToString().ifBlank { "none" }}")
-            appendLine("Blocked: ${execution.blockedSteps.joinToString().ifBlank { "none" }}")
-            appendLine("Failed/escalated: ${execution.failedSteps.joinToString().ifBlank { "none" }}")
-            append("Awaiting approval: ${execution.waitingForApprovalSteps.joinToString().ifBlank { "none" }}")
+            if (redactTaskNames) {
+                appendLine("Completed tasks: ${execution.completedSteps.size}")
+                appendLine("Active tasks: ${execution.activeSteps.size}")
+                appendLine("Blocked tasks: ${execution.blockedSteps.size}")
+                appendLine("Failed/escalated tasks: ${execution.failedSteps.size}")
+                append("Awaiting approval tasks: ${execution.waitingForApprovalSteps.size}")
+            } else {
+                appendLine("Completed: ${execution.completedSteps.joinToString().ifBlank { "none" }}")
+                appendLine("Active: ${execution.activeSteps.joinToString().ifBlank { "none" }}")
+                appendLine("Blocked: ${execution.blockedSteps.joinToString().ifBlank { "none" }}")
+                appendLine("Failed/escalated: ${execution.failedSteps.joinToString().ifBlank { "none" }}")
+                append("Awaiting approval: ${execution.waitingForApprovalSteps.joinToString().ifBlank { "none" }}")
+            }
         },
     )
 
