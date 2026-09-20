@@ -21,7 +21,7 @@ class TextLlmProviderReconnectTest {
             override suspend fun generate(prompt: String): TextGenerationResult {
                 calls += 1
                 return TextGenerationResult(
-                    text = if (calls == 1) "Recovered plan" else "Recovered execution",
+                    text = "Recovered execution",
                     inputTokens = 3,
                     outputTokens = 2,
                 )
