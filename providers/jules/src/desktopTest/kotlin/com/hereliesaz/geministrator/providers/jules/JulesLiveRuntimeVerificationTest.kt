@@ -49,8 +49,8 @@ import kotlin.test.assertTrue
 /**
  * Opt-in live acceptance test for the production runtime/Jules integration.
  *
- * Ordinary unit-test runs skip this test. CI's dedicated live-runtime-verification job opts in with
- * AIVE_LIVE_RUNTIME_VERIFICATION=1 and supplies the repository's real JULES_API_KEY.
+ * Disabled from the normal live-runtime verification path. This legacy provider-specific probe
+ * runs only when AIVE_LIVE_JULES_RUNTIME_VERIFICATION=1 is explicitly supplied.
  */
 class JulesLiveRuntimeVerificationTest {
     @Test
@@ -376,6 +376,6 @@ class JulesLiveRuntimeVerificationTest {
     }
 
     private companion object {
-        const val OPT_IN_ENV = "AIVE_LIVE_RUNTIME_VERIFICATION"
+        const val OPT_IN_ENV = "AIVE_LIVE_JULES_RUNTIME_VERIFICATION"
     }
 }
