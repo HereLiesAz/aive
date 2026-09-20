@@ -326,9 +326,9 @@ The strategy therefore reuses normal workflow concurrency, persistence, retries,
 4. Centralized MoA proposer → genealogy gate → aggregator → verifier execution — implemented.
 5. Resource-aware selection between implemented safe topologies — implemented with explicit authorization and conservative fallback.
 6. Generalized local specialist/LoRA library registered into the model registry — implemented with capability-gated shared-base adapter planning and merged-model fallback.
-7. DSPy optimization and release pipeline.
-8. Remaining local orchestration utility family.
-9. Ternary/BitNet experiments — BITCOS codec, native packaging, and capability-gated artifact support implemented; model-family execution and optimized kernels remain experimental.
+7. DSPy optimization pipeline — partially implemented with GEPA/MIPROv2, held-out/adversarial gates, immutable manifests, and a centralized manual workflow; specialist training/export, catalog registration, and runtime consumption remain.
+8. Local orchestration utility family — contracts, deterministic executable baselines, and tests exist for all nine utilities; production runtime wiring and specialist-model integration remain.
+9. Ternary/BitNet experiments — deployment-readiness assessment, BITCOS codec, native packaging, and capability-gated artifact support exist; task-equivalent BitNet-vs-Qwen benchmarking, production model-family execution, and optimized kernels remain experimental.
 10. Skeleton-of-Thought governed DAG execution — implemented.
 
 ## Current implementation status
@@ -373,8 +373,9 @@ Implemented and called by production runtime:
 
 Not yet implemented:
 
-- DSPy/GEPA/MIPRO-style optimization and release pipeline
-- remaining orchestration utility models
+- specialist training/export, local-model catalog registration, and runtime consumption of optimized specialist releases
+- production runtime wiring and specialist-model integration for the local orchestration utility family
+- task-equivalent BitNet b1.58 specialists and same-machine BitNet-vs-Qwen quality/performance benchmarking
 - released ternary/BitNet model family with tokenizer/transformer execution and fused BITCOS compute kernels
 
 Physical-device/real-provider end-to-end verification remains separate from CI and is not claimed by this document.
