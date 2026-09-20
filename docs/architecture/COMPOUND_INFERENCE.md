@@ -327,7 +327,7 @@ The strategy therefore reuses normal workflow concurrency, persistence, retries,
 5. Resource-aware selection between implemented safe topologies — implemented with explicit authorization and conservative fallback.
 6. Generalized local specialist/LoRA library registered into the model registry — implemented with capability-gated shared-base adapter planning and merged-model fallback.
 7. DSPy optimization pipeline — partially implemented with GEPA/MIPROv2, held-out/adversarial gates, immutable manifests, and a centralized manual workflow; specialist training/export, catalog registration, and runtime consumption remain.
-8. Local orchestration utility family — contracts, deterministic executable baselines, and tests exist for all nine utilities; production runtime wiring and specialist-model integration remain.
+8. Local orchestration utility family — all nine deterministic utilities are wired into production memory/context preparation, provider/executor routing, and provider handoff/control context. `ApplicationRuntime.create` exposes a single injectable utility-family seam; trained specialist releases still remain.
 9. Ternary/BitNet experiments — deployment-readiness assessment, BITCOS codec, native packaging, and capability-gated artifact support exist; task-equivalent BitNet-vs-Qwen benchmarking, production model-family execution, and optimized kernels remain experimental.
 10. Skeleton-of-Thought governed DAG execution — implemented.
 
@@ -370,11 +370,15 @@ Implemented and called by production runtime:
 - `MemoryEpoch8LocalModelLibrary` with published FP16, INT8, LoRA, shared-base, and standalone embedding assets
 - lazy durable model-registry bootstrap through `LocalModelBootstrapInferenceFabric`
 - compatibility preservation through `MemoryEpoch8ModelCatalog`
+- production wiring for Memory Query Composer and Context Packer before provider dispatch
+- production Agent Router and Tool Router selection at provider/executor boundaries
+- production Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner context generation from durable workflow truth
+- injectable `LocalOrchestrationUtilityFamily` runtime seam for future trained specialist implementations
 
 Not yet implemented:
 
 - specialist training/export, local-model catalog registration, and runtime consumption of optimized specialist releases
-- production runtime wiring and specialist-model integration for the local orchestration utility family
+- trained orchestration specialist releases plus runtime selection of those releases through the utility-family seam
 - task-equivalent BitNet b1.58 specialists and same-machine BitNet-vs-Qwen quality/performance benchmarking
 - released ternary/BitNet model family with tokenizer/transformer execution and fused BITCOS compute kernels
 
