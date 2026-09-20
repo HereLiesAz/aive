@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -31,9 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,9 +54,13 @@ import com.hereliesaz.conveyance.h2g2.H2g2TerrariumServiceVisit
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumSubject
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
+import kotlin.math.PI
+import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import org.jetbrains.compose.resources.painterResource
 
 /**
  * Production node-creature host.
@@ -233,6 +240,36 @@ private fun RustNodeTerrarium(
             y = heightPx * 0.5f + (position.y - focusY) * heightPx * zoom,
         )
 
+        fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? {
+            val fromSubject = subjectById[relationship.from] ?: return null
+            val toSubject = subjectById[relationship.to] ?: return null
+            val fromPacket = packets[relationship.from] ?: return null
+            val toPacket = packets[relationship.to] ?: return null
+            val fromPosition = workingPositions[relationship.from] ?: fromSubject.position
+            val toPosition = workingPositions[relationship.to] ?: toSubject.position
+            val fromCenter = screenCenter(fromPosition)
+            val toCenter = screenCenter(toPosition)
+            val direction = toCenter - fromCenter
+            if (direction.getDistance() <= 0.001f) return null
+
+            val startTerminal = fromPacket.terminalAnchorToward(
+                NodeCreaturePoint(direction.x, direction.y),
+            )
+            val endTerminal = toPacket.terminalAnchorToward(
+                NodeCreaturePoint(-direction.x, -direction.y),
+            )
+            val terminalScale = vectorScalePx * zoom
+            val start = fromCenter + Offset(
+                startTerminal.x * terminalScale,
+                startTerminal.y * terminalScale,
+            )
+            val end = toCenter + Offset(
+                endTerminal.x * terminalScale,
+                endTerminal.y * terminalScale,
+            )
+            return start to end
+        }
+
         Canvas(Modifier.fillMaxSize()) {
             drawRect(Azphalt.Ink.copy(alpha = 0.025f))
             val grid = 48.dp.toPx() * zoom
@@ -250,49 +287,26 @@ private fun RustNodeTerrarium(
             }
 
             relationships.forEach { relationship ->
-                val fromSubject = subjectById[relationship.from] ?: return@forEach
                 val toSubject = subjectById[relationship.to] ?: return@forEach
-                val fromPacket = packets[relationship.from] ?: return@forEach
-                val toPacket = packets[relationship.to] ?: return@forEach
-                val fromPosition = workingPositions[relationship.from] ?: fromSubject.position
-                val toPosition = workingPositions[relationship.to] ?: toSubject.position
-                val fromCenter = screenCenter(fromPosition)
-                val toCenter = screenCenter(toPosition)
-                val direction = toCenter - fromCenter
-                if (direction.getDistance() <= 0.001f) return@forEach
-
-                val startTerminal = fromPacket.terminalAnchorToward(
-                    NodeCreaturePoint(direction.x, direction.y),
-                )
-                val endTerminal = toPacket.terminalAnchorToward(
-                    NodeCreaturePoint(-direction.x, -direction.y),
-                )
-                val terminalScale = vectorScalePx * zoom
-                val start = fromCenter + Offset(
-                    startTerminal.x * terminalScale,
-                    startTerminal.y * terminalScale,
-                )
-                val end = toCenter + Offset(
-                    endTerminal.x * terminalScale,
-                    endTerminal.y * terminalScale,
-                )
+                val (start, end) = relationshipEndpoints(relationship) ?: return@forEach
 
                 val blocked = toSubject.node.state == H2g2WorkflowState.Blocked ||
                     toSubject.node.state == H2g2WorkflowState.Failed
                 val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
                 val color = when {
-                    blocked -> GeministratorColors.error
-                    active -> Azphalt.White.copy(alpha = 0.96f)
-                    else -> onGround.copy(alpha = 0.70f)
+                    blocked -> GeministratorColors.error.copy(alpha = 0.28f)
+                    active -> onGround.copy(alpha = 0.24f)
+                    else -> onGround.copy(alpha = 0.16f)
                 }
-                val stroke = (if (active) 4.dp else 3.dp).toPx()
+                val stroke = (if (active) 2.dp else 1.5.dp).toPx()
 
-                // Cable shadow makes the connection read as physically plugged into the sockets.
+                // Keep a faint topology backbone behind the detached arm pair. It preserves
+                // readability at extreme distances without competing with the role-specific arms.
                 drawLine(
-                    color = Azphalt.Ink.copy(alpha = 0.62f),
+                    color = Azphalt.Ink.copy(alpha = 0.10f),
                     start = start,
                     end = end,
-                    strokeWidth = stroke + 3.dp.toPx(),
+                    strokeWidth = stroke + 1.dp.toPx(),
                     cap = StrokeCap.Round,
                 )
                 drawLine(
@@ -302,15 +316,38 @@ private fun RustNodeTerrarium(
                     strokeWidth = stroke,
                     cap = StrokeCap.Round,
                 )
-                for (socket in listOf(start, end)) {
-                    drawCircle(Azphalt.Ink, radius = 5.dp.toPx(), center = socket)
-                    drawCircle(color, radius = 3.1.dp.toPx(), center = socket)
-                }
                 if (active) {
                     val pulse = start + (end - start) * linkPulse
-                    drawCircle(color = color, radius = 4.dp.toPx(), center = pulse)
+                    drawCircle(
+                        color = onGround.copy(alpha = 0.72f),
+                        radius = 3.dp.toPx(),
+                        center = pulse,
+                    )
                 }
             }
+        }
+
+        // The connection pair is a transformable layer of its own. Dragging either creature
+        // recomputes these two sprites from the Rust terminal anchors; the creature body is never
+        // stretched or rotated with the relationship.
+        relationships.forEach { relationship ->
+            val fromSubject = subjectById[relationship.from] ?: return@forEach
+            val toSubject = subjectById[relationship.to] ?: return@forEach
+            val (start, end) = relationshipEndpoints(relationship) ?: return@forEach
+            val blocked = toSubject.node.state == H2g2WorkflowState.Blocked ||
+                toSubject.node.state == H2g2WorkflowState.Failed
+            val active = relationship.active ||
+                relationship.kind == H2g2TerrariumRelationshipKind.Transfer
+            DetachedNodeArmPair(
+                relationshipKey = "${relationship.from}->${relationship.to}:${relationship.kind.name}",
+                fromRoleLabel = fromSubject.node.label,
+                toRoleLabel = toSubject.node.label,
+                start = start,
+                end = end,
+                pulse = linkPulse,
+                active = active,
+                blocked = blocked,
+            )
         }
 
         subjects.forEach { subject ->
@@ -464,6 +501,96 @@ private fun RustNodeTerrarium(
             )
         }
     }
+}
+
+@Composable
+private fun DetachedNodeArmPair(
+    relationshipKey: String,
+    fromRoleLabel: String,
+    toRoleLabel: String,
+    start: Offset,
+    end: Offset,
+    pulse: Float,
+    active: Boolean,
+    blocked: Boolean,
+) {
+    val midpoint = Offset(
+        x = (start.x + end.x) * 0.5f,
+        y = (start.y + end.y) * 0.5f,
+    )
+    DetachedNodeArmSprite(
+        asset = NodeArmAssets.forRole(
+            fromRoleLabel,
+            NodeArmAssets.variantFor(relationshipKey, endpointIndex = 0),
+        ),
+        socket = start,
+        toward = midpoint,
+        pulse = pulse,
+        active = active,
+        blocked = blocked,
+    )
+    DetachedNodeArmSprite(
+        asset = NodeArmAssets.forRole(
+            toRoleLabel,
+            NodeArmAssets.variantFor(relationshipKey, endpointIndex = 1),
+        ),
+        socket = end,
+        toward = midpoint,
+        pulse = pulse,
+        active = active,
+        blocked = blocked,
+    )
+}
+
+@Composable
+private fun DetachedNodeArmSprite(
+    asset: NodeArmAsset,
+    socket: Offset,
+    toward: Offset,
+    pulse: Float,
+    active: Boolean,
+    blocked: Boolean,
+) {
+    val density = LocalDensity.current
+    val baseWidth = 144.dp
+    val baseHeight = 72.dp
+    val baseWidthPx = with(density) { baseWidth.toPx() }
+    val baseHeightPx = with(density) { baseHeight.toPx() }
+    val direction = toward - socket
+    val distance = direction.getDistance()
+    if (distance <= 0.5f) return
+
+    val usableWidth = baseWidthPx * (1f - asset.socketPivotX)
+    val stretch = (distance / usableWidth.coerceAtLeast(1f)).coerceIn(0.22f, 6f)
+    val angle = atan2(direction.y, direction.x) * 180f / PI.toFloat()
+    val wave = sin(pulse * (2f * PI.toFloat()))
+    val wobble = when {
+        blocked -> wave * 2.4f
+        active -> wave * 1.25f
+        else -> 0f
+    }
+    val breathe = if (active) 1f + wave * 0.035f else 1f
+
+    Image(
+        painter = painterResource(asset.resource),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    x = (socket.x - baseWidthPx * asset.socketPivotX).roundToInt(),
+                    y = (socket.y - baseHeightPx * asset.socketPivotY).roundToInt(),
+                )
+            }
+            .size(baseWidth, baseHeight)
+            .graphicsLayer {
+                transformOrigin = TransformOrigin(asset.socketPivotX, asset.socketPivotY)
+                rotationZ = angle + wobble
+                scaleX = stretch
+                scaleY = breathe
+                alpha = if (blocked) 0.72f else 0.96f
+            },
+    )
 }
 
 @Composable
