@@ -48,6 +48,7 @@ class TextLlmProviderReconnectTest {
                 request,
                 planGenerated = true,
                 planApproved = true,
+                planPreview = "Previously approved plan",
             ),
         )
 
