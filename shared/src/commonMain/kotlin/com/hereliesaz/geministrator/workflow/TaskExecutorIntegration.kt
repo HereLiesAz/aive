@@ -32,7 +32,7 @@ import com.russhwolf.settings.Settings
 interface TaskExecutorIntegration {
     /** Stable human-readable identifier exposed to the local Tool Router. */
     val orchestrationToolId: String
-        get() = this::class.simpleName ?: "task-executor-integration"
+        get() = "task-executor-integration"
 
     fun supports(executor: TaskExecutor): Boolean
 
