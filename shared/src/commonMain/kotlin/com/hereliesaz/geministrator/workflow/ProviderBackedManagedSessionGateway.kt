@@ -147,6 +147,7 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
         request: AgentTaskRequest,
+        providerPlan: String?,
     ) {
         val provider = providerFor(handle)
         providerOperation("Unable to reconstruct provider session ${handle.providerRunId.value}") {
@@ -159,6 +160,7 @@ class ProviderBackedManagedSessionGateway(
                         ManagedSessionStatus.Planning,
                         ManagedSessionStatus.AwaitingApproval,
                     ),
+                    planPreview = providerPlan,
                 )
             ) {
                 ProviderActionResult.Accepted -> Unit
