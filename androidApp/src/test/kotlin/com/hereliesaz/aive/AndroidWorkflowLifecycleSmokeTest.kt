@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.inference.BlueprintCompoundInferenceFabric
+import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
@@ -15,6 +17,7 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentRunHandle
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +41,11 @@ class AndroidWorkflowLifecycleSmokeTest {
             providers = listOf(provider),
             scope = scope,
             persistence = persistence,
+            providerRegistry = AgentProviderRegistry(
+                providers = listOf(provider),
+                inferenceFabric = BlueprintCompoundInferenceFabric(),
+                genealogyGovernance = InferenceGenealogyGovernanceRuntime(),
+            ),
         )
 
         try {
