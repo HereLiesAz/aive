@@ -45,7 +45,8 @@ class WorkflowDefinitionPreparer(
         val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }
         val prepared = buildList {
             for (task in withCompoundInference.tasks) {
-                val executor = task.effectiveExecutor()
+                val roleForTask = task.roleId?.let(rolesById::get)
+                val executor = task.effectiveExecutor(roleForTask)
                 if (executor !is TaskExecutor.RoleAgent || task.environmentPlanningPolicy == EnvironmentPlanningPolicy.NotRequired) {
                     add(task)
                     continue
