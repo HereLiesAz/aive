@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,6 +40,7 @@ import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CustomCompanyProviderScreen(
@@ -46,6 +48,7 @@ internal fun CustomCompanyProviderScreen(
     connectedProviderIds: Set<String> = emptySet(),
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     onResetRoleCollection: () -> Unit = {},
+    roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -89,6 +92,7 @@ internal fun CustomCompanyProviderScreen(
         initialValue = emptySet(),
     )
     var resetConfirm by remember { mutableStateOf(false) }
+    val roleSurfacePickerScope = rememberCoroutineScope()
 
     LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
         if (!showRoleForm && draftRoles == visibleRoles) {
@@ -474,6 +478,40 @@ internal fun CustomCompanyProviderScreen(
                             index != surfaceIndex
                         }
                     },
+                    onPickSpreadsheet = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSpreadsheet()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Spreadsheet
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SpreadsheetSource.DocumentUri(uri),
+                                                format = SpreadsheetFormat.Auto,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    onPickSqlite = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSqliteDatabase()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Sql
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SqlDatabaseSource.DocumentUri(uri),
+                                                writable = false,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                 )
             }
             if (!roleSurfacesDraft.isConfiguredRoleSurfaces()) {
@@ -748,6 +786,8 @@ private fun CompanyRoleSurfaceEditor(
     index: Int,
     onChange: (RoleSurface) -> Unit,
     onRemove: () -> Unit,
+    onPickSpreadsheet: (() -> Unit)?,
+    onPickSqlite: (() -> Unit)?,
 ) {
     AzphaltRecord(
         seed = "role-surface-$index-${surface.alias}",
@@ -789,8 +829,16 @@ private fun CompanyRoleSurfaceEditor(
                 )
 
                 when (surface) {
-                    is RoleSurface.Spreadsheet -> CompanySpreadsheetSurfaceFields(surface, onChange)
-                    is RoleSurface.Sql -> CompanySqlSurfaceFields(surface, onChange)
+                    is RoleSurface.Spreadsheet -> CompanySpreadsheetSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSpreadsheet,
+                    )
+                    is RoleSurface.Sql -> CompanySqlSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSqlite,
+                    )
                     is RoleSurface.Flowchart -> CompanyFlowchartSurfaceFields(surface, onChange)
                 }
 
@@ -809,6 +857,7 @@ private fun CompanyRoleSurfaceEditor(
 private fun CompanySpreadsheetSurfaceFields(
     surface: RoleSurface.Spreadsheet,
     onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
 ) {
     CompanySectionLabel("Spreadsheet source")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -862,6 +911,14 @@ private fun CompanySpreadsheetSurfaceFields(
             onClick = { onChange(surface.copy(source = SpreadsheetSource.DocumentUri("content://"))) },
             modifier = Modifier.fillMaxWidth(),
         )
+        if (onPickDocument != null) {
+            AzphaltPill(
+                label = "Choose spreadsheet…",
+                seed = "sheet-source-picker-${surface.alias}",
+                onClick = onPickDocument,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 
     when (val source = surface.source) {
@@ -974,6 +1031,7 @@ private fun CompanySpreadsheetSurfaceFields(
 private fun CompanySqlSurfaceFields(
     surface: RoleSurface.Sql,
     onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
 ) {
     CompanySectionLabel("SQL source")
     AzphaltPill(
@@ -997,6 +1055,14 @@ private fun CompanySqlSurfaceFields(
         },
         modifier = Modifier.fillMaxWidth(),
     )
+    if (onPickDocument != null) {
+        AzphaltPill(
+            label = "Choose SQLite database…",
+            seed = "sql-source-picker-${surface.alias}",
+            onClick = onPickDocument,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 
     when (val source = surface.source) {
         is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
