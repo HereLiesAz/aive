@@ -841,6 +841,21 @@ private fun CompanySpreadsheetSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         AzphaltPill(
+            label = "Public Google Sheet",
+            seed = "sheet-source-google-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.GoogleSheet,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.GoogleSheet(spreadsheetId = ""),
+                        format = SpreadsheetFormat.Csv,
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
             label = "Document URI",
             seed = "sheet-source-uri-${surface.alias}",
             selected = surface.source is SpreadsheetSource.DocumentUri,
@@ -879,6 +894,45 @@ private fun CompanySpreadsheetSurfaceFields(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        is SpreadsheetSource.GoogleSheet -> {
+            OutlinedTextField(
+                value = source.spreadsheetId,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(spreadsheetId = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Google Sheets spreadsheet ID") },
+                placeholder = { Text("1AbCdEf...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = source.gid,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(gid = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Sheet GID") },
+                placeholder = { Text("0") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Public/exportable Google Sheets are fetched as CSV. Private Sheets can still be handled by a script runner with its own credentials.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+        }
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1001,19 +1055,15 @@ private fun CompanyFlowchartSurfaceFields(
     )
     val parsed = runCatching { MermaidFlowchartParser.parse(surface.source) }
     parsed.onSuccess { graph ->
+        MermaidFlowchartPreview(
+            graph = graph,
+            modifier = Modifier.fillMaxWidth(),
+        )
         AzphaltNote(
             seed = "flowchart-parse-${surface.alias}",
             label = "Native preview",
             value = buildString {
                 append("${graph.nodes.size} nodes · ${graph.edges.size} edges · ${graph.direction}")
-                if (graph.edges.isNotEmpty()) {
-                    append("\n")
-                    append(
-                        graph.edges.take(6).joinToString("\n") { edge ->
-                            "${edge.from} → ${edge.to}${edge.label?.let { " · $it" } ?: ""}"
-                        },
-                    )
-                }
                 if (graph.warnings.isNotEmpty()) {
                     append("\nWarnings: ")
                     append(graph.warnings.joinToString("; "))
@@ -1132,6 +1182,7 @@ private fun List<RoleSurface>.isConfiguredRoleSurfaces(): Boolean {
                     is SpreadsheetSource.Inline -> true
                     is SpreadsheetSource.DocumentUri -> source.uri.isNotBlank()
                     is SpreadsheetSource.Https -> source.url.startsWith("https://", ignoreCase = true)
+                    is SpreadsheetSource.GoogleSheet -> source.spreadsheetId.isNotBlank()
                 }
             }
             is RoleSurface.Sql -> {
