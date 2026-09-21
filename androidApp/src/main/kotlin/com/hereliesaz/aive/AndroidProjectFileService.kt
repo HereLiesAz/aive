@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.IVE_MIME_TYPE
 import com.hereliesaz.geministrator.ProjectFileDescriptor
 import com.hereliesaz.geministrator.ProjectFileReadResult
 import com.hereliesaz.geministrator.ProjectFileService
+import com.hereliesaz.geministrator.RoleSurfaceFilePicker
 import com.hereliesaz.geministrator.asIveFileName
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -20,7 +21,7 @@ import kotlinx.coroutines.withContext
 
 internal class AndroidProjectFileService(
     private val activity: ComponentActivity,
-) : ProjectFileService {
+) : ProjectFileService, RoleSurfaceFilePicker {
     private val context = activity.applicationContext
     private val resolver = activity.contentResolver
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -110,7 +111,10 @@ internal class AndroidProjectFileService(
         }
 
     override suspend fun chooseAndRead(): ProjectFileReadResult? {
-        val uri = chooseOpenUri() ?: return null
+        val uri = chooseOpenUri(
+            arrayOf(IVE_MIME_TYPE, "application/json", "application/octet-stream", "*/*"),
+            requestWrite = false,
+        ) ?: return null
         return withContext(Dispatchers.IO) {
             rememberUri(uri)
             val content = readUri(uri) ?: return@withContext null
@@ -121,17 +125,46 @@ internal class AndroidProjectFileService(
         }
     }
 
-    private suspend fun chooseOpenUri(): Uri? {
-        check(pendingOpen == null) { "A project file picker is already open" }
+    override suspend fun chooseSpreadsheet(): String? =
+        chooseOpenUri(
+            arrayOf(
+                "text/csv",
+                "text/tab-separated-values",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel",
+                "application/octet-stream",
+                "*/*",
+            ),
+            requestWrite = true,
+        )?.toString()
+
+    override suspend fun chooseSqliteDatabase(): String? =
+        chooseOpenUri(
+            arrayOf(
+                "application/vnd.sqlite3",
+                "application/x-sqlite3",
+                "application/octet-stream",
+                "*/*",
+            ),
+            requestWrite = false,
+        )?.toString()
+
+    private suspend fun chooseOpenUri(
+        mimeTypes: Array<String>,
+        requestWrite: Boolean,
+    ): Uri? {
+        check(pendingOpen == null) { "A document picker is already open" }
         val deferred = CompletableDeferred<Uri?>()
         pendingOpen = deferred
         withContext(Dispatchers.Main.immediate) {
-            openLauncher.launch(arrayOf(IVE_MIME_TYPE, "application/json", "application/octet-stream", "*/*"))
+            openLauncher.launch(mimeTypes)
         }
         val uri = deferred.await()
         uri?.let {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                if (requestWrite) Intent.FLAG_GRANT_WRITE_URI_PERMISSION else 0
             runCatching {
-                resolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                resolver.takePersistableUriPermission(it, flags)
             }
         }
         return uri
