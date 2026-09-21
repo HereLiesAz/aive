@@ -32,6 +32,15 @@ internal fun NodeMascotSurface(
     motionPhase: Float,
     modifier: Modifier = Modifier,
 ) {
+    if (roleLabel.trim().equals("Orchestrator", ignoreCase = true)) {
+        OrchestratorSpritePuppetSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
+
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
     Canvas(modifier) {
