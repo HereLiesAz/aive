@@ -246,12 +246,12 @@ private fun DrawScope.drawNodeMascot(
         rotate(rotation, point(100f, 100f))
         scale(scale, scale, point(100f, 100f))
     }) {
-        drawMascotShadow(point, unit, spec)
-        drawMascotAntennae(point, unit, role, spec, wave)
-        drawMascotBody(point, unit, role, spec)
-        drawMascotAccessory(point, unit, role, spec, wave)
-        drawMascotFace(point, unit, role, spec)
-        drawMascotStateMark(point, unit, state, wave)
+        drawMascotShadow(::point, unit, spec)
+        drawMascotAntennae(::point, unit, role, spec, wave)
+        drawMascotBody(::point, unit, role, spec)
+        drawMascotAccessory(::point, unit, role, spec, wave)
+        drawMascotFace(::point, unit, role, spec)
+        drawMascotStateMark(::point, unit, state, wave)
     }
 }
 
