@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 
 object WorkflowDefinitionExpander {
     fun expand(
