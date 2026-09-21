@@ -26,11 +26,17 @@ import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.FlowchartLanguage
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.RoleSurface
 import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.SpreadsheetFormat
+import com.hereliesaz.geministrator.domain.SpreadsheetSource
+import com.hereliesaz.geministrator.domain.SqlDatabaseSource
 import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
 
@@ -67,6 +73,11 @@ internal fun CustomCompanyProviderScreen(
         serializer = RoleExecutionSource.serializer(),
         initialValue = RoleExecutionSource.Agent,
     )
+    var roleSurfacesDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_SURFACES_KEY,
+        serializer = ListSerializer(RoleSurface.serializer()),
+        initialValue = emptyList(),
+    )
     var roleCapabilitiesDraft by rememberDurableJsonState(
         key = COMPANY_ROLE_CAPABILITIES_KEY,
         serializer = SetSerializer(AgentCapability.serializer()),
@@ -90,6 +101,7 @@ internal fun CustomCompanyProviderScreen(
             DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_EXECUTION_SOURCE_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_SURFACES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_CAPABILITIES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_AUTHORITIES_KEY)
         }
@@ -104,6 +116,7 @@ internal fun CustomCompanyProviderScreen(
         roleInstructionsDraft = ""
         roleProviderDraftValue = ""
         roleExecutionSourceDraft = RoleExecutionSource.Agent
+        roleSurfacesDraft = emptyList()
         roleCapabilitiesDraft = emptySet()
         roleAuthoritiesDraft = emptySet()
     }
@@ -117,6 +130,7 @@ internal fun CustomCompanyProviderScreen(
         roleInstructionsDraft = role.instructions
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
         roleExecutionSourceDraft = role.executionSource
+        roleSurfacesDraft = role.surfaces
         roleCapabilitiesDraft = role.capabilitiesRequired
         roleAuthoritiesDraft = role.authorities
     }
@@ -440,7 +454,8 @@ internal fun CustomCompanyProviderScreen(
                             cleanId.isNotBlank() &&
                             cleanName.isNotBlank() &&
                             cleanId != ROLE_COLLECTION_MARKER_ID &&
-                            roleExecutionSourceDraft.isConfiguredExecutionSource()
+                            roleExecutionSourceDraft.isConfiguredExecutionSource() &&
+                            roleSurfacesDraft.isConfiguredRoleSurfaces()
                         ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
@@ -454,6 +469,7 @@ internal fun CustomCompanyProviderScreen(
                                     null
                                 },
                                 executionSource = roleExecutionSourceDraft,
+                                surfaces = roleSurfacesDraft,
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
                             )
@@ -504,6 +520,10 @@ internal fun CustomCompanyProviderScreen(
                     if (role.authorities.isNotEmpty()) {
                         append("\nAuthority: ")
                         append(role.authorities.joinToString { it.name.humanizeEnumName() })
+                    }
+                    if (role.surfaces.isNotEmpty()) {
+                        append("\nSurfaces: ")
+                        append(role.surfaces.joinToString { it.alias })
                     }
                     if (role.capabilitiesRequired.isNotEmpty()) {
                         append("\nRequires: ")
@@ -772,6 +792,7 @@ private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
 private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"
+private const val COMPANY_ROLE_SURFACES_KEY = "company.role.surfaces"
 private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
 private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
 
