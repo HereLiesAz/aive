@@ -109,7 +109,7 @@ data class ComputeMeshGrant(
 
     fun permits(device: ComputeDeviceAdvertisement): Boolean {
         val battery = device.load.batteryFraction
-        if (!allowWhileOnBattery && device.load.charging == false) return false
+        if (!allowWhileOnBattery && device.load.charging != true) return false
         if (battery != null && device.load.charging != true && battery < minimumBatteryFraction) return false
         return true
     }
@@ -149,6 +149,7 @@ data class ComputeParticipant(
 
 class ComputeMeshScheduler(
     private val localDevice: ComputeDeviceAdvertisement,
+    private val grants: Map<ComputeDeviceId, ComputeMeshGrant> = emptyMap(),
 ) {
     fun plan(
         policy: ComputePlacementPolicy,
@@ -182,7 +183,7 @@ class ComputeMeshScheduler(
         peers: Collection<ComputeDeviceAdvertisement>,
     ): ComputePlacementPlan {
         val preferred = peers.firstOrNull {
-            it.id.value == policy.deviceId && it.satisfies(policy.requirements)
+            it.id.value == policy.deviceId && it.satisfies(policy.requirements) && permittedByGrant(it)
         }
         if (preferred != null) return ComputePlacementPlan.Remote(preferred)
 
@@ -244,11 +245,16 @@ class ComputeMeshScheduler(
         )
     }
 
+    private fun permittedByGrant(device: ComputeDeviceAdvertisement): Boolean {
+        val grant = grants[device.id] ?: return true
+        return grant.permits(device)
+    }
+
     private fun eligible(
         peers: Collection<ComputeDeviceAdvertisement>,
         requirements: ComputeRequirements,
     ): List<ComputeDeviceAdvertisement> =
-        peers.filter { it.satisfies(requirements) }
+        peers.filter { it.satisfies(requirements) && permittedByGrant(it) }
             .sortedWith(
                 compareBy<ComputeDeviceAdvertisement> { it.load.saturation }
                     .thenByDescending { it.load.memoryAvailableBytes ?: it.memoryBytes }

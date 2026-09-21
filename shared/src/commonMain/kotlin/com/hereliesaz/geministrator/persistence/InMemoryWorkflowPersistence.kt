@@ -91,7 +91,7 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
 
         override suspend fun forRun(run: WorkflowRun): List<ArtifactRef> = mutex.withLock {
             val taskRunIds = run.taskRuns.values.map { it.id }.toSet()
-            artifactItems.values.filter { it.taskRunId in taskRunIds }
+            artifactItems.values.filter { it.taskRunId in taskRunIds }.sortedBy { it.createdAtEpochMillis }
         }
     }
 

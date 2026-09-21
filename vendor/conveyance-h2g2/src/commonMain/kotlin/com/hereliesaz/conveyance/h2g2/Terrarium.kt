@@ -197,10 +197,12 @@ fun H2g2SwarmTerrarium(
         val halfCreaturePx = creatureSizePx / 2f
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val snapshotById = snapshots.associateBy { it.id }
+        // groupBy so that multiple simultaneous relationships per node are all retained;
+        // downstream code picks the first (earliest in the list) when it needs a single value.
         val activeContactById = relationships
             .filter { it.active && it.kind != H2g2TerrariumRelationshipKind.Dependency }
             .flatMap { relationship -> listOf(relationship.from to relationship, relationship.to to relationship) }
-            .toMap()
+            .groupBy({ it.first }, { it.second })
 
         Canvas(Modifier.fillMaxSize()) {
             drawTerrariumBackdrop()
@@ -238,7 +240,7 @@ fun H2g2SwarmTerrarium(
                 }
             }
             val birthCenter = parentCenter?.let { parent -> parent + (currentCenter - parent) * birth.value } ?: currentCenter
-            val contact = activeContactById[node.id]
+            val contact = activeContactById[node.id]?.firstOrNull()
             val contactOtherId = contact?.let { if (it.from == node.id) it.to else it.from }
             val contactOther = contactOtherId?.let(snapshotById::get)
             val contactDirection = contactOther?.let { other ->

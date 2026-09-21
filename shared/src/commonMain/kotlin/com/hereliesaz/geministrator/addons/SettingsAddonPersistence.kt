@@ -1,50 +1,60 @@
 package com.hereliesaz.geministrator.addons
 
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 class AddonPersistenceCorruptionException(message: String, cause: Throwable) : IllegalStateException(message, cause)
 
+@Serializable
+private data class AddonPersistenceSnapshot(
+    val installations: List<AddonInstallation> = emptyList(),
+    val history: List<AddonInstallation> = emptyList(),
+)
+
+private val settingsAddonPersistenceMutex = Mutex()
+
 class SettingsAddonPersistence(private val settings: Settings) : AddonPersistence {
     private val json = Json { ignoreUnknownKeys = true }
-    private val installationsKey = "addon_installations"
-    private val historyKey = "addon_tombstones"
+    private val snapshotKey = "addon_state"
 
-    override fun getInstallations(): List<AddonInstallation> {
-        val raw = settings.getStringOrNull(installationsKey) ?: return emptyList()
+    private fun readSnapshot(): AddonPersistenceSnapshot {
+        val raw = settings.getStringOrNull(snapshotKey) ?: return AddonPersistenceSnapshot()
         return try {
-            json.decodeFromString<List<AddonInstallation>>(raw)
+            json.decodeFromString<AddonPersistenceSnapshot>(raw)
         } catch (failure: Exception) {
-            throw AddonPersistenceCorruptionException("Stored add-on installation data is corrupted.", failure)
+            throw AddonPersistenceCorruptionException("Stored add-on data is corrupted.", failure)
         }
     }
 
-    override fun saveInstallation(installation: AddonInstallation) {
-        val current = getInstallations().filterNot { it.id == installation.id }.toMutableList()
-        current.add(installation)
-        settings.putString(installationsKey, json.encodeToString(current))
+    private fun writeSnapshot(snapshot: AddonPersistenceSnapshot) {
+        settings.putString(snapshotKey, json.encodeToString(snapshot))
     }
 
-    override fun removeInstallation(id: String) {
-        val current = getInstallations()
-        val toRemove = current.find { it.id == id } ?: return
-        val history = readHistory().toMutableList()
+    override suspend fun getInstallations(): List<AddonInstallation> =
+        settingsAddonPersistenceMutex.withLock { readSnapshot().installations }
 
-        val remaining = current.filterNot { it.id == id }
-        history.removeAll { it.id == id && it.version == toRemove.version }
-        history.add(toRemove.copy(enabled = false))
-
-        settings.putString(installationsKey, json.encodeToString(remaining))
-        settings.putString(historyKey, json.encodeToString(history))
+    override suspend fun saveInstallation(installation: AddonInstallation) {
+        settingsAddonPersistenceMutex.withLock {
+            val snapshot = readSnapshot()
+            val updated = snapshot.installations.filterNot { it.id == installation.id }.toMutableList()
+            updated.add(installation)
+            writeSnapshot(snapshot.copy(installations = updated))
+        }
     }
 
-    private fun readHistory(): List<AddonInstallation> {
-        val raw = settings.getStringOrNull(historyKey) ?: return emptyList()
-        return try {
-            json.decodeFromString<List<AddonInstallation>>(raw)
-        } catch (failure: Exception) {
-            throw AddonPersistenceCorruptionException("Stored add-on tombstone data is corrupted.", failure)
+    override suspend fun removeInstallation(id: String) {
+        settingsAddonPersistenceMutex.withLock {
+            val snapshot = readSnapshot()
+            val toRemove = snapshot.installations.find { it.id == id } ?: return@withLock
+            val remaining = snapshot.installations.filterNot { it.id == id }
+            val history = snapshot.history.toMutableList()
+            history.removeAll { it.id == id && it.version == toRemove.version }
+            history.add(toRemove.copy(enabled = false))
+            writeSnapshot(snapshot.copy(installations = remaining, history = history))
         }
     }
 

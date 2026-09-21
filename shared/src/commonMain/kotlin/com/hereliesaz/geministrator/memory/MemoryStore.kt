@@ -40,10 +40,12 @@ class SettingsMemoryStore(
     private val storageKey: String = DEFAULT_STORAGE_KEY,
     private val json: Json = defaultJson,
 ) : MemoryStore {
-    override suspend fun read(): MemorySnapshot = settingsMemoryMutex.withLock { readUnlocked() }
+    private val mutex = Mutex()
+
+    override suspend fun read(): MemorySnapshot = mutex.withLock { readUnlocked() }
 
     override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation): Boolean =
-        settingsMemoryMutex.withLock {
+        mutex.withLock {
             val current = readUnlocked()
             if (current.revision != expectedRevision) return@withLock false
             val next = current.applyMutation(mutation)
@@ -52,7 +54,7 @@ class SettingsMemoryStore(
         }
 
     suspend fun clear() {
-        settingsMemoryMutex.withLock { settings.remove(storageKey) }
+        mutex.withLock { settings.remove(storageKey) }
     }
 
     private fun readUnlocked(): MemorySnapshot {
@@ -80,8 +82,6 @@ class SettingsMemoryStore(
         fun createDefault(): SettingsMemoryStore = SettingsMemoryStore(Settings())
     }
 }
-
-private val settingsMemoryMutex = Mutex()
 
 private fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation): MemorySnapshot {
     val episodeIds = episodes.mapTo(mutableSetOf()) { it.id }
