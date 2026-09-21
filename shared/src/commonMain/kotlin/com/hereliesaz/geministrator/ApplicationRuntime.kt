@@ -48,6 +48,7 @@ import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
 import com.hereliesaz.geministrator.workflow.ManagedSessionFailure
 import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
+import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
@@ -714,6 +715,7 @@ class ApplicationRuntime private constructor(
             scope: CoroutineScope,
             persistence: WorkflowPersistence = SettingsWorkflowPersistence.createDefault(),
             executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
+            roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
             providerRegistry: AgentProviderRegistry? = null,
             orchestrationUtilities: LocalOrchestrationUtilityFamily =
                 DeterministicLocalOrchestrationUtilities,
@@ -747,6 +749,7 @@ class ApplicationRuntime private constructor(
                     roles = roles,
                     eventSink = RepositoryWorkflowEventSink(persistence.events),
                     orchestrationUtilities = orchestrationUtilities,
+                    surfaceRuntime = roleSurfaceRuntime,
                 )
                 val coordinator = WorkflowRuntimeCoordinator(
                     persistence = persistence,
