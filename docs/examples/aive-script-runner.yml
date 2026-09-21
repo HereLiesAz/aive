@@ -1,0 +1,90 @@
+name: Aive Script Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      aive_context:
+        description: JSON task envelope supplied by The Aive
+        required: true
+        type: string
+      aive_script:
+        description: JavaScript or Python role source supplied by The Aive
+        required: true
+        type: string
+      aive_language:
+        description: javascript or python
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AIVE_CONTEXT: ${{ inputs.aive_context }}
+      AIVE_SCRIPT: ${{ inputs.aive_script }}
+      AIVE_LANGUAGE: ${{ inputs.aive_language }}
+    steps:
+      - name: Execute Aive role script
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .aive-runner
+          printf '%s' "$AIVE_CONTEXT" > .aive-runner/context.json
+          printf '%s' "$AIVE_SCRIPT" > .aive-runner/source.txt
+
+          if [ "$AIVE_LANGUAGE" = "javascript" ]; then
+            node <<'AIVE_NODE'
+          const fs = require("fs");
+          const context = JSON.parse(fs.readFileSync(".aive-runner/context.json", "utf8"));
+          const source = fs.readFileSync(".aive-runner/source.txt", "utf8");
+          const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+          (async () => {
+            const fn = new AsyncFunction("aive", source);
+            const value = await fn(Object.freeze(context));
+            const result = value === undefined ? { status: "completed" } : value;
+            fs.writeFileSync(".aive-runner/aive-result.json", JSON.stringify(result));
+          })().catch((error) => {
+            fs.writeFileSync(
+              ".aive-runner/aive-result.json",
+              JSON.stringify({ status: "failed", message: String(error && error.stack || error) }),
+            );
+            process.exitCode = 1;
+          });
+          AIVE_NODE
+          elif [ "$AIVE_LANGUAGE" = "python" ]; then
+            python3 <<'AIVE_PYTHON'
+          import json
+          from pathlib import Path
+
+          context = json.loads(Path(".aive-runner/context.json").read_text())
+          source = Path(".aive-runner/source.txt").read_text()
+          scope = {"aive": context, "result": None}
+          try:
+              exec(compile(source, "<aive-role>", "exec"), {"__builtins__": __builtins__}, scope)
+              result = scope.get("result")
+              if result is None:
+                  result = {"status": "completed"}
+          except Exception as error:
+              result = {"status": "failed", "message": repr(error)}
+              Path(".aive-runner/aive-result.json").write_text(json.dumps(result))
+              raise
+          Path(".aive-runner/aive-result.json").write_text(json.dumps(result))
+          AIVE_PYTHON
+          else
+            printf '{"status":"failed","message":"Unsupported aive_language"}' > .aive-runner/aive-result.json
+            exit 2
+          fi
+
+      - name: Publish Aive result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aive-result
+          path: .aive-runner/aive-result.json
+          if-no-files-found: error
+          retention-days: 7
