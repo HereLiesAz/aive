@@ -243,12 +243,161 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            CompanySectionLabel("Provider routing")
-            CompanyProviderChoiceRow(
-                selectedProviderId = roleProviderDraft,
-                connectedProviderIds = connectedProviderIds,
-                onSelected = { roleProviderDraftValue = it.orEmpty() },
-            )
+            CompanySectionLabel("Execution source")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = "Agent / provider",
+                    seed = "role-execution-agent",
+                    selected = roleExecutionSourceDraft is RoleExecutionSource.Agent,
+                    onClick = { roleExecutionSourceDraft = RoleExecutionSource.Agent },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "GitHub Actions",
+                    seed = "role-execution-github",
+                    selected = roleExecutionSourceDraft is RoleExecutionSource.GitHubAction,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.GitHubAction
+                        roleExecutionSourceDraft = RoleExecutionSource.GitHubAction(
+                            workflow = current?.workflow.orEmpty(),
+                            ref = current?.ref,
+                            contextInput = current?.contextInput ?: "aive_context",
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "JavaScript",
+                    seed = "role-execution-javascript",
+                    selected = (roleExecutionSourceDraft as? RoleExecutionSource.Script)?.language == ScriptLanguage.JavaScript,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.Script
+                        roleExecutionSourceDraft = RoleExecutionSource.Script(
+                            language = ScriptLanguage.JavaScript,
+                            source = current?.source?.takeIf(String::isNotBlank)
+                                ?: "return { status: 'completed', output: JSON.stringify(aive) };",
+                            runner = if (current?.language == ScriptLanguage.JavaScript) current.runner else ScriptRunner.LocalSandbox,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Python",
+                    seed = "role-execution-python",
+                    selected = (roleExecutionSourceDraft as? RoleExecutionSource.Script)?.language == ScriptLanguage.Python,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.Script
+                        roleExecutionSourceDraft = RoleExecutionSource.Script(
+                            language = ScriptLanguage.Python,
+                            source = current?.source?.takeIf(String::isNotBlank)
+                                ?: "result = {'status': 'completed', 'output': str(aive)}",
+                            runner = current?.runner as? ScriptRunner.GitHubActions
+                                ?: ScriptRunner.GitHubActions(workflow = ""),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            when (val source = roleExecutionSourceDraft) {
+                RoleExecutionSource.Agent -> {
+                    Text(
+                        "The role runs as an AI agent. Choose a provider or leave it on Auto.",
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                    CompanyProviderChoiceRow(
+                        selectedProviderId = roleProviderDraft,
+                        connectedProviderIds = connectedProviderIds,
+                        onSelected = { roleProviderDraftValue = it.orEmpty() },
+                    )
+                }
+                is RoleExecutionSource.GitHubAction -> {
+                    CompanyGitHubActionFields(
+                        workflow = source.workflow,
+                        ref = source.ref.orEmpty(),
+                        contextInput = source.contextInput,
+                        onChange = { workflow, ref, contextInput ->
+                            roleExecutionSourceDraft = source.copy(
+                                workflow = workflow,
+                                ref = ref.trim().takeIf(String::isNotEmpty),
+                                contextInput = contextInput.ifBlank { "aive_context" },
+                            )
+                        },
+                    )
+                    Text(
+                        "The workflow receives the role/task payload as JSON in the configured context input.",
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+                is RoleExecutionSource.Script -> {
+                    if (source.language == ScriptLanguage.JavaScript) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AzphaltPill(
+                                label = "Local sandbox",
+                                seed = "role-script-local",
+                                selected = source.runner is ScriptRunner.LocalSandbox,
+                                onClick = { roleExecutionSourceDraft = source.copy(runner = ScriptRunner.LocalSandbox) },
+                            )
+                            AzphaltPill(
+                                label = "GitHub runner",
+                                seed = "role-script-github",
+                                selected = source.runner is ScriptRunner.GitHubActions,
+                                onClick = {
+                                    roleExecutionSourceDraft = source.copy(
+                                        runner = source.runner as? ScriptRunner.GitHubActions
+                                            ?: ScriptRunner.GitHubActions(workflow = ""),
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Text(
+                            "Python runs through a GitHub Actions runner, using the same Aive task envelope as other execution sources.",
+                            style = AzphaltType.body,
+                            color = Azphalt.currentGround.onPage,
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = source.source,
+                        onValueChange = { roleExecutionSourceDraft = source.copy(source = it) },
+                        label = { Text(if (source.language == ScriptLanguage.JavaScript) "JavaScript" else "Python") },
+                        minLines = 8,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    when (val runner = source.runner) {
+                        ScriptRunner.LocalSandbox -> {
+                            Text(
+                                "Local JavaScript receives a frozen 'aive' object. Return { status, message, output, artifacts }.",
+                                style = AzphaltType.body,
+                                color = Azphalt.currentGround.onPage,
+                            )
+                        }
+                        is ScriptRunner.GitHubActions -> {
+                            CompanyGitHubScriptRunnerFields(
+                                runner = runner,
+                                onChange = { updated -> roleExecutionSourceDraft = source.copy(runner = updated) },
+                            )
+                            Text(
+                                "The runner receives aive_context, aive_script, and aive_language by default.",
+                                style = AzphaltType.body,
+                                color = Azphalt.currentGround.onPage,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!roleExecutionSourceDraft.isConfiguredExecutionSource()) {
+                Text(
+                    "Complete the execution-source fields before saving this role.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            }
 
             CompanySectionLabel("Required capabilities")
             AgentCapability.entries.forEach { capability ->
@@ -290,7 +439,8 @@ internal fun CustomCompanyProviderScreen(
                         if (
                             cleanId.isNotBlank() &&
                             cleanName.isNotBlank() &&
-                            cleanId != ROLE_COLLECTION_MARKER_ID
+                            cleanId != ROLE_COLLECTION_MARKER_ID &&
+                            roleExecutionSourceDraft.isConfiguredExecutionSource()
                         ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
@@ -298,7 +448,12 @@ internal fun CustomCompanyProviderScreen(
                                 description = roleDescDraft.trim(),
                                 instructions = roleInstructionsDraft.trim(),
                                 enabled = true,
-                                preferredProviderId = roleProviderDraft?.let(::AgentProviderId),
+                                preferredProviderId = if (roleExecutionSourceDraft is RoleExecutionSource.Agent) {
+                                    roleProviderDraft?.let(::AgentProviderId)
+                                } else {
+                                    null
+                                },
+                                executionSource = roleExecutionSourceDraft,
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
                             )
@@ -344,7 +499,8 @@ internal fun CustomCompanyProviderScreen(
                 title = role.name,
                 body = buildString {
                     append(role.description)
-                    append("\nProvider: $providerLabel")
+                    append("\nExecution: ")
+                    append(role.executionSource.companyExecutionLabel(providerLabel))
                     if (role.authorities.isNotEmpty()) {
                         append("\nAuthority: ")
                         append(role.authorities.joinToString { it.name.humanizeEnumName() })
@@ -390,18 +546,26 @@ internal fun CustomCompanyProviderScreen(
                                 },
                             )
                         }
-                        Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
-                        CompanyProviderChoiceRow(
-                            selectedProviderId = assigned,
-                            connectedProviderIds = connectedProviderIds,
-                            onSelected = { selected ->
-                                draftRoles = draftRoles.toMutableList().also { roles ->
-                                    roles[index] = role.copy(
-                                        preferredProviderId = selected?.let(::AgentProviderId),
-                                    )
-                                }
-                            },
-                        )
+                        if (role.executionSource is RoleExecutionSource.Agent) {
+                            Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            CompanyProviderChoiceRow(
+                                selectedProviderId = assigned,
+                                connectedProviderIds = connectedProviderIds,
+                                onSelected = { selected ->
+                                    draftRoles = draftRoles.toMutableList().also { roles ->
+                                        roles[index] = role.copy(
+                                            preferredProviderId = selected?.let(::AgentProviderId),
+                                        )
+                                    }
+                                },
+                            )
+                        } else {
+                            AzphaltNote(
+                                seed = "company-execution-${role.id.value}",
+                                label = "Execution source",
+                                value = role.executionSource.companyExecutionLabel(providerLabel),
+                            )
+                        }
                     }
                 },
             )
