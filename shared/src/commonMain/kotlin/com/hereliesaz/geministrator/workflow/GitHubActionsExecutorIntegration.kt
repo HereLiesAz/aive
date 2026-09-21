@@ -284,6 +284,7 @@ class GitHubRestActionsClient(
 
 class GitHubActionsExecutorIntegration(
     private val client: GitHubActionsClient,
+    private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     private val json: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true },
 ) : TaskExecutorIntegration {
     override fun supports(executor: TaskExecutor): Boolean = when (executor) {
@@ -294,7 +295,11 @@ class GitHubActionsExecutorIntegration(
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val repository = requireGitHubRepository(context)
-        val envelope = json.encodeToString(AiveTaskEnvelope.serializer(), context.toAiveTaskEnvelope())
+        val surfaces = surfaceRuntime.resolve(context.role?.surfaces.orEmpty())
+        val envelope = json.encodeToString(
+            AiveTaskEnvelope.serializer(),
+            context.toAiveTaskEnvelope(surfaces),
+        )
         val request = when (val executor = context.executor) {
             is TaskExecutor.GitHubAction -> {
                 val ref = executor.ref ?: repository.defaultBranch
@@ -345,7 +350,6 @@ class GitHubActionsExecutorIntegration(
         }
         val run = client.getRun(repository, runId)
         val scriptResult = if (
-            context.executor is TaskExecutor.Script &&
             run.status == GitHubWorkflowRunStatus.Completed
         ) {
             run.artifacts
@@ -356,6 +360,15 @@ class GitHubActionsExecutorIntegration(
         } else {
             null
         }
+        scriptResult?.surfaceMutations
+            ?.takeIf(List<AiveSurfaceMutation>::isNotEmpty)
+            ?.let { mutations ->
+                surfaceRuntime.apply(
+                    surfaces = context.role?.surfaces.orEmpty(),
+                    mutations = mutations,
+                    executionKey = "github:${context.taskRun.id.value}:${context.taskRun.attempt}",
+                )
+            }
         return run.toExecution(context, scriptResult)
     }
 
