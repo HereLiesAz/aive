@@ -37,6 +37,8 @@ data class AzphaltPreparedModelInstall(
     val version: String,
     val verification: AzphaltPackageVerification,
     val assets: List<AzphaltAssetEntry>,
+    val revocationStatusVerified: Boolean = true,
+    val localImport: Boolean = false,
 )
 
 data class AzphaltPreparedInstall(
@@ -177,6 +179,62 @@ class AzphaltStoreService(
         )
     }
 
+    suspend fun prepareLocalModelInstall(bytes: ByteArray): AzphaltPreparedModelInstall {
+        val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
+        val verified = verifier.verify(bytes, signingKeys)
+        val manifest = verified.packageContents.manifest
+        require(manifest.kind == "asset") { "Imported package ${manifest.id} is not a model asset package" }
+        requireTargetsAive(manifest.id, manifest.targetApps)
+
+        val revocationResult = runCatching { revocations() }
+        revocationResult.getOrNull()?.let { known ->
+            requireNotRevoked(manifest.id, manifest.version, known)
+        }
+        val revocationStatusVerified = revocationResult.isSuccess
+        val verification = if (revocationStatusVerified) {
+            verified
+        } else {
+            verified.copy(
+                trusted = false,
+                trustReason = "${verified.trustReason}; repository revocation status unavailable",
+            )
+        }
+
+        val compat = azphaltCompatSatisfies(manifest.compat)
+        require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
+        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $HAIVE_AZPHALT_API_VERSION" }
+        val assets = manifest.assets.orEmpty().filter(AzphaltAssetEntry::isModelAsset)
+        require(assets.isNotEmpty()) { "Package ${manifest.id} contains no model assets" }
+        val host = requireNotNull(modelInstaller) { "Model installation is unavailable on this host" }
+        val unsupported = assets.map(AzphaltAssetEntry::type).filterNot { type ->
+            host.supportedAssetTypes.any { it.equals(type, ignoreCase = true) }
+        }.distinct()
+        require(unsupported.isEmpty()) { "This device cannot install model formats ${unsupported.joinToString()}" }
+        assets.forEach { validateModelAsset(it, verification.packageContents) }
+
+        val detail = AzphaltPackageDetail(
+            id = manifest.id,
+            name = manifest.name,
+            author = manifest.author,
+            description = manifest.description,
+            version = manifest.version,
+            latest = manifest.version,
+            kind = manifest.kind,
+            targetApps = manifest.targetApps,
+            manifest = manifest,
+            versions = listOf(AzphaltPackageVersion(version = manifest.version, size = bytes.size.toLong())),
+        )
+        return AzphaltPreparedModelInstall(
+            repositoryUrl = repository.repositoryUrl,
+            detail = detail,
+            version = manifest.version,
+            verification = verification,
+            assets = assets,
+            revocationStatusVerified = revocationStatusVerified,
+            localImport = true,
+        )
+    }
+
     suspend fun installModel(
         prepared: AzphaltPreparedModelInstall,
         nowEpochMillis: Long,
@@ -184,7 +242,13 @@ class AzphaltStoreService(
         allowPublisherChange: Boolean = false,
     ): InstalledAzphaltModelPackage {
         val host = requireNotNull(modelInstaller) { "Model installation is unavailable on this host" }
-        requireNotRevoked(prepared.detail.id, prepared.version)
+        if (prepared.revocationStatusVerified) {
+            requireNotRevoked(prepared.detail.id, prepared.version)
+        } else {
+            require(prepared.localImport && allowUntrustedSigner) {
+                "Repository revocation status is unavailable; explicit offline/untrusted approval is required"
+            }
+        }
         val verification = prepared.verification
         require(!verification.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${prepared.detail.id}; explicit publisher-change approval is required"
