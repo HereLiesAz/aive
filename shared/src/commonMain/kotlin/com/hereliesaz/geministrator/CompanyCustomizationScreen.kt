@@ -26,6 +26,9 @@ import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import kotlinx.serialization.builtins.ListSerializer
@@ -59,6 +62,11 @@ internal fun CustomCompanyProviderScreen(
     var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
     var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
+    var roleExecutionSourceDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_EXECUTION_SOURCE_KEY,
+        serializer = RoleExecutionSource.serializer(),
+        initialValue = RoleExecutionSource.Agent,
+    )
     var roleCapabilitiesDraft by rememberDurableJsonState(
         key = COMPANY_ROLE_CAPABILITIES_KEY,
         serializer = SetSerializer(AgentCapability.serializer()),
@@ -81,6 +89,7 @@ internal fun CustomCompanyProviderScreen(
             DurableUiState.store.remove(COMPANY_ROLE_DESCRIPTION_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_EXECUTION_SOURCE_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_CAPABILITIES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_AUTHORITIES_KEY)
         }
@@ -94,6 +103,7 @@ internal fun CustomCompanyProviderScreen(
         roleDescDraft = ""
         roleInstructionsDraft = ""
         roleProviderDraftValue = ""
+        roleExecutionSourceDraft = RoleExecutionSource.Agent
         roleCapabilitiesDraft = emptySet()
         roleAuthoritiesDraft = emptySet()
     }
@@ -106,6 +116,7 @@ internal fun CustomCompanyProviderScreen(
         roleDescDraft = role.description
         roleInstructionsDraft = role.instructions
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
+        roleExecutionSourceDraft = role.executionSource
         roleCapabilitiesDraft = role.capabilitiesRequired
         roleAuthoritiesDraft = role.authorities
     }
@@ -498,6 +509,7 @@ private const val COMPANY_ROLE_NAME_KEY = "company.role.name"
 private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
+private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"
 private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
 private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
 
