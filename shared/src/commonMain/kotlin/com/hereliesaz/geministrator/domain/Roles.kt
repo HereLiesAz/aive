@@ -81,6 +81,95 @@ sealed interface RoleExecutionSource {
 }
 
 @Serializable
+enum class SpreadsheetFormat {
+    Auto,
+    Csv,
+    Tsv,
+}
+
+@Serializable
+sealed interface SpreadsheetSource {
+    @Serializable
+    data class AppFile(val name: String) : SpreadsheetSource
+
+    @Serializable
+    data class Inline(val text: String) : SpreadsheetSource
+
+    @Serializable
+    data class DocumentUri(val uri: String) : SpreadsheetSource
+
+    @Serializable
+    data class Https(val url: String) : SpreadsheetSource
+}
+
+@Serializable
+enum class SqlDialect {
+    SQLite,
+}
+
+@Serializable
+sealed interface SqlDatabaseSource {
+    @Serializable
+    data class AppDatabase(val name: String) : SqlDatabaseSource
+
+    @Serializable
+    data class DocumentUri(val uri: String) : SqlDatabaseSource
+}
+
+@Serializable
+enum class FlowchartLanguage {
+    Mermaid,
+}
+
+@Serializable
+sealed interface RoleSurface {
+    val alias: String
+
+    @Serializable
+    data class Spreadsheet(
+        override val alias: String,
+        val source: SpreadsheetSource,
+        val format: SpreadsheetFormat = SpreadsheetFormat.Auto,
+        val firstRowHeaders: Boolean = true,
+        val writable: Boolean = false,
+        val maxRows: Int = 1_000,
+    ) : RoleSurface {
+        init {
+            require(alias.isNotBlank()) { "Spreadsheet surface alias must not be blank" }
+            require(maxRows in 1..10_000) { "Spreadsheet surface maxRows must be between 1 and 10,000" }
+        }
+    }
+
+    @Serializable
+    data class Sql(
+        override val alias: String,
+        val source: SqlDatabaseSource,
+        val dialect: SqlDialect = SqlDialect.SQLite,
+        val query: String,
+        val writable: Boolean = false,
+        val maxRows: Int = 1_000,
+    ) : RoleSurface {
+        init {
+            require(alias.isNotBlank()) { "SQL surface alias must not be blank" }
+            require(query.isNotBlank()) { "SQL surface query must not be blank" }
+            require(maxRows in 1..10_000) { "SQL surface maxRows must be between 1 and 10,000" }
+        }
+    }
+
+    @Serializable
+    data class Flowchart(
+        override val alias: String,
+        val language: FlowchartLanguage = FlowchartLanguage.Mermaid,
+        val source: String,
+    ) : RoleSurface {
+        init {
+            require(alias.isNotBlank()) { "Flowchart surface alias must not be blank" }
+            require(source.isNotBlank()) { "Flowchart source must not be blank" }
+        }
+    }
+}
+
+@Serializable
 data class RoleDefinition(
     val id: RoleDefinitionId,
     val name: String,
@@ -89,6 +178,7 @@ data class RoleDefinition(
     val enabled: Boolean = true,
     val preferredProviderId: AgentProviderId? = null,
     val executionSource: RoleExecutionSource = RoleExecutionSource.Agent,
+    val surfaces: List<RoleSurface> = emptyList(),
     val capabilitiesRequired: Set<AgentCapability> = emptySet(),
     val authorities: Set<RoleAuthority> = emptySet(),
 )
