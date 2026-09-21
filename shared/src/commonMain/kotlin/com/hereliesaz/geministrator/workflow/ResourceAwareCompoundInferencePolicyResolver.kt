@@ -80,8 +80,9 @@ object ResourceAwareCompoundInferencePolicyResolver {
         repository: RepositoryRef?,
         profileCache: MutableMap<AgentProviderId, InferenceProviderResourceProfile>,
     ): CompoundInferencePolicy {
-        require(task.effectiveExecutor() is TaskExecutor.RoleAgent) {
-            "Resource-aware compound inference is only supported for role-agent tasks (${task.id.value})"
+        val responsibleRole = task.roleId?.let(rolesById::get)
+        require(task.effectiveExecutor(responsibleRole) is TaskExecutor.RoleAgent) {
+            "Resource-aware compound inference requires an Agent execution source (${task.id.value})"
         }
 
         val complexityScore = task.dependsOn.size * DEPENDENCY_WEIGHT +
