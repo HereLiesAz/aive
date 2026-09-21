@@ -87,7 +87,7 @@ internal class AndroidProviderCredentialStore(context: Context) {
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "haive.jules.api-key"
+        const val KEY_ALIAS = "haive.provider.api-key"
         const val PREFERENCES_NAME = "haive.credentials"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128

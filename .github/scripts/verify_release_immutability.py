@@ -28,11 +28,11 @@ elif match.group(4) != "0":
 
 required_fragments = {
     'AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"':
-        "build jobs do not derive MAJOR.MINOR.PATCH.BUILD from github.run_number",
-    'VERSION_NAME="${MAJOR}.${MINOR}.${PATCH}.${GITHUB_RUN_NUMBER}"':
-        "release job does not derive a four-part version",
-    'TAG_NAME="v${VERSION_NAME}"':
-        "release tag is not tied to the full four-part version",
+        "desktop-packages job does not derive MAJOR.MINOR.PATCH.BUILD from github.run_number",
+    'build-number: ${{ github.run_number }}':
+        "build job does not pass github.run_number to four-part-version action",
+    'build-version: ${{ steps.version.outputs.version }}':
+        "release job does not pass the four-part version to the release action",
     'release-files/TheAive-${VERSION_NAME}-android.apk':
         "Android release asset does not contain the full four-part version",
     'release-files/TheAive-${VERSION_NAME}.deb':

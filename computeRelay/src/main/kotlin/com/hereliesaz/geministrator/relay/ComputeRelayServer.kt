@@ -48,6 +48,10 @@ class ComputeRelayHub(
 
     suspend fun sweepExpired() {
         pools.values.forEach { it.sweepExpired() }
+        val emptyPoolIds = pools.entries
+            .filter { it.value.isEmpty() }
+            .map { it.key }
+        emptyPoolIds.forEach { pools.remove(it) }
     }
 }
 
@@ -148,29 +152,45 @@ fun Application.computeRelayModule(
                         )
                         continue
                     }
-                    when (message) {
-                        is ComputeRelayClientMessage.Register -> {
-                            peer.send(
-                                ComputeRelayServerMessage.Error(
-                                    code = "already-registered",
-                                    message = "This connection is already registered",
-                                ),
-                            )
+                    try {
+                        when (message) {
+                            is ComputeRelayClientMessage.Register -> {
+                                peer.send(
+                                    ComputeRelayServerMessage.Error(
+                                        code = "already-registered",
+                                        message = "This connection is already registered",
+                                    ),
+                                )
+                            }
+                            is ComputeRelayClientMessage.UpdateNode -> pool.updateNode(nodeId, message.node)
+                            is ComputeRelayClientMessage.PublishLease -> pool.publish(nodeId, message.envelope)
+                            is ComputeRelayClientMessage.ClaimLease -> pool.claim(nodeId, message.leaseId)
+                            is ComputeRelayClientMessage.LeaseHeartbeat -> pool.heartbeat(nodeId, message.leaseId)
+                            is ComputeRelayClientMessage.LeaseProgress -> {
+                                pool.progress(nodeId, message.leaseId, message.progress)
+                            }
+                            is ComputeRelayClientMessage.CompleteLease -> {
+                                pool.complete(nodeId, message.leaseId, message.result)
+                            }
+                            is ComputeRelayClientMessage.CancelLease -> {
+                                pool.cancel(nodeId, message.leaseId, message.reason)
+                            }
+                            ComputeRelayClientMessage.NodeHeartbeat -> Unit
                         }
-                        is ComputeRelayClientMessage.UpdateNode -> pool.updateNode(nodeId, message.node)
-                        is ComputeRelayClientMessage.PublishLease -> pool.publish(nodeId, message.envelope)
-                        is ComputeRelayClientMessage.ClaimLease -> pool.claim(nodeId, message.leaseId)
-                        is ComputeRelayClientMessage.LeaseHeartbeat -> pool.heartbeat(nodeId, message.leaseId)
-                        is ComputeRelayClientMessage.LeaseProgress -> {
-                            pool.progress(nodeId, message.leaseId, message.progress)
-                        }
-                        is ComputeRelayClientMessage.CompleteLease -> {
-                            pool.complete(nodeId, message.leaseId, message.result)
-                        }
-                        is ComputeRelayClientMessage.CancelLease -> {
-                            pool.cancel(nodeId, message.leaseId, message.reason)
-                        }
-                        ComputeRelayClientMessage.NodeHeartbeat -> Unit
+                    } catch (e: IllegalArgumentException) {
+                        peer.send(
+                            ComputeRelayServerMessage.Error(
+                                code = "bad-request",
+                                message = e.message ?: "Invalid message content",
+                            ),
+                        )
+                    } catch (e: IllegalStateException) {
+                        peer.send(
+                            ComputeRelayServerMessage.Error(
+                                code = "bad-state",
+                                message = e.message ?: "Unexpected relay state",
+                            ),
+                        )
                     }
                 }
             } finally {

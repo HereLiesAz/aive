@@ -17,9 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @Composable
 fun AddonHostScreen(
@@ -33,20 +35,21 @@ fun AddonHostScreen(
     packageSourceStatus: String? = null,
 ) {
     val persistence = remember { SettingsAddonPersistence.createDefault() }
-    var storedInstallations by remember {
-        mutableStateOf(runCatching { persistence.getInstallations() }.getOrDefault(emptyList()))
-    }
+    val scope = rememberCoroutineScope()
+    var storedInstallations by remember { mutableStateOf(emptyList<AddonInstallation>()) }
     var storageFailure by remember { mutableStateOf<String?>(null) }
 
     fun reloadStoredInstallations() {
-        runCatching { persistence.getInstallations() }
-            .onSuccess {
-                storedInstallations = it
-                storageFailure = null
-            }
-            .onFailure { failure ->
-                storageFailure = failure.message ?: "Add-on storage could not be read."
-            }
+        scope.launch {
+            runCatching { persistence.getInstallations() }
+                .onSuccess {
+                    storedInstallations = it
+                    storageFailure = null
+                }
+                .onFailure { failure ->
+                    storageFailure = failure.message ?: "Add-on storage could not be read."
+                }
+        }
     }
 
     val visibleInstallations = if (installations.isNotEmpty()) installations else storedInstallations
@@ -69,26 +72,30 @@ fun AddonHostScreen(
                     Text(if (installation.enabled) "Enabled" else "Disabled")
                     Button(onClick = {
                         val enabled = !installation.enabled
-                        runCatching {
-                            persistence.saveInstallation(installation.copy(enabled = enabled))
-                        }.onSuccess {
-                            reloadStoredInstallations()
-                            onEnableDisable(installation.id, enabled)
-                        }.onFailure { failure ->
-                            storageFailure = failure.message ?: "Add-on state could not be saved."
+                        scope.launch {
+                            runCatching {
+                                persistence.saveInstallation(installation.copy(enabled = enabled))
+                            }.onSuccess {
+                                reloadStoredInstallations()
+                                onEnableDisable(installation.id, enabled)
+                            }.onFailure { failure ->
+                                storageFailure = failure.message ?: "Add-on state could not be saved."
+                            }
                         }
                     }) {
                         Text(if (installation.enabled) "Disable" else "Enable")
                     }
                     Button(onClick = {
-                        runCatching { persistence.removeInstallation(installation.id) }
-                            .onSuccess {
-                                reloadStoredInstallations()
-                                onRemove(installation.id)
-                            }
-                            .onFailure { failure ->
-                                storageFailure = failure.message ?: "Add-on could not be removed."
-                            }
+                        scope.launch {
+                            runCatching { persistence.removeInstallation(installation.id) }
+                                .onSuccess {
+                                    reloadStoredInstallations()
+                                    onRemove(installation.id)
+                                }
+                                .onFailure { failure ->
+                                    storageFailure = failure.message ?: "Add-on could not be removed."
+                                }
+                        }
                     }) {
                         Text("Remove")
                     }

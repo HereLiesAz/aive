@@ -184,6 +184,7 @@ class GitLabWorkspaceAgentProvider(
         try {
             if (session.phase.value == Phase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
 
@@ -199,6 +200,7 @@ class GitLabWorkspaceAgentProvider(
                         val phase = session.phase.filter { it != Phase.AwaitingApproval }.first()
                         if (phase == Phase.Cancelled) {
                             emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                            sessionsMutex.withLock { sessions.remove(runId) }
                             return@flow
                         }
                     }
@@ -206,6 +208,7 @@ class GitLabWorkspaceAgentProvider(
                 }
                 if (session.phase.value == Phase.Cancelled) {
                     emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                    sessionsMutex.withLock { sessions.remove(runId) }
                     return@flow
                 }
                 emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
@@ -246,6 +249,7 @@ class GitLabWorkspaceAgentProvider(
                     )
                 }
                 emit(AgentEvent.Completed(runId))
+                sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
 
@@ -269,6 +273,7 @@ class GitLabWorkspaceAgentProvider(
                 val phase = session.phase.filter { it != Phase.AwaitingApproval }.first()
                 if (phase == Phase.Cancelled) {
                     emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                    sessionsMutex.withLock { sessions.remove(runId) }
                     return@flow
                 }
                 emit(AgentEvent.PlanApproved(runId))
@@ -280,6 +285,7 @@ class GitLabWorkspaceAgentProvider(
 
             if (session.phase.value == Phase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
 
@@ -319,6 +325,7 @@ class GitLabWorkspaceAgentProvider(
                     emit(AgentEvent.UsageReported(runId, inputTokens = inputTokens, outputTokens = outputTokens))
                 }
                 emit(AgentEvent.Completed(runId))
+                sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
 
@@ -379,6 +386,7 @@ class GitLabWorkspaceAgentProvider(
                 emit(AgentEvent.UsageReported(runId, inputTokens = inputTokens, outputTokens = outputTokens))
             }
             emit(AgentEvent.Completed(runId))
+            sessionsMutex.withLock { sessions.remove(runId) }
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Throwable) {
@@ -389,6 +397,7 @@ class GitLabWorkspaceAgentProvider(
                         ?: failure::class.simpleName.orEmpty().ifBlank { "GitLab workspace execution failed" },
                 ),
             )
+            sessionsMutex.withLock { sessions.remove(runId) }
         }
     }
 

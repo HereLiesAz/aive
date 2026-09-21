@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.addons
 
 import com.russhwolf.settings.MapSettings
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,7 +10,7 @@ import kotlin.test.assertTrue
 
 class SettingsAddonPersistenceTest {
     @Test
-    fun installationsRoundTripAndCanBeDisabled() {
+    fun installationsRoundTripAndCanBeDisabled() = runBlocking {
         val settings = MapSettings()
         val persistence = SettingsAddonPersistence(settings)
         val installation = AddonInstallation(
@@ -31,7 +32,7 @@ class SettingsAddonPersistenceTest {
     }
 
     @Test
-    fun removeDeletesActiveInstallation() {
+    fun removeDeletesActiveInstallation() = runBlocking {
         val settings = MapSettings()
         val persistence = SettingsAddonPersistence(settings)
         persistence.saveInstallation(
@@ -51,18 +52,19 @@ class SettingsAddonPersistenceTest {
     }
 
     @Test
-    fun corruptedInstallationStateFailsClosedInsteadOfPretendingNothingIsInstalled() {
+    fun corruptedInstallationStateFailsClosedInsteadOfPretendingNothingIsInstalled() = runBlocking {
         val settings = MapSettings()
-        settings.putString("addon_installations", "not-json")
+        settings.putString("addon_state", "not-json")
         val persistence = SettingsAddonPersistence(settings)
 
         assertFailsWith<AddonPersistenceCorruptionException> {
             persistence.getInstallations()
         }
+        Unit
     }
 
     @Test
-    fun corruptedTombstoneHistoryDoesNotPartiallyRemoveActiveInstallation() {
+    fun corruptedStateDoesNotSilentlySucceedOnRemove() = runBlocking {
         val settings = MapSettings()
         val persistence = SettingsAddonPersistence(settings)
         val installation = AddonInstallation(
@@ -74,12 +76,13 @@ class SettingsAddonPersistenceTest {
             importedWorkflowIds = emptyList(),
         )
         persistence.saveInstallation(installation)
-        settings.putString("addon_tombstones", "not-json")
+        // The single key holds both installations and history; corrupt the whole blob
+        settings.putString("addon_state", "not-json")
 
+        // removeInstallation must throw rather than silently succeed on corrupt state
         assertFailsWith<AddonPersistenceCorruptionException> {
             persistence.removeInstallation(installation.id)
         }
-
-        assertEquals(listOf(installation), persistence.getInstallations())
+        Unit
     }
 }

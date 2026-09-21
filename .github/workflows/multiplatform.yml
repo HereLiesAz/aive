@@ -35,6 +35,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Resolve four-part build version
+        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -65,8 +66,9 @@ jobs:
           java-version: "21"
 
       - name: Set up Rust native toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@v1
         with:
+          toolchain: stable
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Install cargo-ndk
@@ -112,6 +114,9 @@ jobs:
           fi
           echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "Android release versionCode: $VERSION_CODE"
+
+      - name: Verify release immutability policy
+        run: python3 .github/scripts/verify_release_immutability.py
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
@@ -305,7 +310,7 @@ jobs:
 
   desktop-packages:
     name: Desktop installer (${{ matrix.platform }})
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -366,7 +371,9 @@ jobs:
           java-version: "21"
 
       - name: Set up Rust native toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -472,6 +479,7 @@ jobs:
 
       - name: Derive four-part release version
         id: version
+        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -524,6 +532,7 @@ jobs:
           } > release-notes.md
 
       - name: Publish grouped patch release
+        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
         uses: HereLiesAz/workflows/.github/actions/patch-grouped-release@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

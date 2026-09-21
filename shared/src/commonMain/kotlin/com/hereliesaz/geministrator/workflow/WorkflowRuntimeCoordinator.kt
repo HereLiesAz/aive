@@ -117,7 +117,7 @@ class WorkflowRuntimeCoordinator(
         val authoritativeState = if (
             persistedRun != null &&
             persistedRun != state.run &&
-            persistedRun.updatedAtEpochMillis >= state.run.updatedAtEpochMillis
+            persistedRun.updatedAtEpochMillis > state.run.updatedAtEpochMillis
         ) {
             WorkflowRuntimeState(
                 run = persistedRun,
@@ -620,6 +620,11 @@ class WorkflowRuntimeCoordinator(
     ): WorkflowRun {
         val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, now)
         return if (
+            refreshed.taskRuns.isNotEmpty() &&
+            refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }
+        ) {
+            refreshed.copy(status = WorkflowRunStatus.Cancelled, updatedAtEpochMillis = now)
+        } else if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all {
                 it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled

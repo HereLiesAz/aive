@@ -90,6 +90,7 @@ interface AddonSettingsApi {
 
 interface AddonUiApi {
     fun provideScreen(): AddonScreen
+    fun dispatchAction(namespace: String, actionId: String): Boolean
 }
 
 interface HaiveAddonApi {

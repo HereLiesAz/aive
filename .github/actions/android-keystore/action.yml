@@ -156,7 +156,7 @@ runs:
           -deststorepass:env KEYSTORE_PASSWORD -destkeypass:env KEY_PASSWORD \
           -destalias "$KEY_ALIAS" -noprompt
 
-        rm -f "$assembled" "$key_pem"
+        rm -f "$assembled" "$key_pem" "$cert_pem" "$chain_pem"
         chmod 600 "$keystore"
 
         if ! keytool -list -v -keystore "$keystore" -storetype PKCS12 \
