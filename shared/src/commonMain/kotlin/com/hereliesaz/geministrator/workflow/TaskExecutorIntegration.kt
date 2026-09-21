@@ -93,7 +93,6 @@ data class AiveExecutorRepositoryEnvelope(
 )
 
 @Serializable
-@Serializable
 data class AiveScriptArtifactResult(
     val label: String,
     val kind: String = "CommandOutput",
@@ -109,8 +108,10 @@ data class AiveScriptResult(
     val message: String? = null,
     val output: String? = null,
     val artifacts: List<AiveScriptArtifactResult> = emptyList(),
+    val surfaceMutations: List<AiveSurfaceMutation> = emptyList(),
 )
 
+@Serializable
 data class AiveTaskEnvelope(
     val version: Int = 1,
     val projectId: String,
@@ -127,9 +128,12 @@ data class AiveTaskEnvelope(
     val acceptanceCriteria: List<String> = emptyList(),
     val attempt: Int,
     val dependencyArtifacts: List<AiveExecutorArtifactEnvelope> = emptyList(),
+    val surfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
 )
 
-fun TaskExecutorContext.toAiveTaskEnvelope(): AiveTaskEnvelope {
+fun TaskExecutorContext.toAiveTaskEnvelope(
+    resolvedSurfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
+): AiveTaskEnvelope {
     val redaction = definition.payloadRedactionPolicy
     val artifacts = task.dependsOn
         .flatMap { dependencyId -> run.taskRuns[dependencyId]?.artifacts.orEmpty() }
@@ -177,6 +181,7 @@ fun TaskExecutorContext.toAiveTaskEnvelope(): AiveTaskEnvelope {
         acceptanceCriteria = task.acceptanceCriteria.map { it.description },
         attempt = taskRun.attempt,
         dependencyArtifacts = artifacts,
+        surfaces = resolvedSurfaces,
     )
 }
 
