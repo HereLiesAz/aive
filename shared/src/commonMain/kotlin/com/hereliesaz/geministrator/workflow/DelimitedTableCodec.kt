@@ -110,7 +110,7 @@ object DelimitedTableCodec {
 
     private fun escapeCell(value: String, delimiter: Char): String =
         if (value.any { it == delimiter || it == '"' || it == '\n' || it == '\r' }) {
-            """ + value.replace(""", """") + """
+            "\"" + value.replace("\"", "\"\"") + "\""
         } else {
             value
         }
