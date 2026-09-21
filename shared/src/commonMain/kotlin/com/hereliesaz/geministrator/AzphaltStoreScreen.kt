@@ -278,11 +278,64 @@ internal fun AzphaltStoreScreen(
                                 color = Azphalt.currentGround.onPage,
                             )
                             if (modelAsset) {
-                                Text(
-                                    "Available model asset from Azphalt. It is discoverable here without being misrouted through the workflow/role installer; compatible model-runtime installation is a separate host path.",
-                                    style = AzphaltType.body,
-                                    color = Azphalt.currentGround.onPage,
-                                )
+                                if (isRevoked) {
+                                    Text(
+                                        "A repository revocation applies to this model package/version. Installation is blocked.",
+                                        style = AzphaltType.body,
+                                        color = Azphalt.currentGround.onPage,
+                                    )
+                                } else {
+                                    AzphaltPill(
+                                        label = if (installedModel == null) "Inspect model install" else "Inspect model update",
+                                        seed = "azphalt-model-prepare-${item.id}",
+                                        endCap = item.latest,
+                                        onClick = {
+                                            if (!loading) {
+                                                scope.launch {
+                                                    loading = true
+                                                    error = null
+                                                    status = null
+                                                    runCatching { service.prepareModelInstall(item.id, item.latest) }
+                                                        .onSuccess { plan ->
+                                                            preparedModel = plan
+                                                            prepared = null
+                                                            allowUntrustedSigner = false
+                                                            allowPublisherChange = false
+                                                        }
+                                                        .onFailure { failure ->
+                                                            error = failure.message ?: "Model package preparation failed."
+                                                        }
+                                                    loading = false
+                                                }
+                                            }
+                                        },
+                                    )
+                                    if (installedModel != null) {
+                                        AzphaltPill(
+                                            label = "Remove model",
+                                            seed = "azphalt-model-remove-${item.id}",
+                                            endCap = installedModel.version,
+                                            onClick = {
+                                                if (!loading) {
+                                                    scope.launch {
+                                                        loading = true
+                                                        error = null
+                                                        runCatching { service.removeModel(item.id) }
+                                                            .onSuccess {
+                                                                status = "Removed ${item.name}."
+                                                                preparedModel = null
+                                                                refreshGeneration += 1
+                                                            }
+                                                            .onFailure { failure ->
+                                                                error = failure.message ?: "Model removal failed."
+                                                            }
+                                                        loading = false
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
                             } else if (isRevoked) {
                                 Text(
                                     "A repository revocation applies to this package/version. Installation is blocked until a non-revoked version is selected.",
