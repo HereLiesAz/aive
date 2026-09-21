@@ -25,6 +25,75 @@ import kotlin.test.assertTrue
 
 class ProviderTaskRequestFactoryTest {
     @Test
+    fun providerRequestIncludesResolvedRoleSurfaces() {
+        val role = RoleDefinition(
+            id = RoleDefinitionId("data-role"),
+            name = "Data role",
+            description = "Reads attached data",
+            instructions = "Use the attached customer data.",
+        )
+        val taskId = TaskDefinitionId("target")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("definition"),
+            name = "Definition",
+            tasks = listOf(
+                TaskDefinition(
+                    id = taskId,
+                    name = "Analyze",
+                    objective = "Analyze customers",
+                    roleId = role.id,
+                ),
+            ),
+        )
+        val taskRun = TaskRun(
+            id = TaskRunId("target-run"),
+            taskDefinitionId = taskId,
+            status = TaskRunStatus.Ready,
+            assignedRoleId = role.id,
+        )
+        val run = WorkflowRun(
+            id = WorkflowRunId("run"),
+            projectId = ProjectId("project"),
+            workflowDefinitionId = definition.id,
+            objective = "Analyze",
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(taskId to taskRun),
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L,
+        )
+        val surfaces = listOf(
+            AiveRoleSurfaceEnvelope(
+                alias = "customers",
+                kind = "spreadsheet",
+                writable = false,
+                table = AiveSurfaceTable(
+                    columns = listOf("name"),
+                    rows = listOf(mapOf("name" to "Ada")),
+                ),
+            ),
+        )
+
+        val request = buildProviderTaskRequest(
+            project = Project(
+                id = run.projectId,
+                name = "Project",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L,
+            ),
+            definition = definition,
+            run = run,
+            task = definition.tasks.single(),
+            taskRun = taskRun,
+            role = role,
+            resolvedSurfaces = surfaces,
+        )
+
+        val block = request.promptContext.dynamicContext.single { it.label == "Attached role surfaces" }
+        assertTrue(block.content.contains("\"customers\""))
+        assertTrue(block.content.contains("\"Ada\""))
+    }
+
+    @Test
     fun providerRequestAppliesRedactionToResumeAndPromptContext() {
         val dependencyId = TaskDefinitionId("dependency")
         val targetId = TaskDefinitionId("target")
