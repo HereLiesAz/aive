@@ -3,14 +3,14 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Runtime 2D puppet rig for workflow mascots.
+ * Hierarchical 2D puppet rig for the approved workflow mascots.
  *
- * The approved 2D character design is the source of truth. Animation is applied through named,
- * hierarchical bones rather than by regenerating a 3D approximation. Every major body region,
- * face control, prop anchor, leg, and antenna receives its own independently addressable bone.
+ * The 2D character artwork is canonical. Animation is expressed as bone transforms against the
+ * 200x200 design-space artboard; there is no 3D reconstruction step anywhere in this runtime.
  */
 internal object MascotPuppetRig {
     const val Root = "root"
@@ -18,14 +18,27 @@ internal object MascotPuppetRig {
     const val TorsoUpper = "torso.upper"
     const val TorsoMid = "torso.mid"
     const val Pelvis = "pelvis"
-    const val LeftLeg = "leg.left"
-    const val RightLeg = "leg.right"
+
+    const val LeftLegUpper = "leg.left.upper"
+    const val LeftLegLower = "leg.left.lower"
+    const val LeftFoot = "leg.left.foot"
+    const val RightLegUpper = "leg.right.upper"
+    const val RightLegLower = "leg.right.lower"
+    const val RightFoot = "leg.right.foot"
+
     const val Prop = "prop"
     const val LeftEye = "face.eye.left"
     const val RightEye = "face.eye.right"
+    const val LeftBrow = "face.brow.left"
+    const val RightBrow = "face.brow.right"
     const val Mouth = "face.mouth"
 
-    fun antenna(index: Int): String = "antenna.$index"
+    fun antennaBase(index: Int): String = "antenna.$index.base"
+    fun antennaMid(index: Int): String = "antenna.$index.mid"
+    fun antennaTip(index: Int): String = "antenna.$index.tip"
+
+    /** Compatibility alias for callers that only need the primary antenna control. */
+    fun antenna(index: Int): String = antennaBase(index)
 
     fun skeleton(antennaCount: Int): MascotSkeleton {
         val bones = buildList {
@@ -34,29 +47,65 @@ internal object MascotPuppetRig {
             add(MascotBone(TorsoUpper, Root, 100f, 120f))
             add(MascotBone(TorsoMid, TorsoUpper, 100f, 139f))
             add(MascotBone(Pelvis, TorsoMid, 100f, 155f))
-            add(MascotBone(LeftLeg, Pelvis, 94f, 154f))
-            add(MascotBone(RightLeg, Pelvis, 106f, 154f))
+
+            add(MascotBone(LeftLegUpper, Pelvis, 94f, 154f))
+            add(MascotBone(LeftLegLower, LeftLegUpper, 84f, 166f))
+            add(MascotBone(LeftFoot, LeftLegLower, 75f, 169f))
+            add(MascotBone(RightLegUpper, Pelvis, 106f, 154f))
+            add(MascotBone(RightLegLower, RightLegUpper, 116f, 166f))
+            add(MascotBone(RightFoot, RightLegLower, 125f, 169f))
+
             add(MascotBone(Prop, Root, 134f, 104f))
             add(MascotBone(LeftEye, Head, 88f, 81f))
             add(MascotBone(RightEye, Head, 112f, 81f))
+            add(MascotBone(LeftBrow, Head, 88f, 73f))
+            add(MascotBone(RightBrow, Head, 112f, 73f))
             add(MascotBone(Mouth, Head, 100f, 98f))
+
             repeat(antennaCount.coerceAtLeast(1)) { index ->
-                add(MascotBone(antenna(index), Head, 100f, 83f))
+                add(MascotBone(antennaBase(index), Head, 100f, 83f))
+                add(MascotBone(antennaMid(index), antennaBase(index), 100f, 83f))
+                add(MascotBone(antennaTip(index), antennaMid(index), 100f, 83f))
             }
         }
         return MascotSkeleton(bones)
     }
 
+    /**
+     * Samples the built-in workflow-state motion and optionally layers arbitrary puppet controls
+     * over it. [overrides] is the hook used by future keyframe editors, scripted motion and direct
+     * manipulation without changing the renderer.
+     */
     fun pose(
         role: NodeCreatureRoleKind,
         state: H2g2WorkflowState,
         phase: Float,
         antennaCount: Int,
+        overrides: Map<String, MascotBonePose> = emptyMap(),
     ): MascotPuppetPose {
-        val wave = sin(phase * 2f * PI.toFloat())
-        val fastWave = sin(phase * 4f * PI.toFloat())
+        val cycle = phase - kotlin.math.floor(phase)
+        val wave = sin(cycle * 2f * PI.toFloat())
+        val fastWave = sin(cycle * 4f * PI.toFloat())
         val blocked = state == H2g2WorkflowState.Blocked || state == H2g2WorkflowState.Failed
 
+        val rootY = when {
+            blocked -> 2.2f
+            state == H2g2WorkflowState.Active -> -3.2f * wave
+            state == H2g2WorkflowState.Complete -> -2.0f * abs(wave)
+            state == H2g2WorkflowState.Gate -> -1.6f * wave
+            else -> -0.8f * wave
+        }
+        val rootRotation = when {
+            blocked -> -3f
+            state == H2g2WorkflowState.Active -> wave * 2.2f
+            state == H2g2WorkflowState.Complete -> wave * 1.2f
+            else -> wave * 0.6f
+        }
+        val rootScale = when {
+            state == H2g2WorkflowState.Complete -> 1f + 0.018f * abs(wave)
+            blocked -> 0.975f
+            else -> 1f
+        }
         val headRotation = when {
             blocked -> -7f
             state == H2g2WorkflowState.Active -> wave * 4.5f
@@ -79,6 +128,12 @@ internal object MascotPuppetRig {
             state == H2g2WorkflowState.Complete -> wave * 5f
             else -> wave * 2.5f
         }
+        val kneeFlex = when {
+            blocked -> 12f
+            state == H2g2WorkflowState.Active -> abs(fastWave) * 14f
+            state == H2g2WorkflowState.Complete -> abs(wave) * 7f
+            else -> abs(wave) * 3f
+        }
         val propRotation = when {
             blocked -> 12f
             state == H2g2WorkflowState.Active -> -wave * 9f
@@ -88,7 +143,7 @@ internal object MascotPuppetRig {
 
         val blink = when {
             blocked -> 0.72f
-            phase > 0.92f -> 0.18f
+            cycle > 0.92f -> 0.18f
             else -> 1f
         }
         val mouthScale = when {
@@ -97,18 +152,39 @@ internal object MascotPuppetRig {
             state == H2g2WorkflowState.Complete -> 1.15f
             else -> 1f
         }
+        val browTilt = when {
+            blocked -> 12f
+            role == NodeCreatureRoleKind.AdversarialReviewer ||
+                role == NodeCreatureRoleKind.Antagonist ||
+                role == NodeCreatureRoleKind.ImplementationEngineer -> -10f
+            state == H2g2WorkflowState.Active -> wave * 3f
+            else -> 0f
+        }
 
         val local = buildMap {
-            put(Root, MascotBonePose())
+            put(Root, MascotBonePose(
+                y = rootY,
+                rotationDegrees = rootRotation,
+                scaleX = rootScale,
+                scaleY = rootScale,
+            ))
             put(Head, MascotBonePose(y = headY, rotationDegrees = headRotation))
             put(TorsoUpper, MascotBonePose(rotationDegrees = torsoSway))
             put(TorsoMid, MascotBonePose(rotationDegrees = -torsoSway * 0.72f))
             put(Pelvis, MascotBonePose(rotationDegrees = torsoSway * 0.36f))
-            put(LeftLeg, MascotBonePose(rotationDegrees = legSwing))
-            put(RightLeg, MascotBonePose(rotationDegrees = -legSwing))
+
+            put(LeftLegUpper, MascotBonePose(rotationDegrees = legSwing))
+            put(LeftLegLower, MascotBonePose(rotationDegrees = kneeFlex))
+            put(LeftFoot, MascotBonePose(rotationDegrees = -legSwing * 0.28f))
+            put(RightLegUpper, MascotBonePose(rotationDegrees = -legSwing))
+            put(RightLegLower, MascotBonePose(rotationDegrees = kneeFlex))
+            put(RightFoot, MascotBonePose(rotationDegrees = legSwing * 0.28f))
+
             put(Prop, MascotBonePose(rotationDegrees = propRotation))
             put(LeftEye, MascotBonePose(scaleY = blink))
             put(RightEye, MascotBonePose(scaleY = blink))
+            put(LeftBrow, MascotBonePose(rotationDegrees = browTilt))
+            put(RightBrow, MascotBonePose(rotationDegrees = -browTilt))
             put(Mouth, MascotBonePose(scaleY = mouthScale))
 
             repeat(antennaCount.coerceAtLeast(1)) { index ->
@@ -127,12 +203,30 @@ internal object MascotPuppetRig {
                     state == H2g2WorkflowState.Complete -> 0.72f
                     else -> 0.32f
                 }
-                val rotation = sin(
-                    phase * 2f * PI.toFloat() +
+                val baseRotation = sin(
+                    cycle * 2f * PI.toFloat() +
                         index * 0.73f +
                         role.ordinal * 0.17f,
                 ) * roleAmplitude * stateAmplitude * alternate
-                put(antenna(index), MascotBonePose(rotationDegrees = rotation))
+                val midRotation = sin(
+                    cycle * 2f * PI.toFloat() +
+                        index * 0.73f +
+                        0.8f,
+                ) * roleAmplitude * 0.55f * stateAmplitude * -alternate
+                val tipRotation = sin(
+                    cycle * 2f * PI.toFloat() +
+                        index * 0.73f +
+                        1.6f,
+                ) * roleAmplitude * 0.35f * stateAmplitude * alternate
+
+                put(antennaBase(index), MascotBonePose(rotationDegrees = baseRotation))
+                put(antennaMid(index), MascotBonePose(rotationDegrees = midRotation))
+                put(antennaTip(index), MascotBonePose(rotationDegrees = tipRotation))
+            }
+
+            overrides.forEach { (boneId, override) ->
+                val base = get(boneId) ?: MascotBonePose()
+                put(boneId, base + override)
             }
         }
 
@@ -156,7 +250,33 @@ internal data class MascotBonePose(
     val rotationDegrees: Float = 0f,
     val scaleX: Float = 1f,
     val scaleY: Float = 1f,
-)
+) {
+    operator fun plus(other: MascotBonePose): MascotBonePose = MascotBonePose(
+        x = x + other.x,
+        y = y + other.y,
+        rotationDegrees = rotationDegrees + other.rotationDegrees,
+        scaleX = scaleX * other.scaleX,
+        scaleY = scaleY * other.scaleY,
+    )
+
+    fun lerp(other: MascotBonePose, amount: Float): MascotBonePose {
+        val t = amount.coerceIn(0f, 1f)
+        return MascotBonePose(
+            x = x + (other.x - x) * t,
+            y = y + (other.y - y) * t,
+            rotationDegrees = shortestRotation(rotationDegrees, other.rotationDegrees, t),
+            scaleX = scaleX + (other.scaleX - scaleX) * t,
+            scaleY = scaleY + (other.scaleY - scaleY) * t,
+        )
+    }
+
+    private fun shortestRotation(from: Float, to: Float, amount: Float): Float {
+        var delta = (to - from) % 360f
+        if (delta > 180f) delta -= 360f
+        if (delta < -180f) delta += 360f
+        return from + delta * amount
+    }
+}
 
 internal data class MascotWorldBone(
     val pivotX: Float,
@@ -175,13 +295,15 @@ internal class MascotSkeleton(
         require(byId.size == bones.size) { "Mascot skeleton contains duplicate bone IDs." }
         bones.forEach { bone ->
             require(bone.parentId == null || byId.containsKey(bone.parentId)) {
-                "Mascot bone \${bone.id} references missing parent \${bone.parentId}."
+                "Mascot bone ${bone.id} references missing parent ${bone.parentId}."
             }
         }
     }
 
     fun bone(id: String): MascotBone =
         requireNotNull(byId[id]) { "Unknown mascot bone: $id" }
+
+    fun contains(id: String): Boolean = byId.containsKey(id)
 }
 
 internal class MascotPuppetPose(
@@ -229,11 +351,7 @@ internal class MascotPuppetPose(
         }
     }
 
-    /**
-     * Maps a rest-pose design-space coordinate through a named puppet bone.
-     *
-     * Coordinates use the mascot's canonical 200x200 artboard.
-     */
+    /** Maps a rest-pose artboard coordinate through a named puppet bone. */
     fun map(id: String, x: Float, y: Float): MascotRigPoint {
         val bone = skeleton.bone(id)
         val world = world(id)
@@ -250,8 +368,8 @@ internal class MascotPuppetPose(
         fun rotate(x: Float, y: Float, degrees: Float): Pair<Float, Float> {
             if (degrees == 0f) return x to y
             val radians = degrees * PI.toFloat() / 180f
-            val c = kotlin.math.cos(radians)
-            val s = kotlin.math.sin(radians)
+            val c = cos(radians)
+            val s = sin(radians)
             return (x * c - y * s) to (x * s + y * c)
         }
     }
@@ -261,3 +379,49 @@ internal data class MascotRigPoint(
     val x: Float,
     val y: Float,
 )
+
+/**
+ * Generic keyframe format for scripted, edited or generated mascot motion.
+ *
+ * Clips target the same named bones used by the renderer, so workflow-state motion and custom
+ * animation can be mixed without introducing a second animation system.
+ */
+internal data class MascotAnimationKeyframe(
+    val progress: Float,
+    val pose: MascotBonePose,
+)
+
+internal data class MascotAnimationTrack(
+    val boneId: String,
+    val keyframes: List<MascotAnimationKeyframe>,
+) {
+    init {
+        require(keyframes.isNotEmpty()) { "Mascot animation track must contain a keyframe." }
+    }
+
+    fun sample(progress: Float): MascotBonePose {
+        val sorted = keyframes.sortedBy(MascotAnimationKeyframe::progress)
+        val t = progress.coerceIn(0f, 1f)
+        val before = sorted.lastOrNull { it.progress <= t } ?: sorted.first()
+        val after = sorted.firstOrNull { it.progress >= t } ?: sorted.last()
+        if (before === after || before.progress == after.progress) return before.pose
+        val local = (t - before.progress) / (after.progress - before.progress)
+        return before.pose.lerp(after.pose, local)
+    }
+}
+
+internal data class MascotAnimationClip(
+    val name: String,
+    val tracks: List<MascotAnimationTrack>,
+    val loop: Boolean = true,
+) {
+    fun sample(progress: Float): Map<String, MascotBonePose> {
+        val t = if (loop) {
+            val wrapped = progress % 1f
+            if (wrapped < 0f) wrapped + 1f else wrapped
+        } else {
+            progress.coerceIn(0f, 1f)
+        }
+        return tracks.associate { track -> track.boneId to track.sample(t) }
+    }
+}
