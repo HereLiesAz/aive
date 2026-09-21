@@ -153,13 +153,6 @@ private fun resolveFlowchart(surface: RoleSurface.Flowchart): AiveRoleSurfaceEnv
 
 object MermaidFlowchartParser {
     private val headerPattern = Regex("""^(?:flowchart|graph)\s+([A-Za-z]{2})\s*$""", RegexOption.IGNORE_CASE)
-    private val edgePatterns = listOf(
-        Triple(Regex("""^(.+?)\s*-->|([^|]+)\|\s*(.+)$"""), "arrow", true),
-        Triple(Regex("""^(.+?)\s*-->\s*(.+)$"""), "arrow", false),
-        Triple(Regex("""^(.+?)\s*-\.->\s*(.+)$"""), "dotted", false),
-        Triple(Regex("""^(.+?)\s*---\s*(.+)$"""), "line", false),
-    )
-
     fun parse(source: String): AiveFlowchartGraph {
         val nodes = linkedMapOf<String, AiveFlowchartNode>()
         val edges = mutableListOf<AiveFlowchartEdge>()
@@ -241,6 +234,7 @@ object MermaidFlowchartParser {
     private fun parseNode(raw: String): AiveFlowchartNode {
         val value = raw.trim()
         val patterns = listOf(
+            Triple(Regex("""^([A-Za-z0-9_.:-]+)\(\[([^]]+)]\)$"""), "stadium", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\[([^]]+)]$"""), "rectangle", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\{([^}]+)}$"""), "decision", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\(\((.+)\)\)$"""), "circle", 2),
