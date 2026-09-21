@@ -45,6 +45,8 @@ internal class AndroidAzphaltHost(
     )
 
     val persistence = SettingsWorkflowPersistence.createDefault()
+    private val modelInstaller = AndroidAzphaltModelPackageInstaller(appContext, httpClient)
+
     val service = AzphaltStoreService(
         repository = repository,
         verifier = verifier,
@@ -54,6 +56,7 @@ internal class AndroidAzphaltHost(
             publisherPins = publisherPins,
         ),
         installStore = installStore,
+        modelInstaller = modelInstaller,
     )
 
     var importRequest by mutableStateOf<AzphaltPackageImportRequest?>(null)

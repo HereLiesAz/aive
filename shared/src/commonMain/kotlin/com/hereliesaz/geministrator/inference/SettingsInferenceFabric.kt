@@ -46,6 +46,10 @@ class SettingsInferenceStateStore(
 
     suspend fun models(): List<InferenceModelDescriptor> = read().models.map(PersistedInferenceModel::toDomain)
 
+    suspend fun removeModel(logicalModelId: String) = update { snapshot ->
+        snapshot.copy(models = snapshot.models.filterNot { it.logicalModelId == logicalModelId })
+    }
+
     suspend fun registerAgent(agent: InferenceAgentDescriptor) = update { snapshot ->
         snapshot.copy(
             agents = snapshot.agents.upsert(PersistedInferenceAgent.fromDomain(agent)) {
@@ -203,6 +207,13 @@ class SettingsInferenceStateStore(
         }
 
         fun createDefault(): SettingsInferenceStateStore = SettingsInferenceStateStore(Settings())
+
+        fun createDurable(): SettingsInferenceStateStore = SettingsInferenceStateStore(
+            com.hereliesaz.geministrator.persistence.ChunkedStringSettings(
+                delegate = Settings(),
+                chunkedKeys = setOf(DEFAULT_STORAGE_KEY),
+            ),
+        )
     }
 }
 
@@ -394,6 +405,8 @@ private data class PersistedInferenceModel(
     val adapterId: String? = null,
     val precision: String? = null,
     val backend: String? = null,
+    val artifactPath: String? = null,
+    val metadataJson: String? = null,
     val capabilities: List<String> = emptyList(),
     val releaseDigest: String? = null,
 ) {
@@ -403,6 +416,8 @@ private data class PersistedInferenceModel(
         adapterId = adapterId,
         precision = precision,
         backend = backend,
+        artifactPath = artifactPath,
+        metadataJson = metadataJson,
         capabilities = capabilities.toSet(),
         releaseDigest = releaseDigest,
     )
@@ -414,6 +429,8 @@ private data class PersistedInferenceModel(
             adapterId = value.adapterId,
             precision = value.precision,
             backend = value.backend,
+            artifactPath = value.artifactPath,
+            metadataJson = value.metadataJson,
             capabilities = value.capabilities.sorted(),
             releaseDigest = value.releaseDigest,
         )
