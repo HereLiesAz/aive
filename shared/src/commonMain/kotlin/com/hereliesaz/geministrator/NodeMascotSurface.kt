@@ -222,6 +222,12 @@ private fun DrawScope.drawNodeMascot(
     fun point(x: Float, y: Float) = Offset(left + x * unit, top + y * unit)
 
     val wave = sin(phase * 2f * PI.toFloat())
+    val puppet = MascotPuppetRig.pose(
+        role = role,
+        state = state,
+        phase = phase,
+        antennaCount = spec.antennaCount,
+    )
     val bounce = when (state) {
         H2g2WorkflowState.Active -> -3.2f * wave
         H2g2WorkflowState.Complete -> -2.0f * kotlin.math.abs(wave)
@@ -247,10 +253,10 @@ private fun DrawScope.drawNodeMascot(
         scale(scale, scale, point(100f, 100f))
     }) {
         drawMascotShadow(::point, unit, spec)
-        drawMascotAntennae(::point, unit, role, spec, wave)
-        drawMascotBody(::point, unit, role, spec)
-        drawMascotAccessory(::point, unit, role, spec, wave)
-        drawMascotFace(::point, unit, role, spec)
+        drawMascotAntennae(::point, unit, role, spec, wave, puppet)
+        drawMascotBody(::point, unit, role, spec, puppet)
+        drawMascotAccessory(::point, unit, role, spec, wave, puppet)
+        drawMascotFace(::point, unit, role, spec, puppet)
         drawMascotStateMark(::point, unit, state, wave)
     }
 }
@@ -273,8 +279,10 @@ private fun DrawScope.drawMascotAntennae(
     role: NodeCreatureRoleKind,
     spec: MascotSpec,
     wave: Float,
+    puppet: MascotPuppetPose,
 ) {
-    val center = point(100f, 83f)
+    val headCenter = puppet.map(MascotPuppetRig.Head, 100f, 83f)
+    val center = point(headCenter.x, headCenter.y)
     val spanStart = if (spec.radial) -168f else -150f
     val spanEnd = if (spec.radial) 168f else -30f
     val count = spec.antennaCount.coerceAtLeast(1)
@@ -295,35 +303,40 @@ private fun DrawScope.drawMascotAntennae(
             NodeCreatureRoleKind.AdversarialReviewer, NodeCreatureRoleKind.Antagonist -> 56f + (index % 3) * 4f
             else -> 47f + (index % 3) * 6f
         }
-        val tip = Offset(
-            x = center.x + cos(angle) * (length + wobble) * unit,
-            y = center.y + sin(angle) * (length + wobble) * unit,
-        )
-        val rootRadius = 31f * unit
-        val root = Offset(
-            x = center.x + cos(angle) * rootRadius,
-            y = center.y + sin(angle) * rootRadius,
-        )
+        val antennaBone = MascotPuppetRig.antenna(index)
+        fun rigPoint(x: Float, y: Float): Offset {
+            val mapped = puppet.map(antennaBone, x, y)
+            return point(mapped.x, mapped.y)
+        }
+
+        val rootRadius = 31f
+        val rootRestX = 100f + cos(angle) * rootRadius
+        val rootRestY = 83f + sin(angle) * rootRadius
+        val tipRestX = 100f + cos(angle) * (length + wobble)
+        val tipRestY = 83f + sin(angle) * (length + wobble)
+        val root = rigPoint(rootRestX, rootRestY)
+        val tip = rigPoint(tipRestX, tipRestY)
+        val animatedAngle = angle +
+            puppet.world(antennaBone).rotationDegrees * PI.toFloat() / 180f
 
         if (spec.angular) {
-            val elbow = Offset(
-                x = (root.x + tip.x) * 0.5f + sin(angle) * 8f * unit,
-                y = (root.y + tip.y) * 0.5f - cos(angle) * 8f * unit,
-            )
+            val elbowRestX = (rootRestX + tipRestX) * 0.5f + sin(angle) * 8f
+            val elbowRestY = (rootRestY + tipRestY) * 0.5f - cos(angle) * 8f
+            val elbow = rigPoint(elbowRestX, elbowRestY)
             drawLine(spec.body, root, elbow, 5.2f * unit, StrokeCap.Round)
             drawLine(spec.body, elbow, tip, 5.2f * unit, StrokeCap.Round)
         } else {
+            val bend = 11f * if (index % 2 == 0) 1f else -1f
+            val c1 = rigPoint(
+                rootRestX * 0.72f + tipRestX * 0.28f + sin(angle) * bend,
+                rootRestY * 0.72f + tipRestY * 0.28f - cos(angle) * bend,
+            )
+            val c2 = rigPoint(
+                rootRestX * 0.28f + tipRestX * 0.72f - sin(angle) * bend,
+                rootRestY * 0.28f + tipRestY * 0.72f + cos(angle) * bend,
+            )
             val path = Path().apply {
                 moveTo(root.x, root.y)
-                val bend = 11f * unit * if (index % 2 == 0) 1f else -1f
-                val c1 = Offset(
-                    x = root.x * 0.72f + tip.x * 0.28f + sin(angle) * bend,
-                    y = root.y * 0.72f + tip.y * 0.28f - cos(angle) * bend,
-                )
-                val c2 = Offset(
-                    x = root.x * 0.28f + tip.x * 0.72f - sin(angle) * bend,
-                    y = root.y * 0.28f + tip.y * 0.72f + cos(angle) * bend,
-                )
                 cubicTo(c1.x, c1.y, c2.x, c2.y, tip.x, tip.y)
             }
             drawPath(path, spec.body, style = Stroke(5.1f * unit, cap = StrokeCap.Round))
@@ -331,7 +344,7 @@ private fun DrawScope.drawMascotAntennae(
 
         drawMascotTerminal(
             center = tip,
-            angle = angle,
+            angle = animatedAngle,
             unit = unit,
             terminal = terminalFor(role, spec.terminal, index),
             body = spec.body,
@@ -441,18 +454,27 @@ private fun DrawScope.drawMascotBody(
     unit: Float,
     role: NodeCreatureRoleKind,
     spec: MascotSpec,
+    puppet: MascotPuppetPose,
 ) {
-    val head = point(100f, 83f)
+    fun rigPoint(bone: String, x: Float, y: Float): Offset {
+        val mapped = puppet.map(bone, x, y)
+        return point(mapped.x, mapped.y)
+    }
+    val head = rigPoint(MascotPuppetRig.Head, 100f, 83f)
 
     if (role == NodeCreatureRoleKind.Antagonist) {
+        val thornPoints = listOf(
+            64f to 84f,
+            48f to 72f,
+            61f to 69f,
+            51f to 53f,
+            70f to 61f,
+            76f to 47f,
+            85f to 61f,
+        ).map { (x, y) -> rigPoint(MascotPuppetRig.Head, x, y) }
         val thorn = Path().apply {
-            moveTo(point(64f, 84f).x, point(64f, 84f).y)
-            lineTo(point(48f, 72f).x, point(48f, 72f).y)
-            lineTo(point(61f, 69f).x, point(61f, 69f).y)
-            lineTo(point(51f, 53f).x, point(51f, 53f).y)
-            lineTo(point(70f, 61f).x, point(70f, 61f).y)
-            lineTo(point(76f, 47f).x, point(76f, 47f).y)
-            lineTo(point(85f, 61f).x, point(85f, 61f).y)
+            moveTo(thornPoints.first().x, thornPoints.first().y)
+            thornPoints.drop(1).forEach { p -> lineTo(p.x, p.y) }
             close()
         }
         drawPath(thorn, spec.body)
@@ -466,19 +488,23 @@ private fun DrawScope.drawMascotBody(
     )
 
     val segmentColor = spec.body
-    drawCircle(segmentColor, 11f * unit, point(100f, 120f))
-    drawCircle(segmentColor.copy(alpha = 0.94f), 9f * unit, point(100f, 139f))
-    drawCircle(segmentColor.copy(alpha = 0.88f), 7f * unit, point(100f, 155f))
+    drawCircle(segmentColor, 11f * unit, rigPoint(MascotPuppetRig.TorsoUpper, 100f, 120f))
+    drawCircle(segmentColor.copy(alpha = 0.94f), 9f * unit, rigPoint(MascotPuppetRig.TorsoMid, 100f, 139f))
+    drawCircle(segmentColor.copy(alpha = 0.88f), 7f * unit, rigPoint(MascotPuppetRig.Pelvis, 100f, 155f))
 
-    drawMascotLeg(point, unit, spec, left = true)
-    drawMascotLeg(point, unit, spec, left = false)
+    drawMascotLeg(point, unit, spec, left = true, puppet = puppet)
+    drawMascotLeg(point, unit, spec, left = false, puppet = puppet)
 
     if (role == NodeCreatureRoleKind.ReleaseEngineer) {
+        val capePoints = listOf(
+            82f to 109f,
+            58f to 136f,
+            78f to 132f,
+            86f to 119f,
+        ).map { (x, y) -> rigPoint(MascotPuppetRig.TorsoUpper, x, y) }
         val cape = Path().apply {
-            moveTo(point(82f, 109f).x, point(82f, 109f).y)
-            lineTo(point(58f, 136f).x, point(58f, 136f).y)
-            lineTo(point(78f, 132f).x, point(78f, 132f).y)
-            lineTo(point(86f, 119f).x, point(86f, 119f).y)
+            moveTo(capePoints.first().x, capePoints.first().y)
+            capePoints.drop(1).forEach { p -> lineTo(p.x, p.y) }
             close()
         }
         drawPath(cape, Color(0xFF7C57CC).copy(alpha = 0.88f))
@@ -490,11 +516,17 @@ private fun DrawScope.drawMascotLeg(
     unit: Float,
     spec: MascotSpec,
     left: Boolean,
+    puppet: MascotPuppetPose,
 ) {
     val side = if (left) -1f else 1f
-    val hip = point(100f + side * 6f, 154f)
-    val knee = point(100f + side * 16f, 166f)
-    val foot = point(100f + side * 25f, 169f)
+    val bone = if (left) MascotPuppetRig.LeftLeg else MascotPuppetRig.RightLeg
+    fun rigPoint(x: Float, y: Float): Offset {
+        val mapped = puppet.map(bone, x, y)
+        return point(mapped.x, mapped.y)
+    }
+    val hip = rigPoint(100f + side * 6f, 154f)
+    val knee = rigPoint(100f + side * 16f, 166f)
+    val foot = rigPoint(100f + side * 25f, 169f)
     drawLine(spec.body, hip, knee, 4f * unit, StrokeCap.Round)
     drawLine(spec.body, knee, foot, 4f * unit, StrokeCap.Round)
     drawCircle(spec.body, 3.4f * unit, foot)
@@ -505,10 +537,21 @@ private fun DrawScope.drawMascotFace(
     unit: Float,
     role: NodeCreatureRoleKind,
     spec: MascotSpec,
+    puppet: MascotPuppetPose,
 ) {
+    fun headPoint(x: Float, y: Float): Offset {
+        val mapped = puppet.map(MascotPuppetRig.Head, x, y)
+        return point(mapped.x, mapped.y)
+    }
+    fun eyePoint(bone: String, x: Float, y: Float): Offset {
+        val mapped = puppet.map(bone, x, y)
+        return point(mapped.x, mapped.y)
+    }
     val eyeY = 81f
-    val leftEye = point(88f, eyeY)
-    val rightEye = point(112f, eyeY)
+    val leftEye = eyePoint(MascotPuppetRig.LeftEye, 88f, eyeY)
+    val rightEye = eyePoint(MascotPuppetRig.RightEye, 112f, eyeY)
+    val leftBlink = puppet.world(MascotPuppetRig.LeftEye).scaleY
+    val rightBlink = puppet.world(MascotPuppetRig.RightEye).scaleY
 
     when (role) {
         NodeCreatureRoleKind.Orchestrator,
@@ -534,23 +577,39 @@ private fun DrawScope.drawMascotFace(
             )
         }
         NodeCreatureRoleKind.Antagonist -> {
-            drawLine(Color.White, point(81f, 77f), point(94f, 82f), 4f * unit, StrokeCap.Round)
-            drawLine(Color.White, point(119f, 77f), point(106f, 82f), 4f * unit, StrokeCap.Round)
+            drawLine(Color.White, headPoint(81f, 77f), headPoint(94f, 82f), 4f * unit, StrokeCap.Round)
+            drawLine(Color.White, headPoint(119f, 77f), headPoint(106f, 82f), 4f * unit, StrokeCap.Round)
         }
         NodeCreatureRoleKind.AdversarialReviewer,
         NodeCreatureRoleKind.ImplementationEngineer -> {
-            drawLine(spec.dark, point(81f, 76f), point(94f, 82f), 3.2f * unit, StrokeCap.Round)
-            drawLine(spec.dark, point(119f, 76f), point(106f, 82f), 3.2f * unit, StrokeCap.Round)
-            drawCircle(Color.White, 5f * unit, leftEye)
-            drawCircle(Color.White, 5f * unit, rightEye)
-            drawCircle(spec.dark, 2.2f * unit, leftEye)
-            drawCircle(spec.dark, 2.2f * unit, rightEye)
+            drawLine(spec.dark, headPoint(81f, 76f), headPoint(94f, 82f), 3.2f * unit, StrokeCap.Round)
+            drawLine(spec.dark, headPoint(119f, 76f), headPoint(106f, 82f), 3.2f * unit, StrokeCap.Round)
+            drawOval(
+                Color.White,
+                topLeft = leftEye - Offset(5f * unit, 5f * unit * leftBlink),
+                size = Size(10f * unit, 10f * unit * leftBlink),
+            )
+            drawOval(
+                Color.White,
+                topLeft = rightEye - Offset(5f * unit, 5f * unit * rightBlink),
+                size = Size(10f * unit, 10f * unit * rightBlink),
+            )
+            drawCircle(spec.dark, 2.2f * unit * leftBlink.coerceAtLeast(0.45f), leftEye)
+            drawCircle(spec.dark, 2.2f * unit * rightBlink.coerceAtLeast(0.45f), rightEye)
         }
         else -> {
-            drawCircle(Color.White, 6.8f * unit, leftEye)
-            drawCircle(Color.White, 6.8f * unit, rightEye)
-            drawCircle(spec.dark, 3.2f * unit, leftEye)
-            drawCircle(spec.dark, 3.2f * unit, rightEye)
+            drawOval(
+                Color.White,
+                topLeft = leftEye - Offset(6.8f * unit, 6.8f * unit * leftBlink),
+                size = Size(13.6f * unit, 13.6f * unit * leftBlink),
+            )
+            drawOval(
+                Color.White,
+                topLeft = rightEye - Offset(6.8f * unit, 6.8f * unit * rightBlink),
+                size = Size(13.6f * unit, 13.6f * unit * rightBlink),
+            )
+            drawCircle(spec.dark, 3.2f * unit * leftBlink.coerceAtLeast(0.45f), leftEye)
+            drawCircle(spec.dark, 3.2f * unit * rightBlink.coerceAtLeast(0.45f), rightEye)
             drawCircle(Color.White.copy(alpha = 0.78f), 1.2f * unit, leftEye - Offset(1f * unit, 1f * unit))
             drawCircle(Color.White.copy(alpha = 0.78f), 1.2f * unit, rightEye - Offset(1f * unit, 1f * unit))
         }
@@ -559,19 +618,19 @@ private fun DrawScope.drawMascotFace(
     if (role == NodeCreatureRoleKind.CodeReviewer) {
         drawRoundRect(
             color = spec.dark,
-            topLeft = point(77f, 72f),
+            topLeft = headPoint(77f, 72f),
             size = Size(21f * unit, 17f * unit),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f * unit),
             style = Stroke(2.6f * unit),
         )
         drawRoundRect(
             color = spec.dark,
-            topLeft = point(102f, 72f),
+            topLeft = headPoint(102f, 72f),
             size = Size(21f * unit, 17f * unit),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f * unit),
             style = Stroke(2.6f * unit),
         )
-        drawLine(spec.dark, point(98f, 79f), point(102f, 79f), 2.5f * unit)
+        drawLine(spec.dark, headPoint(98f, 79f), headPoint(102f, 79f), 2.5f * unit)
     }
 
     val mouthY = 98f
@@ -584,7 +643,7 @@ private fun DrawScope.drawMascotFace(
                 startAngle = 198f,
                 sweepAngle = 144f,
                 useCenter = false,
-                topLeft = point(91f, mouthY - 3f),
+                topLeft = headPoint(91f, mouthY - 3f),
                 size = Size(18f * unit, 11f * unit),
                 style = Stroke(2.2f * unit, cap = StrokeCap.Round),
             )
@@ -595,7 +654,7 @@ private fun DrawScope.drawMascotFace(
                 startAngle = 18f,
                 sweepAngle = 144f,
                 useCenter = false,
-                topLeft = point(91f, mouthY - 7f),
+                topLeft = headPoint(91f, mouthY - 7f),
                 size = Size(18f * unit, 11f * unit),
                 style = Stroke(2.2f * unit, cap = StrokeCap.Round),
             )
@@ -609,40 +668,49 @@ private fun DrawScope.drawMascotAccessory(
     role: NodeCreatureRoleKind,
     spec: MascotSpec,
     wave: Float,
+    puppet: MascotPuppetPose,
 ) {
+    fun propPoint(x: Float, y: Float): Offset {
+        val mapped = puppet.map(MascotPuppetRig.Prop, x, y)
+        return point(mapped.x, mapped.y)
+    }
+    fun headPoint(x: Float, y: Float): Offset {
+        val mapped = puppet.map(MascotPuppetRig.Head, x, y)
+        return point(mapped.x, mapped.y)
+    }
     when (spec.accessory) {
         MascotAccessory.Baton -> {
-            drawLine(Color(0xFF111827), point(65f, 90f), point(58f, 55f), 3.3f * unit, StrokeCap.Round)
-            drawCircle(Color(0xFF111827), 3f * unit, point(57f, 53f))
-            drawBowTie(point, unit)
+            drawLine(Color(0xFF111827), propPoint(65f, 90f), propPoint(58f, 55f), 3.3f * unit, StrokeCap.Round)
+            drawCircle(Color(0xFF111827), 3f * unit, propPoint(57f, 53f))
+            drawBowTie(headPoint, unit)
         }
-        MascotAccessory.Clipboard -> drawClipboard(point, unit, point(139f, 105f))
-        MascotAccessory.Magnifier -> drawMagnifier(point, unit, point(132f, 84f), spec.dark)
+        MascotAccessory.Clipboard -> drawClipboard(propPoint, unit, propPoint(139f, 105f))
+        MascotAccessory.Magnifier -> drawMagnifier(propPoint, unit, propPoint(132f, 84f), spec.dark)
         MascotAccessory.Blueprint -> {
-            drawBlueprint(point, unit)
-            drawCompass(point, unit)
+            drawBlueprint(propPoint, unit)
+            drawCompass(propPoint, unit)
         }
-        MascotAccessory.Wrench -> drawWrench(point, unit, spec.dark)
+        MascotAccessory.Wrench -> drawWrench(propPoint, unit, spec.dark)
         MascotAccessory.Heart -> {
-            drawHeart(point, unit, point(140f, 118f), spec.body)
-            drawHeart(point, unit, point(58f, 61f), spec.body)
+            drawHeart(propPoint, unit, propPoint(140f, 118f), spec.body)
+            drawHeart(propPoint, unit, propPoint(58f, 61f), spec.body)
         }
-        MascotAccessory.Goggles -> drawGoggles(point, unit, spec.dark)
-        MascotAccessory.Stop -> drawStop(point, unit)
-        MascotAccessory.Tablet -> drawTablet(point, unit, spec.dark)
+        MascotAccessory.Goggles -> drawGoggles(headPoint, unit, spec.dark)
+        MascotAccessory.Stop -> drawStop(propPoint, unit)
+        MascotAccessory.Tablet -> drawTablet(propPoint, unit, spec.dark)
         MascotAccessory.Bandage -> {
-            drawBandage(point, unit)
-            drawPlus(point, unit)
+            drawBandage(headPoint, unit)
+            drawPlus(propPoint, unit)
         }
-        MascotAccessory.Key -> drawKey(point, unit)
-        MascotAccessory.Flame -> drawFlame(point, unit)
-        MascotAccessory.Dashboard -> drawDashboard(point, unit, spec.body)
+        MascotAccessory.Key -> drawKey(propPoint, unit)
+        MascotAccessory.Flame -> drawFlame(propPoint, unit)
+        MascotAccessory.Dashboard -> drawDashboard(propPoint, unit, spec.body)
         MascotAccessory.None -> Unit
     }
 
     if (role == NodeCreatureRoleKind.CrashTestDummy && wave > 0.55f) {
-        drawLine(Color(0xFF3AA9EA), point(143f, 68f), point(149f, 61f), 2f * unit, StrokeCap.Round)
-        drawLine(Color(0xFF3AA9EA), point(146f, 74f), point(154f, 72f), 2f * unit, StrokeCap.Round)
+        drawLine(Color(0xFF3AA9EA), propPoint(143f, 68f), propPoint(149f, 61f), 2f * unit, StrokeCap.Round)
+        drawLine(Color(0xFF3AA9EA), propPoint(146f, 74f), propPoint(154f, 72f), 2f * unit, StrokeCap.Round)
     }
 }
 
