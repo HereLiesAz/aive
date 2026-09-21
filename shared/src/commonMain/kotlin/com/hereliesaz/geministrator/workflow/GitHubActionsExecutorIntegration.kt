@@ -409,7 +409,7 @@ class GitHubActionsExecutorIntegration(
         } == true
         val resultArtifacts = scriptResult?.toArtifactRefs(context).orEmpty()
         val workflowArtifacts = artifacts
-            .filterNot { context.executor is TaskExecutor.Script && it.name == AIVE_RESULT_ARTIFACT }
+            .filterNot { scriptResult != null && it.name == AIVE_RESULT_ARTIFACT }
             .map { artifact ->
                 ArtifactRef(
                     ArtifactId(
