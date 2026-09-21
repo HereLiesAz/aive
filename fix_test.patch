@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+            assertEquals(1, requests)
+=======
+            assertEquals(2, requests)
+>>>>>>> REPLACE
