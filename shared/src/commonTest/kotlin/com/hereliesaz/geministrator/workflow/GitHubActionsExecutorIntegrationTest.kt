@@ -6,6 +6,10 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -22,6 +26,9 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
 
 class GitHubActionsExecutorIntegrationTest {
     @Test
@@ -38,17 +45,73 @@ class GitHubActionsExecutorIntegrationTest {
 
         val execution = integration.dispatch(context)
 
-        assertEquals(
-            GitHubWorkflowDispatchRequest(
-                repository = context.project.repository!!,
-                workflow = "ci.yml",
-                ref = "main",
-            ),
-            client.lastDispatch,
+        val dispatch = assertNotNull(client.lastDispatch)
+        assertEquals(context.project.repository, dispatch.repository)
+        assertEquals("ci.yml", dispatch.workflow)
+        assertEquals("main", dispatch.ref)
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(dispatch.inputs["aive_context"]),
         )
+        assertEquals("Run CI", envelope.taskObjective)
+        assertEquals("Ship", envelope.workflowObjective)
+        assertEquals("Project", envelope.projectName)
         assertEquals(TaskRunStatus.Running, execution.status)
         assertEquals("run-42", execution.externalRunId)
         assertEquals("queued", execution.progressMessage)
+    }
+
+    @Test
+    fun pythonScriptRunnerPassesContextScriptAndLanguageInputs() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed', 'output': aive['taskObjective']}",
+            runner = ScriptRunner.GitHubActions(workflow = "aive-script.yml"),
+        )
+        val context = context(executor)
+
+        integration.dispatch(context)
+
+        val inputs = assertNotNull(client.lastDispatch).inputs
+        assertEquals("python", inputs["aive_language"])
+        assertEquals(executor.source, inputs["aive_script"])
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(inputs["aive_context"]),
+        )
+        assertEquals("Run CI", envelope.taskObjective)
+    }
+
+    @Test
+    fun executorEnvelopeHonorsWorkflowRedactionPolicy() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val base = context(executor)
+        val role = RoleDefinition(
+            id = RoleDefinitionId("scripted-role"),
+            name = "Scripted role",
+            description = "Runs external automation",
+            instructions = "SECRET ROLE INSTRUCTIONS",
+        )
+        val redacted = base.copy(
+            role = role,
+            definition = base.definition.copy(
+                payloadRedactionPolicy = com.hereliesaz.geministrator.domain.PayloadRedactionPolicy(
+                    redactObjective = true,
+                    redactRoleInstructions = true,
+                ),
+            ),
+        )
+
+        integration.dispatch(redacted)
+
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(assertNotNull(client.lastDispatch).inputs["aive_context"]),
+        )
+        assertEquals("[REDACTED]", envelope.taskObjective)
+        assertEquals("[REDACTED]", assertNotNull(envelope.role).instructions)
+        assertTrue(envelope.acceptanceCriteria.isEmpty())
     }
 
     @Test
@@ -177,7 +240,7 @@ class GitHubActionsExecutorIntegrationTest {
         assertEquals("Test: Unit tests (2/3)", execution.progressMessage)
     }
 
-    private fun context(executor: TaskExecutor.GitHubAction): TaskExecutorContext {
+    private fun context(executor: TaskExecutor): TaskExecutorContext {
         val taskId = TaskDefinitionId("ci")
         val repository = RepositoryRef("HereLiesAz", "haive", defaultBranch = "main")
         val project = Project(
