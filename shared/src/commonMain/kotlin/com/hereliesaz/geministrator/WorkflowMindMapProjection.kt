@@ -185,6 +185,7 @@ private fun TaskRun.displayProgress(): Float? = progress ?: when (status) {
 
 internal fun executorMotion(executor: TaskExecutor): H2g2WorkflowMotion = when (executor) {
     is TaskExecutor.GitHubAction -> H2g2WorkflowMotion.Pulse
+    is TaskExecutor.Script -> H2g2WorkflowMotion.Pulse
     is TaskExecutor.TestRunner -> H2g2WorkflowMotion.Skitter
     is TaskExecutor.Deployment -> H2g2WorkflowMotion.Float
     is TaskExecutor.RepositoryOperation -> H2g2WorkflowMotion.Tilt
