@@ -652,6 +652,104 @@ private fun CompanyProviderChoiceRow(
 }
 
 @Composable
+private fun CompanyGitHubActionFields(
+    workflow: String,
+    ref: String,
+    contextInput: String,
+    onChange: (workflow: String, ref: String, contextInput: String) -> Unit,
+) {
+    OutlinedTextField(
+        value = workflow,
+        onValueChange = { onChange(it, ref, contextInput) },
+        label = { Text("Workflow file or ID") },
+        placeholder = { Text("aive-role.yml") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = ref,
+        onValueChange = { onChange(workflow, it, contextInput) },
+        label = { Text("Ref / branch (optional)") },
+        placeholder = { Text("Uses project default branch") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = contextInput,
+        onValueChange = { onChange(workflow, ref, it) },
+        label = { Text("Aive context input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun CompanyGitHubScriptRunnerFields(
+    runner: ScriptRunner.GitHubActions,
+    onChange: (ScriptRunner.GitHubActions) -> Unit,
+) {
+    CompanyGitHubActionFields(
+        workflow = runner.workflow,
+        ref = runner.ref.orEmpty(),
+        contextInput = runner.contextInput,
+        onChange = { workflow, ref, contextInput ->
+            onChange(
+                runner.copy(
+                    workflow = workflow,
+                    ref = ref.trim().takeIf(String::isNotEmpty),
+                    contextInput = contextInput.ifBlank { "aive_context" },
+                ),
+            )
+        },
+    )
+    OutlinedTextField(
+        value = runner.scriptInput,
+        onValueChange = { onChange(runner.copy(scriptInput = it.ifBlank { "aive_script" })) },
+        label = { Text("Script input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = runner.languageInput,
+        onValueChange = { onChange(runner.copy(languageInput = it.ifBlank { "aive_language" })) },
+        label = { Text("Language input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+private fun RoleExecutionSource.isConfiguredExecutionSource(): Boolean = when (this) {
+    RoleExecutionSource.Agent -> true
+    is RoleExecutionSource.GitHubAction -> workflow.isNotBlank() && contextInput.isNotBlank()
+    is RoleExecutionSource.Script -> when (val selectedRunner = runner) {
+        ScriptRunner.LocalSandbox ->
+            language == ScriptLanguage.JavaScript && source.isNotBlank()
+        is ScriptRunner.GitHubActions ->
+            source.isNotBlank() &&
+                selectedRunner.workflow.isNotBlank() &&
+                selectedRunner.contextInput.isNotBlank() &&
+                selectedRunner.scriptInput.isNotBlank() &&
+                selectedRunner.languageInput.isNotBlank()
+    }
+}
+
+private fun RoleExecutionSource.companyExecutionLabel(providerLabel: String): String = when (this) {
+    RoleExecutionSource.Agent -> "Agent / $providerLabel"
+    is RoleExecutionSource.GitHubAction ->
+        "GitHub Actions / $workflow${ref?.let { " @ $it" } ?: ""}"
+    is RoleExecutionSource.Script -> when (language) {
+        ScriptLanguage.JavaScript -> when (val selectedRunner = runner) {
+            ScriptRunner.LocalSandbox -> "JavaScript / local sandbox"
+            is ScriptRunner.GitHubActions -> "JavaScript / GitHub Actions / ${selectedRunner.workflow}"
+        }
+        ScriptLanguage.Python -> when (val selectedRunner = runner) {
+            ScriptRunner.LocalSandbox -> "Python / unsupported local runner"
+            is ScriptRunner.GitHubActions -> "Python / GitHub Actions / ${selectedRunner.workflow}"
+        }
+    }
+}
+
+@Composable
 private fun CompanySectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
 }
