@@ -552,6 +552,11 @@ private fun DrawScope.drawMascotFace(
     val rightEye = eyePoint(MascotPuppetRig.RightEye, 112f, eyeY)
     val leftBlink = puppet.world(MascotPuppetRig.LeftEye).scaleY
     val rightBlink = puppet.world(MascotPuppetRig.RightEye).scaleY
+    fun mouthPoint(x: Float, y: Float): Offset {
+        val mapped = puppet.map(MascotPuppetRig.Mouth, x, y)
+        return point(mapped.x, mapped.y)
+    }
+    val mouthScaleY = puppet.world(MascotPuppetRig.Mouth).scaleY
 
     when (role) {
         NodeCreatureRoleKind.Orchestrator,
@@ -643,8 +648,8 @@ private fun DrawScope.drawMascotFace(
                 startAngle = 198f,
                 sweepAngle = 144f,
                 useCenter = false,
-                topLeft = headPoint(91f, mouthY - 3f),
-                size = Size(18f * unit, 11f * unit),
+                topLeft = mouthPoint(91f, mouthY - 3f),
+                size = Size(18f * unit, 11f * unit * mouthScaleY),
                 style = Stroke(2.2f * unit, cap = StrokeCap.Round),
             )
         }
@@ -654,8 +659,8 @@ private fun DrawScope.drawMascotFace(
                 startAngle = 18f,
                 sweepAngle = 144f,
                 useCenter = false,
-                topLeft = headPoint(91f, mouthY - 7f),
-                size = Size(18f * unit, 11f * unit),
+                topLeft = mouthPoint(91f, mouthY - 7f),
+                size = Size(18f * unit, 11f * unit * mouthScaleY),
                 style = Stroke(2.2f * unit, cap = StrokeCap.Round),
             )
         }
@@ -670,13 +675,13 @@ private fun DrawScope.drawMascotAccessory(
     wave: Float,
     puppet: MascotPuppetPose,
 ) {
-    fun propPoint(x: Float, y: Float): Offset {
+    val propPoint: (Float, Float) -> Offset = { x, y ->
         val mapped = puppet.map(MascotPuppetRig.Prop, x, y)
-        return point(mapped.x, mapped.y)
+        point(mapped.x, mapped.y)
     }
-    fun headPoint(x: Float, y: Float): Offset {
+    val headPoint: (Float, Float) -> Offset = { x, y ->
         val mapped = puppet.map(MascotPuppetRig.Head, x, y)
-        return point(mapped.x, mapped.y)
+        point(mapped.x, mapped.y)
     }
     when (spec.accessory) {
         MascotAccessory.Baton -> {
