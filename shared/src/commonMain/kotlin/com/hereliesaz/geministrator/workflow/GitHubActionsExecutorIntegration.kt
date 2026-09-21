@@ -361,7 +361,7 @@ class GitHubActionsExecutorIntegration(
             null
         }
         scriptResult?.surfaceMutations
-            ?.takeIf(List<AiveSurfaceMutation>::isNotEmpty)
+            ?.takeIf { it.isNotEmpty() }
             ?.let { mutations ->
                 surfaceRuntime.apply(
                     surfaces = context.role?.surfaces.orEmpty(),
