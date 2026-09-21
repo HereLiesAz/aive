@@ -181,6 +181,7 @@ class WorkflowEngine(
                 }
 
                 is TaskExecutor.GitHubAction,
+                is TaskExecutor.Script,
                 is TaskExecutor.TestRunner,
                 is TaskExecutor.Deployment,
                 is TaskExecutor.RepositoryOperation,
