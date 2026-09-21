@@ -12,7 +12,7 @@ import kotlin.test.assertNotNull
 
 class RoleSurfaceRuntimeTest {
     @Test
-    fun resolvesSpreadsheetSqlAndFlowchartTogether() = runBlocking {
+    fun resolvesSpreadsheetSqlAndFlowchartTogether() = runBlocking<Unit> {
         val fake = RecordingSurfaceIntegration()
         val runtime = RoleSurfaceRuntimeRegistry(listOf(fake))
         val surfaces = listOf(
@@ -69,7 +69,7 @@ class RoleSurfaceRuntimeTest {
     }
 
     @Test
-    fun readOnlyRemoteSpreadsheetRejectsWrites() = runBlocking {
+    fun readOnlyRemoteSpreadsheetRejectsWrites() = runBlocking<Unit> {
         val runtime = RoleSurfaceRuntimeRegistry(listOf(RecordingSurfaceIntegration()))
         val surface = RoleSurface.Spreadsheet(
             alias = "remote",
