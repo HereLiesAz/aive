@@ -119,10 +119,16 @@ internal class AndroidResumableFileDownloader(
                 }
 
                 if (knownTotal != null && reportedTotal != null && knownTotal != reportedTotal) {
-                    throw IOException(
-                        "Download size changed for ${output.name}: expected $knownTotal bytes, " +
-                            "server reports $reportedTotal bytes",
-                    )
+                    val retainShortInitialResponse =
+                        requestedOffset == 0L &&
+                            response.status == HttpStatusCode.OK &&
+                            reportedTotal < knownTotal
+                    if (!retainShortInitialResponse) {
+                        throw IOException(
+                            "Download size changed for ${output.name}: expected $knownTotal bytes, " +
+                                "server reports $reportedTotal bytes",
+                        )
+                    }
                 }
                 if (knownTotal == null) knownTotal = reportedTotal
 

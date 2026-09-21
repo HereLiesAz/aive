@@ -22,16 +22,26 @@ class AndroidResumableFileDownloaderTest {
         val bytes = "0123456789".encodeToByteArray()
         var requests = 0
         val client = HttpClient(MockEngine { request ->
-            requests += 1
-            assertEquals("bytes=4-", request.headers[HttpHeaders.Range])
-            respond(
-                content = bytes.copyOfRange(4, bytes.size),
-                status = HttpStatusCode.PartialContent,
-                headers = headersOf(
-                    HttpHeaders.ContentRange to listOf("bytes 4-9/10"),
-                    HttpHeaders.ContentLength to listOf("6"),
-                ),
-            )
+            when (requests++) {
+                0 -> {
+                    assertEquals(null, request.headers[HttpHeaders.Range])
+                    respond(
+                        content = bytes.copyOfRange(0, 4),
+                        status = HttpStatusCode.OK,
+                    )
+                }
+                else -> {
+                    assertEquals("bytes=4-", request.headers[HttpHeaders.Range])
+                    respond(
+                        content = bytes.copyOfRange(4, bytes.size),
+                        status = HttpStatusCode.PartialContent,
+                        headers = headersOf(
+                            HttpHeaders.ContentRange to listOf("bytes 4-9/10"),
+                            HttpHeaders.ContentLength to listOf("6"),
+                        ),
+                    )
+                }
+            }
         })
 
         val root = Files.createTempDirectory("aive-resume-test").toFile()
