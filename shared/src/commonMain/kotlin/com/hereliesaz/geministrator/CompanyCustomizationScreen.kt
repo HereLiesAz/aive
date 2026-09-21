@@ -141,7 +141,7 @@ internal fun CustomCompanyProviderScreen(
     ) {
         Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "These are Aive's semantic orchestration roles. Add, remove, reorder, rewrite, reroute, and redefine them as a collection. Deterministic system workers and repetitive programmatic executors remain fixed outside this roster.",
+            "These are Aive's semantic orchestration roles. Each role can run through an AI provider, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
