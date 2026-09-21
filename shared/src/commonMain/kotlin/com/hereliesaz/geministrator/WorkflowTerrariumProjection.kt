@@ -297,6 +297,7 @@ private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManif
     is TaskExecutor.TestRunner,
     is TaskExecutor.RepositoryOperation,
     is TaskExecutor.NestedWorkflow,
+    is TaskExecutor.Script,
     -> H2g2DependencyManifestation.Tool
 
     is TaskExecutor.ExternalService,
