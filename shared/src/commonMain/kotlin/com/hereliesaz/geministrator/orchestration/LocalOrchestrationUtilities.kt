@@ -262,14 +262,6 @@ interface LocalOrchestrationUtilityFamily {
 object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamily {
     override fun composeMemoryQueries(input: MemoryQueryInput): MemoryQueryPlan {
         require(input.maxQueries >= 1) { "maxQueries must be at least one" }
-        if (input.alreadyRetrievedEvidenceCount > 0 &&
-            input.knownEntities.isEmpty() &&
-            input.knownActions.isEmpty() &&
-            input.codeSymbols.isEmpty()
-        ) {
-            return MemoryQueryPlan(emptyList(), enoughEvidence = true)
-        }
-
         val queries = linkedMapOf<String, MemoryQuerySpec>()
         fun add(text: String, resolution: MemoryResolution, reason: String) {
             val clean = text.trim()

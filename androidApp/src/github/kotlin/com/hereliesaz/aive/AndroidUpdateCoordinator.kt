@@ -12,7 +12,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,14 +67,20 @@ internal class AndroidUpdateCoordinator(
         state = AndroidUpdateState.Downloading(release.version)
         val downloadedFile = withContext(Dispatchers.IO) {
             runCatching {
-                val bytes = GithubReleaseFeed.download(release.downloadUrl)
                 val directory = File(
                     context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir,
                     "updates",
                 ).apply { mkdirs() }
                 val destination = File(directory, "TheAive-${release.version}-android.apk")
                 val temporary = File(directory, destination.name + ".tmp")
-                temporary.writeBytes(bytes)
+                GithubReleaseFeed.download(release.downloadUrl, temporary)
+                if (release.sha256 != null) {
+                    val actual = sha256(temporary)
+                    if (actual != release.sha256) {
+                        temporary.delete()
+                        error("SHA-256 mismatch for downloaded APK: expected ${release.sha256}, got $actual")
+                    }
+                }
                 if (destination.exists() && !destination.delete()) {
                     temporary.delete()
                     error("Could not replace downloaded update")
@@ -170,6 +179,19 @@ internal class AndroidUpdateCoordinator(
 
     private fun currentVersion(): String =
         activity.packageManager.getPackageInfo(activity.packageName, 0).versionName ?: "0"
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        BufferedInputStream(FileInputStream(file)).use { input ->
+            val buffer = ByteArray(256 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > 0) digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
 
     private companion object {
         const val PREFERENCES_NAME = "aive.github-updater.v1"

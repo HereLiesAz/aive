@@ -2,10 +2,14 @@ package com.hereliesaz.aive
 
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Process-local mailbox between the installed-Gemini transport and accessibility service. */
 internal object InstalledGeminiBridge {
     enum class Phase { Idle, Input, AwaitResponse }
+
+    private val bridgeMutex = Mutex()
 
     @Volatile var pendingPrompt: String? = null
     @Volatile var targetPackage: String? = null
@@ -21,15 +25,17 @@ internal object InstalledGeminiBridge {
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    fun reset() {
-        pendingPrompt = null
-        targetPackage = null
-        waiting = false
-        phase = Phase.Idle
-        promptSubmitted = false
-        baselineCopyActions = 0
-        baselineSnapshot = ""
-        observedGenerating = false
-        while (responses.tryReceive().getOrNull() != null) Unit
+    suspend fun reset() {
+        bridgeMutex.withLock {
+            pendingPrompt = null
+            targetPackage = null
+            phase = Phase.Idle
+            promptSubmitted = false
+            baselineCopyActions = 0
+            baselineSnapshot = ""
+            observedGenerating = false
+            waiting = false
+            while (responses.tryReceive().getOrNull() != null) Unit
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.workflow
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -68,7 +69,9 @@ object WorkflowRunFactory {
             createdAtEpochMillis = nowEpochMillis,
             updatedAtEpochMillis = nowEpochMillis,
             repositorySnapshot = repository,
-            roleSnapshot = roles.distinctBy(RoleDefinition::id),
+            roleSnapshot = roles
+                .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
+                .distinctBy(RoleDefinition::id),
         )
     }
 
@@ -84,18 +87,11 @@ object WorkflowRunFactory {
 
             val task = definitionsById[taskId] ?: return@mapValues taskRun
             val dependencyRuns = task.dependsOn.mapNotNull(run.taskRuns::get)
-            val hasFailedDependency = dependencyRuns.any {
-                it.status == TaskRunStatus.Failed ||
-                    it.status == TaskRunStatus.Escalated ||
-                    it.status == TaskRunStatus.Cancelled
-            }
-            val allCompleted = dependencyRuns.size == task.dependsOn.size &&
-                dependencyRuns.all { it.status == TaskRunStatus.Completed }
             val allTerminal = dependencyRuns.size == task.dependsOn.size &&
                 dependencyRuns.all { it.status.isTerminal() }
 
             val conditionMet: Boolean = when (val c = task.condition) {
-                is TaskCondition.Always -> allCompleted
+                is TaskCondition.Always -> allTerminal
                 is TaskCondition.OnAnyOutcome -> {
                     val targetRun = run.taskRuns[c.ofTask]
                     allTerminal && targetRun != null && targetRun.status.isTerminal()
@@ -114,12 +110,6 @@ object WorkflowRunFactory {
                 conditionMet -> taskRun.copy(
                     status = TaskRunStatus.Ready,
                     blockingReason = null,
-                )
-                hasFailedDependency && task.condition is TaskCondition.Always -> taskRun.copy(
-                    blockingReason = BlockingReason(
-                        code = "DEPENDENCY_FAILED",
-                        message = "A dependency did not complete successfully.",
-                    ),
                 )
                 conditionUnreachable -> taskRun.copy(
                     status = TaskRunStatus.Cancelled,

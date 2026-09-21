@@ -32,17 +32,31 @@ class RelayPool(
 
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
+        var displacedPeer: RelayPeer? = null
         val online = mutex.withLock {
             val previous = nodes.put(node.nodeId, NodeSession(node, peer))
             val message = if (previous == null) {
                 ComputeRelayServerMessage.NodeJoined(node)
             } else {
+                // A different connection is replacing an existing registration for the same node ID.
+                // Notify the displaced peer so it knows its connection is no longer active.
+                displacedPeer = previous.peer
                 ComputeRelayServerMessage.NodeUpdated(node)
             }
             nodes.values
                 .filter { it.descriptor.nodeId != node.nodeId }
                 .forEach { outbound += it.peer to message }
             nodes.values.map(NodeSession::descriptor)
+        }
+        displacedPeer?.let {
+            runCatching {
+                it.send(
+                    ComputeRelayServerMessage.Error(
+                        code = "displaced",
+                        message = "This node has been re-registered by a new connection; this connection is no longer active",
+                    ),
+                )
+            }
         }
         sendAll(outbound)
         return online
@@ -270,6 +284,8 @@ class RelayPool(
     }
 
     suspend fun pendingLeaseCount(): Int = mutex.withLock { leases.size }
+
+    suspend fun isEmpty(): Boolean = mutex.withLock { nodes.isEmpty() && leases.isEmpty() }
 
     private suspend fun offerPendingLeases() {
         val ids = mutex.withLock {

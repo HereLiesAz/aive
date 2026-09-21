@@ -15,6 +15,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -36,12 +38,13 @@ internal class AndroidOrchestrationModelInstaller(
     context: Context,
     private val httpClient: HttpClient,
 ) {
+    private val installMutex = Mutex()
     private val installRoot = File(context.filesDir, "haive/orchestration")
     private val json = Json { ignoreUnknownKeys = true }
     private val downloader = AndroidResumableFileDownloader(httpClient)
 
     suspend fun ensureInstalled(role: OrchestrationAgentRole): InstalledOrchestrationModel =
-        withContext(Dispatchers.IO) {
+        installMutex.withLock { withContext(Dispatchers.IO) {
             val bundle = OrchestrationEpoch8ModelCatalog.bundleFor(role)
             val destination = File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}")
             findInstalled(role, destination)?.let { return@withContext it }
@@ -93,7 +96,7 @@ internal class AndroidOrchestrationModelInstaller(
                 // exact GitHub release part instead of restarting a 900 MB transfer.
                 throw failure
             }
-        }
+        } }
 
     suspend fun ensurePlannerAndRepairInstalled(): Map<OrchestrationAgentRole, InstalledOrchestrationModel> =
         mapOf(

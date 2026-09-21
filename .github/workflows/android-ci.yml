@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,8 +44,37 @@ jobs:
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
 
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: '**/build/reports/tests/'
+
+  dependency-submission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: unit-tests
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+          dependency-graph: disabled
+
       - name: Replace legacy dependency snapshot with filtered runtime graph
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: gradle/actions/dependency-submission@v6
         with:
           dependency-graph: generate-and-submit
@@ -54,13 +83,6 @@ jobs:
           dependency-graph-continue-on-failure: false
           additional-arguments: '-Phaive.useLocalH2g2=false'
           cache-disabled: true
-
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-reports
-          path: '**/build/reports/tests/'
 
   build-and-release:
     needs: unit-tests
@@ -81,8 +103,9 @@ jobs:
           distribution: 'temurin'
 
       - name: Install Rust Android toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@v1
         with:
+          toolchain: stable
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Install cargo-ndk

@@ -187,5 +187,9 @@ class HaiveAddonMediator(
             checkPermission(HostPermission.UiScreen)
             return uiBridge.provideScreen(addonId)
         }
+        override fun dispatchAction(namespace: String, actionId: String): Boolean {
+            checkPermission(HostPermission.UiScreen)
+            return uiBridge.dispatchAction(namespace, actionId)
+        }
     }
 }

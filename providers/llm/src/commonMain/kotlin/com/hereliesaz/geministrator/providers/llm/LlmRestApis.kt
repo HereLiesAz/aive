@@ -107,7 +107,6 @@ class AnthropicMessagesApi(
             val key = apiKeyProvider.requireKey("Anthropic")
             header("x-api-key", key)
             header("anthropic-version", "2023-06-01")
-            header("anthropic-dangerous-direct-browser-access", "true")
             contentType(ContentType.Application.Json)
             setBody(
                 AnthropicMessageRequest(

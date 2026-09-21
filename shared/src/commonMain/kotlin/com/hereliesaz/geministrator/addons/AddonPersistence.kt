@@ -13,7 +13,7 @@ data class AddonInstallation(
 )
 
 interface AddonPersistence {
-    fun getInstallations(): List<AddonInstallation>
-    fun saveInstallation(installation: AddonInstallation)
-    fun removeInstallation(id: String)
+    suspend fun getInstallations(): List<AddonInstallation>
+    suspend fun saveInstallation(installation: AddonInstallation)
+    suspend fun removeInstallation(id: String)
 }
