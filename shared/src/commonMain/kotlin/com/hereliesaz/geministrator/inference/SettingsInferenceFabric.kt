@@ -405,6 +405,7 @@ private data class PersistedInferenceModel(
     val adapterId: String? = null,
     val precision: String? = null,
     val backend: String? = null,
+    val artifactPath: String? = null,
     val capabilities: List<String> = emptyList(),
     val releaseDigest: String? = null,
 ) {
@@ -414,6 +415,7 @@ private data class PersistedInferenceModel(
         adapterId = adapterId,
         precision = precision,
         backend = backend,
+        artifactPath = artifactPath,
         capabilities = capabilities.toSet(),
         releaseDigest = releaseDigest,
     )
@@ -425,6 +427,7 @@ private data class PersistedInferenceModel(
             adapterId = value.adapterId,
             precision = value.precision,
             backend = value.backend,
+            artifactPath = value.artifactPath,
             capabilities = value.capabilities.sorted(),
             releaseDigest = value.releaseDigest,
         )
