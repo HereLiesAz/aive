@@ -93,6 +93,24 @@ data class AiveExecutorRepositoryEnvelope(
 )
 
 @Serializable
+@Serializable
+data class AiveScriptArtifactResult(
+    val label: String,
+    val kind: String = "CommandOutput",
+    val uri: String? = null,
+    val textContent: String? = null,
+    val mediaType: String? = null,
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class AiveScriptResult(
+    val status: String = "completed",
+    val message: String? = null,
+    val output: String? = null,
+    val artifacts: List<AiveScriptArtifactResult> = emptyList(),
+)
+
 data class AiveTaskEnvelope(
     val version: Int = 1,
     val projectId: String,
