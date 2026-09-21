@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -28,10 +29,18 @@ import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
+import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+
+private enum class AzphaltStoreCategory(val label: String) {
+    All("All"),
+    Workflows("Workflows"),
+    Roles("Roles"),
+    Models("Models"),
+}
 
 @OptIn(ExperimentalTime::class)
 @Composable
@@ -46,6 +55,8 @@ internal fun AzphaltStoreScreen(
     var snapshot by remember(service) { mutableStateOf<AzphaltStoreSnapshot?>(null) }
     var packages by remember(service) { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
     var query by rememberDurableStringState("azphalt-store.query")
+    var categoryName by rememberDurableStringState("azphalt-store.category", AzphaltStoreCategory.All.name)
+    val category = AzphaltStoreCategory.entries.firstOrNull { it.name == categoryName } ?: AzphaltStoreCategory.All
     var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
     val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
@@ -111,6 +122,15 @@ internal fun AzphaltStoreScreen(
         }
     }
 
+    val visiblePackages = packages.filter { item ->
+        when (category) {
+            AzphaltStoreCategory.All -> true
+            AzphaltStoreCategory.Workflows -> item.kind == "workflow"
+            AzphaltStoreCategory.Roles -> item.kind == "role"
+            AzphaltStoreCategory.Models -> item.isModelAssetPackage()
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -120,8 +140,8 @@ internal fun AzphaltStoreScreen(
     ) {
         Text("AZPHALT STORE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            snapshot?.repository?.name?.let { "$it · workflows and roles for The Aive" }
-                ?: "Verified workflows and roles for The Aive",
+            snapshot?.repository?.name?.let { "$it · workflows, roles, and models for The Aive" }
+                ?: "Verified workflows, roles, and models for The Aive",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -159,27 +179,57 @@ internal fun AzphaltStoreScreen(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search workflows and roles") },
+            label = { Text("Search workflows, roles, and models") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
 
-        if (!loading && packages.isEmpty()) {
-            Text("No Aive workflow or role packages match this search.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AzphaltStoreCategory.entries.forEach { item ->
+                val count = when (item) {
+                    AzphaltStoreCategory.All -> packages.size
+                    AzphaltStoreCategory.Workflows -> packages.count { it.kind == "workflow" }
+                    AzphaltStoreCategory.Roles -> packages.count { it.kind == "role" }
+                    AzphaltStoreCategory.Models -> packages.count(AzphaltPackageSummary::isModelAssetPackage)
+                }
+                AzphaltPill(
+                    label = item.label,
+                    seed = "azphalt-category-${item.name}",
+                    selected = item == category,
+                    endCap = count.toString(),
+                    onClick = { categoryName = item.name },
+                )
+            }
+        }
+
+        if (!loading && visiblePackages.isEmpty()) {
+            Text("No Azphalt packages match this search and filter.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
         val updatesById = snapshot?.updates.orEmpty().associateBy { it.id }
         val revoked = snapshot?.revocations.orEmpty().map { it.id to it.version }.toSet()
 
-        packages.forEach { item ->
+        visiblePackages.forEach { item ->
+            val modelAsset = item.isModelAssetPackage()
             val installed = installedById[item.id]
             val update = updatesById[item.id]
             val selected = selectedPackageId == item.id
             val isRevoked = (item.id to item.latest) in revoked || (installed != null && (item.id to installed.version) in revoked)
             AzphaltRecord(
                 seed = "azphalt-package-${item.id}",
-                eyebrow = item.author?.takeIf(String::isNotBlank) ?: "Azphalt ${item.kind}",
+                eyebrow = if (modelAsset) {
+                    listOfNotNull(
+                        "Model",
+                        item.types.firstOrNull()?.uppercase(),
+                        item.author?.takeIf(String::isNotBlank),
+                    ).joinToString(" · ")
+                } else {
+                    item.author?.takeIf(String::isNotBlank) ?: "Azphalt ${item.kind}"
+                },
                 title = item.name,
                 body = item.description ?: item.id,
                 endCap = when {
@@ -187,6 +237,7 @@ internal fun AzphaltStoreScreen(
                     update?.updateAvailable == true -> "Update ${update.latest ?: item.latest}"
                     installed != null -> "Installed ${installed.version}"
                     item.priceStatus != "free" -> item.priceStatus
+                    modelAsset -> "Model · ${item.latest}"
                     else -> item.latest
                 },
                 selected = selected,
@@ -201,11 +252,27 @@ internal fun AzphaltStoreScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                             Text(
-                                "${item.kind} · ${item.priceStatus} · ${item.byteSize?.let(::formatByteSize) ?: "size not published"}",
+                                buildString {
+                                    append(item.kind)
+                                    if (modelAsset && item.types.isNotEmpty()) {
+                                        append(" · ")
+                                        append(item.types.joinToString())
+                                    }
+                                    append(" · ")
+                                    append(item.priceStatus)
+                                    append(" · ")
+                                    append(item.byteSize?.let(::formatByteSize) ?: "size not published")
+                                },
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
-                            if (isRevoked) {
+                            if (modelAsset) {
+                                Text(
+                                    "Available model asset from Azphalt. It is discoverable here without being misrouted through the workflow/role installer; compatible model-runtime installation is a separate host path.",
+                                    style = AzphaltType.body,
+                                    color = Azphalt.currentGround.onPage,
+                                )
+                            } else if (isRevoked) {
                                 Text(
                                     "A repository revocation applies to this package/version. Installation is blocked until a non-revoked version is selected.",
                                     style = AzphaltType.body,
