@@ -1,48 +1,20 @@
-# Haive Node Creature Engine
+# Legacy Node Creature Engine
 
-This crate owns the visual intelligence of Haive's living workflow graph. Compose is the product/UI host, not the character generator or animation renderer.
+This crate contains the former procedural 3D node-creature renderer.
 
-## Responsibilities
+It is retained temporarily for compatibility and migration work, but it is **not the production terrarium character renderer**. The production UI now uses the approved flat 2D workflow-mascot family rendered directly by Compose, with the role-specific detached arm system handling relationship attachment.
 
-The engine is responsible for:
+## Historical responsibilities
 
-- deterministic role + identity seed -> creature genome generation;
-- one dominant 3D node/head mass with 3–10 structural antennae distributed around the full body silhouette;
-- role-specific faces, antenna terminals, appendages, proportions, surface details, and body plans;
-- procedural animation poses driven by workflow activity/state;
-- real 3D mesh generation for bodies, limbs, antennae, terminal sockets, role machinery, eyes, pupils, and facial marks;
-- orthographic projection into flat vector geometry;
-- discrete cel-shade levels and silhouette extraction;
-- projected antenna-terminal anchors so graph edges physically plug socket-to-socket.
+The legacy engine provided deterministic role genomes, procedural animation, 3D mesh generation, orthographic projection, cel shading, silhouette extraction, and projected terminal anchors.
 
-The rendered look is intentionally a flat graphic reduction of actual animated 3D geometry: silhouettes and planes come from the model rather than being hand-faked as unrelated 2D mascots. The family resemblance to The Haive icon is mandatory: dark rounded body, vivid rim and antennae, compact radial proportions, and simple expressive ring-eye geometry.
+Those projected bodies are no longer shown in the app. Their visual direction was superseded by the approved mascot/animation sheets.
 
-## Runtime split
+## Production source of truth
 
-- `native/node-creatures`: generator, geometry, animation, projection, and versioned render packet.
-- Compose/KMP: workflow truth, camera/focus controls, drag/drop authoring, labels, inspector bottom sheet, accessibility, and rasterization of Rust-projected geometry.
-- Native/WASM bridge: Android, Desktop, JS, and Kotlin/Wasm all consume the same Rust engine so visual behavior remains in parity.
+- `NodeMascotSurface.kt`: role-specific 2D mascot bodies, faces, props, and workflow-state motion.
+- `RustNodeTerrarium.kt`: workflow placement, drag/drop, relationship layout, detached-arm attachment, labels, and status treatment. The filename is historical.
+- `NodeArmAssets.kt`: role-specific detached relationship-arm grammar.
+- `docs/swarm-terrarium/README.md`: current visual requirements.
 
-There is no production Compose creature generator. If the Rust renderer is unavailable, the workflow surface reports that renderer failure instead of silently substituting a visually different mascot system.
-
-## Semantic cast
-
-The canonical workflow roles are intentionally different pieces of anatomy, not palette swaps:
-
-- **Orchestrator** — black/red hub organism, dominant eye, dense radial routing sockets.
-- **Implementation engineer** — orange builder organism with clamp/tool anatomy and additional working limbs.
-- **Crash test dummy** — blue test organism with paired eyes, visible X patch, probes, and coiled sensor antennae.
-- **QA engineer** — purple inspection organism with scanning eye treatment and diagnostic display anatomy.
-- **Code reviewer** — charcoal/red review organism with heavy-lidded eye, tangled/forked terminals, and blocked-state deformation.
-
-Additional planner/research/generic roles remain deterministic members of the same visual grammar.
-
-## Visual invariants
-
-1. Every creature has 3–10 antennae.
-2. Antennae surround the node body rather than occupying only arm-like left/right positions.
-3. Every antenna ends in a rendered node/socket; workflow links connect those sockets directly.
-4. Role identity is structural, not a color swap or chest icon.
-5. Current activity changes pose/behavior, not merely a text badge.
-6. Blocked/failed states physically deform or jam the creature and its connections.
-7. Labels confirm what the creature already communicates visually.
+The old native/WASM renderer may be removed once remaining packaging references are retired and release compatibility no longer requires the artifact.
