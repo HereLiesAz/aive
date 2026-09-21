@@ -369,6 +369,7 @@ fun App(
                             }
                         },
                         projectFileService = projectFileService,
+                        roleSurfaceFilePicker = projectFileService as? RoleSurfaceFilePicker,
                         onExportCurrentProjectFile = { runtime?.exportCurrentProjectFile() },
                         onImportProjectFile = { encoded ->
                             val imported = runtime?.importProjectFile(encoded)
