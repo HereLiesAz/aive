@@ -21,6 +21,8 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal class AndroidRoleSurfaceIntegration(
@@ -30,6 +32,7 @@ internal class AndroidRoleSurfaceIntegration(
     private val appContext = context.applicationContext
     private val spreadsheetRoot = File(appContext.filesDir, "role-surfaces/spreadsheets")
     private val mutationPrefs = appContext.getSharedPreferences("aive_role_surface_mutations", Context.MODE_PRIVATE)
+    private val mutationMutex = Mutex()
 
     override fun supports(surface: RoleSurface): Boolean =
         surface is RoleSurface.Spreadsheet || surface is RoleSurface.Sql
@@ -44,9 +47,9 @@ internal class AndroidRoleSurfaceIntegration(
         surface: RoleSurface,
         mutation: AiveSurfaceMutation,
         mutationKey: String,
-    ) {
+    ) = mutationMutex.withLock {
         require(surface.writableSurface()) { "Surface ${surface.alias} is read-only" }
-        if (mutationPrefs.getBoolean(mutationKey, false)) return
+        if (mutationPrefs.getBoolean(mutationKey, false)) return@withLock
         when (surface) {
             is RoleSurface.Spreadsheet -> applySpreadsheet(surface, mutation)
             is RoleSurface.Sql -> applySql(surface, mutation)
