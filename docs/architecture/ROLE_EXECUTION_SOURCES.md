@@ -73,3 +73,111 @@ but role scripts receive only the permissions/secrets the selected workflow expl
 Centralized MoA, Skeleton-of-Thought, resource-aware compound inference, and agent environment
 planning require an **Agent** execution source. A scripted or Actions-backed role is never silently
 converted back to a provider/model-backed role during workflow preparation.
+
+
+## Attached role surfaces
+
+Execution source and attached surfaces are independent. A role may use an AI provider, GitHub Actions,
+local JavaScript, or a GitHub-backed JavaScript/Python runner while simultaneously exposing any
+number of named data/logic surfaces.
+
+The Swarm editor currently supports:
+
+- **Spreadsheet** — CSV/TSV from an app-owned file, inline data, a document URI, or HTTPS. App-owned
+  files and writable document URIs can accept controlled row mutations.
+- **SQL database** — SQLite query surfaces backed by an app-owned database or read-only document URI.
+  App-owned SQLite databases can accept explicit SQL mutations.
+- **Flowchart** — a native Mermaid-style `flowchart` / `graph` surface. The Aive parses the
+  supported flowchart subset itself into nodes and edges; no WebView is required.
+
+Resolved surfaces appear in the executor envelope:
+
+```json
+{
+  "surfaces": [
+    {
+      "alias": "customers",
+      "kind": "spreadsheet",
+      "writable": true,
+      "table": {
+        "columns": ["id", "name"],
+        "rows": [{"id": "1", "name": "Ada"}],
+        "truncated": false
+      }
+    },
+    {
+      "alias": "db",
+      "kind": "sql",
+      "writable": true,
+      "table": {
+        "columns": ["id", "status"],
+        "rows": [{"id": "1", "status": "open"}]
+      }
+    },
+    {
+      "alias": "process",
+      "kind": "flowchart",
+      "flowchart": {
+        "direction": "TD",
+        "nodes": [{"id": "A", "label": "Load", "shape": "rectangle"}],
+        "edges": [{"from": "A", "to": "B", "style": "arrow"}]
+      }
+    }
+  ]
+}
+```
+
+JavaScript reads `aive.surfaces`; Python reads the same data from `aive["surfaces"]`.
+
+### Surface mutations
+
+A successful script/Action may return `surfaceMutations` alongside ordinary output/artifacts:
+
+```json
+{
+  "status": "completed",
+  "surfaceMutations": [
+    {
+      "alias": "customers",
+      "operation": "AppendRows",
+      "rows": [{"id": "2", "name": "Grace"}]
+    },
+    {
+      "alias": "db",
+      "operation": "ExecuteSql",
+      "sql": "UPDATE jobs SET status = 'done' WHERE id = 7"
+    }
+  ]
+}
+```
+
+Spreadsheet operations are `AppendRows` and `ReplaceRows`. SQL accepts `ExecuteSql` only.
+Mutations are rejected unless the target surface is explicitly writable. HTTPS/inline spreadsheets,
+document-URI SQLite databases, and flowcharts are read-only. The host keys mutations by task run,
+attempt, and mutation index so repeated GitHub reconciliation does not normally replay a completed
+write.
+
+### Spreadsheet limits
+
+Spreadsheet snapshots are bounded by the surface's configured row limit (1–10,000 rows) and the
+Android host caps source/serialized size at 5 MiB. CSV/TSV parsing supports quoted fields, embedded
+delimiters/newlines, escaped quotes, CRLF, duplicate header disambiguation, and headerless tables.
+
+### SQL boundary
+
+The first SQL implementation is SQLite because Android ships a native SQLite runtime. Read queries
+are bounded by the configured row limit. Only app-owned SQLite databases may be mutated; imported
+document-URI databases are copied to a temporary read-only file for the query and deleted afterward.
+This keeps database-server credentials and arbitrary remote SQL transports out of the first surface
+contract while leaving `RoleSurface.Sql`/dialect routing extensible.
+
+### Native flowchart scripting
+
+The first native flowchart language is the Mermaid flowchart subset. Supported syntax includes
+`flowchart` / `graph` direction headers, ordinary/rounded/circle/decision/stadium nodes, arrow,
+line, dotted edges, and labeled arrows. Unsupported statements are reported as parser warnings or
+validation failures rather than being passed to a browser renderer.
+
+Because the parsed graph is a normal role surface, a script can combine deterministic flow topology
+with spreadsheet/SQL data in the same execution. The graph is intentionally read-only at runtime;
+editing happens through the Swarm flowchart source field.
