@@ -406,6 +406,7 @@ private data class PersistedInferenceModel(
     val precision: String? = null,
     val backend: String? = null,
     val artifactPath: String? = null,
+    val metadataJson: String? = null,
     val capabilities: List<String> = emptyList(),
     val releaseDigest: String? = null,
 ) {
@@ -416,6 +417,7 @@ private data class PersistedInferenceModel(
         precision = precision,
         backend = backend,
         artifactPath = artifactPath,
+        metadataJson = metadataJson,
         capabilities = capabilities.toSet(),
         releaseDigest = releaseDigest,
     )
@@ -428,6 +430,7 @@ private data class PersistedInferenceModel(
             precision = value.precision,
             backend = value.backend,
             artifactPath = value.artifactPath,
+            metadataJson = value.metadataJson,
             capabilities = value.capabilities.sorted(),
             releaseDigest = value.releaseDigest,
         )
