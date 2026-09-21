@@ -52,11 +52,13 @@ internal class AndroidAzphaltModelPackageInstaller(
         val versionSegment = safeSegment(prepared.version)
         val packageRoot = File(root, packageSegment)
         val finalDir = File(packageRoot, versionSegment)
+        val backupDir = File(packageRoot, "$versionSegment.previous")
         val staging = File(File(root, ".staging"), "$packageSegment-$versionSegment")
         staging.deleteRecursively()
         check(staging.mkdirs() || staging.isDirectory) { "Could not create model staging directory" }
 
         val previous = readInstalled().firstOrNull { it.packageId == packageId }
+        val previousDescriptors = previous?.files.orEmpty().mapNotNull { inferenceState.model(it.logicalModelId) }
         val installedArtifacts = mutableListOf<InstalledAzphaltModelFile>()
         val descriptors = mutableListOf<InferenceModelDescriptor>()
 
@@ -109,7 +111,10 @@ internal class AndroidAzphaltModelPackageInstaller(
             }
 
             packageRoot.mkdirs()
-            finalDir.deleteRecursively()
+            backupDir.deleteRecursively()
+            if (finalDir.exists()) {
+                check(finalDir.renameTo(backupDir)) { "Could not stage previous installed model version for replacement" }
+            }
             finalizeDirectory(staging, finalDir)
             descriptors.forEach { inferenceState.registerModel(it) }
 
@@ -129,12 +134,19 @@ internal class AndroidAzphaltModelPackageInstaller(
                 .filterNot { old -> installedArtifacts.any { it.logicalModelId == old.logicalModelId } }
                 .forEach { inferenceState.removeModel(it.logicalModelId) }
 
+            backupDir.deleteRecursively()
             packageRoot.listFiles()
-                ?.filter { it.isDirectory && it.name != versionSegment }
+                ?.filter { it.isDirectory && it.name != versionSegment && it.name != backupDir.name }
                 ?.forEach(File::deleteRecursively)
             installed
         } catch (failure: Throwable) {
             staging.deleteRecursively()
+            descriptors.forEach { inferenceState.removeModel(it.logicalModelId) }
+            previousDescriptors.forEach { inferenceState.registerModel(it) }
+            finalDir.deleteRecursively()
+            if (backupDir.exists()) {
+                check(backupDir.renameTo(finalDir)) { "Could not restore previous model version after failed update" }
+            }
             throw failure
         }
     }
