@@ -64,6 +64,12 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
             "stress test" in role ||
             "playtest" in role -> NodeCreatureRoleKind.CrashTestDummy
 
+        // Skeptics, reviewers and red-team roles challenge another node's result.
+        "adversarial" in role ||
+            "skeptic" in role ||
+            "red team" in role ||
+            "reviewer" in role -> NodeCreatureRoleKind.AdversarialReviewer
+
         // Verification/audit/evaluation roles use the inspection character family.
         role == "qa" ||
             "qa engineer" in role ||
@@ -74,12 +80,6 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
             "evaluator" in role ||
             "visual qc" in role ||
             "inspector" in role -> NodeCreatureRoleKind.QaEngineer
-
-        // Skeptics, reviewers and red-team roles challenge another node's result.
-        "adversarial" in role ||
-            "skeptic" in role ||
-            "red team" in role ||
-            "reviewer" in role -> NodeCreatureRoleKind.AdversarialReviewer
 
         // Environment planning is deliberately word-bounded: "repair" must never match "epa".
         hasWord("epa") ||
