@@ -308,8 +308,12 @@ internal class AndroidRoleSurfaceIntegration(
         }
     }
 
-    private fun resolveSpreadsheetFormat(surface: RoleSurface.Spreadsheet): SpreadsheetFormat =
-        when (surface.format) {
+    private fun resolveSpreadsheetFormat(surface: RoleSurface.Spreadsheet): SpreadsheetFormat {
+        if (surface.source is SpreadsheetSource.GoogleSheet) return SpreadsheetFormat.Csv
+        require(surface.source !is SpreadsheetSource.Inline || surface.format != SpreadsheetFormat.Xlsx) {
+            "Inline spreadsheets cannot use XLSX format"
+        }
+        return when (surface.format) {
             SpreadsheetFormat.Csv -> SpreadsheetFormat.Csv
             SpreadsheetFormat.Tsv -> SpreadsheetFormat.Tsv
             SpreadsheetFormat.Xlsx -> SpreadsheetFormat.Xlsx
@@ -336,6 +340,7 @@ internal class AndroidRoleSurfaceIntegration(
                     ) SpreadsheetFormat.Tsv else SpreadsheetFormat.Csv
             }
         }
+    }
 
     private fun spreadsheetFile(
         name: String,
