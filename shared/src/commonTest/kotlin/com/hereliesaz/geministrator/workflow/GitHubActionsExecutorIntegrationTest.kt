@@ -29,6 +29,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
+import no.synth.kmpzip.io.ByteArrayOutputStream
+import no.synth.kmpzip.zip.ZipEntry
+import no.synth.kmpzip.zip.ZipOutputStream
 
 class GitHubActionsExecutorIntegrationTest {
     @Test
@@ -177,6 +180,49 @@ class GitHubActionsExecutorIntegrationTest {
     }
 
     @Test
+    fun completedScriptRunImportsStructuredAiveResult() = runBlocking {
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed'}",
+            runner = ScriptRunner.GitHubActions(workflow = "aive-script.yml"),
+        )
+        val base = context(executor)
+        val client = FakeGitHubActionsClient(
+            reconciledRun = GitHubWorkflowRun(
+                id = "run-42",
+                status = GitHubWorkflowRunStatus.Completed,
+                artifacts = listOf(
+                    GitHubWorkflowArtifact(
+                        id = "artifact-result",
+                        name = "aive-result",
+                        archiveDownloadUrl = "https://example.invalid/result",
+                    ),
+                ),
+            ),
+            artifactBytes = resultArchive(
+                """{"status":"completed","message":"done","output":"script value","artifacts":[{"label":"analysis","kind":"Research","textContent":"evidence","mediaType":"text/plain"}]}""",
+            ),
+        )
+        val integration = GitHubActionsExecutorIntegration(client)
+        val context = base.copy(
+            taskRun = base.taskRun.copy(
+                status = TaskRunStatus.Running,
+                externalRunId = "run-42",
+            ),
+        )
+
+        val execution = integration.reconcile(context)
+
+        assertEquals(TaskRunStatus.Completed, execution.status)
+        assertEquals("done", execution.progressMessage)
+        assertEquals(2, execution.artifacts.size)
+        assertEquals(ArtifactKind.Research, execution.artifacts[0].kind)
+        assertEquals("evidence", execution.artifacts[0].textContent)
+        assertEquals("script value", execution.artifacts[1].textContent)
+        assertEquals("artifact-result", client.lastArtifactId)
+    }
+
+    @Test
     fun jobStepProgressProjectsIntoTaskProgress() = runBlocking {
         val base = context(TaskExecutor.GitHubAction("ci.yml"))
         val client = FakeGitHubActionsClient(
@@ -287,10 +333,12 @@ class GitHubActionsExecutorIntegrationTest {
 private class FakeGitHubActionsClient(
     private val dispatchedRun: GitHubWorkflowRun = GitHubWorkflowRun("run", GitHubWorkflowRunStatus.Queued),
     private val reconciledRun: GitHubWorkflowRun = GitHubWorkflowRun("run", GitHubWorkflowRunStatus.Running),
+    private val artifactBytes: ByteArray = ByteArray(0),
 ) : GitHubActionsClient {
     var lastDispatch: GitHubWorkflowDispatchRequest? = null
     var lastRepository: RepositoryRef? = null
     var lastRunId: String? = null
+    var lastArtifactId: String? = null
 
     override suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun {
         lastDispatch = request
@@ -302,4 +350,20 @@ private class FakeGitHubActionsClient(
         lastRunId = runId
         return reconciledRun
     }
+
+    override suspend fun downloadArtifact(repository: RepositoryRef, artifactId: String): ByteArray {
+        lastRepository = repository
+        lastArtifactId = artifactId
+        return artifactBytes
+    }
+}
+
+private fun resultArchive(json: String): ByteArray {
+    val output = ByteArrayOutputStream()
+    ZipOutputStream(output).use { zip ->
+        zip.putNextEntry(ZipEntry("aive-result.json"))
+        zip.write(json.encodeToByteArray())
+        zip.closeEntry()
+    }
+    return output.toByteArray()
 }
