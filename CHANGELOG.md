@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.9.6 — 2026-09-19
+- Added role-level execution sources so Swarm roles can run through AI providers, GitHub Actions, isolated local JavaScript, or JavaScript/Python GitHub runners; all system-backed roles receive the same redaction-aware Aive task envelope and script results re-enter the normal artifact pipeline.
 
 - Fixed Android upgrade continuity by restoring the GitHub APK lineage to its original `com.hereliesaz.haive` application ID while keeping Google Play on `com.hereliesaz.aive`.
 - Added durable write-through persistence for user drafts, navigation, appearance, workflow composition, company-role editing, project setup, artifact browsing, agent messages, compute settings, and add-on navigation.
