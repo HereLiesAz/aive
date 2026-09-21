@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
 import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
+import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -519,9 +520,12 @@ internal fun configuredAndroidExecutorIntegrations(
             )
         }
     }
+    val surfaceRuntime = RoleSurfaceRuntimeRegistry(
+        listOf(AndroidRoleSurfaceIntegration(context, httpClient)),
+    )
     return TaskExecutorIntegrationRegistry(
         buildList {
-            add(AndroidJavaScriptExecutorIntegration(context))
+            add(AndroidJavaScriptExecutorIntegration(context, surfaceRuntime))
             if (repositoryClients.isNotEmpty()) {
                 add(
                     RepositoryOperationExecutorIntegration(
@@ -532,10 +536,11 @@ internal fun configuredAndroidExecutorIntegrations(
             githubToken?.let { token ->
                 add(
                     GitHubActionsExecutorIntegration(
-                        GitHubRestActionsClient(
+                        client = GitHubRestActionsClient(
                             httpClient = httpClient,
                             tokenProvider = GitHubTokenProvider { token },
                         ),
+                        surfaceRuntime = surfaceRuntime,
                     ),
                 )
             }
