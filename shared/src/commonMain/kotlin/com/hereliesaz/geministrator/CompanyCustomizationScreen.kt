@@ -743,6 +743,317 @@ private fun CompanyProviderChoiceRow(
 }
 
 @Composable
+private fun CompanyRoleSurfaceEditor(
+    surface: RoleSurface,
+    index: Int,
+    onChange: (RoleSurface) -> Unit,
+    onRemove: () -> Unit,
+) {
+    AzphaltRecord(
+        seed = "role-surface-$index-${surface.alias}",
+        eyebrow = when (surface) {
+            is RoleSurface.Spreadsheet -> "Spreadsheet"
+            is RoleSurface.Sql -> "SQL database"
+            is RoleSurface.Flowchart -> "Flowchart"
+        },
+        title = surface.alias.ifBlank { "Unnamed surface" },
+        body = when (surface) {
+            is RoleSurface.Spreadsheet ->
+                "Tabular rows available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Sql ->
+                "SQLite query result available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Flowchart ->
+                "Mermaid flowchart parsed natively and exposed as nodes and edges."
+        },
+        endCap = when (surface) {
+            is RoleSurface.Spreadsheet -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Sql -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Flowchart -> "Mermaid"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = surface.alias,
+                    onValueChange = { value ->
+                        when (surface) {
+                            is RoleSurface.Spreadsheet -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Sql -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Flowchart -> onChange(surface.copy(alias = value))
+                        }
+                    },
+                    label = { Text("Surface alias") },
+                    placeholder = { Text("customers") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                when (surface) {
+                    is RoleSurface.Spreadsheet -> CompanySpreadsheetSurfaceFields(surface, onChange)
+                    is RoleSurface.Sql -> CompanySqlSurfaceFields(surface, onChange)
+                    is RoleSurface.Flowchart -> CompanyFlowchartSurfaceFields(surface, onChange)
+                }
+
+                AzphaltPill(
+                    label = "Remove surface",
+                    seed = "role-surface-remove-$index",
+                    onClick = onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CompanySpreadsheetSurfaceFields(
+    surface: RoleSurface.Spreadsheet,
+    onChange: (RoleSurface) -> Unit,
+) {
+    CompanySectionLabel("Spreadsheet source")
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        AzphaltPill(
+            label = "App spreadsheet",
+            seed = "sheet-source-app-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.AppFile,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.AppFile("role-data.csv"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Inline CSV / TSV",
+            seed = "sheet-source-inline-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Inline,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.Inline("column_a,column_b\n"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "HTTPS spreadsheet",
+            seed = "sheet-source-https-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Https,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.Https("https://"),
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Document URI",
+            seed = "sheet-source-uri-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.DocumentUri,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.DocumentUri("content://"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    when (val source = surface.source) {
+        is SpreadsheetSource.AppFile -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("App spreadsheet file") },
+            placeholder = { Text("customers.csv") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Inline -> OutlinedTextField(
+            value = source.text,
+            onValueChange = { onChange(surface.copy(source = source.copy(text = it))) },
+            label = { Text("Spreadsheet data") },
+            minLines = 6,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Https -> OutlinedTextField(
+            value = source.url,
+            onValueChange = { onChange(surface.copy(source = source.copy(url = it), writable = false)) },
+            label = { Text("HTTPS CSV / TSV URL") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it))) },
+            label = { Text("Document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        SpreadsheetFormat.entries.forEach { format ->
+            AzphaltPill(
+                label = format.name,
+                seed = "sheet-format-${surface.alias}-${format.name}",
+                selected = surface.format == format,
+                onClick = { onChange(surface.copy(format = format)) },
+            )
+        }
+    }
+    AzphaltPill(
+        label = "First row is headers",
+        seed = "sheet-headers-${surface.alias}",
+        selected = surface.firstRowHeaders,
+        onClick = { onChange(surface.copy(firstRowHeaders = !surface.firstRowHeaders)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SpreadsheetSource.AppFile ||
+        surface.source is SpreadsheetSource.DocumentUri
+    AzphaltPill(
+        label = if (writableSource) "Allow script writes" else "Read-only source",
+        seed = "sheet-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sheet-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanySqlSurfaceFields(
+    surface: RoleSurface.Sql,
+    onChange: (RoleSurface) -> Unit,
+) {
+    CompanySectionLabel("SQL source")
+    AzphaltPill(
+        label = "App SQLite database",
+        seed = "sql-source-app-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.AppDatabase,
+        onClick = { onChange(surface.copy(source = SqlDatabaseSource.AppDatabase("role-data.db"))) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltPill(
+        label = "SQLite document URI",
+        seed = "sql-source-uri-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.DocumentUri,
+        onClick = {
+            onChange(
+                surface.copy(
+                    source = SqlDatabaseSource.DocumentUri("content://"),
+                    writable = false,
+                ),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    when (val source = surface.source) {
+        is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("SQLite database name") },
+            placeholder = { Text("customers.db") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SqlDatabaseSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it), writable = false)) },
+            label = { Text("SQLite document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    OutlinedTextField(
+        value = surface.query,
+        onValueChange = { onChange(surface.copy(query = it)) },
+        label = { Text("Read query") },
+        placeholder = { Text("SELECT * FROM customers ORDER BY name") },
+        minLines = 4,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SqlDatabaseSource.AppDatabase
+    AzphaltPill(
+        label = if (writableSource) "Allow script SQL mutations" else "Read-only database source",
+        seed = "sql-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sql-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanyFlowchartSurfaceFields(
+    surface: RoleSurface.Flowchart,
+    onChange: (RoleSurface) -> Unit,
+) {
+    OutlinedTextField(
+        value = surface.source,
+        onValueChange = { onChange(surface.copy(source = it)) },
+        label = { Text("Mermaid flowchart") },
+        placeholder = { Text("flowchart TD\n    A[Start] --> B[Done]") },
+        minLines = 8,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val parsed = runCatching { MermaidFlowchartParser.parse(surface.source) }
+    parsed.onSuccess { graph ->
+        AzphaltNote(
+            seed = "flowchart-parse-${surface.alias}",
+            label = "Native preview",
+            value = buildString {
+                append("${graph.nodes.size} nodes · ${graph.edges.size} edges · ${graph.direction}")
+                if (graph.edges.isNotEmpty()) {
+                    append("\n")
+                    append(
+                        graph.edges.take(6).joinToString("\n") { edge ->
+                            "${edge.from} → ${edge.to}${edge.label?.let { " · $it" } ?: ""}"
+                        },
+                    )
+                }
+                if (graph.warnings.isNotEmpty()) {
+                    append("\nWarnings: ")
+                    append(graph.warnings.joinToString("; "))
+                }
+            },
+        )
+    }.onFailure { failure ->
+        Text(
+            failure.message ?: "Flowchart could not be parsed.",
+            style = AzphaltType.body,
+            color = Azphalt.currentGround.onPage,
+        )
+    }
+}
+
+@Composable
+private fun CompanyMaxRowsField(
+    value: Int,
+    seed: String,
+    onChange: (Int) -> Unit,
+) {
+    OutlinedTextField(
+        value = value.toString(),
+        onValueChange = { raw ->
+            raw.toIntOrNull()
+                ?.coerceIn(1, 10_000)
+                ?.let(onChange)
+        },
+        label = { Text("Maximum rows exposed") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltNote(
+        seed = seed,
+        label = "Envelope limit",
+        value = "1–10,000 rows; larger sources are marked truncated.",
+    )
+}
+
+@Composable
 private fun CompanyGitHubActionFields(
     workflow: String,
     ref: String,
