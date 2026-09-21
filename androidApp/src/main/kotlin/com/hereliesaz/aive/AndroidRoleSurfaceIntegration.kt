@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.workflow.DelimitedTableCodec
 import com.hereliesaz.geministrator.workflow.RoleSurfaceIntegration
 import com.hereliesaz.geministrator.workflow.writableSurface
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import java.io.File
@@ -60,16 +61,24 @@ internal class AndroidRoleSurfaceIntegration(
         surface: RoleSurface.Spreadsheet,
     ): AiveRoleSurfaceEnvelope = withContext(Dispatchers.IO) {
         val format = resolveSpreadsheetFormat(surface)
-        val text = readSpreadsheetText(surface)
-        require(text.encodeToByteArray().size <= MAX_SPREADSHEET_BYTES) {
-            "Spreadsheet surface ${surface.alias} exceeds ${MAX_SPREADSHEET_BYTES / 1024 / 1024} MiB"
+        val table = if (format == SpreadsheetFormat.Xlsx) {
+            AndroidXlsxCodec.parse(
+                bytes = readSpreadsheetBytes(surface),
+                firstRowHeaders = surface.firstRowHeaders,
+                maxRows = surface.maxRows,
+            )
+        } else {
+            val text = readSpreadsheetText(surface)
+            require(text.encodeToByteArray().size <= MAX_SPREADSHEET_BYTES) {
+                "Spreadsheet surface ${surface.alias} exceeds ${MAX_SPREADSHEET_BYTES / 1024 / 1024} MiB"
+            }
+            DelimitedTableCodec.parse(
+                text = text,
+                delimiter = if (format == SpreadsheetFormat.Tsv) '\t' else ',',
+                firstRowHeaders = surface.firstRowHeaders,
+                maxRows = surface.maxRows,
+            )
         }
-        val table = DelimitedTableCodec.parse(
-            text = text,
-            delimiter = if (format == SpreadsheetFormat.Tsv) '\t' else ',',
-            firstRowHeaders = surface.firstRowHeaders,
-            maxRows = surface.maxRows,
-        )
         AiveRoleSurfaceEnvelope(
             alias = surface.alias,
             kind = "spreadsheet",
@@ -141,12 +150,20 @@ internal class AndroidRoleSurfaceIntegration(
         val format = resolveSpreadsheetFormat(surface)
         val delimiter = if (format == SpreadsheetFormat.Tsv) '\t' else ','
         val existing = if (mutation.operation == AiveSurfaceMutationOperation.AppendRows) {
-            DelimitedTableCodec.parse(
-                text = readSpreadsheetText(surface),
-                delimiter = delimiter,
-                firstRowHeaders = surface.firstRowHeaders,
-                maxRows = MAX_STORED_ROWS,
-            )
+            if (format == SpreadsheetFormat.Xlsx) {
+                AndroidXlsxCodec.parse(
+                    bytes = readSpreadsheetBytes(surface),
+                    firstRowHeaders = surface.firstRowHeaders,
+                    maxRows = MAX_STORED_ROWS,
+                )
+            } else {
+                DelimitedTableCodec.parse(
+                    text = readSpreadsheetText(surface),
+                    delimiter = delimiter,
+                    firstRowHeaders = surface.firstRowHeaders,
+                    maxRows = MAX_STORED_ROWS,
+                )
+            }
         } else {
             AiveSurfaceTable(emptyList())
         }
@@ -155,11 +172,18 @@ internal class AndroidRoleSurfaceIntegration(
             "Spreadsheet surface ${surface.alias} exceeds the $MAX_STORED_ROWS row storage limit"
         }
         val columns = DelimitedTableCodec.columnsFor(existing.columns, allRows)
-        val serialized = DelimitedTableCodec.serialize(columns, allRows, delimiter, surface.firstRowHeaders)
-        require(serialized.encodeToByteArray().size <= MAX_SPREADSHEET_BYTES) {
-            "Spreadsheet surface ${surface.alias} exceeds ${MAX_SPREADSHEET_BYTES / 1024 / 1024} MiB after mutation"
+        if (format == SpreadsheetFormat.Xlsx) {
+            writeSpreadsheetBytes(
+                surface,
+                AndroidXlsxCodec.serialize(columns, allRows, surface.firstRowHeaders),
+            )
+        } else {
+            val serialized = DelimitedTableCodec.serialize(columns, allRows, delimiter, surface.firstRowHeaders)
+            require(serialized.encodeToByteArray().size <= MAX_SPREADSHEET_BYTES) {
+                "Spreadsheet surface ${surface.alias} exceeds ${MAX_SPREADSHEET_BYTES / 1024 / 1024} MiB after mutation"
+            }
+            writeSpreadsheetText(surface, serialized)
         }
-        writeSpreadsheetText(surface, serialized)
     }
 
     private suspend fun applySql(
@@ -209,7 +233,57 @@ internal class AndroidRoleSurfaceIntegration(
                 }
                 httpClient.get(source.url).bodyAsText()
             }
+            is SpreadsheetSource.GoogleSheet -> {
+                require(source.spreadsheetId.isNotBlank()) { "Google Sheet ID is required" }
+                httpClient.get(
+                    "https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/export?format=csv&gid=${source.gid.ifBlank { "0" }}",
+                ).bodyAsText()
+            }
         }
+
+    private suspend fun readSpreadsheetBytes(surface: RoleSurface.Spreadsheet): ByteArray =
+        when (val source = surface.source) {
+            is SpreadsheetSource.AppFile -> withContext(Dispatchers.IO) {
+                val file = spreadsheetFile(source.name, surface)
+                if (file.exists()) file.readBytes() else AndroidXlsxCodec.serialize(emptyList(), emptyList(), surface.firstRowHeaders)
+            }
+            is SpreadsheetSource.DocumentUri -> withContext(Dispatchers.IO) {
+                appContext.contentResolver.openInputStream(Uri.parse(source.uri))?.use { it.readBytes() }
+                    ?: error("Unable to open spreadsheet document URI")
+            }
+            is SpreadsheetSource.Https -> {
+                require(source.url.startsWith("https://", ignoreCase = true)) {
+                    "Spreadsheet network sources must use HTTPS"
+                }
+                httpClient.get(source.url).body()
+            }
+            is SpreadsheetSource.GoogleSheet ->
+                readSpreadsheetText(surface).encodeToByteArray()
+            is SpreadsheetSource.Inline ->
+                source.text.encodeToByteArray()
+        }
+
+    private fun writeSpreadsheetBytes(
+        surface: RoleSurface.Spreadsheet,
+        bytes: ByteArray,
+    ) {
+        when (val source = surface.source) {
+            is SpreadsheetSource.AppFile -> {
+                val file = spreadsheetFile(source.name, surface)
+                file.parentFile?.mkdirs()
+                file.writeBytes(bytes)
+            }
+            is SpreadsheetSource.DocumentUri -> {
+                val output = appContext.contentResolver.openOutputStream(Uri.parse(source.uri), "wt")
+                    ?: error("Unable to open spreadsheet document URI for writing")
+                output.use { it.write(bytes) }
+            }
+            is SpreadsheetSource.Inline,
+            is SpreadsheetSource.Https,
+            is SpreadsheetSource.GoogleSheet,
+            -> error("Spreadsheet source ${source::class.simpleName} is read-only")
+        }
+    }
 
     private fun writeSpreadsheetText(
         surface: RoleSurface.Spreadsheet,
@@ -229,6 +303,7 @@ internal class AndroidRoleSurfaceIntegration(
             }
             is SpreadsheetSource.Inline,
             is SpreadsheetSource.Https,
+            is SpreadsheetSource.GoogleSheet,
             -> error("Spreadsheet source ${source::class.simpleName} is read-only")
         }
     }
@@ -237,13 +312,24 @@ internal class AndroidRoleSurfaceIntegration(
         when (surface.format) {
             SpreadsheetFormat.Csv -> SpreadsheetFormat.Csv
             SpreadsheetFormat.Tsv -> SpreadsheetFormat.Tsv
+            SpreadsheetFormat.Xlsx -> SpreadsheetFormat.Xlsx
             SpreadsheetFormat.Auto -> when (val source = surface.source) {
-                is SpreadsheetSource.AppFile ->
-                    if (source.name.endsWith(".tsv", ignoreCase = true)) SpreadsheetFormat.Tsv else SpreadsheetFormat.Csv
-                is SpreadsheetSource.DocumentUri ->
-                    if (source.uri.substringBefore('?').endsWith(".tsv", ignoreCase = true)) SpreadsheetFormat.Tsv else SpreadsheetFormat.Csv
-                is SpreadsheetSource.Https ->
-                    if (source.url.substringBefore('?').endsWith(".tsv", ignoreCase = true)) SpreadsheetFormat.Tsv else SpreadsheetFormat.Csv
+                is SpreadsheetSource.AppFile -> when {
+                    source.name.endsWith(".xlsx", ignoreCase = true) -> SpreadsheetFormat.Xlsx
+                    source.name.endsWith(".tsv", ignoreCase = true) -> SpreadsheetFormat.Tsv
+                    else -> SpreadsheetFormat.Csv
+                }
+                is SpreadsheetSource.DocumentUri -> when {
+                    source.uri.substringBefore('?').endsWith(".xlsx", ignoreCase = true) -> SpreadsheetFormat.Xlsx
+                    source.uri.substringBefore('?').endsWith(".tsv", ignoreCase = true) -> SpreadsheetFormat.Tsv
+                    else -> SpreadsheetFormat.Csv
+                }
+                is SpreadsheetSource.Https -> when {
+                    source.url.substringBefore('?').endsWith(".xlsx", ignoreCase = true) -> SpreadsheetFormat.Xlsx
+                    source.url.substringBefore('?').endsWith(".tsv", ignoreCase = true) -> SpreadsheetFormat.Tsv
+                    else -> SpreadsheetFormat.Csv
+                }
+                is SpreadsheetSource.GoogleSheet -> SpreadsheetFormat.Csv
                 is SpreadsheetSource.Inline ->
                     if (source.text.lineSequence().firstOrNull().orEmpty().count { it == '\t' } >
                         source.text.lineSequence().firstOrNull().orEmpty().count { it == ',' }
@@ -258,11 +344,16 @@ internal class AndroidRoleSurfaceIntegration(
         val safe = safeFileName(name)
         val extension = when (resolveSpreadsheetFormat(surface)) {
             SpreadsheetFormat.Tsv -> ".tsv"
+            SpreadsheetFormat.Xlsx -> ".xlsx"
             SpreadsheetFormat.Csv,
             SpreadsheetFormat.Auto,
             -> ".csv"
         }
-        val fileName = if (safe.endsWith(".csv", true) || safe.endsWith(".tsv", true)) safe else safe + extension
+        val fileName = if (
+            safe.endsWith(".csv", true) ||
+            safe.endsWith(".tsv", true) ||
+            safe.endsWith(".xlsx", true)
+        ) safe else safe + extension
         return File(spreadsheetRoot, fileName)
     }
 
@@ -310,6 +401,7 @@ internal class AndroidRoleSurfaceIntegration(
         is SpreadsheetSource.Inline -> "inline"
         is SpreadsheetSource.DocumentUri -> "document-uri"
         is SpreadsheetSource.Https -> "https"
+        is SpreadsheetSource.GoogleSheet -> "google-sheet"
     }
 
     private fun SqlDatabaseSource.surfaceSourceLabel(): String = when (this) {
