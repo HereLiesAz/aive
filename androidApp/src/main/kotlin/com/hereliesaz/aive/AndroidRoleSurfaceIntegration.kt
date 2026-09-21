@@ -86,6 +86,7 @@ internal class AndroidRoleSurfaceIntegration(
         surface: RoleSurface.Sql,
     ): AiveRoleSurfaceEnvelope = withContext(Dispatchers.IO) {
         val database = openSqlite(surface.source, writable = false)
+        val temporaryPath = if (surface.source is SqlDatabaseSource.DocumentUri) database.path else null
         try {
             val cursor = database.rawQuery(surface.query, null)
             cursor.use {
@@ -119,6 +120,7 @@ internal class AndroidRoleSurfaceIntegration(
             }
         } finally {
             database.close()
+            temporaryPath?.let { File(it).delete() }
         }
     }
 
