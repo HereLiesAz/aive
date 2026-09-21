@@ -95,6 +95,7 @@ internal class AndroidAzphaltModelPackageInstaller(
                     baseModelId = packageId,
                     backend = backend,
                     artifactPath = finalArtifactPath,
+                    metadataJson = json.encodeToString(AzphaltAssetEntry.serializer(), asset),
                     capabilities = buildSet {
                         add("local-model")
                         add("azphalt")
