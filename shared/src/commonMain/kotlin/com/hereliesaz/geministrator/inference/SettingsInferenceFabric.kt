@@ -46,6 +46,10 @@ class SettingsInferenceStateStore(
 
     suspend fun models(): List<InferenceModelDescriptor> = read().models.map(PersistedInferenceModel::toDomain)
 
+    suspend fun removeModel(logicalModelId: String) = update { snapshot ->
+        snapshot.copy(models = snapshot.models.filterNot { it.logicalModelId == logicalModelId })
+    }
+
     suspend fun registerAgent(agent: InferenceAgentDescriptor) = update { snapshot ->
         snapshot.copy(
             agents = snapshot.agents.upsert(PersistedInferenceAgent.fromDomain(agent)) {
@@ -203,6 +207,13 @@ class SettingsInferenceStateStore(
         }
 
         fun createDefault(): SettingsInferenceStateStore = SettingsInferenceStateStore(Settings())
+
+        fun createDurable(): SettingsInferenceStateStore = SettingsInferenceStateStore(
+            com.hereliesaz.geministrator.persistence.ChunkedStringSettings(
+                delegate = Settings(),
+                chunkedKeys = setOf(DEFAULT_STORAGE_KEY),
+            ),
+        )
     }
 }
 
