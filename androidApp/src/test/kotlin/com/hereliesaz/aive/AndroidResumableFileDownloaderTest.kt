@@ -3,6 +3,7 @@ package com.hereliesaz.aive
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -17,36 +18,26 @@ import kotlin.test.assertTrue
 
 class AndroidResumableFileDownloaderTest {
     @Test
-    fun resumesFromRetainedPartialAfterTruncatedResponse() = runBlocking {
+    fun resumesFromRetainedPartialAfterInterruptedTransfer() = runBlocking {
         val bytes = "0123456789".encodeToByteArray()
         var requests = 0
         val client = HttpClient(MockEngine { request ->
-            when (requests++) {
-                0 -> {
-                    assertEquals(null, request.headers[HttpHeaders.Range])
-                    respond(
-                        content = bytes.copyOfRange(0, 4),
-                        status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentLength, bytes.size.toString()),
-                    )
-                }
-                else -> {
-                    assertEquals("bytes=4-", request.headers[HttpHeaders.Range])
-                    respond(
-                        content = bytes.copyOfRange(4, bytes.size),
-                        status = HttpStatusCode.PartialContent,
-                        headers = headersOf(
-                            HttpHeaders.ContentRange to listOf("bytes 4-9/10"),
-                            HttpHeaders.ContentLength to listOf("6"),
-                        ),
-                    )
-                }
-            }
+            requests += 1
+            assertEquals("bytes=4-", request.headers[HttpHeaders.Range])
+            respond(
+                content = bytes.copyOfRange(4, bytes.size),
+                status = HttpStatusCode.PartialContent,
+                headers = headersOf(
+                    HttpHeaders.ContentRange to listOf("bytes 4-9/10"),
+                    HttpHeaders.ContentLength to listOf("6"),
+                ),
+            )
         })
 
         val root = Files.createTempDirectory("aive-resume-test").toFile()
         try {
             val output = File(root, "model.part001")
+            File(root, "model.part001.download").writeBytes(bytes.copyOfRange(0, 4))
             val downloader = AndroidResumableFileDownloader(
                 httpClient = client,
                 maxAttempts = 3,
@@ -62,7 +53,7 @@ class AndroidResumableFileDownloaderTest {
 
             assertEquals(bytes.toList(), output.readBytes().toList())
             assertTrue(!File(root, "model.part001.download").exists())
-            assertEquals(2, requests)
+            assertEquals(1, requests)
         } finally {
             client.close()
             root.deleteRecursively()
@@ -111,17 +102,18 @@ class AndroidResumableFileDownloaderTest {
     @Test
     fun keepsPartialBytesWhenRetriesAreExhausted() = runBlocking {
         val bytes = "0123456789".encodeToByteArray()
-        val client = HttpClient(MockEngine {
-            respond(
-                content = bytes.copyOfRange(0, 4),
-                status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentLength, bytes.size.toString()),
-            )
+        var requestedRange: String? = null
+        val client = HttpClient(MockEngine { request ->
+            requestedRange = request.headers[HttpHeaders.Range]
+            respondError(HttpStatusCode.InternalServerError)
         })
         val root = Files.createTempDirectory("aive-retain-test").toFile()
 
         try {
             val output = File(root, "model.part001")
+            val partial = File(root, "model.part001.download").apply {
+                writeBytes(bytes.copyOfRange(0, 4))
+            }
             val failure = assertFailsWith<java.io.IOException> {
                 AndroidResumableFileDownloader(
                     httpClient = client,
@@ -135,7 +127,7 @@ class AndroidResumableFileDownloaderTest {
                 )
             }
 
-            val partial = File(root, "model.part001.download")
+            assertEquals("bytes=4-", requestedRange)
             assertTrue(partial.isFile)
             assertEquals(4L, partial.length())
             assertTrue(failure.message.orEmpty().contains("retained 4 partial bytes"))
