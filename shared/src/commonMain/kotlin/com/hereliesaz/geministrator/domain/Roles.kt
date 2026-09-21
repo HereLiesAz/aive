@@ -70,14 +70,7 @@ sealed interface RoleExecutionSource {
         val language: ScriptLanguage,
         val source: String,
         val runner: ScriptRunner,
-    ) : RoleExecutionSource {
-        init {
-            require(source.isNotBlank()) { "Role script source must not be blank" }
-            require(language == ScriptLanguage.JavaScript || runner !is ScriptRunner.LocalSandbox) {
-                "Only JavaScript can use the local sandbox; Python requires a remote runner"
-            }
-        }
-    }
+    ) : RoleExecutionSource
 }
 
 @Serializable
@@ -133,12 +126,7 @@ sealed interface RoleSurface {
         val firstRowHeaders: Boolean = true,
         val writable: Boolean = false,
         val maxRows: Int = 1_000,
-    ) : RoleSurface {
-        init {
-            require(alias.isNotBlank()) { "Spreadsheet surface alias must not be blank" }
-            require(maxRows in 1..10_000) { "Spreadsheet surface maxRows must be between 1 and 10,000" }
-        }
-    }
+    ) : RoleSurface
 
     @Serializable
     data class Sql(
@@ -148,25 +136,14 @@ sealed interface RoleSurface {
         val query: String,
         val writable: Boolean = false,
         val maxRows: Int = 1_000,
-    ) : RoleSurface {
-        init {
-            require(alias.isNotBlank()) { "SQL surface alias must not be blank" }
-            require(query.isNotBlank()) { "SQL surface query must not be blank" }
-            require(maxRows in 1..10_000) { "SQL surface maxRows must be between 1 and 10,000" }
-        }
-    }
+    ) : RoleSurface
 
     @Serializable
     data class Flowchart(
         override val alias: String,
         val language: FlowchartLanguage = FlowchartLanguage.Mermaid,
         val source: String,
-    ) : RoleSurface {
-        init {
-            require(alias.isNotBlank()) { "Flowchart surface alias must not be blank" }
-            require(source.isNotBlank()) { "Flowchart source must not be blank" }
-        }
-    }
+    ) : RoleSurface
 }
 
 @Serializable
