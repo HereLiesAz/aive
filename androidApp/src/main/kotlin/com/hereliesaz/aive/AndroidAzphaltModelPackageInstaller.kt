@@ -17,6 +17,8 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -31,6 +33,7 @@ internal class AndroidAzphaltModelPackageInstaller(
         "onnx", "tflite", "litert", "sherpa-bundle", "model", "task", "vosk-bundle",
     )
 
+    private val installMutex = Mutex()
     private val appContext = context.applicationContext
     private val root = File(appContext.filesDir, "azphalt/models")
     private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -46,7 +49,7 @@ internal class AndroidAzphaltModelPackageInstaller(
     override suspend fun install(
         prepared: AzphaltPreparedModelInstall,
         nowEpochMillis: Long,
-    ): InstalledAzphaltModelPackage = withContext(Dispatchers.IO) {
+    ): InstalledAzphaltModelPackage = installMutex.withLock { withContext(Dispatchers.IO) {
         val packageId = prepared.detail.id
         val packageSegment = safeSegment(packageId)
         val versionSegment = safeSegment(prepared.version)
@@ -151,7 +154,7 @@ internal class AndroidAzphaltModelPackageInstaller(
             }
             throw failure
         }
-    }
+    } }
 
     override suspend fun remove(packageId: String) = withContext(Dispatchers.IO) {
         val installed = readInstalled()
@@ -415,7 +418,7 @@ internal class AndroidAzphaltModelPackageInstaller(
     }
 
     private fun normalizeChecksum(value: String): String =
-        value.trim().lowercase().removePrefix("sha256-").also {
+        value.trim().lowercase().removePrefix("sha256:").also {
             require(it.matches(Regex("[0-9a-f]{64}"))) { "Invalid model SHA-256 checksum" }
         }
 

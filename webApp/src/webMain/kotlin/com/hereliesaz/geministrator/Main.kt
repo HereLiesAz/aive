@@ -282,7 +282,7 @@ private fun providerStorageKey(providerId: String): String = when (providerId) {
 private fun repositoryStorageKey(serviceId: String): String = when (serviceId) {
     RepositoryServiceCatalog.GITHUB_ID -> GITHUB_TOKEN_STORAGE_KEY
     RepositoryServiceCatalog.GITLAB_ID -> GITLAB_TOKEN_STORAGE_KEY
-    else -> error("Unknown repository service $serviceId")
+    else -> "haive.${serviceId}Token"
 }
 
 private fun Map<String, String>.cleanKey(id: String): String? =

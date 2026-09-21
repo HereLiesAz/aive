@@ -42,15 +42,33 @@ class CatalogBackedLocalOrchestrationSpecialistRuntime(
     private val executor: LocalOrchestrationModelExecutor,
 ) : LocalOrchestrationSpecialistRuntime {
     override fun infer(role: OrchestrationUtilityRole, inputJson: String): String? {
-        val plan = runCatching {
+        val specialistId = OrchestrationSpecialistIds.specialistId(role)
+        val plan = try {
             library.plan(
-                specialistId = OrchestrationSpecialistIds.specialistId(role),
+                specialistId = specialistId,
                 runtime = runtimeCapabilities,
             )
-        }.getOrNull() ?: return null
+        } catch (e: Exception) {
+            // Distinguish missing specialist (expected) from unexpected failures (log a warning).
+            val message = e.message.orEmpty()
+            if (message.contains("not found", ignoreCase = true) ||
+                message.contains("not installed", ignoreCase = true) ||
+                message.contains("unavailable", ignoreCase = true)
+            ) {
+                // Specialist simply not installed — fall back silently.
+                return null
+            }
+            println("WARNING: CatalogBackedLocalOrchestrationSpecialistRuntime: " +
+                "library.plan failed for specialist '$specialistId': $e")
+            return null
+        } ?: return null
 
-        return runCatching {
+        return try {
             executor.generate(role, plan, inputJson)
-        }.getOrNull()
+        } catch (e: Exception) {
+            println("WARNING: CatalogBackedLocalOrchestrationSpecialistRuntime: " +
+                "executor.generate failed for role '$role' specialist '$specialistId': $e")
+            null
+        }
     }
 }

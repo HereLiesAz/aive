@@ -60,8 +60,8 @@ interface WorkflowPersistence : FailureEscalationDecisionStore {
     val approvalGates: ApprovalGateRepository
 
     /**
-     * Replace the workflow-definition and role catalogs as one logical write.
-     * Durable implementations should override this to make the replacement atomic.
+     * Replace the workflow-definition and role catalogs.
+     * NOTE: the default implementation is NOT atomic — override this method for atomic replacement.
      */
     suspend fun replaceCatalog(
         definitions: List<WorkflowDefinition>,

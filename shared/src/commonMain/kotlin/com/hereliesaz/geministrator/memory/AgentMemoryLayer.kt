@@ -23,15 +23,22 @@ class AgentMemoryLayer private constructor(
     suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
         val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
         if (result is MemoryConsolidationResult.Completed) {
-            programmaticAssociator.refresh(nowEpochMillis)
-            lexicalAssociator.refresh(nowEpochMillis)
+            while (programmaticAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
+            while (lexicalAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
         }
         return result
     }
 
     /** Refresh exact/bookkeeping associations without invoking a model. */
-    suspend fun refreshProgrammaticAssociations(nowEpochMillis: Long): Int =
-        programmaticAssociator.refresh(nowEpochMillis)
+    suspend fun refreshProgrammaticAssociations(nowEpochMillis: Long): Int {
+        var total = 0
+        var batch: Int
+        do {
+            batch = programmaticAssociator.refresh(nowEpochMillis)
+            total += batch
+        } while (batch > 0)
+        return total
+    }
 
     /** Refresh deterministic lexical/structural heuristic associations without invoking a model. */
     suspend fun refreshLexicalAssociations(nowEpochMillis: Long): Int =
