@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
@@ -19,6 +21,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
+import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -28,6 +32,11 @@ import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.nullable
+
+private enum class WorkflowLibrarySurface(val label: String) {
+    Library("MY LIBRARY"),
+    Store("AZPHALT STORE"),
+}
 
 private enum class WorkflowLibraryFilter(val label: String) {
     All("All"),
@@ -40,10 +49,39 @@ private enum class WorkflowLibraryFilter(val label: String) {
 internal fun LiveWorkflowLibraryScreen(
     runtimeState: ApplicationRuntimeState,
     onLoadDefinitions: suspend () -> List<WorkflowDefinition>,
+    azphaltStoreService: AzphaltStoreService? = null,
+    azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
+    onAzphaltPackageImportHandled: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val host = LocalWorkflowLibraryHost.current
+    var surfaceName by rememberDurableStringState("workflows.surface", WorkflowLibrarySurface.Library.name)
+    val surface = WorkflowLibrarySurface.entries.firstOrNull { it.name == surfaceName }
+        ?: WorkflowLibrarySurface.Library
+
+    LaunchedEffect(azphaltPackageImportRequest?.requestId) {
+        if (azphaltPackageImportRequest != null) {
+            surfaceName = WorkflowLibrarySurface.Store.name
+        }
+    }
+
+    if (surface == WorkflowLibrarySurface.Store) {
+        Column(modifier = modifier.fillMaxSize()) {
+            WorkflowLibrarySurfaceSwitcher(
+                surface = surface,
+                onSelected = { surfaceName = it.name },
+                modifier = Modifier.padding(horizontal = 26.dp, vertical = 14.dp),
+            )
+            AzphaltStoreScreen(
+                service = azphaltStoreService,
+                importRequest = azphaltPackageImportRequest,
+                onImportHandled = onAzphaltPackageImportHandled,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        return
+    }
     var entries by remember { mutableStateOf<List<WorkflowLibraryEntry>?>(null) }
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
     var loadError by remember { mutableStateOf<String?>(null) }
@@ -128,6 +166,10 @@ internal fun LiveWorkflowLibraryScreen(
             "Installed workflows, saved compositions, and reusable roles share one graph library.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
+        )
+        WorkflowLibrarySurfaceSwitcher(
+            surface = surface,
+            onSelected = { surfaceName = it.name },
         )
 
         loadError?.let { AzphaltNote("workflow-library-error", "LIBRARY ERROR", it) }
@@ -446,6 +488,27 @@ internal fun LiveWorkflowLibraryScreen(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WorkflowLibrarySurfaceSwitcher(
+    surface: WorkflowLibrarySurface,
+    onSelected: (WorkflowLibrarySurface) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        WorkflowLibrarySurface.entries.forEach { item ->
+            AzphaltPill(
+                label = item.label,
+                seed = "workflow-surface-${item.name}",
+                selected = surface == item,
+                onClick = { onSelected(item) },
+            )
         }
     }
 }
