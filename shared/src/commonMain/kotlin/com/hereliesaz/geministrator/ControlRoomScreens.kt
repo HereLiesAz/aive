@@ -596,6 +596,10 @@ internal fun WorkflowTemplateScreen(
                                 val executorDetail = when (val ex = task.effectiveExecutor()) {
                                     is TaskExecutor.RoleAgent -> "Role: ${ex.roleId.value}"
                                     is TaskExecutor.GitHubAction -> "Workflow: ${ex.workflow}${ex.ref?.let { " @ $it" } ?: ""}"
+                                    is TaskExecutor.Script -> "Script: ${ex.language.name} · " + when (val runner = ex.runner) {
+                                        is com.hereliesaz.geministrator.domain.ScriptRunner.LocalSandbox -> "local sandbox"
+                                        is com.hereliesaz.geministrator.domain.ScriptRunner.GitHubActions -> "GitHub Actions / ${runner.workflow}"
+                                    }
                                     is TaskExecutor.TestRunner -> "Command: ${ex.command ?: "default"}"
                                     is TaskExecutor.Deployment -> "Environment: ${ex.environment}"
                                     is TaskExecutor.RepositoryOperation -> "Operation: ${ex.operation}"
