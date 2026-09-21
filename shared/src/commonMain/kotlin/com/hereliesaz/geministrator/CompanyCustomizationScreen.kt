@@ -1120,6 +1120,45 @@ private fun CompanyGitHubScriptRunnerFields(
     )
 }
 
+private fun List<RoleSurface>.isConfiguredRoleSurfaces(): Boolean {
+    val normalizedAliases = map { it.alias.trim() }
+    if (normalizedAliases.any(String::isBlank)) return false
+    if (normalizedAliases.distinct().size != size) return false
+    return all { surface ->
+        when (surface) {
+            is RoleSurface.Spreadsheet -> {
+                surface.maxRows in 1..10_000 && when (val source = surface.source) {
+                    is SpreadsheetSource.AppFile -> source.name.isNotBlank()
+                    is SpreadsheetSource.Inline -> true
+                    is SpreadsheetSource.DocumentUri -> source.uri.isNotBlank()
+                    is SpreadsheetSource.Https -> source.url.startsWith("https://", ignoreCase = true)
+                }
+            }
+            is RoleSurface.Sql -> {
+                surface.maxRows in 1..10_000 &&
+                    surface.query.isNotBlank() &&
+                    when (val source = surface.source) {
+                        is SqlDatabaseSource.AppDatabase -> source.name.isNotBlank()
+                        is SqlDatabaseSource.DocumentUri -> source.uri.isNotBlank()
+                    }
+            }
+            is RoleSurface.Flowchart ->
+                surface.language == FlowchartLanguage.Mermaid &&
+                    runCatching { MermaidFlowchartParser.parse(surface.source) }.isSuccess
+        }
+    }
+}
+
+private fun nextSurfaceAlias(
+    surfaces: List<RoleSurface>,
+    prefix: String,
+): String {
+    val used = surfaces.mapTo(mutableSetOf()) { it.alias }
+    var index = 1
+    while ("$prefix$index" in used) index += 1
+    return "$prefix$index"
+}
+
 private fun RoleExecutionSource.isConfiguredExecutionSource(): Boolean = when (this) {
     RoleExecutionSource.Agent -> true
     is RoleExecutionSource.GitHubAction -> workflow.isNotBlank() && contextInput.isNotBlank()
