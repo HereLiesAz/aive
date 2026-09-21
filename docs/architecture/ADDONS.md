@@ -21,8 +21,27 @@ This fallback is a resilience mechanism, not a replacement for correct repositor
 centralized Azphalt deployment workflow verifies both the generated catalog and the live
 `azphalt.store/packages` endpoint contain known Aive workflow/role packages after deployment.
 
-Model assets are discovery-only until a compatible Aive model runtime owns their install lifecycle.
-They are never sent through the workflow/role installer merely because they appear in the same Store.
+Model assets have their own install lifecycle and are never sent through the workflow/role installer.
+On Android, The Aive currently accepts every model asset type defined by Azphalt:
+`onnx`, `tflite`, `litert`, `task`, `sherpa-bundle`, `vosk-bundle`, and generic `model`.
+Generic model packages are routed from their materialized contents when a known concrete format is
+detectable.
+
+Model installation:
+- verifies the signed `.azp` package and revocation state before mutation;
+- verifies every remote model member against its declared SHA-256 digest and supports resumable downloads;
+- materializes bundled and remote multi-file assets into app-private storage;
+- validates ONNX graphs through the bundled ONNX Runtime, validates TFLite/LiteRT flatbuffer headers,
+  validates task bundles, and checks the required Sherpa/Vosk bundle structure;
+- records the concrete installed artifact path, backend, role, package/version, and digest in the
+  durable inference-model registry;
+- replaces updates transactionally with rollback to the previous files and registry entries on failure;
+- removes both files and registry entries on uninstall;
+- supports Android ACTION_VIEW/ACTION_SEND imports through the same trust/install path.
+
+Model-license metadata is surfaced in the install review before mutation. Model files remain owned by
+the Azphalt model installer; the inference registry stores identity and resolution metadata rather than
+duplicating weights.
 
 A failed repository request must surface as an error. A legitimately empty compatible catalog is
 reported separately from transport/server failure; the UI must not quietly translate a failed refresh
