@@ -60,10 +60,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Production node-creature host.
+ * Production workflow-mascot host.
  *
- * Creature geometry is always supplied by the Rust native/WASM engine. Compose owns only workflow
- * placement, interaction, labels and rasterization of the projected render packets.
+ * The terrarium now renders the approved flat 2D mascot family directly in Compose. The legacy
+ * Rust/native 3D node-creature renderer is deliberately bypassed; Compose owns mascot rendering,
+ * workflow placement, interaction, labels, animation and relationship attachment.
  */
 @Composable
 internal fun PlatformNodeTerrarium(
@@ -79,14 +80,7 @@ internal fun PlatformNodeTerrarium(
     editable: Boolean = true,
     compact: Boolean = false,
 ) {
-    val engine = remember { platformNodeCreatureRenderEngine() }
-    if (engine == null) {
-        NodeCreatureRendererUnavailable(modifier)
-        return
-    }
-
-    RustNodeTerrarium(
-        engine = engine,
+    MascotNodeTerrarium(
         subjects = subjects,
         relationships = relationships,
         adornments = adornments,
@@ -118,8 +112,7 @@ private fun NodeCreatureRendererUnavailable(modifier: Modifier) {
 }
 
 @Composable
-private fun RustNodeTerrarium(
-    engine: NodeCreatureRenderEngine,
+private fun MascotNodeTerrarium(
     subjects: List<H2g2TerrariumSubject>,
     relationships: List<H2g2TerrariumRelationship>,
     adornments: Map<String, List<H2g2SwarmAdornment>>,
@@ -168,15 +161,15 @@ private fun RustNodeTerrarium(
         label = "terrarium-focus-y",
     )
 
-    val clock = rememberInfiniteTransition(label = "rust-node-creature-clock")
-    val timeSeconds by clock.animateFloat(
+    val clock = rememberInfiniteTransition(label = "node-mascot-clock")
+    val motionPhase by clock.animateFloat(
         initialValue = 0f,
-        targetValue = 12f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(12_000, easing = LinearEasing),
+            animation = tween(2_400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "rust-node-creature-time",
+        label = "node-mascot-motion",
     )
     val linkPulse by clock.animateFloat(
         initialValue = 0f,
@@ -185,41 +178,8 @@ private fun RustNodeTerrarium(
             animation = tween(1_700, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "rust-node-link-pulse",
+        label = "node-mascot-link-pulse",
     )
-
-    // Rust packet generation includes topology construction. Quantize creature animation to 20 Hz
-    // so link/UI animation can remain fluid without rebuilding every creature mesh on every frame.
-    val creatureFrameTime = (timeSeconds * 20f).roundToInt() / 20f
-    val packetInputs = subjects.map { subject ->
-        listOf(
-            subject.node.id,
-            subject.node.label,
-            subject.identitySeed,
-            subject.node.state.name,
-        )
-    }
-    val packets = remember(packetInputs, creatureFrameTime) {
-        subjects.associateNotNull { subject ->
-            runCatching {
-                subject.node.id to NodeCreatureRenderPacketDecoder.decode(
-                    engine.render(
-                        NodeCreatureRenderRequest(
-                            roleLabel = subject.node.label,
-                            identitySeed = subject.identitySeed,
-                            activity = subject.node.state.toNodeCreatureActivity(),
-                            timeSeconds = creatureFrameTime,
-                        ),
-                    ),
-                )
-            }.getOrNull()
-        }
-    }
-
-    if (packets.size != subjects.size) {
-        NodeCreatureRendererUnavailable(modifier)
-        return
-    }
 
     BoxWithConstraints(modifier = modifier) {
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
@@ -228,7 +188,6 @@ private fun RustNodeTerrarium(
         val creatureSize = if (compact) 154.dp else 176.dp
         val creatureSizePx = with(density) { creatureSize.toPx() }
         val halfCreaturePx = creatureSizePx / 2f
-        val vectorScalePx = creatureSizePx * 0.92f
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val onGround = Azphalt.currentGround.onPage
 
@@ -240,31 +199,20 @@ private fun RustNodeTerrarium(
         fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? {
             val fromSubject = subjectById[relationship.from] ?: return null
             val toSubject = subjectById[relationship.to] ?: return null
-            val fromPacket = packets[relationship.from] ?: return null
-            val toPacket = packets[relationship.to] ?: return null
             val fromPosition = workingPositions[relationship.from] ?: fromSubject.position
             val toPosition = workingPositions[relationship.to] ?: toSubject.position
             val fromCenter = screenCenter(fromPosition)
             val toCenter = screenCenter(toPosition)
             val direction = toCenter - fromCenter
-            if (direction.getDistance() <= 0.001f) return null
+            val distance = direction.getDistance()
+            if (distance <= 0.001f) return null
 
-            val startTerminal = fromPacket.terminalAnchorToward(
-                NodeCreaturePoint(direction.x, direction.y),
-            )
-            val endTerminal = toPacket.terminalAnchorToward(
-                NodeCreaturePoint(-direction.x, -direction.y),
-            )
-            val terminalScale = vectorScalePx * zoom
-            val start = fromCenter + Offset(
-                startTerminal.x * terminalScale,
-                startTerminal.y * terminalScale,
-            )
-            val end = toCenter + Offset(
-                endTerminal.x * terminalScale,
-                endTerminal.y * terminalScale,
-            )
-            return start to end
+            // The reference mascots use visible radial appendages rather than projected 3D
+            // terminal anchors. Attach detached connection arms at the mascot silhouette edge.
+            val normalized = Offset(direction.x / distance, direction.y / distance)
+            val anchorRadius = creatureSizePx * zoom * 0.29f
+            return (fromCenter + normalized * anchorRadius) to
+                (toCenter - normalized * anchorRadius)
         }
 
         Canvas(Modifier.fillMaxSize()) {
@@ -324,8 +272,8 @@ private fun RustNodeTerrarium(
             }
         }
 
-        // The connection pair is a transformable layer of its own. Dragging either creature
-        // recomputes these two sprites from the Rust terminal anchors; the creature body is never
+        // The connection pair is a transformable layer of its own. Dragging either mascot
+        // recomputes these two sprites from silhouette-edge anchors; the mascot body is never
         // stretched or rotated with the relationship.
         relationships.forEach { relationship ->
             val fromSubject = subjectById[relationship.from] ?: return@forEach
@@ -350,7 +298,6 @@ private fun RustNodeTerrarium(
 
         subjects.forEach { subject ->
             val node = subject.node
-            val packet = packets[node.id] ?: return@forEach
             val position = workingPositions[node.id] ?: subject.position
             val center = screenCenter(position)
             val isSelected = selectedId == node.id
@@ -440,10 +387,11 @@ private fun RustNodeTerrarium(
                     }
                 }
 
-                NodeCreatureVectorSurface(
-                    packet = packet,
-                    hueSeed = subject.identitySeed,
+                NodeMascotSurface(
                     roleLabel = node.label,
+                    hueSeed = subject.identitySeed,
+                    state = node.state,
+                    motionPhase = motionPhase,
                     modifier = Modifier.fillMaxSize(),
                 )
                 H2g2SwarmAdornmentLayer(
