@@ -69,8 +69,9 @@ internal class AndroidAzphaltModelPackageInstaller(
                 val files = materializeAsset(prepared, asset, assetDir)
                 val backend = validateAndResolveBackend(asset, files)
                 val logicalModelId = buildLogicalModelId(packageId, asset, index)
-                val artifactTarget = when (backend) {
-                    BACKEND_SHERPA, BACKEND_VOSK -> assetDir
+                val artifactTarget = when {
+                    backend == BACKEND_SHERPA || backend == BACKEND_VOSK -> assetDir
+                    backend == BACKEND_GENERIC && files.size > 1 -> assetDir
                     else -> choosePrimaryFile(asset, files)
                 }
                 val releaseDigest = aggregateDigest(files)
@@ -222,13 +223,14 @@ internal class AndroidAzphaltModelPackageInstaller(
         "task" -> validateTask(choosePrimaryFile(asset, files)).let { BACKEND_TASK }
         "sherpa-bundle" -> validateSherpa(files).let { BACKEND_SHERPA }
         "vosk-bundle" -> validateVosk(files).let { BACKEND_VOSK }
-        "model" -> routeGenericModel(files)
+        "model" -> routeGenericModel(asset, files)
         else -> error("Unsupported Azphalt model type ${asset.type}")
     }
 
     private fun validateOnnx(files: List<MaterializedModelFile>) {
         val models = files.filter { it.file.extension.equals("onnx", ignoreCase = true) }
-        require(models.isNotEmpty()) { "ONNX asset contains no .onnx file" }
+            .ifEmpty { if (files.size == 1) files else emptyList() }
+        require(models.isNotEmpty()) { "ONNX asset contains no identifiable ONNX model file" }
         models.forEach { model ->
             environment.createSession(model.file.absolutePath).use { session ->
                 require(session.inputNames.isNotEmpty()) { "${model.file.name} exposes no ONNX inputs" }
@@ -286,7 +288,36 @@ internal class AndroidAzphaltModelPackageInstaller(
         }) { "Vosk bundle contains no decoding graph" }
     }
 
-    private fun routeGenericModel(files: List<MaterializedModelFile>): String {
+    private fun routeGenericModel(
+        asset: AzphaltAssetEntry,
+        files: List<MaterializedModelFile>,
+    ): String {
+        val declaredRuntime = runCatching {
+            asset.requirements?.jsonObject?.get("runtime")?.jsonPrimitive?.content?.lowercase()
+        }.getOrNull()
+        when (declaredRuntime) {
+            "onnxruntime" -> {
+                validateOnnx(files)
+                return BACKEND_ONNX
+            }
+            "tflite" -> {
+                validateTflite(choosePrimaryFile(asset, files))
+                return BACKEND_TFLITE
+            }
+            "litert" -> {
+                validateTflite(choosePrimaryFile(asset, files))
+                return BACKEND_LITERT
+            }
+            "sherpa-onnx" -> {
+                validateSherpa(files)
+                return BACKEND_SHERPA
+            }
+            "vosk" -> {
+                validateVosk(files)
+                return BACKEND_VOSK
+            }
+        }
+
         val names = files.map { it.file.name.lowercase() }
         return when {
             names.count { it.endsWith(".onnx") } > 1 && names.any { it.contains("tokens") } -> {
