@@ -114,8 +114,16 @@ class RoleSurfaceRuntimeRegistry(
 }
 
 fun RoleSurface.writableSurface(): Boolean = when (this) {
-    is RoleSurface.Spreadsheet -> writable
-    is RoleSurface.Sql -> writable
+    is RoleSurface.Spreadsheet -> writable && when (source) {
+        is com.hereliesaz.geministrator.domain.SpreadsheetSource.AppFile,
+        is com.hereliesaz.geministrator.domain.SpreadsheetSource.DocumentUri,
+        -> true
+        is com.hereliesaz.geministrator.domain.SpreadsheetSource.Inline,
+        is com.hereliesaz.geministrator.domain.SpreadsheetSource.Https,
+        -> false
+    }
+    is RoleSurface.Sql -> writable &&
+        source is com.hereliesaz.geministrator.domain.SqlDatabaseSource.AppDatabase
     is RoleSurface.Flowchart -> false
 }
 
