@@ -209,6 +209,10 @@ internal fun TechnicalInspector(
 private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.RoleAgent -> roleId.value
     is TaskExecutor.GitHubAction -> listOfNotNull(workflow, ref).joinToString(" @ ")
+    is TaskExecutor.Script -> "${language.name} · " + when (runner) {
+        is com.hereliesaz.geministrator.domain.ScriptRunner.LocalSandbox -> "local sandbox"
+        is com.hereliesaz.geministrator.domain.ScriptRunner.GitHubActions -> "GitHub Actions"
+    }
     is TaskExecutor.TestRunner -> command ?: "default runner"
     is TaskExecutor.Deployment -> environment
     is TaskExecutor.RepositoryOperation -> operation
