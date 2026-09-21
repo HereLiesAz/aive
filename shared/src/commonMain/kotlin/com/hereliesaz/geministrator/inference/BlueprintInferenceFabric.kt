@@ -21,6 +21,8 @@ data class InferenceModelDescriptor(
     val adapterId: String? = null,
     val precision: String? = null,
     val backend: String? = null,
+    val artifactPath: String? = null,
+    val metadataJson: String? = null,
     val capabilities: Set<String> = emptySet(),
     val releaseDigest: String? = null,
 ) {

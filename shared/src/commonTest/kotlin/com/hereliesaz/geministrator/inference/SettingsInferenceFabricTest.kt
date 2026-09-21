@@ -20,6 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SettingsInferenceFabricTest {
     @Test
@@ -58,6 +59,7 @@ class SettingsInferenceFabricTest {
             adapterId = "adapter",
             precision = "int8",
             backend = "onnx",
+            artifactPath = "/models/specialist.onnx",
             capabilities = setOf("research"),
             releaseDigest = "sha256:model",
         )
@@ -108,4 +110,26 @@ class SettingsInferenceFabricTest {
         assertIs<InferenceStreamPayload.ArtifactObserved>(oldStreamAfterRestart.last().payload)
         assertEquals("Late event after restart", (oldStreamAfterRestart.last().payload as InferenceStreamPayload.ArtifactObserved).label)
     }
+    @Test
+    fun modelRegistryPathCanBeRemovedDurably() = runBlocking {
+        val settings = MapSettings()
+        val state = SettingsInferenceStateStore(settings)
+        state.registerModel(
+            InferenceModelDescriptor(
+                logicalModelId = "azphalt:com.example.detector:object-detection:0",
+                baseModelId = "com.example.detector",
+                backend = "onnxruntime-android",
+                artifactPath = "/data/user/0/com.hereliesaz.aive/files/azphalt/models/detector/model.onnx",
+                metadataJson = """{"type":"onnx","role":"object-detection"}""",
+                capabilities = setOf("local-model", "azphalt", "role:object-detection"),
+                releaseDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            ),
+        )
+
+        val recreated = SettingsInferenceStateStore(settings)
+        assertNotNull(recreated.model("azphalt:com.example.detector:object-detection:0"))
+        recreated.removeModel("azphalt:com.example.detector:object-detection:0")
+        assertNull(SettingsInferenceStateStore(settings).model("azphalt:com.example.detector:object-detection:0"))
+    }
+
 }

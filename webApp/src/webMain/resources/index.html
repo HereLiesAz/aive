@@ -60,7 +60,6 @@
         })();
     </script>
     <script src="mesh-crypto.js"></script>
-    <script src="node-creatures.js"></script>
     <script>
         (() => {
             const failStartup = (message, error) => {
@@ -121,26 +120,13 @@
                 document.body.appendChild(script);
             });
 
-            const renderer = globalThis.HaiveNodeCreatures;
-            if (!renderer || typeof renderer.init !== "function") {
-                failStartup("Node-creature browser adapter is unavailable.");
-                return;
-            }
-
             normalizeBrowserLocale();
-            renderer.init("haive_node_creatures.wasm")
-                .then(() => {
-                    if (!renderer.ready) {
-                        throw new Error("Rust renderer initialization completed without becoming ready.");
-                    }
-                    globalThis.__haiveNodeCreaturesReady = true;
-                    return loadHaive();
-                })
+            loadHaive()
                 .then(() => {
                     globalThis.__haiveAppScriptLoaded = true;
                 })
                 .catch((error) => {
-                    failStartup("The Aive could not initialize the Rust node-creature renderer.", error);
+                    failStartup("The Aive could not load.", error);
                 });
         })();
     </script>

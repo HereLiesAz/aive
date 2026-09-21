@@ -26,8 +26,10 @@ import com.hereliesaz.geministrator.azphalt.AzphaltDependencyStatus
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
+import com.hereliesaz.geministrator.azphalt.AzphaltPreparedModelInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
+import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
 import kotlinx.coroutines.delay
@@ -60,6 +62,7 @@ internal fun AzphaltStoreScreen(
     var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
     val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
+    var preparedModel by remember { mutableStateOf<AzphaltPreparedModelInstall?>(null) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
     var allowPublisherChange by remember { mutableStateOf(false) }
@@ -100,20 +103,46 @@ internal fun AzphaltStoreScreen(
         error = null
         status = null
         try {
-            val plan = service.prepareLocalInstall(request.bytes)
-            prepared = plan
-            selectedPackageIdValue = plan.detail.id
-            approvedPermissions = service.installed()
-                .firstOrNull { it.packageId == plan.detail.id }
-                ?.approvedHostPermissions
-                ?.toSet()
-                .orEmpty()
-            allowUntrustedSigner = false
-            allowPublisherChange = false
-            status = request.sourceLabel
-                ?.takeIf(String::isNotBlank)
-                ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
-                ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+            val workflowAttempt = runCatching { service.prepareLocalInstall(request.bytes) }
+            val workflowPlan = workflowAttempt.getOrNull()
+            if (workflowPlan != null) {
+                prepared = workflowPlan
+                preparedModel = null
+                selectedPackageIdValue = workflowPlan.detail.id
+                approvedPermissions = service.installed()
+                    .firstOrNull { it.packageId == workflowPlan.detail.id }
+                    ?.approvedHostPermissions
+                    ?.toSet()
+                    .orEmpty()
+                allowUntrustedSigner = false
+                allowPublisherChange = false
+                status = request.sourceLabel
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
+                    ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+            } else {
+                val workflowFailure = workflowAttempt.exceptionOrNull()
+                val modelAttempt = runCatching { service.prepareLocalModelInstall(request.bytes) }
+                val modelPlan = modelAttempt.getOrNull()
+                if (modelPlan != null) {
+                    preparedModel = modelPlan
+                    prepared = null
+                    selectedPackageIdValue = modelPlan.detail.id
+                    allowUntrustedSigner = false
+                    allowPublisherChange = false
+                    status = request.sourceLabel
+                        ?.takeIf(String::isNotBlank)
+                        ?.let { "Verified $it. Review model trust and license metadata before installing." }
+                        ?: "Verified imported model package. Review trust and license metadata before installing."
+                } else {
+                    val modelFailure = modelAttempt.exceptionOrNull()
+                    throw if (workflowFailure?.message.orEmpty().contains("is kind asset")) {
+                        modelFailure ?: workflowFailure ?: IllegalArgumentException("Imported package is invalid")
+                    } else {
+                        workflowFailure ?: modelFailure ?: IllegalArgumentException("Imported package is invalid")
+                    }
+                }
+            }
         } catch (failure: Exception) {
             error = failure.message ?: "Imported Azphalt package could not be verified."
         } finally {
@@ -161,7 +190,8 @@ internal fun AzphaltStoreScreen(
                 seed = "azphalt-refresh",
                 onClick = { if (!loading) refreshGeneration += 1 },
             )
-            snapshot?.installed?.size?.let { count ->
+            snapshot?.let { loaded ->
+                val count = loaded.installed.size + loaded.installedModels.size
                 Text("$count installed", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
@@ -210,15 +240,20 @@ internal fun AzphaltStoreScreen(
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
+        val installedModelsById = snapshot?.installedModels.orEmpty().associateBy(InstalledAzphaltModelPackage::packageId)
         val updatesById = snapshot?.updates.orEmpty().associateBy { it.id }
         val revoked = snapshot?.revocations.orEmpty().map { it.id to it.version }.toSet()
 
         visiblePackages.forEach { item ->
             val modelAsset = item.isModelAssetPackage()
             val installed = installedById[item.id]
+            val installedModel = installedModelsById[item.id]
             val update = updatesById[item.id]
             val selected = selectedPackageId == item.id
-            val isRevoked = (item.id to item.latest) in revoked || (installed != null && (item.id to installed.version) in revoked)
+            val isRevoked =
+                (item.id to item.latest) in revoked ||
+                    (installed != null && (item.id to installed.version) in revoked) ||
+                    (installedModel != null && (item.id to installedModel.version) in revoked)
             AzphaltRecord(
                 seed = "azphalt-package-${item.id}",
                 eyebrow = if (modelAsset) {
@@ -236,6 +271,7 @@ internal fun AzphaltStoreScreen(
                     isRevoked -> "Revoked"
                     update?.updateAvailable == true -> "Update ${update.latest ?: item.latest}"
                     installed != null -> "Installed ${installed.version}"
+                    installedModel != null -> "Installed ${installedModel.version}"
                     item.priceStatus != "free" -> item.priceStatus
                     modelAsset -> "Model · ${item.latest}"
                     else -> item.latest
@@ -244,6 +280,7 @@ internal fun AzphaltStoreScreen(
                 onClick = {
                     selectedPackageIdValue = if (selected) "" else item.id
                     prepared = prepared?.takeIf { it.detail.id == item.id }
+                    preparedModel = preparedModel?.takeIf { it.detail.id == item.id }
                     error = null
                     status = null
                 },
@@ -267,11 +304,64 @@ internal fun AzphaltStoreScreen(
                                 color = Azphalt.currentGround.onPage,
                             )
                             if (modelAsset) {
-                                Text(
-                                    "Available model asset from Azphalt. It is discoverable here without being misrouted through the workflow/role installer; compatible model-runtime installation is a separate host path.",
-                                    style = AzphaltType.body,
-                                    color = Azphalt.currentGround.onPage,
-                                )
+                                if (isRevoked) {
+                                    Text(
+                                        "A repository revocation applies to this model package/version. Installation is blocked.",
+                                        style = AzphaltType.body,
+                                        color = Azphalt.currentGround.onPage,
+                                    )
+                                } else {
+                                    AzphaltPill(
+                                        label = if (installedModel == null) "Inspect model install" else "Inspect model update",
+                                        seed = "azphalt-model-prepare-${item.id}",
+                                        endCap = item.latest,
+                                        onClick = {
+                                            if (!loading) {
+                                                scope.launch {
+                                                    loading = true
+                                                    error = null
+                                                    status = null
+                                                    runCatching { service.prepareModelInstall(item.id, item.latest) }
+                                                        .onSuccess { plan ->
+                                                            preparedModel = plan
+                                                            prepared = null
+                                                            allowUntrustedSigner = false
+                                                            allowPublisherChange = false
+                                                        }
+                                                        .onFailure { failure ->
+                                                            error = failure.message ?: "Model package preparation failed."
+                                                        }
+                                                    loading = false
+                                                }
+                                            }
+                                        },
+                                    )
+                                    if (installedModel != null) {
+                                        AzphaltPill(
+                                            label = "Remove model",
+                                            seed = "azphalt-model-remove-${item.id}",
+                                            endCap = installedModel.version,
+                                            onClick = {
+                                                if (!loading) {
+                                                    scope.launch {
+                                                        loading = true
+                                                        error = null
+                                                        runCatching { service.removeModel(item.id) }
+                                                            .onSuccess {
+                                                                status = "Removed ${item.name}."
+                                                                preparedModel = null
+                                                                refreshGeneration += 1
+                                                            }
+                                                            .onFailure { failure ->
+                                                                error = failure.message ?: "Model removal failed."
+                                                            }
+                                                        loading = false
+                                                    }
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
                             } else if (isRevoked) {
                                 Text(
                                     "A repository revocation applies to this package/version. Installation is blocked until a non-revoked version is selected.",
@@ -308,6 +398,38 @@ internal fun AzphaltStoreScreen(
                         }
                     }
                 } else null,
+            )
+        }
+
+        preparedModel?.let { plan ->
+            PreparedAzphaltModelInstallPanel(
+                prepared = plan,
+                allowUntrustedSigner = allowUntrustedSigner,
+                onAllowUntrustedSignerChanged = { allowUntrustedSigner = it },
+                allowPublisherChange = allowPublisherChange,
+                onAllowPublisherChangeChanged = { allowPublisherChange = it },
+                onInstall = {
+                    scope.launch {
+                        loading = true
+                        error = null
+                        status = null
+                        runCatching {
+                            service.installModel(
+                                prepared = plan,
+                                nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                                allowUntrustedSigner = allowUntrustedSigner,
+                                allowPublisherChange = allowPublisherChange,
+                            )
+                        }.onSuccess { installed ->
+                            status = "Installed ${installed.packageId} ${installed.version}. Its model assets are registered for local inference."
+                            preparedModel = null
+                            refreshGeneration += 1
+                        }.onFailure { failure ->
+                            error = failure.message ?: "Model installation failed."
+                        }
+                        loading = false
+                    }
+                },
             )
         }
 
@@ -370,6 +492,94 @@ internal fun AzphaltStoreScreen(
             )
         }
     }
+}
+
+@Composable
+private fun PreparedAzphaltModelInstallPanel(
+    prepared: AzphaltPreparedModelInstall,
+    allowUntrustedSigner: Boolean,
+    onAllowUntrustedSignerChanged: (Boolean) -> Unit,
+    allowPublisherChange: Boolean,
+    onAllowPublisherChangeChanged: (Boolean) -> Unit,
+    onInstall: () -> Unit,
+) {
+    val verification = prepared.verification
+    AzphaltRecord(
+        seed = "azphalt-model-prepared-${prepared.detail.id}",
+        eyebrow = "Verified model install",
+        title = "${prepared.detail.name} ${prepared.version}",
+        body = prepared.assets.joinToString(" · ") { asset ->
+            buildString {
+                append(asset.type.uppercase())
+                asset.role?.takeIf(String::isNotBlank)?.let { append(" / ").append(it) }
+                asset.byteSize?.let { append(" / ").append(formatByteSize(it)) }
+            }
+        },
+        endCap = if (verification.trusted) {
+            "Trusted"
+        } else if (verification.packageContents.signed) {
+            "Unknown signer"
+        } else {
+            "Unsigned"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                prepared.assets.forEachIndexed { index, asset ->
+                    AzphaltNote(
+                        seed = "azphalt-model-asset-$index",
+                        label = asset.role ?: asset.type,
+                        value = buildString {
+                            append(asset.type)
+                            if (asset.files.isNotEmpty()) append(" · ${asset.files.size} files")
+                            asset.modelLicense?.let {
+                                append(" · model license: ")
+                                append(it.toString())
+                            }
+                        },
+                    )
+                }
+
+                if (verification.packageContents.signed && !verification.trusted) {
+                    ConfirmationRow(
+                        checked = allowUntrustedSigner,
+                        onCheckedChange = onAllowUntrustedSignerChanged,
+                        text = "Install despite an unrecognized signing key",
+                    )
+                }
+                if (verification.publisherChanged) {
+                    ConfirmationRow(
+                        checked = allowPublisherChange,
+                        onCheckedChange = onAllowPublisherChangeChanged,
+                        text = "Approve publisher-key change for this package id",
+                    )
+                }
+
+                val trustReady =
+                    !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
+                val publisherReady = !verification.publisherChanged || allowPublisherChange
+                if (trustReady && publisherReady) {
+                    AzphaltPill(
+                        label = "Install verified model",
+                        seed = "azphalt-model-install-${prepared.detail.id}",
+                        endCap = prepared.version,
+                        onClick = onInstall,
+                    )
+                } else {
+                    Text(
+                        if (!publisherReady) {
+                            "Publisher-key change requires explicit approval."
+                        } else {
+                            "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                        },
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable

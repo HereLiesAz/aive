@@ -12,6 +12,7 @@
 - Added resumable, SHA-verified Android downloads for large local memory/orchestration release assets, including retained partial files and HTTP Range resume.
 - Added Azphalt catalog recovery when an app-scoped workflow/role search incorrectly returns empty, with local `targetApps` filtering for current and legacy Aive host IDs.
 - Exposed Azphalt model assets alongside workflows and roles, including a dedicated Models filter while keeping model packages out of the workflow/role installer.
+- Added full Android Azphalt model installation for ONNX, TFLite, LiteRT, MediaPipe/TFLite task bundles, Sherpa-ONNX bundles, Vosk bundles, and generic model assets, with verified/resumable remote members, app-private persistence, durable inference-registry paths, updates with rollback, uninstall, and direct .azp import support.
 - Grouped all `0.9.6.x` build assets under one `v0.9.6` GitHub Release while preserving immutable four-part build tags.
 - Moved four-part build-version derivation and patch-grouped GitHub Release policy into `HereLiesAz/workflows`.
 

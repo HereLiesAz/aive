@@ -133,7 +133,7 @@ data class AzphaltManifest(
     val entry: JsonElement? = null,
     val runtime: JsonElement? = null,
     val capabilities: JsonElement? = null,
-    val assets: JsonElement? = null,
+    val assets: List<AzphaltAssetEntry>? = null,
     val contributes: JsonElement? = null,
     val app: JsonElement? = null,
     val mcp: JsonElement? = null,
@@ -148,6 +148,35 @@ data class AzphaltManifest(
     val workflow: AzphaltWorkflowManifest? = null,
     val role: AzphaltRoleManifest? = null,
 )
+
+@Serializable
+data class AzphaltAssetEntry(
+    val type: String,
+    val path: String = "",
+    val remoteUrl: String? = null,
+    val checksum: String? = null,
+    val byteSize: Long? = null,
+    val role: String? = null,
+    val tags: List<String> = emptyList(),
+    val params: JsonElement? = null,
+    val io: JsonElement? = null,
+    val files: List<AzphaltModelFileMember> = emptyList(),
+    val requirements: JsonElement? = null,
+    val modelLicense: JsonElement? = null,
+)
+
+@Serializable
+data class AzphaltModelFileMember(
+    val name: String,
+    val path: String? = null,
+    val remoteUrl: String? = null,
+    val checksum: String? = null,
+    val byteSize: Long? = null,
+    val supportsRange: Boolean? = null,
+)
+
+internal fun AzphaltAssetEntry.isModelAsset(): Boolean =
+    AZPHALT_MODEL_ASSET_TYPES.any { it.equals(type, ignoreCase = true) }
 
 @Serializable
 data class AzphaltWorkflowManifest(
