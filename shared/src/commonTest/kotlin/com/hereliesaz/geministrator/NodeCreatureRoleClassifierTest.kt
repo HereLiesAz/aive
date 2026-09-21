@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class NodeCreatureRoleClassifierTest {
     @Test
-    fun supportedAliasesMatchNativeRoleSemantics() {
+    fun supportedAliasesMatchMascotRoleSemantics() {
         val aliases = mapOf(
             "Systems Monitor" to NodeCreatureRoleKind.HallMonitor,
             "Antagonist" to NodeCreatureRoleKind.Antagonist,
@@ -37,23 +37,23 @@ class NodeCreatureRoleClassifierTest {
     fun activeLabelsFollowAliasClassification() {
         assertEquals(
             "VERIFYING",
-            nodeCreatureActivityLabel("Inspector", H2g2WorkflowState.Active),
+            mascotActivityLabel("Inspector", H2g2WorkflowState.Active),
         )
         assertEquals(
             "BUILDING",
-            nodeCreatureActivityLabel("Developer", H2g2WorkflowState.Active),
+            mascotActivityLabel("Developer", H2g2WorkflowState.Active),
         )
         assertEquals(
             "BUILDING",
-            nodeCreatureActivityLabel("Coder", H2g2WorkflowState.Active),
+            mascotActivityLabel("Coder", H2g2WorkflowState.Active),
         )
         assertEquals(
             "RELEASING",
-            nodeCreatureActivityLabel("Publisher", H2g2WorkflowState.Active),
+            mascotActivityLabel("Publisher", H2g2WorkflowState.Active),
         )
         assertEquals(
             "MONITORING",
-            nodeCreatureActivityLabel("Systems Monitor", H2g2WorkflowState.Active),
+            mascotActivityLabel("Systems Monitor", H2g2WorkflowState.Active),
         )
     }
 
@@ -67,7 +67,7 @@ class NodeCreatureRoleClassifierTest {
             H2g2WorkflowState.Complete to "COMPLETE",
             H2g2WorkflowState.Gate to "AWAITING GATE",
         )) {
-            assertEquals(expected, nodeCreatureActivityLabel("Developer", state))
+            assertEquals(expected, mascotActivityLabel("Developer", state))
         }
     }
 }

@@ -50,6 +50,7 @@ class WorkflowEngine(
     private val eventSink: WorkflowEventSink = NoOpWorkflowEventSink,
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
+    private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -132,6 +133,7 @@ class WorkflowEngine(
                     val providerActive = activeByProvider[providerId] ?: 0
                     if (providerActive >= providerLimit) continue
 
+                    val resolvedSurfaces = surfaceRuntime.resolve(role.surfaces)
                     val request = buildProviderTaskRequest(
                         project = project,
                         definition = definition,
@@ -140,6 +142,7 @@ class WorkflowEngine(
                         taskRun = taskRun,
                         role = role,
                         orchestrationUtilities = orchestrationUtilities,
+                        resolvedSurfaces = resolvedSurfaces,
                     )
                     pendingAgentDispatches += PendingAgentDispatch(
                         taskRun = taskRun,

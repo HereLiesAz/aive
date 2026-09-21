@@ -29,6 +29,7 @@ import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
@@ -38,6 +39,7 @@ import kotlinx.coroutines.launch
 fun App(
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
+    roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
     persistence: WorkflowPersistence? = null,
     projectFileService: ProjectFileService? = null,
@@ -64,7 +66,7 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, executorIntegrations, workflowPersistence, runtimeGeneration) {
+    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -74,6 +76,7 @@ fun App(
                 scope = scope,
                 persistence = workflowPersistence,
                 executorIntegrations = executorIntegrations,
+                roleSurfaceRuntime = roleSurfaceRuntime,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
@@ -366,6 +369,7 @@ fun App(
                             }
                         },
                         projectFileService = projectFileService,
+                        roleSurfaceFilePicker = projectFileService as? RoleSurfaceFilePicker,
                         onExportCurrentProjectFile = { runtime?.exportCurrentProjectFile() },
                         onImportProjectFile = { encoded ->
                             val imported = runtime?.importProjectFile(encoded)

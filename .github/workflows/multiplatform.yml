@@ -64,10 +64,10 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Rust renderer toolchain
+      - name: Set up Rust native toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Install cargo-ndk
         uses: taiki-e/install-action@v2
@@ -155,7 +155,6 @@ jobs:
         run: |
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            test -f "androidApp/build/generated/node-creatures/jniLibs/${abi}/libhaive_node_creatures.so"
             test -f "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so"
           done
 
@@ -200,12 +199,8 @@ jobs:
           cp -R webApp/src/webMain/resources/. webApp/build/pages/wasm/
           test -f webApp/build/pages/index.html
           test -f webApp/build/pages/haive.js
-          test -f webApp/build/pages/node-creatures.js
-          test -f webApp/build/pages/haive_node_creatures.wasm
           test -f webApp/build/pages/wasm/index.html
           test -f webApp/build/pages/wasm/haive.js
-          test -f webApp/build/pages/wasm/node-creatures.js
-          test -f webApp/build/pages/wasm/haive_node_creatures.wasm
 
       - name: Generate release notes
         if: github.event_name != 'pull_request'
@@ -370,7 +365,7 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Rust renderer toolchain
+      - name: Set up Rust native toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Gradle
@@ -419,9 +414,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 -print
           find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 -print
-          test "$(find desktopApp/build/generated/node-creatures/desktop/node-creatures -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
           test "$(find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
 
       - name: Upload native installer

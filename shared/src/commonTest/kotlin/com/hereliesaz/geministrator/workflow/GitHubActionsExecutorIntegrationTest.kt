@@ -10,6 +10,8 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.ScriptLanguage
 import com.hereliesaz.geministrator.domain.ScriptRunner
+import com.hereliesaz.geministrator.domain.RoleSurface
+import com.hereliesaz.geministrator.domain.SpreadsheetSource
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -83,6 +85,101 @@ class GitHubActionsExecutorIntegrationTest {
             assertNotNull(inputs["aive_context"]),
         )
         assertEquals("Run CI", envelope.taskObjective)
+    }
+
+    @Test
+    fun dispatchIncludesResolvedRoleSurfaces() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val surfaceIntegration = RecordingGitHubSurfaceIntegration()
+        val integration = GitHubActionsExecutorIntegration(
+            client = client,
+            surfaceRuntime = RoleSurfaceRuntimeRegistry(listOf(surfaceIntegration)),
+        )
+        val role = RoleDefinition(
+            id = RoleDefinitionId("data-role"),
+            name = "Data role",
+            description = "Uses attached data",
+            instructions = "Read the spreadsheet.",
+            surfaces = listOf(
+                RoleSurface.Spreadsheet(
+                    alias = "customers",
+                    source = SpreadsheetSource.AppFile("customers.csv"),
+                    writable = true,
+                ),
+                RoleSurface.Flowchart(
+                    alias = "process",
+                    source = "flowchart TD\nA[Load] --> B[Transform]",
+                ),
+            ),
+        )
+        val context = context(TaskExecutor.GitHubAction("role.yml")).copy(role = role)
+
+        integration.dispatch(context)
+
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(assertNotNull(client.lastDispatch).inputs["aive_context"]),
+        )
+        assertEquals(listOf("customers", "process"), envelope.surfaces.map { it.alias })
+        assertEquals("Ada", envelope.surfaces.first().table?.rows?.single()?.get("name"))
+        assertEquals(2, assertNotNull(envelope.surfaces[1].flowchart).nodes.size)
+    }
+
+    @Test
+    fun completedActionsResultAppliesSurfaceMutations() = runBlocking {
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed'}",
+            runner = ScriptRunner.GitHubActions(workflow = "runner.yml"),
+        )
+        val role = RoleDefinition(
+            id = RoleDefinitionId("data-role"),
+            name = "Data role",
+            description = "Writes attached data",
+            instructions = "Append one row.",
+            surfaces = listOf(
+                RoleSurface.Spreadsheet(
+                    alias = "customers",
+                    source = SpreadsheetSource.AppFile("customers.csv"),
+                    writable = true,
+                ),
+            ),
+        )
+        val client = FakeGitHubActionsClient(
+            reconciledRun = GitHubWorkflowRun(
+                id = "run-42",
+                status = GitHubWorkflowRunStatus.Completed,
+                artifacts = listOf(
+                    GitHubWorkflowArtifact(
+                        id = "result",
+                        name = "aive-result",
+                        archiveDownloadUrl = "https://example.invalid/result",
+                    ),
+                ),
+            ),
+            artifactBytes = resultArchive(
+                """{"status":"completed","surfaceMutations":[{"alias":"customers","operation":"AppendRows","rows":[{"name":"Grace"}]}]}""",
+            ),
+        )
+        val surfaceIntegration = RecordingGitHubSurfaceIntegration()
+        val integration = GitHubActionsExecutorIntegration(
+            client = client,
+            surfaceRuntime = RoleSurfaceRuntimeRegistry(listOf(surfaceIntegration)),
+        )
+        val base = context(executor)
+        val running = base.copy(
+            role = role,
+            taskRun = base.taskRun.copy(
+                status = TaskRunStatus.Running,
+                externalRunId = "run-42",
+            ),
+        )
+
+        val execution = integration.reconcile(running)
+
+        assertEquals(TaskRunStatus.Completed, execution.status)
+        assertEquals("customers", surfaceIntegration.lastMutation?.alias)
+        assertEquals(AiveSurfaceMutationOperation.AppendRows, surfaceIntegration.lastMutation?.operation)
+        assertEquals("github:task-run:1:0", surfaceIntegration.lastMutationKey)
     }
 
     @Test
@@ -327,6 +424,33 @@ class GitHubActionsExecutorIntegrationTest {
             updatedAtEpochMillis = 1L,
         )
         return TaskExecutorContext(project, definition, run, task, taskRun, executor, 10L)
+    }
+}
+
+private class RecordingGitHubSurfaceIntegration : RoleSurfaceIntegration {
+    var lastMutation: AiveSurfaceMutation? = null
+    var lastMutationKey: String? = null
+
+    override fun supports(surface: RoleSurface): Boolean = surface is RoleSurface.Spreadsheet
+
+    override suspend fun resolve(surface: RoleSurface): AiveRoleSurfaceEnvelope =
+        AiveRoleSurfaceEnvelope(
+            alias = surface.alias,
+            kind = "spreadsheet",
+            writable = true,
+            table = AiveSurfaceTable(
+                columns = listOf("name"),
+                rows = listOf(mapOf("name" to "Ada")),
+            ),
+        )
+
+    override suspend fun apply(
+        surface: RoleSurface,
+        mutation: AiveSurfaceMutation,
+        mutationKey: String,
+    ) {
+        lastMutation = mutation
+        lastMutationKey = mutationKey
     }
 }
 

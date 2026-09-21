@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,13 +27,20 @@ import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.FlowchartLanguage
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.RoleSurface
 import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.SpreadsheetFormat
+import com.hereliesaz.geministrator.domain.SpreadsheetSource
+import com.hereliesaz.geministrator.domain.SqlDatabaseSource
 import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CustomCompanyProviderScreen(
@@ -40,6 +48,7 @@ internal fun CustomCompanyProviderScreen(
     connectedProviderIds: Set<String> = emptySet(),
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     onResetRoleCollection: () -> Unit = {},
+    roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -67,6 +76,11 @@ internal fun CustomCompanyProviderScreen(
         serializer = RoleExecutionSource.serializer(),
         initialValue = RoleExecutionSource.Agent,
     )
+    var roleSurfacesDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_SURFACES_KEY,
+        serializer = ListSerializer(RoleSurface.serializer()),
+        initialValue = emptyList(),
+    )
     var roleCapabilitiesDraft by rememberDurableJsonState(
         key = COMPANY_ROLE_CAPABILITIES_KEY,
         serializer = SetSerializer(AgentCapability.serializer()),
@@ -78,6 +92,7 @@ internal fun CustomCompanyProviderScreen(
         initialValue = emptySet(),
     )
     var resetConfirm by remember { mutableStateOf(false) }
+    val roleSurfacePickerScope = rememberCoroutineScope()
 
     LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
         if (!showRoleForm && draftRoles == visibleRoles) {
@@ -90,6 +105,7 @@ internal fun CustomCompanyProviderScreen(
             DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_EXECUTION_SOURCE_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_SURFACES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_CAPABILITIES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_AUTHORITIES_KEY)
         }
@@ -104,6 +120,7 @@ internal fun CustomCompanyProviderScreen(
         roleInstructionsDraft = ""
         roleProviderDraftValue = ""
         roleExecutionSourceDraft = RoleExecutionSource.Agent
+        roleSurfacesDraft = emptyList()
         roleCapabilitiesDraft = emptySet()
         roleAuthoritiesDraft = emptySet()
     }
@@ -117,6 +134,7 @@ internal fun CustomCompanyProviderScreen(
         roleInstructionsDraft = role.instructions
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
         roleExecutionSourceDraft = role.executionSource
+        roleSurfacesDraft = role.surfaces
         roleCapabilitiesDraft = role.capabilitiesRequired
         roleAuthoritiesDraft = role.authorities
     }
@@ -371,7 +389,7 @@ internal fun CustomCompanyProviderScreen(
                     when (val runner = source.runner) {
                         ScriptRunner.LocalSandbox -> {
                             Text(
-                                "Local JavaScript receives a frozen 'aive' object. Return { status, message, output, artifacts }.",
+                                "Local JavaScript receives a frozen 'aive' object, including aive.surfaces. Return { status, message, output, artifacts, surfaceMutations }.",
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
@@ -382,7 +400,7 @@ internal fun CustomCompanyProviderScreen(
                                 onChange = { updated -> roleExecutionSourceDraft = source.copy(runner = updated) },
                             )
                             Text(
-                                "The runner receives aive_context, aive_script, and aive_language by default.",
+                                "The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.",
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
@@ -394,6 +412,111 @@ internal fun CustomCompanyProviderScreen(
             if (!roleExecutionSourceDraft.isConfiguredExecutionSource()) {
                 Text(
                     "Complete the execution-source fields before saving this role.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            }
+
+            CompanySectionLabel("Attached surfaces")
+            Text(
+                "Attach data and visual logic without changing how the role executes. Scripts and GitHub Actions receive resolved surfaces in aive.surfaces.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = "Add spreadsheet",
+                    seed = "role-surface-add-spreadsheet",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Spreadsheet(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "sheet"),
+                            source = SpreadsheetSource.AppFile("role-data.csv"),
+                            format = SpreadsheetFormat.Csv,
+                            firstRowHeaders = true,
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add SQL database",
+                    seed = "role-surface-add-sql",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Sql(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "db"),
+                            source = SqlDatabaseSource.AppDatabase("role-data.db"),
+                            query = "SELECT name, type FROM sqlite_master ORDER BY name",
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add flowchart",
+                    seed = "role-surface-add-flowchart",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Flowchart(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "flow"),
+                            language = FlowchartLanguage.Mermaid,
+                            source = "flowchart TD\n    A[Start] --> B[Done]",
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            roleSurfacesDraft.forEachIndexed { surfaceIndex, surface ->
+                CompanyRoleSurfaceEditor(
+                    surface = surface,
+                    index = surfaceIndex,
+                    onChange = { updated ->
+                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                            it[surfaceIndex] = updated
+                        }
+                    },
+                    onRemove = {
+                        roleSurfacesDraft = roleSurfacesDraft.filterIndexed { index, _ ->
+                            index != surfaceIndex
+                        }
+                    },
+                    onPickSpreadsheet = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSpreadsheet()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Spreadsheet
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SpreadsheetSource.DocumentUri(uri),
+                                                format = SpreadsheetFormat.Auto,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    onPickSqlite = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSqliteDatabase()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Sql
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SqlDatabaseSource.DocumentUri(uri),
+                                                writable = false,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            if (!roleSurfacesDraft.isConfiguredRoleSurfaces()) {
+                Text(
+                    "Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.",
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -440,7 +563,8 @@ internal fun CustomCompanyProviderScreen(
                             cleanId.isNotBlank() &&
                             cleanName.isNotBlank() &&
                             cleanId != ROLE_COLLECTION_MARKER_ID &&
-                            roleExecutionSourceDraft.isConfiguredExecutionSource()
+                            roleExecutionSourceDraft.isConfiguredExecutionSource() &&
+                            roleSurfacesDraft.isConfiguredRoleSurfaces()
                         ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
@@ -454,6 +578,7 @@ internal fun CustomCompanyProviderScreen(
                                     null
                                 },
                                 executionSource = roleExecutionSourceDraft,
+                                surfaces = roleSurfacesDraft,
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
                             )
@@ -504,6 +629,10 @@ internal fun CustomCompanyProviderScreen(
                     if (role.authorities.isNotEmpty()) {
                         append("\nAuthority: ")
                         append(role.authorities.joinToString { it.name.humanizeEnumName() })
+                    }
+                    if (role.surfaces.isNotEmpty()) {
+                        append("\nSurfaces: ")
+                        append(role.surfaces.joinToString { it.alias })
                     }
                     if (role.capabilitiesRequired.isNotEmpty()) {
                         append("\nRequires: ")
@@ -652,6 +781,395 @@ private fun CompanyProviderChoiceRow(
 }
 
 @Composable
+private fun CompanyRoleSurfaceEditor(
+    surface: RoleSurface,
+    index: Int,
+    onChange: (RoleSurface) -> Unit,
+    onRemove: () -> Unit,
+    onPickSpreadsheet: (() -> Unit)?,
+    onPickSqlite: (() -> Unit)?,
+) {
+    AzphaltRecord(
+        seed = "role-surface-$index-${surface.alias}",
+        eyebrow = when (surface) {
+            is RoleSurface.Spreadsheet -> "Spreadsheet"
+            is RoleSurface.Sql -> "SQL database"
+            is RoleSurface.Flowchart -> "Flowchart"
+        },
+        title = surface.alias.ifBlank { "Unnamed surface" },
+        body = when (surface) {
+            is RoleSurface.Spreadsheet ->
+                "Tabular rows available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Sql ->
+                "SQLite query result available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Flowchart ->
+                "Mermaid flowchart parsed natively and exposed as nodes and edges."
+        },
+        endCap = when (surface) {
+            is RoleSurface.Spreadsheet -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Sql -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Flowchart -> "Mermaid"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = surface.alias,
+                    onValueChange = { value ->
+                        when (surface) {
+                            is RoleSurface.Spreadsheet -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Sql -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Flowchart -> onChange(surface.copy(alias = value))
+                        }
+                    },
+                    label = { Text("Surface alias") },
+                    placeholder = { Text("customers") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                when (surface) {
+                    is RoleSurface.Spreadsheet -> CompanySpreadsheetSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSpreadsheet,
+                    )
+                    is RoleSurface.Sql -> CompanySqlSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSqlite,
+                    )
+                    is RoleSurface.Flowchart -> CompanyFlowchartSurfaceFields(surface, onChange)
+                }
+
+                AzphaltPill(
+                    label = "Remove surface",
+                    seed = "role-surface-remove-$index",
+                    onClick = onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CompanySpreadsheetSurfaceFields(
+    surface: RoleSurface.Spreadsheet,
+    onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
+) {
+    CompanySectionLabel("Spreadsheet source")
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        AzphaltPill(
+            label = "App spreadsheet",
+            seed = "sheet-source-app-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.AppFile,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.AppFile("role-data.csv"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Inline CSV / TSV",
+            seed = "sheet-source-inline-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Inline,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.Inline("column_a,column_b\n"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "HTTPS spreadsheet",
+            seed = "sheet-source-https-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Https,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.Https("https://"),
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Public Google Sheet",
+            seed = "sheet-source-google-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.GoogleSheet,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.GoogleSheet(spreadsheetId = ""),
+                        format = SpreadsheetFormat.Csv,
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Document URI",
+            seed = "sheet-source-uri-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.DocumentUri,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.DocumentUri("content://"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (onPickDocument != null) {
+            AzphaltPill(
+                label = "Choose spreadsheet…",
+                seed = "sheet-source-picker-${surface.alias}",
+                onClick = onPickDocument,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    when (val source = surface.source) {
+        is SpreadsheetSource.AppFile -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("App spreadsheet file") },
+            placeholder = { Text("customers.csv") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Inline -> OutlinedTextField(
+            value = source.text,
+            onValueChange = { onChange(surface.copy(source = source.copy(text = it))) },
+            label = { Text("Spreadsheet data") },
+            minLines = 6,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Https -> OutlinedTextField(
+            value = source.url,
+            onValueChange = { onChange(surface.copy(source = source.copy(url = it), writable = false)) },
+            label = { Text("HTTPS CSV / TSV URL") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it))) },
+            label = { Text("Document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.GoogleSheet -> {
+            OutlinedTextField(
+                value = source.spreadsheetId,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(spreadsheetId = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Google Sheets spreadsheet ID") },
+                placeholder = { Text("1AbCdEf...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = source.gid,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(gid = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Sheet GID") },
+                placeholder = { Text("0") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Public/exportable Google Sheets are fetched as CSV. Private Sheets can still be handled by a script runner with its own credentials.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+        }
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        SpreadsheetFormat.entries.forEach { format ->
+            AzphaltPill(
+                label = format.name,
+                seed = "sheet-format-${surface.alias}-${format.name}",
+                selected = surface.format == format,
+                onClick = { onChange(surface.copy(format = format)) },
+            )
+        }
+    }
+    AzphaltPill(
+        label = "First row is headers",
+        seed = "sheet-headers-${surface.alias}",
+        selected = surface.firstRowHeaders,
+        onClick = { onChange(surface.copy(firstRowHeaders = !surface.firstRowHeaders)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SpreadsheetSource.AppFile ||
+        surface.source is SpreadsheetSource.DocumentUri
+    AzphaltPill(
+        label = if (writableSource) "Allow script writes" else "Read-only source",
+        seed = "sheet-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sheet-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanySqlSurfaceFields(
+    surface: RoleSurface.Sql,
+    onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
+) {
+    CompanySectionLabel("SQL source")
+    AzphaltPill(
+        label = "App SQLite database",
+        seed = "sql-source-app-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.AppDatabase,
+        onClick = { onChange(surface.copy(source = SqlDatabaseSource.AppDatabase("role-data.db"))) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltPill(
+        label = "SQLite document URI",
+        seed = "sql-source-uri-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.DocumentUri,
+        onClick = {
+            onChange(
+                surface.copy(
+                    source = SqlDatabaseSource.DocumentUri("content://"),
+                    writable = false,
+                ),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (onPickDocument != null) {
+        AzphaltPill(
+            label = "Choose SQLite database…",
+            seed = "sql-source-picker-${surface.alias}",
+            onClick = onPickDocument,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    when (val source = surface.source) {
+        is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("SQLite database name") },
+            placeholder = { Text("customers.db") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SqlDatabaseSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it), writable = false)) },
+            label = { Text("SQLite document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    OutlinedTextField(
+        value = surface.query,
+        onValueChange = { onChange(surface.copy(query = it)) },
+        label = { Text("Read query") },
+        placeholder = { Text("SELECT * FROM customers ORDER BY name") },
+        minLines = 4,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SqlDatabaseSource.AppDatabase
+    AzphaltPill(
+        label = if (writableSource) "Allow script SQL mutations" else "Read-only database source",
+        seed = "sql-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sql-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanyFlowchartSurfaceFields(
+    surface: RoleSurface.Flowchart,
+    onChange: (RoleSurface) -> Unit,
+) {
+    OutlinedTextField(
+        value = surface.source,
+        onValueChange = { onChange(surface.copy(source = it)) },
+        label = { Text("Mermaid flowchart") },
+        placeholder = { Text("flowchart TD\n    A[Start] --> B[Done]") },
+        minLines = 8,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val parsed = runCatching { MermaidFlowchartParser.parse(surface.source) }
+    parsed.onSuccess { graph ->
+        MermaidFlowchartPreview(
+            graph = graph,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltNote(
+            seed = "flowchart-parse-${surface.alias}",
+            label = "Native preview",
+            value = buildString {
+                append("${graph.nodes.size} nodes · ${graph.edges.size} edges · ${graph.direction}")
+                if (graph.warnings.isNotEmpty()) {
+                    append("\nWarnings: ")
+                    append(graph.warnings.joinToString("; "))
+                }
+            },
+        )
+    }.onFailure { failure ->
+        Text(
+            failure.message ?: "Flowchart could not be parsed.",
+            style = AzphaltType.body,
+            color = Azphalt.currentGround.onPage,
+        )
+    }
+}
+
+@Composable
+private fun CompanyMaxRowsField(
+    value: Int,
+    seed: String,
+    onChange: (Int) -> Unit,
+) {
+    OutlinedTextField(
+        value = value.toString(),
+        onValueChange = { raw ->
+            raw.toIntOrNull()
+                ?.coerceIn(1, 10_000)
+                ?.let(onChange)
+        },
+        label = { Text("Maximum rows exposed") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltNote(
+        seed = seed,
+        label = "Envelope limit",
+        value = "1–10,000 rows; larger sources are marked truncated.",
+    )
+}
+
+@Composable
 private fun CompanyGitHubActionFields(
     workflow: String,
     ref: String,
@@ -718,6 +1236,46 @@ private fun CompanyGitHubScriptRunnerFields(
     )
 }
 
+private fun List<RoleSurface>.isConfiguredRoleSurfaces(): Boolean {
+    val normalizedAliases = map { it.alias.trim() }
+    if (normalizedAliases.any(String::isBlank)) return false
+    if (normalizedAliases.distinct().size != size) return false
+    return all { surface ->
+        when (surface) {
+            is RoleSurface.Spreadsheet -> {
+                surface.maxRows in 1..10_000 && when (val source = surface.source) {
+                    is SpreadsheetSource.AppFile -> source.name.isNotBlank()
+                    is SpreadsheetSource.Inline -> true
+                    is SpreadsheetSource.DocumentUri -> source.uri.isNotBlank()
+                    is SpreadsheetSource.Https -> source.url.startsWith("https://", ignoreCase = true)
+                    is SpreadsheetSource.GoogleSheet -> source.spreadsheetId.isNotBlank()
+                }
+            }
+            is RoleSurface.Sql -> {
+                surface.maxRows in 1..10_000 &&
+                    surface.query.isNotBlank() &&
+                    when (val source = surface.source) {
+                        is SqlDatabaseSource.AppDatabase -> source.name.isNotBlank()
+                        is SqlDatabaseSource.DocumentUri -> source.uri.isNotBlank()
+                    }
+            }
+            is RoleSurface.Flowchart ->
+                surface.language == FlowchartLanguage.Mermaid &&
+                    runCatching { MermaidFlowchartParser.parse(surface.source) }.isSuccess
+        }
+    }
+}
+
+private fun nextSurfaceAlias(
+    surfaces: List<RoleSurface>,
+    prefix: String,
+): String {
+    val used = surfaces.mapTo(mutableSetOf()) { it.alias }
+    var index = 1
+    while ("$prefix$index" in used) index += 1
+    return "$prefix$index"
+}
+
 private fun RoleExecutionSource.isConfiguredExecutionSource(): Boolean = when (this) {
     RoleExecutionSource.Agent -> true
     is RoleExecutionSource.GitHubAction -> workflow.isNotBlank() && contextInput.isNotBlank()
@@ -772,6 +1330,7 @@ private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
 private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"
+private const val COMPANY_ROLE_SURFACES_KEY = "company.role.surfaces"
 private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
 private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
 

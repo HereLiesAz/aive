@@ -70,14 +70,87 @@ sealed interface RoleExecutionSource {
         val language: ScriptLanguage,
         val source: String,
         val runner: ScriptRunner,
-    ) : RoleExecutionSource {
-        init {
-            require(source.isNotBlank()) { "Role script source must not be blank" }
-            require(language == ScriptLanguage.JavaScript || runner !is ScriptRunner.LocalSandbox) {
-                "Only JavaScript can use the local sandbox; Python requires a remote runner"
-            }
-        }
-    }
+    ) : RoleExecutionSource
+}
+
+@Serializable
+enum class SpreadsheetFormat {
+    Auto,
+    Csv,
+    Tsv,
+    Xlsx,
+}
+
+@Serializable
+sealed interface SpreadsheetSource {
+    @Serializable
+    data class AppFile(val name: String) : SpreadsheetSource
+
+    @Serializable
+    data class Inline(val text: String) : SpreadsheetSource
+
+    @Serializable
+    data class DocumentUri(val uri: String) : SpreadsheetSource
+
+    @Serializable
+    data class Https(val url: String) : SpreadsheetSource
+
+    @Serializable
+    data class GoogleSheet(
+        val spreadsheetId: String,
+        val gid: String = "0",
+    ) : SpreadsheetSource
+}
+
+@Serializable
+enum class SqlDialect {
+    SQLite,
+}
+
+@Serializable
+sealed interface SqlDatabaseSource {
+    @Serializable
+    data class AppDatabase(val name: String) : SqlDatabaseSource
+
+    @Serializable
+    data class DocumentUri(val uri: String) : SqlDatabaseSource
+}
+
+@Serializable
+enum class FlowchartLanguage {
+    Mermaid,
+}
+
+@Serializable
+sealed interface RoleSurface {
+    val alias: String
+
+    @Serializable
+    data class Spreadsheet(
+        override val alias: String,
+        val source: SpreadsheetSource,
+        val format: SpreadsheetFormat = SpreadsheetFormat.Auto,
+        val firstRowHeaders: Boolean = true,
+        val writable: Boolean = false,
+        val maxRows: Int = 1_000,
+    ) : RoleSurface
+
+    @Serializable
+    data class Sql(
+        override val alias: String,
+        val source: SqlDatabaseSource,
+        val dialect: SqlDialect = SqlDialect.SQLite,
+        val query: String,
+        val writable: Boolean = false,
+        val maxRows: Int = 1_000,
+    ) : RoleSurface
+
+    @Serializable
+    data class Flowchart(
+        override val alias: String,
+        val language: FlowchartLanguage = FlowchartLanguage.Mermaid,
+        val source: String,
+    ) : RoleSurface
 }
 
 @Serializable
@@ -89,6 +162,7 @@ data class RoleDefinition(
     val enabled: Boolean = true,
     val preferredProviderId: AgentProviderId? = null,
     val executionSource: RoleExecutionSource = RoleExecutionSource.Agent,
+    val surfaces: List<RoleSurface> = emptyList(),
     val capabilitiesRequired: Set<AgentCapability> = emptySet(),
     val authorities: Set<RoleAuthority> = emptySet(),
 )

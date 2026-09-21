@@ -43,34 +43,6 @@ val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
     }
 }
 
-val nodeCreatureManifest = rootProject.layout.projectDirectory.file("native/node-creatures/Cargo.toml")
-val nodeCreatureSources = rootProject.layout.projectDirectory.dir("native/node-creatures/src")
-val nativeLibraryName = System.mapLibraryName("haive_node_creatures")
-val generatedDesktopNodeNativeDir = layout.buildDirectory.dir("generated/node-creatures/desktop")
-val buildDesktopNodeCreatureNative = tasks.register<Exec>("buildDesktopNodeCreatureNative") {
-    group = "build"
-    description = "Builds and stages the Rust node-creature renderer for the current desktop OS."
-    inputs.file(nodeCreatureManifest)
-    inputs.dir(nodeCreatureSources)
-    outputs.file(generatedDesktopNodeNativeDir.map { it.file("node-creatures/$nativeLibraryName") })
-    commandLine(
-        "cargo",
-        "build",
-        "--release",
-        "--manifest-path", nodeCreatureManifest.asFile.absolutePath,
-    )
-    doLast {
-        val source = rootProject.layout.projectDirectory
-            .file("native/node-creatures/target/release/$nativeLibraryName")
-            .asFile
-        check(source.isFile) { "Rust node-creature library was not produced at ${source.absolutePath}" }
-        val destination = generatedDesktopNodeNativeDir.get().file("node-creatures/$nativeLibraryName").asFile
-        destination.parentFile.mkdirs()
-        source.copyTo(destination, overwrite = true)
-    }
-}
-
-
 val bitcosManifest = rootProject.layout.projectDirectory.file("native/bitcos/Cargo.toml")
 val bitcosSources = rootProject.layout.projectDirectory.dir("native/bitcos/src")
 val bitcosNativeLibraryName = System.mapLibraryName("haive_bitcos")
@@ -101,13 +73,12 @@ val buildDesktopBitcosNative = tasks.register<Exec>("buildDesktopBitcosNative") 
 sourceSets {
     main {
         resources.srcDir(generatedDesktopBrandDir)
-        resources.srcDir(generatedDesktopNodeNativeDir)
         resources.srcDir(generatedDesktopBitcosNativeDir)
     }
 }
 
 tasks.processResources {
-    dependsOn(generateDesktopBrandAssets, buildDesktopNodeCreatureNative, buildDesktopBitcosNative)
+    dependsOn(generateDesktopBrandAssets, buildDesktopBitcosNative)
 }
 
 tasks.matching {
@@ -115,7 +86,7 @@ tasks.matching {
         it.name == "createDistributable" ||
         it.name == "runDistributable"
 }.configureEach {
-    dependsOn(generateDesktopBrandAssets, buildDesktopNodeCreatureNative, buildDesktopBitcosNative)
+    dependsOn(generateDesktopBrandAssets, buildDesktopBitcosNative)
 }
 
 val appVersionName = providers.gradleProperty("app.versionName").get()

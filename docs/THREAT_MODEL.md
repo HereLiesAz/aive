@@ -120,3 +120,24 @@ The following invariants must hold regardless of the integration used:
   before ZIP/JSON parsing.
 - Script-produced artifacts re-enter the same durable workflow artifact/evidence path as other
   executor outputs.
+
+
+### Attached spreadsheet and SQL surfaces
+
+**Threats**
+- A role can expose sensitive spreadsheet/database rows to a local or remote execution source.
+- Script-returned mutations can corrupt user-owned data if a surface is made writable.
+- Repeated remote-run reconciliation can replay non-idempotent writes.
+- Imported SQLite documents and network spreadsheets can be oversized or malformed.
+
+**Mitigations in place**
+- Surfaces are opt-in per role and named explicitly in the Swarm editor.
+- HTTPS is required for network spreadsheet sources.
+- Snapshot row counts and spreadsheet byte sizes are bounded.
+- Only app-owned SQLite databases may execute returned SQL mutations; imported SQLite documents are
+  query-only.
+- Inline and HTTPS spreadsheets are read-only. Document spreadsheets require a writable URI before
+  writes can succeed.
+- Flowchart surfaces are read-only and parsed by The Aive rather than executing browser content.
+- Surface mutations are accepted only for declared writable aliases and are keyed by task
+  run/attempt/index to suppress ordinary reconciliation replay.
