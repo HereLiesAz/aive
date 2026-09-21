@@ -5,6 +5,8 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
@@ -29,6 +31,7 @@ data class GitHubWorkflowDispatchRequest(
     val repository: RepositoryRef,
     val workflow: String,
     val ref: String,
+    val inputs: Map<String, String> = emptyMap(),
 )
 
 data class GitHubWorkflowArtifact(
@@ -88,6 +91,7 @@ class GitHubRestActionsClient(
                 json.encodeToString(
                     DispatchBody(
                         ref = request.ref,
+                        inputs = request.inputs,
                         returnRunDetails = true,
                     ),
                 ),
@@ -204,6 +208,7 @@ class GitHubRestActionsClient(
     @Serializable
     private data class DispatchBody(
         val ref: String,
+        val inputs: Map<String, String> = emptyMap(),
         @SerialName("return_run_details") val returnRunDetails: Boolean,
     )
 
@@ -260,19 +265,58 @@ class GitHubRestActionsClient(
 
 class GitHubActionsExecutorIntegration(
     private val client: GitHubActionsClient,
+    private val json: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true },
 ) : TaskExecutorIntegration {
-    override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.GitHubAction
+    override fun supports(executor: TaskExecutor): Boolean = when (executor) {
+        is TaskExecutor.GitHubAction -> true
+        is TaskExecutor.Script -> executor.runner is ScriptRunner.GitHubActions
+        else -> false
+    }
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
-        val executor = context.executor as TaskExecutor.GitHubAction
         val repository = requireGitHubRepository(context)
-        val ref = executor.ref ?: repository.defaultBranch
-        require(!ref.isNullOrBlank()) {
-            "GitHub Action executor requires an explicit ref or repository default branch"
+        val envelope = json.encodeToString(AiveTaskEnvelope.serializer(), context.toAiveTaskEnvelope())
+        val request = when (val executor = context.executor) {
+            is TaskExecutor.GitHubAction -> {
+                val ref = executor.ref ?: repository.defaultBranch
+                require(!ref.isNullOrBlank()) {
+                    "GitHub Action executor requires an explicit ref or repository default branch"
+                }
+                val inputs = executor.inputs.toMutableMap()
+                executor.contextInput
+                    ?.trim()
+                    ?.takeIf(String::isNotEmpty)
+                    ?.let { inputs[it] = envelope }
+                GitHubWorkflowDispatchRequest(repository, executor.workflow, ref, inputs)
+            }
+            is TaskExecutor.Script -> {
+                val runner = executor.runner as? ScriptRunner.GitHubActions
+                    ?: error("Script executor is not configured for GitHub Actions")
+                val ref = runner.ref ?: repository.defaultBranch
+                require(!ref.isNullOrBlank()) {
+                    "GitHub script runner requires an explicit ref or repository default branch"
+                }
+                require(runner.workflow.isNotBlank()) { "GitHub script runner workflow is required" }
+                require(executor.source.length <= MAX_SCRIPT_INPUT_CHARS) {
+                    "Inline script exceeds GitHub workflow input limit; keep it under $MAX_SCRIPT_INPUT_CHARS characters"
+                }
+                GitHubWorkflowDispatchRequest(
+                    repository = repository,
+                    workflow = runner.workflow,
+                    ref = ref,
+                    inputs = mapOf(
+                        runner.contextInput to envelope,
+                        runner.scriptInput to executor.source,
+                        runner.languageInput to when (executor.language) {
+                            ScriptLanguage.JavaScript -> "javascript"
+                            ScriptLanguage.Python -> "python"
+                        },
+                    ),
+                )
+            }
+            else -> error("Unsupported GitHub executor")
         }
-        return client.dispatch(
-            GitHubWorkflowDispatchRequest(repository, executor.workflow, ref),
-        ).toExecution(context)
+        return client.dispatch(request).toExecution(context)
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
@@ -331,4 +375,8 @@ class GitHubActionsExecutorIntegration(
             progressMessage = stepMessage,
         )
     }
+    private companion object {
+        const val MAX_SCRIPT_INPUT_CHARS = 50_000
+    }
+
 }
