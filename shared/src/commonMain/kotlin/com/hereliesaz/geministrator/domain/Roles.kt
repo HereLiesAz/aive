@@ -33,6 +33,54 @@ enum class RoleAuthority {
 }
 
 @Serializable
+enum class ScriptLanguage {
+    JavaScript,
+    Python,
+}
+
+@Serializable
+sealed interface ScriptRunner {
+    @Serializable
+    data object LocalSandbox : ScriptRunner
+
+    @Serializable
+    data class GitHubActions(
+        val workflow: String,
+        val ref: String? = null,
+        val contextInput: String = "aive_context",
+        val scriptInput: String = "aive_script",
+        val languageInput: String = "aive_language",
+    ) : ScriptRunner
+}
+
+@Serializable
+sealed interface RoleExecutionSource {
+    @Serializable
+    data object Agent : RoleExecutionSource
+
+    @Serializable
+    data class GitHubAction(
+        val workflow: String,
+        val ref: String? = null,
+        val contextInput: String = "aive_context",
+    ) : RoleExecutionSource
+
+    @Serializable
+    data class Script(
+        val language: ScriptLanguage,
+        val source: String,
+        val runner: ScriptRunner,
+    ) : RoleExecutionSource {
+        init {
+            require(source.isNotBlank()) { "Role script source must not be blank" }
+            require(language == ScriptLanguage.JavaScript || runner !is ScriptRunner.LocalSandbox) {
+                "Only JavaScript can use the local sandbox; Python requires a remote runner"
+            }
+        }
+    }
+}
+
+@Serializable
 data class RoleDefinition(
     val id: RoleDefinitionId,
     val name: String,
@@ -40,6 +88,7 @@ data class RoleDefinition(
     val instructions: String,
     val enabled: Boolean = true,
     val preferredProviderId: AgentProviderId? = null,
+    val executionSource: RoleExecutionSource = RoleExecutionSource.Agent,
     val capabilitiesRequired: Set<AgentCapability> = emptySet(),
     val authorities: Set<RoleAuthority> = emptySet(),
 )
