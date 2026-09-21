@@ -32,9 +32,12 @@ internal fun NodeMascotSurface(
     motionPhase: Float,
     modifier: Modifier = Modifier,
 ) {
+    val character = MascotCharacterCatalog.forRole(roleLabel)
+    val anatomyTemplate = character?.anatomyTemplate ?: classifyNodeCreatureRole(roleLabel)
     Canvas(modifier) {
         drawNodeMascot(
-            role = classifyNodeCreatureRole(roleLabel),
+            role = anatomyTemplate,
+            character = character,
             hueSeed = hueSeed,
             state = state,
             phase = motionPhase,
@@ -76,9 +79,42 @@ private data class MascotSpec(
     val accessory: MascotAccessory,
     val angular: Boolean = false,
     val radial: Boolean = false,
+    val headScaleX: Float = 1f,
+    val headScaleY: Float = 1f,
+    val segmentScale: Float = 1f,
+    val emblemVariant: Int = -1,
 )
 
-private fun mascotSpec(role: NodeCreatureRoleKind, hueSeed: String): MascotSpec = when (role) {
+private data class MascotPalette(
+    val body: Color,
+    val dark: Color,
+)
+
+private val azphaltCharacterPalettes = listOf(
+    MascotPalette(Color(0xFFE75A7C), Color(0xFF6E263D)),
+    MascotPalette(Color(0xFFEF8354), Color(0xFF6B351F)),
+    MascotPalette(Color(0xFFF2C14E), Color(0xFF6B531B)),
+    MascotPalette(Color(0xFF8BC34A), Color(0xFF355A1C)),
+    MascotPalette(Color(0xFF42B883), Color(0xFF1C5B42)),
+    MascotPalette(Color(0xFF2EC4B6), Color(0xFF175E59)),
+    MascotPalette(Color(0xFF39A9DB), Color(0xFF1B4F6A)),
+    MascotPalette(Color(0xFF4E7AEF), Color(0xFF253E7B)),
+    MascotPalette(Color(0xFF6C63D9), Color(0xFF3A3478)),
+    MascotPalette(Color(0xFF9B6BD9), Color(0xFF533979)),
+    MascotPalette(Color(0xFFC65FD4), Color(0xFF6A3272)),
+    MascotPalette(Color(0xFFF06EA9), Color(0xFF763755)),
+    MascotPalette(Color(0xFF9A7B5B), Color(0xFF4E3A29)),
+    MascotPalette(Color(0xFF7B8794), Color(0xFF39414A)),
+    MascotPalette(Color(0xFF4FAF6F), Color(0xFF245636)),
+    MascotPalette(Color(0xFFE65F4D), Color(0xFF6C2C25)),
+)
+
+private fun mascotSpec(
+    role: NodeCreatureRoleKind,
+    hueSeed: String,
+    character: MascotCharacterIdentity?,
+): MascotSpec {
+    val base = when (role) {
     NodeCreatureRoleKind.Orchestrator -> MascotSpec(
         body = Color(0xFFFFB91F),
         dark = Color(0xFF111827),
@@ -205,15 +241,49 @@ private fun mascotSpec(role: NodeCreatureRoleKind, hueSeed: String): MascotSpec 
         accessory = MascotAccessory.None,
         radial = true,
     )
+    }
+    if (character == null) return base
+
+    // Every explicit Store persona receives its own phenotype. We deliberately do not vary tendril
+    // count here: tendrils are workflow topology, not decorative identity.
+    val phenotype = character.phenotypeIndex
+    val palette = azphaltCharacterPalettes[phenotype % azphaltCharacterPalettes.size]
+    val headProfile = (phenotype / azphaltCharacterPalettes.size) % 4
+    val bodyProfile = (phenotype / (azphaltCharacterPalettes.size * 4)) % 3
+    val headScaleX = when (headProfile) {
+        0 -> 0.88f
+        1 -> 0.96f
+        2 -> 1.04f
+        else -> 1.12f
+    }
+    val headScaleY = when (bodyProfile) {
+        0 -> 0.92f
+        1 -> 1.00f
+        else -> 1.10f
+    }
+    val segmentScale = when ((phenotype / 7) % 3) {
+        0 -> 0.88f
+        1 -> 1.00f
+        else -> 1.12f
+    }
+    return base.copy(
+        body = palette.body,
+        dark = palette.dark,
+        headScaleX = headScaleX,
+        headScaleY = headScaleY,
+        segmentScale = segmentScale,
+        emblemVariant = phenotype % 8,
+    )
 }
 
 private fun DrawScope.drawNodeMascot(
     role: NodeCreatureRoleKind,
+    character: MascotCharacterIdentity?,
     hueSeed: String,
     state: H2g2WorkflowState,
     phase: Float,
 ) {
-    val spec = mascotSpec(role, hueSeed)
+    val spec = mascotSpec(role, hueSeed, character)
     val side = min(size.width, size.height)
     val unit = side / 200f
     val left = (size.width - side) * 0.5f
@@ -459,17 +529,40 @@ private fun DrawScope.drawMascotBody(
         drawPath(thorn, spec.body)
     }
 
-    drawCircle(spec.body, 34f * unit, head)
-    drawCircle(
+    val headSize = Size(
+        width = 68f * spec.headScaleX * unit,
+        height = 68f * spec.headScaleY * unit,
+    )
+    drawOval(
+        color = spec.body,
+        topLeft = head - Offset(headSize.width * 0.5f, headSize.height * 0.5f),
+        size = headSize,
+    )
+    val highlightSize = Size(
+        width = 52f * spec.headScaleX * unit,
+        height = 52f * spec.headScaleY * unit,
+    )
+    drawOval(
         color = Color.White.copy(alpha = 0.12f),
-        radius = 26f * unit,
-        center = head - Offset(6f * unit, 8f * unit),
+        topLeft = head - Offset(
+            highlightSize.width * 0.5f + 6f * unit,
+            highlightSize.height * 0.5f + 8f * unit,
+        ),
+        size = highlightSize,
     )
 
     val segmentColor = spec.body
-    drawCircle(segmentColor, 11f * unit, rigPoint(MascotPuppetRig.TorsoUpper, 100f, 120f))
-    drawCircle(segmentColor.copy(alpha = 0.94f), 9f * unit, rigPoint(MascotPuppetRig.TorsoMid, 100f, 139f))
-    drawCircle(segmentColor.copy(alpha = 0.88f), 7f * unit, rigPoint(MascotPuppetRig.Pelvis, 100f, 155f))
+    drawCircle(segmentColor, 11f * spec.segmentScale * unit, rigPoint(MascotPuppetRig.TorsoUpper, 100f, 120f))
+    drawCircle(segmentColor.copy(alpha = 0.94f), 9f * spec.segmentScale * unit, rigPoint(MascotPuppetRig.TorsoMid, 100f, 139f))
+    drawCircle(segmentColor.copy(alpha = 0.88f), 7f * spec.segmentScale * unit, rigPoint(MascotPuppetRig.Pelvis, 100f, 155f))
+    if (spec.emblemVariant >= 0) {
+        drawMascotEmblem(
+            center = rigPoint(MascotPuppetRig.TorsoUpper, 100f, 120f),
+            unit = unit,
+            dark = spec.dark,
+            variant = spec.emblemVariant,
+        )
+    }
 
     drawMascotLeg(point, unit, spec, left = true, puppet = puppet)
     drawMascotLeg(point, unit, spec, left = false, puppet = puppet)
@@ -487,6 +580,54 @@ private fun DrawScope.drawMascotBody(
             close()
         }
         drawPath(cape, Color(0xFF7C57CC).copy(alpha = 0.88f))
+    }
+}
+
+private fun DrawScope.drawMascotEmblem(
+    center: Offset,
+    unit: Float,
+    dark: Color,
+    variant: Int,
+) {
+    when (variant % 8) {
+        0 -> drawCircle(dark.copy(alpha = 0.72f), 2.2f * unit, center)
+        1 -> drawRect(
+            dark.copy(alpha = 0.72f),
+            topLeft = center - Offset(2.2f * unit, 2.2f * unit),
+            size = Size(4.4f * unit, 4.4f * unit),
+        )
+        2 -> drawCircle(dark.copy(alpha = 0.72f), 3f * unit, center, style = Stroke(1.2f * unit))
+        3 -> {
+            drawLine(dark.copy(alpha = 0.72f), center - Offset(3f * unit, 0f), center + Offset(3f * unit, 0f), 1.2f * unit)
+            drawLine(dark.copy(alpha = 0.72f), center - Offset(0f, 3f * unit), center + Offset(0f, 3f * unit), 1.2f * unit)
+        }
+        4 -> {
+            val p = Path().apply {
+                moveTo(center.x, center.y - 3.5f * unit)
+                lineTo(center.x + 3.5f * unit, center.y)
+                lineTo(center.x, center.y + 3.5f * unit)
+                lineTo(center.x - 3.5f * unit, center.y)
+                close()
+            }
+            drawPath(p, dark.copy(alpha = 0.72f))
+        }
+        5 -> {
+            drawLine(dark.copy(alpha = 0.72f), center - Offset(3f * unit, 2f * unit), center + Offset(3f * unit, 2f * unit), 1.4f * unit)
+            drawLine(dark.copy(alpha = 0.72f), center - Offset(3f * unit, -2f * unit), center + Offset(3f * unit, -2f * unit), 1.4f * unit)
+        }
+        6 -> {
+            val p = Path().apply {
+                moveTo(center.x, center.y - 3.6f * unit)
+                lineTo(center.x + 3.2f * unit, center.y + 2.8f * unit)
+                lineTo(center.x - 3.2f * unit, center.y + 2.8f * unit)
+                close()
+            }
+            drawPath(p, dark.copy(alpha = 0.72f))
+        }
+        else -> {
+            drawCircle(dark.copy(alpha = 0.72f), 3.2f * unit, center, style = Stroke(1.1f * unit))
+            drawCircle(dark.copy(alpha = 0.72f), 1.1f * unit, center)
+        }
     }
 }
 
