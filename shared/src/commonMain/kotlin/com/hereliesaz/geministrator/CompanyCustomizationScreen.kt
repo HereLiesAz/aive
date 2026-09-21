@@ -413,6 +413,77 @@ internal fun CustomCompanyProviderScreen(
                 )
             }
 
+            CompanySectionLabel("Attached surfaces")
+            Text(
+                "Attach data and visual logic without changing how the role executes. Scripts and GitHub Actions receive resolved surfaces in aive.surfaces.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = "Add spreadsheet",
+                    seed = "role-surface-add-spreadsheet",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Spreadsheet(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "sheet"),
+                            source = SpreadsheetSource.AppFile("role-data.csv"),
+                            format = SpreadsheetFormat.Csv,
+                            firstRowHeaders = true,
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add SQL database",
+                    seed = "role-surface-add-sql",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Sql(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "db"),
+                            source = SqlDatabaseSource.AppDatabase("role-data.db"),
+                            query = "SELECT name, type FROM sqlite_master ORDER BY name",
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add flowchart",
+                    seed = "role-surface-add-flowchart",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Flowchart(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "flow"),
+                            language = FlowchartLanguage.Mermaid,
+                            source = "flowchart TD\n    A[Start] --> B[Done]",
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            roleSurfacesDraft.forEachIndexed { surfaceIndex, surface ->
+                CompanyRoleSurfaceEditor(
+                    surface = surface,
+                    index = surfaceIndex,
+                    onChange = { updated ->
+                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                            it[surfaceIndex] = updated
+                        }
+                    },
+                    onRemove = {
+                        roleSurfacesDraft = roleSurfacesDraft.filterIndexed { index, _ ->
+                            index != surfaceIndex
+                        }
+                    },
+                )
+            }
+            if (!roleSurfacesDraft.isConfiguredRoleSurfaces()) {
+                Text(
+                    "Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            }
+
             CompanySectionLabel("Required capabilities")
             AgentCapability.entries.forEach { capability ->
                 AzphaltPill(
