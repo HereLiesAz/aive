@@ -58,15 +58,21 @@ internal object AndroidXlsxCodec {
     }
 
     private fun unzip(bytes: ByteArray): Map<String, ByteArray> = buildMap {
+        var totalBytes = 0L
+        var entryCount = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (!entry.isDirectory) {
+                    entryCount += 1
+                    require(entryCount <= MAX_ENTRY_COUNT) { "XLSX contains too many archive entries" }
                     require(entry.size < 0 || entry.size <= MAX_ENTRY_BYTES) {
                         "XLSX entry ${entry.name} is too large"
                     }
                     val data = zip.readBytes()
                     require(data.size <= MAX_ENTRY_BYTES) { "XLSX entry ${entry.name} is too large" }
+                    totalBytes += data.size
+                    require(totalBytes <= MAX_UNCOMPRESSED_BYTES) { "XLSX expands beyond the allowed size" }
                     put(entry.name, data)
                 }
                 zip.closeEntry()
@@ -283,4 +289,6 @@ internal object AndroidXlsxCodec {
 
     private const val MAX_XLSX_BYTES = 20 * 1024 * 1024
     private const val MAX_ENTRY_BYTES = 12 * 1024 * 1024
+    private const val MAX_UNCOMPRESSED_BYTES = 40L * 1024L * 1024L
+    private const val MAX_ENTRY_COUNT = 128
 }
