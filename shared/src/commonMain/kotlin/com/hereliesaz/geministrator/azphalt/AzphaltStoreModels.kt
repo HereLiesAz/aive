@@ -63,6 +63,23 @@ data class AzphaltPackageSummary(
     val descriptionLocalized: Map<String, String> = emptyMap(),
 )
 
+
+private val AZPHALT_MODEL_ASSET_TYPES: Set<String> = setOf(
+    "tflite",
+    "litert",
+    "onnx",
+    "sherpa-bundle",
+    "model",
+    "task",
+    "vosk-bundle",
+)
+
+internal fun AzphaltPackageSummary.isModelAssetPackage(): Boolean =
+    kind == "asset" && (
+        mediaDomains.any { it.equals("model", ignoreCase = true) } ||
+            types.any { type -> AZPHALT_MODEL_ASSET_TYPES.any { it.equals(type, ignoreCase = true) } }
+        )
+
 @Serializable
 data class AzphaltPreview(
     val image: String? = null,
