@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.workflow.toAiveTaskEnvelope
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 internal class AndroidJavaScriptExecutorIntegration(
