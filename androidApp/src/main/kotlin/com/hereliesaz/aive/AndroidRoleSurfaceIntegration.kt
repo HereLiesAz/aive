@@ -27,6 +27,7 @@ internal class AndroidRoleSurfaceIntegration(
 ) : RoleSurfaceIntegration {
     private val appContext = context.applicationContext
     private val spreadsheetRoot = File(appContext.filesDir, "role-surfaces/spreadsheets")
+    private val mutationPrefs = appContext.getSharedPreferences("aive_role_surface_mutations", Context.MODE_PRIVATE)
 
     override fun supports(surface: RoleSurface): Boolean =
         surface is RoleSurface.Spreadsheet || surface is RoleSurface.Sql
@@ -40,12 +41,17 @@ internal class AndroidRoleSurfaceIntegration(
     override suspend fun apply(
         surface: RoleSurface,
         mutation: AiveSurfaceMutation,
+        mutationKey: String,
     ) {
         require(surface.writableSurface()) { "Surface ${surface.alias} is read-only" }
+        if (mutationPrefs.getBoolean(mutationKey, false)) return
         when (surface) {
             is RoleSurface.Spreadsheet -> applySpreadsheet(surface, mutation)
             is RoleSurface.Sql -> applySql(surface, mutation)
             is RoleSurface.Flowchart -> error("Flowchart surfaces are read-only")
+        }
+        check(mutationPrefs.edit().putBoolean(mutationKey, true).commit()) {
+            "Surface mutation was applied but replay marker could not be persisted"
         }
     }
 
