@@ -26,8 +26,10 @@ import com.hereliesaz.geministrator.azphalt.AzphaltDependencyStatus
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
+import com.hereliesaz.geministrator.azphalt.AzphaltPreparedModelInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
+import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
 import kotlinx.coroutines.delay
@@ -60,6 +62,7 @@ internal fun AzphaltStoreScreen(
     var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
     val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
+    var preparedModel by remember { mutableStateOf<AzphaltPreparedModelInstall?>(null) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
     var allowPublisherChange by remember { mutableStateOf(false) }
@@ -161,7 +164,8 @@ internal fun AzphaltStoreScreen(
                 seed = "azphalt-refresh",
                 onClick = { if (!loading) refreshGeneration += 1 },
             )
-            snapshot?.installed?.size?.let { count ->
+            snapshot?.let { loaded ->
+                val count = loaded.installed.size + loaded.installedModels.size
                 Text("$count installed", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
@@ -210,15 +214,20 @@ internal fun AzphaltStoreScreen(
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
+        val installedModelsById = snapshot?.installedModels.orEmpty().associateBy(InstalledAzphaltModelPackage::packageId)
         val updatesById = snapshot?.updates.orEmpty().associateBy { it.id }
         val revoked = snapshot?.revocations.orEmpty().map { it.id to it.version }.toSet()
 
         visiblePackages.forEach { item ->
             val modelAsset = item.isModelAssetPackage()
             val installed = installedById[item.id]
+            val installedModel = installedModelsById[item.id]
             val update = updatesById[item.id]
             val selected = selectedPackageId == item.id
-            val isRevoked = (item.id to item.latest) in revoked || (installed != null && (item.id to installed.version) in revoked)
+            val isRevoked =
+                (item.id to item.latest) in revoked ||
+                    (installed != null && (item.id to installed.version) in revoked) ||
+                    (installedModel != null && (item.id to installedModel.version) in revoked)
             AzphaltRecord(
                 seed = "azphalt-package-${item.id}",
                 eyebrow = if (modelAsset) {
@@ -236,6 +245,7 @@ internal fun AzphaltStoreScreen(
                     isRevoked -> "Revoked"
                     update?.updateAvailable == true -> "Update ${update.latest ?: item.latest}"
                     installed != null -> "Installed ${installed.version}"
+                    installedModel != null -> "Installed ${installedModel.version}"
                     item.priceStatus != "free" -> item.priceStatus
                     modelAsset -> "Model · ${item.latest}"
                     else -> item.latest
@@ -244,6 +254,7 @@ internal fun AzphaltStoreScreen(
                 onClick = {
                     selectedPackageIdValue = if (selected) "" else item.id
                     prepared = prepared?.takeIf { it.detail.id == item.id }
+                    preparedModel = preparedModel?.takeIf { it.detail.id == item.id }
                     error = null
                     status = null
                 },
