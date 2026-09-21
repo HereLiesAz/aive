@@ -6,6 +6,12 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.ScriptRunner
+import com.hereliesaz.geministrator.domain.RoleSurface
+import com.hereliesaz.geministrator.domain.SpreadsheetSource
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -22,6 +28,12 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import no.synth.kmpzip.io.ByteArrayOutputStream
+import no.synth.kmpzip.zip.ZipEntry
+import no.synth.kmpzip.zip.ZipOutputStream
 
 class GitHubActionsExecutorIntegrationTest {
     @Test
@@ -38,17 +50,168 @@ class GitHubActionsExecutorIntegrationTest {
 
         val execution = integration.dispatch(context)
 
-        assertEquals(
-            GitHubWorkflowDispatchRequest(
-                repository = context.project.repository!!,
-                workflow = "ci.yml",
-                ref = "main",
-            ),
-            client.lastDispatch,
+        val dispatch = assertNotNull(client.lastDispatch)
+        assertEquals(context.project.repository, dispatch.repository)
+        assertEquals("ci.yml", dispatch.workflow)
+        assertEquals("main", dispatch.ref)
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(dispatch.inputs["aive_context"]),
         )
+        assertEquals("Run CI", envelope.taskObjective)
+        assertEquals("Ship", envelope.workflowObjective)
+        assertEquals("Project", envelope.projectName)
         assertEquals(TaskRunStatus.Running, execution.status)
         assertEquals("run-42", execution.externalRunId)
         assertEquals("queued", execution.progressMessage)
+    }
+
+    @Test
+    fun pythonScriptRunnerPassesContextScriptAndLanguageInputs() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed', 'output': aive['taskObjective']}",
+            runner = ScriptRunner.GitHubActions(workflow = "aive-script.yml"),
+        )
+        val context = context(executor)
+
+        integration.dispatch(context)
+
+        val inputs = assertNotNull(client.lastDispatch).inputs
+        assertEquals("python", inputs["aive_language"])
+        assertEquals(executor.source, inputs["aive_script"])
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(inputs["aive_context"]),
+        )
+        assertEquals("Run CI", envelope.taskObjective)
+    }
+
+    @Test
+    fun dispatchIncludesResolvedRoleSurfaces() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val surfaceIntegration = RecordingGitHubSurfaceIntegration()
+        val integration = GitHubActionsExecutorIntegration(
+            client = client,
+            surfaceRuntime = RoleSurfaceRuntimeRegistry(listOf(surfaceIntegration)),
+        )
+        val role = RoleDefinition(
+            id = RoleDefinitionId("data-role"),
+            name = "Data role",
+            description = "Uses attached data",
+            instructions = "Read the spreadsheet.",
+            surfaces = listOf(
+                RoleSurface.Spreadsheet(
+                    alias = "customers",
+                    source = SpreadsheetSource.AppFile("customers.csv"),
+                    writable = true,
+                ),
+                RoleSurface.Flowchart(
+                    alias = "process",
+                    source = "flowchart TD\nA[Load] --> B[Transform]",
+                ),
+            ),
+        )
+        val context = context(TaskExecutor.GitHubAction("role.yml")).copy(role = role)
+
+        integration.dispatch(context)
+
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(assertNotNull(client.lastDispatch).inputs["aive_context"]),
+        )
+        assertEquals(listOf("customers", "process"), envelope.surfaces.map { it.alias })
+        assertEquals("Ada", envelope.surfaces.first().table?.rows?.single()?.get("name"))
+        assertEquals(2, assertNotNull(envelope.surfaces[1].flowchart).nodes.size)
+    }
+
+    @Test
+    fun completedActionsResultAppliesSurfaceMutations() = runBlocking {
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed'}",
+            runner = ScriptRunner.GitHubActions(workflow = "runner.yml"),
+        )
+        val role = RoleDefinition(
+            id = RoleDefinitionId("data-role"),
+            name = "Data role",
+            description = "Writes attached data",
+            instructions = "Append one row.",
+            surfaces = listOf(
+                RoleSurface.Spreadsheet(
+                    alias = "customers",
+                    source = SpreadsheetSource.AppFile("customers.csv"),
+                    writable = true,
+                ),
+            ),
+        )
+        val client = FakeGitHubActionsClient(
+            reconciledRun = GitHubWorkflowRun(
+                id = "run-42",
+                status = GitHubWorkflowRunStatus.Completed,
+                artifacts = listOf(
+                    GitHubWorkflowArtifact(
+                        id = "result",
+                        name = "aive-result",
+                        archiveDownloadUrl = "https://example.invalid/result",
+                    ),
+                ),
+            ),
+            artifactBytes = resultArchive(
+                """{"status":"completed","surfaceMutations":[{"alias":"customers","operation":"AppendRows","rows":[{"name":"Grace"}]}]}""",
+            ),
+        )
+        val surfaceIntegration = RecordingGitHubSurfaceIntegration()
+        val integration = GitHubActionsExecutorIntegration(
+            client = client,
+            surfaceRuntime = RoleSurfaceRuntimeRegistry(listOf(surfaceIntegration)),
+        )
+        val base = context(executor)
+        val running = base.copy(
+            role = role,
+            taskRun = base.taskRun.copy(
+                status = TaskRunStatus.Running,
+                externalRunId = "run-42",
+            ),
+        )
+
+        val execution = integration.reconcile(running)
+
+        assertEquals(TaskRunStatus.Completed, execution.status)
+        assertEquals("customers", surfaceIntegration.lastMutation?.alias)
+        assertEquals(AiveSurfaceMutationOperation.AppendRows, surfaceIntegration.lastMutation?.operation)
+        assertEquals("github:task-run:1:0", surfaceIntegration.lastMutationKey)
+    }
+
+    @Test
+    fun executorEnvelopeHonorsWorkflowRedactionPolicy() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val base = context(executor)
+        val role = RoleDefinition(
+            id = RoleDefinitionId("scripted-role"),
+            name = "Scripted role",
+            description = "Runs external automation",
+            instructions = "SECRET ROLE INSTRUCTIONS",
+        )
+        val redacted = base.copy(
+            role = role,
+            definition = base.definition.copy(
+                payloadRedactionPolicy = com.hereliesaz.geministrator.domain.PayloadRedactionPolicy(
+                    redactObjective = true,
+                    redactRoleInstructions = true,
+                ),
+            ),
+        )
+
+        integration.dispatch(redacted)
+
+        val envelope = Json.decodeFromString<AiveTaskEnvelope>(
+            assertNotNull(assertNotNull(client.lastDispatch).inputs["aive_context"]),
+        )
+        assertEquals("[REDACTED]", envelope.taskObjective)
+        assertEquals("[REDACTED]", assertNotNull(envelope.role).instructions)
+        assertTrue(envelope.acceptanceCriteria.isEmpty())
     }
 
     @Test
@@ -111,6 +274,49 @@ class GitHubActionsExecutorIntegrationTest {
         assertEquals(ArtifactKind.CommandOutput, artifact.kind)
         assertEquals("test-results", artifact.label)
         assertEquals("https://example.invalid/artifact", artifact.uri)
+    }
+
+    @Test
+    fun completedScriptRunImportsStructuredAiveResult() = runBlocking {
+        val executor = TaskExecutor.Script(
+            language = ScriptLanguage.Python,
+            source = "result = {'status': 'completed'}",
+            runner = ScriptRunner.GitHubActions(workflow = "aive-script.yml"),
+        )
+        val base = context(executor)
+        val client = FakeGitHubActionsClient(
+            reconciledRun = GitHubWorkflowRun(
+                id = "run-42",
+                status = GitHubWorkflowRunStatus.Completed,
+                artifacts = listOf(
+                    GitHubWorkflowArtifact(
+                        id = "artifact-result",
+                        name = "aive-result",
+                        archiveDownloadUrl = "https://example.invalid/result",
+                    ),
+                ),
+            ),
+            artifactBytes = resultArchive(
+                """{"status":"completed","message":"done","output":"script value","artifacts":[{"label":"analysis","kind":"Research","textContent":"evidence","mediaType":"text/plain"}]}""",
+            ),
+        )
+        val integration = GitHubActionsExecutorIntegration(client)
+        val context = base.copy(
+            taskRun = base.taskRun.copy(
+                status = TaskRunStatus.Running,
+                externalRunId = "run-42",
+            ),
+        )
+
+        val execution = integration.reconcile(context)
+
+        assertEquals(TaskRunStatus.Completed, execution.status)
+        assertEquals("done", execution.progressMessage)
+        assertEquals(2, execution.artifacts.size)
+        assertEquals(ArtifactKind.Research, execution.artifacts[0].kind)
+        assertEquals("evidence", execution.artifacts[0].textContent)
+        assertEquals("script value", execution.artifacts[1].textContent)
+        assertEquals("artifact-result", client.lastArtifactId)
     }
 
     @Test
@@ -177,7 +383,7 @@ class GitHubActionsExecutorIntegrationTest {
         assertEquals("Test: Unit tests (2/3)", execution.progressMessage)
     }
 
-    private fun context(executor: TaskExecutor.GitHubAction): TaskExecutorContext {
+    private fun context(executor: TaskExecutor): TaskExecutorContext {
         val taskId = TaskDefinitionId("ci")
         val repository = RepositoryRef("HereLiesAz", "haive", defaultBranch = "main")
         val project = Project(
@@ -221,13 +427,42 @@ class GitHubActionsExecutorIntegrationTest {
     }
 }
 
+private class RecordingGitHubSurfaceIntegration : RoleSurfaceIntegration {
+    var lastMutation: AiveSurfaceMutation? = null
+    var lastMutationKey: String? = null
+
+    override fun supports(surface: RoleSurface): Boolean = surface is RoleSurface.Spreadsheet
+
+    override suspend fun resolve(surface: RoleSurface): AiveRoleSurfaceEnvelope =
+        AiveRoleSurfaceEnvelope(
+            alias = surface.alias,
+            kind = "spreadsheet",
+            writable = true,
+            table = AiveSurfaceTable(
+                columns = listOf("name"),
+                rows = listOf(mapOf("name" to "Ada")),
+            ),
+        )
+
+    override suspend fun apply(
+        surface: RoleSurface,
+        mutation: AiveSurfaceMutation,
+        mutationKey: String,
+    ) {
+        lastMutation = mutation
+        lastMutationKey = mutationKey
+    }
+}
+
 private class FakeGitHubActionsClient(
     private val dispatchedRun: GitHubWorkflowRun = GitHubWorkflowRun("run", GitHubWorkflowRunStatus.Queued),
     private val reconciledRun: GitHubWorkflowRun = GitHubWorkflowRun("run", GitHubWorkflowRunStatus.Running),
+    private val artifactBytes: ByteArray = ByteArray(0),
 ) : GitHubActionsClient {
     var lastDispatch: GitHubWorkflowDispatchRequest? = null
     var lastRepository: RepositoryRef? = null
     var lastRunId: String? = null
+    var lastArtifactId: String? = null
 
     override suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun {
         lastDispatch = request
@@ -239,4 +474,20 @@ private class FakeGitHubActionsClient(
         lastRunId = runId
         return reconciledRun
     }
+
+    override suspend fun downloadArtifact(repository: RepositoryRef, artifactId: String): ByteArray {
+        lastRepository = repository
+        lastArtifactId = artifactId
+        return artifactBytes
+    }
+}
+
+private fun resultArchive(json: String): ByteArray {
+    val output = ByteArrayOutputStream()
+    ZipOutputStream(output).use { zip ->
+        zip.putNextEntry(ZipEntry("aive-result.json"))
+        zip.write(json.encodeToByteArray())
+        zip.closeEntry()
+    }
+    return output.toByteArray()
 }

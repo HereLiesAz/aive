@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,10 +27,20 @@ import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.FlowchartLanguage
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.RoleSurface
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.SpreadsheetFormat
+import com.hereliesaz.geministrator.domain.SpreadsheetSource
+import com.hereliesaz.geministrator.domain.SqlDatabaseSource
+import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CustomCompanyProviderScreen(
@@ -37,6 +48,7 @@ internal fun CustomCompanyProviderScreen(
     connectedProviderIds: Set<String> = emptySet(),
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     onResetRoleCollection: () -> Unit = {},
+    roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -59,6 +71,16 @@ internal fun CustomCompanyProviderScreen(
     var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
     var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
+    var roleExecutionSourceDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_EXECUTION_SOURCE_KEY,
+        serializer = RoleExecutionSource.serializer(),
+        initialValue = RoleExecutionSource.Agent,
+    )
+    var roleSurfacesDraft by rememberDurableJsonState(
+        key = COMPANY_ROLE_SURFACES_KEY,
+        serializer = ListSerializer(RoleSurface.serializer()),
+        initialValue = emptyList(),
+    )
     var roleCapabilitiesDraft by rememberDurableJsonState(
         key = COMPANY_ROLE_CAPABILITIES_KEY,
         serializer = SetSerializer(AgentCapability.serializer()),
@@ -70,6 +92,7 @@ internal fun CustomCompanyProviderScreen(
         initialValue = emptySet(),
     )
     var resetConfirm by remember { mutableStateOf(false) }
+    val roleSurfacePickerScope = rememberCoroutineScope()
 
     LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
         if (!showRoleForm && draftRoles == visibleRoles) {
@@ -81,6 +104,8 @@ internal fun CustomCompanyProviderScreen(
             DurableUiState.store.remove(COMPANY_ROLE_DESCRIPTION_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_EXECUTION_SOURCE_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_SURFACES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_CAPABILITIES_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_AUTHORITIES_KEY)
         }
@@ -94,6 +119,8 @@ internal fun CustomCompanyProviderScreen(
         roleDescDraft = ""
         roleInstructionsDraft = ""
         roleProviderDraftValue = ""
+        roleExecutionSourceDraft = RoleExecutionSource.Agent
+        roleSurfacesDraft = emptyList()
         roleCapabilitiesDraft = emptySet()
         roleAuthoritiesDraft = emptySet()
     }
@@ -106,6 +133,8 @@ internal fun CustomCompanyProviderScreen(
         roleDescDraft = role.description
         roleInstructionsDraft = role.instructions
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
+        roleExecutionSourceDraft = role.executionSource
+        roleSurfacesDraft = role.surfaces
         roleCapabilitiesDraft = role.capabilitiesRequired
         roleAuthoritiesDraft = role.authorities
     }
@@ -130,7 +159,7 @@ internal fun CustomCompanyProviderScreen(
     ) {
         Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "These are Aive's semantic orchestration roles. Add, remove, reorder, rewrite, reroute, and redefine them as a collection. Deterministic system workers and repetitive programmatic executors remain fixed outside this roster.",
+            "These are Aive's semantic orchestration roles. Each role can run through an AI provider, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -232,12 +261,266 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            CompanySectionLabel("Provider routing")
-            CompanyProviderChoiceRow(
-                selectedProviderId = roleProviderDraft,
-                connectedProviderIds = connectedProviderIds,
-                onSelected = { roleProviderDraftValue = it.orEmpty() },
+            CompanySectionLabel("Execution source")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = "Agent / provider",
+                    seed = "role-execution-agent",
+                    selected = roleExecutionSourceDraft is RoleExecutionSource.Agent,
+                    onClick = { roleExecutionSourceDraft = RoleExecutionSource.Agent },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "GitHub Actions",
+                    seed = "role-execution-github",
+                    selected = roleExecutionSourceDraft is RoleExecutionSource.GitHubAction,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.GitHubAction
+                        roleExecutionSourceDraft = RoleExecutionSource.GitHubAction(
+                            workflow = current?.workflow.orEmpty(),
+                            ref = current?.ref,
+                            contextInput = current?.contextInput ?: "aive_context",
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "JavaScript",
+                    seed = "role-execution-javascript",
+                    selected = (roleExecutionSourceDraft as? RoleExecutionSource.Script)?.language == ScriptLanguage.JavaScript,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.Script
+                        roleExecutionSourceDraft = RoleExecutionSource.Script(
+                            language = ScriptLanguage.JavaScript,
+                            source = current?.source?.takeIf(String::isNotBlank)
+                                ?: "return { status: 'completed', output: JSON.stringify(aive) };",
+                            runner = if (current?.language == ScriptLanguage.JavaScript) current.runner else ScriptRunner.LocalSandbox,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Python",
+                    seed = "role-execution-python",
+                    selected = (roleExecutionSourceDraft as? RoleExecutionSource.Script)?.language == ScriptLanguage.Python,
+                    onClick = {
+                        val current = roleExecutionSourceDraft as? RoleExecutionSource.Script
+                        roleExecutionSourceDraft = RoleExecutionSource.Script(
+                            language = ScriptLanguage.Python,
+                            source = current?.source?.takeIf(String::isNotBlank)
+                                ?: "result = {'status': 'completed', 'output': str(aive)}",
+                            runner = current?.runner as? ScriptRunner.GitHubActions
+                                ?: ScriptRunner.GitHubActions(workflow = ""),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            when (val source = roleExecutionSourceDraft) {
+                RoleExecutionSource.Agent -> {
+                    Text(
+                        "The role runs as an AI agent. Choose a provider or leave it on Auto.",
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                    CompanyProviderChoiceRow(
+                        selectedProviderId = roleProviderDraft,
+                        connectedProviderIds = connectedProviderIds,
+                        onSelected = { roleProviderDraftValue = it.orEmpty() },
+                    )
+                }
+                is RoleExecutionSource.GitHubAction -> {
+                    CompanyGitHubActionFields(
+                        workflow = source.workflow,
+                        ref = source.ref.orEmpty(),
+                        contextInput = source.contextInput,
+                        onChange = { workflow, ref, contextInput ->
+                            roleExecutionSourceDraft = source.copy(
+                                workflow = workflow,
+                                ref = ref.trim().takeIf(String::isNotEmpty),
+                                contextInput = contextInput.ifBlank { "aive_context" },
+                            )
+                        },
+                    )
+                    Text(
+                        "The workflow receives the role/task payload as JSON in the configured context input.",
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+                is RoleExecutionSource.Script -> {
+                    if (source.language == ScriptLanguage.JavaScript) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AzphaltPill(
+                                label = "Local sandbox",
+                                seed = "role-script-local",
+                                selected = source.runner is ScriptRunner.LocalSandbox,
+                                onClick = { roleExecutionSourceDraft = source.copy(runner = ScriptRunner.LocalSandbox) },
+                            )
+                            AzphaltPill(
+                                label = "GitHub runner",
+                                seed = "role-script-github",
+                                selected = source.runner is ScriptRunner.GitHubActions,
+                                onClick = {
+                                    roleExecutionSourceDraft = source.copy(
+                                        runner = source.runner as? ScriptRunner.GitHubActions
+                                            ?: ScriptRunner.GitHubActions(workflow = ""),
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        Text(
+                            "Python runs through a GitHub Actions runner, using the same Aive task envelope as other execution sources.",
+                            style = AzphaltType.body,
+                            color = Azphalt.currentGround.onPage,
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = source.source,
+                        onValueChange = { roleExecutionSourceDraft = source.copy(source = it) },
+                        label = { Text(if (source.language == ScriptLanguage.JavaScript) "JavaScript" else "Python") },
+                        minLines = 8,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    when (val runner = source.runner) {
+                        ScriptRunner.LocalSandbox -> {
+                            Text(
+                                "Local JavaScript receives a frozen 'aive' object, including aive.surfaces. Return { status, message, output, artifacts, surfaceMutations }.",
+                                style = AzphaltType.body,
+                                color = Azphalt.currentGround.onPage,
+                            )
+                        }
+                        is ScriptRunner.GitHubActions -> {
+                            CompanyGitHubScriptRunnerFields(
+                                runner = runner,
+                                onChange = { updated -> roleExecutionSourceDraft = source.copy(runner = updated) },
+                            )
+                            Text(
+                                "The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.",
+                                style = AzphaltType.body,
+                                color = Azphalt.currentGround.onPage,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (!roleExecutionSourceDraft.isConfiguredExecutionSource()) {
+                Text(
+                    "Complete the execution-source fields before saving this role.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            }
+
+            CompanySectionLabel("Attached surfaces")
+            Text(
+                "Attach data and visual logic without changing how the role executes. Scripts and GitHub Actions receive resolved surfaces in aive.surfaces.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
             )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = "Add spreadsheet",
+                    seed = "role-surface-add-spreadsheet",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Spreadsheet(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "sheet"),
+                            source = SpreadsheetSource.AppFile("role-data.csv"),
+                            format = SpreadsheetFormat.Csv,
+                            firstRowHeaders = true,
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add SQL database",
+                    seed = "role-surface-add-sql",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Sql(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "db"),
+                            source = SqlDatabaseSource.AppDatabase("role-data.db"),
+                            query = "SELECT name, type FROM sqlite_master ORDER BY name",
+                            writable = true,
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = "Add flowchart",
+                    seed = "role-surface-add-flowchart",
+                    onClick = {
+                        roleSurfacesDraft = roleSurfacesDraft + RoleSurface.Flowchart(
+                            alias = nextSurfaceAlias(roleSurfacesDraft, "flow"),
+                            language = FlowchartLanguage.Mermaid,
+                            source = "flowchart TD\n    A[Start] --> B[Done]",
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            roleSurfacesDraft.forEachIndexed { surfaceIndex, surface ->
+                CompanyRoleSurfaceEditor(
+                    surface = surface,
+                    index = surfaceIndex,
+                    onChange = { updated ->
+                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                            it[surfaceIndex] = updated
+                        }
+                    },
+                    onRemove = {
+                        roleSurfacesDraft = roleSurfacesDraft.filterIndexed { index, _ ->
+                            index != surfaceIndex
+                        }
+                    },
+                    onPickSpreadsheet = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSpreadsheet()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Spreadsheet
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SpreadsheetSource.DocumentUri(uri),
+                                                format = SpreadsheetFormat.Auto,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    onPickSqlite = roleSurfaceFilePicker?.let { picker ->
+                        {
+                            roleSurfacePickerScope.launch {
+                                picker.chooseSqliteDatabase()?.let { uri ->
+                                    val current = roleSurfacesDraft.getOrNull(surfaceIndex) as? RoleSurface.Sql
+                                    if (current != null) {
+                                        roleSurfacesDraft = roleSurfacesDraft.toMutableList().also {
+                                            it[surfaceIndex] = current.copy(
+                                                source = SqlDatabaseSource.DocumentUri(uri),
+                                                writable = false,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            if (!roleSurfacesDraft.isConfiguredRoleSurfaces()) {
+                Text(
+                    "Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+            }
 
             CompanySectionLabel("Required capabilities")
             AgentCapability.entries.forEach { capability ->
@@ -279,7 +562,9 @@ internal fun CustomCompanyProviderScreen(
                         if (
                             cleanId.isNotBlank() &&
                             cleanName.isNotBlank() &&
-                            cleanId != ROLE_COLLECTION_MARKER_ID
+                            cleanId != ROLE_COLLECTION_MARKER_ID &&
+                            roleExecutionSourceDraft.isConfiguredExecutionSource() &&
+                            roleSurfacesDraft.isConfiguredRoleSurfaces()
                         ) {
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
@@ -287,7 +572,13 @@ internal fun CustomCompanyProviderScreen(
                                 description = roleDescDraft.trim(),
                                 instructions = roleInstructionsDraft.trim(),
                                 enabled = true,
-                                preferredProviderId = roleProviderDraft?.let(::AgentProviderId),
+                                preferredProviderId = if (roleExecutionSourceDraft is RoleExecutionSource.Agent) {
+                                    roleProviderDraft?.let(::AgentProviderId)
+                                } else {
+                                    null
+                                },
+                                executionSource = roleExecutionSourceDraft,
+                                surfaces = roleSurfacesDraft,
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
                             )
@@ -333,10 +624,15 @@ internal fun CustomCompanyProviderScreen(
                 title = role.name,
                 body = buildString {
                     append(role.description)
-                    append("\nProvider: $providerLabel")
+                    append("\nExecution: ")
+                    append(role.executionSource.companyExecutionLabel(providerLabel))
                     if (role.authorities.isNotEmpty()) {
                         append("\nAuthority: ")
                         append(role.authorities.joinToString { it.name.humanizeEnumName() })
+                    }
+                    if (role.surfaces.isNotEmpty()) {
+                        append("\nSurfaces: ")
+                        append(role.surfaces.joinToString { it.alias })
                     }
                     if (role.capabilitiesRequired.isNotEmpty()) {
                         append("\nRequires: ")
@@ -379,18 +675,26 @@ internal fun CustomCompanyProviderScreen(
                                 },
                             )
                         }
-                        Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
-                        CompanyProviderChoiceRow(
-                            selectedProviderId = assigned,
-                            connectedProviderIds = connectedProviderIds,
-                            onSelected = { selected ->
-                                draftRoles = draftRoles.toMutableList().also { roles ->
-                                    roles[index] = role.copy(
-                                        preferredProviderId = selected?.let(::AgentProviderId),
-                                    )
-                                }
-                            },
-                        )
+                        if (role.executionSource is RoleExecutionSource.Agent) {
+                            Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            CompanyProviderChoiceRow(
+                                selectedProviderId = assigned,
+                                connectedProviderIds = connectedProviderIds,
+                                onSelected = { selected ->
+                                    draftRoles = draftRoles.toMutableList().also { roles ->
+                                        roles[index] = role.copy(
+                                            preferredProviderId = selected?.let(::AgentProviderId),
+                                        )
+                                    }
+                                },
+                            )
+                        } else {
+                            AzphaltNote(
+                                seed = "company-execution-${role.id.value}",
+                                label = "Execution source",
+                                value = role.executionSource.companyExecutionLabel(providerLabel),
+                            )
+                        }
                     }
                 },
             )
@@ -477,6 +781,533 @@ private fun CompanyProviderChoiceRow(
 }
 
 @Composable
+private fun CompanyRoleSurfaceEditor(
+    surface: RoleSurface,
+    index: Int,
+    onChange: (RoleSurface) -> Unit,
+    onRemove: () -> Unit,
+    onPickSpreadsheet: (() -> Unit)?,
+    onPickSqlite: (() -> Unit)?,
+) {
+    AzphaltRecord(
+        seed = "role-surface-$index-${surface.alias}",
+        eyebrow = when (surface) {
+            is RoleSurface.Spreadsheet -> "Spreadsheet"
+            is RoleSurface.Sql -> "SQL database"
+            is RoleSurface.Flowchart -> "Flowchart"
+        },
+        title = surface.alias.ifBlank { "Unnamed surface" },
+        body = when (surface) {
+            is RoleSurface.Spreadsheet ->
+                "Tabular rows available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Sql ->
+                "SQLite query result available to scripts as aive.surfaces['${surface.alias}']."
+            is RoleSurface.Flowchart ->
+                "Mermaid flowchart parsed natively and exposed as nodes and edges."
+        },
+        endCap = when (surface) {
+            is RoleSurface.Spreadsheet -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Sql -> if (surface.writable) "Read / write" else "Read only"
+            is RoleSurface.Flowchart -> "Mermaid"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = surface.alias,
+                    onValueChange = { value ->
+                        when (surface) {
+                            is RoleSurface.Spreadsheet -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Sql -> onChange(surface.copy(alias = value))
+                            is RoleSurface.Flowchart -> onChange(surface.copy(alias = value))
+                        }
+                    },
+                    label = { Text("Surface alias") },
+                    placeholder = { Text("customers") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                when (surface) {
+                    is RoleSurface.Spreadsheet -> CompanySpreadsheetSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSpreadsheet,
+                    )
+                    is RoleSurface.Sql -> CompanySqlSurfaceFields(
+                        surface = surface,
+                        onChange = onChange,
+                        onPickDocument = onPickSqlite,
+                    )
+                    is RoleSurface.Flowchart -> CompanyFlowchartSurfaceFields(surface, onChange)
+                }
+
+                AzphaltPill(
+                    label = "Remove surface",
+                    seed = "role-surface-remove-$index",
+                    onClick = onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CompanySpreadsheetSurfaceFields(
+    surface: RoleSurface.Spreadsheet,
+    onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
+) {
+    CompanySectionLabel("Spreadsheet source")
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        AzphaltPill(
+            label = "App spreadsheet",
+            seed = "sheet-source-app-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.AppFile,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.AppFile("role-data.csv"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Inline CSV / TSV",
+            seed = "sheet-source-inline-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Inline,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.Inline("column_a,column_b\n"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "HTTPS spreadsheet",
+            seed = "sheet-source-https-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.Https,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.Https("https://"),
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Public Google Sheet",
+            seed = "sheet-source-google-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.GoogleSheet,
+            onClick = {
+                onChange(
+                    surface.copy(
+                        source = SpreadsheetSource.GoogleSheet(spreadsheetId = ""),
+                        format = SpreadsheetFormat.Csv,
+                        writable = false,
+                    ),
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            label = "Document URI",
+            seed = "sheet-source-uri-${surface.alias}",
+            selected = surface.source is SpreadsheetSource.DocumentUri,
+            onClick = { onChange(surface.copy(source = SpreadsheetSource.DocumentUri("content://"))) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (onPickDocument != null) {
+            AzphaltPill(
+                label = "Choose spreadsheet…",
+                seed = "sheet-source-picker-${surface.alias}",
+                onClick = onPickDocument,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    when (val source = surface.source) {
+        is SpreadsheetSource.AppFile -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("App spreadsheet file") },
+            placeholder = { Text("customers.csv") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Inline -> OutlinedTextField(
+            value = source.text,
+            onValueChange = { onChange(surface.copy(source = source.copy(text = it))) },
+            label = { Text("Spreadsheet data") },
+            minLines = 6,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.Https -> OutlinedTextField(
+            value = source.url,
+            onValueChange = { onChange(surface.copy(source = source.copy(url = it), writable = false)) },
+            label = { Text("HTTPS CSV / TSV URL") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it))) },
+            label = { Text("Document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SpreadsheetSource.GoogleSheet -> {
+            OutlinedTextField(
+                value = source.spreadsheetId,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(spreadsheetId = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Google Sheets spreadsheet ID") },
+                placeholder = { Text("1AbCdEf...") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = source.gid,
+                onValueChange = {
+                    onChange(
+                        surface.copy(
+                            source = source.copy(gid = it),
+                            format = SpreadsheetFormat.Csv,
+                            writable = false,
+                        ),
+                    )
+                },
+                label = { Text("Sheet GID") },
+                placeholder = { Text("0") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "Public/exportable Google Sheets are fetched as CSV. Private Sheets can still be handled by a script runner with its own credentials.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+        }
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        SpreadsheetFormat.entries.forEach { format ->
+            AzphaltPill(
+                label = format.name,
+                seed = "sheet-format-${surface.alias}-${format.name}",
+                selected = surface.format == format,
+                onClick = { onChange(surface.copy(format = format)) },
+            )
+        }
+    }
+    AzphaltPill(
+        label = "First row is headers",
+        seed = "sheet-headers-${surface.alias}",
+        selected = surface.firstRowHeaders,
+        onClick = { onChange(surface.copy(firstRowHeaders = !surface.firstRowHeaders)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SpreadsheetSource.AppFile ||
+        surface.source is SpreadsheetSource.DocumentUri
+    AzphaltPill(
+        label = if (writableSource) "Allow script writes" else "Read-only source",
+        seed = "sheet-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sheet-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanySqlSurfaceFields(
+    surface: RoleSurface.Sql,
+    onChange: (RoleSurface) -> Unit,
+    onPickDocument: (() -> Unit)?,
+) {
+    CompanySectionLabel("SQL source")
+    AzphaltPill(
+        label = "App SQLite database",
+        seed = "sql-source-app-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.AppDatabase,
+        onClick = { onChange(surface.copy(source = SqlDatabaseSource.AppDatabase("role-data.db"))) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltPill(
+        label = "SQLite document URI",
+        seed = "sql-source-uri-${surface.alias}",
+        selected = surface.source is SqlDatabaseSource.DocumentUri,
+        onClick = {
+            onChange(
+                surface.copy(
+                    source = SqlDatabaseSource.DocumentUri("content://"),
+                    writable = false,
+                ),
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (onPickDocument != null) {
+        AzphaltPill(
+            label = "Choose SQLite database…",
+            seed = "sql-source-picker-${surface.alias}",
+            onClick = onPickDocument,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+
+    when (val source = surface.source) {
+        is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
+            value = source.name,
+            onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
+            label = { Text("SQLite database name") },
+            placeholder = { Text("customers.db") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        is SqlDatabaseSource.DocumentUri -> OutlinedTextField(
+            value = source.uri,
+            onValueChange = { onChange(surface.copy(source = source.copy(uri = it), writable = false)) },
+            label = { Text("SQLite document content URI") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    OutlinedTextField(
+        value = surface.query,
+        onValueChange = { onChange(surface.copy(query = it)) },
+        label = { Text("Read query") },
+        placeholder = { Text("SELECT * FROM customers ORDER BY name") },
+        minLines = 4,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val writableSource = surface.source is SqlDatabaseSource.AppDatabase
+    AzphaltPill(
+        label = if (writableSource) "Allow script SQL mutations" else "Read-only database source",
+        seed = "sql-writable-${surface.alias}",
+        selected = surface.writable && writableSource,
+        onClick = {
+            if (writableSource) onChange(surface.copy(writable = !surface.writable))
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    CompanyMaxRowsField(
+        value = surface.maxRows,
+        seed = "sql-max-rows-${surface.alias}",
+        onChange = { onChange(surface.copy(maxRows = it)) },
+    )
+}
+
+@Composable
+private fun CompanyFlowchartSurfaceFields(
+    surface: RoleSurface.Flowchart,
+    onChange: (RoleSurface) -> Unit,
+) {
+    OutlinedTextField(
+        value = surface.source,
+        onValueChange = { onChange(surface.copy(source = it)) },
+        label = { Text("Mermaid flowchart") },
+        placeholder = { Text("flowchart TD\n    A[Start] --> B[Done]") },
+        minLines = 8,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    val parsed = runCatching { MermaidFlowchartParser.parse(surface.source) }
+    parsed.onSuccess { graph ->
+        MermaidFlowchartPreview(
+            graph = graph,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltNote(
+            seed = "flowchart-parse-${surface.alias}",
+            label = "Native preview",
+            value = buildString {
+                append("${graph.nodes.size} nodes · ${graph.edges.size} edges · ${graph.direction}")
+                if (graph.warnings.isNotEmpty()) {
+                    append("\nWarnings: ")
+                    append(graph.warnings.joinToString("; "))
+                }
+            },
+        )
+    }.onFailure { failure ->
+        Text(
+            failure.message ?: "Flowchart could not be parsed.",
+            style = AzphaltType.body,
+            color = Azphalt.currentGround.onPage,
+        )
+    }
+}
+
+@Composable
+private fun CompanyMaxRowsField(
+    value: Int,
+    seed: String,
+    onChange: (Int) -> Unit,
+) {
+    OutlinedTextField(
+        value = value.toString(),
+        onValueChange = { raw ->
+            raw.toIntOrNull()
+                ?.coerceIn(1, 10_000)
+                ?.let(onChange)
+        },
+        label = { Text("Maximum rows exposed") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AzphaltNote(
+        seed = seed,
+        label = "Envelope limit",
+        value = "1–10,000 rows; larger sources are marked truncated.",
+    )
+}
+
+@Composable
+private fun CompanyGitHubActionFields(
+    workflow: String,
+    ref: String,
+    contextInput: String,
+    onChange: (workflow: String, ref: String, contextInput: String) -> Unit,
+) {
+    OutlinedTextField(
+        value = workflow,
+        onValueChange = { onChange(it, ref, contextInput) },
+        label = { Text("Workflow file or ID") },
+        placeholder = { Text("aive-role.yml") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = ref,
+        onValueChange = { onChange(workflow, it, contextInput) },
+        label = { Text("Ref / branch (optional)") },
+        placeholder = { Text("Uses project default branch") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = contextInput,
+        onValueChange = { onChange(workflow, ref, it) },
+        label = { Text("Aive context input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun CompanyGitHubScriptRunnerFields(
+    runner: ScriptRunner.GitHubActions,
+    onChange: (ScriptRunner.GitHubActions) -> Unit,
+) {
+    CompanyGitHubActionFields(
+        workflow = runner.workflow,
+        ref = runner.ref.orEmpty(),
+        contextInput = runner.contextInput,
+        onChange = { workflow, ref, contextInput ->
+            onChange(
+                runner.copy(
+                    workflow = workflow,
+                    ref = ref.trim().takeIf(String::isNotEmpty),
+                    contextInput = contextInput.ifBlank { "aive_context" },
+                ),
+            )
+        },
+    )
+    OutlinedTextField(
+        value = runner.scriptInput,
+        onValueChange = { onChange(runner.copy(scriptInput = it.ifBlank { "aive_script" })) },
+        label = { Text("Script input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    OutlinedTextField(
+        value = runner.languageInput,
+        onValueChange = { onChange(runner.copy(languageInput = it.ifBlank { "aive_language" })) },
+        label = { Text("Language input") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+private fun List<RoleSurface>.isConfiguredRoleSurfaces(): Boolean {
+    val normalizedAliases = map { it.alias.trim() }
+    if (normalizedAliases.any(String::isBlank)) return false
+    if (normalizedAliases.distinct().size != size) return false
+    return all { surface ->
+        when (surface) {
+            is RoleSurface.Spreadsheet -> {
+                surface.maxRows in 1..10_000 && when (val source = surface.source) {
+                    is SpreadsheetSource.AppFile -> source.name.isNotBlank()
+                    is SpreadsheetSource.Inline -> true
+                    is SpreadsheetSource.DocumentUri -> source.uri.isNotBlank()
+                    is SpreadsheetSource.Https -> source.url.startsWith("https://", ignoreCase = true)
+                    is SpreadsheetSource.GoogleSheet -> source.spreadsheetId.isNotBlank()
+                }
+            }
+            is RoleSurface.Sql -> {
+                surface.maxRows in 1..10_000 &&
+                    surface.query.isNotBlank() &&
+                    when (val source = surface.source) {
+                        is SqlDatabaseSource.AppDatabase -> source.name.isNotBlank()
+                        is SqlDatabaseSource.DocumentUri -> source.uri.isNotBlank()
+                    }
+            }
+            is RoleSurface.Flowchart ->
+                surface.language == FlowchartLanguage.Mermaid &&
+                    runCatching { MermaidFlowchartParser.parse(surface.source) }.isSuccess
+        }
+    }
+}
+
+private fun nextSurfaceAlias(
+    surfaces: List<RoleSurface>,
+    prefix: String,
+): String {
+    val used = surfaces.mapTo(mutableSetOf()) { it.alias }
+    var index = 1
+    while ("$prefix$index" in used) index += 1
+    return "$prefix$index"
+}
+
+private fun RoleExecutionSource.isConfiguredExecutionSource(): Boolean = when (this) {
+    RoleExecutionSource.Agent -> true
+    is RoleExecutionSource.GitHubAction -> workflow.isNotBlank() && contextInput.isNotBlank()
+    is RoleExecutionSource.Script -> when (val selectedRunner = runner) {
+        ScriptRunner.LocalSandbox ->
+            language == ScriptLanguage.JavaScript && source.isNotBlank()
+        is ScriptRunner.GitHubActions ->
+            source.isNotBlank() &&
+                selectedRunner.workflow.isNotBlank() &&
+                selectedRunner.contextInput.isNotBlank() &&
+                selectedRunner.scriptInput.isNotBlank() &&
+                selectedRunner.languageInput.isNotBlank()
+    }
+}
+
+private fun RoleExecutionSource.companyExecutionLabel(providerLabel: String): String = when (this) {
+    RoleExecutionSource.Agent -> "Agent / $providerLabel"
+    is RoleExecutionSource.GitHubAction ->
+        "GitHub Actions / $workflow${ref?.let { " @ $it" } ?: ""}"
+    is RoleExecutionSource.Script -> when (language) {
+        ScriptLanguage.JavaScript -> when (val selectedRunner = runner) {
+            ScriptRunner.LocalSandbox -> "JavaScript / local sandbox"
+            is ScriptRunner.GitHubActions -> "JavaScript / GitHub Actions / ${selectedRunner.workflow}"
+        }
+        ScriptLanguage.Python -> when (val selectedRunner = runner) {
+            ScriptRunner.LocalSandbox -> "Python / unsupported local runner"
+            is ScriptRunner.GitHubActions -> "Python / GitHub Actions / ${selectedRunner.workflow}"
+        }
+    }
+}
+
+@Composable
 private fun CompanySectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
 }
@@ -498,6 +1329,8 @@ private const val COMPANY_ROLE_NAME_KEY = "company.role.name"
 private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
+private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"
+private const val COMPANY_ROLE_SURFACES_KEY = "company.role.surfaces"
 private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
 private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
 

@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import kotlinx.serialization.Serializable
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.inference.InferenceDataDescriptor
 import com.hereliesaz.geministrator.inference.InferenceDataKind
@@ -60,6 +61,129 @@ data class TaskExecutorContext(
     val nowEpochMillis: Long,
     val role: RoleDefinition? = null,
 )
+
+@Serializable
+data class AiveExecutorArtifactEnvelope(
+    val id: String,
+    val kind: String,
+    val label: String,
+    val uri: String? = null,
+    val textContent: String? = null,
+    val mediaType: String? = null,
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class AiveExecutorRoleEnvelope(
+    val id: String,
+    val name: String,
+    val description: String,
+    val instructions: String,
+    val requiredCapabilities: List<String> = emptyList(),
+    val authorities: List<String> = emptyList(),
+)
+
+@Serializable
+data class AiveExecutorRepositoryEnvelope(
+    val source: String,
+    val owner: String,
+    val name: String,
+    val defaultBranch: String? = null,
+    val remoteUrl: String? = null,
+)
+
+@Serializable
+data class AiveScriptArtifactResult(
+    val label: String,
+    val kind: String = "CommandOutput",
+    val uri: String? = null,
+    val textContent: String? = null,
+    val mediaType: String? = null,
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class AiveScriptResult(
+    val status: String = "completed",
+    val message: String? = null,
+    val output: String? = null,
+    val artifacts: List<AiveScriptArtifactResult> = emptyList(),
+    val surfaceMutations: List<AiveSurfaceMutation> = emptyList(),
+)
+
+@Serializable
+data class AiveTaskEnvelope(
+    val version: Int = 1,
+    val projectId: String,
+    val projectName: String,
+    val repository: AiveExecutorRepositoryEnvelope? = null,
+    val workflowDefinitionId: String,
+    val workflowRunId: String,
+    val workflowObjective: String,
+    val taskId: String,
+    val taskRunId: String,
+    val taskName: String,
+    val taskObjective: String,
+    val role: AiveExecutorRoleEnvelope? = null,
+    val acceptanceCriteria: List<String> = emptyList(),
+    val attempt: Int,
+    val dependencyArtifacts: List<AiveExecutorArtifactEnvelope> = emptyList(),
+    val surfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
+)
+
+fun TaskExecutorContext.toAiveTaskEnvelope(
+    resolvedSurfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
+): AiveTaskEnvelope {
+    val redaction = definition.payloadRedactionPolicy
+    val artifacts = task.dependsOn
+        .flatMap { dependencyId -> run.taskRuns[dependencyId]?.artifacts.orEmpty() }
+        .filterNot { it.kind in redaction.excludedArtifactKinds }
+        .map { artifact ->
+            AiveExecutorArtifactEnvelope(
+                id = artifact.id.value,
+                kind = artifact.kind.name,
+                label = artifact.label,
+                uri = artifact.uri,
+                textContent = artifact.textContent,
+                mediaType = artifact.mediaType,
+                metadata = artifact.metadata,
+            )
+        }
+    return AiveTaskEnvelope(
+        projectId = project.id.value,
+        projectName = project.name,
+        repository = project.repository?.let { repository ->
+            AiveExecutorRepositoryEnvelope(
+                source = repository.source.name,
+                owner = repository.owner,
+                name = repository.name,
+                defaultBranch = repository.defaultBranch,
+                remoteUrl = repository.remoteUrl,
+            )
+        },
+        workflowDefinitionId = definition.id.value,
+        workflowRunId = run.id.value,
+        workflowObjective = run.objective,
+        taskId = task.id.value,
+        taskRunId = taskRun.id.value,
+        taskName = task.name,
+        taskObjective = if (redaction.redactObjective) "[REDACTED]" else task.objective,
+        role = role?.let { role ->
+            AiveExecutorRoleEnvelope(
+                id = role.id.value,
+                name = role.name,
+                description = role.description,
+                instructions = if (redaction.redactRoleInstructions) "[REDACTED]" else role.instructions,
+                requiredCapabilities = role.capabilitiesRequired.map { it.name }.sorted(),
+                authorities = role.authorities.map { it.name }.sorted(),
+            )
+        },
+        acceptanceCriteria = task.acceptanceCriteria.map { it.description },
+        attempt = taskRun.attempt,
+        dependencyArtifacts = artifacts,
+        surfaces = resolvedSurfaces,
+    )
+}
 
 data class TaskExecutorExecution(
     val status: TaskRunStatus,
@@ -213,6 +337,7 @@ private class EvidenceIndexingTaskExecutorIntegration(
 
 private fun TaskExecutor.orchestrationOperationClass(): String = when (this) {
     is TaskExecutor.GitHubAction -> "github-action"
+    is TaskExecutor.Script -> "script"
     is TaskExecutor.TestRunner -> "test"
     is TaskExecutor.Deployment -> "deploy"
     is TaskExecutor.RepositoryOperation -> "repository-operation"
@@ -236,6 +361,7 @@ private fun durableExecutorEvidenceRegistry(): InferenceDataRegistry {
 
 fun TaskExecutor.isSystemExecutor(): Boolean = when (this) {
     is TaskExecutor.GitHubAction,
+    is TaskExecutor.Script,
     is TaskExecutor.TestRunner,
     is TaskExecutor.Deployment,
     is TaskExecutor.RepositoryOperation,

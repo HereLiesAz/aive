@@ -73,6 +73,7 @@ data class ComputeNodeDescriptor(
 fun TaskExecutor.distributedKind(): String = when (this) {
     is TaskExecutor.RoleAgent -> "role-agent"
     is TaskExecutor.GitHubAction -> "github-action"
+    is TaskExecutor.Script -> "script"
     is TaskExecutor.TestRunner -> "test-runner"
     is TaskExecutor.Deployment -> "deployment"
     is TaskExecutor.RepositoryOperation -> "repository-operation"

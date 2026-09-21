@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
+import kotlinx.serialization.json.Json
 
 /**
  * Builds the exact provider-facing request used for both initial dispatch and persisted-run resume.
@@ -38,6 +39,7 @@ internal fun buildProviderTaskRequest(
     role: RoleDefinition,
     orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
+    resolvedSurfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
 ): AgentTaskRequest {
     val redaction = definition.payloadRedactionPolicy
     val objective = if (redaction.redactObjective) "[redacted]" else task.objective
@@ -82,10 +84,22 @@ internal fun buildProviderTaskRequest(
                     if (redaction.redactRoleInstructions) "[redacted]" else role.instructions,
                 ),
             ),
-            dynamicContext = listOf(
-                PromptContextBlock("Task", objective),
-                PromptContextBlock("Attempt", taskRun.attempt.toString()),
-            ) + utilityBlocks,
+            dynamicContext = buildList {
+                add(PromptContextBlock("Task", objective))
+                add(PromptContextBlock("Attempt", taskRun.attempt.toString()))
+                if (resolvedSurfaces.isNotEmpty()) {
+                    add(
+                        PromptContextBlock(
+                            "Attached role surfaces",
+                            Json.encodeToString(
+                                kotlinx.serialization.builtins.ListSerializer(AiveRoleSurfaceEnvelope.serializer()),
+                                resolvedSurfaces,
+                            ),
+                        ),
+                    )
+                }
+                addAll(utilityBlocks)
+            },
             reusePolicy = definition.promptReusePolicy,
             cacheNamespace = "${run.id.value}:${role.id.value}",
         ),

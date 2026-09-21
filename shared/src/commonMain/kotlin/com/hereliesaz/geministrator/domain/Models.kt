@@ -37,7 +37,17 @@ data class AcceptanceCriterion(
 @Serializable
 sealed interface TaskExecutor {
     @Serializable data class RoleAgent(val roleId: RoleDefinitionId) : TaskExecutor
-    @Serializable data class GitHubAction(val workflow: String, val ref: String? = null) : TaskExecutor
+    @Serializable data class GitHubAction(
+        val workflow: String,
+        val ref: String? = null,
+        val contextInput: String? = "aive_context",
+        val inputs: Map<String, String> = emptyMap(),
+    ) : TaskExecutor
+    @Serializable data class Script(
+        val language: ScriptLanguage,
+        val source: String,
+        val runner: ScriptRunner,
+    ) : TaskExecutor
     @Serializable data class TestRunner(val command: String? = null) : TaskExecutor
     @Serializable data class Deployment(val environment: String) : TaskExecutor
     @Serializable data class RepositoryOperation(val operation: String) : TaskExecutor
@@ -66,13 +76,34 @@ sealed interface TaskExecutor {
     }
 }
 
-fun TaskDefinition.effectiveExecutor(): TaskExecutor = executor
+fun RoleExecutionSource.toTaskExecutor(roleId: RoleDefinitionId): TaskExecutor = when (this) {
+    RoleExecutionSource.Agent -> TaskExecutor.RoleAgent(roleId)
+    is RoleExecutionSource.GitHubAction -> TaskExecutor.GitHubAction(
+        workflow = workflow,
+        ref = ref,
+        contextInput = contextInput,
+    )
+    is RoleExecutionSource.Script -> TaskExecutor.Script(
+        language = language,
+        source = source,
+        runner = runner,
+    )
+}
+
+fun TaskDefinition.effectiveExecutor(role: RoleDefinition?): TaskExecutor = executor
+    ?: role?.executionSource?.toTaskExecutor(role.id)
     ?: roleId?.let(TaskExecutor::RoleAgent)
     ?: error("Task ${id.value} has neither an executor nor a responsible role")
+
+fun TaskDefinition.effectiveExecutor(): TaskExecutor = effectiveExecutor(null)
 
 fun TaskExecutor.displayName(): String = when (this) {
     is TaskExecutor.RoleAgent -> "Agent"
     is TaskExecutor.GitHubAction -> "GitHub Action"
+    is TaskExecutor.Script -> when (language) {
+        ScriptLanguage.JavaScript -> "JavaScript"
+        ScriptLanguage.Python -> "Python"
+    }
     is TaskExecutor.TestRunner -> "Test Runner"
     is TaskExecutor.Deployment -> "Deployment"
     is TaskExecutor.RepositoryOperation -> "Repository Operation"

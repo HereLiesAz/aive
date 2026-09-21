@@ -48,8 +48,9 @@ object CentralizedMixtureOfAgentsExpander {
                     continue
                 }
 
-                require(task.effectiveExecutor() is TaskExecutor.RoleAgent) {
-                    "Centralized MoA is only supported for role-agent tasks (${task.id.value})"
+                val responsibleRole = task.roleId?.let(rolesById::get)
+                require(task.effectiveExecutor(responsibleRole) is TaskExecutor.RoleAgent) {
+                    "Centralized MoA requires an Agent execution source (${task.id.value})"
                 }
 
                 val proposerRoles = policy.proposerRoleIds.map { roleId ->

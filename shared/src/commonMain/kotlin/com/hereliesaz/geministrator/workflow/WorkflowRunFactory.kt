@@ -30,6 +30,7 @@ object WorkflowRunFactory {
         roles: Collection<RoleDefinition> = emptyList(),
     ): WorkflowRun {
         WorkflowGraphValidator.requireValid(definition)
+        val rolesById = roles.associateBy(RoleDefinition::id)
 
         val taskRuns = definition.tasks.associate { task ->
             val conditionTask = when (val c = task.condition) {
@@ -45,7 +46,7 @@ object WorkflowRunFactory {
                 taskDefinitionId = task.id,
                 status = status,
                 assignedRoleId = task.roleId,
-                executor = task.effectiveExecutor(),
+                executor = task.effectiveExecutor(task.roleId?.let(rolesById::get)),
                 blockingReason = if (status == TaskRunStatus.Blocked) {
                     BlockingReason(
                         code = "WAITING_FOR_DEPENDENCIES",

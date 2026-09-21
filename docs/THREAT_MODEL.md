@@ -98,3 +98,46 @@ The following invariants must hold regardless of the integration used:
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Threat model for nested Haive workflows (executor type `NestedWorkflow`) once implemented.
 - Per-session provider response content hashing to detect replay.
+
+
+### User-configured role scripts
+
+**Threats**
+- A JavaScript/Python role script can intentionally process untrusted dependency artifacts or attempt
+  to exfiltrate context.
+- A GitHub-backed script runs with the selected workflow's token permissions and any secrets that
+  workflow exposes.
+- Oversized or malicious result archives can attempt memory exhaustion during import.
+
+**Mitigations in place**
+- Local JavaScript uses AndroidX JavaScriptEngine's isolated sandbox rather than WebView page context.
+- The normal `PayloadRedactionPolicy` is applied before role/task context reaches any script runner.
+- The bundled GitHub runner example defaults to `contents: read` and does not expose repository
+  secrets unless the user modifies the workflow.
+- GitHub script source/context are passed as workflow inputs/environment data instead of interpolated
+  directly into shell commands.
+- Remote structured results are accepted only from the named `aive-result` artifact and are bounded
+  before ZIP/JSON parsing.
+- Script-produced artifacts re-enter the same durable workflow artifact/evidence path as other
+  executor outputs.
+
+
+### Attached spreadsheet and SQL surfaces
+
+**Threats**
+- A role can expose sensitive spreadsheet/database rows to a local or remote execution source.
+- Script-returned mutations can corrupt user-owned data if a surface is made writable.
+- Repeated remote-run reconciliation can replay non-idempotent writes.
+- Imported SQLite documents and network spreadsheets can be oversized or malformed.
+
+**Mitigations in place**
+- Surfaces are opt-in per role and named explicitly in the Swarm editor.
+- HTTPS is required for network spreadsheet sources.
+- Snapshot row counts and spreadsheet byte sizes are bounded.
+- Only app-owned SQLite databases may execute returned SQL mutations; imported SQLite documents are
+  query-only.
+- Inline and HTTPS spreadsheets are read-only. Document spreadsheets require a writable URI before
+  writes can succeed.
+- Flowchart surfaces are read-only and parsed by The Aive rather than executing browser content.
+- Surface mutations are accepted only for declared writable aliases and are keyed by task
+  run/attempt/index to suppress ordinary reconciliation replay.

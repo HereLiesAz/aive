@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
 import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
+import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -179,8 +180,18 @@ class MainActivity : ComponentActivity() {
                         installedGeminiApi = installedGeminiApi,
                     )
                 }
-                val baseExecutorIntegrations = remember(repositoryCredentials) {
-                    configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
+                val roleSurfaceRuntime = remember {
+                    RoleSurfaceRuntimeRegistry(
+                        listOf(AndroidRoleSurfaceIntegration(this, repositoryHttpClient)),
+                    )
+                }
+                val baseExecutorIntegrations = remember(repositoryCredentials, roleSurfaceRuntime) {
+                    configuredAndroidExecutorIntegrations(
+                        context = this,
+                        repositoryCredentials = repositoryCredentials,
+                        httpClient = repositoryHttpClient,
+                        roleSurfaceRuntime = roleSurfaceRuntime,
+                    )
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
@@ -275,6 +286,7 @@ class MainActivity : ComponentActivity() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        roleSurfaceRuntime = roleSurfaceRuntime,
                         orchestrationRuntime = orchestrationRuntime,
                         persistence = azphaltHost.persistence,
                         projectFileService = projectFileService,
@@ -495,8 +507,12 @@ internal fun configuredAndroidProviders(julesApiKey: String?): List<AgentProvide
     )
 
 internal fun configuredAndroidExecutorIntegrations(
+    context: android.content.Context,
     repositoryCredentials: Map<String, String>,
     httpClient: HttpClient,
+    roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry(
+        listOf(AndroidRoleSurfaceIntegration(context, httpClient)),
+    ),
 ): TaskExecutorIntegrationRegistry {
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
@@ -518,10 +534,9 @@ internal fun configuredAndroidExecutorIntegrations(
             )
         }
     }
-    if (repositoryClients.isEmpty() && githubToken == null) return TaskExecutorIntegrationRegistry.Empty
-
     return TaskExecutorIntegrationRegistry(
         buildList {
+            add(AndroidJavaScriptExecutorIntegration(context, roleSurfaceRuntime))
             if (repositoryClients.isNotEmpty()) {
                 add(
                     RepositoryOperationExecutorIntegration(
@@ -532,10 +547,11 @@ internal fun configuredAndroidExecutorIntegrations(
             githubToken?.let { token ->
                 add(
                     GitHubActionsExecutorIntegration(
-                        GitHubRestActionsClient(
+                        client = GitHubRestActionsClient(
                             httpClient = httpClient,
                             tokenProvider = GitHubTokenProvider { token },
                         ),
+                        surfaceRuntime = roleSurfaceRuntime,
                     ),
                 )
             }
@@ -559,6 +575,7 @@ internal fun configuredAndroidRepositoryDiscovery(
 private fun androidDistributedExecutorKinds(
     repositoryCredentials: Map<String, String>,
 ): Set<String> = buildSet {
+    add("script")
     if (repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID) != null) {
         add("github-action")
         add("repository-operation")
