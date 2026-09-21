@@ -103,20 +103,46 @@ internal fun AzphaltStoreScreen(
         error = null
         status = null
         try {
-            val plan = service.prepareLocalInstall(request.bytes)
-            prepared = plan
-            selectedPackageIdValue = plan.detail.id
-            approvedPermissions = service.installed()
-                .firstOrNull { it.packageId == plan.detail.id }
-                ?.approvedHostPermissions
-                ?.toSet()
-                .orEmpty()
-            allowUntrustedSigner = false
-            allowPublisherChange = false
-            status = request.sourceLabel
-                ?.takeIf(String::isNotBlank)
-                ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
-                ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+            val workflowAttempt = runCatching { service.prepareLocalInstall(request.bytes) }
+            val workflowPlan = workflowAttempt.getOrNull()
+            if (workflowPlan != null) {
+                prepared = workflowPlan
+                preparedModel = null
+                selectedPackageIdValue = workflowPlan.detail.id
+                approvedPermissions = service.installed()
+                    .firstOrNull { it.packageId == workflowPlan.detail.id }
+                    ?.approvedHostPermissions
+                    ?.toSet()
+                    .orEmpty()
+                allowUntrustedSigner = false
+                allowPublisherChange = false
+                status = request.sourceLabel
+                    ?.takeIf(String::isNotBlank)
+                    ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
+                    ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+            } else {
+                val workflowFailure = workflowAttempt.exceptionOrNull()
+                val modelAttempt = runCatching { service.prepareLocalModelInstall(request.bytes) }
+                val modelPlan = modelAttempt.getOrNull()
+                if (modelPlan != null) {
+                    preparedModel = modelPlan
+                    prepared = null
+                    selectedPackageIdValue = modelPlan.detail.id
+                    allowUntrustedSigner = false
+                    allowPublisherChange = false
+                    status = request.sourceLabel
+                        ?.takeIf(String::isNotBlank)
+                        ?.let { "Verified $it. Review model trust and license metadata before installing." }
+                        ?: "Verified imported model package. Review trust and license metadata before installing."
+                } else {
+                    val modelFailure = modelAttempt.exceptionOrNull()
+                    throw if (workflowFailure?.message.orEmpty().contains("is kind asset")) {
+                        modelFailure ?: workflowFailure ?: IllegalArgumentException("Imported package is invalid")
+                    } else {
+                        workflowFailure ?: modelFailure ?: IllegalArgumentException("Imported package is invalid")
+                    }
+                }
+            }
         } catch (failure: Exception) {
             error = failure.message ?: "Imported Azphalt package could not be verified."
         } finally {
