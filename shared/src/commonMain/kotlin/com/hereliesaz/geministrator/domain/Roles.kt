@@ -78,6 +78,7 @@ enum class SpreadsheetFormat {
     Auto,
     Csv,
     Tsv,
+    Xlsx,
 }
 
 @Serializable
@@ -93,6 +94,12 @@ sealed interface SpreadsheetSource {
 
     @Serializable
     data class Https(val url: String) : SpreadsheetSource
+
+    @Serializable
+    data class GoogleSheet(
+        val spreadsheetId: String,
+        val gid: String = "0",
+    ) : SpreadsheetSource
 }
 
 @Serializable
