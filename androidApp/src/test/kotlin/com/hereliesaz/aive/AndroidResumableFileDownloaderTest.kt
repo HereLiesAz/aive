@@ -27,7 +27,6 @@ class AndroidResumableFileDownloaderTest {
                     respond(
                         content = bytes.copyOfRange(0, 4),
                         status = HttpStatusCode.OK,
-                        headers = headersOf(HttpHeaders.ContentLength, bytes.size.toString()),
                     )
                 }
                 else -> {
@@ -115,7 +114,6 @@ class AndroidResumableFileDownloaderTest {
             respond(
                 content = bytes.copyOfRange(0, 4),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentLength, bytes.size.toString()),
             )
         })
         val root = Files.createTempDirectory("aive-retain-test").toFile()
