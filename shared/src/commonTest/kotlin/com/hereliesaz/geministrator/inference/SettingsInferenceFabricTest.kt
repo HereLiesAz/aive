@@ -120,6 +120,7 @@ class SettingsInferenceFabricTest {
                 baseModelId = "com.example.detector",
                 backend = "onnxruntime-android",
                 artifactPath = "/data/user/0/com.hereliesaz.aive/files/azphalt/models/detector/model.onnx",
+                metadataJson = """{"type":"onnx","role":"object-detection"}""",
                 capabilities = setOf("local-model", "azphalt", "role:object-detection"),
                 releaseDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             ),
