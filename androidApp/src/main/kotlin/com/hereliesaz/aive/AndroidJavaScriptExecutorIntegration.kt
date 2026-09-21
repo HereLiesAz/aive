@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.workflow.AiveScriptResult
 import com.hereliesaz.geministrator.workflow.AiveTaskEnvelope
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
+import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegration
 import com.hereliesaz.geministrator.workflow.toAiveTaskEnvelope
 import kotlinx.coroutines.guava.await
@@ -23,6 +24,7 @@ import kotlinx.serialization.json.Json
 
 internal class AndroidJavaScriptExecutorIntegration(
     context: Context,
+    private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
 ) : TaskExecutorIntegration {
     override val orchestrationToolId: String = "local-javascript"
 
@@ -52,9 +54,10 @@ internal class AndroidJavaScriptExecutorIntegration(
             "Android JavaScript sandbox is unavailable on this device"
         }
 
+        val resolvedSurfaces = surfaceRuntime.resolve(context.role?.surfaces.orEmpty())
         val envelope = json.encodeToString(
             AiveTaskEnvelope.serializer(),
-            context.toAiveTaskEnvelope(),
+            context.toAiveTaskEnvelope(resolvedSurfaces),
         )
         val envelopeLiteral = json.encodeToString(String.serializer(), envelope)
         val wrapped = buildString {
@@ -92,7 +95,7 @@ internal class AndroidJavaScriptExecutorIntegration(
             progressMessage = context.taskRun.progressMessage ?: "Local JavaScript completed",
         )
 
-    private fun parseResult(
+    private suspend fun parseResult(
         raw: String,
         context: TaskExecutorContext,
     ): TaskExecutorExecution {
@@ -146,6 +149,13 @@ internal class AndroidJavaScriptExecutorIntegration(
         }
         val failed = result.status.equals("failed", ignoreCase = true) ||
             result.status.equals("error", ignoreCase = true)
+        if (!failed && result.surfaceMutations.isNotEmpty()) {
+            surfaceRuntime.apply(
+                surfaces = context.role?.surfaces.orEmpty(),
+                mutations = result.surfaceMutations,
+                executionKey = "local-js:${context.taskRun.id.value}:${context.taskRun.attempt}",
+            )
+        }
         return TaskExecutorExecution(
             status = if (failed) TaskRunStatus.Failed else TaskRunStatus.Completed,
             externalRunId = "local-js:${context.taskRun.id.value}:${context.taskRun.attempt}",
