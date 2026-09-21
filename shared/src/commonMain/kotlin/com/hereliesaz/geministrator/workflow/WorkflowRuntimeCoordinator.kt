@@ -37,6 +37,7 @@ class WorkflowRuntimeCoordinator(
     private val remoteComputeCoordinator: RemoteComputeCoordinator? = null,
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
+    private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -82,6 +83,7 @@ class WorkflowRuntimeCoordinator(
                 val resolvedRole = requireNotNull(role) {
                     "Provider-backed task ${taskDefinitionId.value} has no role definition"
                 }
+                val resolvedSurfaces = surfaceRuntime.resolve(resolvedRole.surfaces)
                 val request = buildProviderTaskRequest(
                     project = project,
                     definition = definition,
@@ -90,6 +92,7 @@ class WorkflowRuntimeCoordinator(
                     taskRun = taskRun,
                     role = resolvedRole,
                     orchestrationUtilities = orchestrationUtilities,
+                    resolvedSurfaces = resolvedSurfaces,
                 )
                 sessionGateway.reconnect(
                     handle,
