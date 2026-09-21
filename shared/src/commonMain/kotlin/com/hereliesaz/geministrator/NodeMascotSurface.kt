@@ -40,6 +40,14 @@ internal fun NodeMascotSurface(
         )
         return
     }
+    if (roleLabel.trim().equals("UX Designer", ignoreCase = true)) {
+        UxDesignerSpritePuppetSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
 
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
