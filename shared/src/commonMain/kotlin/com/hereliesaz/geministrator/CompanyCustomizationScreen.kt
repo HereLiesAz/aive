@@ -385,7 +385,7 @@ internal fun CustomCompanyProviderScreen(
                     when (val runner = source.runner) {
                         ScriptRunner.LocalSandbox -> {
                             Text(
-                                "Local JavaScript receives a frozen 'aive' object. Return { status, message, output, artifacts }.",
+                                "Local JavaScript receives a frozen 'aive' object, including aive.surfaces. Return { status, message, output, artifacts, surfaceMutations }.",
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
@@ -396,7 +396,7 @@ internal fun CustomCompanyProviderScreen(
                                 onChange = { updated -> roleExecutionSourceDraft = source.copy(runner = updated) },
                             )
                             Text(
-                                "The runner receives aive_context, aive_script, and aive_language by default.",
+                                "The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.",
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
