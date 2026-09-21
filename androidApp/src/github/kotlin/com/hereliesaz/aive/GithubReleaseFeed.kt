@@ -1,5 +1,6 @@
 package com.hereliesaz.aive
 
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.serialization.json.Json
@@ -10,6 +11,7 @@ import kotlinx.serialization.json.jsonPrimitive
 internal data class GithubAndroidRelease(
     val version: String,
     val downloadUrl: String,
+    val sha256: String? = null,
 )
 
 internal object GithubReleaseFeed {
@@ -46,7 +48,11 @@ internal object GithubReleaseFeed {
                     val version = apkName.matchEntire(name)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
                     val url = asset.jsonObject["browser_download_url"]?.jsonPrimitive?.content
                         ?: return@mapNotNull null
-                    GithubAndroidRelease(version = version, downloadUrl = url)
+                    val sha256 = asset.jsonObject["digest"]?.jsonPrimitive?.content
+                        ?.removePrefix("sha256:")
+                        ?.lowercase()
+                        ?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+                    GithubAndroidRelease(version = version, downloadUrl = url, sha256 = sha256)
                 }
                 .reduceOrNull { best, candidate ->
                     if (isNewerVersion(candidate.version, best.version)) candidate else best
@@ -54,7 +60,7 @@ internal object GithubReleaseFeed {
         }
     }
 
-    fun download(url: String): ByteArray {
+    fun download(url: String, destination: File): File {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = true
             connectTimeout = 20_000
@@ -67,7 +73,18 @@ internal object GithubReleaseFeed {
             if (responseCode !in 200..299) {
                 error("Update download failed with HTTP $responseCode")
             }
-            inputStream.use { it.readBytes() }
+            destination.parentFile?.mkdirs()
+            val buffer = ByteArray(256 * 1024)
+            inputStream.use { input ->
+                destination.outputStream().use { output ->
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        if (count > 0) output.write(buffer, 0, count)
+                    }
+                }
+            }
+            destination
         }
     }
 

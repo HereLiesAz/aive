@@ -40,6 +40,7 @@ open class TextLlmProvider(
         val request: AgentTaskRequest,
         val phase: MutableStateFlow<TextLlmSessionPhase>,
         val planGenerated: MutableStateFlow<Boolean>,
+        var planResult: TextGenerationResult? = null,
     )
 
     private val mutex = Mutex()
@@ -109,16 +110,20 @@ open class TextLlmProvider(
         if (session.request.requirePlanApproval) {
             if (!session.planGenerated.value) {
                 val preview = api.generate(renderPrompt(session.request))
+                session.planResult = preview
                 session.planGenerated.value = true
                 emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
             }
             val phase = session.phase.filter { it != TextLlmSessionPhase.AwaitingApproval }.first()
             if (phase == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
+                mutex.withLock { sessions.remove(runId) }
                 return@flow
             }
             emit(AgentEvent.PlanApproved(runId))
-            val result = api.generate(renderPrompt(session.request))
+            val result = requireNotNull(session.planResult) {
+                "Plan result was not stored; cannot deliver the approved output"
+            }
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -126,6 +131,7 @@ open class TextLlmProvider(
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
+                mutex.withLock { sessions.remove(runId) }
                 return@flow
             }
             val result = api.generate(renderPrompt(session.request))
@@ -135,6 +141,7 @@ open class TextLlmProvider(
             }
         }
         emit(AgentEvent.Completed(runId))
+        mutex.withLock { sessions.remove(runId) }
     }
 
     override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =

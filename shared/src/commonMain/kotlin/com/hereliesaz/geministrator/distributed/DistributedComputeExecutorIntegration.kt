@@ -16,13 +16,21 @@ class DistributedComputeExecutorIntegration(
         val distributed = context.executor as? TaskExecutor.Distributed
             ?: error("DistributedComputeExecutorIntegration requires TaskExecutor.Distributed")
         val leaseId = leaseId(context)
+        // Strip artifacts from all other tasks' TaskRuns to avoid broadcasting the full
+        // WorkflowRun's artifact payloads to every worker node. Only the dispatched task's
+        // artifacts are needed for execution.
+        val dispatchedTaskId = context.task.id
+        val strippedTaskRuns = context.run.taskRuns.mapValues { (taskId, taskRun) ->
+            if (taskId == dispatchedTaskId) taskRun else taskRun.copy(artifacts = emptyList())
+        }
+        val strippedRun = context.run.copy(taskRuns = strippedTaskRuns)
         gateway.submit(
             DistributedTaskEnvelope(
                 leaseId = leaseId,
                 originNodeId = gateway.localNodeId,
                 project = context.project,
                 definition = context.definition,
-                run = context.run,
+                run = strippedRun,
                 task = context.task,
                 taskRun = context.taskRun,
                 role = context.role,

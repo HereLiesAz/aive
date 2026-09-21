@@ -141,9 +141,6 @@ class MemoryConsolidator(
      * packets; entries at the same priority remain FIFO by sequence.
      */
     suspend fun processNext(nowEpochMillis: Long): MemoryConsolidationResult {
-        @Suppress("UNUSED_VARIABLE")
-        val invocationTime = nowEpochMillis
-
         while (true) {
             val snapshot = store.read()
             val entry = snapshot.queue
@@ -164,7 +161,13 @@ class MemoryConsolidator(
                 continue
             }
 
-            val plan = buildPacket(snapshot, entry)
+            val plan = try {
+                buildPacket(snapshot, entry)
+            } catch (failure: IllegalArgumentException) {
+                val reason = failure.message ?: "Oversized memory work item prevented packet construction"
+                markFailed(entry, reason)
+                return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
+            }
             if (plan == null) {
                 val advanced = if (entry.stage == MemoryConsolidationStage.Condensation) {
                     entry.copy(

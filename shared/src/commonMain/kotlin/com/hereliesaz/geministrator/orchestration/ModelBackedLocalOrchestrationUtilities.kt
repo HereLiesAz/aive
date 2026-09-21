@@ -36,7 +36,7 @@ class GuardedModelBackedOrchestrationUtilities(
     private val fallback: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
     private val json: Json = Json {
         encodeDefaults = true
-        ignoreUnknownKeys = false
+        ignoreUnknownKeys = true
     },
 ) : LocalOrchestrationUtilityFamily {
     override fun composeMemoryQueries(input: MemoryQueryInput): MemoryQueryPlan {
@@ -77,7 +77,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 }
             selected.size == selectedSet.size &&
                 selectedSet.all(known::contains) &&
-                candidate.omittedEvidenceIds == omittedExpected &&
+                candidate.omittedEvidenceIds.toSet() == omittedExpected.toSet() &&
                 candidate.totalEstimatedTokens == recomputedTokens &&
                 recomputedTokens <= input.tokenBudget &&
                 requiredIncluded &&
@@ -94,7 +94,7 @@ class GuardedModelBackedOrchestrationUtilities(
             baseline,
         ) { candidate ->
             if (candidate.decision == AgentRouteDecision.Escalate) {
-                true
+                baseline.decision == AgentRouteDecision.Escalate
             } else {
                 val selected = candidate.selectedAgent?.let(candidates::get)
                 selected != null &&
@@ -184,7 +184,8 @@ class GuardedModelBackedOrchestrationUtilities(
                             candidate.evidenceIds.toSet() == knownEvidence
                     )) &&
                 (baseline.unsatisfiedCriteria.isEmpty() ||
-                    candidate.unsatisfiedCriteria.containsAll(baseline.unsatisfiedCriteria))
+                    candidate.unsatisfiedCriteria.containsAll(baseline.unsatisfiedCriteria)) &&
+                completionIsAtLeastAsConservative(candidate.decision, baseline.decision)
         }
     }
 
@@ -257,6 +258,29 @@ class GuardedModelBackedOrchestrationUtilities(
         EscalationDecision.NeedTool ->
             candidate == EscalationDecision.NeedTool || candidate == EscalationDecision.Escalate
         EscalationDecision.Escalate -> candidate == EscalationDecision.Escalate
+    }
+
+    /**
+     * Conservatism ordering for completion decisions (most to least conservative):
+     * Failed > Blocked > NeedsVerification > Incomplete > Complete
+     *
+     * A candidate decision is at least as conservative as the baseline when it is
+     * equally or more conservative — i.e. the model may not downgrade the baseline.
+     */
+    private fun completionIsAtLeastAsConservative(
+        candidate: CompletionDecision,
+        baseline: CompletionDecision,
+    ): Boolean {
+        val order = listOf(
+            CompletionDecision.Complete,
+            CompletionDecision.Incomplete,
+            CompletionDecision.NeedsVerification,
+            CompletionDecision.Blocked,
+            CompletionDecision.Failed,
+        )
+        val candidateRank = order.indexOf(candidate)
+        val baselineRank = order.indexOf(baseline)
+        return candidateRank >= baselineRank
     }
 
     private fun stepKey(step: VerificationStep): String =

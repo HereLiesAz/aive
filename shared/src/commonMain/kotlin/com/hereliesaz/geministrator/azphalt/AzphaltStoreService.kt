@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.azphalt
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
 data class AzphaltStoreSnapshot(
     val repository: AzphaltRepositoryIndex,
     val packages: List<AzphaltPackageSummary>,
@@ -68,10 +71,13 @@ class AzphaltStoreService(
     private val modelInstaller: AzphaltModelPackageInstaller? = null,
 ) {
     private var cachedIndex: AzphaltRepositoryIndex? = null
+    private val indexMutex = Mutex()
 
     suspend fun repositoryIndex(refresh: Boolean = false): AzphaltRepositoryIndex {
-        if (!refresh) cachedIndex?.let { return it }
-        return repository.index().also { cachedIndex = it }
+        return indexMutex.withLock {
+            if (!refresh) cachedIndex?.let { return@withLock it }
+            repository.index().also { cachedIndex = it }
+        }
     }
 
     suspend fun search(
@@ -92,11 +98,14 @@ class AzphaltStoreService(
         val packages = (orchestration.packages + models.packages)
             .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() }
             .distinctBy(AzphaltPackageSummary::id)
+        // total and pages are derived from the deduplicated merged list.
+        // Summing the two individual totals would overcount packages that appear in both result sets.
+        // Pagination is not fully supported for merged results; pages is set to 1 as a safe default.
         return AzphaltPackageSearchResponse(
             packages = packages,
-            total = orchestration.total + models.total,
+            total = packages.size,
             page = page,
-            pages = maxOf(orchestration.pages, models.pages),
+            pages = 1,
         )
     }
 
