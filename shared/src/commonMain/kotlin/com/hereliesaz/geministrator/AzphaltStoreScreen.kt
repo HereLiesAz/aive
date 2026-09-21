@@ -375,6 +375,38 @@ internal fun AzphaltStoreScreen(
             )
         }
 
+        preparedModel?.let { plan ->
+            PreparedAzphaltModelInstall(
+                prepared = plan,
+                allowUntrustedSigner = allowUntrustedSigner,
+                onAllowUntrustedSignerChanged = { allowUntrustedSigner = it },
+                allowPublisherChange = allowPublisherChange,
+                onAllowPublisherChangeChanged = { allowPublisherChange = it },
+                onInstall = {
+                    scope.launch {
+                        loading = true
+                        error = null
+                        status = null
+                        runCatching {
+                            service.installModel(
+                                prepared = plan,
+                                nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                                allowUntrustedSigner = allowUntrustedSigner,
+                                allowPublisherChange = allowPublisherChange,
+                            )
+                        }.onSuccess { installed ->
+                            status = "Installed ${installed.packageId} ${installed.version}. Its model assets are registered for local inference."
+                            preparedModel = null
+                            refreshGeneration += 1
+                        }.onFailure { failure ->
+                            error = failure.message ?: "Model installation failed."
+                        }
+                        loading = false
+                    }
+                },
+            )
+        }
+
         prepared?.let { plan ->
             PreparedAzphaltInstall(
                 prepared = plan,
@@ -434,6 +466,94 @@ internal fun AzphaltStoreScreen(
             )
         }
     }
+}
+
+@Composable
+private fun PreparedAzphaltModelInstall(
+    prepared: AzphaltPreparedModelInstall,
+    allowUntrustedSigner: Boolean,
+    onAllowUntrustedSignerChanged: (Boolean) -> Unit,
+    allowPublisherChange: Boolean,
+    onAllowPublisherChangeChanged: (Boolean) -> Unit,
+    onInstall: () -> Unit,
+) {
+    val verification = prepared.verification
+    AzphaltRecord(
+        seed = "azphalt-model-prepared-${prepared.detail.id}",
+        eyebrow = "Verified model install",
+        title = "${prepared.detail.name} ${prepared.version}",
+        body = prepared.assets.joinToString(" · ") { asset ->
+            buildString {
+                append(asset.type.uppercase())
+                asset.role?.takeIf(String::isNotBlank)?.let { append(" / ").append(it) }
+                asset.byteSize?.let { append(" / ").append(formatByteSize(it)) }
+            }
+        },
+        endCap = if (verification.trusted) {
+            "Trusted"
+        } else if (verification.packageContents.signed) {
+            "Unknown signer"
+        } else {
+            "Unsigned"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                prepared.assets.forEachIndexed { index, asset ->
+                    AzphaltNote(
+                        seed = "azphalt-model-asset-$index",
+                        label = asset.role ?: asset.type,
+                        value = buildString {
+                            append(asset.type)
+                            if (asset.files.isNotEmpty()) append(" · ${asset.files.size} files")
+                            asset.modelLicense?.let {
+                                append(" · model license: ")
+                                append(it.toString())
+                            }
+                        },
+                    )
+                }
+
+                if (verification.packageContents.signed && !verification.trusted) {
+                    ConfirmationRow(
+                        checked = allowUntrustedSigner,
+                        onCheckedChange = onAllowUntrustedSignerChanged,
+                        text = "Install despite an unrecognized signing key",
+                    )
+                }
+                if (verification.publisherChanged) {
+                    ConfirmationRow(
+                        checked = allowPublisherChange,
+                        onCheckedChange = onAllowPublisherChangeChanged,
+                        text = "Approve publisher-key change for this package id",
+                    )
+                }
+
+                val trustReady =
+                    !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
+                val publisherReady = !verification.publisherChanged || allowPublisherChange
+                if (trustReady && publisherReady) {
+                    AzphaltPill(
+                        label = "Install verified model",
+                        seed = "azphalt-model-install-${prepared.detail.id}",
+                        endCap = prepared.version,
+                        onClick = onInstall,
+                    )
+                } else {
+                    Text(
+                        if (!publisherReady) {
+                            "Publisher-key change requires explicit approval."
+                        } else {
+                            "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                        },
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable
