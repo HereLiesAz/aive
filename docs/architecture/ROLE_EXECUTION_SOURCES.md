@@ -83,8 +83,9 @@ number of named data/logic surfaces.
 
 The Swarm editor currently supports:
 
-- **Spreadsheet** — CSV/TSV from an app-owned file, inline data, a document URI, or HTTPS. App-owned
-  files and writable document URIs can accept controlled row mutations.
+- **Spreadsheet** — CSV, TSV, or XLSX from an app-owned file, inline delimited data, a document URI,
+  HTTPS, or a public Google Sheet. App-owned files and writable document URIs can accept controlled
+  row mutations. Public Google Sheets resolve through Google's CSV export and remain read-only.
 - **SQL database** — SQLite query surfaces backed by an app-owned database or read-only document URI.
   App-owned SQLite databases can accept explicit SQL mutations.
 - **Flowchart** — a native Mermaid-style `flowchart` / `graph` surface. The Aive parses the
@@ -127,7 +128,9 @@ Resolved surfaces appear in the executor envelope:
 }
 ```
 
-JavaScript reads `aive.surfaces`; Python reads the same data from `aive["surfaces"]`.
+JavaScript reads `aive.surfaces`; Python reads the same data from `aive["surfaces"]`. Provider-backed
+AI roles receive the same resolved surfaces in an `Attached role surfaces` prompt-context block, and
+the same data is rebuilt during persisted-session reconnect.
 
 ### Surface mutations
 
@@ -159,9 +162,12 @@ write.
 
 ### Spreadsheet limits
 
-Spreadsheet snapshots are bounded by the surface's configured row limit (1–10,000 rows) and the
-Android host caps source/serialized size at 5 MiB. CSV/TSV parsing supports quoted fields, embedded
-delimiters/newlines, escaped quotes, CRLF, duplicate header disambiguation, and headerless tables.
+Spreadsheet snapshots are bounded by the surface's configured row limit (1–10,000 rows). CSV/TSV
+sources are capped at 5 MiB and support quoted fields, embedded delimiters/newlines, escaped quotes,
+CRLF, duplicate header disambiguation, and headerless tables. XLSX is parsed natively from the first
+worksheet, supports shared/inline strings and numeric values, and can be written back for writable
+app/document sources. XLSX archive size, entry count, per-entry expansion, and total expansion are
+bounded before parsing.
 
 ### SQL boundary
 
@@ -181,3 +187,12 @@ validation failures rather than being passed to a browser renderer.
 Because the parsed graph is a normal role surface, a script can combine deterministic flow topology
 with spreadsheet/SQL data in the same execution. The graph is intentionally read-only at runtime;
 editing happens through the Swarm flowchart source field.
+
+
+## Surface extension point
+
+`RoleSurface` is deliberately independent from `RoleExecutionSource`. New surfaces only need a
+serializable role-surface definition plus a `RoleSurfaceIntegration` that resolves it into an
+`AiveRoleSurfaceEnvelope` and optionally applies bounded mutations. This keeps future surfaces such
+as key/value stores, document collections, vector stores, REST/GraphQL endpoints, calendars, or
+domain-specific canvases from becoming new executor types.
