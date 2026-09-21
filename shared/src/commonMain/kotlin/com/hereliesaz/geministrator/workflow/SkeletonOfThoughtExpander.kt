@@ -46,8 +46,9 @@ object SkeletonOfThoughtExpander {
                     continue
                 }
 
-                require(task.effectiveExecutor() is TaskExecutor.RoleAgent) {
-                    "Skeleton-of-Thought is only supported for role-agent tasks (${task.id.value})"
+                val responsibleRole = task.roleId?.let(rolesById::get)
+                require(task.effectiveExecutor(responsibleRole) is TaskExecutor.RoleAgent) {
+                    "Skeleton-of-Thought requires an Agent execution source (${task.id.value})"
                 }
 
                 val skeletonRole = requireNotNull(rolesById[policy.skeletonRoleId]) {
