@@ -6,8 +6,10 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Document
+import org.w3c.dom.Element
 
 internal object AndroidXlsxCodec {
     fun parse(
@@ -89,101 +91,98 @@ internal object AndroidXlsxCodec {
     }
 
     private fun parseFirstSheetRelationshipId(bytes: ByteArray): String? {
-        val parser = parser(bytes)
-        while (parser.eventType != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "sheet") {
-                for (index in 0 until parser.attributeCount) {
-                    val name = parser.getAttributeName(index)
-                    if (name == "id" || name == "r:id") return parser.getAttributeValue(index)
-                }
-            }
-            parser.next()
-        }
-        return null
+        val document = parseXml(bytes)
+        val sheets = document.getElementsByTagNameNS("*", "sheet")
+        if (sheets.length == 0) return null
+        val sheet = sheets.item(0) as? Element ?: return null
+        return sheet.getAttributeNS(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            "id",
+        ).takeIf(String::isNotBlank)
+            ?: sheet.getAttribute("r:id").takeIf(String::isNotBlank)
+            ?: sheet.getAttribute("id").takeIf(String::isNotBlank)
     }
 
     private fun parseRelationshipTarget(bytes: ByteArray, id: String): String? {
-        val parser = parser(bytes)
-        while (parser.eventType != XmlPullParser.END_DOCUMENT) {
-            if (parser.eventType == XmlPullParser.START_TAG && parser.name == "Relationship") {
-                val currentId = parser.getAttributeValue(null, "Id")
-                if (currentId == id) return parser.getAttributeValue(null, "Target")
+        val document = parseXml(bytes)
+        val relationships = document.getElementsByTagNameNS("*", "Relationship")
+        for (index in 0 until relationships.length) {
+            val relationship = relationships.item(index) as? Element ?: continue
+            if (relationship.getAttribute("Id") == id) {
+                return relationship.getAttribute("Target").takeIf(String::isNotBlank)
             }
-            parser.next()
         }
         return null
     }
 
     private fun parseSharedStrings(bytes: ByteArray): List<String> {
-        val parser = parser(bytes)
-        val strings = mutableListOf<String>()
-        var insideItem = false
-        val current = StringBuilder()
-        while (parser.eventType != XmlPullParser.END_DOCUMENT) {
-            when (parser.eventType) {
-                XmlPullParser.START_TAG -> if (parser.name == "si") {
-                    insideItem = true
-                    current.clear()
-                }
-                XmlPullParser.TEXT -> if (insideItem) current.append(parser.text)
-                XmlPullParser.END_TAG -> if (parser.name == "si" && insideItem) {
-                    strings += current.toString()
-                    insideItem = false
-                }
+        val document = parseXml(bytes)
+        val items = document.getElementsByTagNameNS("*", "si")
+        return buildList(items.length) {
+            for (index in 0 until items.length) {
+                add(items.item(index).textContent.orEmpty())
             }
-            parser.next()
         }
-        return strings
     }
 
     private fun parseSheet(
         bytes: ByteArray,
         sharedStrings: List<String>,
     ): List<Map<Int, String?>> {
-        val parser = parser(bytes)
-        val rows = mutableListOf<Map<Int, String?>>()
-        var currentRow = linkedMapOf<Int, String?>()
-        var currentCellRef: String? = null
-        var currentType: String? = null
-        var captureValue = false
-        var value = StringBuilder()
-
-        while (parser.eventType != XmlPullParser.END_DOCUMENT) {
-            when (parser.eventType) {
-                XmlPullParser.START_TAG -> when (parser.name) {
-                    "row" -> currentRow = linkedMapOf()
-                    "c" -> {
-                        currentCellRef = parser.getAttributeValue(null, "r")
-                        currentType = parser.getAttributeValue(null, "t")
+        val document = parseXml(bytes)
+        val rowNodes = document.getElementsByTagNameNS("*", "row")
+        return buildList(rowNodes.length) {
+            for (rowIndex in 0 until rowNodes.length) {
+                val row = rowNodes.item(rowIndex) as? Element ?: continue
+                val cells = row.getElementsByTagNameNS("*", "c")
+                val values = linkedMapOf<Int, String?>()
+                for (cellIndex in 0 until cells.length) {
+                    val cell = cells.item(cellIndex) as? Element ?: continue
+                    val reference = cell.getAttribute("r").takeIf(String::isNotBlank)
+                    val column = reference?.let(::columnIndexFromReference) ?: cellIndex
+                    val type = cell.getAttribute("t")
+                    val raw = when (type) {
+                        "inlineStr" -> cell.firstDescendantText("t")
+                        else -> cell.firstDescendantText("v")
                     }
-                    "v", "t" -> {
-                        captureValue = true
-                        value = StringBuilder()
+                    values[column] = when (type) {
+                        "s" -> raw?.toIntOrNull()?.let(sharedStrings::getOrNull)
+                        else -> raw
                     }
                 }
-                XmlPullParser.TEXT -> if (captureValue) value.append(parser.text)
-                XmlPullParser.END_TAG -> when (parser.name) {
-                    "v", "t" -> {
-                        captureValue = false
-                        val column = currentCellRef?.let(::columnIndexFromReference) ?: currentRow.size
-                        val raw = value.toString()
-                        currentRow[column] = when (currentType) {
-                            "s" -> raw.toIntOrNull()?.let(sharedStrings::getOrNull)
-                            else -> raw
-                        }
-                    }
-                    "row" -> rows += currentRow
-                }
+                add(values)
             }
-            parser.next()
         }
-        return rows
     }
 
-    private fun parser(bytes: ByteArray): XmlPullParser =
-        XmlPullParserFactory.newInstance().newPullParser().apply {
-            setInput(ByteArrayInputStream(bytes), "UTF-8")
+    private fun Element.firstDescendantText(localName: String): String? {
+        val nodes = getElementsByTagNameNS("*", localName)
+        return if (nodes.length > 0) nodes.item(0).textContent else null
+    }
+
+    private fun parseXml(bytes: ByteArray): Document {
+        val factory = DocumentBuilderFactory.newInstance().apply {
+            isNamespaceAware = true
+            isExpandEntityReferences = false
+            runCatching { isXIncludeAware = false }
+            runCatching {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-general-entities", false)
+            }
+            runCatching {
+                setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            }
+            runCatching {
+                setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+            }
+            runCatching {
+                setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+            }
         }
+        return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+    }
 
     private fun columnIndexFromReference(reference: String): Int {
         var value = 0
