@@ -180,8 +180,18 @@ class MainActivity : ComponentActivity() {
                         installedGeminiApi = installedGeminiApi,
                     )
                 }
-                val baseExecutorIntegrations = remember(repositoryCredentials) {
-                    configuredAndroidExecutorIntegrations(this, repositoryCredentials, repositoryHttpClient)
+                val roleSurfaceRuntime = remember {
+                    RoleSurfaceRuntimeRegistry(
+                        listOf(AndroidRoleSurfaceIntegration(this, repositoryHttpClient)),
+                    )
+                }
+                val baseExecutorIntegrations = remember(repositoryCredentials, roleSurfaceRuntime) {
+                    configuredAndroidExecutorIntegrations(
+                        context = this,
+                        repositoryCredentials = repositoryCredentials,
+                        httpClient = repositoryHttpClient,
+                        roleSurfaceRuntime = roleSurfaceRuntime,
+                    )
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
@@ -276,6 +286,7 @@ class MainActivity : ComponentActivity() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        roleSurfaceRuntime = roleSurfaceRuntime,
                         orchestrationRuntime = orchestrationRuntime,
                         persistence = azphaltHost.persistence,
                         projectFileService = projectFileService,
@@ -499,6 +510,9 @@ internal fun configuredAndroidExecutorIntegrations(
     context: android.content.Context,
     repositoryCredentials: Map<String, String>,
     httpClient: HttpClient,
+    roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry(
+        listOf(AndroidRoleSurfaceIntegration(context, httpClient)),
+    ),
 ): TaskExecutorIntegrationRegistry {
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
@@ -520,12 +534,9 @@ internal fun configuredAndroidExecutorIntegrations(
             )
         }
     }
-    val surfaceRuntime = RoleSurfaceRuntimeRegistry(
-        listOf(AndroidRoleSurfaceIntegration(context, httpClient)),
-    )
     return TaskExecutorIntegrationRegistry(
         buildList {
-            add(AndroidJavaScriptExecutorIntegration(context, surfaceRuntime))
+            add(AndroidJavaScriptExecutorIntegration(context, roleSurfaceRuntime))
             if (repositoryClients.isNotEmpty()) {
                 add(
                     RepositoryOperationExecutorIntegration(
@@ -540,7 +551,7 @@ internal fun configuredAndroidExecutorIntegrations(
                             httpClient = httpClient,
                             tokenProvider = GitHubTokenProvider { token },
                         ),
-                        surfaceRuntime = surfaceRuntime,
+                        surfaceRuntime = roleSurfaceRuntime,
                     ),
                 )
             }
