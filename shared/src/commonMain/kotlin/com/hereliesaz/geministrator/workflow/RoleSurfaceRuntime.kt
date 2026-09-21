@@ -75,13 +75,18 @@ interface RoleSurfaceIntegration {
 class RoleSurfaceRuntimeRegistry(
     private val integrations: List<RoleSurfaceIntegration> = emptyList(),
 ) {
-    suspend fun resolve(surfaces: List<RoleSurface>): List<AiveRoleSurfaceEnvelope> =
-        surfaces.map { surface ->
+    suspend fun resolve(surfaces: List<RoleSurface>): List<AiveRoleSurfaceEnvelope> {
+        require(surfaces.all { it.alias.isNotBlank() }) { "Role surface aliases must not be blank" }
+        require(surfaces.map { it.alias }.distinct().size == surfaces.size) {
+            "Role surface aliases must be unique"
+        }
+        return surfaces.map { surface ->
             when (surface) {
                 is RoleSurface.Flowchart -> resolveFlowchart(surface)
                 else -> integrationFor(surface).resolve(surface)
             }
         }
+    }
 
     suspend fun apply(
         surfaces: List<RoleSurface>,
