@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 
 object WorkflowDefinitionExpander {
     fun expand(
@@ -47,8 +48,7 @@ object WorkflowDefinitionExpander {
                 val role = taskRole(task)
                 val effectiveAuthority = task.requiredRoleAuthority
                     ?: role?.authorities?.singleOrNull()
-                val roleAgent = (task.executor ?: task.roleId?.let(TaskExecutor::RoleAgent))
-                    as? TaskExecutor.RoleAgent
+                val roleAgent = task.effectiveExecutor(role) as? TaskExecutor.RoleAgent
                 if (
                     role == null ||
                     roleAgent == null ||
