@@ -6,7 +6,6 @@ import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -175,10 +174,10 @@ internal object AndroidXlsxCodec {
                 setFeature("http://xml.org/sax/features/external-parameter-entities", false)
             }
             runCatching {
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
             }
             runCatching {
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
             }
         }
         return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
