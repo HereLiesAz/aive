@@ -19,6 +19,7 @@ import com.hereliesaz.geministrator.workflow.toAiveTaskEnvelope
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
@@ -76,7 +77,9 @@ internal class AndroidJavaScriptExecutorIntegration(
         try {
             val isolate = sandbox.createIsolate()
             try {
-                val raw = isolate.evaluateJavaScriptAsync(wrapped).await()
+                val raw = withTimeout(LOCAL_SCRIPT_TIMEOUT_MILLIS) {
+                    isolate.evaluateJavaScriptAsync(wrapped).await()
+                }
                 parseResult(raw, context)
             } finally {
                 isolate.close()
@@ -168,4 +171,8 @@ internal class AndroidJavaScriptExecutorIntegration(
     private fun artifactKind(raw: String): ArtifactKind =
         ArtifactKind.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
             ?: ArtifactKind.CommandOutput
+    private companion object {
+        const val LOCAL_SCRIPT_TIMEOUT_MILLIS = 30_000L
+    }
+
 }
