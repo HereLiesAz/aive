@@ -402,7 +402,7 @@ internal fun AzphaltStoreScreen(
         }
 
         preparedModel?.let { plan ->
-            PreparedAzphaltModelInstall(
+            PreparedAzphaltModelInstallPanel(
                 prepared = plan,
                 allowUntrustedSigner = allowUntrustedSigner,
                 onAllowUntrustedSignerChanged = { allowUntrustedSigner = it },
@@ -495,7 +495,7 @@ internal fun AzphaltStoreScreen(
 }
 
 @Composable
-private fun PreparedAzphaltModelInstall(
+private fun PreparedAzphaltModelInstallPanel(
     prepared: AzphaltPreparedModelInstall,
     allowUntrustedSigner: Boolean,
     onAllowUntrustedSignerChanged: (Boolean) -> Unit,
