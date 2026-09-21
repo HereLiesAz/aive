@@ -175,10 +175,10 @@ internal object AndroidXlsxCodec {
                 setFeature("http://xml.org/sax/features/external-parameter-entities", false)
             }
             runCatching {
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
             }
             runCatching {
-                setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+                setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
             }
         }
         return factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
