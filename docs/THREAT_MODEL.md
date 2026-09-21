@@ -98,3 +98,25 @@ The following invariants must hold regardless of the integration used:
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Threat model for nested Haive workflows (executor type `NestedWorkflow`) once implemented.
 - Per-session provider response content hashing to detect replay.
+
+
+### User-configured role scripts
+
+**Threats**
+- A JavaScript/Python role script can intentionally process untrusted dependency artifacts or attempt
+  to exfiltrate context.
+- A GitHub-backed script runs with the selected workflow's token permissions and any secrets that
+  workflow exposes.
+- Oversized or malicious result archives can attempt memory exhaustion during import.
+
+**Mitigations in place**
+- Local JavaScript uses AndroidX JavaScriptEngine's isolated sandbox rather than WebView page context.
+- The normal `PayloadRedactionPolicy` is applied before role/task context reaches any script runner.
+- The bundled GitHub runner example defaults to `contents: read` and does not expose repository
+  secrets unless the user modifies the workflow.
+- GitHub script source/context are passed as workflow inputs/environment data instead of interpolated
+  directly into shell commands.
+- Remote structured results are accepted only from the named `aive-result` artifact and are bounded
+  before ZIP/JSON parsing.
+- Script-produced artifacts re-enter the same durable workflow artifact/evidence path as other
+  executor outputs.
