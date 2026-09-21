@@ -58,6 +58,7 @@ internal class AndroidAzphaltModelPackageInstaller(
 
         val previous = readInstalled().firstOrNull { it.packageId == packageId }
         val installedArtifacts = mutableListOf<InstalledAzphaltModelFile>()
+        val descriptors = mutableListOf<InferenceModelDescriptor>()
 
         try {
             prepared.assets.forEachIndexed { index, asset ->
@@ -86,32 +87,31 @@ internal class AndroidAzphaltModelPackageInstaller(
                 )
 
                 val finalArtifactPath = File(root, relativePath).absolutePath
-                inferenceState.registerModel(
-                    InferenceModelDescriptor(
-                        logicalModelId = logicalModelId,
-                        baseModelId = packageId,
-                        backend = backend,
-                        artifactPath = finalArtifactPath,
-                        capabilities = buildSet {
-                            add("local-model")
-                            add("azphalt")
-                            add("azphalt-package:$packageId")
-                            add("azphalt-version:${prepared.version}")
-                            add("asset-type:${asset.type.lowercase()}")
-                            asset.role?.takeIf(String::isNotBlank)?.let { add("role:$it") }
-                            asset.requirements?.jsonObject?.get("runtime")?.jsonPrimitive?.content
-                                ?.takeIf(String::isNotBlank)?.let { add("runtime:$it") }
-                            asset.requirements?.jsonObject?.get("quantization")?.jsonPrimitive?.content
-                                ?.takeIf(String::isNotBlank)?.let { add("quantization:$it") }
-                        },
-                        releaseDigest = releaseDigest,
-                    ),
+                descriptors += InferenceModelDescriptor(
+                    logicalModelId = logicalModelId,
+                    baseModelId = packageId,
+                    backend = backend,
+                    artifactPath = finalArtifactPath,
+                    capabilities = buildSet {
+                        add("local-model")
+                        add("azphalt")
+                        add("azphalt-package:$packageId")
+                        add("azphalt-version:${prepared.version}")
+                        add("asset-type:${asset.type.lowercase()}")
+                        asset.role?.takeIf(String::isNotBlank)?.let { add("role:$it") }
+                        asset.requirements?.jsonObject?.get("runtime")?.jsonPrimitive?.content
+                            ?.takeIf(String::isNotBlank)?.let { add("runtime:$it") }
+                        asset.requirements?.jsonObject?.get("quantization")?.jsonPrimitive?.content
+                            ?.takeIf(String::isNotBlank)?.let { add("quantization:$it") }
+                    },
+                    releaseDigest = releaseDigest,
                 )
             }
 
             packageRoot.mkdirs()
             finalDir.deleteRecursively()
             finalizeDirectory(staging, finalDir)
+            descriptors.forEach { inferenceState.registerModel(it) }
 
             val installed = InstalledAzphaltModelPackage(
                 packageId = packageId,
@@ -350,9 +350,9 @@ internal class AndroidAzphaltModelPackageInstaller(
         val digest = MessageDigest.getInstance("SHA-256")
         files.sortedBy { it.file.path }.forEach { item ->
             digest.update(item.file.name.encodeToByteArray())
-            digest.update(0)
+            digest.update(0.toByte())
             digest.update(item.sha256.encodeToByteArray())
-            digest.update(0)
+            digest.update(0.toByte())
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
