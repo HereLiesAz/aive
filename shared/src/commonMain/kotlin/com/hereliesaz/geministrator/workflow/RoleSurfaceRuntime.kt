@@ -131,6 +131,7 @@ fun RoleSurface.writableSurface(): Boolean = when (this) {
         -> true
         is com.hereliesaz.geministrator.domain.SpreadsheetSource.Inline,
         is com.hereliesaz.geministrator.domain.SpreadsheetSource.Https,
+        is com.hereliesaz.geministrator.domain.SpreadsheetSource.GoogleSheet,
         -> false
     }
     is RoleSurface.Sql -> writable &&
