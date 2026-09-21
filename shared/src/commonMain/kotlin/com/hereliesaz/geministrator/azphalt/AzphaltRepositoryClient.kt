@@ -42,6 +42,7 @@ class AzphaltRepositoryClient(
     suspend fun search(
         query: String = "",
         kinds: Set<String> = setOf("workflow"),
+        mediaDomains: Set<String> = emptySet(),
         page: Int = 1,
         sort: String = "popular",
     ): AzphaltPackageSearchResponse {
@@ -50,6 +51,7 @@ class AzphaltRepositoryClient(
         val scoped = searchRequest(
             query = query,
             kinds = kinds,
+            mediaDomains = mediaDomains,
             page = page,
             sort = sort,
             appId = hostAppId,
@@ -63,6 +65,7 @@ class AzphaltRepositoryClient(
         val unscoped = searchRequest(
             query = query,
             kinds = kinds,
+            mediaDomains = mediaDomains,
             page = page,
             sort = sort,
             appId = null,
@@ -82,6 +85,7 @@ class AzphaltRepositoryClient(
     private suspend fun searchRequest(
         query: String,
         kinds: Set<String>,
+        mediaDomains: Set<String>,
         page: Int,
         sort: String,
         appId: String?,
@@ -91,6 +95,7 @@ class AzphaltRepositoryClient(
                 appId?.trim()?.takeIf(String::isNotEmpty)?.let { parameters.append("app", it) }
                 query.trim().takeIf(String::isNotEmpty)?.let { parameters.append("q", it) }
                 if (kinds.isNotEmpty()) parameters.append("kind", kinds.sorted().joinToString(","))
+                if (mediaDomains.isNotEmpty()) parameters.append("mediaDomains", mediaDomains.sorted().joinToString(","))
                 parameters.append("page", page.toString())
                 parameters.append("sort", sort)
             }
