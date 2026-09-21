@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
@@ -26,6 +27,7 @@ import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import no.synth.kmpzip.zip.ZipInputStream
 
 data class GitHubWorkflowDispatchRequest(
     val repository: RepositoryRef,
@@ -66,6 +68,7 @@ fun interface GitHubTokenProvider {
 interface GitHubActionsClient {
     suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun
     suspend fun getRun(repository: RepositoryRef, runId: String): GitHubWorkflowRun
+    suspend fun downloadArtifact(repository: RepositoryRef, artifactId: String): ByteArray
 }
 
 class GitHubRestActionsClient(
@@ -172,6 +175,22 @@ class GitHubRestActionsClient(
             else -> status
         },
     )
+
+    override suspend fun downloadArtifact(
+        repository: RepositoryRef,
+        artifactId: String,
+    ): ByteArray {
+        val token = requireToken()
+        val response = httpClient.get(
+            "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}/actions/artifacts/${artifactId.encodeURLPathPart()}/zip",
+        ) {
+            githubHeaders(token)
+        }
+        if (response.status.value !in 200..299) {
+            error("Unable to download GitHub Actions artifact $artifactId: HTTP ${response.status.value}")
+        }
+        return response.body()
+    }
 
     private suspend fun requireToken(): String = tokenProvider.getToken().trim().also {
         require(it.isNotEmpty()) { "GitHub Actions token is not configured" }
@@ -324,7 +343,20 @@ class GitHubActionsExecutorIntegration(
         val runId = requireNotNull(context.taskRun.externalRunId) {
             "GitHub Action task ${context.task.id.value} is missing its external run ID"
         }
-        return client.getRun(repository, runId).toExecution(context)
+        val run = client.getRun(repository, runId)
+        val scriptResult = if (
+            context.executor is TaskExecutor.Script &&
+            run.status == GitHubWorkflowRunStatus.Completed
+        ) {
+            run.artifacts
+                .firstOrNull { it.name == AIVE_RESULT_ARTIFACT }
+                ?.let { artifact ->
+                    parseScriptResultArchive(client.downloadArtifact(repository, artifact.id))
+                }
+        } else {
+            null
+        }
+        return run.toExecution(context, scriptResult)
     }
 
     private fun requireGitHubRepository(context: TaskExecutorContext): RepositoryRef {
@@ -337,7 +369,10 @@ class GitHubActionsExecutorIntegration(
         return repository
     }
 
-    private fun GitHubWorkflowRun.toExecution(context: TaskExecutorContext): TaskExecutorExecution {
+    private fun GitHubWorkflowRun.toExecution(
+        context: TaskExecutorContext,
+        scriptResult: AiveScriptResult? = null,
+    ): TaskExecutorExecution {
         val taskStatus = when (status) {
             GitHubWorkflowRunStatus.Queued,
             GitHubWorkflowRunStatus.Running,
@@ -356,10 +391,13 @@ class GitHubActionsExecutorIntegration(
                 "${activeJob.name}: $step"
             }
         } ?: progressMessage
-        return TaskExecutorExecution(
-            status = taskStatus,
-            externalRunId = id,
-            artifacts = artifacts.map { artifact ->
+        val scriptFailed = scriptResult?.status?.let { status ->
+            status.equals("failed", ignoreCase = true) || status.equals("error", ignoreCase = true)
+        } == true
+        val resultArtifacts = scriptResult?.toArtifactRefs(context).orEmpty()
+        val workflowArtifacts = artifacts
+            .filterNot { context.executor is TaskExecutor.Script && it.name == AIVE_RESULT_ARTIFACT }
+            .map { artifact ->
                 ArtifactRef(
                     ArtifactId(
                         "${context.taskRun.id.value}:github-action:${context.taskRun.attempt}:${artifact.id}",
@@ -370,13 +408,84 @@ class GitHubActionsExecutorIntegration(
                     uri = artifact.archiveDownloadUrl,
                     createdAtEpochMillis = context.nowEpochMillis,
                 )
-            },
-            progress = if (taskStatus == TaskRunStatus.Completed) 1f else stepProgress,
-            progressMessage = stepMessage,
+            }
+        return TaskExecutorExecution(
+            status = if (scriptFailed) TaskRunStatus.Failed else taskStatus,
+            externalRunId = id,
+            artifacts = resultArtifacts + workflowArtifacts,
+            progress = if (taskStatus == TaskRunStatus.Completed && !scriptFailed) 1f else stepProgress,
+            progressMessage = scriptResult?.message ?: stepMessage,
         )
     }
+    private fun parseScriptResultArchive(bytes: ByteArray): AiveScriptResult {
+        require(bytes.size <= MAX_RESULT_ARCHIVE_BYTES) {
+            "Aive result artifact exceeds $MAX_RESULT_ARCHIVE_BYTES bytes"
+        }
+        ZipInputStream(bytes).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory && entry.name.substringAfterLast('/') == AIVE_RESULT_FILE) {
+                    require(entry.size < 0 || entry.size <= MAX_RESULT_JSON_BYTES) {
+                        "Aive result JSON exceeds $MAX_RESULT_JSON_BYTES bytes"
+                    }
+                    val resultBytes = zip.readBytes()
+                    require(resultBytes.size <= MAX_RESULT_JSON_BYTES) {
+                        "Aive result JSON exceeds $MAX_RESULT_JSON_BYTES bytes"
+                    }
+                    return json.decodeFromString(AiveScriptResult.serializer(), resultBytes.decodeToString())
+                }
+                zip.closeEntry()
+            }
+        }
+        error("GitHub script runner artifact does not contain $AIVE_RESULT_FILE")
+    }
+
+    private fun AiveScriptResult.toArtifactRefs(context: TaskExecutorContext): List<ArtifactRef> = buildList {
+        artifacts.forEachIndexed { index, artifact ->
+            require(artifact.uri != null || artifact.textContent != null) {
+                "Script artifact ${artifact.label} must return uri or textContent"
+            }
+            add(
+                ArtifactRef(
+                    id = ArtifactId(
+                        "${context.taskRun.id.value}:script:${context.taskRun.attempt}:$index",
+                    ),
+                    kind = ArtifactKind.entries.firstOrNull {
+                        it.name.equals(artifact.kind, ignoreCase = true)
+                    } ?: ArtifactKind.CommandOutput,
+                    taskRunId = context.taskRun.id,
+                    label = artifact.label,
+                    uri = artifact.uri,
+                    textContent = artifact.textContent,
+                    mediaType = artifact.mediaType,
+                    metadata = artifact.metadata,
+                    createdAtEpochMillis = context.nowEpochMillis,
+                ),
+            )
+        }
+        output?.takeIf(String::isNotBlank)?.let { value ->
+            add(
+                ArtifactRef(
+                    id = ArtifactId(
+                        "${context.taskRun.id.value}:script:${context.taskRun.attempt}:output",
+                    ),
+                    kind = ArtifactKind.CommandOutput,
+                    taskRunId = context.taskRun.id,
+                    label = "Script output",
+                    textContent = value,
+                    mediaType = "text/plain",
+                    createdAtEpochMillis = context.nowEpochMillis,
+                ),
+            )
+        }
+    }
+
     private companion object {
         const val MAX_SCRIPT_INPUT_CHARS = 50_000
+        const val AIVE_RESULT_ARTIFACT = "aive-result"
+        const val AIVE_RESULT_FILE = "aive-result.json"
+        const val MAX_RESULT_ARCHIVE_BYTES = 2 * 1024 * 1024
+        const val MAX_RESULT_JSON_BYTES = 1024 * 1024
     }
 
 }
