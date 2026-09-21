@@ -65,11 +65,28 @@ class AzphaltStoreService(
     suspend fun search(
         query: String = "",
         page: Int = 1,
-    ): AzphaltPackageSearchResponse = repository.search(
-        query = query,
-        kinds = setOf("workflow", "role"),
-        page = page,
-    )
+    ): AzphaltPackageSearchResponse {
+        val orchestration = repository.search(
+            query = query,
+            kinds = setOf("workflow", "role"),
+            page = page,
+        )
+        val models = repository.search(
+            query = query,
+            kinds = setOf("asset"),
+            mediaDomains = setOf("model"),
+            page = page,
+        )
+        val packages = (orchestration.packages + models.packages)
+            .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() }
+            .distinctBy(AzphaltPackageSummary::id)
+        return AzphaltPackageSearchResponse(
+            packages = packages,
+            total = orchestration.total + models.total,
+            page = page,
+            pages = maxOf(orchestration.pages, models.pages),
+        )
+    }
 
     suspend fun installed(): List<InstalledAzphaltWorkflowPackage> = installStore.all()
 

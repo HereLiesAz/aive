@@ -1,7 +1,9 @@
 # Workflow Add-Ons Architecture
 
 The Aive consumes Azphalt `kind:"workflow"` and `kind:"role"` packages so workflows and reusable
-roles can be installed without exposing Aive internals to third-party packages.
+roles can be installed without exposing Aive internals to third-party packages. The Store also
+discovers `kind:"asset"` packages in Azphalt's `model` media domain so compatible ONNX, TFLite,
+LiteRT, task, and speech-model assets are visible from inside The Aive.
 
 ## Host identity and catalog discovery
 
@@ -9,7 +11,7 @@ The current Azphalt host ID is `com.hereliesaz.aive`. Packages published for the
 `com.hereliesaz.haive` host ID remain compatible so old catalog entries do not disappear merely
 because the product name changed.
 
-The Store requests workflow and role packages from the Repository API using the current Aive host ID.
+The Store requests workflow and role packages plus model-domain asset packages from the Repository API using the current Aive host ID.
 If an app-scoped search incorrectly returns an empty first page while the unscoped repository catalog
 is healthy, the client performs one defensive unscoped retry and filters the returned summaries
 locally using `targetApps`. Only packages that are global, target `com.hereliesaz.aive`, or target
@@ -18,6 +20,9 @@ the legacy `com.hereliesaz.haive` identity survive that fallback.
 This fallback is a resilience mechanism, not a replacement for correct repository indexing. The
 centralized Azphalt deployment workflow verifies both the generated catalog and the live
 `azphalt.store/packages` endpoint contain known Aive workflow/role packages after deployment.
+
+Model assets are discovery-only until a compatible Aive model runtime owns their install lifecycle.
+They are never sent through the workflow/role installer merely because they appear in the same Store.
 
 A failed repository request must surface as an error. A legitimately empty compatible catalog is
 reported separately from transport/server failure; the UI must not quietly translate a failed refresh

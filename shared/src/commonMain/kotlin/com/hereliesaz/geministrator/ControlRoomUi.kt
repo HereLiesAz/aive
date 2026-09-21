@@ -60,7 +60,7 @@ enum class ControlRoomDestination(val label: String) {
     Inbox("Inbox"),
     Repositories("Repositories"),
     Compute("Compute"),
-    AddOns("ADD-ONS"),
+    AddOns("AZPHALT STORE"),
     Settings("Settings"),
 }
 
@@ -448,6 +448,9 @@ private fun MainDestination(
             ControlRoomDestination.Workflows -> LiveWorkflowLibraryScreen(
                 runtimeState = runtimeState,
                 onLoadDefinitions = onLoadWorkflowDefinitions,
+                azphaltStoreService = azphaltStoreService,
+                azphaltPackageImportRequest = azphaltPackageImportRequest,
+                onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Company -> CustomCompanyProviderScreen(

@@ -55,6 +55,43 @@ class AzphaltRepositoryClientTest {
         http.close()
     }
 
+
+    @Test
+    fun searchCanRestrictDiscoveryToModelMediaDomain() = runBlocking {
+        var kind: String? = null
+        var mediaDomains: String? = null
+        val http = HttpClient(MockEngine { request ->
+            kind = request.url.parameters["kind"]
+            mediaDomains = request.url.parameters["mediaDomains"]
+            respond(
+                content = """
+                    {
+                      "packages":[{
+                        "id":"com.example.detector",
+                        "name":"Detector",
+                        "version":"1.0.0",
+                        "kind":"asset",
+                        "types":["onnx"],
+                        "mediaDomains":["model"]
+                      }],
+                      "total":1,
+                      "page":1,
+                      "pages":1
+                    }
+                """.trimIndent(),
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        })
+        val client = AzphaltRepositoryClient(http)
+
+        val result = client.search(kinds = setOf("asset"), mediaDomains = setOf("model"))
+
+        assertEquals("asset", kind)
+        assertEquals("model", mediaDomains)
+        assertTrue(result.packages.single().isModelAssetPackage())
+        http.close()
+    }
+
     @Test
     fun emptyScopedSearchFallsBackToUnscopedCatalogAndFiltersLocally() = runBlocking {
         val apps = mutableListOf<String?>()
