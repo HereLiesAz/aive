@@ -180,7 +180,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials) {
-                    configuredAndroidExecutorIntegrations(repositoryCredentials, repositoryHttpClient)
+                    configuredAndroidExecutorIntegrations(this, repositoryCredentials, repositoryHttpClient)
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
@@ -495,6 +495,7 @@ internal fun configuredAndroidProviders(julesApiKey: String?): List<AgentProvide
     )
 
 internal fun configuredAndroidExecutorIntegrations(
+    context: android.content.Context,
     repositoryCredentials: Map<String, String>,
     httpClient: HttpClient,
 ): TaskExecutorIntegrationRegistry {
@@ -518,10 +519,9 @@ internal fun configuredAndroidExecutorIntegrations(
             )
         }
     }
-    if (repositoryClients.isEmpty() && githubToken == null) return TaskExecutorIntegrationRegistry.Empty
-
     return TaskExecutorIntegrationRegistry(
         buildList {
+            add(AndroidJavaScriptExecutorIntegration(context))
             if (repositoryClients.isNotEmpty()) {
                 add(
                     RepositoryOperationExecutorIntegration(
@@ -559,6 +559,7 @@ internal fun configuredAndroidRepositoryDiscovery(
 private fun androidDistributedExecutorKinds(
     repositoryCredentials: Map<String, String>,
 ): Set<String> = buildSet {
+    add("script")
     if (repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID) != null) {
         add("github-action")
         add("repository-operation")
