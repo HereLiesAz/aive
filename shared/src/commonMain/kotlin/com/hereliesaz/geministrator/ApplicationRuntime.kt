@@ -757,6 +757,7 @@ class ApplicationRuntime private constructor(
                     sessionGateway = gateway,
                     executorIntegrations = effectiveExecutorIntegrations,
                     orchestrationUtilities = orchestrationUtilities,
+                    surfaceRuntime = roleSurfaceRuntime,
                 )
                 return ApplicationRuntime(
                     persistence,
