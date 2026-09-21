@@ -68,6 +68,7 @@ interface RoleSurfaceIntegration {
     suspend fun apply(
         surface: RoleSurface,
         mutation: AiveSurfaceMutation,
+        mutationKey: String,
     )
 }
 
@@ -85,12 +86,13 @@ class RoleSurfaceRuntimeRegistry(
     suspend fun apply(
         surfaces: List<RoleSurface>,
         mutations: List<AiveSurfaceMutation>,
+        executionKey: String,
     ) {
         if (mutations.isEmpty()) return
         val byAlias = surfaces.associateBy(RoleSurface::alias)
         require(byAlias.size == surfaces.size) { "Role surface aliases must be unique" }
 
-        mutations.forEach { mutation ->
+        mutations.forEachIndexed { index, mutation ->
             val surface = requireNotNull(byAlias[mutation.alias]) {
                 "Script returned a mutation for unknown surface alias ${mutation.alias}"
             }
@@ -99,7 +101,11 @@ class RoleSurfaceRuntimeRegistry(
             }
             when (surface) {
                 is RoleSurface.Flowchart -> error("Flowchart surfaces are read-only runtime inputs")
-                else -> integrationFor(surface).apply(surface, mutation)
+                else -> integrationFor(surface).apply(
+                    surface = surface,
+                    mutation = mutation,
+                    mutationKey = "$executionKey:$index",
+                )
             }
         }
     }
