@@ -30,7 +30,7 @@ class WorkflowLibraryHost(
     private val persistence: WorkflowPersistence,
     private val storeService: AzphaltStoreService?,
     private val authoredStore: AuthoredWorkflowStore = SettingsAuthoredWorkflowStore(),
-    private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>) -> Unit,
+    private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>, String?) -> Unit,
     private val onPackagesChanged: () -> Unit,
     private val onWorkflowCreated: suspend (WorkflowDefinition) -> Unit = {},
 ) {
@@ -124,7 +124,7 @@ class WorkflowLibraryHost(
         authoredStore.remove(id)
     }
 
-    suspend fun run(definition: WorkflowDefinition) {
+    suspend fun run(definition: WorkflowDefinition, objective: String? = null) {
         composition.validated(definition)
         val neededRoleIds = buildSet {
             definition.tasks.forEach { task ->
@@ -141,7 +141,7 @@ class WorkflowLibraryHost(
             .filter { it.id in neededRoleIds }
             .distinctBy(RoleDefinition::id)
             .toList()
-        launchWorkflow(definition, packageRoles)
+        launchWorkflow(definition, packageRoles, objective?.trim()?.takeIf(String::isNotEmpty))
     }
 
     fun packagesChanged() = onPackagesChanged()
