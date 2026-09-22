@@ -88,7 +88,7 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         require(requested.size <= MAX_BATCH_SIZE) {
             "This workflow accepts at most $MAX_BATCH_SIZE characters per batch."
         }
-        val selected = requested.map(catalog::resolve)
+        val selected = requested.map { catalog.resolve(it) }
         require(selected.map(StoreCreatureCatalogEntry::id).distinct().size == selected.size) {
             "The same source character was selected more than once."
         }
