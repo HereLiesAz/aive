@@ -207,16 +207,16 @@ fun App(
                         BuiltInRoles.all + workflowPersistence.roles.all(),
                     )
                     val rolesById = catalog.associateBy { it.id }
-                    val missingRoleIds = NodeCharacterGenerationWorkflowFactory
-                        .referencedRoleIds(authored)
-                        .filter { roleId ->
-                            val role = rolesById[roleId] ?: return@filter false
-                            val hasEstablishedCharacter =
-                                MascotCharacterCatalog.explicitForRole(role.name) != null ||
-                                    classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Generic
-                            !hasEstablishedCharacter && nodeCharacterAssetStore.get(roleId) == null
+                    val missingRoleIds = linkedSetOf<RoleDefinitionId>()
+                    for (roleId in NodeCharacterGenerationWorkflowFactory.referencedRoleIds(authored)) {
+                        val role = rolesById[roleId] ?: continue
+                        val hasEstablishedCharacter =
+                            MascotCharacterCatalog.explicitForRole(role.name) != null ||
+                                classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Generic
+                        if (!hasEstablishedCharacter && nodeCharacterAssetStore.get(roleId) == null) {
+                            missingRoleIds += roleId
                         }
-                        .toSet()
+                    }
                     if (missingRoleIds.isNotEmpty()) {
                         val generation = NodeCharacterGenerationWorkflowFactory.create(
                             source = authored,
