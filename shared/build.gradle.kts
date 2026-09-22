@@ -90,3 +90,10 @@ kotlin {
 compose.resources {
     packageOfResClass = "com.hereliesaz.geministrator.resources"
 }
+
+// Resource accessor generation must never be restored from build cache: stale entries cause
+// "Unresolved reference" errors for drawables that exist on disk but weren't present when
+// the cached output was produced.
+tasks.matching { it.name.startsWith("generateResourceAccessors") }.configureEach {
+    outputs.cacheIf { false }
+}
