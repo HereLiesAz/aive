@@ -163,7 +163,114 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
                 inspection.issues.joinToString("; ")
         }
 
+
+        val base = context.taskRun.id.value
+        val common = mapOf(
+            "catalogEntryId" to entry.id,
+            "nodeCharacterRoleLabel" to entry.role,
+            "nodeCharacterVariant" to entry.variant.orEmpty(),
+            "sourceSheet" to entry.sourceSheet,
+            "sourceCell" to entry.sourceCell,
+            "slot" to slot.toString(),
+        )
+        val crop = ArtifactRef(
+            id = ArtifactId("$base:store-rig:crop"),
+            kind = ArtifactKind.Media,
+            taskRunId = context.taskRun.id,
+            label = "${entry.displayName()} - exact source crop",
+            uri = cropUri,
+            mediaType = "image/png",
+            metadata = common + mapOf("stage" to "source-crop"),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        val prompt = ArtifactRef(
+            id = ArtifactId("$base:store-rig:prompt"),
+            kind = ArtifactKind.Specification,
+            taskRunId = context.taskRun.id,
+            label = "${entry.displayName()} - approved rig prompt",
+            textContent = approvedPrompt,
+            mediaType = "text/plain",
+            metadata = common + mapOf("stage" to "approved-prompt"),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        val rigArtifact = ArtifactRef(
+            id = ArtifactId("$base:store-rig:rig"),
+            kind = ArtifactKind.Media,
+            taskRunId = context.taskRun.id,
+            label = "${entry.displayName()} - 2D rig sheet",
+            uri = rig.dataUri(),
+            mediaType = "image/png",
+            metadata = common + mapOf(
+                "stage" to "rig-sheet",
+                "attempts" to attempt.toString(),
+            ),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        val verification = ArtifactRef(
+            id = ArtifactId("$base:store-rig:verification"),
+            kind = ArtifactKind.Verification,
+            taskRunId = context.taskRun.id,
+            label = "${entry.displayName()} - rig inspection",
+            textContent = buildString {
+                appendLine("PASS")
+                appendLine("attempts=$attempt")
+                appendLine(inspection.summary)
+            },
+            mediaType = "text/plain",
+            metadata = common + mapOf("stage" to "visual-qc", "result" to "pass"),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        return TaskExecutorExecution(
+            status = TaskRunStatus.Completed,
+            artifacts = listOf(crop, prompt, rigArtifact, verification),
+            progress = 1f,
+            progressMessage = "Generated and inspected ${entry.displayName()}",
+        )
+    }
+
+    private fun overview(context: TaskExecutorContext, op: StoreOperation): TaskExecutorExecution {
+        val plan = dependencyPlan(context)
+        val crops = dependencyArtifacts(context)
+            .filter { it.kind == ArtifactKind.Media && it.metadata["stage"] == "source-crop" }
+            .sortedBy { it.metadata["slot"]?.toIntOrNull() ?: Int.MAX_VALUE }
+        require(crops.size == plan.selected.size) {
+            "Overview requires ${plan.selected.size} approved source characters; found ${crops.size}."
+        }
+        val svg = buildOverviewSvg(
+            plan.workflowLabel,
+            crops.map {
+                OverviewEntry(
+                    it.metadata["nodeCharacterRoleLabel"].orEmpty(),
+                    it.metadata["nodeCharacterVariant"].orEmpty(),
+                    requireNotNull(it.uri),
+                )
+            },
+        )
+        val artifact = ArtifactRef(
+            id = ArtifactId("${context.taskRun.id.value}:store-rig:overview"),
+            kind = ArtifactKind.Media,
+            taskRunId = context.taskRun.id,
+            label = "${plan.workflowLabel} - Node Creatures",
+            uri = "data:image/svg+xml;base64,${Base64.Default.encode(svg.encodeToByteArray())}",
+            mediaType = "image/svg+xml",
+            metadata = mapOf(
+                "stage" to "workflow-creature-overview",
+                "packageId" to op.packageId,
+                "packageVersion" to op.version,
+                "characterCount" to plan.selected.size.toString(),
+            ),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        return TaskExecutorExecution(
+            TaskRunStatus.Completed,
+            artifacts = listOf(artifact),
+            progress = 1f,
+            progressMessage = "Created overview sheet with ${plan.selected.size} exact creatures",
+        )
+    }
+
     //__STORE_PIPELINE_METHODS__
+
 
 }
 
