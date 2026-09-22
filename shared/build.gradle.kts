@@ -91,9 +91,13 @@ compose.resources {
     packageOfResClass = "com.hereliesaz.geministrator.resources"
 }
 
-// Resource accessor generation must never be restored from build cache: stale entries cause
-// "Unresolved reference" errors for drawables that exist on disk but weren't present when
-// the cached output was produced.
-tasks.matching { it.name.startsWith("generateResourceAccessors") }.configureEach {
+// The compose-resource pipeline tasks must never be restored from build cache: stale entries
+// cause "Unresolved reference" errors for drawables that exist on disk but were absent when
+// the cached outputs were produced. All three pipeline stages are covered.
+tasks.matching { task ->
+    task.name.startsWith("copyNonXmlValueResources") ||
+        task.name.startsWith("prepareComposeResourcesTask") ||
+        task.name.startsWith("generateResourceAccessors")
+}.configureEach {
     outputs.cacheIf { false }
 }
