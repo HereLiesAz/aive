@@ -74,7 +74,97 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
             progressMessage = "Store node-character rig operations are synchronous",
         )
 
+
+    private suspend fun preflight(context: TaskExecutorContext, op: StoreOperation): TaskExecutorExecution {
+        val catalog = decodeCatalog(packagePayload(op))
+        val requested = parseRequestedRoles(context.run.objective)
+        require(requested.isNotEmpty()) {
+            "Enter 1-10 source role names in the Run objective, separated by semicolons or new lines."
+        }
+        require(requested.size <= MAX_BATCH_SIZE) {
+            "This workflow accepts at most $MAX_BATCH_SIZE characters per batch."
+        }
+        val selected = requested.map(catalog::resolve)
+        require(selected.map(StoreCreatureCatalogEntry::id).distinct().size == selected.size) {
+            "The same source character was selected more than once."
+        }
+        val plan = StoreCreatureBatchPlan(op.packageId, op.version, context.project.name, selected)
+        val artifact = ArtifactRef(
+            id = ArtifactId("${context.taskRun.id.value}:store-rig:plan"),
+            kind = ArtifactKind.TaskPlan,
+            taskRunId = context.taskRun.id,
+            label = "Node Creature batch plan",
+            textContent = json.encodeToString(StoreCreatureBatchPlan.serializer(), plan),
+            mediaType = "application/json",
+            metadata = mapOf("stage" to "batch-plan", "selectedCount" to selected.size.toString()),
+            createdAtEpochMillis = context.nowEpochMillis,
+        )
+        return TaskExecutorExecution(
+            status = TaskRunStatus.Completed,
+            artifacts = listOf(artifact),
+            progress = 1f,
+            progressMessage = "Validated ${selected.size} source-backed characters",
+        )
+    }
+
+    private suspend fun runSlot(context: TaskExecutorContext, op: StoreOperation): TaskExecutorExecution {
+        val slot = requireNotNull(op.slot) { "slot requires a 1-based slot number" }
+        require(slot in 1..MAX_BATCH_SIZE)
+        val plan = dependencyPlan(context)
+        if (slot > plan.selected.size) {
+            val skip = ArtifactRef(
+                id = ArtifactId("${context.taskRun.id.value}:store-rig:skip"),
+                kind = ArtifactKind.CommandOutput,
+                taskRunId = context.taskRun.id,
+                label = "Rig slot $slot skipped",
+                textContent = "No character assigned to slot $slot.",
+                mediaType = "text/plain",
+                metadata = mapOf("stage" to "slot-skip", "slot" to slot.toString()),
+                createdAtEpochMillis = context.nowEpochMillis,
+            )
+            return TaskExecutorExecution(
+                TaskRunStatus.Completed,
+                artifacts = listOf(skip),
+                progress = 1f,
+                progressMessage = "Slot $slot unused",
+            )
+        }
+
+        val entry = plan.selected[slot - 1]
+        val payload = packagePayload(StoreOperation("slot", plan.packageId, plan.version, slot))
+        val cropBytes = requireNotNull(payload[entry.cropPath]) { "Missing source crop ${entry.cropPath}" }
+        val approvedPrompt = requireNotNull(payload[entry.promptPath]) { "Missing prompt ${entry.promptPath}" }
+            .decodeToString()
+            .trim()
+        require(approvedPrompt.isNotBlank())
+        val cropUri = pngDataUri(cropBytes)
+        val rigPrompt = rigPrompt(entry, approvedPrompt)
+
+        var rig = api.generate(rigPrompt, listOf(cropUri), "auto")
+        var inspection = api.inspect(
+            inspectionPrompt(entry, approvedPrompt),
+            listOf(cropUri, rig.dataUri()),
+        )
+        var attempt = 1
+        while (!inspection.pass && attempt < maxVisualAttempts) {
+            attempt += 1
+            rig = api.generate(
+                correctionPrompt(entry, rigPrompt, inspection.issues),
+                listOf(cropUri, rig.dataUri()),
+                "edit",
+            )
+            inspection = api.inspect(
+                inspectionPrompt(entry, approvedPrompt),
+                listOf(cropUri, rig.dataUri()),
+            )
+        }
+        require(inspection.pass) {
+            "Rig-sheet QC failed for ${entry.displayName()} after $attempt attempts: " +
+                inspection.issues.joinToString("; ")
+        }
+
     //__STORE_PIPELINE_METHODS__
+
 }
 
 private fun storePipelineHttpClient(): HttpClient = HttpClient {
