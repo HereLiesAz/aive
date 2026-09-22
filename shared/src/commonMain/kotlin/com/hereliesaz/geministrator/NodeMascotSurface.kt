@@ -51,15 +51,6 @@ internal fun NodeMascotSurface(
 
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
-    if (MascotSpriteAtlas.forRole(motionArchetype) != null) {
-        SpriteMascotSurface(
-            role = motionArchetype,
-            state = state,
-            motionPhase = motionPhase,
-            modifier = modifier,
-        )
-        return
-    }
     Canvas(modifier) {
         drawNodeMascot(
             role = motionArchetype,
