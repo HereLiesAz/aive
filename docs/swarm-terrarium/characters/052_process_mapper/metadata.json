@@ -1,0 +1,10 @@
+{
+  "sequence": 52,
+  "role": "Process Mapper",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_42_process_mapper.png",
+  "crop_sha256": "28f2351c4e692e1e4757257a23db9d09877e91c88924712e49961e361096d1e9",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

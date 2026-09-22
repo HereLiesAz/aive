@@ -1,0 +1,10 @@
+{
+  "sequence": 65,
+  "role": "Observability Engineer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_25_observability_engineer.png",
+  "crop_sha256": "e15eb296746a98a8f1379b6a53074eb8201d4f548f9feb77c2cd09b3aa3f6ac4",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 62,
+  "role": "Threat Modeler",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_22_threat_modeler.png",
+  "crop_sha256": "b7850f20ca6d7c3a4f90deb1ef1a2c0213401fde072234f7beac3356adf41632",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

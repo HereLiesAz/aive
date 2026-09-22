@@ -1,0 +1,10 @@
+{
+  "sequence": 32,
+  "role": "Resource Manager",
+  "variant": "Sheet 2 variant",
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_32_resource_manager.png",
+  "crop_sha256": "4149fe552ff96bfc1cd0c6a7d6bfae8d9df4b9916f2ed023557fdd8a8d4c4f19",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

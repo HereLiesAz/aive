@@ -1,0 +1,10 @@
+{
+  "sequence": 15,
+  "role": "Hall Monitor",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_35_hall_monitor.png",
+  "crop_sha256": "211277fa143c25eaf91311f3081aa69fe8c3385a25f46358a1db31754e4eb64c",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

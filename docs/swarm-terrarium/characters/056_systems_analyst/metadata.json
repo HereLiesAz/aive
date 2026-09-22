@@ -1,0 +1,10 @@
+{
+  "sequence": 56,
+  "role": "Systems Analyst",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_11_systems_analyst.png",
+  "crop_sha256": "69d4de5fc5698434cfd083efa8bb3f456841f6c6dd9b5d94aced9fa1a91fad66",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

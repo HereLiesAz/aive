@@ -1,0 +1,10 @@
+{
+  "sequence": 44,
+  "role": "Security Analyst",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_24_security_analyst.png",
+  "crop_sha256": "4733bf6ffaa6fa41f772ed72884ec9c06b68751d541b0411d00863b5fdf59ce7",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

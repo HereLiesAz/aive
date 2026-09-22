@@ -1,0 +1,10 @@
+{
+  "sequence": 47,
+  "role": "Test Explorer",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_32_test_explorer.png",
+  "crop_sha256": "d36d066ca0514667af2596ac34e0663e5fd27474530f97467c73f247dcf4167f",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

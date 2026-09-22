@@ -21,3 +21,7 @@ Important
 Repeated roles from different source sheets remain separate entries because the visible
 character variants differ. Each individual folder pairs the exact crop with its exact
 source-specific image-generation prompt.
+
+Updated package notes
+---------------------
+Each character folder includes the character image itself as `character.png` and `source_character.png`, alongside `character_crop.png`, `prompt.txt`, and `metadata.json`.

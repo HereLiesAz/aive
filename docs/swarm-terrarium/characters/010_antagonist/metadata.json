@@ -1,0 +1,10 @@
+{
+  "sequence": 10,
+  "role": "Antagonist",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_25_antagonist.png",
+  "crop_sha256": "28b6d0ccde15b632bdcc2af1a9c381aba60834e0db638f4223aaf0171fad6bc8",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

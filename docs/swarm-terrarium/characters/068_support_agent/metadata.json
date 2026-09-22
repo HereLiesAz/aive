@@ -1,0 +1,10 @@
+{
+  "sequence": 68,
+  "role": "Support Agent",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_33_support_agent.png",
+  "crop_sha256": "5f01679e18d7c5e1034f518af22323452eb5893fe93ca5f1b02d4e67de78d1c4",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

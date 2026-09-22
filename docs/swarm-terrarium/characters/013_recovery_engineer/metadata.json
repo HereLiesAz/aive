@@ -1,0 +1,10 @@
+{
+  "sequence": 13,
+  "role": "Recovery Engineer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_33_recovery_engineer.png",
+  "crop_sha256": "2037247c5b163d1d219b7affaa68210816a966fa0600ec62d866aef118d6d3fb",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}
