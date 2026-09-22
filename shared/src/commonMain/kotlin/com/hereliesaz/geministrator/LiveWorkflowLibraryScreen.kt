@@ -103,6 +103,7 @@ internal fun LiveWorkflowLibraryScreen(
     var composeQuery by rememberDurableStringState("workflows.compose-query")
     var saveId by rememberDurableStringState("workflows.save-id")
     var saveName by rememberDurableStringState("workflows.save-name")
+    var runObjective by rememberDurableStringState("workflows.run-objective")
     var refreshGeneration by remember { mutableStateOf(0) }
 
     LaunchedEffect(runtimeState, host, refreshGeneration) {
@@ -276,6 +277,13 @@ internal fun LiveWorkflowLibraryScreen(
                             style = AzphaltType.body,
                             color = Azphalt.White,
                         )
+                        OutlinedTextField(
+                            value = runObjective,
+                            onValueChange = { runObjective = it },
+                            label = { Text("Run objective / inputs") },
+                            placeholder = { Text("Optional. Workflows may use this as their runtime input.") },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (host != null) {
                                 AzphaltPill(
@@ -283,7 +291,7 @@ internal fun LiveWorkflowLibraryScreen(
                                     seed = "workflow-run-loaded",
                                     onClick = {
                                         scope.launch {
-                                            runCatching { host.run(currentDraft) }
+                                            runCatching { host.run(currentDraft, runObjective) }
                                                 .onSuccess { status = "Started ${currentDraft.name}." }
                                                 .onFailure { loadError = it.message ?: "Workflow launch failed." }
                                         }
