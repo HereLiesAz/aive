@@ -36,9 +36,13 @@ internal data class WorkflowTerrariumProjection(
 
 /**
  * Projects orchestration truth into the living terrarium without pretending every workflow node is
- * an agent. Only [TaskExecutor.RoleAgent] tasks become creatures. Mechanical dependencies may
- * become tools or clothing, external services become transient visiting vehicles, and agent-to-agent
- * flow stays a synaptic relationship.
+ * an agent. [TaskExecutor.RoleAgent] tasks become agent creatures; deterministic/automated
+ * executors ([TaskExecutor.Script], [TaskExecutor.TestRunner], [TaskExecutor.RepositoryOperation],
+ * [TaskExecutor.Deployment], [TaskExecutor.NestedWorkflow]) become the automated-process creature
+ * instead — a real node, not an adornment, since real work still happens even without an agent
+ * driving it. The remaining mechanical dependencies may become tools or clothing, external
+ * services become transient visiting vehicles, and creature-to-creature flow stays a synaptic
+ * relationship.
  */
 internal fun projectWorkflowTerrarium(
     definition: WorkflowDefinition,
@@ -48,7 +52,7 @@ internal fun projectWorkflowTerrarium(
 ): WorkflowTerrariumProjection {
     val tasksById = definition.tasks.associateBy(TaskDefinition::id)
     val rolesById = roles.associateBy(RoleDefinition::id)
-    val agentTasks = definition.tasks.filter { it.effectiveExecutor() is TaskExecutor.RoleAgent }
+    val agentTasks = definition.tasks.filter { it.effectiveExecutor().isTerrariumCreature() }
     val agentIds = agentTasks.mapTo(linkedSetOf(), TaskDefinition::id)
 
     val explicitOrchestrator = agentTasks.firstOrNull { task ->
@@ -289,6 +293,10 @@ private fun TaskRunStatus?.isServiceVisitActive(): Boolean = this in setOf(
     TaskRunStatus.Retrying,
 )
 
+// Deployment/TestRunner/RepositoryOperation/NestedWorkflow/Script are promoted to full creatures
+// by isTerrariumCreature() above and never reach this function as a *dependency's* executor while
+// still classified that way; the branches stay for exhaustiveness and for any future executor kind
+// that opts back out of creature status.
 private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManifestation? = when (this) {
     is TaskExecutor.HumanApproval,
     is TaskExecutor.Deployment,
@@ -306,6 +314,31 @@ private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManif
 
     is TaskExecutor.RoleAgent -> H2g2DependencyManifestation.Synapse
     is TaskExecutor.Distributed -> delegate.dependencyAdornmentManifestation()
+}
+
+/**
+ * Whether this executor gets its own creature node in the terrarium. True for agent-driven work
+ * and for the deterministic/automated executor kinds that still represent real, visible work —
+ * rendered as the automated-process neuron ([NodeCreatureRoleKind.AutomatedProcess]) rather than
+ * an agent mascot. [TaskExecutor.HumanApproval], [TaskExecutor.ExternalService] and
+ * [TaskExecutor.GitHubAction] stay non-creature presentations (clothing adornment / visiting
+ * vehicle) since they represent something outside the terrarium reaching in, not local automation.
+ */
+private fun TaskExecutor.isTerrariumCreature(): Boolean = when (this) {
+    is TaskExecutor.RoleAgent,
+    is TaskExecutor.Script,
+    is TaskExecutor.TestRunner,
+    is TaskExecutor.RepositoryOperation,
+    is TaskExecutor.Deployment,
+    is TaskExecutor.NestedWorkflow,
+    -> true
+
+    is TaskExecutor.HumanApproval,
+    is TaskExecutor.ExternalService,
+    is TaskExecutor.GitHubAction,
+    -> false
+
+    is TaskExecutor.Distributed -> delegate.isTerrariumCreature()
 }
 
 private fun birthParentFor(

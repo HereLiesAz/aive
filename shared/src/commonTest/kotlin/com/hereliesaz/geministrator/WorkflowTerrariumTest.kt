@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.conveyance.h2g2.H2g2DependencyManifestation
 import com.hereliesaz.conveyance.h2g2.H2g2SwarmIdentityKind
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
@@ -24,7 +23,7 @@ import kotlin.test.assertTrue
 
 class WorkflowTerrariumTest {
     @Test
-    fun nonAgentDependencyBecomesEquipmentAndAgentFlowStaysSynaptic() {
+    fun automatedExecutorDependencyBecomesAutomatedProcessCreatureAndFlowStaysSynaptic() {
         val implement = agentTask(
             id = "implement",
             roleId = BuiltInRoles.ImplementationEngineer.id,
@@ -49,18 +48,30 @@ class WorkflowTerrariumTest {
             roles = listOf(BuiltInRoles.ImplementationEngineer, BuiltInRoles.QaEngineer),
         )
 
-        assertTrue(projection.subjects.none { it.node.id == "tests" })
+        // A deterministic executor (TestRunner) still represents real work, so it gets its own
+        // creature node — the automated-process neuron — rather than becoming a worn adornment.
+        val testsSubject = assertNotNull(projection.subjects.singleOrNull { it.node.id == "tests" })
+        assertEquals("Test Runner", testsSubject.node.label)
+        assertEquals(
+            NodeCreatureRoleKind.AutomatedProcess,
+            classifyNodeCreatureRole(testsSubject.node.label),
+        )
         assertTrue(projection.subjects.any { it.node.id == TERRARIUM_ORCHESTRATOR_ID })
         assertEquals(
             H2g2SwarmIdentityKind.Orchestrator,
             projection.subjects.single { it.node.id == TERRARIUM_ORCHESTRATOR_ID }.identityKind,
         )
-        val adornment = assertNotNull(projection.adornments["verify"]).single()
-        assertEquals(H2g2DependencyManifestation.Tool, adornment.manifestation)
+        assertTrue(projection.adornments["verify"].orEmpty().isEmpty())
         assertTrue(
             projection.relationships.any {
                 it.kind == H2g2TerrariumRelationshipKind.Dependency &&
-                    it.from == "implement" && it.to == "verify"
+                    it.from == "implement" && it.to == "tests"
+            },
+        )
+        assertTrue(
+            projection.relationships.any {
+                it.kind == H2g2TerrariumRelationshipKind.Dependency &&
+                    it.from == "tests" && it.to == "verify"
             },
         )
     }

@@ -33,6 +33,10 @@ internal object MascotPuppetRig {
     const val RightBrow = "face.brow.right"
     const val Mouth = "face.mouth"
 
+    const val Limb0 = "limb.0"
+    const val Limb1 = "limb.1"
+    const val Limb2 = "limb.2"
+
     fun antennaBase(index: Int): String = "antenna.$index.base"
     fun antennaMid(index: Int): String = "antenna.$index.mid"
     fun antennaTip(index: Int): String = "antenna.$index.tip"
@@ -56,6 +60,11 @@ internal object MascotPuppetRig {
             add(MascotBone(RightFoot, RightLegLower, 125f, 169f))
 
             add(MascotBone(Prop, Root, 134f, 104f))
+            // Gestation limb: a 3-segment chain hanging off the body, used by automated-process
+            // creatures that have no agent identity of their own.
+            add(MascotBone(Limb0, Head, 122f, 108f))
+            add(MascotBone(Limb1, Limb0, 138f, 128f))
+            add(MascotBone(Limb2, Limb1, 152f, 146f))
             add(MascotBone(LeftEye, Head, 88f, 81f))
             add(MascotBone(RightEye, Head, 112f, 81f))
             add(MascotBone(LeftBrow, Head, 88f, 73f))
@@ -181,6 +190,26 @@ internal object MascotPuppetRig {
             put(RightFoot, MascotBonePose(rotationDegrees = legSwing * 0.28f))
 
             put(Prop, MascotBonePose(rotationDegrees = propRotation))
+
+            val limbAmplitude = when {
+                blocked -> 2f
+                state == H2g2WorkflowState.Active -> 14f
+                state == H2g2WorkflowState.Complete -> 6f
+                else -> 3f
+            }
+            put(Limb0, MascotBonePose(rotationDegrees = sin(cycle * 2f * PI.toFloat()) * limbAmplitude))
+            put(
+                Limb1,
+                MascotBonePose(
+                    rotationDegrees = sin(cycle * 2f * PI.toFloat() + 0.8f) * limbAmplitude * 0.7f,
+                ),
+            )
+            put(
+                Limb2,
+                MascotBonePose(
+                    rotationDegrees = sin(cycle * 2f * PI.toFloat() + 1.6f) * limbAmplitude * 0.45f,
+                ),
+            )
             put(LeftEye, MascotBonePose(scaleY = blink))
             put(RightEye, MascotBonePose(scaleY = blink))
             put(LeftBrow, MascotBonePose(rotationDegrees = browTilt))

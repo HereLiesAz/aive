@@ -160,7 +160,11 @@ jobs:
         run: |
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            test -f "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so"
+            lib="androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so"
+            if [ ! -f "$lib" ]; then
+              echo "::error::Expected native runtime library was not found: $lib"
+              exit 1
+            fi
           done
 
       - name: Publish pinned Conveyance for isolated web builds
@@ -202,10 +206,16 @@ jobs:
           cp -R "$WASM_DIR"/. webApp/build/pages/wasm/
           cp -R webApp/src/webMain/resources/. webApp/build/pages/
           cp -R webApp/src/webMain/resources/. webApp/build/pages/wasm/
-          test -f webApp/build/pages/index.html
-          test -f webApp/build/pages/haive.js
-          test -f webApp/build/pages/wasm/index.html
-          test -f webApp/build/pages/wasm/haive.js
+          for staged in \
+            webApp/build/pages/index.html \
+            webApp/build/pages/haive.js \
+            webApp/build/pages/wasm/index.html \
+            webApp/build/pages/wasm/haive.js; do
+            if [ ! -f "$staged" ]; then
+              echo "::error::Expected staged GitHub Pages file was not found: $staged"
+              exit 1
+            fi
+          done
 
       - name: Generate release notes
         if: github.event_name != 'pull_request'
@@ -383,9 +393,15 @@ jobs:
         run: |
           set -euo pipefail
           ./gradlew :desktopApp:generateDesktopBrandAssets
-          test -f desktopApp/build/generated/brand/desktop/haive-icon-color.png
-          test -f desktopApp/build/generated/brand/desktop/haive-icon.ico
-          test -f desktopApp/build/generated/brand/desktop/haive-icon.icns
+          for icon in \
+            desktopApp/build/generated/brand/desktop/haive-icon-color.png \
+            desktopApp/build/generated/brand/desktop/haive-icon.ico \
+            desktopApp/build/generated/brand/desktop/haive-icon.icns; do
+            if [ ! -f "$icon" ]; then
+              echo "::error::Expected generated desktop brand asset was not found: $icon"
+              exit 1
+            fi
+          done
 
       - name: Publish pinned Conveyance to Maven Local
         shell: bash

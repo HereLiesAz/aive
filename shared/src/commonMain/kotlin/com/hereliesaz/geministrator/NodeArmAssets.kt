@@ -112,6 +112,7 @@ internal object NodeArmAssets {
             NodeCreatureRoleKind.ContentStrategist -> NodeArmRole.ProductManager
             NodeCreatureRoleKind.SupportAgent -> NodeArmRole.RecoveryEngineer
             NodeCreatureRoleKind.MlEngineer -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.AutomatedProcess -> NodeArmRole.ImplementationEngineer
             NodeCreatureRoleKind.Generic -> NodeArmRole.Orchestrator
         }
 
