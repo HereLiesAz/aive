@@ -1,0 +1,10 @@
+{
+  "sequence": 2,
+  "role": "UX Designer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_12_ux_designer.png",
+  "crop_sha256": "0c7eeacd2cab5c4fe9ac74b2783a8e6a2bab5780d95a6acd651d9affb32f9524",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

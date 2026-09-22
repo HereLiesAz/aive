@@ -1,0 +1,10 @@
+{
+  "sequence": 8,
+  "role": "QA Engineer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_23_qa_engineer.png",
+  "crop_sha256": "fe933ae3d75e464856939f27b474992223c73fb3cf2d272c7c3e6e52234060e9",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

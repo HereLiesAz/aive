@@ -1,0 +1,10 @@
+{
+  "sequence": 40,
+  "role": "Scheduler",
+  "variant": "Sheet 3 variant",
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_15_scheduler.png",
+  "crop_sha256": "688118b9339913a17369fbc1315d8e657fd595cdbf049eb089d7ff5aaa334ff8",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

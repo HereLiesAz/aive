@@ -1,0 +1,10 @@
+{
+  "sequence": 5,
+  "role": "Architect",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_15_architect.png",
+  "crop_sha256": "6ce3b3c3132895b8e7b9079d7f8dc3835021feec84e7533158723964cf26772d",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

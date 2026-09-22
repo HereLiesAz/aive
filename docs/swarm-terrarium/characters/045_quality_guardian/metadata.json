@@ -1,0 +1,10 @@
+{
+  "sequence": 45,
+  "role": "Quality Guardian",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_25_quality_guardian.png",
+  "crop_sha256": "571d5965351c030b52b3351a5d1542293da1ad33db0a0449d74f2b946810dafa",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

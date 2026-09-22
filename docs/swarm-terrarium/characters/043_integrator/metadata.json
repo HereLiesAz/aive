@@ -1,0 +1,10 @@
+{
+  "sequence": 43,
+  "role": "Integrator",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_23_integrator.png",
+  "crop_sha256": "316d2cd0345774d644d165760a8af54b7371f85948427f99fbd91a62161fe3a2",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

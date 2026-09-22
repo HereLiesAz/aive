@@ -1,0 +1,10 @@
+{
+  "sequence": 46,
+  "role": "Documentation Specialist",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_31_documentation_specialist.png",
+  "crop_sha256": "966b0559ce323ccffdde151d015e5cf2cf878d82363d33c1214a6786567408ac",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

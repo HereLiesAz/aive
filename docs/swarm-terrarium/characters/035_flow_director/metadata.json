@@ -1,0 +1,10 @@
+{
+  "sequence": 35,
+  "role": "Flow Director",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_35_flow_director.png",
+  "crop_sha256": "e8ed1f95d093525c56eab27708bbff610def30b529de3a55dac77b4fc3091070",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

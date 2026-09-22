@@ -1,0 +1,10 @@
+{
+  "sequence": 60,
+  "role": "Build Engineer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_15_build_engineer.png",
+  "crop_sha256": "751fe000f80c13edc2fbaac32d2381313fd57a25f1302e1fb18d41ec55cba076",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 66,
+  "role": "Business Analyst",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_31_business_analyst.png",
+  "crop_sha256": "6e3d1974a79e06c1270ea995dac98314f86daaf09f2e2fbccb2bbae54e798039",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 34,
+  "role": "Decision Helper",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_34_decision_helper.png",
+  "crop_sha256": "38b4656e805131aeb14a52bddfa7bcf0043bc18c0d60a2a401c9c0ddc1332c95",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

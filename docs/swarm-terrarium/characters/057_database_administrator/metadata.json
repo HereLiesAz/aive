@@ -1,0 +1,10 @@
+{
+  "sequence": 57,
+  "role": "Database Administrator",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_12_database_administrator.png",
+  "crop_sha256": "7d7eeda9cc40f7caf3a8ed9052e75ddba1ac63a0211fce52c3513f7f2ea3a645",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

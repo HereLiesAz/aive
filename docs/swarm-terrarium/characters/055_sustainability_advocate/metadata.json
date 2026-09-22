@@ -1,0 +1,10 @@
+{
+  "sequence": 55,
+  "role": "Sustainability Advocate",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_45_sustainability_advocate.png",
+  "crop_sha256": "76c14c5ca049e7ede2e1056af87fde7d27d8a7b235720ea91723661b5cf9d991",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

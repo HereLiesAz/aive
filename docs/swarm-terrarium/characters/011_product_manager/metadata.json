@@ -1,0 +1,10 @@
+{
+  "sequence": 11,
+  "role": "Product Manager",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_31_product_manager.png",
+  "crop_sha256": "cedb38d1cfd265f674360717c33867d4dc69906128594229e2e79c81554e8bd5",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

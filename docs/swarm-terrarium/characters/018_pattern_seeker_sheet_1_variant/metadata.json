@@ -1,0 +1,10 @@
+{
+  "sequence": 18,
+  "role": "Pattern Seeker",
+  "variant": "Sheet 1 variant",
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_43_pattern_seeker.png",
+  "crop_sha256": "0e988c4083bbc72dd152ad60c6df90d2027cbbf40df4e5fc609b879cda7e06a8",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

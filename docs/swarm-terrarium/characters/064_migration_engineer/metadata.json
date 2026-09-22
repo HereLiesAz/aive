@@ -1,0 +1,10 @@
+{
+  "sequence": 64,
+  "role": "Migration Engineer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_24_migration_engineer.png",
+  "crop_sha256": "d9bbf39b64d5a75914fd15aa6057ae95014cf20bbadd8b9885523b30ae573f03",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}
