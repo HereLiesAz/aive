@@ -34,6 +34,15 @@ internal fun NodeMascotSurface(
 ) {
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val anatomyTemplate = character?.anatomyTemplate ?: classifyNodeCreatureRole(roleLabel)
+    if (MascotSpriteAtlas.forRole(anatomyTemplate) != null) {
+        SpriteMascotSurface(
+            role = anatomyTemplate,
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
     Canvas(modifier) {
         drawNodeMascot(
             role = anatomyTemplate,
