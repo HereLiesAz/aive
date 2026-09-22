@@ -1,3 +1,4 @@
+@file:Suppress("UnusedImport")
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
