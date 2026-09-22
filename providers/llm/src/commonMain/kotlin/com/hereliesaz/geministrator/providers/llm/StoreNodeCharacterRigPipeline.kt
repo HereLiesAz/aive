@@ -329,7 +329,73 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         return matches.single()
     }
 
+
+    private fun rigPrompt(entry: StoreCreatureCatalogEntry, approved: String): String = """
+        Create the production flat 2D puppet-rig sprite sheet for exactly ONE supplied Aive Node Creature:
+        ${entry.displayName()}.
+
+        The attached image is the ONLY visual source. It is the canonical crop from the supplied
+        character sheets (${entry.sourceSheet}, cell ${entry.sourceCell}). Never borrow anatomy from
+        another character.
+
+        ACCOMPANYING APPROVED ROLE PROMPT:
+        $approved
+
+        ACCEPTED RIG-SHEET RULES - THESE OVERRIDE ANY CONFLICT:
+        - Direct-use flat 2D cutout puppet sprite sheet, NOT a 3D exploded model.
+        - Preserve exact creature identity, unique body silhouette, faceted texture, gradients,
+          highlights, translucency, colors, proportions, and source-relative scale.
+        - Eye sockets visibly belonging to the BODY stay.
+        - Eye whites contain NO pupils; pupils are separate; upper/lower eyelids are separate.
+        - Movable appendages use flat overlapping cutout segments; slight hidden overlap is allowed.
+        - NEVER add sockets, hollow tube ends, recessed openings, collars, plugs, pegs, or visible
+          connection hardware to detached appendage segments.
+        - Include only anatomy, terminals, props, and effects present in this crop.
+        - One unique reusable piece appears once. No unnecessary duplicates.
+        - Actual alpha transparency only; never draw a checkerboard.
+        - No cast shadow, floor, scenery, labels, text, borders, diagrams, alternate views, or
+          assembled-character example.
+        - Generous transparent spacing for rectangular slicing.
+        - ONE sprite sheet for this ONE creature only.
+    """.trimIndent()
+
+    private fun inspectionPrompt(entry: StoreCreatureCatalogEntry, approved: String): String = """
+        Image 1 is the authoritative source crop for ${entry.displayName()}.
+        Image 2 is its proposed rig sheet.
+        Return JSON only: {"pass":true|false,"summary":"short factual result","issues":["specific issue"]}.
+
+        FAIL for: wrong creature or invented stand-in; multi-character output; missing/wrongly scaled
+        body; changed silhouette/palette/faceting/proportions; pupils baked into eye whites; missing
+        required eyelids; pseudo-3D exploded-model logic; sockets/hollow ends/holes/collars/plugs/pegs
+        on appendage ends; duplicate reusable parts; invented anatomy/props; labels/text/presentation
+        board/alternate views/assembled example/cast shadow/scenery/opaque background/checkerboard; or
+        touching assets unsafe for rectangular slicing.
+
+        Eye sockets visibly belonging to the BODY are valid.
+
+        APPROVED ROLE PROMPT:
+        $approved
+    """.trimIndent()
+
+    private fun correctionPrompt(
+        entry: StoreCreatureCatalogEntry,
+        original: String,
+        issues: List<String>,
+    ): String = """
+        Correct the rejected flat 2D rig sheet for ${entry.displayName()}.
+        FIRST image = immutable authoritative source crop. SECOND image = rejected rig sheet.
+        Preserve conforming source details and fix EVERY issue. Return only one corrected transparent
+        flat 2D puppet-parts sprite sheet.
+
+        QC FAILURES:
+        ${issues.joinToString("\n") { "- $it" }}
+
+        ORIGINAL RIG CONTRACT:
+        $original
+    """.trimIndent()
+
     //__STORE_PIPELINE_METHODS__
+
 
 
 
