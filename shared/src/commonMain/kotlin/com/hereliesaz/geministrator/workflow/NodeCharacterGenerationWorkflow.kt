@@ -249,7 +249,7 @@ object NodeCharacterGenerationWorkflowFactory {
                 requiredRoleAuthority = RoleAuthority.Implement,
                 executor = TaskExecutor.ExternalService(
                     service = NODE_CHARACTER_IMAGE_PIPELINE_SERVICE,
-                    operation = "generate:${target.id.value}",
+                    operation = "generate|${source.id.value}|${target.id.value}",
                 ),
                 dependsOn = setOf(intake, design, rig),
                 acceptanceCriteria = listOf(
@@ -287,7 +287,7 @@ object NodeCharacterGenerationWorkflowFactory {
                 requiredRoleAuthority = RoleAuthority.ApproveIntegration,
                 executor = TaskExecutor.ExternalService(
                     service = NODE_CHARACTER_IMAGE_PIPELINE_SERVICE,
-                    operation = "register:${target.id.value}",
+                    operation = "register|${source.id.value}|${target.id.value}",
                 ),
                 dependsOn = setOf(generate, inspect),
                 environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
