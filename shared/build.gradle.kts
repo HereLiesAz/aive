@@ -96,11 +96,13 @@ compose.resources {
 // the cached outputs were produced. All three pipeline stages are covered.
 // whenTaskAdded fires synchronously for every added task (eager and lazy), ensuring the
 // cacheIf { false } configuration is applied before any build-cache lookup occurs.
-tasks.whenTaskAdded { task ->
-    if (task.name.startsWith("copyNonXmlValueResources") ||
-        task.name.startsWith("prepareComposeResourcesTask") ||
-        task.name.startsWith("generateResourceAccessors")
-    ) {
-        task.outputs.cacheIf { false }
+tasks.whenTaskAdded(object : Action<Task> {
+    override fun execute(task: Task) {
+        if (task.name.startsWith("copyNonXmlValueResources") ||
+            task.name.startsWith("prepareComposeResourcesTask") ||
+            task.name.startsWith("generateResourceAccessors")
+        ) {
+            task.outputs.cacheIf { false }
+        }
     }
-}
+})
