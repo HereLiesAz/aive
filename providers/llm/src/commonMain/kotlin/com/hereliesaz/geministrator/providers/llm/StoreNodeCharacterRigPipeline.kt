@@ -394,7 +394,116 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         $original
     """.trimIndent()
 
-    //__STORE_PIPELINE_METHODS__
+
+    private fun buildOverviewSvg(workflowLabel: String, entries: List<OverviewEntry>): String {
+        val columns = if (entries.size <= 4) 2 else 3
+        val cardWidth = 420
+        val cardHeight = 430
+        val gutter = 28
+        val margin = 48
+        val header = 120
+        val rows = (entries.size + columns - 1) / columns
+        val width = margin * 2 + columns * cardWidth + (columns - 1) * gutter
+        val height = header + margin + rows * cardHeight + (rows - 1) * gutter + margin
+        return buildString {
+            append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"$width\" height=\"$height\" viewBox=\"0 0 $width $height\">")
+            append("<rect width=\"100%\" height=\"100%\" fill=\"#0b0d12\"/>")
+            append("<text x=\"$margin\" y=\"58\" fill=\"#fff\" font-family=\"sans-serif\" font-size=\"30\" font-weight=\"700\">${xml(workflowLabel)}</text>")
+            append("<text x=\"$margin\" y=\"92\" fill=\"#9da7b8\" font-family=\"sans-serif\" font-size=\"18\">NODE CREATURES - ${entries.size} SOURCE-BACKED CHARACTERS</text>")
+            entries.forEachIndexed { index, entry ->
+                val col = index % columns
+                val row = index / columns
+                val x = margin + col * (cardWidth + gutter)
+                val y = header + row * (cardHeight + gutter)
+                append("<rect x=\"$x\" y=\"$y\" width=\"$cardWidth\" height=\"$cardHeight\" rx=\"22\" fill=\"#141821\" stroke=\"#2c3442\" stroke-width=\"2\"/>")
+                append("<image href=\"${xmlAttr(entry.imageUri)}\" x=\"${x + 36}\" y=\"${y + 28}\" width=\"${cardWidth - 72}\" height=\"${cardHeight - 105}\" preserveAspectRatio=\"xMidYMid meet\"/>")
+                append("<text x=\"${x + 24}\" y=\"${y + cardHeight - 42}\" fill=\"#fff\" font-family=\"sans-serif\" font-size=\"22\" font-weight=\"700\">${xml(entry.role)}</text>")
+                if (entry.variant.isNotBlank()) {
+                    append("<text x=\"${x + 24}\" y=\"${y + cardHeight - 16}\" fill=\"#9da7b8\" font-family=\"sans-serif\" font-size=\"14\">${xml(entry.variant)}</text>")
+                }
+            }
+            append("</svg>")
+        }
+    }
+
+    private fun pngDataUri(bytes: ByteArray): String =
+        "data:image/png;base64,${Base64.Default.encode(bytes)}"
+
+    private fun normalize(value: String): String =
+        value.trim().lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
+
+    private fun xml(value: String): String =
+        value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    private fun xmlAttr(value: String): String = xml(value).replace("\"", "&quot;")
+
+    @Serializable
+    private data class StoreCreatureCatalog(
+        val version: Int = 1,
+        val entries: List<StoreCreatureCatalogEntry> = emptyList(),
+    )
+
+    @Serializable
+    private data class StoreCreatureCatalogEntry(
+        val id: String,
+        val role: String,
+        val variant: String? = null,
+        val sourceSheet: String,
+        val sourceCell: String,
+        val cropPath: String,
+        val promptPath: String,
+    ) {
+        fun displayName(): String =
+            variant?.takeIf(String::isNotBlank)?.let { "$role - $it" } ?: role
+    }
+
+    @Serializable
+    private data class StoreCreatureBatchPlan(
+        val packageId: String,
+        val version: String,
+        val workflowLabel: String,
+        val selected: List<StoreCreatureCatalogEntry>,
+    )
+
+    private data class OverviewEntry(
+        val role: String,
+        val variant: String,
+        val imageUri: String,
+    )
+
+    private data class StoreOperation(
+        val verb: String,
+        val packageId: String,
+        val version: String,
+        val slot: Int? = null,
+    ) {
+        companion object {
+            fun parse(raw: String?): StoreOperation {
+                val parts = raw.orEmpty().split('|')
+                require(parts.size in 3..4) {
+                    "operation must be verb|packageId|version[|slot]"
+                }
+                require(parts.take(3).all(String::isNotBlank))
+                return StoreOperation(
+                    parts[0],
+                    parts[1],
+                    parts[2],
+                    parts.getOrNull(3)?.toIntOrNull(),
+                )
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_BATCH_SIZE = 10
+        const val CATALOG_PATH = "catalog/roles.json"
+        val json = Json {
+            ignoreUnknownKeys = true
+            explicitNulls = false
+            encodeDefaults = true
+        }
+    }
+
 
 
 
