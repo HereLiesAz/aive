@@ -77,7 +77,8 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
 
     private suspend fun preflight(context: TaskExecutorContext, op: StoreOperation): TaskExecutorExecution {
         val catalog = decodeCatalog(packagePayload(op))
-        val requested = parseRequestedRoles(context.run.objective)
+        val input = parseBatchInput(context.run.objective)
+        val requested = input.roles
         require(requested.isNotEmpty()) {
             "Enter 1-10 source role names in the Run objective, separated by semicolons or new lines."
         }
@@ -88,7 +89,12 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         require(selected.map(StoreCreatureCatalogEntry::id).distinct().size == selected.size) {
             "The same source character was selected more than once."
         }
-        val plan = StoreCreatureBatchPlan(op.packageId, op.version, context.project.name, selected)
+        val plan = StoreCreatureBatchPlan(
+            op.packageId,
+            op.version,
+            input.workflowLabel ?: context.project.name,
+            selected,
+        )
         val artifact = ArtifactRef(
             id = ArtifactId("${context.taskRun.id.value}:store-rig:plan"),
             kind = ArtifactKind.TaskPlan,
@@ -299,19 +305,29 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
     private fun dependencyArtifacts(context: TaskExecutorContext): List<ArtifactRef> =
         context.task.dependsOn.flatMap { context.run.taskRuns[it]?.artifacts.orEmpty() }
 
-    private fun parseRequestedRoles(objective: String): List<String> {
+    private fun parseBatchInput(objective: String): BatchInput {
         val text = objective.trim()
-        if (text.isEmpty()) return emptyList()
-        val body = Regex("(?is)(?:^|\\n)\\s*roles?\\s*:\\s*(.+)$")
+        if (text.isEmpty()) return BatchInput(null, emptyList())
+        val workflowLabel = Regex("(?im)^\\s*workflow\\s*:\\s*(.+?)\\s*$")
             .find(text)
             ?.groupValues
             ?.getOrNull(1)
             ?.trim()
-            ?: text
-        return body
-            .split(Regex("[;\\n,]+"))
+            ?.takeIf(String::isNotEmpty)
+        val rolesLine = Regex("(?im)^\\s*roles?\\s*:\\s*(.+?)\\s*$")
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+        val body = rolesLine ?: text
+            .lineSequence()
+            .filterNot { it.trimStart().startsWith("workflow:", ignoreCase = true) }
+            .joinToString(";")
+        val roles = body
+            .split(Regex("[;,]+"))
             .map(String::trim)
             .filter(String::isNotEmpty)
+        return BatchInput(workflowLabel, roles)
     }
 
     private fun StoreCreatureCatalog.resolve(query: String): StoreCreatureCatalogEntry {
@@ -463,6 +479,11 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         val version: String,
         val workflowLabel: String,
         val selected: List<StoreCreatureCatalogEntry>,
+    )
+
+    private data class BatchInput(
+        val workflowLabel: String?,
+        val roles: List<String>,
     )
 
     private data class OverviewEntry(
