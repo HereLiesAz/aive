@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
 import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
 import com.hereliesaz.geministrator.providers.llm.NodeCharacterImagePipelineExecutorIntegration
+import com.hereliesaz.geministrator.providers.llm.StoreNodeCharacterRigPipelineExecutorIntegration
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
@@ -71,11 +72,17 @@ fun main() {
                 gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID),
             )
             credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
-                configured.withPriorityIntegration(
-                    NodeCharacterImagePipelineExecutorIntegration(
-                        apiKeyProvider = LlmApiKeyProvider { key },
-                    ),
-                )
+                configured
+                    .withPriorityIntegration(
+                        NodeCharacterImagePipelineExecutorIntegration(
+                            apiKeyProvider = LlmApiKeyProvider { key },
+                        ),
+                    )
+                    .withPriorityIntegration(
+                        StoreNodeCharacterRigPipelineExecutorIntegration(
+                            apiKeyProvider = LlmApiKeyProvider { key },
+                        ),
+                    )
             } ?: configured
         }
         val repositoryDiscovery = remember(repositoryCredentials) {

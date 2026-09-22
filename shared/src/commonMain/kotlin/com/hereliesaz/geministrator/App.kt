@@ -187,7 +187,7 @@ fun App(
         val workflowLibraryHost = WorkflowLibraryHost(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
-            launchWorkflow = { definition, packageRoles ->
+            launchWorkflow = { definition, packageRoles, objective ->
                 val activeRuntime = runtime ?: error("Runtime is unavailable")
                 val existingProject = when (val state = runtimeState) {
                     is ApplicationRuntimeState.NoRun -> state.project
@@ -197,6 +197,7 @@ fun App(
                 activeRuntime.launchSavedWorkflow(
                     definition = definition,
                     existingProject = existingProject,
+                    objective = objective ?: definition.description ?: definition.name,
                     supplementalRoles = packageRoles,
                 )
             },
