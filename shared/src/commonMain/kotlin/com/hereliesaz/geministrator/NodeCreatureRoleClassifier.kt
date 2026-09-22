@@ -70,6 +70,7 @@ internal enum class NodeCreatureRoleKind {
     ContentStrategist,
     SupportAgent,
     MlEngineer,
+    AutomatedProcess,
     Generic,
 }
 
@@ -87,6 +88,17 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
         Regex("(^|[^a-z0-9])" + Regex.escape(word) + "([^a-z0-9]|$)").containsMatchIn(role)
 
     return when {
+        // Deterministic/automated executors (TaskExecutor.displayName()) — matched by exact label
+        // since these are structural node labels, not free-text agent role names, and must never
+        // fall into the fuzzy keyword buckets below (e.g. a "Deployment" executor is not a
+        // ReleaseEngineer agent).
+        role == "javascript" ||
+            role == "python" ||
+            role == "test runner" ||
+            role == "deployment" ||
+            role == "repository operation" ||
+            role == "nested workflow" -> NodeCreatureRoleKind.AutomatedProcess
+
         // Watchers and continuity keepers.
         "hall monitor" in role ||
             "hall-monitor" in role ||
@@ -415,5 +427,6 @@ internal fun NodeCreatureRoleKind.activeLabel(): String = when (this) {
     NodeCreatureRoleKind.ContentStrategist -> "STRATEGIZING"
     NodeCreatureRoleKind.SupportAgent -> "SUPPORTING"
     NodeCreatureRoleKind.MlEngineer -> "LEARNING"
+    NodeCreatureRoleKind.AutomatedProcess -> "PROCESSING"
     NodeCreatureRoleKind.Generic -> "WORKING"
 }

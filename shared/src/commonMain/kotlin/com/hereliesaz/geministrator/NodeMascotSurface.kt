@@ -51,6 +51,14 @@ internal fun NodeMascotSurface(
 
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
+    if (motionArchetype == NodeCreatureRoleKind.AutomatedProcess) {
+        AutomatedProcessMascotSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
     if (MascotSpriteAtlas.forRole(motionArchetype) != null) {
         SpriteMascotSurface(
             role = motionArchetype,
@@ -465,6 +473,14 @@ private fun mascotSpec(
         antennaCount = 7,
         terminal = MascotTerminal.Plug,
         accessory = MascotAccessory.Wrench,
+    )
+    NodeCreatureRoleKind.AutomatedProcess -> MascotSpec(
+        body = Color(0xFF3FA8E0),
+        dark = Color(0xFF1B3D5C),
+        antennaCount = 9,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.None,
+        radial = true,
     )
     NodeCreatureRoleKind.Generic -> MascotSpec(
         body = Azphalt.hue(hueSeed),
