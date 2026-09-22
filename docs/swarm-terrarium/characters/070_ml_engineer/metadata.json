@@ -1,0 +1,10 @@
+{
+  "sequence": 70,
+  "role": "ML Engineer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_35_ml_engineer.png",
+  "crop_sha256": "415c0b325dd4dcbf01189ee977565668af7096c20421f1cbf794a75f332c4ad4",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

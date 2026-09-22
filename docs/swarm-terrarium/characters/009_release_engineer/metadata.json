@@ -1,0 +1,10 @@
+{
+  "sequence": 9,
+  "role": "Release Engineer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_24_release_engineer.png",
+  "crop_sha256": "90de02474784649a872019e9431209346bfdbe41ef6b298fa79b5a608a2687f8",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 63,
+  "role": "Compliance Officer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_23_compliance_officer.png",
+  "crop_sha256": "2d995f98ee75d3a7cf217a56154d41017914b8cdef7f2332c585b40294d01403",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

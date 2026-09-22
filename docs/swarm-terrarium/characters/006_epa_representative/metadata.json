@@ -1,0 +1,10 @@
+{
+  "sequence": 6,
+  "role": "EPA Representative",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_21_epa_representative.png",
+  "crop_sha256": "d1f088c0d50f378a67259c6c2042ab48283082bb2481122526db73a91993bc27",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

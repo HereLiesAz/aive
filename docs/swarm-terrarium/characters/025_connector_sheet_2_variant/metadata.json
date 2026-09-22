@@ -1,0 +1,10 @@
+{
+  "sequence": 25,
+  "role": "Connector",
+  "variant": "Sheet 2 variant",
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_15_connector.png",
+  "crop_sha256": "cfbb7d1155a73504e449a061b7d2d7ea5a4b18843c4af3fec7aa4ce150980268",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

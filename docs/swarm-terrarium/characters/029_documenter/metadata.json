@@ -1,0 +1,10 @@
+{
+  "sequence": 29,
+  "role": "Documenter",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_24_documenter.png",
+  "crop_sha256": "14f3f948c1d765d7dc0d236dc46bc0e049c9b3ddf22509a1739145c8476b1d14",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

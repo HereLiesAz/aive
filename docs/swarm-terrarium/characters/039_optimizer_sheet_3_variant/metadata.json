@@ -1,0 +1,10 @@
+{
+  "sequence": 39,
+  "role": "Optimizer",
+  "variant": "Sheet 3 variant",
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_14_optimizer.png",
+  "crop_sha256": "98e32c5c0273ef02ecc8b3f066e8f713fa0385cb82b092552c864351b868d1cf",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

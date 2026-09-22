@@ -1,0 +1,10 @@
+{
+  "sequence": 30,
+  "role": "Guardian",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_25_guardian.png",
+  "crop_sha256": "16298a639520fc19578f7b0b4ad51aa6e3f7057436042237094168d286ab7002",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

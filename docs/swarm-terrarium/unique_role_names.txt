@@ -1,0 +1,60 @@
+01. Orchestrator
+02. UX Designer
+03. Researcher
+04. Implementation Engineer
+05. Architect
+06. EPA Representative
+07. Adversarial Reviewer
+08. QA Engineer
+09. Release Engineer
+10. Antagonist
+11. Product Manager
+12. Crash Test Dummy
+13. Recovery Engineer
+14. Code Reviewer
+15. Hall Monitor
+16. Data Miner
+17. Knowledge Keeper
+18. Pattern Seeker
+19. Translator
+20. Connector
+21. Scheduler
+22. Optimizer
+23. Simulator
+24. Documenter
+25. Guardian
+26. Creative Synthesizer
+27. Resource Manager
+28. Feedback Listener
+29. Decision Helper
+30. Flow Director
+31. Pattern Seer
+32. Communicator
+33. Integrator
+34. Security Analyst
+35. Quality Guardian
+36. Documentation Specialist
+37. Test Explorer
+38. Deployment Pilot
+39. Monitoring Sentinel
+40. Feedback Collector
+41. Idea Catalyst
+42. Process Mapper
+43. Strategy Scout
+44. System Maintainer
+45. Sustainability Advocate
+46. Systems Analyst
+47. Database Administrator
+48. Network Engineer
+49. Site Reliability Engineer
+50. Build Engineer
+51. Test Automation Engineer
+52. Threat Modeler
+53. Compliance Officer
+54. Migration Engineer
+55. Observability Engineer
+56. Business Analyst
+57. Content Strategist
+58. Support Agent
+59. Data Scientist
+60. ML Engineer

@@ -1,0 +1,10 @@
+{
+  "sequence": 19,
+  "role": "Translator",
+  "variant": "Sheet 1 variant",
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_44_translator.png",
+  "crop_sha256": "baf85ab53fe4542f508a43699e9162b6706469c822587917bea76887d58fe584",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

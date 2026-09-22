@@ -1,0 +1,10 @@
+{
+  "sequence": 28,
+  "role": "Simulator",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_23_simulator.png",
+  "crop_sha256": "5e4d659f2ebcbb39f4a69f899ef46202f045106fb3c6197499bbd12e29be64b2",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

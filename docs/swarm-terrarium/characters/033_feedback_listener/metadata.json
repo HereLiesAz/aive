@@ -1,0 +1,10 @@
+{
+  "sequence": 33,
+  "role": "Feedback Listener",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_33_feedback_listener.png",
+  "crop_sha256": "430a03aed513bb37e044d43aa9c288ac41ed1eff69fcdc777814332c3f6b9e58",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

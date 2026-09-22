@@ -1,0 +1,10 @@
+{
+  "sequence": 54,
+  "role": "System Maintainer",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_44_system_maintainer.png",
+  "crop_sha256": "f5d5ff899b42ea1809c710e6ed04a4a4b75e107ffa90310827625ff87da9794b",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

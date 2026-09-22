@@ -1,0 +1,10 @@
+{
+  "sequence": 69,
+  "role": "Data Scientist",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_34_data_scientist.png",
+  "crop_sha256": "64000005d766ca69f80eb5f13d864938c7a0119229ea6f2eb7e200b899acfcd8",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

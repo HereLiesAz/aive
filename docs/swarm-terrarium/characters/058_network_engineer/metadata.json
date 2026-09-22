@@ -1,0 +1,10 @@
+{
+  "sequence": 58,
+  "role": "Network Engineer",
+  "variant": null,
+  "source_sheet": "18283",
+  "original_crop_filename": "18283_13_network_engineer.png",
+  "crop_sha256": "4ac010a5521c2803f771ce3bcf660655d1721abdabfb76f6339e40e7e1f2a6e0",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

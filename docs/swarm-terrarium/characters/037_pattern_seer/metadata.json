@@ -1,0 +1,10 @@
+{
+  "sequence": 37,
+  "role": "Pattern Seer",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_12_pattern_seer.png",
+  "crop_sha256": "e443e279928eb01b697896f6fabc7f279ce8be67298e4f5f478e4ca9ed15893c",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 16,
+  "role": "Data Miner",
+  "variant": "Sheet 1 variant",
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_41_data_miner.png",
+  "crop_sha256": "013ce8f05af50c548da2012b61e2d0b71cc6ed480d4bc096fbeb938fc66c61c1",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

@@ -1,0 +1,10 @@
+{
+  "sequence": 7,
+  "role": "Adversarial Reviewer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_22_adversarial_reviewer.png",
+  "crop_sha256": "07f9777bf2189ea0bebe8dffea7abebbef6aabb4322414cceef25a60d8458b25",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

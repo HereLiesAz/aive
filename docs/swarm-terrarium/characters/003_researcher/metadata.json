@@ -1,0 +1,10 @@
+{
+  "sequence": 3,
+  "role": "Researcher",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_13_researcher.png",
+  "crop_sha256": "390fc95dc195c5c843826d23dd13a7b0ec52a5eac386a6cee1ae42cb895c89b7",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

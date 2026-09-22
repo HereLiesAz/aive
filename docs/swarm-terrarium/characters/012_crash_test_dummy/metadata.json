@@ -1,0 +1,10 @@
+{
+  "sequence": 12,
+  "role": "Crash Test Dummy",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_32_crash_test_dummy.png",
+  "crop_sha256": "52edda2f8d80f40fa6559082ee6788eb682ef027521762496f599b4e593f799d",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

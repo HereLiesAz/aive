@@ -1,0 +1,10 @@
+{
+  "sequence": 17,
+  "role": "Knowledge Keeper",
+  "variant": "Sheet 1 variant",
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_42_knowledge_keeper.png",
+  "crop_sha256": "c348af228d815e95b8278ac24ac1450c3f194561ee891061ae40401d6b2bb6b2",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

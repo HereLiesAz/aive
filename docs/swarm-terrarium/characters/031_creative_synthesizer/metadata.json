@@ -1,0 +1,10 @@
+{
+  "sequence": 31,
+  "role": "Creative Synthesizer",
+  "variant": null,
+  "source_sheet": "18282",
+  "original_crop_filename": "18282_31_creative_synthesizer.png",
+  "crop_sha256": "a168664a19c84ba3a429a7f81200c0d6f3e386f963a5ce681ff9882f7777b2b9",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

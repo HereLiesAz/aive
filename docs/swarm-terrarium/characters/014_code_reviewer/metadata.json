@@ -1,0 +1,10 @@
+{
+  "sequence": 14,
+  "role": "Code Reviewer",
+  "variant": null,
+  "source_sheet": "18281",
+  "original_crop_filename": "18281_34_code_reviewer.png",
+  "crop_sha256": "d3858df44ef52be4ff5d3765d1c13f9b055170f809d2d3fc334b13a3e4f0cd74",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}

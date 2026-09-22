@@ -1,0 +1,10 @@
+{
+  "sequence": 48,
+  "role": "Deployment Pilot",
+  "variant": null,
+  "source_sheet": "18284",
+  "original_crop_filename": "18284_33_deployment_pilot.png",
+  "crop_sha256": "3224047950c2b281d9394ead569d4608a9b293d93c4d7818bc0c965667438539",
+  "prompt_file": "prompt.txt",
+  "crop_file": "character_crop.png"
+}
