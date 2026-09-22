@@ -24,61 +24,61 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-ai-evaluation-scientist",
             roleLabel = "AI Evaluation Scientist",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.MlEngineer,
             phenotypeIndex = 0,
         ),
         MascotCharacterIdentity(
             id = "azphalt-accessibility-auditor",
             roleLabel = "Accessibility Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 1,
         ),
         MascotCharacterIdentity(
             id = "azphalt-agent-red-teamer",
             roleLabel = "Agent Red Teamer",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
+            motionArchetype = NodeCreatureRoleKind.ThreatModeler,
             phenotypeIndex = 2,
         ),
         MascotCharacterIdentity(
             id = "azphalt-agent-security-architect",
             roleLabel = "Agent Security Architect",
-            motionArchetype = NodeCreatureRoleKind.Architect,
+            motionArchetype = NodeCreatureRoleKind.SecurityAnalyst,
             phenotypeIndex = 3,
         ),
         MascotCharacterIdentity(
             id = "azphalt-book-editor",
             roleLabel = "Book Editor",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.DocumentationSpecialist,
             phenotypeIndex = 4,
         ),
         MascotCharacterIdentity(
             id = "azphalt-brand-strategist",
             roleLabel = "Brand Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.ContentStrategist,
             phenotypeIndex = 5,
         ),
         MascotCharacterIdentity(
             id = "azphalt-campaign-strategist",
             roleLabel = "Campaign Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.StrategyScout,
             phenotypeIndex = 6,
         ),
         MascotCharacterIdentity(
             id = "azphalt-competitive-analyst",
             roleLabel = "Competitive Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
             phenotypeIndex = 7,
         ),
         MascotCharacterIdentity(
             id = "azphalt-content-strategist",
             roleLabel = "Content Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.ContentStrategist,
             phenotypeIndex = 8,
         ),
         MascotCharacterIdentity(
             id = "azphalt-continuity-supervisor",
             roleLabel = "Continuity Supervisor",
-            motionArchetype = NodeCreatureRoleKind.HallMonitor,
+            motionArchetype = NodeCreatureRoleKind.Guardian,
             phenotypeIndex = 9,
         ),
         MascotCharacterIdentity(
@@ -90,13 +90,13 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-corporate-investigator",
             roleLabel = "Corporate Investigator",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 11,
         ),
         MascotCharacterIdentity(
             id = "azphalt-crisis-communicator",
             roleLabel = "Crisis Communicator",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
+            motionArchetype = NodeCreatureRoleKind.Communicator,
             phenotypeIndex = 12,
         ),
         MascotCharacterIdentity(
@@ -108,31 +108,31 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-data-investigator",
             roleLabel = "Data Investigator",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 14,
         ),
         MascotCharacterIdentity(
             id = "azphalt-data-story-editor",
             roleLabel = "Data Story Editor",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.Documenter,
             phenotypeIndex = 15,
         ),
         MascotCharacterIdentity(
             id = "azphalt-decision-analyst",
             roleLabel = "Decision Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DecisionHelper,
             phenotypeIndex = 16,
         ),
         MascotCharacterIdentity(
             id = "azphalt-deep-research-lead",
             roleLabel = "Deep Research Lead",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
             phenotypeIndex = 17,
         ),
         MascotCharacterIdentity(
             id = "azphalt-deep-researcher",
             roleLabel = "Deep Researcher",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
             phenotypeIndex = 18,
         ),
         MascotCharacterIdentity(
@@ -156,13 +156,13 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-evidence-synthesis-lead",
             roleLabel = "Evidence Synthesis Lead",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.CreativeSynthesizer,
             phenotypeIndex = 22,
         ),
         MascotCharacterIdentity(
             id = "azphalt-execution-secretary",
             roleLabel = "Execution Secretary",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
+            motionArchetype = NodeCreatureRoleKind.Scheduler,
             phenotypeIndex = 23,
         ),
         MascotCharacterIdentity(
@@ -174,19 +174,19 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-experimental-methodologist",
             roleLabel = "Experimental Methodologist",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
             phenotypeIndex = 25,
         ),
         MascotCharacterIdentity(
             id = "azphalt-failure-diagnostician",
             roleLabel = "Failure Diagnostician",
-            motionArchetype = NodeCreatureRoleKind.RecoveryEngineer,
+            motionArchetype = NodeCreatureRoleKind.SystemMaintainer,
             phenotypeIndex = 26,
         ),
         MascotCharacterIdentity(
             id = "azphalt-feature-engineer",
             roleLabel = "Feature Engineer",
-            motionArchetype = NodeCreatureRoleKind.ImplementationEngineer,
+            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
             phenotypeIndex = 27,
         ),
         MascotCharacterIdentity(
@@ -198,7 +198,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-film-continuity-supervisor",
             roleLabel = "Film Continuity Supervisor",
-            motionArchetype = NodeCreatureRoleKind.HallMonitor,
+            motionArchetype = NodeCreatureRoleKind.Guardian,
             phenotypeIndex = 29,
         ),
         MascotCharacterIdentity(
@@ -210,7 +210,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-financial-model-auditor",
             roleLabel = "Financial Model Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 31,
         ),
         MascotCharacterIdentity(
@@ -222,19 +222,19 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-geolocation-analyst",
             roleLabel = "Geolocation Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeer,
             phenotypeIndex = 33,
         ),
         MascotCharacterIdentity(
             id = "azphalt-grant-strategist",
             roleLabel = "Grant Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.StrategyScout,
             phenotypeIndex = 34,
         ),
         MascotCharacterIdentity(
             id = "azphalt-graphic-novel-continuity-editor",
             roleLabel = "Graphic Novel Continuity Editor",
-            motionArchetype = NodeCreatureRoleKind.HallMonitor,
+            motionArchetype = NodeCreatureRoleKind.Guardian,
             phenotypeIndex = 35,
         ),
         MascotCharacterIdentity(
@@ -258,7 +258,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-incident-investigator",
             roleLabel = "Incident Investigator",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 39,
         ),
         MascotCharacterIdentity(
@@ -270,37 +270,37 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-investigative-reporter",
             roleLabel = "Investigative Reporter",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 41,
         ),
         MascotCharacterIdentity(
             id = "azphalt-knowledge-system-evaluator",
             roleLabel = "Knowledge System Evaluator",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
             phenotypeIndex = 42,
         ),
         MascotCharacterIdentity(
             id = "azphalt-launch-strategist",
             roleLabel = "Launch Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.DeploymentPilot,
             phenotypeIndex = 43,
         ),
         MascotCharacterIdentity(
             id = "azphalt-learning-coach",
             roleLabel = "Learning Coach",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.Communicator,
             phenotypeIndex = 44,
         ),
         MascotCharacterIdentity(
             id = "azphalt-localization-lead",
             roleLabel = "Localization Lead",
-            motionArchetype = NodeCreatureRoleKind.ReleaseEngineer,
+            motionArchetype = NodeCreatureRoleKind.Translator,
             phenotypeIndex = 45,
         ),
         MascotCharacterIdentity(
             id = "azphalt-manuscript-continuity-editor",
             roleLabel = "Manuscript Continuity Editor",
-            motionArchetype = NodeCreatureRoleKind.HallMonitor,
+            motionArchetype = NodeCreatureRoleKind.Guardian,
             phenotypeIndex = 46,
         ),
         MascotCharacterIdentity(
@@ -312,7 +312,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-negotiation-planner",
             roleLabel = "Negotiation Planner",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.Scheduler,
             phenotypeIndex = 48,
         ),
         MascotCharacterIdentity(
@@ -324,43 +324,43 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-osint-change-auditor",
             roleLabel = "OSINT Change Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.MonitoringSentinel,
             phenotypeIndex = 50,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-chronology-auditor",
             roleLabel = "OSINT Chronology Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 51,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-corporate-investigator",
             roleLabel = "OSINT Corporate Investigator",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 52,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-earth-observation-analyst",
             roleLabel = "OSINT Earth Observation Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeer,
             phenotypeIndex = 53,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-entity-resolution-auditor",
             roleLabel = "OSINT Entity Resolution Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 54,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-geolocation-analyst",
             roleLabel = "OSINT Geolocation Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeer,
             phenotypeIndex = 55,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-infrastructure-analyst",
             roleLabel = "OSINT Infrastructure Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.SystemsAnalyst,
             phenotypeIndex = 56,
         ),
         MascotCharacterIdentity(
@@ -372,49 +372,49 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-osint-mobility-analyst",
             roleLabel = "OSINT Mobility Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeer,
             phenotypeIndex = 58,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-provenance-analyst",
             roleLabel = "OSINT Provenance Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 59,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-risk-researcher",
             roleLabel = "OSINT Risk Researcher",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.ThreatModeler,
             phenotypeIndex = 60,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-screening-auditor",
             roleLabel = "OSINT Screening Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 61,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-timeline-analyst",
             roleLabel = "OSINT Timeline Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeer,
             phenotypeIndex = 62,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-track-auditor",
             roleLabel = "OSINT Track Auditor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.MonitoringSentinel,
             phenotypeIndex = 63,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-verification-editor",
             roleLabel = "OSINT Verification Editor",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 64,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-verifier",
             roleLabel = "OSINT Verifier",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 65,
         ),
         MascotCharacterIdentity(
@@ -426,13 +426,13 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-geometry-engineer",
             roleLabel = "PaperPlanes Geometry Engineer",
-            motionArchetype = NodeCreatureRoleKind.ImplementationEngineer,
+            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
             phenotypeIndex = 67,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-layer-engineer",
             roleLabel = "PaperPlanes Layer Engineer",
-            motionArchetype = NodeCreatureRoleKind.ImplementationEngineer,
+            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
             phenotypeIndex = 68,
         ),
         MascotCharacterIdentity(
@@ -450,7 +450,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-visual-qc",
             roleLabel = "PaperPlanes Visual QC",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 71,
         ),
         MascotCharacterIdentity(
@@ -462,7 +462,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-podcast-fact-editor",
             roleLabel = "Podcast Fact Editor",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.DataMiner,
             phenotypeIndex = 73,
         ),
         MascotCharacterIdentity(
@@ -474,25 +474,25 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-presentation-editor",
             roleLabel = "Presentation Editor",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.Documenter,
             phenotypeIndex = 75,
         ),
         MascotCharacterIdentity(
             id = "azphalt-pricing-researcher",
             roleLabel = "Pricing Researcher",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
             phenotypeIndex = 76,
         ),
         MascotCharacterIdentity(
             id = "azphalt-privacy-risk-analyst",
             roleLabel = "Privacy Risk Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.SecurityAnalyst,
             phenotypeIndex = 77,
         ),
         MascotCharacterIdentity(
             id = "azphalt-process-engineer",
             roleLabel = "Process Engineer",
-            motionArchetype = NodeCreatureRoleKind.ImplementationEngineer,
+            motionArchetype = NodeCreatureRoleKind.ProcessMapper,
             phenotypeIndex = 78,
         ),
         MascotCharacterIdentity(
@@ -504,7 +504,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-qualitative-synthesist",
             roleLabel = "Qualitative Synthesist",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.CreativeSynthesizer,
             phenotypeIndex = 80,
         ),
         MascotCharacterIdentity(
@@ -516,25 +516,25 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-repair-verifier",
             roleLabel = "Repair Verifier",
-            motionArchetype = NodeCreatureRoleKind.RecoveryEngineer,
+            motionArchetype = NodeCreatureRoleKind.SystemMaintainer,
             phenotypeIndex = 82,
         ),
         MascotCharacterIdentity(
             id = "azphalt-review-scientist",
             roleLabel = "Review Scientist",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
             phenotypeIndex = 83,
         ),
         MascotCharacterIdentity(
             id = "azphalt-scenario-planner",
             roleLabel = "Scenario Planner",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.Simulator,
             phenotypeIndex = 84,
         ),
         MascotCharacterIdentity(
             id = "azphalt-search-strategist",
             roleLabel = "Search Strategist",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.StrategyScout,
             phenotypeIndex = 85,
         ),
         MascotCharacterIdentity(
@@ -552,25 +552,25 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-supplier-analyst",
             roleLabel = "Supplier Analyst",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
             phenotypeIndex = 88,
         ),
         MascotCharacterIdentity(
             id = "azphalt-support-escalation-lead",
             roleLabel = "Support Escalation Lead",
-            motionArchetype = NodeCreatureRoleKind.RecoveryEngineer,
+            motionArchetype = NodeCreatureRoleKind.SupportAgent,
             phenotypeIndex = 89,
         ),
         MascotCharacterIdentity(
             id = "azphalt-survey-methodologist",
             roleLabel = "Survey Methodologist",
-            motionArchetype = NodeCreatureRoleKind.Researcher,
+            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
             phenotypeIndex = 90,
         ),
         MascotCharacterIdentity(
             id = "azphalt-technical-writer",
             roleLabel = "Technical Writer",
-            motionArchetype = NodeCreatureRoleKind.ProductManager,
+            motionArchetype = NodeCreatureRoleKind.DocumentationSpecialist,
             phenotypeIndex = 91,
         ),
         MascotCharacterIdentity(
@@ -582,7 +582,7 @@ internal object MascotCharacterCatalog {
         MascotCharacterIdentity(
             id = "azphalt-vendor-evaluator",
             roleLabel = "Vendor Evaluator",
-            motionArchetype = NodeCreatureRoleKind.QaEngineer,
+            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
             phenotypeIndex = 93,
         ),
     )
