@@ -1,0 +1,27 @@
+<<<<<<< SEARCH
+    @Test
+    fun everyMajorCharacterRegionHasAnAddressableBone() {
+        val skeleton = MascotPuppetRig.skeleton(8)
+        val ids = skeleton.bones.map(MascotBone::id).toSet()
+
+        assertTrue(MascotPuppetRig.Root in ids)
+        assertTrue(MascotPuppetRig.Head in ids)
+        assertTrue(MascotPuppetRig.TorsoUpper in ids)
+        assertTrue(MascotPuppetRig.TorsoMid in ids)
+        assertTrue(MascotPuppetRig.Pelvis in ids)
+        assertTrue(MascotPuppetRig.LeftLeg in ids)
+        assertTrue(MascotPuppetRig.RightLeg in ids)
+=======
+    @Test
+    fun everyMajorCharacterRegionHasAnAddressableBone() {
+        val skeleton = MascotPuppetRig.skeleton(8)
+        val ids = skeleton.bones.map(MascotBone::id).toSet()
+
+        assertTrue(MascotPuppetRig.Root in ids)
+        assertTrue(MascotPuppetRig.Head in ids)
+        assertTrue(MascotPuppetRig.TorsoUpper in ids)
+        assertTrue(MascotPuppetRig.TorsoMid in ids)
+        assertTrue(MascotPuppetRig.Pelvis in ids)
+        assertTrue(MascotPuppetRig.LeftLegUpper in ids)
+        assertTrue(MascotPuppetRig.RightLegUpper in ids)
+>>>>>>> REPLACE

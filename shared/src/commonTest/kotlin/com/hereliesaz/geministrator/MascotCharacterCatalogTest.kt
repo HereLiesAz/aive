@@ -109,6 +109,11 @@ class MascotCharacterCatalogTest {
         assertEquals(expectedRoles.size, characters.size)
         assertEquals(characters.size, characters.map { it.id }.toSet().size)
         assertEquals(characters.size, characters.map { it.phenotypeIndex }.toSet().size)
+        assertEquals(
+            characters.size,
+            characters.map { it.designFingerprint }.toSet().size,
+            "Store roles must remain one-character-per-role rather than collapsing into mascot families",
+        )
 
         expectedRoles.forEach { roleName ->
             assertNotNull(

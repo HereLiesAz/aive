@@ -32,11 +32,28 @@ internal fun NodeMascotSurface(
     motionPhase: Float,
     modifier: Modifier = Modifier,
 ) {
+    if (roleLabel.trim().equals("Orchestrator", ignoreCase = true)) {
+        OrchestratorSpritePuppetSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
+    if (roleLabel.trim().equals("UX Designer", ignoreCase = true)) {
+        UxDesignerSpritePuppetSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
+
     val character = MascotCharacterCatalog.forRole(roleLabel)
-    val anatomyTemplate = character?.anatomyTemplate ?: classifyNodeCreatureRole(roleLabel)
-    if (MascotSpriteAtlas.forRole(anatomyTemplate) != null) {
+    val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
+    if (MascotSpriteAtlas.forRole(motionArchetype) != null) {
         SpriteMascotSurface(
-            role = anatomyTemplate,
+            role = motionArchetype,
             state = state,
             motionPhase = motionPhase,
             modifier = modifier,
@@ -45,7 +62,7 @@ internal fun NodeMascotSurface(
     }
     Canvas(modifier) {
         drawNodeMascot(
-            role = anatomyTemplate,
+            role = motionArchetype,
             character = character,
             hueSeed = hueSeed,
             state = state,
@@ -253,8 +270,9 @@ private fun mascotSpec(
     }
     if (character == null) return base
 
-    // Every explicit Store persona receives its own phenotype. We deliberately do not vary tendril
-    // count here: tendrils are workflow topology, not decorative identity.
+    // Every explicit Store persona receives its own morphology. The role archetype above only
+    // supplies motion/prop semantics; palette, proportions and body mark belong to this character.
+    // Tendril count is deliberately not an identity trait: graph connections own visible tendrils.
     val phenotype = character.phenotypeIndex
     val palette = azphaltCharacterPalettes[phenotype % azphaltCharacterPalettes.size]
     val headProfile = (phenotype / azphaltCharacterPalettes.size) % 4
