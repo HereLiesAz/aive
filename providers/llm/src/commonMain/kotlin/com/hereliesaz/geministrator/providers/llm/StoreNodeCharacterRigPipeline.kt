@@ -12,8 +12,10 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegration
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.get
 import io.ktor.serialization.kotlinx.json.json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -32,6 +34,7 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         repositoryUrl = AZPHALT_STORE_URL,
     ),
     private val archiveReader: KmpZipAzphaltArchiveReader = KmpZipAzphaltArchiveReader(),
+    private val assetClient: HttpClient = storePipelineHttpClient(),
     private val maxVisualAttempts: Int = 3,
 ) : TaskExecutorIntegration {
     init { require(maxVisualAttempts >= 1) }
@@ -137,12 +140,9 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         }
 
         val entry = plan.selected[slot - 1]
-        val payload = packagePayload(StoreOperation("slot", plan.packageId, plan.version, slot))
-        val cropBytes = requireNotNull(payload[entry.cropPath]) { "Missing source crop ${entry.cropPath}" }
-        val approvedPrompt = requireNotNull(payload[entry.promptPath]) { "Missing prompt ${entry.promptPath}" }
-            .decodeToString()
-            .trim()
-        require(approvedPrompt.isNotBlank())
+        val cropBytes = fetchSourceCrop(entry)
+        val approvedPrompt = entry.promptText.trim()
+        require(approvedPrompt.isNotBlank()) { "Approved prompt is blank for ${entry.displayName()}" }
         val cropUri = pngDataUri(cropBytes)
         val rigPrompt = rigPrompt(entry, approvedPrompt)
 
@@ -275,6 +275,14 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         )
     }
 
+
+    private suspend fun fetchSourceCrop(entry: StoreCreatureCatalogEntry): ByteArray {
+        val response = assetClient.get(entry.cropUrl)
+        require(response.status.value in 200..299) {
+            "Unable to fetch canonical source crop for ${entry.displayName()}: HTTP ${response.status.value}"
+        }
+        return response.body()
+    }
 
     private suspend fun packagePayload(op: StoreOperation): Map<String, ByteArray> {
         val key = "${op.packageId}@${op.version}"
@@ -466,8 +474,8 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         val variant: String? = null,
         val sourceSheet: String,
         val sourceCell: String,
-        val cropPath: String,
-        val promptPath: String,
+        val cropUrl: String,
+        val promptText: String,
     ) {
         fun displayName(): String =
             variant?.takeIf(String::isNotBlank)?.let { "$role - $it" } ?: role
