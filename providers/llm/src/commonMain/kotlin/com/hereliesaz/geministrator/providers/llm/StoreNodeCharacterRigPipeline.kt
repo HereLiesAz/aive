@@ -269,7 +269,68 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         )
     }
 
+
+    private suspend fun packagePayload(op: StoreOperation): Map<String, ByteArray> {
+        val key = "${op.packageId}@${op.version}"
+        packageCache[key]?.let { return it }
+        return archiveReader.read(repositoryClient.download(op.packageId, op.version)).also {
+            packageCache[key] = it
+        }
+    }
+
+    private fun decodeCatalog(payload: Map<String, ByteArray>): StoreCreatureCatalog =
+        json.decodeFromString(
+            StoreCreatureCatalog.serializer(),
+            requireNotNull(payload[CATALOG_PATH]) {
+                "Store package is missing $CATALOG_PATH"
+            }.decodeToString(),
+        ).also { require(it.entries.isNotEmpty()) }
+
+    private fun dependencyPlan(context: TaskExecutorContext): StoreCreatureBatchPlan {
+        val artifact = dependencyArtifacts(context).firstOrNull {
+            it.kind == ArtifactKind.TaskPlan && it.metadata["stage"] == "batch-plan"
+        } ?: error("Node Creature batch plan is missing")
+        return json.decodeFromString(
+            StoreCreatureBatchPlan.serializer(),
+            requireNotNull(artifact.textContent),
+        )
+    }
+
+    private fun dependencyArtifacts(context: TaskExecutorContext): List<ArtifactRef> =
+        context.task.dependsOn.flatMap { context.run.taskRuns[it]?.artifacts.orEmpty() }
+
+    private fun parseRequestedRoles(objective: String): List<String> {
+        val text = objective.trim()
+        if (text.isEmpty()) return emptyList()
+        val body = Regex("(?is)(?:^|\\n)\\s*roles?\\s*:\\s*(.+)$")
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            ?: text
+        return body
+            .split(Regex("[;\\n,]+"))
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+    }
+
+    private fun StoreCreatureCatalog.resolve(query: String): StoreCreatureCatalogEntry {
+        val needle = normalize(query)
+        entries.firstOrNull { normalize(it.id) == needle }?.let { return it }
+        entries.firstOrNull { normalize(it.displayName()) == needle }?.let { return it }
+        val matches = entries.filter { normalize(it.role) == needle }
+        require(matches.isNotEmpty()) {
+            "No supplied source character matches '$query'. This workflow never invents stand-ins."
+        }
+        require(matches.size == 1) {
+            "Role '$query' has multiple supplied variants. Choose: " +
+                matches.joinToString { it.displayName() }
+        }
+        return matches.single()
+    }
+
     //__STORE_PIPELINE_METHODS__
+
 
 
 }
