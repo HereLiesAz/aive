@@ -53,7 +53,7 @@ class AndroidResumableFileDownloaderTest {
 
             assertEquals(bytes.toList(), output.readBytes().toList())
             assertTrue(!File(root, "model.part001.download").exists())
-            assertEquals(2, requests)
+            assertEquals(1, requests)
         } finally {
             client.close()
             root.deleteRecursively()

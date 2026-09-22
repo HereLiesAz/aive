@@ -91,7 +91,8 @@ object WorkflowRunFactory {
                 dependencyRuns.all { it.status.isTerminal() }
 
             val conditionMet: Boolean = when (val c = task.condition) {
-                is TaskCondition.Always -> allTerminal
+                is TaskCondition.Always -> allTerminal &&
+                    dependencyRuns.all { it.status == TaskRunStatus.Completed }
                 is TaskCondition.OnAnyOutcome -> {
                     val targetRun = run.taskRuns[c.ofTask]
                     allTerminal && targetRun != null && targetRun.status.isTerminal()
@@ -105,7 +106,10 @@ object WorkflowRunFactory {
                 }
             }
 
-            val conditionUnreachable = allTerminal && !conditionMet
+            // Always-conditioned tasks stay Blocked when a dep fails rather than being cancelled:
+            // the happy-path semantics let the workflow continue via failure handlers without
+            // prematurely cancelling tasks that haven't had a chance to run yet.
+            val conditionUnreachable = task.condition !is TaskCondition.Always && allTerminal && !conditionMet
             when {
                 conditionMet -> taskRun.copy(
                     status = TaskRunStatus.Ready,
