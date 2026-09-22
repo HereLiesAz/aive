@@ -26,6 +26,50 @@ internal enum class NodeCreatureRoleKind {
     WorldBuilder,
     Storyteller,
     Pathfinder,
+    // Wave 3 — swarm-terrarium characters
+    DataMiner,
+    KnowledgeKeeper,
+    PatternSeeker,
+    PatternSeer,
+    Translator,
+    Connector,
+    Scheduler,
+    Optimizer,
+    Simulator,
+    Documenter,
+    Guardian,
+    CreativeSynthesizer,
+    ResourceManager,
+    FeedbackListener,
+    DecisionHelper,
+    FlowDirector,
+    Communicator,
+    Integrator,
+    SecurityAnalyst,
+    QualityGuardian,
+    DocumentationSpecialist,
+    TestExplorer,
+    DeploymentPilot,
+    MonitoringSentinel,
+    FeedbackCollector,
+    IdeaCatalyst,
+    ProcessMapper,
+    StrategyScout,
+    SystemMaintainer,
+    SustainabilityAdvocate,
+    SystemsAnalyst,
+    DatabaseAdministrator,
+    NetworkEngineer,
+    SiteReliabilityEngineer,
+    BuildEngineer,
+    TestAutomationEngineer,
+    ThreatModeler,
+    MigrationEngineer,
+    ObservabilityEngineer,
+    BusinessAnalyst,
+    ContentStrategist,
+    SupportAgent,
+    MlEngineer,
     Generic,
 }
 
@@ -194,8 +238,109 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
             "director" in role ||
             "producer" in role ||
             "showrunner" in role ||
-            "secretary" in role ||
-            "communicator" in role -> NodeCreatureRoleKind.Orchestrator
+            "secretary" in role -> NodeCreatureRoleKind.Orchestrator
+
+        // Wave 3 — specific roles checked before broad fallbacks above.
+        "data miner" in role ||
+            "data mining" in role -> NodeCreatureRoleKind.DataMiner
+
+        "knowledge keeper" in role ||
+            "knowledge base" in role ||
+            "knowledge manager" in role -> NodeCreatureRoleKind.KnowledgeKeeper
+
+        "pattern seeker" in role -> NodeCreatureRoleKind.PatternSeeker
+        "pattern seer" in role -> NodeCreatureRoleKind.PatternSeer
+
+        "translator" in role ||
+            "translation" in role -> NodeCreatureRoleKind.Translator
+
+        "connector" in role -> NodeCreatureRoleKind.Connector
+
+        "scheduler" in role ||
+            "scheduling" in role -> NodeCreatureRoleKind.Scheduler
+
+        "optimizer" in role ||
+            "optimiser" in role ||
+            "optimization" in role -> NodeCreatureRoleKind.Optimizer
+
+        "simulator" in role ||
+            "simulation" in role -> NodeCreatureRoleKind.Simulator
+
+        "documenter" in role -> NodeCreatureRoleKind.Documenter
+
+        "guardian" in role -> NodeCreatureRoleKind.Guardian
+
+        "creative synthes" in role -> NodeCreatureRoleKind.CreativeSynthesizer
+
+        "resource manager" in role -> NodeCreatureRoleKind.ResourceManager
+
+        "feedback listener" in role ||
+            "feedback collector" in role -> NodeCreatureRoleKind.FeedbackListener
+
+        "decision helper" in role ||
+            "decision maker" in role -> NodeCreatureRoleKind.DecisionHelper
+
+        "flow director" in role -> NodeCreatureRoleKind.FlowDirector
+
+        "communicator" in role -> NodeCreatureRoleKind.Communicator
+
+        "integrator" in role ||
+            "integration" in role -> NodeCreatureRoleKind.Integrator
+
+        "security analyst" in role ||
+            "threat model" in role -> NodeCreatureRoleKind.SecurityAnalyst
+
+        "quality guardian" in role -> NodeCreatureRoleKind.QualityGuardian
+
+        "documentation specialist" in role -> NodeCreatureRoleKind.DocumentationSpecialist
+
+        "test explorer" in role -> NodeCreatureRoleKind.TestExplorer
+
+        "deployment pilot" in role -> NodeCreatureRoleKind.DeploymentPilot
+
+        "monitoring sentinel" in role ||
+            "sentinel" in role -> NodeCreatureRoleKind.MonitoringSentinel
+
+        "idea catalyst" in role -> NodeCreatureRoleKind.IdeaCatalyst
+
+        "process mapper" in role -> NodeCreatureRoleKind.ProcessMapper
+
+        "strategy scout" in role -> NodeCreatureRoleKind.StrategyScout
+
+        "system maintainer" in role ||
+            "maintenance" in role -> NodeCreatureRoleKind.SystemMaintainer
+
+        "sustainability" in role -> NodeCreatureRoleKind.SustainabilityAdvocate
+
+        "systems analyst" in role ||
+            "system analyst" in role -> NodeCreatureRoleKind.SystemsAnalyst
+
+        "database admin" in role ||
+            "dba" in role -> NodeCreatureRoleKind.DatabaseAdministrator
+
+        "network engineer" in role -> NodeCreatureRoleKind.NetworkEngineer
+
+        "site reliability" in role ||
+            "sre" in role -> NodeCreatureRoleKind.SiteReliabilityEngineer
+
+        "build engineer" in role -> NodeCreatureRoleKind.BuildEngineer
+
+        "test automation" in role -> NodeCreatureRoleKind.TestAutomationEngineer
+
+        "migration engineer" in role ||
+            "migration" in role -> NodeCreatureRoleKind.MigrationEngineer
+
+        "observability" in role -> NodeCreatureRoleKind.ObservabilityEngineer
+
+        "business analyst" in role -> NodeCreatureRoleKind.BusinessAnalyst
+
+        "content strategist" in role -> NodeCreatureRoleKind.ContentStrategist
+
+        "support agent" in role ||
+            "customer support" in role -> NodeCreatureRoleKind.SupportAgent
+
+        "ml engineer" in role ||
+            "machine learning engineer" in role -> NodeCreatureRoleKind.MlEngineer
 
         else -> NodeCreatureRoleKind.Generic
     }
@@ -227,5 +372,48 @@ internal fun NodeCreatureRoleKind.activeLabel(): String = when (this) {
     NodeCreatureRoleKind.WorldBuilder -> "BUILDING WORLDS"
     NodeCreatureRoleKind.Storyteller -> "NARRATING"
     NodeCreatureRoleKind.Pathfinder -> "EXPLORING"
+    NodeCreatureRoleKind.DataMiner -> "MINING"
+    NodeCreatureRoleKind.KnowledgeKeeper -> "INDEXING"
+    NodeCreatureRoleKind.PatternSeeker -> "SEEKING"
+    NodeCreatureRoleKind.PatternSeer -> "PERCEIVING"
+    NodeCreatureRoleKind.Translator -> "TRANSLATING"
+    NodeCreatureRoleKind.Connector -> "CONNECTING"
+    NodeCreatureRoleKind.Scheduler -> "SCHEDULING"
+    NodeCreatureRoleKind.Optimizer -> "OPTIMIZING"
+    NodeCreatureRoleKind.Simulator -> "SIMULATING"
+    NodeCreatureRoleKind.Documenter -> "DOCUMENTING"
+    NodeCreatureRoleKind.Guardian -> "GUARDING"
+    NodeCreatureRoleKind.CreativeSynthesizer -> "SYNTHESIZING"
+    NodeCreatureRoleKind.ResourceManager -> "ALLOCATING"
+    NodeCreatureRoleKind.FeedbackListener -> "LISTENING"
+    NodeCreatureRoleKind.DecisionHelper -> "DECIDING"
+    NodeCreatureRoleKind.FlowDirector -> "DIRECTING"
+    NodeCreatureRoleKind.Communicator -> "COMMUNICATING"
+    NodeCreatureRoleKind.Integrator -> "INTEGRATING"
+    NodeCreatureRoleKind.SecurityAnalyst -> "HARDENING"
+    NodeCreatureRoleKind.QualityGuardian -> "INSPECTING"
+    NodeCreatureRoleKind.DocumentationSpecialist -> "WRITING"
+    NodeCreatureRoleKind.TestExplorer -> "EXPLORING TESTS"
+    NodeCreatureRoleKind.DeploymentPilot -> "DEPLOYING"
+    NodeCreatureRoleKind.MonitoringSentinel -> "SENTINEL"
+    NodeCreatureRoleKind.FeedbackCollector -> "COLLECTING"
+    NodeCreatureRoleKind.IdeaCatalyst -> "IDEATING"
+    NodeCreatureRoleKind.ProcessMapper -> "MAPPING"
+    NodeCreatureRoleKind.StrategyScout -> "SCOUTING"
+    NodeCreatureRoleKind.SystemMaintainer -> "MAINTAINING"
+    NodeCreatureRoleKind.SustainabilityAdvocate -> "ADVOCATING"
+    NodeCreatureRoleKind.SystemsAnalyst -> "ANALYZING SYSTEMS"
+    NodeCreatureRoleKind.DatabaseAdministrator -> "ADMINISTERING"
+    NodeCreatureRoleKind.NetworkEngineer -> "NETWORKING"
+    NodeCreatureRoleKind.SiteReliabilityEngineer -> "RELIABILITY"
+    NodeCreatureRoleKind.BuildEngineer -> "BUILDING"
+    NodeCreatureRoleKind.TestAutomationEngineer -> "AUTOMATING TESTS"
+    NodeCreatureRoleKind.ThreatModeler -> "THREAT MODELING"
+    NodeCreatureRoleKind.MigrationEngineer -> "MIGRATING"
+    NodeCreatureRoleKind.ObservabilityEngineer -> "OBSERVING"
+    NodeCreatureRoleKind.BusinessAnalyst -> "ANALYZING"
+    NodeCreatureRoleKind.ContentStrategist -> "STRATEGIZING"
+    NodeCreatureRoleKind.SupportAgent -> "SUPPORTING"
+    NodeCreatureRoleKind.MlEngineer -> "LEARNING"
     NodeCreatureRoleKind.Generic -> "WORKING"
 }

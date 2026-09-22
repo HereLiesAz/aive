@@ -336,6 +336,136 @@ private fun mascotSpec(
         terminal = MascotTerminal.Leaf,
         accessory = MascotAccessory.Bandage,
     )
+    NodeCreatureRoleKind.DataMiner,
+    NodeCreatureRoleKind.KnowledgeKeeper,
+    NodeCreatureRoleKind.PatternSeeker,
+    NodeCreatureRoleKind.PatternSeer,
+    NodeCreatureRoleKind.FeedbackListener,
+    NodeCreatureRoleKind.StrategyScout,
+    NodeCreatureRoleKind.SystemsAnalyst,
+    NodeCreatureRoleKind.BusinessAnalyst,
+    NodeCreatureRoleKind.MlEngineer -> MascotSpec(
+        body = Color(0xFF38AAEA),
+        dark = Color(0xFF153E67),
+        antennaCount = 5,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Magnifier,
+    )
+    NodeCreatureRoleKind.Translator,
+    NodeCreatureRoleKind.Scheduler,
+    NodeCreatureRoleKind.Documenter,
+    NodeCreatureRoleKind.CreativeSynthesizer,
+    NodeCreatureRoleKind.DecisionHelper,
+    NodeCreatureRoleKind.Communicator,
+    NodeCreatureRoleKind.DocumentationSpecialist,
+    NodeCreatureRoleKind.IdeaCatalyst,
+    NodeCreatureRoleKind.ContentStrategist -> MascotSpec(
+        body = Color(0xFFF56C9B),
+        dark = Color(0xFF5B2440),
+        antennaCount = 8,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Clipboard,
+        radial = true,
+    )
+    NodeCreatureRoleKind.Connector,
+    NodeCreatureRoleKind.ResourceManager,
+    NodeCreatureRoleKind.FlowDirector -> MascotSpec(
+        body = Color(0xFFFFB91F),
+        dark = Color(0xFF111827),
+        antennaCount = 10,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Baton,
+        radial = true,
+    )
+    NodeCreatureRoleKind.Optimizer,
+    NodeCreatureRoleKind.Integrator,
+    NodeCreatureRoleKind.DatabaseAdministrator,
+    NodeCreatureRoleKind.NetworkEngineer,
+    NodeCreatureRoleKind.SiteReliabilityEngineer,
+    NodeCreatureRoleKind.BuildEngineer,
+    NodeCreatureRoleKind.MigrationEngineer -> MascotSpec(
+        body = Color(0xFFFF7B00),
+        dark = Color(0xFF6C370F),
+        antennaCount = 8,
+        terminal = MascotTerminal.Square,
+        accessory = MascotAccessory.Wrench,
+        angular = true,
+        radial = true,
+    )
+    NodeCreatureRoleKind.Simulator -> MascotSpec(
+        body = Color(0xFFFFD134),
+        dark = Color(0xFF655316),
+        antennaCount = 6,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Goggles,
+    )
+    NodeCreatureRoleKind.Guardian,
+    NodeCreatureRoleKind.MonitoringSentinel,
+    NodeCreatureRoleKind.ObservabilityEngineer -> MascotSpec(
+        body = Color(0xFF78AFE8),
+        dark = Color(0xFF244D81),
+        antennaCount = 7,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Dashboard,
+        radial = true,
+    )
+    NodeCreatureRoleKind.SecurityAnalyst,
+    NodeCreatureRoleKind.ThreatModeler -> MascotSpec(
+        body = Color(0xFFF12E3D),
+        dark = Color(0xFF711621),
+        antennaCount = 8,
+        terminal = MascotTerminal.Spike,
+        accessory = MascotAccessory.Stop,
+        angular = true,
+        radial = true,
+    )
+    NodeCreatureRoleKind.QualityGuardian,
+    NodeCreatureRoleKind.TestExplorer,
+    NodeCreatureRoleKind.TestAutomationEngineer -> MascotSpec(
+        body = Color(0xFF3CC4DA),
+        dark = Color(0xFF173B59),
+        antennaCount = 5,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Tablet,
+    )
+    NodeCreatureRoleKind.DeploymentPilot -> MascotSpec(
+        body = Color(0xFFA66EE8),
+        dark = Color(0xFF57337E),
+        antennaCount = 7,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Key,
+        radial = true,
+    )
+    NodeCreatureRoleKind.FeedbackCollector -> MascotSpec(
+        body = Color(0xFF38AAEA),
+        dark = Color(0xFF153E67),
+        antennaCount = 5,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Magnifier,
+    )
+    NodeCreatureRoleKind.ProcessMapper -> MascotSpec(
+        body = Color(0xFF8D5AE9),
+        dark = Color(0xFF4D2A86),
+        antennaCount = 7,
+        terminal = MascotTerminal.Square,
+        accessory = MascotAccessory.Blueprint,
+        angular = true,
+    )
+    NodeCreatureRoleKind.SystemMaintainer,
+    NodeCreatureRoleKind.SupportAgent -> MascotSpec(
+        body = Color(0xFF59C793),
+        dark = Color(0xFF1F6847),
+        antennaCount = 7,
+        terminal = MascotTerminal.Leaf,
+        accessory = MascotAccessory.Bandage,
+    )
+    NodeCreatureRoleKind.SustainabilityAdvocate -> MascotSpec(
+        body = Color(0xFF43B94D),
+        dark = Color(0xFF195B2B),
+        antennaCount = 7,
+        terminal = MascotTerminal.Plug,
+        accessory = MascotAccessory.Wrench,
+    )
     NodeCreatureRoleKind.Generic -> MascotSpec(
         body = Azphalt.hue(hueSeed),
         dark = Azphalt.cap(hueSeed),

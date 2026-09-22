@@ -69,6 +69,49 @@ internal object NodeArmAssets {
             NodeCreatureRoleKind.WorldBuilder -> NodeArmRole.Architect
             NodeCreatureRoleKind.Storyteller -> NodeArmRole.ProductManager
             NodeCreatureRoleKind.Pathfinder -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.DataMiner -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.KnowledgeKeeper -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.PatternSeeker -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.PatternSeer -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.Translator -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.Connector -> NodeArmRole.Orchestrator
+            NodeCreatureRoleKind.Scheduler -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.Optimizer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.Simulator -> NodeArmRole.CrashTestDummy
+            NodeCreatureRoleKind.Documenter -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.Guardian -> NodeArmRole.HallMonitor
+            NodeCreatureRoleKind.CreativeSynthesizer -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.ResourceManager -> NodeArmRole.Orchestrator
+            NodeCreatureRoleKind.FeedbackListener -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.DecisionHelper -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.FlowDirector -> NodeArmRole.Orchestrator
+            NodeCreatureRoleKind.Communicator -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.Integrator -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.SecurityAnalyst -> NodeArmRole.AdversarialReviewer
+            NodeCreatureRoleKind.QualityGuardian -> NodeArmRole.QaEngineer
+            NodeCreatureRoleKind.DocumentationSpecialist -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.TestExplorer -> NodeArmRole.QaEngineer
+            NodeCreatureRoleKind.DeploymentPilot -> NodeArmRole.ReleaseEngineer
+            NodeCreatureRoleKind.MonitoringSentinel -> NodeArmRole.HallMonitor
+            NodeCreatureRoleKind.FeedbackCollector -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.IdeaCatalyst -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.ProcessMapper -> NodeArmRole.Architect
+            NodeCreatureRoleKind.StrategyScout -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.SystemMaintainer -> NodeArmRole.RecoveryEngineer
+            NodeCreatureRoleKind.SustainabilityAdvocate -> NodeArmRole.EpaRepresentative
+            NodeCreatureRoleKind.SystemsAnalyst -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.DatabaseAdministrator -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.NetworkEngineer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.SiteReliabilityEngineer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.BuildEngineer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.TestAutomationEngineer -> NodeArmRole.QaEngineer
+            NodeCreatureRoleKind.ThreatModeler -> NodeArmRole.AdversarialReviewer
+            NodeCreatureRoleKind.MigrationEngineer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.ObservabilityEngineer -> NodeArmRole.HallMonitor
+            NodeCreatureRoleKind.BusinessAnalyst -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.ContentStrategist -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.SupportAgent -> NodeArmRole.RecoveryEngineer
+            NodeCreatureRoleKind.MlEngineer -> NodeArmRole.Researcher
             NodeCreatureRoleKind.Generic -> NodeArmRole.Orchestrator
         }
 
