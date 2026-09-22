@@ -17,6 +17,10 @@ import androidx.compose.ui.Modifier
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.resolveRoleCollection
+import com.hereliesaz.geministrator.workflow.NodeCharacterGenerationWorkflowFactory
+import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
@@ -178,6 +182,8 @@ fun App(
             }
         }
 
+        val nodeCharacterAssetStore = remember { SettingsNodeCharacterAssetStore() }
+
         val workflowLibraryHost = WorkflowLibraryHost(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
@@ -195,6 +201,46 @@ fun App(
                 )
             },
             onPackagesChanged = { runtimeGeneration += 1 },
+            onWorkflowCreated = { authored ->
+                if (!authored.id.value.startsWith("node-characters-for-")) {
+                    val catalog = resolveRoleCollection(
+                        BuiltInRoles.all + workflowPersistence.roles.all(),
+                    )
+                    val rolesById = catalog.associateBy { it.id }
+                    val missingRoleIds = NodeCharacterGenerationWorkflowFactory
+                        .referencedRoleIds(authored)
+                        .filter { roleId ->
+                            val role = rolesById[roleId] ?: return@filter false
+                            val hasEstablishedCharacter =
+                                MascotCharacterCatalog.explicitForRole(role.name) != null ||
+                                    classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Generic
+                            !hasEstablishedCharacter && nodeCharacterAssetStore.get(roleId) == null
+                        }
+                        .toSet()
+                    if (missingRoleIds.isNotEmpty()) {
+                        val generation = NodeCharacterGenerationWorkflowFactory.create(
+                            source = authored,
+                            roleCatalog = catalog,
+                            targetRoleIds = missingRoleIds,
+                        )
+                        val activeRuntime = runtime ?: error("Runtime is unavailable")
+                        val existingProject = when (val state = runtimeState) {
+                            is ApplicationRuntimeState.NoRun -> state.project
+                            is ApplicationRuntimeState.Live -> state.presentation.project
+                            else -> null
+                        }
+                        activeRuntime.launchSavedWorkflow(
+                            definition = generation,
+                            existingProject = existingProject,
+                            projectName = existingProject?.name ?: authored.name,
+                            objective = "Generate Node Creature assets for newly introduced roles in ${authored.name}.",
+                            supplementalRoles =
+                                NodeCharacterGenerationWorkflowFactory.roles +
+                                    catalog.filter { it.id in missingRoleIds },
+                        )
+                    }
+                }
+            },
         )
 
         CompositionLocalProvider(LocalWorkflowLibraryHost provides workflowLibraryHost) {
