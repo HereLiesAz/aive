@@ -1,3 +1,4 @@
+@file:Suppress("UnusedImport")
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -88,4 +89,18 @@ kotlin {
 
 compose.resources {
     packageOfResClass = "com.hereliesaz.geministrator.resources"
+}
+
+// The compose-resource pipeline tasks must never be restored from build cache: stale entries
+// cause "Unresolved reference" errors for drawables that exist on disk but were absent when
+// the cached outputs were produced. All three pipeline stages are covered.
+// whenTaskAdded fires synchronously for every added task (eager and lazy), ensuring the
+// cacheIf { false } configuration is applied before any build-cache lookup occurs.
+tasks.whenTaskAdded { task ->
+    if (task.name.startsWith("copyNonXmlValueResources") ||
+        task.name.startsWith("prepareComposeResourcesTask") ||
+        task.name.startsWith("generateResourceAccessors")
+    ) {
+        task.outputs.cacheIf { false }
+    }
 }

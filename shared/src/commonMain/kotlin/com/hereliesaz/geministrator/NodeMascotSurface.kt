@@ -51,6 +51,15 @@ internal fun NodeMascotSurface(
 
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
+    if (MascotSpriteAtlas.forRole(motionArchetype) != null) {
+        SpriteMascotSurface(
+            role = motionArchetype,
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
     Canvas(modifier) {
         drawNodeMascot(
             role = motionArchetype,
@@ -249,6 +258,83 @@ private fun mascotSpec(
         terminal = MascotTerminal.Eye,
         accessory = MascotAccessory.Dashboard,
         radial = true,
+    )
+    // ── New characters — canvas fallback (normally intercepted by SpriteMascotSurface) ──
+    NodeCreatureRoleKind.DataScientist -> MascotSpec(
+        body = Color(0xFF3A8FD9),
+        dark = Color(0xFF1A4A72),
+        antennaCount = 5,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Magnifier,
+    )
+    NodeCreatureRoleKind.DataEngineer -> MascotSpec(
+        body = Color(0xFF3A7FBF),
+        dark = Color(0xFF1A3D5C),
+        antennaCount = 6,
+        terminal = MascotTerminal.Square,
+        accessory = MascotAccessory.Wrench,
+        angular = true,
+    )
+    NodeCreatureRoleKind.ContentCreator -> MascotSpec(
+        body = Color(0xFFF06EA9),
+        dark = Color(0xFF763755),
+        antennaCount = 5,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Clipboard,
+        radial = true,
+    )
+    NodeCreatureRoleKind.TechnicalAuthor -> MascotSpec(
+        body = Color(0xFF9B6BD9),
+        dark = Color(0xFF533979),
+        antennaCount = 4,
+        terminal = MascotTerminal.Square,
+        accessory = MascotAccessory.Tablet,
+        angular = true,
+    )
+    NodeCreatureRoleKind.ComplianceOfficer -> MascotSpec(
+        body = Color(0xFF3CC4DA),
+        dark = Color(0xFF173B59),
+        antennaCount = 5,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Tablet,
+    )
+    NodeCreatureRoleKind.LegalCounsel -> MascotSpec(
+        body = Color(0xFF78AFE8),
+        dark = Color(0xFF244D81),
+        antennaCount = 4,
+        terminal = MascotTerminal.Eye,
+        accessory = MascotAccessory.Dashboard,
+        radial = true,
+    )
+    NodeCreatureRoleKind.BugReporter -> MascotSpec(
+        body = Color(0xFFF12E3D),
+        dark = Color(0xFF711621),
+        antennaCount = 6,
+        terminal = MascotTerminal.Spike,
+        accessory = MascotAccessory.Stop,
+        angular = true,
+    )
+    NodeCreatureRoleKind.WorldBuilder -> MascotSpec(
+        body = Color(0xFF4A9E8E),
+        dark = Color(0xFF1F5247),
+        antennaCount = 6,
+        terminal = MascotTerminal.Leaf,
+        accessory = MascotAccessory.Blueprint,
+    )
+    NodeCreatureRoleKind.Storyteller -> MascotSpec(
+        body = Color(0xFF4FAF6F),
+        dark = Color(0xFF245636),
+        antennaCount = 5,
+        terminal = MascotTerminal.Round,
+        accessory = MascotAccessory.Magnifier,
+        radial = true,
+    )
+    NodeCreatureRoleKind.Pathfinder -> MascotSpec(
+        body = Color(0xFFEF8354),
+        dark = Color(0xFF6B351F),
+        antennaCount = 5,
+        terminal = MascotTerminal.Leaf,
+        accessory = MascotAccessory.Bandage,
     )
     NodeCreatureRoleKind.Generic -> MascotSpec(
         body = Azphalt.hue(hueSeed),

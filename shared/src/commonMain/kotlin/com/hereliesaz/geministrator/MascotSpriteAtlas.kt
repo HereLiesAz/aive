@@ -1,0 +1,644 @@
+package com.hereliesaz.geministrator
+
+import com.hereliesaz.geministrator.resources.Res
+import org.jetbrains.compose.resources.DrawableResource
+
+/**
+ * Sprite atlas definitions for all 16 NodeCreatureRoleKind mascot characters.
+ *
+ * All sizing is expressed in the 200×200 artboard coordinate space used by [MascotPuppetRig].
+ * [pivotNormX]/[pivotNormY] locate the bone's attachment point within the sprite bounds (0=near
+ * side, 1=far side), so the renderer can align each part to its bone pivot correctly.
+ */
+internal data class MascotSpritePart(
+    val resource: DrawableResource,
+    /** Width of the sprite when drawn in artboard units. Height is computed from aspect ratio. */
+    val designWidth: Float,
+    val pivotNormX: Float = 0.5f,
+    val pivotNormY: Float = 0.5f,
+    /** Pixel dimensions of the source region — for a stand-alone asset this is the full image. */
+    val srcW: Int,
+    val srcH: Int,
+    /** Top-left pixel offset within the source image; non-zero for composite-sheet assets. */
+    val srcOffsetX: Int = 0,
+    val srcOffsetY: Int = 0,
+)
+
+internal data class MascotSpriteAtlasSpec(
+    val antennaCount: Int,
+    val body: MascotSpritePart,
+    val prop: MascotSpritePart,
+    val leg: MascotSpritePart,
+    val antenna: MascotSpritePart,
+    /** True for left-side bones: the leg sprite is drawn mirrored horizontally. */
+    val mirrorLeftLeg: Boolean = true,
+)
+
+internal object MascotSpriteAtlas {
+
+    fun forRole(role: NodeCreatureRoleKind): MascotSpriteAtlasSpec? = specs[role]
+
+    private val specs: Map<NodeCreatureRoleKind, MascotSpriteAtlasSpec> by lazy {
+        mapOf(
+            NodeCreatureRoleKind.Orchestrator to MascotSpriteAtlasSpec(
+                antennaCount = 7,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_orchestrator_body,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 425, srcH = 390,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_orchestrator_prop,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 109, srcH = 155,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_orchestrator_leg,
+                    designWidth = 24f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 138, srcH = 166,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_orchestrator_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.9f,
+                    srcW = 96, srcH = 128,
+                ),
+            ),
+            NodeCreatureRoleKind.UxDesigner to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_ux_designer_body,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 430, srcH = 401,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_ux_designer_prop,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 293, srcH = 418,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_ux_designer_leg,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 127, srcH = 253,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_ux_designer_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 98, srcH = 135,
+                ),
+            ),
+            NodeCreatureRoleKind.Researcher to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_researcher_body,
+                    designWidth = 88f, pivotNormX = 0.5f, pivotNormY = 0.55f,
+                    srcW = 559, srcH = 556,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_researcher_prop,
+                    designWidth = 32f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 239, srcH = 277,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_researcher_leg,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 138, srcH = 125,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_researcher_antenna,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.9f,
+                    srcW = 111, srcH = 115,
+                ),
+            ),
+            NodeCreatureRoleKind.ImplementationEngineer to MascotSpriteAtlasSpec(
+                antennaCount = 8,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_implementation_engineer_body,
+                    designWidth = 96f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 716, srcH = 761,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_implementation_engineer_prop,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.1f,
+                    srcW = 153, srcH = 412,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_implementation_engineer_leg,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 81, srcH = 142,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_implementation_engineer_antenna,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 93, srcH = 129,
+                ),
+            ),
+            NodeCreatureRoleKind.Architect to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_architect_body,
+                    designWidth = 92f, pivotNormX = 0.45f, pivotNormY = 0.5f,
+                    srcW = 693, srcH = 535,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_architect_prop,
+                    designWidth = 38f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 292, srcH = 259,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_architect_leg,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 110, srcH = 120,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_architect_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 126, srcH = 248,
+                ),
+            ),
+            NodeCreatureRoleKind.EpaRepresentative to MascotSpriteAtlasSpec(
+                antennaCount = 8,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_epa_representative_body,
+                    designWidth = 82f, pivotNormX = 0.5f, pivotNormY = 0.55f,
+                    srcW = 407, srcH = 393,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_epa_representative_prop,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 204, srcH = 381,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_epa_representative_leg,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 163, srcH = 165,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_epa_representative_antenna,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 142, srcH = 154,
+                ),
+            ),
+            NodeCreatureRoleKind.AdversarialReviewer to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_adversarial_reviewer_body,
+                    designWidth = 92f, pivotNormX = 0.5f, pivotNormY = 0.55f,
+                    srcW = 642, srcH = 587,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_adversarial_reviewer_prop,
+                    designWidth = 30f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 241, srcH = 481,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_adversarial_reviewer_leg,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 156, srcH = 69,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_adversarial_reviewer_antenna,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 203, srcH = 177,
+                ),
+            ),
+            NodeCreatureRoleKind.QaEngineer to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_qa_engineer_body,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 403, srcH = 389,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_qa_engineer_prop,
+                    designWidth = 30f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 195, srcH = 195,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_qa_engineer_leg,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 144, srcH = 148,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_qa_engineer_antenna,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 83, srcH = 237,
+                ),
+            ),
+            NodeCreatureRoleKind.ReleaseEngineer to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_release_engineer_body,
+                    designWidth = 86f, pivotNormX = 0.5f, pivotNormY = 0.55f,
+                    srcW = 433, srcH = 645,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_release_engineer_prop,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 191, srcH = 498,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_release_engineer_leg,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 112, srcH = 151,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_release_engineer_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 97, srcH = 98,
+                ),
+            ),
+            NodeCreatureRoleKind.Antagonist to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_antagonist_body,
+                    designWidth = 82f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 392, srcH = 365,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_antagonist_prop,
+                    designWidth = 26f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 226, srcH = 362,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_antagonist_leg,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 147, srcH = 126,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_antagonist_antenna,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 141, srcH = 221,
+                ),
+            ),
+            NodeCreatureRoleKind.ProductManager to MascotSpriteAtlasSpec(
+                antennaCount = 4,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_product_manager_body,
+                    designWidth = 86f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 541, srcH = 577,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_product_manager_prop,
+                    designWidth = 36f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 294, srcH = 390,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_product_manager_leg,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 132, srcH = 156,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_product_manager_antenna,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 177, srcH = 316,
+                ),
+            ),
+            NodeCreatureRoleKind.CrashTestDummy to MascotSpriteAtlasSpec(
+                antennaCount = 8,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_crash_test_dummy_body,
+                    designWidth = 88f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 586, srcH = 540,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_crash_test_dummy_prop,
+                    designWidth = 42f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 378, srcH = 199,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_crash_test_dummy_leg,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 121, srcH = 143,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_crash_test_dummy_antenna,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 89, srcH = 126,
+                ),
+            ),
+            NodeCreatureRoleKind.RecoveryEngineer to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_recovery_engineer_body,
+                    designWidth = 88f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 539, srcH = 491,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_recovery_engineer_prop,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 204, srcH = 209,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_recovery_engineer_leg,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 145, srcH = 139,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_recovery_engineer_antenna,
+                    designWidth = 14f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 97, srcH = 174,
+                ),
+            ),
+            NodeCreatureRoleKind.CodeReviewer to MascotSpriteAtlasSpec(
+                antennaCount = 4,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_code_reviewer_body,
+                    designWidth = 88f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 567, srcH = 724,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_code_reviewer_prop,
+                    designWidth = 34f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 277, srcH = 260,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_code_reviewer_leg,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 132, srcH = 247,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_code_reviewer_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 381, srcH = 132,
+                ),
+            ),
+            NodeCreatureRoleKind.HallMonitor to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_hall_monitor_body,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 402, srcH = 388,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_hall_monitor_prop,
+                    designWidth = 24f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 162, srcH = 440,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_hall_monitor_leg,
+                    designWidth = 20f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 138, srcH = 138,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_hall_monitor_antenna,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 146, srcH = 266,
+                ),
+            ),
+            // ── New characters ── composite sheets (1024×1536, 2×2 grid, each cell 512×768)
+            NodeCreatureRoleKind.DataScientist to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_data_scientist,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_data_scientist,
+                    designWidth = 30f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_data_scientist,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_data_scientist,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.DataEngineer to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_data_engineer,
+                    designWidth = 86f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_data_engineer,
+                    designWidth = 32f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_data_engineer,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_data_engineer,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.ContentCreator to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_content_creator,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_content_creator,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_content_creator,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_content_creator,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.TechnicalAuthor to MascotSpriteAtlasSpec(
+                antennaCount = 4,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_technical_author,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_technical_author,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_technical_author,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_technical_author,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.ComplianceOfficer to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_compliance_officer,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_compliance_officer,
+                    designWidth = 30f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_compliance_officer,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_compliance_officer,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.LegalCounsel to MascotSpriteAtlasSpec(
+                antennaCount = 4,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_legal_counsel,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_legal_counsel,
+                    designWidth = 32f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_legal_counsel,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_legal_counsel,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.BugReporter to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_bug_reporter,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_bug_reporter,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_bug_reporter,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_bug_reporter,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.WorldBuilder to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_world_builder,
+                    designWidth = 86f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_world_builder,
+                    designWidth = 36f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_world_builder,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_world_builder,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.Storyteller to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_storyteller,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_storyteller,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_storyteller,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_storyteller,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.Pathfinder to MascotSpriteAtlasSpec(
+                antennaCount = 5,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_pathfinder,
+                    designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_pathfinder,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.15f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_pathfinder,
+                    designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_pathfinder,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
+                ),
+            ),
+            NodeCreatureRoleKind.Generic to MascotSpriteAtlasSpec(
+                antennaCount = 6,
+                body = MascotSpritePart(
+                    Res.drawable.mascot_generic_body,
+                    designWidth = 82f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 387, srcH = 366,
+                ),
+                prop = MascotSpritePart(
+                    Res.drawable.mascot_generic_prop,
+                    designWidth = 28f, pivotNormX = 0.5f, pivotNormY = 0.5f,
+                    srcW = 206, srcH = 216,
+                ),
+                leg = MascotSpritePart(
+                    Res.drawable.mascot_generic_leg,
+                    designWidth = 22f, pivotNormX = 0.5f, pivotNormY = 0.05f,
+                    srcW = 196, srcH = 224,
+                ),
+                antenna = MascotSpritePart(
+                    Res.drawable.mascot_generic_antenna,
+                    designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
+                    srcW = 132, srcH = 160,
+                ),
+            ),
+        )
+    }
+}

@@ -16,6 +16,16 @@ internal enum class NodeCreatureRoleKind {
     ReleaseEngineer,
     Antagonist,
     HallMonitor,
+    DataScientist,
+    DataEngineer,
+    ContentCreator,
+    TechnicalAuthor,
+    ComplianceOfficer,
+    LegalCounsel,
+    BugReporter,
+    WorldBuilder,
+    Storyteller,
+    Pathfinder,
     Generic,
 }
 
@@ -41,6 +51,54 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
             "supervisor" in role -> NodeCreatureRoleKind.HallMonitor
 
         "antagonist" in role -> NodeCreatureRoleKind.Antagonist
+
+        // Legal and compliance roles — checked before broader reviewer/auditor buckets.
+        "legal counsel" in role ||
+            "attorney" in role ||
+            "lawyer" in role ||
+            "scales of justice" in role ||
+            "legal advisor" in role -> NodeCreatureRoleKind.LegalCounsel
+
+        "compliance" in role -> NodeCreatureRoleKind.ComplianceOfficer
+
+        // Bug reporting — checked before broad researcher/reporter bucket.
+        "bug reporter" in role ||
+            "bug tracker" in role -> NodeCreatureRoleKind.BugReporter
+
+        // Data science — checked before engineer and researcher buckets.
+        "data scientist" in role ||
+            "data science" in role ||
+            "machine learning" in role ||
+            "ml engineer" in role -> NodeCreatureRoleKind.DataScientist
+
+        // Data engineering — checked before broad engineer bucket.
+        "data engineer" in role ||
+            "data pipeline" in role ||
+            "etl" in role -> NodeCreatureRoleKind.DataEngineer
+
+        // Technical authoring — checked before broad writer/editor bucket.
+        "technical author" in role -> NodeCreatureRoleKind.TechnicalAuthor
+
+        // Content creators — checked before broad strategist/editor bucket.
+        "content creator" in role ||
+            "content writer" in role -> NodeCreatureRoleKind.ContentCreator
+
+        // Storytellers and narrators — checked before broad orchestrator bucket.
+        "storyteller" in role ||
+            "narrator" in role ||
+            "broadcaster" in role ||
+            "podcast fact" in role -> NodeCreatureRoleKind.Storyteller
+
+        // World-builders and game-world designers.
+        "world builder" in role ||
+            "world-builder" in role ||
+            "world design" in role ||
+            "level design" in role -> NodeCreatureRoleKind.WorldBuilder
+
+        // Pathfinders and explorers.
+        "pathfinder" in role ||
+            "pioneer" in role ||
+            "explorer" in role -> NodeCreatureRoleKind.Pathfinder
 
         // A repair role is recovery even when its title also says verifier.
         "recovery" in role ||
@@ -159,5 +217,15 @@ internal fun NodeCreatureRoleKind.activeLabel(): String = when (this) {
     NodeCreatureRoleKind.ReleaseEngineer -> "RELEASING"
     NodeCreatureRoleKind.Antagonist -> "FINDING FLAWS"
     NodeCreatureRoleKind.HallMonitor -> "MONITORING"
+    NodeCreatureRoleKind.DataScientist -> "ANALYZING"
+    NodeCreatureRoleKind.DataEngineer -> "PROCESSING"
+    NodeCreatureRoleKind.ContentCreator -> "CREATING"
+    NodeCreatureRoleKind.TechnicalAuthor -> "DOCUMENTING"
+    NodeCreatureRoleKind.ComplianceOfficer -> "AUDITING"
+    NodeCreatureRoleKind.LegalCounsel -> "REVIEWING TERMS"
+    NodeCreatureRoleKind.BugReporter -> "REPORTING"
+    NodeCreatureRoleKind.WorldBuilder -> "BUILDING WORLDS"
+    NodeCreatureRoleKind.Storyteller -> "NARRATING"
+    NodeCreatureRoleKind.Pathfinder -> "EXPLORING"
     NodeCreatureRoleKind.Generic -> "WORKING"
 }
