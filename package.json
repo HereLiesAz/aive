@@ -1,0 +1,14 @@
+{
+  "name": "aive-azphalt-packages",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the Azphalt Store workflow/role packages under docs/azphalt-packages into signed-ready .azp archives.",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/azp/build.mjs",
+    "test": "node tools/azp/verify.mjs"
+  },
+  "dependencies": {
+    "@azphalt/azp": "^0.1.0"
+  }
+}

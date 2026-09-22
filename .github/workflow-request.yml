@@ -1,0 +1,35 @@
+# CENTRAL WORKFLOW MENU / REQUEST
+#
+# This file is documentation/request metadata for HereLiesAz/workflows.
+# It is not executable GitHub Actions. See
+# HereLiesAz/workflows:templates/repository-workflow-request.yml for the menu.
+#
+# aive ships 78 Azphalt Store workflow/role packages as loose JSON under
+# docs/azphalt-packages/<slug>/. They need to be packed into .azp archives and
+# published as release assets so azphalt.store can index them, then signed with
+# the centrally held publisher key.
+#
+requested:
+  - azp-sign-release
+
+new_workflow_request:
+  name: azp-package-release
+  purpose: >-
+    Managed release of a repository's .azp content packages. Same shape as the
+    existing azp-model-release, minus the single-upstream-model assumptions:
+    there is no upstream binary to fetch and no manifest checksum to inject,
+    and the build emits many .azp files (one per package directory) rather than
+    one alongside a model asset. The central workflow checks the target out at
+    the release tag, runs `npm install && npm run build`, and publishes every
+    file matching a profile-supplied glob to the tagged GitHub Release.
+    Repository-agnostic: the only repository-specific value is the glob, which
+    lives in the purpose profile (aive's is `build/azp/*.azp`).
+  required_inputs:
+    # Supplied through the existing purpose-profile mechanism, not new dispatch inputs.
+    - name: packages_glob
+      purpose: Newline-separated glob(s) of built .azp files to attach to the release.
+      default: "*.azp"
+  required_secrets:
+    # None beyond the catalog's existing GH_TOKEN. Signing stays in
+    # azp-sign-release, which already owns AZP_PRIVATE_KEY.
+    []
