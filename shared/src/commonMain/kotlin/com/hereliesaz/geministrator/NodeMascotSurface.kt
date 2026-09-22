@@ -48,9 +48,16 @@ internal fun NodeMascotSurface(
         )
         return
     }
-
     val character = MascotCharacterCatalog.forRole(roleLabel)
     val motionArchetype = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
+    if (motionArchetype == NodeCreatureRoleKind.LegalCounsel) {
+        LegalCounselSpritePuppetSurface(
+            state = state,
+            motionPhase = motionPhase,
+            modifier = modifier,
+        )
+        return
+    }
     if (motionArchetype == NodeCreatureRoleKind.AutomatedProcess) {
         AutomatedProcessMascotSurface(
             state = state,
