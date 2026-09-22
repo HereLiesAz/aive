@@ -501,25 +501,26 @@ internal object MascotSpriteAtlas {
                     srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
                 ),
             ),
+            // No source art exists for LegalCounsel; shares compliance_officer sheet as placeholder.
             NodeCreatureRoleKind.LegalCounsel to MascotSpriteAtlasSpec(
                 antennaCount = 4,
                 body = MascotSpritePart(
-                    Res.drawable.mascot_legal_counsel,
+                    Res.drawable.mascot_compliance_officer,
                     designWidth = 84f, pivotNormX = 0.5f, pivotNormY = 0.5f,
                     srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 0,
                 ),
                 prop = MascotSpritePart(
-                    Res.drawable.mascot_legal_counsel,
+                    Res.drawable.mascot_compliance_officer,
                     designWidth = 32f, pivotNormX = 0.5f, pivotNormY = 0.15f,
                     srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 0,
                 ),
                 leg = MascotSpritePart(
-                    Res.drawable.mascot_legal_counsel,
+                    Res.drawable.mascot_compliance_officer,
                     designWidth = 18f, pivotNormX = 0.5f, pivotNormY = 0.05f,
                     srcW = 512, srcH = 768, srcOffsetX = 0, srcOffsetY = 768,
                 ),
                 antenna = MascotSpritePart(
-                    Res.drawable.mascot_legal_counsel,
+                    Res.drawable.mascot_compliance_officer,
                     designWidth = 16f, pivotNormX = 0.5f, pivotNormY = 0.95f,
                     srcW = 512, srcH = 768, srcOffsetX = 512, srcOffsetY = 768,
                 ),
