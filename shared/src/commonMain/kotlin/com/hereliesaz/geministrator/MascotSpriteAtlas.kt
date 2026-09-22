@@ -1,7 +1,6 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.drawable.*
 import org.jetbrains.compose.resources.DrawableResource
 
 /**

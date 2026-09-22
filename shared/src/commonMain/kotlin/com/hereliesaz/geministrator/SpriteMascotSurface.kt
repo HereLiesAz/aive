@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.withTransform
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
@@ -56,8 +57,8 @@ internal fun SpriteMascotSurface(
 
             withTransform({
                 translate(pivotXPx, pivotYPx)
-                rotate(wb.rotationDegrees, 0f, 0f)
-                if (mirrorX) scale(-1f, 1f, 0f, 0f)
+                rotate(wb.rotationDegrees, Offset.Zero)
+                if (mirrorX) scale(-1f, 1f, Offset.Zero)
                 translate(-displayW * part.pivotNormX, -displayH * part.pivotNormY)
             }) {
                 val painter = when (part) {
