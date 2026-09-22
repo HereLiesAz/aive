@@ -1,0 +1,40 @@
+name: sign-azp
+# After a release is published, sign its .azp assets with the publisher key and re-upload them.
+# Auto-signs every future release; dispatch it to sign an existing one. Never touches the repo build.
+on:
+  release:
+    types: [published, released]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Sign released .azp assets
+        env:
+          AZP_PRIVATE_KEY: ${{ secrets.AZP_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -z "$AZP_PRIVATE_KEY" ]; then echo "AZP_PRIVATE_KEY not set - skipping"; exit 0; fi
+          TAG="${TAG:-$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null)}"
+          if [ -z "$TAG" ]; then echo "no release to sign"; exit 0; fi
+          npm install --no-audit --no-fund @azphalt/azp
+          mkdir sign && cd sign
+          if ! gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*.azp'; then echo "no .azp assets"; exit 0; fi
+          node -e '
+            const fs = require("fs");
+            const { signAzp } = require("@azphalt/azp");
+            const pk = process.env.AZP_PRIVATE_KEY;
+            let n = 0;
+            for (const f of fs.readdirSync(".").filter((x) => x.endsWith(".azp"))) {
+              fs.writeFileSync(f, signAzp(fs.readFileSync(f), { privateKey: pk }));
+              console.log("signed " + f);
+              n++;
+            }
+            if (!n) console.log("no .azp files downloaded");
+          '
+          gh release upload "$TAG" *.azp --clobber -R "$GITHUB_REPOSITORY" || true
