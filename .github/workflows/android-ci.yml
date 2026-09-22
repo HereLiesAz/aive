@@ -39,6 +39,9 @@ jobs:
           cache-read-only: false
           dependency-graph: disabled
 
+      - name: Clear compose-resource build cache entries
+        run: rm -rf ~/.gradle/caches/build-cache/ || true
+
       - name: Run unit tests
         run: |
           chmod +x gradlew

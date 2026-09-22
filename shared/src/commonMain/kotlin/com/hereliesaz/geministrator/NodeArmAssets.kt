@@ -59,6 +59,16 @@ internal object NodeArmAssets {
             NodeCreatureRoleKind.ReleaseEngineer -> NodeArmRole.ReleaseEngineer
             NodeCreatureRoleKind.Antagonist -> NodeArmRole.Antagonist
             NodeCreatureRoleKind.HallMonitor -> NodeArmRole.HallMonitor
+            NodeCreatureRoleKind.DataScientist -> NodeArmRole.Researcher
+            NodeCreatureRoleKind.DataEngineer -> NodeArmRole.ImplementationEngineer
+            NodeCreatureRoleKind.ContentCreator -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.TechnicalAuthor -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.ComplianceOfficer -> NodeArmRole.QaEngineer
+            NodeCreatureRoleKind.LegalCounsel -> NodeArmRole.AdversarialReviewer
+            NodeCreatureRoleKind.BugReporter -> NodeArmRole.QaEngineer
+            NodeCreatureRoleKind.WorldBuilder -> NodeArmRole.Architect
+            NodeCreatureRoleKind.Storyteller -> NodeArmRole.ProductManager
+            NodeCreatureRoleKind.Pathfinder -> NodeArmRole.Researcher
             NodeCreatureRoleKind.Generic -> NodeArmRole.Orchestrator
         }
 
