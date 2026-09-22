@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
 import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
+import com.hereliesaz.geministrator.providers.llm.NodeCharacterImagePipelineExecutorIntegration
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
@@ -185,13 +186,20 @@ class MainActivity : ComponentActivity() {
                         listOf(AndroidRoleSurfaceIntegration(this, repositoryHttpClient)),
                     )
                 }
-                val baseExecutorIntegrations = remember(repositoryCredentials, roleSurfaceRuntime) {
-                    configuredAndroidExecutorIntegrations(
+                val baseExecutorIntegrations = remember(repositoryCredentials, roleSurfaceRuntime, credentials) {
+                    val configured = configuredAndroidExecutorIntegrations(
                         context = this,
                         repositoryCredentials = repositoryCredentials,
                         httpClient = repositoryHttpClient,
                         roleSurfaceRuntime = roleSurfaceRuntime,
                     )
+                    credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
+                        configured.withPriorityIntegration(
+                            NodeCharacterImagePipelineExecutorIntegration(
+                                apiKeyProvider = LlmApiKeyProvider { key },
+                            ),
+                        )
+                    } ?: configured
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
