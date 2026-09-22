@@ -207,20 +207,24 @@ fun App(
                         BuiltInRoles.all + workflowPersistence.roles.all(),
                     )
                     val rolesById = catalog.associateBy { it.id }
+                    val builtInRoleIds = BuiltInRoles.all.mapTo(hashSetOf()) { it.id }
                     val missingRoleIds = linkedSetOf<RoleDefinitionId>()
                     for (roleId in NodeCharacterGenerationWorkflowFactory.referencedRoleIds(authored)) {
                         val role = rolesById[roleId] ?: continue
                         val hasEstablishedCharacter =
-                            MascotCharacterCatalog.explicitForRole(role.name) != null ||
-                                classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Generic
+                            roleId in builtInRoleIds ||
+                                MascotCharacterCatalog.explicitForRole(role.name) != null
                         if (!hasEstablishedCharacter && nodeCharacterAssetStore.get(roleId) == null) {
                             missingRoleIds += roleId
                         }
                     }
                     if (missingRoleIds.isNotEmpty()) {
+                        NodeCharacterGenerationWorkflowFactory.roles.forEach { role ->
+                            workflowPersistence.roles.put(role)
+                        }
                         val generation = NodeCharacterGenerationWorkflowFactory.create(
                             source = authored,
-                            roleCatalog = catalog,
+                            roleCatalog = catalog + NodeCharacterGenerationWorkflowFactory.roles,
                             targetRoleIds = missingRoleIds,
                         )
                         val activeRuntime = runtime ?: error("Runtime is unavailable")
