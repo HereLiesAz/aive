@@ -90,4 +90,35 @@ class MascotPuppetRigTest {
         assertTrue(eye.pivotY < 100f)
         assertEquals(head.rotationDegrees, eye.rotationDegrees)
     }
+
+    @Test
+    fun gestationLimbChainIsAddressableAndIndependentlyAnimated() {
+        val skeleton = MascotPuppetRig.skeleton(1)
+        val ids = skeleton.bones.map(MascotBone::id).toSet()
+        assertTrue(MascotPuppetRig.Limb0 in ids)
+        assertTrue(MascotPuppetRig.Limb1 in ids)
+        assertTrue(MascotPuppetRig.Limb2 in ids)
+
+        val pose = MascotPuppetRig.pose(
+            role = NodeCreatureRoleKind.AutomatedProcess,
+            state = H2g2WorkflowState.Active,
+            phase = 0.31f,
+            antennaCount = 1,
+        )
+        val rotations = listOf(
+            pose.local(MascotPuppetRig.Limb0).rotationDegrees,
+            pose.local(MascotPuppetRig.Limb1).rotationDegrees,
+            pose.local(MascotPuppetRig.Limb2).rotationDegrees,
+        )
+        assertEquals(3, rotations.toSet().size, "each limb segment should rotate independently")
+
+        // Segment 2 is a child of segment 1, which is a child of the body — its world rotation
+        // must compose both parents' local rotations, exactly like the leg/antenna chains.
+        val limb2World = pose.world(MascotPuppetRig.Limb2)
+        val expected = pose.world(MascotPuppetRig.Head).rotationDegrees +
+            pose.local(MascotPuppetRig.Limb0).rotationDegrees +
+            pose.local(MascotPuppetRig.Limb1).rotationDegrees +
+            pose.local(MascotPuppetRig.Limb2).rotationDegrees
+        assertTrue(kotlin.math.abs(expected - limb2World.rotationDegrees) < 0.001f)
+    }
 }
