@@ -175,8 +175,8 @@ object MermaidFlowchartParser {
             parseEdge(line)?.let { parsed ->
                 val from = parseNode(parsed.from)
                 val to = parseNode(parsed.to)
-                nodes.putIfAbsent(from.id, from)
-                nodes.putIfAbsent(to.id, to)
+                if (from.id !in nodes) nodes[from.id] = from
+                if (to.id !in nodes) nodes[to.id] = to
                 edges += AiveFlowchartEdge(
                     from = from.id,
                     to = to.id,
@@ -187,7 +187,9 @@ object MermaidFlowchartParser {
             }
 
             runCatching { parseNode(line) }
-                .onSuccess { node -> nodes.putIfAbsent(node.id, node) }
+                .onSuccess { node ->
+                    if (node.id !in nodes) nodes[node.id] = node
+                }
                 .onFailure { warnings += "Line ${index + 1}: unsupported Mermaid flowchart statement" }
         }
 

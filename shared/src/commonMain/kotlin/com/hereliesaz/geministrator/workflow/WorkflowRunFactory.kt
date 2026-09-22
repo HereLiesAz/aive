@@ -90,9 +90,11 @@ object WorkflowRunFactory {
             val allTerminal = dependencyRuns.size == task.dependsOn.size &&
                 dependencyRuns.all { it.status.isTerminal() }
 
+            val allCompleted = dependencyRuns.size == task.dependsOn.size &&
+                dependencyRuns.all { it.status == TaskRunStatus.Completed }
+
             val conditionMet: Boolean = when (val c = task.condition) {
-                is TaskCondition.Always -> allTerminal &&
-                    dependencyRuns.all { it.status == TaskRunStatus.Completed }
+                is TaskCondition.Always -> allCompleted
                 is TaskCondition.OnAnyOutcome -> {
                     val targetRun = run.taskRuns[c.ofTask]
                     allTerminal && targetRun != null && targetRun.status.isTerminal()

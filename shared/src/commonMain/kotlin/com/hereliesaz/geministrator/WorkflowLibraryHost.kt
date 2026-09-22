@@ -32,6 +32,7 @@ class WorkflowLibraryHost(
     private val authoredStore: AuthoredWorkflowStore = SettingsAuthoredWorkflowStore(),
     private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>) -> Unit,
     private val onPackagesChanged: () -> Unit,
+    private val onWorkflowCreated: suspend (WorkflowDefinition) -> Unit = {},
 ) {
     private val composition = WorkflowCompositionService(persistence)
 
@@ -93,8 +94,10 @@ class WorkflowLibraryHost(
             .sortedBy { it.name.lowercase() }
 
     suspend fun saveAuthored(definition: WorkflowDefinition): WorkflowDefinition {
+        val wasAuthored = definition.id in authoredStore.all()
         val saved = composition.save(definition)
         authoredStore.add(saved.id)
+        if (!wasAuthored) onWorkflowCreated(saved)
         return saved
     }
 
@@ -110,8 +113,10 @@ class WorkflowLibraryHost(
             .flatMap { it.workflowDefinitionIds }
             .toSet()
         require(id.value !in installedIds) { "Cannot overwrite an installed workflow definition" }
+        val wasAuthored = id in authoredStore.all()
         val saved = composition.saveAs(definition, id, name.trim())
         authoredStore.add(saved.id)
+        if (!wasAuthored) onWorkflowCreated(saved)
         return saved
     }
 
