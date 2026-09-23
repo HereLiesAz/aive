@@ -20,7 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import com.hereliesaz.geministrator.App
+import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
 import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
@@ -99,9 +103,11 @@ class MainActivity : ComponentActivity() {
         )
     }
     private val orchestrationRuntime by orchestrationRuntimeDelegate
+    private var crashReportNoticeVisible by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashReporting.install(this) { crashReportNoticeVisible = true }
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
@@ -159,6 +165,7 @@ class MainActivity : ComponentActivity() {
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
+                var crashReportingEnabled by remember { mutableStateOf(CrashReporting.isEnabled(this@MainActivity)) }
 
                 val installedGeminiApi = remember(credentials, installedGeminiReady) {
                     if (!installedGeminiReady) {
@@ -346,8 +353,40 @@ class MainActivity : ComponentActivity() {
                             computeCredentialStore.clear()
                             computeToken = null
                         },
+                        crashReportingSetting = if (CrashReporting.isSupported) {
+                            CrashReportingSetting(crashReportingEnabled) { enabled ->
+                                CrashReporting.setEnabled(this, enabled)
+                                crashReportingEnabled = enabled
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
+            }
+
+            if (crashReportNoticeVisible) {
+                AlertDialog(
+                    onDismissRequest = {
+                        CrashReporting.markFirstReportNoticeShown(this)
+                        crashReportNoticeVisible = false
+                    },
+                    title = { Text("Crash report sent") },
+                    text = {
+                        Text(
+                            "Aive crashed or stopped responding earlier, and a report (stack trace, app version, " +
+                                "Android version, device model) was sent automatically to the HereLiesAz/aive " +
+                                "GitHub issue tracker. You can turn automatic crash reports off any time in " +
+                                "Settings → Crash Reports.",
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            CrashReporting.markFirstReportNoticeShown(this)
+                            crashReportNoticeVisible = false
+                        }) { Text("OK") }
+                    },
+                )
             }
 
             if (splashFinished && startupReady) {
