@@ -47,6 +47,19 @@ internal class AndroidOrchestrationAgentRuntime(
         role: OrchestrationAgentRole,
         packet: OrchestrationPacket,
     ): OrchestrationPlan = withContext(Dispatchers.Default) {
+        try {
+            runModel(role, packet)
+        } catch (error: OutOfMemoryError) {
+            // Errors are not Exceptions: without this conversion the failure escapes the
+            // UI's catch(Exception) and the launch button appears to do nothing.
+            throw OrchestrationModelOutOfMemoryException(role, error)
+        }
+    }
+
+    private suspend fun runModel(
+        role: OrchestrationAgentRole,
+        packet: OrchestrationPacket,
+    ): OrchestrationPlan {
         val installed = installer.ensureInstalled(role)
         val bundle = OrchestrationEpoch8ModelCatalog.bundleFor(role)
         val modelSpec = MemoryMicroAgentModelSpec(
@@ -55,7 +68,7 @@ internal class AndroidOrchestrationAgentRuntime(
         )
         val prepared = sessionManager.sessionFor(installed.onnxModel.absolutePath, modelSpec)
         val prompt = buildPrompt(role, packet)
-        HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
+        return HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
             val generated = generate(
                 session = prepared.session,
                 tokenizer = tokenizer,
@@ -110,22 +123,38 @@ internal class AndroidOrchestrationAgentRuntime(
             .toSet()
         val generated = mutableListOf<Long>()
 
-        var totalLength = promptIds.size
+        // Prefill in bounded chunks. The exported graph emits full-sequence logits
+        // ([1, inputLength, vocab]); running the whole ~400-token prompt in one pass
+        // and then reading `logits` via OnnxTensor.getFloatBuffer() (which copies the
+        // entire tensor into a Java-heap FloatBuffer) needs ~255MB of heap and OOMs on
+        // Android. Chunking bounds each logits tensor to PREFILL_CHUNK_TOKENS * vocab,
+        // and intermediate chunks don't request `logits` at all.
+        val cacheOnlyOutputs = session.outputNames.filterTo(linkedSetOf()) { it != LOGITS_OUTPUT }
+        var totalLength = 0
         var activeResult: OrtSession.Result? = null
         try {
-            val initialOwned = mutableListOf<OnnxTensor>()
-            val initialInputs = buildInputs(
-                session = session,
-                tokenIds = promptIds,
-                totalLength = totalLength,
-                previousResult = null,
-                config = config,
-                owned = initialOwned,
-            )
-            activeResult = try {
-                session.run(initialInputs)
-            } finally {
-                initialOwned.forEach(OnnxTensor::close)
+            val chunks = prefillChunks(promptIds.size, PREFILL_CHUNK_TOKENS)
+            chunks.forEachIndexed { chunkIndex, range ->
+                val chunkIds = promptIds.copyOfRange(range.first, range.last + 1)
+                totalLength += chunkIds.size
+                val previous = activeResult
+                val owned = mutableListOf<OnnxTensor>()
+                val inputs = buildInputs(
+                    session = session,
+                    tokenIds = chunkIds,
+                    totalLength = totalLength,
+                    previousResult = previous,
+                    config = config,
+                    owned = owned,
+                )
+                val isFinalChunk = chunkIndex == chunks.lastIndex
+                val chunkResult = try {
+                    if (isFinalChunk) session.run(inputs) else session.run(inputs, cacheOnlyOutputs)
+                } finally {
+                    owned.forEach(OnnxTensor::close)
+                }
+                previous?.close()
+                activeResult = chunkResult
             }
 
             for (ignored in 0 until maxNewTokens) {
@@ -235,7 +264,7 @@ internal class AndroidOrchestrationAgentRuntime(
     }
 
     private fun argmaxLastLogit(result: OrtSession.Result): Long {
-        val logits = result.get("logits").orElseThrow {
+        val logits = result.get(LOGITS_OUTPUT).orElseThrow {
             IllegalStateException("Orchestration model output logits is missing")
         } as? OnnxTensor ?: error("Orchestration logits output is not a tensor")
         val shape = logits.info.shape
@@ -281,7 +310,26 @@ internal class AndroidOrchestrationAgentRuntime(
         val headDim: Int,
     )
 
-    private companion object {
+    internal companion object {
         const val MAX_NEW_TOKENS = 768
+        const val PREFILL_CHUNK_TOKENS = 32
+        const val LOGITS_OUTPUT = "logits"
+
+        /** Splits [0, tokenCount) into consecutive ranges of at most [chunkSize] tokens. */
+        fun prefillChunks(tokenCount: Int, chunkSize: Int): List<IntRange> {
+            require(tokenCount > 0) { "Prompt must contain at least one token" }
+            require(chunkSize > 0) { "Chunk size must be positive" }
+            return (0 until tokenCount step chunkSize).map { start ->
+                start until minOf(start + chunkSize, tokenCount)
+            }
+        }
     }
 }
+
+internal class OrchestrationModelOutOfMemoryException(
+    role: OrchestrationAgentRole,
+    cause: Throwable,
+) : IllegalStateException(
+    "Local ${role.name} model ran out of memory. Free up device memory (close other apps) and try again.",
+    cause,
+)

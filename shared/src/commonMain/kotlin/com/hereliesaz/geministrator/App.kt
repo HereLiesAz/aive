@@ -292,7 +292,10 @@ fun App(
                                     }
                                 } catch (failure: CancellationException) {
                                     throw failure
-                                } catch (failure: Exception) {
+                                } catch (failure: Throwable) {
+                                    // Catch Throwable, not Exception: on-device model failures such as
+                                    // OutOfMemoryError are Errors and previously escaped this handler,
+                                    // leaving the launch button silently doing nothing.
                                     runtimeState = failure.toRuntimeFailureState("Workflow launch failed")
                                 }
                             }
