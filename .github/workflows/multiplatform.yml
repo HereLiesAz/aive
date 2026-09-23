@@ -560,7 +560,32 @@ jobs:
           notes-file: release-notes.md
           prerelease: ${{ steps.version.outputs.prerelease }}
           make-latest: "true"
-          migrate-legacy-build-releases: "true"
+          # Per-build releases below are intentional; migration would fold and delete them each run.
+          migrate-legacy-build-releases: "false"
+
+      - name: Publish per-build release
+        # One release per merge, on the immutable exact-build tag the grouped step created.
+        # Never marked latest, so the grouped MAJOR.MINOR release stays the landing page.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $VERSION_NAME already exists; leaving it untouched."
+            exit 0
+          fi
+          FLAGS=(--verify-tag --latest=false)
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS+=(--prerelease)
+          fi
+          gh release create "$VERSION_NAME" release-files/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "The Aive ${VERSION_NAME}" \
+            --notes-file release-notes.md \
+            "${FLAGS[@]}"
 
   deploy-pages:
     if: github.event_name != 'pull_request'

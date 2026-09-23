@@ -23,34 +23,30 @@ Maturity is encoded by the version number itself, not by prerelease suffixes:
 Do not append `-alpha`, `-beta`, `-rc`, or similar labels to `app.versionName`, Git tags,
 release titles, or installer names.
 
-## Immutable build identity and patch-grouped GitHub Releases
+## Immutable build identity and grouped GitHub Releases
 
-Every published build keeps its own permanent four-part Git tag:
+Every merge to `main` publishes its build twice:
 
-- exact build tag: `v<major>.<minor>.<patch>.<build>`
-- grouped release tag: `v<major>.<minor>.<patch>`
-- grouped release title: `The Aive <major>.<minor>.<patch>`
+- exact build tag and release: `<major>.<minor>.<patch>.<build>`, titled `The Aive <major>.<minor>.<patch>.<build>`
+- grouped release tag: `<major>.<minor>`, titled `The Aive <major>.<minor>`
 
-For example, `v0.9.6.412`, `v0.9.6.413`, and `v0.9.6.414` remain immutable exact-build tags,
-but their APK, DEB, MSI, and DMG files are collected under the single GitHub Release `v0.9.6`.
+For example, `0.9.6.1722` gets its own release, and its APK, DEB, MSI, and DMG are also collected
+under the single GitHub Release `0.9` alongside every other `0.9.x.x` build. The grouped release is
+marked latest; per-build releases never are.
 
 Asset filenames always include the full four-part version so several builds can coexist in one
 release without clobbering each other. A grouped release may gain new build assets and refreshed
 release notes, but an existing asset name may never be replaced with different bytes.
 
-Older four-part GitHub Release objects are migrated into their patch release when the centralized
-publisher encounters them. Migration moves their assets into the patch release and deletes only the
-old Release object; the exact four-part Git tags remain intact.
-
-The patch tag is created when that patch line is first published and is not moved afterward. Exact
-build tags are also never moved.
+Legacy release migration is disabled in Aive's workflow, since it would fold and delete the
+per-build releases. Tags are never moved or deleted.
 
 ## Centralized release policy
 
 Version derivation and GitHub Release policy are owned by `HereLiesAz/workflows`, not by Aive-local
 shell logic. The shared `four-part-version` action replaces only BUILD with the GitHub Actions run
 number and exports the resulting version to build steps. The shared `patch-grouped-release` action
-owns exact-build tags, patch grouping, legacy release migration, collision checks, prerelease state,
+owns exact-build tags, minor grouping, legacy release migration, collision checks, prerelease state,
 and idempotent asset publication.
 
 Aive's workflow is responsible for producing and naming Aive-specific artifacts; it delegates
