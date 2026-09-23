@@ -37,6 +37,7 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+/** Normalized habitat coordinate. Persist this in the host, not pixel coordinates. */
 data class H2g2TerrariumPosition(val x: Float, val y: Float) {
     fun clamped(): H2g2TerrariumPosition = H2g2TerrariumPosition(
         x = x.coerceIn(.05f, .95f),
@@ -47,8 +48,11 @@ data class H2g2TerrariumPosition(val x: Float, val y: Float) {
 data class H2g2TerrariumSubject(
     val node: H2g2WorkflowNode,
     val position: H2g2TerrariumPosition,
+    /** First appearance visibly emerges from this parent if the parent exists in the same habitat. */
     val birthParentId: String? = null,
+    /** Stable non-colour identity input. */
     val identitySeed: String = node.id,
+    /** Orchestrator is host-rendered canonical art; all other subjects are procedurally generated. */
     val identityKind: H2g2SwarmIdentityKind = H2g2SwarmIdentityKind.Generated,
 )
 
@@ -63,9 +67,27 @@ data class H2g2TerrariumRelationship(
     val from: String,
     val to: String,
     val kind: H2g2TerrariumRelationshipKind = H2g2TerrariumRelationshipKind.Dependency,
+    /** True only while the host runtime says the interaction is currently occurring. */
     val active: Boolean = false,
 )
 
+/**
+ * A workflow as a living artificial-life terrarium.
+ *
+ * Every creature owns an independent decision cadence, behavioral state, personality and RNG stream
+ * in [H2g2SwarmWorld]. Compose supplies one display-frame clock and renders snapshots; it does not
+ * run an AI/physics engine per frame. This keeps the colony cheap while allowing behavior itself to
+ * become recognizable identity.
+ *
+ * [orchestratorContent] is deliberately host supplied. H2G2 must never procedurally approximate the
+ * Haive orchestrator: Haive injects the exact canonical logo character there.
+ *
+ * [adornments] are persistent visualized dependencies carried or worn by the downstream creature.
+ * [serviceVisits] are transient outside actors such as the fixed USPR delivery truck.
+ *
+ * Dragging is presentation until drop completes. [onNodeDroppedOn] is the semantic boundary: a host
+ * may rewrite an editable workflow, stage a revision for a running workflow, or reject the gesture.
+ */
 @Composable
 fun H2g2SwarmTerrarium(
     subjects: List<H2g2TerrariumSubject>,
@@ -197,12 +219,10 @@ fun H2g2SwarmTerrarium(
         val halfCreaturePx = creatureSizePx / 2f
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val snapshotById = snapshots.associateBy { it.id }
-        // groupBy so that multiple simultaneous relationships per node are all retained;
-        // downstream code picks the first (earliest in the list) when it needs a single value.
         val activeContactById = relationships
             .filter { it.active && it.kind != H2g2TerrariumRelationshipKind.Dependency }
             .flatMap { relationship -> listOf(relationship.from to relationship, relationship.to to relationship) }
-            .groupBy({ it.first }, { it.second })
+            .toMap()
 
         Canvas(Modifier.fillMaxSize()) {
             drawTerrariumBackdrop()
@@ -240,7 +260,7 @@ fun H2g2SwarmTerrarium(
                 }
             }
             val birthCenter = parentCenter?.let { parent -> parent + (currentCenter - parent) * birth.value } ?: currentCenter
-            val contact = activeContactById[node.id]?.firstOrNull()
+            val contact = activeContactById[node.id]
             val contactOtherId = contact?.let { if (it.from == node.id) it.to else it.from }
             val contactOther = contactOtherId?.let(snapshotById::get)
             val contactDirection = contactOther?.let { other ->

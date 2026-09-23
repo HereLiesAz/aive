@@ -52,7 +52,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation("com.github.HereLiesAz:conveyance-h2g2:8566a9db02d533d9534327df40424ee7b88ebe88")
+            implementation("com.github.HereLiesAz:conveyance-h2g2:060231873e51d64082c43208a585a6ebb4a71ed5")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)

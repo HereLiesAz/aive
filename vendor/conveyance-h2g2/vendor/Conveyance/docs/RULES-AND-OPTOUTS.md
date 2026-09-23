@@ -137,6 +137,23 @@ Act.destroy(
 
 The pressure is intentional. Before introducing confirmation friction, look for undo, recovery, staging, a Ghost, delayed commitment, or another construction that lets the person act without being treated as a likely mistake.
 
+> **"Ghost", in this spec, means one thing only: the reversible residue a destroyed subject leaves
+> behind, in the place it was.** That is what `Ghosts`/`Residue`
+> (`conveyance-compose/src/commonMain/kotlin/com/hereliesaz/conveyance/compose/Ghosts.kt`, held by
+> the collection surface in `Collection.kt`) implement, and it is the mechanism that makes a
+> confirmation dialog unnecessary.
+>
+> Do not confuse it with `ConveyWeight.Ghost` in the downstream
+> [`convey`](https://github.com/HereLiesAz/convey) library (a separate Kotlin Multiplatform design
+> system built on this Manifesto). There, `Ghost` is the lowest tier of a four-step *visual
+> hierarchy* vocabulary (Hero / Primary / Secondary / Ghost) — a decorative, inert element that
+> carries no emphasis. It has nothing to do with destruction, reversal, or residue. The name
+> collision is coincidental and lives in a downstream implementation this spec does not own;
+> `convey` names its own destruction-residue mechanism `ConveyReversal` precisely because
+> `ConveyWeight.Ghost` had already taken the word. Anyone extending this spec should keep reading
+> "Ghost" here as destruction-residue, and qualify the word explicitly whenever both ecosystems are
+> in scope.
+
 ### Opt-out — `Act.destroyIrreversibly(...)`
 
 When the actual consequence has no meaningful inverse, say so explicitly.

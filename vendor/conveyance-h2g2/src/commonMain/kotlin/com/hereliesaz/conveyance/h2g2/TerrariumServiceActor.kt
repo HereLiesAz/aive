@@ -18,8 +18,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
@@ -57,13 +55,11 @@ fun H2g2TerrariumServiceLayer(
     BoxWithConstraints(modifier) {
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        val density = LocalDensity.current
         active.forEach { visit ->
             UsprVisitActor(
                 visit = visit,
                 widthPx = widthPx,
                 heightPx = heightPx,
-                density = density,
             )
         }
     }
@@ -74,7 +70,6 @@ private fun UsprVisitActor(
     visit: H2g2TerrariumServiceVisit,
     widthPx: Float,
     heightPx: Float,
-    density: Density,
 ) {
     val progress = remember(visit.id) { Animatable(-.18f) }
     var visible by remember(visit.id) { mutableStateOf(true) }
@@ -95,14 +90,13 @@ private fun UsprVisitActor(
     if (!visible) return
 
     val centerX = progress.value * widthPx
-    val margin68px = with(density) { 68.dp.toPx() }
-    val centerY = (visit.target.y * heightPx).coerceIn(margin68px, heightPx - margin68px)
+    val centerY = (visit.target.y * heightPx).coerceIn(68f, heightPx - 68f)
     Canvas(
         Modifier
             .offset {
                 IntOffset(
-                    x = (centerX - with(density) { 74.dp.toPx() }).roundToInt(),
-                    y = (centerY - with(density) { 41.dp.toPx() }).roundToInt(),
+                    x = (centerX - 74f).roundToInt(),
+                    y = (centerY - 41f).roundToInt(),
                 )
             }
             .size(148.dp, 82.dp),

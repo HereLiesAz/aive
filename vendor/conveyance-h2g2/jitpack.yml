@@ -1,2 +1,20 @@
 jdk:
   - openjdk17
+
+# Scope JitPack's publish to the targets consumers actually resolve (android/desktop/common
+# metadata). The js/wasmJs publications pull in Kotlin's kotlinNpmInstall task, which downloads
+# a recent Node.js binary that fails to run on JitPack's build container:
+#   /home/jitpack/.gradle/nodejs/node-v24.16.0-linux-x64/bin/node:
+#     /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `CXXABI_1.3.11' not found
+# (confirmed live against JitPack's own build log) - the container's glibc/libstdc++ predates
+# what that Node build needs. This mirrors the same install-command-scoping fix already applied
+# to HereLiesAz/Conveyance's jitpack.yml for the identical failure mode.
+#
+# No `-x test`: unlike Conveyance's aggregate project (which has a real `test` task in one of
+# its subprojects), this project registers no bare `test` task at all - only `desktopTest`,
+# `jsTest`, `wasmJsTest`. Gradle's `-x <task>` resolves the exclusion target eagerly, so passing
+# `-x test` here failed the whole invocation with "Task 'test' not found" before anything ran -
+# confirmed live against JitPack's own build log. The three publish tasks below don't pull in
+# any test task anyway (confirmed via `--dry-run`), so no exclusion is needed.
+install:
+  - ./gradlew publishAndroidPublicationToMavenLocal publishDesktopPublicationToMavenLocal publishKotlinMultiplatformPublicationToMavenLocal
