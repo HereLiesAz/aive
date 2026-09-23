@@ -290,6 +290,7 @@ internal fun ProviderSettingsScreen(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    crashReportingSetting: CrashReportingSetting? = null,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -415,6 +416,24 @@ internal fun ProviderSettingsScreen(
             },
             modifier = Modifier.fillMaxWidth(),
         )
+
+        crashReportingSetting?.let { setting ->
+            ProviderSectionLabel("Crash Reports")
+            Text(
+                "When enabled, crashes and app-not-responding events are sent automatically to the " +
+                    "HereLiesAz/aive GitHub issue tracker (exception, stack trace, app version, Android version, " +
+                    "device model). No workflow content or credentials are included.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            AzphaltPill(
+                if (setting.enabled) "Automatic crash reports: ON" else "Automatic crash reports: OFF",
+                "crash-reporting-toggle",
+                selected = setting.enabled,
+                onClick = { setting.onEnabledChange(!setting.enabled) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         ProviderSectionLabel("Compute Pool")
         Text(

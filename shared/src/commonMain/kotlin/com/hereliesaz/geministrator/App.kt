@@ -64,6 +64,7 @@ fun App(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    crashReportingSetting: CrashReportingSetting? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: SettingsWorkflowPersistence.createDefault() }
@@ -538,6 +539,7 @@ fun App(
                         distributedComputeState = distributedComputeState,
                         onSaveDistributedCompute = onSaveDistributedCompute,
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                        crashReportingSetting = crashReportingSetting,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
                         onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
