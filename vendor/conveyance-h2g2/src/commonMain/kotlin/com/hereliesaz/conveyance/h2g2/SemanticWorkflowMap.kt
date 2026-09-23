@@ -17,7 +17,12 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.geometry.Offset
+// `isSpecified` is a top-level extension val on Offset, not a member -- without this import the
+// whole module fails to compile. It did: this file has never compiled since it was added.
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.floor
@@ -341,14 +346,35 @@ private fun bandSummaryNode(index: Int, band: H2g2WorkflowBand): H2g2WorkflowNod
     )
 }
 
-private fun aggregateState(nodes: List<H2g2WorkflowNode>): H2g2WorkflowState = when {
-    nodes.any { it.state == H2g2WorkflowState.Failed } -> H2g2WorkflowState.Failed
-    nodes.any { it.state == H2g2WorkflowState.Active } -> H2g2WorkflowState.Active
-    nodes.any { it.state == H2g2WorkflowState.Blocked } -> H2g2WorkflowState.Blocked
-    nodes.any { it.state == H2g2WorkflowState.Gate } -> H2g2WorkflowState.Gate
-    nodes.any { it.state == H2g2WorkflowState.Ready } -> H2g2WorkflowState.Ready
-    nodes.all { it.state == H2g2WorkflowState.Complete } -> H2g2WorkflowState.Complete
-    else -> H2g2WorkflowState.Pending
+private fun aggregateState(nodes: List<H2g2WorkflowNode>): H2g2WorkflowState {
+    var hasFailed = false
+    var hasActive = false
+    var hasBlocked = false
+    var hasGate = false
+    var hasReady = false
+    var allComplete = true
+
+    for (node in nodes) {
+        when (node.state) {
+            H2g2WorkflowState.Failed -> hasFailed = true
+            H2g2WorkflowState.Active -> hasActive = true
+            H2g2WorkflowState.Blocked -> hasBlocked = true
+            H2g2WorkflowState.Gate -> hasGate = true
+            H2g2WorkflowState.Ready -> hasReady = true
+            H2g2WorkflowState.Complete -> {}
+            H2g2WorkflowState.Pending -> allComplete = false
+        }
+    }
+
+    return when {
+        hasFailed -> H2g2WorkflowState.Failed
+        hasActive -> H2g2WorkflowState.Active
+        hasBlocked -> H2g2WorkflowState.Blocked
+        hasGate -> H2g2WorkflowState.Gate
+        hasReady -> H2g2WorkflowState.Ready
+        allComplete && nodes.isNotEmpty() -> H2g2WorkflowState.Complete
+        else -> H2g2WorkflowState.Pending
+    }
 }
 
 private fun bandSummaryId(index: Int): String = "$BandSummaryPrefix$index"
@@ -361,40 +387,48 @@ private fun Modifier.semanticZoomGesture(
     semanticView: H2g2SemanticWorkflowView,
     state: H2g2WorkflowViewportState,
     onNodeSelected: (H2g2WorkflowNode) -> Unit,
-): Modifier = pointerInput(bands, semanticView, state.zoomLevel, state.focusedBandIndex, state.focusedNodeId) {
-    awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
-        var cumulativeZoom = 1f
-        var lastCentroid = Offset.Unspecified
-        var triggered = false
-        var event: PointerEvent
-        do {
-            event = awaitPointerEvent()
-            if (event.changes.count { it.pressed } >= 2) {
-                val zoom = event.calculateZoom()
-                if (zoom.isFinite() && zoom > 0f) cumulativeZoom *= zoom
-                val centroid = event.calculateCentroid(useCurrent = true)
-                if (centroid.isFinitePoint()) lastCentroid = centroid
+): Modifier = composed {
+    val currentBands by rememberUpdatedState(bands)
+    val currentSemanticView by rememberUpdatedState(semanticView)
+    val currentOnNodeSelected by rememberUpdatedState(onNodeSelected)
 
-                if (!triggered && cumulativeZoom >= ZoomInThreshold) {
-                    semanticZoomInAt(
-                        centroid = lastCentroid,
-                        viewportWidth = size.width.toFloat(),
-                        viewportHeight = size.height.toFloat(),
-                        bands = bands,
-                        semanticView = semanticView,
-                        state = state,
-                        onNodeSelected = onNodeSelected,
-                    )
-                    triggered = true
-                    event.changes.forEach { it.consume() }
-                } else if (!triggered && cumulativeZoom <= ZoomOutThreshold) {
-                    state.zoomOut()
-                    triggered = true
-                    event.changes.forEach { it.consume() }
+    pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var cumulativeZoom = 1f
+            var lastCentroid = Offset.Unspecified
+            var triggered = false
+            var event: PointerEvent
+            do {
+                event = awaitPointerEvent()
+                if (event.changes.count { it.pressed } >= 2) {
+                    val zoom = event.calculateZoom()
+                    if (zoom.isFinite() && zoom > 0f) cumulativeZoom *= zoom
+                    val centroid = event.calculateCentroid(useCurrent = true)
+                    if (centroid.isSpecified) lastCentroid = centroid
+
+                    if (!triggered && cumulativeZoom >= ZoomInThreshold) {
+                        semanticZoomInAt(
+                            centroid = lastCentroid,
+                            viewportWidth = size.width.toFloat(),
+                            viewportHeight = size.height.toFloat(),
+                            bands = currentBands,
+                            semanticView = currentSemanticView,
+                            state = state,
+                            onNodeSelected = currentOnNodeSelected,
+                        )
+                        triggered = true
+                        event.changes.forEach { it.consume() }
+                    } else if (!triggered && cumulativeZoom <= ZoomOutThreshold) {
+                        state.zoomOut()
+                        triggered = true
+                        event.changes.forEach { it.consume() }
+                    } else if (triggered) {
+                        event.changes.forEach { it.consume() }
+                    }
                 }
-            }
-        } while (event.changes.any { it.pressed })
+            } while (event.changes.any { it.pressed })
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.conveyance.Act
 import com.hereliesaz.conveyance.compose.Offer
@@ -22,6 +23,10 @@ import com.hereliesaz.conveyance.h2g2.H2g2.contrastingText
 // to its outermost shape -- the exact wiring Conveyance's own demo (conveyance-demo/.../Gallery.kt)
 // uses at every real Offer call site. Without it a template still renders correctly but is inert:
 // nothing engages the act on tap, so ActState can never leave Ready through this template alone.
+//
+// Every template also clips to `request.surfaceShape(<its own default>)` rather than to a
+// hardcoded H2g2Surface literal, so the manifest's `surface` string actually selects the shape --
+// the behaviour ComposableRequest.surface has always been documented to have.
 
 /**
  * What a `kind: "composable"` `.azp` package's `elements[]` entry (azphalt `spec/composable.md`)
@@ -40,6 +45,11 @@ data class ComposableRequest(
     /** Resolved via [H2g2.indexOf] -- a real hue name if it's one of [H2g2.hueNames], otherwise
      *  hashed via [H2g2.hueOf], typically off the manifest element's own `id` or a subject id. */
     val hueSeed: String,
+    /**
+     * One of [H2g2Surface]'s four names (`recordTile`/`note`/`well`/`capsule`), resolved through
+     * [surfaceShape]. Every template clips its outermost shape to this; a name this vocabulary
+     * doesn't have leaves that template on its own documented default shape.
+     */
     val surface: String,
     val scale: String,
     val label: String,
@@ -47,6 +57,22 @@ data class ComposableRequest(
     val detailLines: List<String>? = null,
     val endCapText: String? = null,
 )
+
+/**
+ * The single point every template resolves [ComposableRequest.surface] through.
+ *
+ * A manifest naming one of [H2g2Surface]'s four shapes gets that shape; anything else -- an empty
+ * string, a name this vocabulary doesn't have, a manifest that simply didn't bother -- keeps
+ * [default], the shape the calling template was written around. That keeps `h2g2.tile.note`
+ * note-shaped and `h2g2.pill.action` capsule-shaped for every existing caller while making
+ * [ComposableRequest.surface] do the thing it has always been documented to do.
+ *
+ * This exists as a named function rather than an inline `H2g2Surface.byName(...)` call in six
+ * places so the resolution rule is testable on its own (`TemplatesTest`) without a UI harness:
+ * an adversarial audit found every template hardcoding its shape literal and ignoring
+ * [ComposableRequest.surface] entirely, and [H2g2Surface.byName] with no callers at all.
+ */
+fun ComposableRequest.surfaceShape(default: Shape): Shape = H2g2Surface.byName(surface, default)
 
 /**
  * The h2g2 composable-set's template registry -- what a `templateId` resolves against once this
@@ -76,12 +102,13 @@ fun RecordTile(request: ComposableRequest) {
     val hue = H2g2.hues[H2g2.indexOf(request.hueSeed)]
     val textColor = hue.contrastingText()
     val type = h2g2Type()
+    val shape = request.surfaceShape(H2g2Surface.recordTile)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Box(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.recordTile)
+                .clip(shape)
                 .background(hue)
                 .padding(horizontal = 20.dp, vertical = 14.dp),
             contentAlignment = Alignment.CenterStart,
@@ -120,12 +147,13 @@ fun RecordTileWithWell(request: ComposableRequest) {
     val textColor = hue.contrastingText()
     val lines = request.detailLines
     val type = h2g2Type()
+    val shape = request.surfaceShape(H2g2Surface.recordTile)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Column(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.recordTile)
+                .clip(shape)
                 .background(hue)
                 .padding(20.dp),
         ) {
@@ -161,12 +189,13 @@ fun NoteTile(request: ComposableRequest) {
     val hue = H2g2.hues[H2g2.indexOf(request.hueSeed)]
     val textColor = hue.contrastingText()
     val type = h2g2Type()
+    val shape = request.surfaceShape(H2g2Surface.note)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Box(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.note)
+                .clip(shape)
                 .background(hue)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             contentAlignment = Alignment.CenterStart,
@@ -192,12 +221,13 @@ fun NoteTile(request: ComposableRequest) {
 @Composable
 fun ActionPill(request: ComposableRequest) {
     val hue = H2g2.hues[H2g2.indexOf(request.hueSeed)]
+    val shape = request.surfaceShape(H2g2Surface.capsule)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Box(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.capsule)
+                .clip(shape)
                 .background(hue)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             contentAlignment = Alignment.Center,
@@ -238,12 +268,13 @@ private fun EndCap(text: String, hueIndex: Int) {
 fun CappedPill(request: ComposableRequest) {
     val hueIndex = H2g2.indexOf(request.hueSeed)
     val hue = H2g2.hues[hueIndex]
+    val shape = request.surfaceShape(H2g2Surface.capsule)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Row(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.capsule)
+                .clip(shape)
                 .background(hue)
                 .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = if (request.endCapText != null) 6.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -270,12 +301,13 @@ fun CappedRecordTile(request: ComposableRequest) {
     val hueIndex = H2g2.indexOf(request.hueSeed)
     val hue = H2g2.hues[hueIndex]
     val textColor = hue.contrastingText()
+    val shape = request.surfaceShape(H2g2Surface.recordTile)
     Offer(act = request.act, modifier = Modifier.wrapContentSize()) {
         Row(
             modifier = Modifier
                 .tell(owesTell, weight)
                 .clickable { engage() }
-                .clip(H2g2Surface.recordTile)
+                .clip(shape)
                 .background(hue)
                 .padding(start = 20.dp, top = 14.dp, bottom = 14.dp, end = if (request.endCapText != null) 10.dp else 20.dp),
             verticalAlignment = Alignment.CenterVertically,

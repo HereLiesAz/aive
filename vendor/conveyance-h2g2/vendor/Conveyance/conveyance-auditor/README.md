@@ -71,11 +71,32 @@ try {
 
 ## Using it
 
+Not on Maven Central — see [PUBLISHING.md](../docs/PUBLISHING.md) for what still blocks that and
+who has to decide it. What does resolve today is JitPack, which is how every downstream repo in
+this ecosystem already consumes `conveyance-core`/`conveyance-compose`:
+
 ```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+
+// build.gradle.kts
 dependencies {
-    implementation("com.hereliesaz.conveyance:conveyance-auditor:0.1.0")
+    implementation("com.github.HereLiesAz.Conveyance:conveyance-auditor:main-SNAPSHOT")
 }
 ```
 
-Not yet on Maven Central — see the [root quickstart](../docs/GETTING-STARTED.md) for what's available
-today.
+The group is JitPack's own `com.github.<owner>.<repo>` form, not the `com.hereliesaz.conveyance`
+group ID this build's POMs carry — JitPack rewrites it. `main-SNAPSHOT` tracks this repo's `main`
+branch; there is no tagged release to pin to yet. Note that the `0.1.0` this build's `version`
+is set to (root `build.gradle.kts`) is not a released version either, and disagrees with the
+release version CI actually stamps from `version.properties`/`.version-state.json` (`0.0.12.1` at
+the time of writing) — one more reason not to write a pinned number here.
+
+Or skip the coordinate entirely and build against source, per the
+[root quickstart](../docs/GETTING-STARTED.md): `includeBuild("../Conveyance")`, or
+`./gradlew publishToMavenLocal` and depend on `com.hereliesaz.conveyance:conveyance-auditor`.

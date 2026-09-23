@@ -26,11 +26,11 @@ if (useMavenLocalH2g2) {
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {
-                substitute(module("com.github.HereLiesAz:conveyance-h2g2:8566a9db02d533d9534327df40424ee7b88ebe88"))
+                substitute(module("com.github.HereLiesAz:conveyance-h2g2:060231873e51d64082c43208a585a6ebb4a71ed5"))
                     .using(module("com.hereliesaz.conveyance:conveyance-h2g2:0.1.0"))
-                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:b3e13674df9dfbcc0b35f800b57d78a305d07b03"))
+                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:653122cd8ec79a4b3ceadd44d99fe80f66c9905d"))
                     .using(module("com.hereliesaz.conveyance:conveyance-core:0.1.0"))
-                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-compose:b3e13674df9dfbcc0b35f800b57d78a305d07b03"))
+                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-compose:653122cd8ec79a4b3ceadd44d99fe80f66c9905d"))
                     .using(module("com.hereliesaz.conveyance:conveyance-compose:0.1.0"))
             }
         }

@@ -1,2 +1,24 @@
 jdk:
   - openjdk17
+
+# JitPack builds this repo to publish the artifacts every downstream repo actually consumes:
+# conveyance-core, conveyance-compose, and conveyance-auditor (a plain JVM module depending only
+# on conveyance-core). Left to its own devices it runs the aggregate build,
+# which also configures and resolves :conveyance-demo -- and that module depends on the five
+# sibling composable-set repos at `com.github.HereLiesAz:<name>:main-SNAPSHOT`, each of which
+# depends back on THIS repo's JitPack artifacts. That cycle cannot resolve while this repo is the
+# one being built, so the aggregate build fails, and JitPack marks the whole build "Error" and
+# publishes nothing -- even though conveyance-core/-compose's own maven-publish output was
+# produced successfully before the failure. Every JitPack build of this repo has failed this way,
+# which in turn breaks conveyance-h2g2, conveyance-liquid and conveyance-space downstream.
+#
+# Scoping the install command to just the publishable modules' publishToMavenLocal tasks means
+# :conveyance-demo is never configured or resolved here at all, so the cycle is never touched.
+# JitPack picks the artifacts up out of the local Maven repository this writes to. The demo
+# modules are applications built to prove the framework, not part of its published API surface --
+# nothing consuming this repo needs them built, and `./gradlew build` still builds everything
+# locally and in this repo's own CI, where the sibling repos' artifacts do resolve normally.
+#
+# -x test: JitPack is a publishing step, not the test gate. Tests run in .github/workflows.
+install:
+  - ./gradlew :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal :conveyance-auditor:publishToMavenLocal -x test
