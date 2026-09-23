@@ -88,4 +88,41 @@ class AttentionGatedRecallTest {
         assertEquals(0.1f, agents.forAgent("x").currentState().effectiveLevel)
         assertEquals(0.9f, agents.forAgent("y").currentState().effectiveLevel)
     }
+
+    /** Tokens (in 16-token steps) until a suppressed agent's dial stops rising. */
+    private fun tokensToRecover(baseline: Float, suppressTo: Float): Pair<Int, Float> = runBlocking {
+        val agents = PerAgentAttention(defaultLevel = baseline)
+        agents.suppress("a", suppressTo)
+        val recall = agents.forAgent("a")
+        var used = 0
+        var last = recall.currentState().effectiveLevel
+        while (true) {
+            recall.consumeTokens(16)
+            used += 16
+            val now = recall.currentState().effectiveLevel
+            if (now == last && recall.currentState().effectiveLevel >= baseline) break
+            last = now
+        }
+        used to last
+    }
+
+    @Test
+    fun deeperSuppressionNeedsMoreTokensToRecover() {
+        val (shallow, _) = tokensToRecover(0.8f, 0.6f)
+        val (deep, _) = tokensToRecover(0.8f, 0.0f)
+        assertTrue(deep >= 2 * shallow, "deep=$deep shallow=$shallow")
+    }
+
+    @Test
+    fun recoveryOvershootsBaseline() = runBlocking {
+        val (_, rest) = tokensToRecover(0.5f, 0.1f)
+        assertTrue(rest > 0.5f, "rest=$rest")
+        // An explicit baseline change afterwards takes effect immediately and drops the overshoot.
+        val agents = PerAgentAttention(defaultLevel = 0.5f)
+        agents.suppress("a", 0.1f)
+        agents.forAgent("a").consumeTokens(10_000)
+        assertTrue(agents.forAgent("a").currentState().effectiveLevel > 0.5f)
+        agents.setLevel("a", 0.3f)
+        assertEquals(0.3f, agents.forAgent("a").currentState().effectiveLevel)
+    }
 }

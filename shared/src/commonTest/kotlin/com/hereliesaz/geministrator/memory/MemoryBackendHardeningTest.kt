@@ -107,7 +107,8 @@ class MemoryBackendHardeningTest {
 
         assertEquals(Long.MAX_VALUE, recovered.tokensSinceSuppression)
         assertEquals(Long.MAX_VALUE, recovered.tokensSinceCue)
-        assertEquals(nearLimit.baselineLevel, recovered.effectiveLevel)
+        assertEquals(gate.recoveryRestLevel(nearLimit), recovered.effectiveLevel)
+        assertTrue(recovered.effectiveLevel > nearLimit.baselineLevel)
     }
 
     @Test

@@ -98,7 +98,7 @@ internal class PerAgentAttention(
     /** Persistently turns one agent's dial to [level]. */
     suspend fun setLevel(agentId: String, level: Float) = forAgent(agentId).setBaseline(level)
 
-    /** Temporarily lowers one agent's dial; token use recovers it toward its level. */
+    /** Temporarily lowers one agent's dial; token use recovers it (scaled by depth) to rest above its level. */
     suspend fun suppress(agentId: String, level: Float) = forAgent(agentId).suppress(level)
 
     suspend fun forget(agentId: String) = mutex.withLock { agents.remove(agentId) }
