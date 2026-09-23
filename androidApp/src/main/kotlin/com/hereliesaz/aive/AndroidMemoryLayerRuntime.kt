@@ -479,6 +479,7 @@ internal class AndroidMemoryLayerRuntime(
     }
     private val layer = AgentMemoryLayer.createDefaultWithMicroAgents(agents)
     private val drainMutex = Mutex()
+    private val attention = AttentionGatedRecall()
 
     val observer: MemorySessionObserver = object : MemorySessionObserver {
         override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
@@ -487,6 +488,12 @@ internal class AndroidMemoryLayerRuntime(
 
         override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
             layer.sessionObserver.onSessionEvent(handle, event)
+            val text = when (event) {
+                is AgentEvent.Message -> event.content
+                is AgentEvent.PlanGenerated -> event.summary
+                else -> null
+            }
+            attention.consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
@@ -497,6 +504,13 @@ internal class AndroidMemoryLayerRuntime(
 
     private val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
         val context = request.orchestrationContext
+        // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
+        attention.consumeTokens(
+            AttentionGatedRecall.approximateTokens(
+                request.objective + request.roleInstructions,
+                APPROXIMATE_CHARS_PER_TOKEN,
+            ),
+        )
         val hitsById = linkedMapOf<String, MemoryRecallHit>()
 
         queryPlan.queries.forEach { querySpec ->
@@ -531,9 +545,11 @@ internal class AndroidMemoryLayerRuntime(
             }
         }
 
-        val hits = hitsById.values
+        val ranked = hitsById.values
             .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
             .take(MAX_RECALL_RESULTS)
+        // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
+        val hits = attention.select(ranked)
 
         if (hits.isEmpty()) {
             MemoryPromptRecall()
