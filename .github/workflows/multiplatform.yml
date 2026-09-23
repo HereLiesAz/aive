@@ -49,14 +49,14 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8566a9db02d533d9534327df40424ee7b88ebe88
+          ref: 060231873e51d64082c43208a585a6ebb4a71ed5
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/Conveyance
-          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          ref: ec32af47a3dbe36fc87cd4643c54121ed702579d
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
@@ -364,14 +364,14 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 8566a9db02d533d9534327df40424ee7b88ebe88
+          ref: 060231873e51d64082c43208a585a6ebb4a71ed5
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
         uses: actions/checkout@v7
         with:
           repository: HereLiesAz/Conveyance
-          ref: b3e13674df9dfbcc0b35f800b57d78a305d07b03
+          ref: ec32af47a3dbe36fc87cd4643c54121ed702579d
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21

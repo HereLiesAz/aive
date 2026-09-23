@@ -1,5 +1,5 @@
 [versions]
-# Toolchain baseline. AGP 9.4.0 is the current stable release and supports API 37.
+# Toolchain baseline. AGP 9.4.1 is the current stable release and supports API 37.
 # Kotlin 2.4.20 includes the fix for CVE-2026-53914 (unsafe build-cache deserialization).
 agp = "9.4.1"
 gradle = "9.7.1"
