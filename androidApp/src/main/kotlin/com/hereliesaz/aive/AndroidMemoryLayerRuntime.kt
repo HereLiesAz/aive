@@ -479,7 +479,17 @@ internal class AndroidMemoryLayerRuntime(
     }
     private val layer = AgentMemoryLayer.createDefaultWithMicroAgents(agents)
     private val drainMutex = Mutex()
-    private val attention = AttentionGatedRecall()
+    /** Attention Deficit Dial state, one per agent (task run). Adjust via [setAttentionLevel]. */
+    val attention = PerAgentAttention()
+
+    /** Turns the dial for agents that have not started yet. */
+    fun setDefaultAttentionLevel(level: Float) { attention.defaultLevel = level }
+
+    /** Turns one running agent's dial persistently. */
+    suspend fun setAttentionLevel(taskRunId: String, level: Float) = attention.setLevel(taskRunId, level)
+
+    /** Temporarily lowers one agent's dial; its own token use recovers it. */
+    suspend fun suppressAttention(taskRunId: String, level: Float) = attention.suppress(taskRunId, level)
 
     val observer: MemorySessionObserver = object : MemorySessionObserver {
         override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
@@ -493,11 +503,12 @@ internal class AndroidMemoryLayerRuntime(
                 is AgentEvent.PlanGenerated -> event.summary
                 else -> null
             }
-            attention.consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
+            attention.forAgent(handle.taskRunId.value).consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
             layer.sessionObserver.onSessionFinished(handle, status)
+            attention.forget(handle.taskRunId.value)
             scope.launch { drainConsolidationQueue() }
         }
     }
@@ -505,7 +516,8 @@ internal class AndroidMemoryLayerRuntime(
     private val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
         val context = request.orchestrationContext
         // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
-        attention.consumeTokens(
+        val agentAttention = attention.forAgent(request.taskRunId.value)
+        agentAttention.consumeTokens(
             AttentionGatedRecall.approximateTokens(
                 request.objective + request.roleInstructions,
                 APPROXIMATE_CHARS_PER_TOKEN,
@@ -549,7 +561,7 @@ internal class AndroidMemoryLayerRuntime(
             .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
             .take(MAX_RECALL_RESULTS)
         // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
-        val hits = attention.select(ranked)
+        val hits = agentAttention.select(ranked)
 
         if (hits.isEmpty()) {
             MemoryPromptRecall()

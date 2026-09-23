@@ -13,14 +13,19 @@ import kotlinx.coroutines.sync.withLock
  *
  * Per docs/architecture/MEMORY_BANKING_AND_ATTENTION.md the dial only controls *surfacing*; it never
  * touches the memory graph. Recall is cue-first:
+ *  - Tags are the ambient layer: the only memory an agent sees without deliberately thinking about
+ *    it. They are not a fallback of this gate; the gate governs whether associative recall is
+ *    injected into the prompt at all.
  *  - While the gate is closed (strongest association below the dial's similarity threshold, or not
- *    enough tokens have passed since the last cue), only tag-level cues (noun/verb/category tags)
- *    may surface, capped at the dial's `maxTags`.
- *  - When the gate opens, the full ranked recall (tags plus deeper phrase/summary/context) surfaces
- *    and the cue interval is reset via [MemoryAttentionGate.markCueSurfaced].
+ *    enough tokens have passed since the last cue) the result is silence: nothing is injected.
+ *  - When the gate opens, the ranked recall surfaces and the cue interval is reset via
+ *    [MemoryAttentionGate.markCueSurfaced].
  *
- * Token consumption (the documented recovery signal) is fed in via [consumeTokens]. State is held
- * for the lifetime of the owning runtime, i.e. one per attached memory layer.
+ * Token consumption (the documented recovery signal) is fed in via [consumeTokens]. The number of
+ * tokens needed before the gate reopens scales with the dial: the cue interval interpolates from
+ * `focusedCueIntervalTokens` (dial 0) down to `intrusiveCueIntervalTokens` (dial 1), so a lower dial
+ * needs more tokens to reopen and a higher dial fewer. One instance holds one agent's state; see
+ * [PerAgentAttention].
  */
 internal class AttentionGatedRecall(
     policy: MemoryAttentionPolicy = MemoryAttentionPolicy(),
@@ -49,8 +54,7 @@ internal class AttentionGatedRecall(
             state = gate.markCueSurfaced(state)
             rankedHits
         } else {
-            val maxTags = gate.cuePolicy(state).maxTags
-            rankedHits.filter { it.node.kind in CUE_KINDS }.take(maxTags)
+            emptyList()
         }
     }
 
@@ -60,4 +64,42 @@ internal class AttentionGatedRecall(
         fun approximateTokens(text: String?, charsPerToken: Int = 4): Int =
             if (text.isNullOrEmpty()) 0 else (text.length + charsPerToken - 1) / charsPerToken
     }
+}
+
+/**
+ * Attention state keyed per agent. An agent here is one managed session, identified by the
+ * [com.hereliesaz.geministrator.domain.TaskRunId] value that both the prompt-context request and
+ * the session handle carry. [defaultLevel] is the dial position new agents start at; it and each
+ * agent's own level can be changed at runtime.
+ */
+internal class PerAgentAttention(
+    private val policy: MemoryAttentionPolicy = MemoryAttentionPolicy(),
+    defaultLevel: Float = MemoryAttentionState().baselineLevel,
+) {
+    private val mutex = Mutex()
+    private val agents = mutableMapOf<String, AttentionGatedRecall>()
+
+    init { require(defaultLevel in 0f..1f) }
+
+    @Volatile
+    var defaultLevel: Float = defaultLevel
+        set(value) {
+            require(value in 0f..1f)
+            field = value
+        }
+
+    suspend fun forAgent(agentId: String): AttentionGatedRecall = mutex.withLock {
+        agents.getOrPut(agentId) {
+            val level = defaultLevel
+            AttentionGatedRecall(policy, MemoryAttentionState(baselineLevel = level))
+        }
+    }
+
+    /** Persistently turns one agent's dial to [level]. */
+    suspend fun setLevel(agentId: String, level: Float) = forAgent(agentId).setBaseline(level)
+
+    /** Temporarily lowers one agent's dial; token use recovers it toward its level. */
+    suspend fun suppress(agentId: String, level: Float) = forAgent(agentId).suppress(level)
+
+    suspend fun forget(agentId: String) = mutex.withLock { agents.remove(agentId) }
 }

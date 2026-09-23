@@ -1,6 +1,7 @@
 package com.hereliesaz.aive
 
 import com.hereliesaz.geministrator.memory.MemoryAttentionPolicy
+import com.hereliesaz.geministrator.memory.MemoryAttentionState
 import com.hereliesaz.geministrator.memory.MemoryNode
 import com.hereliesaz.geministrator.memory.MemoryNodeId
 import com.hereliesaz.geministrator.memory.MemoryNodeKind
@@ -23,33 +24,68 @@ class AttentionGatedRecallTest {
     )
 
     @Test
-    fun rapidRepeatedRecallIsThrottledToTagCuesUntilTokensPass() = runBlocking {
+    fun closedGateIsSilentNotATagFallback() = runBlocking {
         val recall = AttentionGatedRecall(MemoryAttentionPolicy())
         // Fresh state: no cue yet, strong association -> full recall, cue interval reset.
         assertEquals(ranked, recall.select(ranked))
         assertEquals(0L, recall.currentState().tokensSinceCue)
-
-        // Immediate repeat: interval not elapsed -> tag-level cues only.
-        val throttled = recall.select(ranked)
-        assertTrue(throttled.isNotEmpty())
-        assertTrue(throttled.all { it.node.kind in AttentionGatedRecall.CUE_KINDS })
-
-        // Token passage past the dial's cue interval re-opens deeper recall.
+        // Immediate repeat: interval not elapsed -> silence, even though tag hits are present.
+        assertTrue(recall.select(ranked).isEmpty())
+        // Token passage past the dial's cue interval re-opens recall.
         recall.consumeTokens(5_000)
         assertEquals(ranked, recall.select(ranked))
     }
 
     @Test
-    fun weakAssociationsStayCueOnlyAndSuppressionRecoversWithTokens() = runBlocking {
-        val recall = AttentionGatedRecall(MemoryAttentionPolicy(recoveryWindowTokens = 1_000))
+    fun weakAssociationsStaySilentWhenFocused() = runBlocking {
+        val recall = AttentionGatedRecall(MemoryAttentionPolicy())
         val weak = listOf(hit("phrase", MemoryNodeKind.Phrase, 0.6f), hit("noun", MemoryNodeKind.NounTag, 0.5f))
         recall.suppress(0f)
-        // Focused: 0.6 < 0.92 threshold -> only the tag cue survives.
-        assertEquals(listOf("noun"), recall.select(weak).map { it.node.id.value })
-        // Tokens restore the dial toward baseline (0.5 -> threshold 0.685) and pass the interval,
-        // but 0.6 is still below threshold; a strong association now opens.
-        recall.consumeTokens(3_000)
-        assertEquals(listOf("noun"), recall.select(weak).map { it.node.id.value })
+        assertTrue(recall.select(weak).isEmpty())
         assertEquals(ranked, recall.select(ranked))
+    }
+
+    /** Smallest token count after a surfaced cue that reopens the gate at [level]. */
+    private fun tokensToReopen(level: Float): Int = runBlocking {
+        val recall = AttentionGatedRecall(MemoryAttentionPolicy(), MemoryAttentionState(baselineLevel = level))
+        assertEquals(ranked, recall.select(ranked))
+        var used = 0
+        do {
+            recall.consumeTokens(16)
+            used += 16
+        } while (recall.select(ranked).isEmpty())
+        used
+    }
+
+    @Test
+    fun lowerDialNeedsMoreTokensToReopen() {
+        val low = tokensToReopen(0.2f)
+        val high = tokensToReopen(0.8f)
+        assertTrue(low > high, "low=$low high=$high")
+        assertTrue(low >= 2 * high, "low=$low high=$high")
+    }
+
+    @Test
+    fun attentionIsIsolatedPerAgent() = runBlocking {
+        val agents = PerAgentAttention()
+        val a = agents.forAgent("task-a")
+        val b = agents.forAgent("task-b")
+        assertEquals(ranked, a.select(ranked))
+        assertTrue(a.select(ranked).isEmpty()) // agent A throttled by its own rapid queries
+        assertEquals(ranked, b.select(ranked)) // agent B unaffected
+        assertTrue(agents.forAgent("task-a") === a)
+    }
+
+    @Test
+    fun dialIsSettableDefaultAndPerAgent() = runBlocking {
+        val agents = PerAgentAttention(defaultLevel = 0.2f)
+        assertEquals(0.2f, agents.forAgent("x").currentState().baselineLevel)
+        agents.defaultLevel = 0.9f
+        assertEquals(0.9f, agents.forAgent("y").currentState().baselineLevel)
+        agents.setLevel("x", 0.7f)
+        assertEquals(0.7f, agents.forAgent("x").currentState().effectiveLevel)
+        agents.suppress("x", 0.1f)
+        assertEquals(0.1f, agents.forAgent("x").currentState().effectiveLevel)
+        assertEquals(0.9f, agents.forAgent("y").currentState().effectiveLevel)
     }
 }
