@@ -169,13 +169,29 @@ class MemoryBankingAttentionTest {
         val gate = MemoryAttentionGate(MemoryAttentionPolicy(recoveryWindowTokens = 4_000))
         val baseline = MemoryAttentionState(baselineLevel = 0.7f)
         val suppressed = gate.suppress(baseline, 0.1f)
-        val halfway = gate.consumeTokens(suppressed, 2_000)
-        val recovered = gate.consumeTokens(halfway, 2_000)
+        // Depth 0.6 -> window lerp(256, 4000, 0.6) = 2502 tokens; rest = 0.7 + 0.6 * 0.25 = 0.85.
+        val window = gate.recoveryWindowTokens(suppressed)
+        assertEquals(2_502L, window)
+        val halfway = gate.consumeTokens(suppressed, (window / 2).toInt())
+        val recovered = gate.consumeTokens(halfway, (window - window / 2).toInt())
 
         assertEquals(0.1f, suppressed.effectiveLevel)
         assertTrue(halfway.effectiveLevel > suppressed.effectiveLevel)
         assertTrue(halfway.effectiveLevel < baseline.baselineLevel)
-        assertEquals(baseline.baselineLevel, recovered.effectiveLevel)
+        assertEquals(gate.recoveryRestLevel(suppressed), recovered.effectiveLevel)
+        assertTrue(recovered.effectiveLevel > baseline.baselineLevel)
+        assertEquals(0.85f, recovered.effectiveLevel, 1e-5f)
+    }
+
+    @Test
+    fun deeperSuppressionTakesLongerAndReboundsHigher() {
+        val gate = MemoryAttentionGate()
+        val baseline = MemoryAttentionState(baselineLevel = 0.6f)
+        val shallow = gate.suppress(baseline, 0.5f)
+        val deep = gate.suppress(baseline, 0.0f)
+        assertTrue(gate.recoveryWindowTokens(deep) > 2 * gate.recoveryWindowTokens(shallow))
+        assertTrue(gate.recoveryRestLevel(deep) > gate.recoveryRestLevel(shallow))
+        assertTrue(gate.recoveryRestLevel(shallow) > baseline.baselineLevel)
     }
 
     @Test

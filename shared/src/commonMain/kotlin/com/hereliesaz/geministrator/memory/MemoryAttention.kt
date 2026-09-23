@@ -12,7 +12,16 @@ import kotlin.math.roundToInt
  */
 @Serializable
 data class MemoryAttentionPolicy(
+    /** Tokens needed to recover from the deepest possible suppression (baseline 1 pushed to 0). */
     val recoveryWindowTokens: Int = 4_096,
+    /** Tokens needed to recover from a vanishingly shallow suppression. */
+    val shallowRecoveryWindowTokens: Int = 256,
+    /**
+     * Fraction of the suppression depth added on top of the baseline once recovery completes. After
+     * a suppression cycle the agent rests at `baseline + depth * recoveryOvershootFraction`
+     * (clamped to 1): the deeper it was held down, the more attentive it rebounds.
+     */
+    val recoveryOvershootFraction: Float = 0.25f,
     val focusedSimilarityThreshold: Float = 0.92f,
     val intrusiveSimilarityThreshold: Float = 0.45f,
     val focusedCueIntervalTokens: Int = 2_048,
@@ -22,6 +31,9 @@ data class MemoryAttentionPolicy(
 ) {
     init {
         require(recoveryWindowTokens > 0)
+        require(shallowRecoveryWindowTokens > 0)
+        require(recoveryWindowTokens >= shallowRecoveryWindowTokens)
+        require(recoveryOvershootFraction >= 0f)
         require(focusedSimilarityThreshold in 0f..1f)
         require(intrusiveSimilarityThreshold in 0f..1f)
         require(focusedSimilarityThreshold >= intrusiveSimilarityThreshold)
@@ -38,8 +50,9 @@ data class MemoryAttentionPolicy(
  *
  * [baselineLevel] is the agent's configured ADD level. [effectiveLevel] may be temporarily lowered
  * for focus. [suppressedFromLevel] records the temporary floor so token consumption can recover
- * deterministically toward baseline without relying on the agent to remember to turn memory back
- * on.
+ * deterministically without relying on the agent to remember to turn memory back on. Recovery
+ * overshoots: a recovered agent rests *above* [baselineLevel] (see
+ * [MemoryAttentionGate.recoveryRestLevel]) until its baseline is explicitly set again.
  */
 @Serializable
 data class MemoryAttentionState(
@@ -72,9 +85,10 @@ class MemoryAttentionGate(
     fun setBaseline(state: MemoryAttentionState, level: Float): MemoryAttentionState {
         require(level in 0f..1f)
 
-        // A state already resting at baseline is not under temporary suppression, so a persistent
-        // baseline change should take effect immediately in either direction.
-        if (state.effectiveLevel == state.baselineLevel) {
+        // A state resting at (or, after a recovered suppression, above) baseline is not under
+        // temporary suppression, so a persistent baseline change takes effect immediately in either
+        // direction. An explicit baseline change also discards any post-recovery overshoot.
+        if (state.effectiveLevel >= state.baselineLevel) {
             return state.copy(
                 baselineLevel = level,
                 effectiveLevel = level,
@@ -85,6 +99,8 @@ class MemoryAttentionGate(
 
         // While focus suppression is active, changing the normal baseline must not unexpectedly
         // raise current attention. Lower baselines still clamp the effective level immediately.
+        // Recovery depth/overshoot are derived from the *current* baseline at consume time, so the
+        // remaining recovery re-targets the new baseline.
         val effective = minOf(state.effectiveLevel, level)
         return state.copy(
             baselineLevel = level,
@@ -107,19 +123,48 @@ class MemoryAttentionGate(
         )
     }
 
+    /** How far below the current baseline the active suppression floor sits, in 0..1. */
+    fun suppressionDepth(state: MemoryAttentionState): Float =
+        (state.baselineLevel - state.suppressedFromLevel).coerceIn(0f, 1f)
+
     /**
-     * Token use restores a temporarily lowered dial toward its configured baseline. Wall-clock
-     * idleness does not perform this recovery.
+     * Tokens needed to fully recover from [state]'s suppression. Mirrors the cue-interval curve:
+     * linear interpolation, here from `shallowRecoveryWindowTokens` (depth 0) up to
+     * `recoveryWindowTokens` (depth 1), so deeper suppression takes proportionally longer.
+     */
+    fun recoveryWindowTokens(state: MemoryAttentionState): Long =
+        lerp(
+            policy.shallowRecoveryWindowTokens.toFloat(),
+            policy.recoveryWindowTokens.toFloat(),
+            suppressionDepth(state),
+        ).roundToInt().coerceAtLeast(1).toLong()
+
+    /**
+     * Level the dial rests at once recovery completes: baseline plus a rebound proportional to the
+     * suppression depth (`depth * recoveryOvershootFraction`), clamped to 1. With no suppression
+     * this is exactly the baseline.
+     */
+    fun recoveryRestLevel(state: MemoryAttentionState): Float =
+        (state.baselineLevel + suppressionDepth(state) * policy.recoveryOvershootFraction).coerceIn(0f, 1f)
+
+    /**
+     * Token use restores a temporarily lowered dial past its configured baseline to
+     * [recoveryRestLevel], over [recoveryWindowTokens]. Wall-clock idleness does not perform this
+     * recovery.
      */
     fun consumeTokens(state: MemoryAttentionState, tokenCount: Int): MemoryAttentionState {
         require(tokenCount >= 0)
         if (tokenCount == 0) return state
         val increment = tokenCount.toLong()
         val used = saturatingAdd(state.tokensSinceSuppression, increment)
-        val progress = (used.toDouble() / policy.recoveryWindowTokens.toDouble())
+        val progress = (used.toDouble() / recoveryWindowTokens(state).toDouble())
             .coerceIn(0.0, 1.0)
             .toFloat()
-        val recovered = lerp(state.suppressedFromLevel, state.baselineLevel, progress)
+        val recovered = if (progress >= 1f) {
+            recoveryRestLevel(state)
+        } else {
+            lerp(state.suppressedFromLevel, recoveryRestLevel(state), progress)
+        }
         val cueTokens = saturatingAdd(state.tokensSinceCue, increment)
         return state.copy(
             effectiveLevel = recovered,
