@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationEpoch8ModelCatalog
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
+import com.hereliesaz.geministrator.orchestration.currentLaunchProgressSink
 import com.hereliesaz.geministrator.orchestration.validateAgainst
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
@@ -60,12 +61,15 @@ internal class AndroidOrchestrationAgentRuntime(
         role: OrchestrationAgentRole,
         packet: OrchestrationPacket,
     ): OrchestrationPlan {
+        val progress = currentLaunchProgressSink()
+        progress("Checking ${role.progressLabel} model files…")
         val installed = installer.ensureInstalled(role)
         val bundle = OrchestrationEpoch8ModelCatalog.bundleFor(role)
         val modelSpec = MemoryMicroAgentModelSpec(
             modelId = bundle.runtimeArtifactId,
             quantization = bundle.quantization,
         )
+        progress("Loading ${role.progressLabel} model…")
         val prepared = sessionManager.sessionFor(installed.onnxModel.absolutePath, modelSpec)
         val prompt = buildPrompt(role, packet)
         return HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
@@ -75,7 +79,9 @@ internal class AndroidOrchestrationAgentRuntime(
                 modelRoot = installed.root,
                 prompt = prompt,
                 maxNewTokens = MAX_NEW_TOKENS,
+                progress = progress,
             )
+            progress("Decoding plan…")
             prepared.captureExecutionProfile()
             decodePlan(generated)
         }
@@ -114,10 +120,12 @@ internal class AndroidOrchestrationAgentRuntime(
         modelRoot: java.io.File,
         prompt: String,
         maxNewTokens: Int,
+        progress: (String) -> Unit = {},
     ): String {
         val config = loadModelConfig(modelRoot)
         val promptIds = tokenizer.encode(prompt).ids
         require(promptIds.isNotEmpty()) { "Tokenizer returned no prompt tokens" }
+        progress("Reading prompt (${promptIds.size} tokens)…")
         val stopIds = listOf("<|im_end|>", "<|endoftext|>")
             .mapNotNull { token -> tokenizer.encode(token).ids.singleOrNull() }
             .toSet()
@@ -135,6 +143,7 @@ internal class AndroidOrchestrationAgentRuntime(
         try {
             val chunks = prefillChunks(promptIds.size, PREFILL_CHUNK_TOKENS)
             chunks.forEachIndexed { chunkIndex, range ->
+                progress("Thinking (chunk ${chunkIndex + 1} of ${chunks.size})…")
                 val chunkIds = promptIds.copyOfRange(range.first, range.last + 1)
                 totalLength += chunkIds.size
                 val previous = activeResult
@@ -162,6 +171,9 @@ internal class AndroidOrchestrationAgentRuntime(
                 val nextToken = argmaxLastLogit(currentResult)
                 if (nextToken in stopIds) break
                 generated += nextToken
+                if (generated.size == 1 || generated.size % GENERATION_PROGRESS_INTERVAL == 0) {
+                    progress("Writing plan (${generated.size} tokens)…")
+                }
                 totalLength += 1
 
                 val owned = mutableListOf<OnnxTensor>()
@@ -314,6 +326,7 @@ internal class AndroidOrchestrationAgentRuntime(
         const val MAX_NEW_TOKENS = 768
         const val PREFILL_CHUNK_TOKENS = 32
         const val LOGITS_OUTPUT = "logits"
+        const val GENERATION_PROGRESS_INTERVAL = 32
 
         /** Splits [0, tokenCount) into consecutive ranges of at most [chunkSize] tokens. */
         fun prefillChunks(tokenCount: Int, chunkSize: Int): List<IntRange> {
@@ -325,6 +338,12 @@ internal class AndroidOrchestrationAgentRuntime(
         }
     }
 }
+
+private val OrchestrationAgentRole.progressLabel: String
+    get() = when (this) {
+        OrchestrationAgentRole.Planner -> "planning"
+        OrchestrationAgentRole.PlanRepair -> "plan-repair"
+    }
 
 internal class OrchestrationModelOutOfMemoryException(
     role: OrchestrationAgentRole,

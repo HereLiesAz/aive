@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,6 +91,7 @@ internal fun MindMapRunScreen(
         key = "overview.$draftScope.default-branch",
         initialValue = existingRepository?.defaultBranch.orEmpty(),
     )
+    var launchFieldsError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySearchError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySuggestions by remember(runtimeState) { mutableStateOf<List<RepositorySuggestion>>(emptyList()) }
@@ -377,8 +379,25 @@ internal fun MindMapRunScreen(
                     seed = "project-start-run",
                     selected = projectName.isNotBlank() && objective.isNotBlank(),
                     onClick = {
-                        if (projectName.isBlank() || objective.isBlank()) return@AzphaltPill
                         val locator = repositoryLocator.trim()
+                        // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
+                        // but launch failed" in any future "nothing happens" report.
+                        platformDebugLog(
+                            "AiveLaunch",
+                            "CREATE PROJECT + START RUN tapped: project=${projectName.trim()} " +
+                                "repo=${locator.ifEmpty { "<none>" }} objectiveChars=${objective.trim().length}",
+                        )
+                        if (projectName.isBlank() || objective.isBlank()) {
+                            // Previously a silent no-op: the only cue was the pill's unselected colour.
+                            launchFieldsError = when {
+                                projectName.isBlank() && objective.isBlank() -> "Enter a project name and an objective to start a run."
+                                projectName.isBlank() -> "Enter a project name to start a run."
+                                else -> "Enter an objective to start a run."
+                            }
+                            platformDebugLog("AiveLaunch", "Launch blocked: $launchFieldsError")
+                            return@AzphaltPill
+                        }
+                        launchFieldsError = null
                         if (locator.isEmpty()) {
                             repositoryError = null
                             onLaunchWorkflow(projectName.trim(), objective.trim(), null)
@@ -396,12 +415,16 @@ internal fun MindMapRunScreen(
                                 },
                                 onFailure = { failure ->
                                     repositoryError = failure.message ?: "Invalid repository location"
+                                    platformDebugLog("AiveLaunch", "Launch blocked: invalid repository: $repositoryError")
                                 },
                             )
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                launchFieldsError?.let { message ->
+                    Text(message, style = AzphaltType.body, color = MaterialTheme.colorScheme.error)
+                }
             }
             Spacer(Modifier.height(24.dp))
             return@Column

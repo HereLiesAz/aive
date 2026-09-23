@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -7,6 +8,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
+import com.hereliesaz.geministrator.orchestration.LaunchProgress
 import kotlinx.coroutines.launch
 
 @Composable
@@ -67,6 +70,9 @@ fun App(
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
+    var launching by remember { mutableStateOf(false) }
+    val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
+    val launchStepRows by launchSteps.rows.collectAsState()
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
@@ -250,7 +256,8 @@ fun App(
 
         CompositionLocalProvider(LocalWorkflowLibraryHost provides workflowLibraryHost) {
             Scaffold { paddingValues ->
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+              Box(modifier = Modifier.fillMaxSize()) {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,
                         onDestinationSelected = { target ->
@@ -269,10 +276,20 @@ fun App(
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
                         },
-                        onLaunchWorkflow = { projectName, objective, repository ->
+                        onLaunchWorkflow = onLaunch@{ projectName, objective, repository ->
                             val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
-                            scope.launch {
+                            if (launching) {
+                                platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
+                                return@onLaunch
+                            }
+                            launching = true
+                            launchSteps.clear()
+                            scope.launch(LaunchProgress(launchSteps::push)) {
                                 try {
+                                    platformDebugLog(
+                                        "AiveLaunch",
+                                        "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
+                                    )
                                     val activeRuntime = runtime ?: error("Runtime is unavailable")
                                     if (orchestrationRuntime != null) {
                                         activeRuntime.launchOrchestratedWorkflow(
@@ -283,6 +300,7 @@ fun App(
                                             existingProject = existingProject,
                                         )
                                     } else {
+                                        launchSteps.push("Starting the starter workflow…")
                                         activeRuntime.launchStarterWorkflow(
                                             projectName = projectName,
                                             objective = objective,
@@ -296,7 +314,10 @@ fun App(
                                     // Catch Throwable, not Exception: on-device model failures such as
                                     // OutOfMemoryError are Errors and previously escaped this handler,
                                     // leaving the launch button silently doing nothing.
+                                    platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
                                     runtimeState = failure.toRuntimeFailureState("Workflow launch failed")
+                                } finally {
+                                    launching = false
                                 }
                             }
                         },
@@ -526,6 +547,10 @@ fun App(
                         connectedProviderIds = providers.map { it.id.value }.toSet(),
                     )
                 }
+                if (launching) {
+                    LaunchStepsOverlay(rows = launchStepRows, maxRows = launchSteps.maxRows)
+                }
+              }
             }
         }
     }
