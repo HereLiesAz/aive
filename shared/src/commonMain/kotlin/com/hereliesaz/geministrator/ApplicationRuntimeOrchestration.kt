@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
+import com.hereliesaz.geministrator.orchestration.reportLaunchProgress
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
@@ -31,6 +32,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     val cleanObjective = objective.trim()
     require(cleanProjectName.isNotEmpty()) { "Project name is required" }
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
+    reportLaunchProgress("Reading your objective…")
 
     parseHallMonitorTrialLaunchObjective(cleanObjective)?.let { trial ->
         testHallMonitorSolution(
@@ -55,6 +57,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         updatedAtEpochMillis = now,
     )
 
+    reportLaunchProgress("Gathering available agent roles…")
     val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
     val packet = OrchestrationPacket(
         objective = cleanObjective,
@@ -68,7 +71,10 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         },
         instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
     )
+    reportLaunchProgress("Asking the planner for a workflow (${launchRoles.size} roles available)…")
     val plan = orchestrationRuntime.plan(packet)
+    reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
+    reportLaunchProgress("Assembling workflow…")
     val definition = OrchestratedWorkflowFactory.create(
         id = WorkflowDefinitionId("workflow-$now"),
         objective = cleanObjective,
@@ -82,6 +88,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         eventSink = RepositoryWorkflowEventSink(persistence.events),
         roles = launchRoles,
     )
+    reportLaunchProgress("Saving project and starting run…")
     launchService.launch(
         project = project,
         definition = definition,
@@ -90,5 +97,6 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
     )
+    reportLaunchProgress("Loading the new run…")
     loadLatest()
 }
