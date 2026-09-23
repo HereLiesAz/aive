@@ -1,15 +1,15 @@
 [versions]
 # Toolchain baseline. AGP 9.4.0 is the current stable release and supports API 37.
 # Kotlin 2.4.20 includes the fix for CVE-2026-53914 (unsafe build-cache deserialization).
-agp = "9.4.1"
+agp = "9.4.0"
 gradle = "9.7.1"
 kotlin = "2.4.20"
 # Compose Multiplatform: latest stable plugin.
-compose = "1.12.1"
+compose = "1.12.0"
 # material3 is taken at alpha deliberately: the Expressive shape-morph machinery
 # (MaterialShapes, Morph) lives there and nowhere else. Used as geometry, never as
 # a channel vocabulary -- Conveyance assigns its own meanings and cannot import M3's.
-androidxMaterial3 = "1.5.0-alpha28"
+androidxMaterial3 = "1.5.0-alpha27"
 compileSdk = "37"
 compileSdkMinor = "1"
 minSdk = "24"
@@ -19,8 +19,8 @@ detekt = "1.23.8"
 # The generated API reference, built from the KDoc already written throughout the codebase.
 dokka = "2.2.0"
 # The auditor calls Claude to run the two rules no structural check can settle.
-anthropic = "2.65.0"
-jackson = "2.22.3"
+anthropic = "2.60.0"
+jackson = "2.22.2"
 jvmToolchain = "21"
 # The Android entry point (conveyance-demo-android) is a plain, non-KMP application module --
 # AGP 9 forbids com.android.application and the KMP library plugin in the same module -- so it
