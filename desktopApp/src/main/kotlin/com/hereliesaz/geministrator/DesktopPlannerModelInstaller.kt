@@ -23,6 +23,14 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 
 /** The optional desktop planner model, published as split parts on a GitHub release. */
 internal object DesktopPlannerModel {
+    /**
+     * Off until a model plans usefully. Tested end to end on the epoch-8 int8 export: it installs,
+     * loads and generates, but emits a different schema (`nextSteps`/`escalate`), no role ids or
+     * objectives, and malformed JSON. While false, desktop plans with the linked LLM only and the
+     * Settings section is hidden.
+     */
+    const val ENABLED = false
+
     const val RELEASE_API_URL = "https://api.github.com/repos/HereLiesAz/aive/releases/tags/orchestration-layer-epoch8"
     const val ARCHIVE_NAME = "haive-orch_planner-int8-epoch8.tar.gz"
     const val RUNTIME_ARTIFACT_ID = "orchestration:epoch8:planner:int8"
@@ -64,8 +72,11 @@ internal class DesktopPlannerModelInstaller(
             staging.mkdirs()
             progress("Fetching release info…")
             val assets = loadReleaseAssets()
+            // Only "<archive>.part001"-style assets; the release also carries "<archive>.parts.json"
+            // and per-part ".sha256" files, which must not be joined into the archive.
+            val partPattern = Regex(Regex.escape(DesktopPlannerModel.ARCHIVE_NAME) + """\.part\d+""")
             val parts = assets
-                .filter { it.name.startsWith("${DesktopPlannerModel.ARCHIVE_NAME}.part") && !it.name.endsWith(".sha256") }
+                .filter { partPattern.matches(it.name) }
                 .sortedBy(ReleaseAsset::name)
             check(parts.isNotEmpty()) { "No release parts found for ${DesktopPlannerModel.ARCHIVE_NAME}" }
 
