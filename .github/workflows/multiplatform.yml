@@ -223,12 +223,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p fastlane/metadata/android/en-US/changelogs
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Search from HEAD^ so a re-run of an already-tagged commit still diffs against
+          # the previous release instead of its own tag (which yields empty notes).
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           if [ -n "$LAST_TAG" ]; then
             git log "${LAST_TAG}..HEAD" --pretty=format:"- %s" --no-merges -n 50 \
               > fastlane/metadata/android/en-US/changelogs/default.txt
           else
             git log --pretty=format:"- %s" --no-merges -20 \
+              > fastlane/metadata/android/en-US/changelogs/default.txt
+          fi
+          # Google Play publishing requires non-empty notes.
+          if [ ! -s fastlane/metadata/android/en-US/changelogs/default.txt ]; then
+            git log -1 --pretty=format:"- %s" \
               > fastlane/metadata/android/en-US/changelogs/default.txt
           fi
           echo "=== Release notes ==="
