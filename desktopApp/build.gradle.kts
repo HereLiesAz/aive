@@ -15,7 +15,17 @@ dependencies {
     implementation(projects.providers.llm)
     implementation(compose.desktop.currentOs)
     implementation(libs.ktor.client.cio)
+    // Optional local workflow planner: ONNX inference, HF tokenizer, and the model archive format.
+    if (System.getProperty("os.name").lowercase().contains("mac")) {
+        implementation(libs.onnxruntime)
+    } else {
+        implementation(libs.onnxruntime.gpu)
+    }
+    implementation(libs.djl.huggingface.tokenizers)
+    implementation(libs.commons.compress)
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(kotlin("test"))
+    testImplementation(libs.ktor.client.mock)
 }
 
 kotlin {
