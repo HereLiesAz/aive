@@ -64,8 +64,11 @@ internal class DesktopPlannerModelInstaller(
             staging.mkdirs()
             progress("Fetching release info…")
             val assets = loadReleaseAssets()
+            // Only "<archive>.part001"-style assets; the release also carries "<archive>.parts.json"
+            // and per-part ".sha256" files, which must not be joined into the archive.
+            val partPattern = Regex(Regex.escape(DesktopPlannerModel.ARCHIVE_NAME) + """\.part\d+""")
             val parts = assets
-                .filter { it.name.startsWith("${DesktopPlannerModel.ARCHIVE_NAME}.part") && !it.name.endsWith(".sha256") }
+                .filter { partPattern.matches(it.name) }
                 .sortedBy(ReleaseAsset::name)
             check(parts.isNotEmpty()) { "No release parts found for ${DesktopPlannerModel.ARCHIVE_NAME}" }
 
