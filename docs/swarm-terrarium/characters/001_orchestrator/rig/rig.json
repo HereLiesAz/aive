@@ -1,0 +1,453 @@
+{
+  "schema": "aive.node-rig.v1",
+  "character": "001_orchestrator",
+  "coordinateSpace": "normalized",
+  "source": "../source_character.png",
+  "root": "body",
+  "bones": [
+    {
+      "id": "body",
+      "parent": null,
+      "anchor": [
+        0.5,
+        0.43
+      ],
+      "tip": [
+        0.5,
+        0.53
+      ],
+      "stiffness": 0.9,
+      "damping": 0.84
+    },
+    {
+      "id": "eye_l",
+      "parent": "body",
+      "anchor": [
+        0.43,
+        0.43
+      ],
+      "tip": [
+        0.43,
+        0.43
+      ],
+      "stiffness": 1,
+      "damping": 1
+    },
+    {
+      "id": "eye_r",
+      "parent": "body",
+      "anchor": [
+        0.57,
+        0.43
+      ],
+      "tip": [
+        0.57,
+        0.43
+      ],
+      "stiffness": 1,
+      "damping": 1
+    },
+    {
+      "id": "dendrite_nw_0",
+      "parent": "body",
+      "anchor": [
+        0.42,
+        0.34
+      ],
+      "tip": [
+        0.34,
+        0.24
+      ],
+      "stiffness": 0.62,
+      "damping": 0.72
+    },
+    {
+      "id": "dendrite_nw_1",
+      "parent": "dendrite_nw_0",
+      "anchor": [
+        0.34,
+        0.24
+      ],
+      "tip": [
+        0.28,
+        0.12
+      ],
+      "stiffness": 0.44,
+      "damping": 0.68
+    },
+    {
+      "id": "dendrite_nw_branch",
+      "parent": "dendrite_nw_0",
+      "anchor": [
+        0.34,
+        0.24
+      ],
+      "tip": [
+        0.23,
+        0.22
+      ],
+      "stiffness": 0.38,
+      "damping": 0.66
+    },
+    {
+      "id": "dendrite_n_0",
+      "parent": "body",
+      "anchor": [
+        0.5,
+        0.32
+      ],
+      "tip": [
+        0.51,
+        0.2
+      ],
+      "stiffness": 0.58,
+      "damping": 0.7
+    },
+    {
+      "id": "dendrite_n_1",
+      "parent": "dendrite_n_0",
+      "anchor": [
+        0.51,
+        0.2
+      ],
+      "tip": [
+        0.55,
+        0.08
+      ],
+      "stiffness": 0.42,
+      "damping": 0.66
+    },
+    {
+      "id": "dendrite_n_branch",
+      "parent": "dendrite_n_0",
+      "anchor": [
+        0.51,
+        0.2
+      ],
+      "tip": [
+        0.44,
+        0.14
+      ],
+      "stiffness": 0.34,
+      "damping": 0.64
+    },
+    {
+      "id": "dendrite_ne_0",
+      "parent": "body",
+      "anchor": [
+        0.59,
+        0.35
+      ],
+      "tip": [
+        0.69,
+        0.25
+      ],
+      "stiffness": 0.6,
+      "damping": 0.71
+    },
+    {
+      "id": "dendrite_ne_1",
+      "parent": "dendrite_ne_0",
+      "anchor": [
+        0.69,
+        0.25
+      ],
+      "tip": [
+        0.78,
+        0.15
+      ],
+      "stiffness": 0.42,
+      "damping": 0.66
+    },
+    {
+      "id": "dendrite_ne_branch",
+      "parent": "dendrite_ne_0",
+      "anchor": [
+        0.69,
+        0.25
+      ],
+      "tip": [
+        0.78,
+        0.29
+      ],
+      "stiffness": 0.33,
+      "damping": 0.63
+    },
+    {
+      "id": "dendrite_w_0",
+      "parent": "body",
+      "anchor": [
+        0.38,
+        0.46
+      ],
+      "tip": [
+        0.25,
+        0.44
+      ],
+      "stiffness": 0.64,
+      "damping": 0.73
+    },
+    {
+      "id": "dendrite_w_1",
+      "parent": "dendrite_w_0",
+      "anchor": [
+        0.25,
+        0.44
+      ],
+      "tip": [
+        0.13,
+        0.39
+      ],
+      "stiffness": 0.46,
+      "damping": 0.68
+    },
+    {
+      "id": "dendrite_w_branch",
+      "parent": "dendrite_w_0",
+      "anchor": [
+        0.25,
+        0.44
+      ],
+      "tip": [
+        0.17,
+        0.5
+      ],
+      "stiffness": 0.36,
+      "damping": 0.64
+    },
+    {
+      "id": "dendrite_e_0",
+      "parent": "body",
+      "anchor": [
+        0.62,
+        0.47
+      ],
+      "tip": [
+        0.74,
+        0.51
+      ],
+      "stiffness": 0.61,
+      "damping": 0.72
+    },
+    {
+      "id": "dendrite_e_1",
+      "parent": "dendrite_e_0",
+      "anchor": [
+        0.74,
+        0.51
+      ],
+      "tip": [
+        0.87,
+        0.48
+      ],
+      "stiffness": 0.43,
+      "damping": 0.67
+    },
+    {
+      "id": "dendrite_e_branch",
+      "parent": "dendrite_e_0",
+      "anchor": [
+        0.74,
+        0.51
+      ],
+      "tip": [
+        0.82,
+        0.58
+      ],
+      "stiffness": 0.35,
+      "damping": 0.63
+    },
+    {
+      "id": "gestation_0",
+      "parent": "body",
+      "anchor": [
+        0.49,
+        0.55
+      ],
+      "tip": [
+        0.42,
+        0.64
+      ],
+      "stiffness": 0.5,
+      "damping": 0.72
+    },
+    {
+      "id": "gestation_1",
+      "parent": "gestation_0",
+      "anchor": [
+        0.42,
+        0.64
+      ],
+      "tip": [
+        0.56,
+        0.7
+      ],
+      "stiffness": 0.4,
+      "damping": 0.68
+    },
+    {
+      "id": "gestation_pod_1",
+      "parent": "gestation_1",
+      "anchor": [
+        0.56,
+        0.7
+      ],
+      "tip": [
+        0.62,
+        0.72
+      ],
+      "stiffness": 0.75,
+      "damping": 0.8
+    },
+    {
+      "id": "gestation_2",
+      "parent": "gestation_1",
+      "anchor": [
+        0.56,
+        0.7
+      ],
+      "tip": [
+        0.43,
+        0.78
+      ],
+      "stiffness": 0.36,
+      "damping": 0.66
+    },
+    {
+      "id": "gestation_pod_2",
+      "parent": "gestation_2",
+      "anchor": [
+        0.43,
+        0.78
+      ],
+      "tip": [
+        0.36,
+        0.8
+      ],
+      "stiffness": 0.72,
+      "damping": 0.8
+    },
+    {
+      "id": "gestation_3",
+      "parent": "gestation_2",
+      "anchor": [
+        0.43,
+        0.78
+      ],
+      "tip": [
+        0.55,
+        0.87
+      ],
+      "stiffness": 0.32,
+      "damping": 0.64
+    },
+    {
+      "id": "gestation_egg",
+      "parent": "gestation_3",
+      "anchor": [
+        0.55,
+        0.87
+      ],
+      "tip": [
+        0.68,
+        0.91
+      ],
+      "stiffness": 0.82,
+      "damping": 0.86
+    }
+  ],
+  "controls": [
+    {
+      "id": "look",
+      "type": "vec2",
+      "targets": [
+        "eye_l",
+        "eye_r"
+      ],
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "blink",
+      "type": "scalar",
+      "targets": [
+        "eye_l",
+        "eye_r"
+      ],
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "body_squash",
+      "type": "scalar",
+      "targets": [
+        "body"
+      ],
+      "range": [
+        -0.18,
+        0.16
+      ]
+    },
+    {
+      "id": "body_turn",
+      "type": "scalar",
+      "targets": [
+        "body"
+      ],
+      "range": [
+        -18,
+        18
+      ]
+    },
+    {
+      "id": "dendrite_sway",
+      "type": "scalar",
+      "targets": [
+        "dendrite_nw_0",
+        "dendrite_n_0",
+        "dendrite_ne_0",
+        "dendrite_w_0",
+        "dendrite_e_0"
+      ],
+      "range": [
+        -1,
+        1
+      ]
+    },
+    {
+      "id": "gestation_sway",
+      "type": "scalar",
+      "targets": [
+        "gestation_0",
+        "gestation_1",
+        "gestation_2",
+        "gestation_3"
+      ],
+      "range": [
+        -1,
+        1
+      ]
+    }
+  ],
+  "physics": {
+    "gravity": [
+      0,
+      0.16
+    ],
+    "wind": [
+      0.05,
+      0
+    ],
+    "solverIterations": 8,
+    "maxAngleDeg": 28
+  },
+  "notes": [
+    "Asymmetric dendrite lengths are intentional.",
+    "Branch bones originate mid-tendril, not only at endpoints.",
+    "Gestation limb is a separate underside chain with two elongated pods and one large egg terminal."
+  ]
+}
