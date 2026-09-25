@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+<style>
+.b{stroke:#00e5ff;stroke-width:8;fill:none;stroke-linecap:round}.j{fill:#ff4f8b}.g{stroke:#ffb000;stroke-width:10;fill:none;stroke-linecap:round}.t{font:26px monospace;fill:#fff}
+</style>
+<rect width="100%" height="100%" fill="#111"/>
+<circle cx="500" cy="430" r="145" fill="#242047" stroke="#ff6847" stroke-width="16"/>
+<ellipse cx="430" cy="430" rx="34" ry="52" fill="#050816" stroke="#ff6847" stroke-width="12"/>
+<ellipse cx="570" cy="430" rx="34" ry="52" fill="#050816" stroke="#ff6847" stroke-width="12"/>
+<path class="b" d="M420 340 Q340 260 280 120 M340 240 L230 220"/>
+<path class="b" d="M500 320 Q510 200 550 80 M510 200 L440 140"/>
+<path class="b" d="M590 350 Q690 250 780 150 M690 250 L780 290"/>
+<path class="b" d="M380 460 Q250 440 130 390 M250 440 L170 500"/>
+<path class="b" d="M620 470 Q740 510 870 480 M740 510 L820 580"/>
+<circle class="j" cx="280" cy="120" r="20"/><circle class="j" cx="230" cy="220" r="14"/>
+<circle class="j" cx="550" cy="80" r="19"/><circle class="j" cx="440" cy="140" r="13"/>
+<circle class="j" cx="780" cy="150" r="20"/><circle class="j" cx="780" cy="290" r="14"/>
+<circle class="j" cx="130" cy="390" r="22"/><circle class="j" cx="170" cy="500" r="14"/>
+<circle class="j" cx="870" cy="480" r="20"/><circle class="j" cx="820" cy="580" r="14"/>
+<path class="g" d="M490 550 Q420 640 560 700 Q430 780 550 870"/>
+<ellipse cx="610" cy="720" rx="56" ry="26" fill="#ffb000"/><ellipse cx="360" cy="800" rx="56" ry="26" fill="#ffb000"/>
+<ellipse cx="680" cy="910" rx="95" ry="70" fill="#ffb000"/>
+<text class="t" x="36" y="55">001_orchestrator — rig preview</text>
+</svg>
