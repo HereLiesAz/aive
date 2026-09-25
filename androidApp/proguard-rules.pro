@@ -11,3 +11,11 @@
 
 # ONNX Runtime: JNI code creates and reads Java objects by name.
 -keep class ai.onnxruntime.** { *; }
+
+# DJL's desktop-only helpers (image drawing, audio files, runtime compilation, JMX stats) reference
+# JDK classes Android lacks. Aive only uses DJL's tokenizer, which never reaches them.
+-dontwarn java.awt.**
+-dontwarn javax.imageio.**
+-dontwarn javax.sound.sampled.**
+-dontwarn javax.tools.**
+-dontwarn java.lang.management.**

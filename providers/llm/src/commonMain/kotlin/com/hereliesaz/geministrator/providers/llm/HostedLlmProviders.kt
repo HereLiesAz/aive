@@ -119,12 +119,19 @@ object HostedLlmProviders {
     ): AgentProvider = TextLlmProvider(
         id = AgentProviderId(spec.id),
         displayName = spec.displayName,
-        api = OpenAiCompatibleChatApi(
-            apiKeyProvider = apiKeyProvider,
-            model = model,
-            baseUrl = spec.baseUrl,
-            extraHeaders = spec.extraHeaders,
-        ),
+        api = textApi(spec, apiKeyProvider, model),
+    )
+
+    /** The raw chat API behind a hosted provider, for callers that need text generation only. */
+    fun textApi(
+        spec: HostedLlmProviderSpec,
+        apiKeyProvider: LlmApiKeyProvider,
+        model: String = spec.defaultModel,
+    ): TextGenerationApi = OpenAiCompatibleChatApi(
+        apiKeyProvider = apiKeyProvider,
+        model = model,
+        baseUrl = spec.baseUrl,
+        extraHeaders = spec.extraHeaders,
     )
 
     /** Build every hosted provider whose credential is currently configured. */
