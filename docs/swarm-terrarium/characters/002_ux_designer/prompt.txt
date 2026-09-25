@@ -1,1 +1,38 @@
-Use ONLY the UX Designer character in the attached reference. Create one transparent PNG sprite sheet containing only its actual 2D rigging pieces. Preserve the exact source-relative sizes, proportions, silhouettes, faceted/polygonal texture, colors, gradients, shading, highlights, translucency, and finish. Character-specific anatomy: pink faceted rounded core; numerous soft curling ribbon-like tendrils; heart element. Output the complete visible body/core at its real size; each actual eye white separately with NO pupil baked in; each pupil separately; upper and lower eyelids separately; every movable upper appendage as separate base, mid, and tip/terminal pieces; every lower gestation limb as separate base, mid, and bud-tip pieces; and each real prop/effect as its own asset. Do not invent alternate views, generic replacement anatomy, extra parts, labels, text, diagrams, or an assembled character. Do not enlarge small pieces or shrink the body for presentation. Keep unique body shapes unique. Use a transparent background with generous empty spacing so every part can be sliced by a rectangular bounding box without touching another asset.
+Use ONLY docs/swarm-terrarium/characters/002_ux_designer/approved_character.png as the visual authority. Reconstruct that exact approved UX Designer as independent 2D puppet-rig parts. Do not redesign, reinterpret, simplify, restyle, recolor, or borrow anatomy from any other node creature.
+
+STYLE AND MATCHING
+Preserve the approved character's exact coral/pink/orange/deep-indigo palette, smooth glossy 2D vector-like gradients, highlight placement, outline treatment, body proportions, asymmetry, tendril shapes, bulb sizes, branching pattern, heart-shaped terminal, eye design, and long underside gestation limb. The finished parts must reassemble into the approved character with no visible style or silhouette drift.
+
+STRICT 2D RIGGING RULES
+This is layered 2D puppet art, NOT a 3D model, exploded model, mechanical assembly, toy, or cutaway.
+- NEVER draw holes, sockets, tubes, cavities, rims, ports, connector collars, recessed eye sockets, exposed cross-sections, or visible cut faces.
+- NEVER make the body hollow.
+- The BODY/CORE layer must be a complete uninterrupted version of the approved body with the entire face surface filled in behind both eyes. NO eyes and NO eye-shaped holes or depressions on the body layer.
+- Every movable part is a flat layered artwork asset. Joint boundaries are ordinary 2D silhouette edges.
+- Extend hidden portions of limbs underneath neighboring parts so rotation cannot expose gaps. These overlap extensions must continue the same colors/shading; they are not plugs or sockets.
+- Do not bake one movable part into another.
+
+REQUIRED INDEPENDENT PARTS
+1. body_core — complete face/body, no eyes, no holes, no tendrils, no gestation limb.
+2. left_eye_outer/ring matching the approved left eye.
+3. left_eye_black oval.
+4. left_eye_highlight(s), separated only if useful for eye motion.
+5. right_eye_outer/ring.
+6. right_eye_black oval.
+7. right_eye_highlight(s), separated only if useful for eye motion.
+8. blink/eyelid overlays shaped from the approved eye design and palette; these sit ON TOP of the intact body and must not require a socket.
+9. Every approved upper/side dendritic appendage as its own independent rig chain. Preserve each appendage's exact unique length, curvature, branch locations, terminal bulbs, and asymmetry. Where a chain needs more than one moving section, divide it into base/mid/tip pieces with generous hidden 2D overlap.
+10. Preserve the distinctive heart-shaped terminal/branch as its exact own appendage part(s), not a generic heart prop.
+11. The underside gestation limb as independent sequential 2D pieces following the approved serpentine path.
+12. Both elongated intermediate gestation pods as separate parts.
+13. The large terminal gestation egg as a separate part.
+14. Any other visible movable element in approved_character.png that is not listed above.
+
+COMPLETENESS
+Count and reproduce EVERY visible tendril, every branch-off, every terminal bulb, both eyes, the heart terminal, every gestation segment/pod/egg, and every small movable appendage visible in approved_character.png. Missing a small branch is failure. Adding an unapproved branch is failure.
+
+OUTPUT
+Create one transparent PNG sprite sheet containing only the independent rig parts, widely spaced so each can later be extracted by rectangular bounds without touching another part. No text, labels, arrows, guides, background, checkerboard baked into pixels, assembled duplicate, alternate poses, alternate views, or generic spare parts. Preserve source-relative scale: do not enlarge tiny parts or shrink the body merely to fill the sheet.
+
+FINAL SELF-CHECK BEFORE RETURNING
+Mentally reassemble every part in the exact approved pose. Verify: intact face under eyes; zero 3D holes/sockets; exact part count; exact branches/bulbs; exact heart terminal; exact gestation anatomy; exact colors and silhouettes. If any part would not reconstruct approved_character.png faithfully, regenerate before returning.
