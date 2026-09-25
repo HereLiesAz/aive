@@ -23,6 +23,14 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 
 /** The optional desktop planner model, published as split parts on a GitHub release. */
 internal object DesktopPlannerModel {
+    /**
+     * Off until a model plans usefully. Tested end to end on the epoch-8 int8 export: it installs,
+     * loads and generates, but emits a different schema (`nextSteps`/`escalate`), no role ids or
+     * objectives, and malformed JSON. While false, desktop plans with the linked LLM only and the
+     * Settings section is hidden.
+     */
+    const val ENABLED = false
+
     const val RELEASE_API_URL = "https://api.github.com/repos/HereLiesAz/aive/releases/tags/orchestration-layer-epoch8"
     const val ARCHIVE_NAME = "haive-orch_planner-int8-epoch8.tar.gz"
     const val RUNTIME_ARTIFACT_ID = "orchestration:epoch8:planner:int8"

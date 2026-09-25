@@ -162,7 +162,7 @@ fun main() {
                 // Linked cloud LLM plans; an installed local planner goes first and falls back to it.
                 val planningRuntime = remember(credentials, localPlannerStatus) {
                     val cloud = configuredPlanningApi(credentials)?.let(::TextGenerationOrchestrationAgentRuntime)
-                    if (localPlannerStatus == LocalPlannerStatus.Installed) {
+                    if (DesktopPlannerModel.ENABLED && localPlannerStatus == LocalPlannerStatus.Installed) {
                         PreferLocalOrchestrationAgentRuntime(
                             local = localPlanner,
                             localReady = { plannerInstaller.installed() != null },
@@ -269,7 +269,7 @@ fun main() {
                             computeToken = null
                         },
                         orchestrationRuntime = planningRuntime,
-                        localPlannerSetting = localPlannerSetting,
+                        localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
                     )
                 }
             }
