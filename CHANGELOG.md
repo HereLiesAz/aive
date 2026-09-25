@@ -43,6 +43,7 @@ All notable changes to **The Aive** are documented here from the current product
 - `main` is the canonical product branch.
 - GitHub Release containers are patch-scoped; exact build identity remains in immutable four-part tags and artifact filenames.
 - Android release builds are shrunk with R8; the Play mapping.txt is uploaded with each bundle through the shared `google-play-publish` action, and the GitHub flavor's mapping is kept as a workflow artifact.
+- Workflow planning and plan repair run on the linked cloud LLM (Gemini, OpenAI, Claude, Grok, then hosted providers). The on-device planner and its 3.86 GB model download are removed, and leftover planner files are deleted on launch; with no LLM linked, runs start from the starter workflow.
 - Android draws edge-to-edge on every API level; the shared Scaffold pads content by the system-bar insets.
 - The BITCOS native library links with 16 KB page alignment, and release CI verifies alignment of every 64-bit native library in the Play bundle.
 

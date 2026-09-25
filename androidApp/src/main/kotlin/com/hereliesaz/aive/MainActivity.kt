@@ -51,6 +51,7 @@ import com.hereliesaz.geministrator.providers.llm.StoreNodeCharacterRigPipelineE
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
+import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
@@ -97,13 +98,6 @@ class MainActivity : ComponentActivity() {
         )
     }
     private val memoryRuntime by memoryRuntimeDelegate
-    private val orchestrationRuntimeDelegate = lazy {
-        AndroidOrchestrationAgentRuntime(
-            installer = AndroidOrchestrationModelInstaller(this, repositoryHttpClient),
-            cacheDirectory = cacheDir,
-        )
-    }
-    private val orchestrationRuntime by orchestrationRuntimeDelegate
     private var crashReportNoticeVisible by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -135,6 +129,7 @@ class MainActivity : ComponentActivity() {
         }
         val initialComputeToken = computeCredentialStore.readToken()
         azphaltHost.handleIntent(intent)
+        removeRetiredOnDevicePlannerFiles()
 
         setContent {
             var splashFinished by remember { mutableStateOf(false) }
@@ -191,6 +186,10 @@ class MainActivity : ComponentActivity() {
                         repositoryHttpClient = repositoryHttpClient,
                         installedGeminiApi = installedGeminiApi,
                     )
+                }
+                // Planning runs on the linked cloud LLM; with none linked, App uses the starter workflow.
+                val planningRuntime = remember(credentials) {
+                    configuredPlanningApi(credentials)?.let(::TextGenerationOrchestrationAgentRuntime)
                 }
                 val roleSurfaceRuntime = remember {
                     RoleSurfaceRuntimeRegistry(
@@ -312,7 +311,7 @@ class MainActivity : ComponentActivity() {
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         roleSurfaceRuntime = roleSurfaceRuntime,
-                        orchestrationRuntime = orchestrationRuntime,
+                        orchestrationRuntime = planningRuntime,
                         persistence = azphaltHost.persistence,
                         projectFileService = projectFileService,
                         azphaltStoreService = azphaltHost.service,
@@ -418,11 +417,18 @@ class MainActivity : ComponentActivity() {
             InstalledGeminiTextGenerationApi.isAvailable(this)
     }
 
+    /**
+     * Earlier builds downloaded a multi-gigabyte on-device planner. Planning is cloud-only now, so
+     * reclaim whatever of it (complete or partial) is still on disk.
+     */
+    private fun removeRetiredOnDevicePlannerFiles() {
+        val retired = java.io.File(filesDir, "haive/orchestration")
+        if (!retired.exists()) return
+        Thread({ retired.deleteRecursively() }, "retired-planner-cleanup").start()
+    }
+
     override fun onDestroy() {
         azphaltHost.close()
-        if (orchestrationRuntimeDelegate.isInitialized()) {
-            orchestrationRuntime.close()
-        }
         if (memoryRuntimeDelegate.isInitialized()) {
             memoryRuntime.close()
         }
@@ -456,6 +462,28 @@ fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
             modifier = Modifier.size(280.dp),
             onAnimationStarted = { animationStarted = true },
         )
+    }
+}
+
+/**
+ * The linked cloud LLM used for workflow planning: the first configured of Gemini, OpenAI, Claude,
+ * Grok, then the hosted providers in catalog order. Null when none is linked.
+ */
+internal fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? {
+    credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
+        return GeminiGenerateContentApi(LlmApiKeyProvider { key })
+    }
+    credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
+        return OpenAiResponsesApi(LlmApiKeyProvider { key })
+    }
+    credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
+        return AnthropicMessagesApi(LlmApiKeyProvider { key })
+    }
+    credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
+        return XaiResponsesApi(LlmApiKeyProvider { key })
+    }
+    return HostedLlmProviders.entries.firstNotNullOfOrNull { spec ->
+        credentials.cleanKey(spec.id)?.let { key -> HostedLlmProviders.textApi(spec, LlmApiKeyProvider { key }) }
     }
 }
 

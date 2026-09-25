@@ -224,7 +224,8 @@ private fun MemoryWorkItem.sourceSectionIds(): List<MemorySectionId> = metadata[
     .filter(String::isNotEmpty)
     .map(::MemorySectionId)
 
-private fun String.extractJsonObject(): String {
+/** The outermost JSON object in a model reply, tolerating markdown fences and surrounding prose. */
+internal fun String.extractJsonObject(source: String = "Memory manager"): String {
     val trimmed = trim()
         .removePrefix("```json")
         .removePrefix("```")
@@ -232,7 +233,7 @@ private fun String.extractJsonObject(): String {
         .trim()
     val start = trimmed.indexOf('{')
     val end = trimmed.lastIndexOf('}')
-    require(start >= 0 && end > start) { "Memory manager did not return a JSON object" }
+    require(start >= 0 && end > start) { "$source did not return a JSON object" }
     return trimmed.substring(start, end + 1)
 }
 
