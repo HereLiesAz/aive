@@ -60,7 +60,7 @@ jobs:
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -382,7 +382,7 @@ jobs:
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
