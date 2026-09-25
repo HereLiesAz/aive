@@ -42,6 +42,9 @@ All notable changes to **The Aive** are documented here from the current product
 - Progress is modeled as task-run execution data rather than agent-specific state.
 - `main` is the canonical product branch.
 - GitHub Release containers are patch-scoped; exact build identity remains in immutable four-part tags and artifact filenames.
+- Android release builds are shrunk with R8; the Play mapping.txt is uploaded with each bundle through the shared `google-play-publish` action, and the GitHub flavor's mapping is kept as a workflow artifact.
+- Android draws edge-to-edge on every API level; the shared Scaffold pads content by the system-bar insets.
+- The BITCOS native library links with 16 KB page alignment, and release CI verifies alignment of every 64-bit native library in the Play bundle.
 
 ### Removed
 

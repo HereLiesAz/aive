@@ -146,8 +146,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Release minification runs on PRs too, so R8 keep-rule breaks surface before main.
             ./gradlew -Papp.versionName="$AIVE_VERSION" \
-              :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug
+              :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug \
+              :androidApp:minifyPlayReleaseWithR8 :androidApp:minifyGithubReleaseWithR8
           else
             ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" \
               -Papp.versionName="$AIVE_VERSION" \
@@ -166,6 +168,33 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Verify 16 KB native library alignment
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Google Play requires every 64-bit native library to use >= 16 KB LOAD alignment.
+          # libdjl_tokenizer.so is DJL's prebuilt (4 KB); tracked separately until rebuilt from source.
+          KNOWN_UNALIGNED="libdjl_tokenizer.so"
+          AAB=$(find androidApp/build/outputs/bundle/playRelease -name '*.aab' -print -quit)
+          test -n "$AAB"
+          WORK=$(mktemp -d)
+          unzip -q "$AAB" 'base/lib/*' -d "$WORK"
+          bad=0
+          for so in $(find "$WORK/base/lib/arm64-v8a" "$WORK/base/lib/x86_64" -name '*.so' 2>/dev/null); do
+            align=$(readelf -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | head -1)
+            name=$(basename "$so")
+            if [ $((align)) -lt 16384 ]; then
+              if [[ " $KNOWN_UNALIGNED " == *" $name "* ]]; then
+                echo "::warning::$name is ${align}-aligned (known upstream prebuilt)"
+              else
+                echo "::error::$name is ${align}-aligned; 16 KB required"
+                bad=1
+              fi
+            fi
+          done
+          exit $bad
 
       - name: Publish pinned Conveyance for isolated web builds
         run: |
@@ -297,6 +326,14 @@ jobs:
         with:
           name: aive-android-github-release
           path: androidApp/build/outputs/apk/github/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload GitHub Android R8 mapping
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: aive-android-github-mapping
+          path: androidApp/build/outputs/mapping/githubRelease/mapping.txt
           if-no-files-found: error
 
       - name: Upload Play Android release
@@ -607,11 +644,12 @@ jobs:
           cp "$NOTES_DIR/default.txt" "$NOTES_DIR/whatsnew-en-US"
 
       - name: Publish to Google Play internal track
-        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
+        # Shared publisher: uploads the bundle plus the R8 mapping.txt embedded in it.
+        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        uses: HereLiesAz/workflows/.github/actions/google-play-publish@main
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.hereliesaz.aive
-          releaseFiles: android-release/**/*.aab
-          track: internal
-          status: completed
-          whatsNewDirectory: fastlane/metadata/android/en-US/changelogs
+          service-account-json: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          package-name: com.hereliesaz.aive
+          aab-path: android-release/**/*.aab
+          tracks: '[{"track":"internal","status":"completed"}]'
+          release-notes-dir: fastlane/metadata/android/en-US/changelogs

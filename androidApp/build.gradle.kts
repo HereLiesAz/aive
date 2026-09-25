@@ -40,6 +40,8 @@ val buildAndroidBitcosNative = tasks.register<Exec>("buildAndroidBitcosNative") 
         val outputDir = generatedAndroidBitcosJniDir.get().asFile
         outputDir.deleteRecursively()
         outputDir.mkdirs()
+        // Google Play requires 16 KB ELF segment alignment for Android 15+ devices.
+        environment("RUSTFLAGS", "-C link-arg=-Wl,-z,max-page-size=16384")
         commandLine(
             "cargo",
             "ndk",
@@ -92,6 +94,13 @@ android {
             if (!keyStorePath.isNullOrBlank()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // R8 shrinking; the resulting mapping.txt is uploaded to Play with each bundle.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 

@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -106,6 +107,8 @@ class MainActivity : ComponentActivity() {
     private var crashReportNoticeVisible by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Draw behind system bars on every API level; the shared Scaffold pads content by its insets.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         CrashReporting.install(this) { crashReportNoticeVisible = true }
         val providerCredentialStore = AndroidProviderCredentialStore(this)
