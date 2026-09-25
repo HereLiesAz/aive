@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -49,6 +50,10 @@ import java.util.UUID
 import javax.swing.JFileChooser
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
@@ -72,6 +77,8 @@ fun main() {
     }
     val initialComputeToken = computeCredentialStore.readToken()
     val httpClient = HttpClient(CIO)
+    val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
+    val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
 
     try {
         application {
@@ -146,6 +153,51 @@ fun main() {
                     }
                 }
                 val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
+                val uiScope = rememberCoroutineScope()
+                var localPlannerStatus by remember {
+                    mutableStateOf<LocalPlannerStatus>(
+                        if (plannerInstaller.installed() != null) LocalPlannerStatus.Installed else LocalPlannerStatus.NotInstalled,
+                    )
+                }
+                // Linked cloud LLM plans; an installed local planner goes first and falls back to it.
+                val planningRuntime = remember(credentials, localPlannerStatus) {
+                    val cloud = configuredPlanningApi(credentials)?.let(::TextGenerationOrchestrationAgentRuntime)
+                    if (localPlannerStatus == LocalPlannerStatus.Installed) {
+                        PreferLocalOrchestrationAgentRuntime(
+                            local = localPlanner,
+                            localReady = { plannerInstaller.installed() != null },
+                            cloud = cloud,
+                        )
+                    } else {
+                        cloud
+                    }
+                }
+                val localPlannerSetting = LocalPlannerSetting(
+                    status = localPlannerStatus,
+                    downloadSize = DesktopPlannerModel.downloadSizeLabel,
+                    onInstall = install@{
+                        if (localPlannerStatus is LocalPlannerStatus.Installing) return@install
+                        localPlannerStatus = LocalPlannerStatus.Installing("Starting…")
+                        uiScope.launch {
+                            localPlannerStatus = try {
+                                plannerInstaller.install { line -> localPlannerStatus = LocalPlannerStatus.Installing(line) }
+                                LocalPlannerStatus.Installed
+                            } catch (cancelled: CancellationException) {
+                                localPlannerStatus = LocalPlannerStatus.NotInstalled
+                                throw cancelled
+                            } catch (failure: Throwable) {
+                                LocalPlannerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                            }
+                        }
+                    },
+                    onRemove = {
+                        uiScope.launch {
+                            localPlanner.releaseModel()
+                            plannerInstaller.remove()
+                            localPlannerStatus = LocalPlannerStatus.NotInstalled
+                        }
+                    },
+                )
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
                 }
@@ -216,11 +268,14 @@ fun main() {
                             computeCredentialStore.clear()
                             computeToken = null
                         },
+                        orchestrationRuntime = planningRuntime,
+                        localPlannerSetting = localPlannerSetting,
                     )
                 }
             }
         }
     } finally {
+        localPlanner.close()
         httpClient.close()
     }
 }

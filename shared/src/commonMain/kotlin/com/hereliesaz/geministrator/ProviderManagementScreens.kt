@@ -291,6 +291,7 @@ internal fun ProviderSettingsScreen(
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
+    localPlannerSetting: LocalPlannerSetting? = null,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -433,6 +434,54 @@ internal fun ProviderSettingsScreen(
                 onClick = { setting.onEnabledChange(!setting.enabled) },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        localPlannerSetting?.let { setting ->
+            ProviderSectionLabel("Local Planner")
+            Text(
+                "Plans workflows on this computer instead of the linked LLM. Needs a " +
+                    "${setting.downloadSize} download and a capable machine. The linked LLM still plans " +
+                    "whenever the local planner is not installed or fails, and always handles plan repair.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            when (val status = setting.status) {
+                LocalPlannerStatus.NotInstalled -> AzphaltPill(
+                    "Install local planner (${setting.downloadSize})",
+                    "local-planner-install",
+                    onClick = setting.onInstall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                is LocalPlannerStatus.Installing -> AzphaltRecord(
+                    seed = "local-planner-installing",
+                    eyebrow = "Local planner",
+                    title = "Installing",
+                    body = status.progress,
+                    endCap = "…",
+                )
+                LocalPlannerStatus.Installed -> AzphaltPill(
+                    "Local planner installed: remove",
+                    "local-planner-remove",
+                    selected = true,
+                    onClick = setting.onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                is LocalPlannerStatus.Failed -> {
+                    AzphaltRecord(
+                        seed = "local-planner-failed",
+                        eyebrow = "Local planner",
+                        title = "Install failed",
+                        body = status.message,
+                        endCap = "Retry",
+                    )
+                    AzphaltPill(
+                        "Retry install (${setting.downloadSize})",
+                        "local-planner-retry",
+                        onClick = setting.onInstall,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         }
 
         ProviderSectionLabel("Compute Pool")

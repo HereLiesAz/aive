@@ -52,6 +52,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
@@ -462,28 +463,6 @@ fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
             modifier = Modifier.size(280.dp),
             onAnimationStarted = { animationStarted = true },
         )
-    }
-}
-
-/**
- * The linked cloud LLM used for workflow planning: the first configured of Gemini, OpenAI, Claude,
- * Grok, then the hosted providers in catalog order. Null when none is linked.
- */
-internal fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? {
-    credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
-        return GeminiGenerateContentApi(LlmApiKeyProvider { key })
-    }
-    credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
-        return OpenAiResponsesApi(LlmApiKeyProvider { key })
-    }
-    credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
-        return AnthropicMessagesApi(LlmApiKeyProvider { key })
-    }
-    credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
-        return XaiResponsesApi(LlmApiKeyProvider { key })
-    }
-    return HostedLlmProviders.entries.firstNotNullOfOrNull { spec ->
-        credentials.cleanKey(spec.id)?.let { key -> HostedLlmProviders.textApi(spec, LlmApiKeyProvider { key }) }
     }
 }
 
