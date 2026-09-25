@@ -25,21 +25,25 @@ val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
     }
 }
 
-val bitcosManifest = rootProject.layout.projectDirectory.file("native/bitcos/Cargo.toml")
-val bitcosSources = rootProject.layout.projectDirectory.dir("native/bitcos/src")
-val generatedAndroidBitcosJniDir = layout.buildDirectory.dir("generated/bitcos/jniLibs")
-val buildAndroidBitcosNative = tasks.register<Exec>("buildAndroidBitcosNative") {
+/** Registers a `cargo ndk` build of the Rust crate in [crateDir] for the app's Android ABIs. */
+fun registerAndroidRustLibrary(
+    name: String,
+    description: String,
+    crateDir: String,
+    outputDir: Provider<Directory>,
+) = tasks.register<Exec>(name) {
     group = "build"
-    description = "Builds the Rust BITCOS decoder for Android ABIs."
-    inputs.file(bitcosManifest)
-    inputs.dir(bitcosSources)
-    outputs.dir(generatedAndroidBitcosJniDir)
-    workingDir(bitcosManifest.asFile.parentFile)
+    this.description = description
+    val crate = rootProject.layout.projectDirectory.dir(crateDir)
+    inputs.file(crate.file("Cargo.toml"))
+    inputs.dir(crate.dir("src"))
+    outputs.dir(outputDir)
+    workingDir(crate.asFile)
 
     doFirst {
-        val outputDir = generatedAndroidBitcosJniDir.get().asFile
-        outputDir.deleteRecursively()
-        outputDir.mkdirs()
+        val output = outputDir.get().asFile
+        output.deleteRecursively()
+        output.mkdirs()
         // Google Play requires 16 KB ELF segment alignment for Android 15+ devices.
         environment("RUSTFLAGS", "-C link-arg=-Wl,-z,max-page-size=16384")
         commandLine(
@@ -48,12 +52,29 @@ val buildAndroidBitcosNative = tasks.register<Exec>("buildAndroidBitcosNative") 
             "-t", "arm64-v8a",
             "-t", "armeabi-v7a",
             "-t", "x86_64",
-            "-o", outputDir.absolutePath,
+            "-o", output.absolutePath,
             "build",
             "--release",
         )
     }
 }
+
+val generatedAndroidBitcosJniDir = layout.buildDirectory.dir("generated/bitcos/jniLibs")
+val buildAndroidBitcosNative = registerAndroidRustLibrary(
+    name = "buildAndroidBitcosNative",
+    description = "Builds the Rust BITCOS decoder for Android ABIs.",
+    crateDir = "native/bitcos",
+    outputDir = generatedAndroidBitcosJniDir,
+)
+
+// DJL's prebuilt tokenizer-native AAR is 4 KB-aligned; build the same JNI library from source.
+val generatedAndroidDjlTokenizerJniDir = layout.buildDirectory.dir("generated/djl-tokenizer/jniLibs")
+val buildAndroidDjlTokenizerNative = registerAndroidRustLibrary(
+    name = "buildAndroidDjlTokenizerNative",
+    description = "Builds DJL's HuggingFace tokenizer JNI library for Android ABIs.",
+    crateDir = "native/djl-tokenizer",
+    outputDir = generatedAndroidDjlTokenizerJniDir,
+)
 
 android {
     namespace = "com.hereliesaz.aive"
@@ -72,6 +93,7 @@ android {
     sourceSets.getByName("main").apply {
         res.srcDir(generatedAndroidBrandResDir.get().asFile)
         jniLibs.srcDir(generatedAndroidBitcosJniDir.get().asFile)
+        jniLibs.srcDir(generatedAndroidDjlTokenizerJniDir.get().asFile)
     }
 
     signingConfigs {
@@ -121,6 +143,11 @@ android {
         }
     }
 
+    packaging {
+        // DJL's tokenizer jar bundles desktop natives (~55 MB); Android loads libdjl_tokenizer.so.
+        resources.excludes += "native/lib/**"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -135,7 +162,7 @@ tasks.named("preBuild") {
 tasks.matching { task ->
     task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
 }.configureEach {
-    dependsOn(buildAndroidBitcosNative)
+    dependsOn(buildAndroidBitcosNative, buildAndroidDjlTokenizerNative)
 }
 
 dependencies {
@@ -155,7 +182,6 @@ dependencies {
     implementation(libs.onnxruntime.android)
     implementation(libs.commons.compress)
     implementation(libs.djl.huggingface.tokenizers)
-    runtimeOnly(libs.djl.android.tokenizer.native)
     testImplementation(kotlin("test-junit"))
     testImplementation(libs.ktor.client.mock)
 }

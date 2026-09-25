@@ -162,11 +162,14 @@ jobs:
         run: |
           set -euo pipefail
           for abi in arm64-v8a armeabi-v7a x86_64; do
-            lib="androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so"
-            if [ ! -f "$lib" ]; then
-              echo "::error::Expected native runtime library was not found: $lib"
-              exit 1
-            fi
+            for lib in \
+              "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so" \
+              "androidApp/build/generated/djl-tokenizer/jniLibs/${abi}/libdjl_tokenizer.so"; do
+              if [ ! -f "$lib" ]; then
+                echo "::error::Expected native runtime library was not found: $lib"
+                exit 1
+              fi
+            done
           done
 
       - name: Verify 16 KB native library alignment
@@ -175,8 +178,6 @@ jobs:
         run: |
           set -euo pipefail
           # Google Play requires every 64-bit native library to use >= 16 KB LOAD alignment.
-          # libdjl_tokenizer.so is DJL's prebuilt (4 KB); tracked separately until rebuilt from source.
-          KNOWN_UNALIGNED="libdjl_tokenizer.so"
           AAB=$(find androidApp/build/outputs/bundle/playRelease -name '*.aab' -print -quit)
           test -n "$AAB"
           WORK=$(mktemp -d)
@@ -186,12 +187,8 @@ jobs:
             align=$(readelf -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | head -1)
             name=$(basename "$so")
             if [ $((align)) -lt 16384 ]; then
-              if [[ " $KNOWN_UNALIGNED " == *" $name "* ]]; then
-                echo "::warning::$name is ${align}-aligned (known upstream prebuilt)"
-              else
-                echo "::error::$name is ${align}-aligned; 16 KB required"
-                bad=1
-              fi
+              echo "::error::$name is ${align}-aligned; 16 KB required"
+              bad=1
             fi
           done
           exit $bad

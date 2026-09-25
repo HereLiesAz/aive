@@ -15,7 +15,6 @@ multiplatform-settings = "1.3.0"
 onnxruntime = "1.30.0"
 commons-compress = "1.28.0"
 djl = "0.38.0"
-djl-android-tokenizer = "0.33.0"
 kmp-zip = "1.0.0"
 cryptography = "0.6.0"
 
@@ -44,7 +43,6 @@ onnxruntime-gpu = { module = "com.microsoft.onnxruntime:onnxruntime_gpu", versio
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 djl-huggingface-tokenizers = { module = "ai.djl.huggingface:tokenizers", version.ref = "djl" }
-djl-android-tokenizer-native = { module = "ai.djl.android:tokenizer-native", version.ref = "djl-android-tokenizer" }
 kmp-zip = { module = "no.synth:kmp-zip", version.ref = "kmp-zip" }
 cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
 cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptography" }

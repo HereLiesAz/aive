@@ -47,6 +47,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Desktop plans with the linked cloud LLM too, and Settings offers an optional local planner (3.6 GB download, fine-tuned Qwen2.5-1.5B via ONNX Runtime). Once installed it plans first and falls back to the linked LLM on failure; plan repair always uses the linked LLM.
 - Android draws edge-to-edge on every API level; the shared Scaffold pads content by the system-bar insets.
 - The BITCOS native library links with 16 KB page alignment, and release CI verifies alignment of every 64-bit native library in the Play bundle.
+- DJL's tokenizer JNI library is built from source (`native/djl-tokenizer`) with 16 KB page alignment instead of DJL's 4 KB-aligned prebuilt, so every native library in the Play bundle now meets the 16 KB requirement; the release alignment check is strict. DJL's bundled desktop tokenizer natives (~55 MB) are excluded from Android packages.
 
 ### Removed
 
