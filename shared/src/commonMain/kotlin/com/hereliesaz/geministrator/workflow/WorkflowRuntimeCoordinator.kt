@@ -204,19 +204,24 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Planning -> RetryReason.PlanRejected
                 else -> RetryReason.ProviderFailure
             }
+            // The executor's last status line; for provider sessions this is the provider's failure reason.
+            val failureReason = nextRun.taskRuns[taskId]?.progressMessage
+                ?.takeIf { it.isNotBlank() }
+                ?.let { "Executor failed. Last status: $it" }
+                ?: "Executor failed"
             nextRun = engine.handleFailure(
                 definition = definition,
                 run = nextRun,
                 taskDefinitionId = taskId,
                 retryReason = retryReason,
-                reason = "Executor failed",
+                reason = failureReason,
                 nowEpochMillis = nowEpochMillis,
             )
             if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
                 ensureFailureEscalationGate(
                     run = nextRun,
                     taskId = taskId,
-                    reason = "Executor failed",
+                    reason = failureReason,
                     now = nowEpochMillis,
                 )
             }

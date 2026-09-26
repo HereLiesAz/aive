@@ -27,6 +27,30 @@ central acceptance workflow bootstraps a real local Ollama server and exercises 
 OpenAI-compatible provider transport against SmolLM2. Jules is not part of this acceptance
 requirement.
 
+`AIVE_LIVE_PROVIDER` may also name any hosted OpenAI-compatible provider (for example `groq` or
+`kilo`). Its key comes from `AIVE_LIVE_HOSTED_CREDENTIAL` and its model from
+`AIVE_LIVE_HOSTED_MODEL`; the keyless providers (`kilo`, `llm7`, `ovhcloud`) need neither. Run it
+locally with:
+
+~~~
+AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=kilo \
+  ./gradlew :providers:llm:desktopTest --tests '*ProviderNeutralLiveRuntimeVerificationTest'
+~~~
+
+The test prints `[live]` lines (time to each gate, the provider's plan, and the kind of each provider
+artifact) to the test report's system-out. If the provider task fails while a plan or escalation is
+awaited, the test stops at once and reports the provider's reason instead of waiting out the
+timeout.
+
+### Recorded local runs
+
+- 2026-09-26, desktop JVM, Kilo Gateway (`kilo-auto/free`, no key): all 14 steps passed in 1 m 37 s.
+  Plan gate reached in 12–18 s; the provider's artifact was a `TaskPlan`.
+- 2026-09-26, desktop JVM, LLM7 (no key): passed once (8.2 s), then failed on HTTP 503 and later
+  HTTP 429 "Daily token quota exceeded". Anonymous keyless tiers are not reliable enough for a gate.
+
+These are local runs, not the centralized verification below.
+
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching roadmap items in `TODO.md` are marked complete: the on-runtime verification item
 under "Runtime integrity audit" and the "Make one complete workflow actually work end-to-end" section.

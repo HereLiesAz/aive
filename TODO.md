@@ -44,6 +44,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Build and stage both JS and Wasm outputs for GitHub Pages.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
 - [ ] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
+  - Desktop JVM passed locally against Kilo Gateway on 2026-09-26 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). Still needs the centralized run, and Android, JS and Wasm.
 
 ## P0 — Compound inference foundation
 
@@ -109,7 +110,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Test provider substitution for the same role/task contract.
 - [x] Make Jules explicit-only: it runs where a role names it and is never selected automatically.
 - [x] Add the OpenCode agent on GitHub Actions as the automatic coding agent for GitHub repositories, with per-step progress.
-- [ ] Verify the OpenCode agent end to end against a real GitHub repository (so far: unit tests plus a local run of the runner script against a mock GitHub API).
+- [x] Verify the OpenCode agent runner on real GitHub infrastructure. Live run on `HereLiesAz/test` (2026-09-26): the runner created its check run and streamed the step log, OpenCode's free model fixed a planted bug, the runner pushed the fix to an `aive/opencode-*` branch, and the `aive-result` artifact matched what the app parses.
+- [ ] Verify the app's own dispatch path end to end: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. The live run above was started by a push trigger, because the test session could not call `workflow_dispatch`.
 
 ## P1 — Persistence and recovery
 
