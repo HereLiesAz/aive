@@ -121,9 +121,10 @@ open class TextLlmProvider(
                 return@flow
             }
             emit(AgentEvent.PlanApproved(runId))
-            val result = requireNotNull(session.planResult) {
-                "Plan result was not stored; cannot deliver the approved output"
-            }
+            // In-process sessions deliver the generation the user approved. A session
+            // reconstructed by reconnect() after a restart only has the durable plan
+            // flag, not the generation itself, so it executes exactly once here.
+            val result = session.planResult ?: api.generate(renderPrompt(session.request))
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))

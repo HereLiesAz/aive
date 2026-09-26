@@ -7,6 +7,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.runBlocking
@@ -25,7 +26,7 @@ class OpenAiCompatibleChatApiTest {
         var requestUrl = ""
         val client = HttpClient(MockEngine { request ->
             authorization = request.headers[HttpHeaders.Authorization]
-            requestBody = request.body.toString()
+            requestBody = (request.body as TextContent).text
             requestUrl = request.url.toString()
             respond(
                 content = """{

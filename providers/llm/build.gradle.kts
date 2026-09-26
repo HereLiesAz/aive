@@ -58,6 +58,13 @@ kotlin {
             }
         }
 
+        named("desktopTest") {
+            dependencies {
+                implementation(libs.multiplatform.settings.no.arg)
+                implementation(libs.multiplatform.settings.test)
+            }
+        }
+
         named("jsMain") {
             dependencies {
                 implementation(libs.ktor.client.js)

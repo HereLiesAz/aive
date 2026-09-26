@@ -127,6 +127,9 @@ jobs:
       - name: Test Jules provider
         run: ./gradlew :providers:jules:desktopTest
 
+      - name: Test LLM providers
+        run: ./gradlew :providers:llm:desktopTest
+
       - name: Compile Jules provider Android
         run: ./gradlew :providers:jules:compileAndroidMain
 
