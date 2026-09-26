@@ -23,7 +23,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Automatic crash/ANR reporting for the GitHub release flavor (default ON, opt-out in Settings).
+ * Automatic crash/ANR reporting for the GitHub release flavor (opt-in: off until enabled in Settings).
  *
  * The app holds NO GitHub credential. Reports go to the HereLiesAz/workflows gateway Worker,
  * which files/deduplicates issues on HereLiesAz/aive with its own server-side GitHub App token.

@@ -75,14 +75,14 @@ class CrashReportCoreTest {
     }
 
     @Test
-    fun reportingDefaultsOnAndCanBeDisabled() {
+    fun reportingDefaultsOffAndCanBeEnabled() {
         val store = MapStore()
         val policy = CrashReportPolicy(store)
-        assertTrue(policy.enabled)
-        policy.enabled = false
-        assertFalse(CrashReportPolicy(store).enabled)
+        assertFalse(policy.enabled)
         policy.enabled = true
         assertTrue(CrashReportPolicy(store).enabled)
+        policy.enabled = false
+        assertFalse(CrashReportPolicy(store).enabled)
     }
 
     @Test

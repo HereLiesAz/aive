@@ -421,7 +421,7 @@ internal fun ProviderSettingsScreen(
         crashReportingSetting?.let { setting ->
             ProviderSectionLabel("Crash Reports")
             Text(
-                "When enabled, crashes and app-not-responding events are sent automatically to the " +
+                "Off unless you turn it on. When enabled, crashes and app-not-responding events are sent automatically to the " +
                     "HereLiesAz/aive GitHub issue tracker (exception, stack trace, app version, Android version, " +
                     "device model). No workflow content or credentials are included.",
                 style = AzphaltType.body,

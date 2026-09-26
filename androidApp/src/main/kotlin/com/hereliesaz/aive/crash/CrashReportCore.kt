@@ -56,13 +56,13 @@ object CrashSignatures {
 }
 
 /**
- * Opt-out setting, first-report notice flag, and per-app-version signature dedup.
+ * Opt-in setting (off until the user enables it), first-report notice flag, and per-app-version signature dedup.
  * A signature is sent at most once per app version (crash loops file one report, not hundreds);
  * the relay adds server-side dedup across versions/devices by commenting on the open issue.
  */
 class CrashReportPolicy(private val store: CrashReportKeyValueStore, private val maxRemembered: Int = 200) {
     var enabled: Boolean
-        get() = store.getBoolean(KEY_ENABLED, true)
+        get() = store.getBoolean(KEY_ENABLED, false)
         set(value) = store.putBoolean(KEY_ENABLED, value)
 
     val firstReportNoticeShown: Boolean get() = store.getBoolean(KEY_NOTICE_SHOWN, false)
