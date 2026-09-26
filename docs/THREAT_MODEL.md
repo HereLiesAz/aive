@@ -114,16 +114,18 @@ The Aive installs `.github/workflows/aive-opencode-agent.yml` on the repository'
 - Checkout uses `persist-credentials: false`, so no Git credential is stored in the working copy.
 - The runner deletes `GITHUB_TOKEN` and the raw task from the agent process's environment. The runner, not the agent, pushes the result branch. It uses the token in a one-off remote URL and scrubs the token from push error text.
 - The workflow requests only `contents: write` and `checks: write`. The job token expires when the job ends, and the job has a 60-minute timeout.
-- The workflow contents are managed by the app. Before each dispatch The Aive compares the installed file with its bundled template and overwrites it when they differ.
+- The workflow contents are managed by the app. Before each dispatch The Aive compares the installed file with its bundled template. Installing or updating it always requires a person to approve a plan that says the file will be committed directly to the default branch, even for tasks that otherwise run without a plan gate.
 - Results land on a new branch, never the default branch, and the task can require plan approval before dispatch. The patch is surfaced as a `CodeChange` artifact for review.
 - The prompt is capped at 50,000 characters to stay within GitHub's `workflow_dispatch` input limits.
+- The result artifact is bounded: at most 4 MB zipped and 2 MB of JSON.
+- Resume after a restart searches up to 1,000 recent dispatches (ten pages) for the run's unique `run-name`.
 
 **Residual risks**
 - Prompt injection can put arbitrary code on the result branch. Treat the branch as untrusted until reviewed.
 - Removing the token from the agent's environment is defense in depth, not an isolation boundary. The agent's shell runs as the same runner user as the parent process that still holds the token.
 - Free Zen models may log prompts.
 - Installing the workflow requires a GitHub token with Contents **and Workflows** write access. That token can rewrite any workflow in the repository.
-- Installing or updating the workflow commits directly to the default branch, without a `HumanApproval` task.
+- The approved workflow install still commits directly to the default branch; repositories that protect that branch must add the file themselves.
 
 ### GitLab workspace agent
 
@@ -291,7 +293,7 @@ No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkf
 
 **Remaining gaps**
 - Imported run bundles are not cryptographically signed. A tampered bundle is accepted if it passes schema validation.
-- The web build stores credentials unencrypted in browser `localStorage`, where they are readable by any script running on the origin.
+- The web build encrypts credentials in `localStorage` with a non-extractable AES-GCM key held in IndexedDB (`credential-vault.js`). That defeats copied or dumped storage, not script running on the origin, which can still ask the key to decrypt. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) fall back to plaintext.
 
 ## Invariants
 
@@ -302,7 +304,7 @@ The following invariants must hold regardless of the integration used:
 3. The Aive runtime never executes artifact content as code or instructions. Remote agents with shell access (OpenCode) may act on it, and that risk is covered as a residual risk above.
 4. Every mutating `RepositoryOperation` task (anything other than `status`/`fetch`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents write only to new dedicated branches.
 5. Provider payloads are subject to `PayloadRedactionPolicy` before transmission.
-6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among recent dispatches of its app-managed workflow.
+6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
 
 ## Open Items
 
@@ -311,11 +313,9 @@ The following invariants must hold regardless of the integration used:
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Per-session provider response content hashing to detect replay.
 - Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and signed approvals so workers can verify gates rather than trust the submitted run.
-- The OpenCode result artifact is parsed without the size bounds applied to script-runner results.
-- OpenCode resume looks only at the 50 most recent dispatches. A run older than that is not found and is dispatched again.
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.
 - Recursion limits and approval propagation for nested workflows once a `NestedWorkflowClient` is wired.
-- Encrypted credential storage for the web build.
+- Web credential protection against same-origin script (for example, a passphrase-derived key).
 
 ### Accepted risks
 

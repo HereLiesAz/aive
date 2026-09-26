@@ -132,7 +132,7 @@ Where credentials are stored today:
 
 - **Android.** Provider, Jules, repository, and relay credentials are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.
 - **Desktop.** Credentials are kept in the macOS Keychain, the Linux Secret Service (`secret-tool`), or Windows DPAPI. If none of these is available, the credential is refused instead of being stored in plain text.
-- **Web.** Credentials are stored **unencrypted** in the browser's localStorage for the site. Anyone or anything with access to that browser profile can read them.
+- **Web.** Credentials are stored in the browser's localStorage for the site, encrypted with a non-extractable AES-GCM key kept in the site's IndexedDB. A copy of the storage alone does not reveal them, but code running on the page can still use the key. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) store them unencrypted.
 
 Repository secrets used by GitHub Actions remain within GitHub Actions and are not part of the app's workflow persistence.
 

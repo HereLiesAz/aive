@@ -126,18 +126,24 @@ class GitHubRestOpenCodeRunnerClient(
 
     override suspend fun findRun(repository: RepositoryRef, runName: String): OpenCodeWorkflowRunRef? {
         val token = token()
-        val response = httpClient.get(
-            "${repositoryUrl(repository)}/actions/workflows/${OpenCodeAgentWorkflow.FILE_NAME.encodeURLPathPart()}/runs",
-        ) {
-            githubHeaders(token)
-            parameter("event", "workflow_dispatch")
-            parameter("per_page", 50)
+        // Newest first; a resumed run is normally on the first page, but look back up to 1,000 runs.
+        for (page in 1..MAX_RUN_PAGES) {
+            val response = httpClient.get(
+                "${repositoryUrl(repository)}/actions/workflows/${OpenCodeAgentWorkflow.FILE_NAME.encodeURLPathPart()}/runs",
+            ) {
+                githubHeaders(token)
+                parameter("event", "workflow_dispatch")
+                parameter("per_page", RUNS_PER_PAGE)
+                parameter("page", page)
+            }
+            if (response.status.value == 404) return null
+            val runs = json.decodeFromString<RunsResponse>(response.requireSuccessBody("list OpenCode agent runs"))
+            runs.workflowRuns.firstOrNull { it.displayTitle == runName }?.let { run ->
+                return OpenCodeWorkflowRunRef(id = run.id.toString(), runName = runName, headSha = run.headSha)
+            }
+            if (runs.workflowRuns.size < RUNS_PER_PAGE) return null
         }
-        if (response.status.value == 404) return null
-        val runs = json.decodeFromString<RunsResponse>(response.requireSuccessBody("list OpenCode agent runs"))
-        return runs.workflowRuns.firstOrNull { it.displayTitle == runName }?.let { run ->
-            OpenCodeWorkflowRunRef(id = run.id.toString(), runName = runName, headSha = run.headSha)
-        }
+        return null
     }
 
     override suspend fun getRun(repository: RepositoryRef, runId: String): GitHubWorkflowRun =
@@ -187,6 +193,11 @@ class GitHubRestOpenCodeRunnerClient(
             )
         }
         return body
+    }
+
+    private companion object {
+        const val RUNS_PER_PAGE = 100
+        const val MAX_RUN_PAGES = 10
     }
 
     @Serializable
