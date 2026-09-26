@@ -1,0 +1,232 @@
+name: Aive OpenCode Agent
+run-name: ${{ fromJSON(inputs.aive_task).checkName }}
+
+# Installed by The Aive (.github/workflows/aive-opencode-agent.yml). Runs the open-source OpenCode
+# agent headless on a free OpenCode Zen model, streams every step into a check run that Aive
+# polls, pushes the resulting changes to a branch and publishes an aive-result artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      aive_task:
+        description: JSON task supplied by The Aive
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  checks: write
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      AIVE_TASK: ${{ inputs.aive_task }}
+      GITHUB_TOKEN: ${{ github.token }}
+      OPENCODE_VERSION: 1.18.32
+    steps:
+      # No stored credentials: the agent's shell must not be able to push. The runner pushes
+      # the result branch itself with the token, which is kept out of the agent's environment.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install OpenCode
+        run: npm install --global "opencode-ai@${OPENCODE_VERSION}"
+
+      - name: Run OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'AIVE_NODE'
+          const { spawn, execFileSync } = require("child_process");
+          const fs = require("fs");
+          const path = require("path");
+
+          const task = JSON.parse(process.env.AIVE_TASK);
+          const api = process.env.GITHUB_API_URL;
+          const repo = process.env.GITHUB_REPOSITORY;
+          const headers = {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          const outDir = path.join(process.env.RUNNER_TEMP, "aive-result");
+          fs.mkdirSync(outDir, { recursive: true });
+
+          const MAX_LINES = 400;
+          const lines = [];
+          let seq = 0;
+          let finalText = "";
+          let inputTokens = 0;
+          let outputTokens = 0;
+          const log = (message) => {
+            const clean = String(message).replace(/\s+/g, " ").trim().slice(0, 400);
+            if (!clean) return;
+            seq += 1;
+            lines.push(`${seq}\t${clean}`);
+            if (lines.length > MAX_LINES) lines.shift();
+            console.log(clean);
+          };
+
+          async function github(method, url, body) {
+            const response = await fetch(`${api}${url}`, {
+              method,
+              headers: { ...headers, "Content-Type": "application/json" },
+              body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`${method} ${url}: HTTP ${response.status} ${await response.text()}`);
+            return response.json();
+          }
+
+          // Aive reads output.text: one "seq<TAB>message" line per agent step, newest last.
+          let checkRunId = null;
+          let lastPublished = -1;
+          async function publish(status, conclusion) {
+            if (checkRunId === null || (seq === lastPublished && status === "in_progress")) return;
+            lastPublished = seq;
+            const body = {
+              status,
+              output: {
+                title: "OpenCode agent",
+                summary: `${seq} steps · ${inputTokens} in / ${outputTokens} out tokens`,
+                text: lines.join("\n").slice(-60000),
+              },
+            };
+            if (conclusion) body.conclusion = conclusion;
+            try {
+              await github("PATCH", `/repos/${repo}/check-runs/${checkRunId}`, body);
+            } catch (error) {
+              console.error(String(error));
+            }
+          }
+
+          function describe(event) {
+            const part = event.part || {};
+            switch (event.type) {
+              case "tool_use": {
+                const input = (part.state && part.state.input) || {};
+                const raw = input.command || input.filePath || input.path || input.pattern || input.url || part.state?.title || "";
+                const target = String(raw).split(`${process.cwd()}/`).join("");
+                const failed = part.state && part.state.status === "error" ? " (failed)" : "";
+                return `${part.tool}: ${target}${failed}`;
+              }
+              case "text":
+                finalText = part.text || finalText;
+                return part.text;
+              case "step_finish":
+                inputTokens += (part.tokens && part.tokens.input) || 0;
+                outputTokens += (part.tokens && part.tokens.output) || 0;
+                return null;
+              case "error":
+                return `error: ${JSON.stringify(event.error || part).slice(0, 300)}`;
+              default:
+                return null;
+            }
+          }
+
+          function git(...args) {
+            return execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+          }
+
+          function writeResult(result) {
+            fs.writeFileSync(path.join(outDir, "aive-result.json"), JSON.stringify(result));
+          }
+
+          (async () => {
+            const checkRun = await github("POST", `/repos/${repo}/check-runs`, {
+              name: task.checkName,
+              head_sha: process.env.GITHUB_SHA,
+              status: "in_progress",
+              output: { title: "OpenCode agent", summary: "Starting" },
+            });
+            checkRunId = checkRun.id;
+            log(`Starting OpenCode (${task.model})`);
+            await publish("in_progress");
+            const ticker = setInterval(() => publish("in_progress"), 3000);
+
+            const exitCode = await new Promise((resolve) => {
+              const agentEnv = { ...process.env };
+              delete agentEnv.GITHUB_TOKEN;
+              delete agentEnv.AIVE_TASK;
+              const child = spawn("opencode", ["run", "--format", "json", "--auto", "-m", task.model, task.prompt], {
+                stdio: ["ignore", "pipe", "inherit"],
+                env: agentEnv,
+              });
+              let buffer = "";
+              child.stdout.on("data", (chunk) => {
+                buffer += chunk;
+                let newline;
+                while ((newline = buffer.indexOf("\n")) >= 0) {
+                  const line = buffer.slice(0, newline).trim();
+                  buffer = buffer.slice(newline + 1);
+                  if (!line) continue;
+                  try {
+                    const message = describe(JSON.parse(line));
+                    if (message) log(message);
+                  } catch {
+                    log(line);
+                  }
+                }
+              });
+              child.on("close", resolve);
+            });
+            clearInterval(ticker);
+
+            git("config", "user.name", "aive-opencode[bot]");
+            git("config", "user.email", "aive-opencode@users.noreply.github.com");
+            git("add", "--all");
+            const changed = git("status", "--porcelain").trim().length > 0;
+            let patch = "";
+            if (changed) {
+              git("checkout", "-b", task.branch);
+              git("commit", "--quiet", "-m", task.commitMessage);
+              patch = git("show", "--format=", "HEAD");
+              const host = new URL(process.env.GITHUB_SERVER_URL).host;
+              const remote = `https://x-access-token:${process.env.GITHUB_TOKEN}@${host}/${repo}.git`;
+              try {
+                git("push", "--quiet", remote, `HEAD:refs/heads/${task.branch}`);
+              } catch (error) {
+                const detail = String(error.stderr || error.message || error).split(process.env.GITHUB_TOKEN).join("***");
+                throw new Error(`git push failed: ${detail.trim()}`);
+              }
+              log(`Pushed ${task.branch}`);
+            } else {
+              log("No file changes");
+            }
+
+            const status = exitCode === 0 ? "completed" : "failed";
+            writeResult({
+              status,
+              message: exitCode === 0 ? (changed ? `Changes pushed to ${task.branch}` : "Finished without file changes")
+                : `OpenCode exited with code ${exitCode}`,
+              branch: changed ? task.branch : null,
+              patch: patch.length > 900000 ? null : patch,
+              summary: finalText.slice(0, 20000),
+              inputTokens,
+              outputTokens,
+            });
+            await publish("completed", status === "completed" ? "success" : "failure");
+            if (exitCode !== 0) process.exitCode = 1;
+          })().catch(async (error) => {
+            log(`Runner error: ${error && error.message || error}`);
+            writeResult({ status: "failed", message: String(error && error.message || error) });
+            await publish("completed", "failure");
+            process.exitCode = 1;
+          });
+          AIVE_NODE
+
+      - name: Publish Aive result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aive-result
+          path: ${{ runner.temp }}/aive-result/aive-result.json
+          if-no-files-found: warn
+          retention-days: 7

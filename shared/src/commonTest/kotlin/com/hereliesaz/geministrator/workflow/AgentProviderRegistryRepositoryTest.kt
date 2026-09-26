@@ -108,6 +108,59 @@ class AgentProviderRegistryRepositoryTest {
 
         assertEquals(gitLabCapable.id, selected.id)
     }
+
+    @Test
+    fun explicitOnlyProviderIsNeverChosenAutomatically() = runBlocking {
+        val julesLike = SourceAwareProvider(
+            id = AgentProviderId("jules"),
+            supportedSources = setOf(RepositorySource.GitHub),
+            explicitOnly = true,
+        )
+        val registry = AgentProviderRegistry(listOf(julesLike))
+        val github = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub)
+
+        val failure = assertFailsWith<IllegalStateException> {
+            registry.select(
+                ProviderSelectionRequest(
+                    requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                    repository = github,
+                ),
+            )
+        }
+        assertTrue(failure.message.orEmpty().contains("assign to a role"))
+
+        val preferred = registry.select(
+            ProviderSelectionRequest(
+                preferredProviderId = julesLike.id,
+                requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                repository = github,
+            ),
+        )
+        assertEquals(julesLike.id, preferred.id)
+    }
+
+    @Test
+    fun explicitOnlyProviderYieldsToAutomaticProviders() = runBlocking {
+        val julesLike = SourceAwareProvider(
+            id = AgentProviderId("jules"),
+            supportedSources = setOf(RepositorySource.GitHub),
+            explicitOnly = true,
+        )
+        val automatic = SourceAwareProvider(
+            id = AgentProviderId("automatic"),
+            supportedSources = setOf(RepositorySource.GitHub),
+        )
+        val registry = AgentProviderRegistry(listOf(julesLike, automatic))
+
+        val selected = registry.select(
+            ProviderSelectionRequest(
+                requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                repository = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub),
+            ),
+        )
+
+        assertEquals(automatic.id, selected.id)
+    }
 }
 
 private class SourceAwareProvider(
@@ -117,6 +170,7 @@ private class SourceAwareProvider(
         AgentCapability.RepositoryRead,
         AgentCapability.RepositoryWrite,
     ),
+    override val explicitOnly: Boolean = false,
 ) : AgentProvider {
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(capabilities)
 

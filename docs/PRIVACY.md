@@ -39,7 +39,9 @@ This data is used to restore workflows and continue runs after the application o
 
 ## External providers and executors
 
-The Aive is designed to work with external services. Jules is the first provider integration, and future versions may support additional AI providers, GitHub Actions, deployment systems, test runners, and other executors.
+The Aive is designed to work with external services: AI providers, coding agents (Jules, OpenCode on GitHub Actions), GitHub Actions, deployment systems, test runners, and other executors.
+
+Free tiers often pay for themselves with your data. OpenCode Zen's free models and Kilo Gateway's free routing may log prompts and use them to improve models; keep confidential material out of tasks sent to them.
 
 When you assign work to an external service, The Aive may send information required for that task, such as:
 

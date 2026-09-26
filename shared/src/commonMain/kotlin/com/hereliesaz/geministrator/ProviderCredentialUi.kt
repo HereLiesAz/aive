@@ -62,7 +62,7 @@ fun ProviderCredentialSetup(
                     eyebrow = "AI provider",
                     title = entry.displayName,
                     body = entry.description,
-                    endCap = "Credential required",
+                    endCap = if (entry.keyOptional) "Key optional" else "Credential required",
                     well = {
                         AzphaltPill(
                             label = "Get ${entry.credentialLabel}",
@@ -84,6 +84,11 @@ fun ProviderCredentialSetup(
                         errorMessage = null
                     },
                     label = { Text(entry.credentialLabel) },
+                    placeholder = if (entry.keyOptional) {
+                        { Text("Leave blank to use the free tier") }
+                    } else {
+                        null
+                    },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -97,10 +102,12 @@ fun ProviderCredentialSetup(
                     AzphaltPill(
                         label = "Save",
                         seed = "credential-save-${entry.id}",
-                        selected = apiKey.isNotBlank(),
+                        selected = apiKey.isNotBlank() || entry.keyOptional,
                         onClick = {
                             val clean = apiKey.trim()
-                            if (clean.isEmpty()) {
+                            if (clean.isEmpty() && entry.keyOptional) {
+                                onSave(ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                            } else if (clean.isEmpty()) {
                                 errorMessage = "${entry.credentialLabel} is required"
                             } else {
                                 onSave(clean)

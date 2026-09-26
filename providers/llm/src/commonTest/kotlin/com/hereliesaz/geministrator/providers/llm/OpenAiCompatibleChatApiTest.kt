@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.ProviderCatalog
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -14,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class OpenAiCompatibleChatApiTest {
     @Test
@@ -94,12 +96,66 @@ class OpenAiCompatibleChatApiTest {
     fun hostedRegistryHasUniqueStableIds() {
         val entries = HostedLlmProviders.entries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)
-        assertEquals(12, entries.size)
+        assertEquals(18, entries.size)
         entries.forEach { spec ->
             check(spec.id.isNotBlank())
             check(spec.displayName.isNotBlank())
             check(spec.defaultModel.isNotBlank())
             check(spec.baseUrl.startsWith("https://"))
         }
+    }
+
+    @Test
+    fun keylessEndpointSendsNoAuthorization() = runBlocking {
+        var sawAuthorization = true
+        val client = HttpClient(MockEngine { request ->
+            sawAuthorization = request.headers[HttpHeaders.Authorization] != null
+            respond(
+                content = """{"choices":[{"message":{"role":"assistant","content":"free answer"}}]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        try {
+            val result = OpenAiCompatibleChatApi(
+                apiKeyProvider = LlmApiKeyProvider { "" },
+                model = "free/model",
+                baseUrl = "https://example.test/v1",
+                requireApiKey = false,
+                client = client,
+            ).generate("Plan")
+
+            assertEquals(false, sawAuthorization)
+            assertEquals("free answer", result.text)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun anonymousCredentialOnlyBuildsKeylessProviders() {
+        val kilo = HostedLlmProviders.entry(HostedLlmProviders.KILO_ID)!!
+        val groq = HostedLlmProviders.entry(HostedLlmProviders.GROQ_ID)!!
+
+        HostedLlmProviders.textApi(kilo, ProviderCatalog.ANONYMOUS_CREDENTIAL)
+        assertFailsWith<IllegalArgumentException> {
+            HostedLlmProviders.textApi(groq, ProviderCatalog.ANONYMOUS_CREDENTIAL)
+        }
+    }
+
+    @Test
+    fun cloudflareCredentialNeedsAccountAndToken() {
+        val cloudflare = HostedLlmProviders.entry(HostedLlmProviders.CLOUDFLARE_ID)!!
+
+        HostedLlmProviders.textApi(cloudflare, "abc123:token")
+        assertFailsWith<IllegalArgumentException> { HostedLlmProviders.textApi(cloudflare, "token-only") }
+        assertNull(
+            HostedLlmProviders.configured(mapOf(HostedLlmProviders.CLOUDFLARE_ID to "token-only")).firstOrNull(),
+        )
     }
 }

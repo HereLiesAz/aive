@@ -48,6 +48,9 @@ All notable changes to **The Aive** are documented here from the current product
 - Android draws edge-to-edge on every API level; the shared Scaffold pads content by the system-bar insets.
 - The BITCOS native library links with 16 KB page alignment, and release CI verifies alignment of every 64-bit native library in the Play bundle.
 - DJL's tokenizer JNI library is built from source (`native/djl-tokenizer`) with 16 KB page alignment instead of DJL's 4 KB-aligned prebuilt, so every native library in the Play bundle now meets the 16 KB requirement; the release alignment check is strict. DJL's bundled desktop tokenizer natives (~55 MB) are excluded from Android packages.
+- GitHub repositories get an automatic coding agent: OpenCode (open source) runs headless on GitHub Actions with a free OpenCode Zen model, no key. Aive installs `.github/workflows/aive-opencode-agent.yml` on the default branch (and keeps it in step with the app), streams every agent step into the run's progress through a check run, and returns the work as a pushed `aive/opencode-*` branch plus patch. The GitHub token needs Contents, Actions, Checks and Workflows access.
+- Jules is never chosen automatically; it runs only where a role names it, since it reports almost nothing between plan approval and completion.
+- New hosted LLM providers with free tiers: Ollama Cloud, Z.ai (GLM-4.7-Flash), Cloudflare Workers AI (`ACCOUNT_ID:API_TOKEN`), and three that work with no key at all: Kilo Gateway, LLM7 and OVHcloud AI Endpoints. Keyless providers are linked by saving a blank key and are tried last for planning.
 
 ### Removed
 
