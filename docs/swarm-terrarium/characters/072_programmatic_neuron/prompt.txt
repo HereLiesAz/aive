@@ -1,10 +1,10 @@
-NODE 046 — DOCUMENTATION SPECIALIST
+NODE 072 — PROGRAMMATIC NEURON
 2D RIG BODY-PART SPRITE SHEET PROMPT
 
 VISUAL AUTHORITY
 Use ONLY the single human-approved character preview image attached to this image-generation call.
 Ignore every other image in the conversation, repository, prior generations, full character sheets, neighboring nodes, and remembered designs.
-The role/name "Documentation Specialist" is metadata only. Never invent anatomy, props, colors, symbols, or effects from the role name.
+The role/name "Programmatic Neuron" is metadata only. Never invent anatomy, props, colors, symbols, or effects from the role name.
 If the approved preview is not attached, do not generate the sprite sheet.
 
 TASK
