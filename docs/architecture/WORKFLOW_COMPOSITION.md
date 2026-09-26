@@ -34,6 +34,23 @@ That implicit workflow can be used anywhere another workflow can be used. It may
 
 Use nesting when the child should preserve its own run boundary, lifecycle, artifacts, or implementation details. Nested workflows may themselves contain nested workflows.
 
+#### Running a nested node
+
+`ApplicationRuntime` registers `WorkflowRunNestedWorkflowClient` through `NestedWorkflowExecutorIntegration` on every platform. A nested node:
+
+- starts a child `WorkflowRun` of the referenced definition, in the node's `projectId` when set and otherwise in the parent's project. The child uses the stored definition as-is and the parent run's role snapshot;
+- stores the child run ID as the task run's `externalRunId`. The ID is derived from the parent task run and attempt (`nested-d<depth>-<taskRunId>-a<attempt>`), so a repeated dispatch or a reconcile after restart reattaches to the same child run and never starts a duplicate;
+- advances the child one cycle on each parent reconcile, through a coordinator owned by that child, and reports the fraction of child tasks done as progress;
+- completes when the child completes and fails when the child fails or is cancelled. The parent task's own retry and escalation policy then applies.
+
+Safeguards:
+
+- **Depth limit.** A child deeper than `WorkflowRunNestedWorkflowClient.DEFAULT_MAX_DEPTH` (4) is refused.
+- **Cycle refusal.** Before starting, the client walks the nesting graph from the child definition, including nodes wrapped in `TaskExecutor.Distributed`. It refuses the start if the graph reaches the parent definition or contains any cycle. Every ancestor reaches the parent through nesting, so this also covers cycles through ancestors further up.
+- **Approval gates.** `HumanApproval` tasks inside the child are ordinary gates and are never approved automatically. While one is pending, the parent node stays `Running` and its message names the gate; the inspector shows **Approve nested gate**, which approves that gate in the child (or grandchild) run. Plan approvals and failure escalations inside a child are named on the parent node but cannot yet be decided from it.
+
+Refusals are not retried. Child artifacts stay on the child run and are not copied to the parent task.
+
 ### Inline
 
 `WorkflowComposer.inline()` expands a child definition into the parent graph.
@@ -63,15 +80,15 @@ The replacement workflow may contain any number of roles and may itself contain 
 
 Example:
 
-```text
+~~~text
 Intake -> Researcher -> Publish
-```
+~~~
 
 can become:
 
-```text
+~~~text
 Intake -> [Collect -> Corroborate -> Adversarial Review] -> Publish
-```
+~~~
 
 without changing the surrounding workflow's contract.
 

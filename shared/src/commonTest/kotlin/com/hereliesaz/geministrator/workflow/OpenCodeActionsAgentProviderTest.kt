@@ -40,13 +40,22 @@ class OpenCodeActionsAgentProviderTest {
     )
 
     @Test
-    fun installsWorkflowStreamsStepsAndReturnsBranch() = runBlocking<Unit> {
+    fun workflowUpdateWaitsForApprovalThenStreamsStepsAndReturnsBranch() = runBlocking<Unit> {
         val client = FakeRunnerClient(installed = "template-v1")
         val provider = provider(client)
+        // No plan gate was requested, but committing the workflow file still needs approval.
         val runId = provider.start(request()).providerRunId
 
-        val events = provider.observe(runId).toList()
+        val observed = async { provider.observe(runId).toList() }
+        repeat(20) { yield() }
+        assertEquals(null, client.written)
+        assertEquals(null, client.dispatchedTask)
 
+        provider.approvePlan(runId)
+        val events = observed.await()
+
+        val plan = events.filterIsInstance<AgentEvent.PlanGenerated>().single()
+        assertContains(plan.summary, "update ${OpenCodeAgentWorkflow.PATH} by committing it directly to main")
         assertEquals("template-v2", client.written)
         assertContains(client.dispatchedTask.orEmpty(), "Fix the add function")
         assertContains(client.dispatchedTask.orEmpty(), OpenCodeActionsAgentProvider.runName(runId))

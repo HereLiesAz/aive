@@ -61,6 +61,8 @@ class OpenCodeActionsAgentProvider(
     private class Session(
         val request: AgentTaskRequest,
         val approved: MutableStateFlow<Boolean>,
+        /** Set once a person approved a plan that disclosed the workflow install/update. */
+        var approvedWithWorkflowChange: Boolean = false,
         var cancelled: Boolean = false,
         var githubRunId: String? = null,
     )
@@ -105,7 +107,11 @@ class OpenCodeActionsAgentProvider(
         }
         mutex.withLock {
             sessions.getOrPut(runId) {
-                Session(request, MutableStateFlow(!request.requirePlanApproval || planApproved))
+                Session(
+                    request = request,
+                    approved = MutableStateFlow(!request.requirePlanApproval || planApproved),
+                    approvedWithWorkflowChange = planApproved && planPreview?.contains(OpenCodeAgentWorkflow.PATH) == true,
+                )
             }
         }
         return ProviderActionResult.Accepted
@@ -118,16 +124,28 @@ class OpenCodeActionsAgentProvider(
 
         var githubRunId = session.githubRunId ?: client.findRun(repository, runName)?.id
         if (githubRunId == null) {
+            val branch = repository.defaultBranch ?: client.defaultBranch(repository)
+            val template = workflowTemplate()
+            val installed = client.workflowFile(repository, branch)
+            val workflowChange = when (installed) {
+                template -> null
+                null -> "install"
+                else -> "update"
+            }
+            // Committing a workflow file to the default branch always needs a person's approval,
+            // even for tasks that would otherwise run without a plan gate.
+            if (workflowChange != null && !session.approvedWithWorkflowChange) session.approved.value = false
             if (!session.approved.value) {
-                emit(AgentEvent.PlanGenerated(runId, planSummary(session.request)))
+                emit(AgentEvent.PlanGenerated(runId, planSummary(session.request, workflowChange, branch)))
                 session.approved.first { it }
+                if (workflowChange != null) session.approvedWithWorkflowChange = true
                 emit(AgentEvent.PlanApproved(runId))
             }
             if (session.cancelled) {
                 emit(AgentEvent.Failed(runId, "OpenCode run cancelled before dispatch"))
                 return@flow
             }
-            githubRunId = dispatch(runId, session.request, repository, runName)
+            githubRunId = dispatch(runId, session.request, repository, runName, branch, template, installed)
         }
         session.githubRunId = githubRunId
         followRun(runId, repository, githubRunId, runName)
@@ -138,10 +156,10 @@ class OpenCodeActionsAgentProvider(
         request: AgentTaskRequest,
         repository: RepositoryRef,
         runName: String,
+        branch: String,
+        template: String,
+        installed: String?,
     ): String {
-        val branch = repository.defaultBranch ?: client.defaultBranch(repository)
-        val template = workflowTemplate()
-        val installed = client.workflowFile(repository, branch)
         if (installed != template) {
             emit(
                 AgentEvent.Progress(
@@ -273,11 +291,17 @@ class OpenCodeActionsAgentProvider(
     }
 
     private fun readResult(archive: ByteArray): OpenCodeResult? {
+        require(archive.size <= MAX_RESULT_ARCHIVE_BYTES) { "OpenCode result artifact exceeds $MAX_RESULT_ARCHIVE_BYTES bytes" }
         ZipInputStream(archive).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (!entry.isDirectory && entry.name.substringAfterLast('/') == RESULT_FILE) {
-                    return json.decodeFromString(OpenCodeResult.serializer(), zip.readBytes().decodeToString())
+                    require(entry.size < 0 || entry.size <= MAX_RESULT_JSON_BYTES) {
+                        "OpenCode result exceeds $MAX_RESULT_JSON_BYTES bytes"
+                    }
+                    val bytes = zip.readBytes()
+                    require(bytes.size <= MAX_RESULT_JSON_BYTES) { "OpenCode result exceeds $MAX_RESULT_JSON_BYTES bytes" }
+                    return json.decodeFromString(OpenCodeResult.serializer(), bytes.decodeToString())
                 }
                 zip.closeEntry()
             }
@@ -285,7 +309,10 @@ class OpenCodeActionsAgentProvider(
         return null
     }
 
-    private fun planSummary(request: AgentTaskRequest): String = buildString {
+    private fun planSummary(request: AgentTaskRequest, workflowChange: String?, branch: String): String = buildString {
+        if (workflowChange != null) {
+            append("Approving this will $workflowChange ${OpenCodeAgentWorkflow.PATH} by committing it directly to $branch.\n\n")
+        }
         append("OpenCode ($model) will work on GitHub Actions:\n")
         append(request.objective.trim())
         if (request.acceptanceCriteria.isNotEmpty()) {
@@ -345,6 +372,10 @@ class OpenCodeActionsAgentProvider(
         private const val RESULT_FILE = "aive-result.json"
         private const val DISPATCH_ATTEMPTS = 4
         private const val DISPATCH_RETRY_MILLIS = 5_000L
+
+        // The runner caps the patch at ~900 KB and the summary at 20 KB.
+        private const val MAX_RESULT_ARCHIVE_BYTES = 4 * 1024 * 1024
+        private const val MAX_RESULT_JSON_BYTES = 2 * 1024 * 1024
 
         // workflow_dispatch inputs are capped at 65,535 characters in total.
         private const val MAX_PROMPT_CHARS = 50_000

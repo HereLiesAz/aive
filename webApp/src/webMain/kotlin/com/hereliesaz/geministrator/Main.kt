@@ -1,9 +1,11 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
@@ -38,6 +40,7 @@ import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import kotlinx.browser.window
+import kotlinx.coroutines.launch
 
 private const val JULES_API_KEY_STORAGE_KEY = "haive.julesApiKey"
 private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
@@ -55,8 +58,16 @@ fun main() {
             return@ComposeViewport
         }
 
-        var credentials by remember { mutableStateOf(readWebProviderCredentials()) }
-        var repositoryCredentials by remember { mutableStateOf(readWebRepositoryCredentials()) }
+        var credentials by remember { mutableStateOf(emptyMap<String, String>()) }
+        var repositoryCredentials by remember { mutableStateOf(emptyMap<String, String>()) }
+        var credentialsLoaded by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        // Credentials are encrypted at rest, so they load asynchronously before the app starts.
+        LaunchedEffect(Unit) {
+            credentials = readWebProviderCredentials()
+            repositoryCredentials = readWebRepositoryCredentials()
+            credentialsLoaded = true
+        }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
         var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
         val repositoryHttpClient = remember { HttpClient() }
@@ -89,24 +100,29 @@ fun main() {
             configuredWebRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
         }
 
+        if (!credentialsLoaded) return@ComposeViewport
         val repositoryServiceId = configuringRepositoryServiceId
         val providerId = configuringProviderId
         when {
             repositoryServiceId != null -> RepositoryCredentialSetup(
                 serviceId = repositoryServiceId,
                 onSave = { credential ->
-                    window.localStorage.setItem(repositoryStorageKey(repositoryServiceId), credential)
-                    repositoryCredentials = readWebRepositoryCredentials()
                     configuringRepositoryServiceId = null
+                    scope.launch {
+                        WebCredentialStore.write(repositoryStorageKey(repositoryServiceId), credential)
+                        repositoryCredentials = readWebRepositoryCredentials()
+                    }
                 },
                 onCancel = { configuringRepositoryServiceId = null },
             )
             providerId != null -> ProviderCredentialSetup(
                 providerId = providerId,
                 onSave = { key ->
-                    window.localStorage.setItem(providerStorageKey(providerId), key)
-                    credentials = readWebProviderCredentials()
                     configuringProviderId = null
+                    scope.launch {
+                        WebCredentialStore.write(providerStorageKey(providerId), key)
+                        credentials = readWebProviderCredentials()
+                    }
                 },
                 onCancel = { configuringProviderId = null },
             )
@@ -117,13 +133,13 @@ fun main() {
                 onSearchRepositories = repositoryDiscovery::search,
                 onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                 onDisconnectRepositoryService = { serviceId ->
-                    window.localStorage.removeItem(repositoryStorageKey(serviceId))
-                    repositoryCredentials = readWebRepositoryCredentials()
+                    WebCredentialStore.remove(repositoryStorageKey(serviceId))
+                    repositoryCredentials = repositoryCredentials - serviceId
                 },
                 onReconfigureProvider = { configuringProviderId = it },
                 onDisconnectProvider = { disconnectedProviderId ->
-                    window.localStorage.removeItem(providerStorageKey(disconnectedProviderId))
-                    credentials = readWebProviderCredentials()
+                    WebCredentialStore.remove(providerStorageKey(disconnectedProviderId))
+                    credentials = credentials - disconnectedProviderId
                 },
             )
         }
@@ -267,21 +283,15 @@ internal fun configuredWebRepositoryDiscovery(
     )
 }
 
-private fun readWebProviderCredentials(): Map<String, String> = buildMap {
+private suspend fun readWebProviderCredentials(): Map<String, String> = buildMap {
     ProviderCatalog.entries.forEach { entry ->
-        window.localStorage.getItem(providerStorageKey(entry.id))
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?.let { put(entry.id, it) }
+        WebCredentialStore.read(providerStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 
-private fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
+private suspend fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
     RepositoryServiceCatalog.entries.forEach { entry ->
-        window.localStorage.getItem(repositoryStorageKey(entry.id))
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?.let { put(entry.id, it) }
+        WebCredentialStore.read(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 

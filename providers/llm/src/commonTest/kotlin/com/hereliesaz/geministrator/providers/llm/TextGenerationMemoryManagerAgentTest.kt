@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 class TextGenerationMemoryManagerAgentTest {
     @Test
-    fun generatedNodeInheritsPacketProvenanceAndUsesPacketScopedIds() = runBlocking {
+    fun generatedNodeInheritsPacketProvenanceAndUsesPacketScopedIds() = runBlocking<Unit> {
         val api = object : TextGenerationApi {
             override suspend fun generate(prompt: String): TextGenerationResult = TextGenerationResult(
                 text = """
@@ -79,7 +79,7 @@ class TextGenerationMemoryManagerAgentTest {
     }
 
     @Test
-    fun modelCannotClaimProvenanceOutsideItsPacket() = runBlocking {
+    fun modelCannotClaimProvenanceOutsideItsPacket() = runBlocking<Unit> {
         val api = object : TextGenerationApi {
             override suspend fun generate(prompt: String): TextGenerationResult = TextGenerationResult(
                 text = """

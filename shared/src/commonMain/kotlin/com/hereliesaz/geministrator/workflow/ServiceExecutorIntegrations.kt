@@ -99,17 +99,38 @@ interface NestedWorkflowClient {
         workflowDefinitionId: WorkflowDefinitionId,
         targetProjectId: ProjectId? = null,
     ): ExternalExecutionRun
+
+    /** Start with the parent task context, which clients need for idempotent child IDs and safeguards. */
+    suspend fun start(
+        context: TaskExecutorContext,
+        workflowDefinitionId: WorkflowDefinitionId,
+        targetProjectId: ProjectId?,
+    ): ExternalExecutionRun = start(context.project, workflowDefinitionId, targetProjectId)
+
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
 }
 
 class NestedWorkflowExecutorIntegration(
     private val client: NestedWorkflowClient,
 ) : TaskExecutorIntegration {
+    // Refusals (depth limit, cycle, missing definition) are deterministic; retrying cannot succeed.
+    override val retryDispatchFailures: Boolean = false
+
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.NestedWorkflow
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.NestedWorkflow
-        return client.start(context.project, executor.workflowDefinitionId, executor.projectId).toTaskExecution()
+        return try {
+            client.start(context, executor.workflowDefinitionId, executor.projectId).toTaskExecution()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Throwable) {
+            TaskExecutorExecution(
+                status = TaskRunStatus.Failed,
+                progressMessage = failure.message?.takeIf(String::isNotBlank)
+                    ?: "Nested workflow ${executor.workflowDefinitionId.value} could not start",
+            )
+        }
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
