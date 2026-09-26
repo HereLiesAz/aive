@@ -18,7 +18,7 @@ djl = "0.38.0"
 kmp-zip = "1.0.0"
 cryptography = "0.6.0"
 # cryptography-provider-jdk-bc 0.6.0 pulls bcprov 1.83 (GHSA-574f/9pwp/c3fc/p93r/qp49); pinned to a fixed release.
-bouncycastle = "1.86"
+bouncycastle = "1.85"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }

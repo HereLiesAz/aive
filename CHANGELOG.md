@@ -32,7 +32,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Documentation brought in line with shipped behavior (privacy policy, threat model, architecture, index, versioning, roadmap checkboxes); stray patch and CI-trigger files removed.
 - Repository operations placed on another device (`TaskExecutor.Distributed`) now need the same human approval as local ones.
 - Compute-pool workers re-check every lease before running it: the workflow must validate, a repository mutation needs a completed approval in the submitted run, and anything using the worker's repository credentials must target a repository of a project linked on that device.
-- BouncyCastle (`bcprov-jdk18on`, pulled in by the Android cryptography provider) is pinned to 1.86, fixing the five advisories on 1.83 (two critical, two high, one moderate).
+- BouncyCastle (`bcprov-jdk18on`, pulled in by the Android cryptography provider) is pinned to 1.85, fixing the five advisories on 1.83 (two critical, two high, one moderate).
 - The LLM provider test suite compiles again, its stale tests were fixed, and CI now runs it. Along the way, a text provider resumed after an app restart with an already-approved plan no longer fails with "Plan result was not stored"; it runs the approved task once.
 - Installing or updating the OpenCode workflow in a repository now always waits for a person to approve a plan that says it will be committed to the default branch. OpenCode results are size-bounded, and resume searches up to 1,000 recent runs.
 - The web app encrypts saved provider and repository credentials (AES-GCM, non-extractable key in IndexedDB); existing plaintext entries are re-encrypted on first load.
