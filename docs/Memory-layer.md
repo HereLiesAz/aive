@@ -1,12 +1,12 @@
-# Haive Memory Clerks — Training and Deployment Contract
+# The Aive Memory Clerks — Training and Deployment Contract
 
-This document is normative for Haive's local memory-clerk model family.
+This document is normative for The Aive's local memory-clerk model family.
 
 Memory clerks organize what was thought, said, done, requested, observed, or produced. They do not decide what should be thought.
 
 ## Architecture
 
-Haive uses two distinct local-inference families:
+The Aive uses two distinct local-inference families:
 
 1. **Eight structured generative clerks** based presumptively on `Qwen/Qwen2.5-0.5B-Instruct`, with specialist LoRA/PEFT adapters where practical.
 2. **One semantic association clerk** based on a compact MiniLM-style embedding model and cosine similarity.
@@ -321,7 +321,7 @@ To validate conscious conflict reasoning:
 
 1. Store two semantically related memories containing differing information.
 2. `AssociationLinker` links them only by similarity/relatedness.
-3. A normal orchestrated Haive agent recalls both.
+3. A normal orchestrated Aive agent recalls both.
 4. That agent may consciously notice and reason about the discrepancy.
 5. Its reasoning becomes ordinary session context.
 6. The resulting episode later passes through the same clerical pipeline.

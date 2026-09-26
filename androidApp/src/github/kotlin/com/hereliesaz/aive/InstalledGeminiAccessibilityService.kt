@@ -24,6 +24,8 @@ class InstalledGeminiAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!InstalledGeminiBridge.waiting) return
+        // Enabled in Android settings is not enough: the in-app opt-in must also be on.
+        if (!InstalledGeminiPreference.isEnabled(this)) return
         val target = InstalledGeminiBridge.targetPackage ?: return
         if (event?.packageName?.toString() != target) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&

@@ -1,12 +1,12 @@
 # Memory banking and associative attention
 
-This document defines the canonical Haive memory-deposit and memory-surfacing semantics.
+This document defines the canonical Aive memory-deposit and memory-surfacing semantics.
 
 These rules are architectural invariants. Implementations, training prompts, orchestration code, and future sessions should preserve them unless the architecture is deliberately revised.
 
 ## Core principle
 
-Haive memory is associative before it is explicit.
+The Aive's memory is associative before it is explicit.
 
 The normal path is:
 
@@ -34,7 +34,7 @@ There are two important ways banking happens, but they use the same memory syste
 
 ### 1. Automatic lifecycle banking
 
-At the appropriate agent lifecycle boundary, Haive banks the agent's full available context into the memory layer.
+At the appropriate agent lifecycle boundary, The Aive banks the agent's full available context into the memory layer.
 
 This is the durable record of the agent's lived session: what it was asked, what it saw, what it tried, what it produced, what failed, what changed, what it reasoned about, and what remained unresolved.
 
@@ -70,7 +70,7 @@ After banking, the deliberately deposited note is processed and retrieved like o
 
 ## There is no programmatic reminder engine in the memory architecture
 
-Haive should not need a separate programmatic reminder mechanism such as:
+The Aive should not need a separate programmatic reminder mechanism such as:
 
 ```text
 reminder.fireWhen(...)
@@ -215,7 +215,7 @@ The system is intended to solve a common failure mode in which information still
 
 ## Attention Deficit Dial
 
-Haive may expose an **Attention Deficit Dial** controlling how often associative memory cues enter the active agent's context.
+The Aive may expose an **Attention Deficit Dial** controlling how often associative memory cues enter the active agent's context.
 
 The dial belongs to the attention/orchestration layer, not to the Memory Clerks.
 

@@ -42,6 +42,7 @@ internal class InstalledGeminiTextGenerationApi(
 
     private suspend fun generateInstalled(prompt: String): TextGenerationResult {
         require(prompt.isNotBlank()) { "Gemini prompt must not be blank" }
+        check(InstalledGeminiPreference.isEnabled(context)) { "The installed-Gemini bridge is turned off in The Aive" }
         check(isAccessibilityServiceEnabled(context)) {
             "Haive's installed-Gemini accessibility service is not enabled"
         }

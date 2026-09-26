@@ -1,6 +1,6 @@
 # BITCOS ternary model runtime
 
-Haive treats BITCOS as an experimental weight encoding for genuinely ternary models, not as a generic compressor for FP16, INT8, GGUF, or ONNX checkpoints.
+The Aive treats BITCOS as an experimental weight encoding for genuinely ternary models, not as a generic compressor for FP16, INT8, GGUF, or ONNX checkpoints.
 
 The implementation is based on Intel researchers Evangelos Georganas, Alexander Heinecke, and Pradeep Dubey, *Breaking the 1.58-bit Barrier for Ternary LLMs* (arXiv:2609.16338, 2026).
 
@@ -11,9 +11,9 @@ For a ternary tensor whose weights are in `{-1, 0, +1}`, BITCOS stores:
 1. a dense presence bitmap with one bit per element, set when the weight is non-zero;
 2. a compacted sign stream with one bit per non-zero element, in tensor order.
 
-Haive uses `1 = negative` for sign bits and LSB-first bit numbering. If a tensor has zero density `z`, the symbol payload is `2 - z` bits per weight before scale and container metadata.
+The Aive uses `1 = negative` for sign bits and LSB-first bit numbering. If a tensor has zero density `z`, the symbol payload is `2 - z` bits per weight before scale and container metadata.
 
-This layout is lossless for already-ternary weights. Haive does not convert ordinary Qwen/ONNX specialists to BITCOS by relabeling or compressing their bytes.
+This layout is lossless for already-ternary weights. The Aive does not convert ordinary Qwen/ONNX specialists to BITCOS by relabeling or compressing their bytes.
 
 ## Runtime architecture
 
@@ -54,7 +54,7 @@ The local-model planner requires explicit `bitcos-v1` support. A runtime that me
 
 ## HBCS v1
 
-`native/bitcos` defines Haive's transport container for BITCOS tensors. It is intentionally small and independent of any one transformer architecture.
+`native/bitcos` defines The Aive's transport container for BITCOS tensors. It is intentionally small and independent of any one transformer architecture.
 
 The fixed header contains:
 
@@ -112,13 +112,13 @@ The current code does **not** yet claim Intel-equivalent throughput. Remaining o
 - Intel Xe2/XeTLA implementation;
 - architecture-specific transformer operators and tokenizer integration.
 
-These optimizations must compare bit-for-bit against the portable decoder and task-for-task against Haive's existing local specialists before BITCOS becomes preferred automatically.
+These optimizations must compare bit-for-bit against the portable decoder and task-for-task against The Aive's existing local specialists before BITCOS becomes preferred automatically.
 
 ## Model-family compatibility
 
 BITCOS is appropriate only when the underlying checkpoint is ternary. Candidate families include BitNet b1.58 and other ternary-native or ternary-quantized families whose actual released tensor semantics are known.
 
-A released Haive BITCOS artifact must include:
+A released Aive BITCOS artifact must include:
 
 - stable logical model identity;
 - upstream/foundation identity;
@@ -136,6 +136,6 @@ Until such artifacts are published and benchmarked, existing ONNX INT8 memory sp
 1. Lossless converter round-trip against source ternary tensors.
 2. Portable decoder parity on Android ARM, Linux, Windows, and macOS.
 3. Fused-kernel numerical parity against the portable path.
-4. Task-accuracy parity or improvement on Haive specialist evaluations.
+4. Task-accuracy parity or improvement on Aive specialist evaluations.
 5. Measured startup, RAM, decode throughput, energy, and thermal behavior on physical devices.
 6. Fallback to verified existing local artifacts whenever runtime capability or artifact compatibility is unproven.

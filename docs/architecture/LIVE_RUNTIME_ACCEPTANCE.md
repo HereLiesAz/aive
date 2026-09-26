@@ -28,7 +28,9 @@ OpenAI-compatible provider transport against SmolLM2. Jules is not part of this 
 requirement.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
-before the matching P0 roadmap items are marked complete.
+before the matching roadmap items in `TODO.md` are marked complete: the on-runtime verification item
+under "Runtime integrity audit" and the "Make one complete workflow actually work end-to-end" section.
+Other checked P0 items record implementation with automated test coverage, not live verification.
 
 
 ## Android runtime recovery expectations

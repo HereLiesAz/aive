@@ -1,6 +1,6 @@
 # Recursive Workflow Composition
 
-Haive treats roles and workflows as points on the same composition continuum.
+The Aive treats roles and workflows as points on the same composition continuum.
 
 ## Core rule
 

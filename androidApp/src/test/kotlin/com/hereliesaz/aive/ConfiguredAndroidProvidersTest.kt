@@ -31,7 +31,7 @@ class ConfiguredAndroidProvidersTest {
     fun everyHostedCredentialConfiguresItsProvider() {
         HostedLlmProviders.entries.forEach { spec ->
             val providers = configuredAndroidProviders(
-                credentials = mapOf(spec.id to "key-${spec.id}"),
+                credentials = mapOf(spec.id to if (spec.accountScoped) "account:key-${spec.id}" else "key-${spec.id}"),
             )
             assertTrue(
                 providers.any { it.id == AgentProviderId(spec.id) },

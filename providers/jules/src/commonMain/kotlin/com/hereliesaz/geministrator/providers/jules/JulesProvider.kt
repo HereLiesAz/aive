@@ -39,6 +39,10 @@ class JulesProvider(
 
     override val id: AgentProviderId = AgentProviderId("jules")
 
+    // Jules reports little between plan approval and completion, so it never drives a workflow on
+    // its own; it runs only where a role names it.
+    override val explicitOnly: Boolean = true
+
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
         supported = setOf(
             AgentCapability.RepositoryRead,

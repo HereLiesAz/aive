@@ -9,6 +9,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -21,6 +25,18 @@ internal fun AndroidGeminiProviderSetup(
     onUseApiKey: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    // The bridge reads another app's screen, so it is enabled only after an explicit disclosure.
+    var disclosing by remember { mutableStateOf(false) }
+    if (disclosing) {
+        InstalledGeminiBridgeDisclosure(
+            onAgree = {
+                disclosing = false
+                onUseInstalledGemini()
+            },
+            onBack = { disclosing = false },
+        )
+        return
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -40,7 +56,7 @@ internal fun AndroidGeminiProviderSetup(
         )
         if (installedBridgeSupported && installedAppDetected) {
             Button(
-                onClick = onUseInstalledGemini,
+                onClick = { disclosing = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (accessibilityEnabled) "Use installed Gemini" else "Enable installed Gemini bridge")

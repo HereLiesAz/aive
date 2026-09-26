@@ -4,7 +4,7 @@ import com.hereliesaz.geministrator.ProviderCatalog
 
 /**
  * The linked cloud LLM used for workflow planning: the first configured of Gemini, OpenAI, Claude,
- * Grok, then the hosted providers in catalog order. Null when none is linked.
+ * Grok, then the hosted providers in catalog order (keyless ones last). Null when none is linked.
  */
 fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? {
     fun key(id: String): LlmApiKeyProvider? =
@@ -15,6 +15,8 @@ fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? 
     key(ProviderCatalog.ANTHROPIC_ID)?.let { return AnthropicMessagesApi(it) }
     key(ProviderCatalog.XAI_ID)?.let { return XaiResponsesApi(it) }
     return HostedLlmProviders.entries.firstNotNullOfOrNull { spec ->
-        key(spec.id)?.let { HostedLlmProviders.textApi(spec, it) }
+        credentials[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { credential ->
+            runCatching { HostedLlmProviders.textApi(spec, credential) }.getOrNull()
+        }
     }
 }

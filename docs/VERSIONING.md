@@ -67,3 +67,8 @@ for every CI build while leaving the public Aive version untouched. For example,
 `0.9.6.412` packages as native version `1.9.412`. Downloadable filenames always use the full four-part public version. The GitHub Release container
 uses the three-part patch version while the exact build remains visible in the filename and immutable
 four-part Git tag.
+
+Known constraint: `desktopApp/build.gradle.kts` fails the build unless public MAJOR is `0..2`, MINOR is
+`0..99`, and BUILD is `0..65535` (the package-manager limit on a version component). Because BUILD is
+`github.run_number`, desktop packaging will stop building once the run number exceeds 65535 unless the
+encoding is revised.

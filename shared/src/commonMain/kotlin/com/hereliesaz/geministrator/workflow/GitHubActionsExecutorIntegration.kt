@@ -57,6 +57,7 @@ data class GitHubWorkflowRun(
     val artifacts: List<GitHubWorkflowArtifact> = emptyList(),
     val jobs: List<GitHubWorkflowJob> = emptyList(),
     val progressMessage: String? = null,
+    val headSha: String? = null,
 )
 
 enum class GitHubWorkflowRunStatus { Queued, Running, Completed, Failed }
@@ -174,6 +175,7 @@ class GitHubRestActionsClient(
             conclusion != null -> conclusion
             else -> status
         },
+        headSha = headSha,
     )
 
     override suspend fun downloadArtifact(
@@ -241,6 +243,7 @@ class GitHubRestActionsClient(
         val id: Long,
         val status: String,
         val conclusion: String? = null,
+        @SerialName("head_sha") val headSha: String? = null,
     )
 
     @Serializable

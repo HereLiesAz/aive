@@ -1,6 +1,6 @@
 # Repository services
 
-Haive treats repository services separately from AI providers. A project links to a repository source; repository-service credentials authorize host operations for that source.
+The Aive treats repository services separately from AI providers. A project links to a repository source; repository-service credentials authorize host operations for that source.
 
 ## Sources
 
@@ -26,7 +26,7 @@ Repository-operation tasks support:
 - `create-branch:<branch>`
 - `open-merge-request:<source>:<target>:<title>`
 
-When both a GitLab repository credential and a supported LLM provider are connected, Haive can also execute governed coding tasks directly against a linked GitLab project. The GitLab workspace agent:
+When both a GitLab repository credential and a supported LLM provider are connected, The Aive can also execute governed coding tasks directly against a linked GitLab project. The GitLab workspace agent:
 
 - reads a bounded repository tree and selected file contents
 - generates an approval-gated implementation plan when required
@@ -37,11 +37,11 @@ When both a GitLab repository credential and a supported LLM provider are connec
 
 GitLab workspace execution does not claim shell or test execution. Tests remain separate execution work until a GitLab CI executor is connected.
 
-GitLab.com and self-managed GitLab repository URLs are mapped to that host's `/api/v4` endpoint.
+Only GitLab.com is supported (`https://gitlab.com/api/v4`); repository operations reject other hosts, so self-managed GitLab instances do not work yet.
 
 ### Local Git
 
-Desktop Haive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `haive/...` branches.
+On Desktop, The Aive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `haive/...` branches.
 
 ## Orchestration artifacts
 
@@ -55,7 +55,7 @@ Repository operations emit normal workflow artifacts. The run overview consumes 
 - pull request or merge request
 - release activity
 
-Remote repository hosts do not report Local Git working-tree cleanliness, so Haive does not label a remote repository clean or dirty based on host state.
+Remote repository hosts do not report Local Git working-tree cleanliness, so The Aive does not label a remote repository clean or dirty based on host state.
 
 ## Failure behavior
 

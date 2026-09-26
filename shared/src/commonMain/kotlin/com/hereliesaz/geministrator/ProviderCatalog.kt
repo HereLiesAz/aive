@@ -6,6 +6,8 @@ data class ProviderCatalogEntry(
     val apiKeyUrl: String,
     val credentialLabel: String,
     val description: String,
+    /** Serves free models without a key; the credential field may be left blank. */
+    val keyOptional: Boolean = false,
 )
 
 object ProviderCatalog {
@@ -26,6 +28,15 @@ object ProviderCatalog {
     const val COHERE_ID = "cohere"
     const val NVIDIA_ID = "nvidia"
     const val SAMBANOVA_ID = "sambanova"
+    const val OLLAMA_CLOUD_ID = "ollama-cloud"
+    const val ZAI_ID = "zai"
+    const val CLOUDFLARE_ID = "cloudflare"
+    const val KILO_ID = "kilo"
+    const val LLM7_ID = "llm7"
+    const val OVHCLOUD_ID = "ovhcloud"
+
+    /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
+    const val ANONYMOUS_CREDENTIAL = "anonymous"
 
     val entries: List<ProviderCatalogEntry> = listOf(
         ProviderCatalogEntry(
@@ -33,7 +44,8 @@ object ProviderCatalog {
             displayName = "Jules",
             apiKeyUrl = "https://jules.google.com/settings#api",
             credentialLabel = "Jules API key",
-            description = "Repository coding agent with remote sessions and pull-request output.",
+            description = "Repository coding agent with remote sessions and pull-request output. " +
+                "Background tasks only: it reports little progress, so it runs only where a role names it.",
         ),
         ProviderCatalogEntry(
             id = OPENAI_ID,
@@ -146,6 +158,53 @@ object ProviderCatalog {
             apiKeyUrl = "https://cloud.sambanova.ai/apis",
             credentialLabel = "SambaNova API key",
             description = "SambaCloud models through its OpenAI-compatible Chat Completions API.",
+        ),
+        ProviderCatalogEntry(
+            id = OLLAMA_CLOUD_ID,
+            displayName = "Ollama Cloud",
+            apiKeyUrl = "https://ollama.com/settings/keys",
+            credentialLabel = "Ollama API key",
+            description = "Large open models (DeepSeek, Kimi, GLM, gpt-oss) hosted by Ollama. Free tier with weekly limits.",
+        ),
+        ProviderCatalogEntry(
+            id = ZAI_ID,
+            displayName = "Z.ai",
+            apiKeyUrl = "https://z.ai/manage-apikey/apikey-list",
+            credentialLabel = "Z.ai API key",
+            description = "GLM models; GLM-4.7-Flash is free, one request at a time.",
+        ),
+        ProviderCatalogEntry(
+            id = CLOUDFLARE_ID,
+            displayName = "Cloudflare Workers AI",
+            apiKeyUrl = "https://dash.cloudflare.com/profile/api-tokens",
+            credentialLabel = "ACCOUNT_ID:API_TOKEN",
+            description = "Open models on Cloudflare's edge. Free: 10,000 neurons a day. " +
+                "Enter your account ID and a Workers AI token separated by a colon.",
+        ),
+        ProviderCatalogEntry(
+            id = KILO_ID,
+            displayName = "Kilo Gateway",
+            apiKeyUrl = "https://app.kilo.ai/profile",
+            credentialLabel = "Kilo API key (optional)",
+            description = "Free models with no key: 200 requests an hour per IP. Free routing may use " +
+                "providers that log prompts; keep confidential data out.",
+            keyOptional = true,
+        ),
+        ProviderCatalogEntry(
+            id = LLM7_ID,
+            displayName = "LLM7",
+            apiKeyUrl = "https://token.llm7.io/",
+            credentialLabel = "LLM7 token (optional)",
+            description = "Free models with no key, heavily rate-limited; a free token raises the limit.",
+            keyOptional = true,
+        ),
+        ProviderCatalogEntry(
+            id = OVHCLOUD_ID,
+            displayName = "OVHcloud AI Endpoints",
+            apiKeyUrl = "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/",
+            credentialLabel = "OVHcloud AI token (optional)",
+            description = "Qwen, Llama, Mistral and gpt-oss with no key: 2 requests a minute per IP.",
+            keyOptional = true,
         ),
     )
 

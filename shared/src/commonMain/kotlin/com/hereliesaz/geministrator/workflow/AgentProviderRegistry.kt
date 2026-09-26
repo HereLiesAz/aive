@@ -85,9 +85,12 @@ class AgentProviderRegistry(
             else -> Unit
         }
 
+        // Explicit-only providers join the candidates only as the role's preferred provider.
         val ordered = buildList {
             request.preferredProviderId?.let { providersById[it] }?.let(::add)
-            providersById.values.forEach { provider -> if (provider !in this) add(provider) }
+            providersById.values.forEach { provider ->
+                if (provider !in this && !provider.explicitOnly) add(provider)
+            }
         }
 
         val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
@@ -134,7 +137,12 @@ class AgentProviderRegistry(
         } else {
             ""
         }
-        error("No agent provider satisfies required capabilities $required$repositorySuffix")
+        val explicitOnlyHint = providersById.values
+            .filter { it.explicitOnly && it !in ordered }
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(prefix = ". Not chosen automatically: ", postfix = " (assign to a role to use)") { it.id.value }
+            .orEmpty()
+        error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint")
     }
 }
 

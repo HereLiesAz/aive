@@ -37,8 +37,10 @@ import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
+import com.hereliesaz.geministrator.workflow.GitHubRestOpenCodeRunnerClient
 import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
+import com.hereliesaz.geministrator.workflow.OpenCodeActionsAgentProvider
 import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
@@ -286,7 +288,17 @@ internal fun configuredDesktopProviders(
     repositoryHttpClient: HttpClient? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
     addAll(HostedLlmProviders.configured(credentials))
+    // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
+    // model, no key; needs only the linked GitHub token.
+    if (githubToken != null && repositoryHttpClient != null) {
+        add(
+            OpenCodeActionsAgentProvider(
+                GitHubRestOpenCodeRunnerClient(GitHubTokenProvider { githubToken }, repositoryHttpClient),
+            ),
+        )
+    }
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
