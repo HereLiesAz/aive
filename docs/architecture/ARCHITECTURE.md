@@ -25,7 +25,7 @@ The Aive is not an IDE. Source editing, terminals, and generic filesystem toolin
 
 ## Targets
 
-- Android — application ID and namespace `com.hereliesaz.aive`
+- Android — namespace `com.hereliesaz.aive`; application ID `com.hereliesaz.aive` for the `play` flavor and `com.hereliesaz.haive` for the `github` release flavor, kept permanently so GitHub-release installs upgrade in place
 - Desktop JVM
 - Web JavaScript
 - WebAssembly
@@ -34,13 +34,14 @@ Shared code must remain portable across all four targets.
 
 ## Active modules
 
-```text
+~~~text
 shared/       domain, workflow engine, policies, persistence, shared Compose UI
-providers/    provider adapters, beginning with Jules
+providers/    provider adapters: Jules, and llm (native and OpenAI-compatible hosted adapters)
+computeRelay/ distributed compute relay server
 androidApp/   Android launcher
 desktopApp/   Desktop launcher
 webApp/       browser launcher
-```
+~~~
 
 The root Gradle settings are the authoritative active build graph.
 
@@ -54,12 +55,14 @@ The current executor model represents:
 
 - role-backed provider agents
 - GitHub Actions
+- scripts
 - test runners
 - deployments
 - repository operations
 - human approvals
 - external services
-- nested Haive workflows
+- nested Aive workflows
+- distributed placement of another executor on a remote compute node (`TaskExecutor.Distributed`; see [Distributed compute](DISTRIBUTED_COMPUTE.md))
 
 Non-agent execution does not require a fabricated employee role. A GitHub Action, deployment, or repository operation may legitimately have no `roleId` at all. A human approval may still carry a responsibility role while remaining a human executor rather than an agent.
 
@@ -125,9 +128,14 @@ Task start, completion, failure, retry, escalation, approval, artifact, and work
 
 Provider adapters translate external APIs into neutral runtime contracts.
 
-Jules is the first provider. Jules source IDs, session IDs, request payloads, credentials, and activity schemas remain inside the Jules adapter.
+Registered agent providers are built from the configured credentials:
 
-Future providers can implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
+- OpenCode on GitHub Actions (`OpenCodeActionsAgentProvider`) — the automatic coding agent for linked GitHub repositories; it needs only the linked GitHub token.
+- Text LLM providers from `providers/llm` — native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers.
+- GitLab workspace agent (`providers/llm`) for linked GitLab repositories, and the Desktop-only local workspace agent for linked Local Git projects. Both return validated file changes and commit them to a branch; neither executes repository code.
+- Jules — explicit-only (`AgentProvider.explicitOnly`). The registry never selects it automatically; it runs only as a role's preferred provider or when a task requires it by ID. Jules source IDs, session IDs, request payloads, credentials, and activity schemas remain inside the Jules adapter.
+
+New providers implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
 
 ## Artifacts and evidence
 
@@ -162,9 +170,9 @@ The technical inspector likewise shows executor, provider, provider-run ID, exte
 
 ## Persistence compatibility
 
-Persistence schema `2` stores executor-neutral task definitions and task runs. Schema `1` snapshots are migrated explicitly: role-backed tasks/runs that lack an executor are mapped to `TaskExecutor.RoleAgent` while preserving all existing workflow IDs, task-run IDs, statuses, provider IDs, artifacts, and progress state.
+The current persistence schema is `3`. Schema `2` introduced executor-neutral task definitions and task runs (schema `1` role-backed tasks/runs are mapped to `TaskExecutor.RoleAgent`); schema `3` rewrites legacy provider and GitHub artifact IDs to include the task attempt so retries cannot collide. Migrations preserve workflow IDs, task-run IDs, statuses, provider IDs, artifacts, and progress, and are written back immediately.
 
-The legacy storage key is intentionally retained so existing installations can migrate in place instead of silently starting with an empty data store.
+Snapshots live under `geministrator.workflow.persistence.v2`; the older `geministrator.workflow.persistence.v1` key is a read fallback that is migrated forward and then retired. See [Persistence](PERSISTENCE.md) for detail.
 
 ## Human attention
 
@@ -192,7 +200,7 @@ Pushes to `main`:
 - publish exact-build assets into the patch-grouped GitHub Release through the centralized release action
 - deploy the JS production bundle to GitHub Pages after a successful build
 
-The composite build currently runs on JDK 21 because the pinned H2G2 renderer is compiled with a Java 21 toolchain. Android-facing Haive bytecode may still target JVM 17. Haive and the pinned renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
+The composite build currently runs on JDK 21 because the pinned H2G2 renderer is compiled with a Java 21 toolchain. Android-facing Aive bytecode may still target JVM 17. The Aive and the pinned renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
 
 Web packaging uses isolated Maven publications because Kotlin/JS package generation cannot
 resolve the nested H2G2 composite build from within itself. CI publishes the pinned source
@@ -208,7 +216,7 @@ step and uses the repository Play service-account secret when enabled.
 
 The checked-in release line remains four-part (`MAJOR.MINOR.PATCH.BUILD`). Exact builds keep
 immutable four-part Git tags, while GitHub Release objects are grouped by patch: all `0.9.6.x`
-artifacts, for example, live under `v0.9.6`. Asset filenames retain the exact build number so
+artifacts, for example, live under `0.9.6`. Asset filenames retain the exact build number so
 multiple builds coexist safely. The version calculation, patch grouping, legacy-release migration,
 and collision policy live in `HereLiesAz/workflows`; Aive's workflow only produces Aive-specific
 artifacts and delegates those semantics.
