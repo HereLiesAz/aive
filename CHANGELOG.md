@@ -37,6 +37,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Installing or updating the OpenCode workflow in a repository now always waits for a person to approve a plan that says it will be committed to the default branch. OpenCode results are size-bounded, and resume searches up to 1,000 recent runs.
 - The web app encrypts saved provider and repository credentials (AES-GCM, non-extractable key in IndexedDB); existing plaintext entries are re-encrypted on first load.
 - Nested workflow nodes (`TaskExecutor.NestedWorkflow`) now run on Android, Desktop and Web: each starts a child run of the referenced workflow on the same engine and storage, shows the child's progress, and completes or fails with it. After a restart the node reconnects to its existing child run. Nesting deeper than four levels and nesting that loops back to a workflow already in the chain are refused. Human approval gates inside the child stay pending until approved from the nested node's inspector.
+- The OpenCode runner workflow was verified on real GitHub infrastructure (live check-run step log, a correct fix pushed to an `aive/opencode-*` branch, a parseable result artifact). The app's own dispatch path still needs a live run.
 
 ## Foundation — before 0.9.6
 
