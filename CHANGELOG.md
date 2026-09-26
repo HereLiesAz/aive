@@ -36,6 +36,7 @@ All notable changes to **The Aive** are documented here from the current product
 - The LLM provider test suite compiles again, its stale tests were fixed, and CI now runs it. Along the way, a text provider resumed after an app restart with an already-approved plan no longer fails with "Plan result was not stored"; it runs the approved task once.
 - Installing or updating the OpenCode workflow in a repository now always waits for a person to approve a plan that says it will be committed to the default branch. OpenCode results are size-bounded, and resume searches up to 1,000 recent runs.
 - The web app encrypts saved provider and repository credentials (AES-GCM, non-extractable key in IndexedDB); existing plaintext entries are re-encrypted on first load.
+- Nested workflow nodes (`TaskExecutor.NestedWorkflow`) now run on Android, Desktop and Web: each starts a child run of the referenced workflow on the same engine and storage, shows the child's progress, and completes or fails with it. After a restart the node reconnects to its existing child run. Nesting deeper than four levels and nesting that loops back to a workflow already in the chain are refused. Human approval gates inside the child stay pending until approved from the nested node's inspector.
 
 ## Foundation — before 0.9.6
 

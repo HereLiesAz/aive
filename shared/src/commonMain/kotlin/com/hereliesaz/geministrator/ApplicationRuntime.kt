@@ -47,6 +47,7 @@ import com.hereliesaz.geministrator.workflow.ApprovalGateKind
 import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
 import com.hereliesaz.geministrator.workflow.ManagedSessionFailure
 import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
+import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
@@ -57,7 +58,9 @@ import com.hereliesaz.geministrator.workflow.WorkflowEngine
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeCoordinator
+import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
+import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -107,6 +110,7 @@ class ApplicationRuntime private constructor(
     val publisher: WorkflowRuntimePublisher,
     private val runtimeScope: CoroutineScope,
     private val roles: List<RoleDefinition>,
+    private val nestedWorkflows: WorkflowRunNestedWorkflowClient? = null,
 ) {
     private data class Current(
         val project: Project,
@@ -272,6 +276,14 @@ class ApplicationRuntime private constructor(
             }
             val taskRun = requireNotNull(snapshot.state.run.taskRuns[taskDefinitionId]) {
                 "Task ${taskDefinitionId.value} has no runtime state"
+            }
+            if (taskRun.awaitsNestedHumanApproval()) {
+                // The gate lives in the child run; the next cycle carries the decision back up.
+                val childRunId = requireNotNull(taskRun.externalRunId)
+                require(nestedWorkflows?.approvePendingHumanApproval(childRunId) == true) {
+                    "Nested workflow run $childRunId has no pending human approval"
+                }
+                return@withLock
             }
             require(taskRun.status == TaskRunStatus.AwaitingApproval) {
                 "Task ${taskDefinitionId.value} is not awaiting approval"
@@ -751,23 +763,35 @@ class ApplicationRuntime private constructor(
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                 )
-                val coordinator = WorkflowRuntimeCoordinator(
+                // Nested workflow nodes run child runs through this same engine and persistence.
+                // Each child gets its own coordinator because coordinator cycles are not reentrant.
+                lateinit var runtimeIntegrations: TaskExecutorIntegrationRegistry
+                fun newCoordinator() = WorkflowRuntimeCoordinator(
                     persistence = persistence,
                     engine = engine,
                     sessionGateway = gateway,
-                    executorIntegrations = effectiveExecutorIntegrations,
+                    executorIntegrations = runtimeIntegrations,
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                 )
+                val nestedWorkflows = WorkflowRunNestedWorkflowClient(
+                    persistence = persistence,
+                    engine = engine,
+                    coordinatorFactory = ::newCoordinator,
+                    nowEpochMillis = ::nowEpochMillis,
+                )
+                runtimeIntegrations = effectiveExecutorIntegrations
+                    .withIntegration(NestedWorkflowExecutorIntegration(nestedWorkflows))
                 return ApplicationRuntime(
                     persistence,
                     registry,
                     gateway,
                     engine,
-                    coordinator,
+                    newCoordinator(),
                     publisher,
                     runtimeScope,
                     roles,
+                    nestedWorkflows,
                 )
             }
 

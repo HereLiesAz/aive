@@ -185,10 +185,24 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 
 `TaskExecutor.NestedWorkflow` and composition (`WorkflowComposer.nest` / `inline`) ship. Inlined children become ordinary namespaced tasks and are validated with the parent. Their repository-operation approval rule and cycle detection therefore apply.
 
-No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkflow` node is therefore marked `Blocked` ("Nested workflow executor is not available in this runtime") rather than being dispatched.
+Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowClient`, registered in the shared `ApplicationRuntime`. Each node starts a child run of the referenced definition on the same engine and storage, and the child's result becomes the node's result.
+
+**Threats**
+- A workflow that nests itself, directly or through other workflows, starts child runs without end.
+- Deep nesting multiplies work and storage.
+- A child run could skip approvals the user expects to see.
+- A retried dispatch or a restart could start a second child run.
+
+**Mitigations in place**
+- Nesting deeper than four levels (`DEFAULT_MAX_DEPTH`) is refused.
+- Before a child starts, the nesting graph reachable from its definition is checked. The start is refused if the graph reaches the parent definition or contains any cycle, which also covers cycles through ancestors further up.
+- Refusals fail the node without retry.
+- `HumanApproval` tasks in a child run are ordinary gates that are never approved automatically. A pending gate is named on the parent node, and a person must approve it.
+- The child run ID is derived from the parent task run and attempt and stored as the node's external run ID. A repeated dispatch or a resume reattaches to the same child run.
 
 **Remaining gaps**
-- When a nested executor is wired, it needs recursion-depth limits and cycle detection across definitions, and approval gates must carry into the child run.
+- Plan approvals and failure escalations inside a child run are named on the parent node but can't be decided from it.
+- The child runs the stored definition without the preparation pass a direct launch applies.
 
 ### Distributed compute relay and executor
 
@@ -314,7 +328,7 @@ The following invariants must hold regardless of the integration used:
 - Per-session provider response content hashing to detect replay.
 - Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and signed approvals so workers can verify gates rather than trust the submitted run.
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.
-- Recursion limits and approval propagation for nested workflows once a `NestedWorkflowClient` is wired.
+- Deciding plan approvals and failure escalations inside nested child runs from the parent node.
 - Web credential protection against same-origin script (for example, a passphrase-derived key).
 
 ### Accepted risks
