@@ -39,6 +39,14 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
         "Circular dependency detected among tasks: ${taskIds.joinToString(" → ") { it.value }}. These tasks can never all complete."
 }
 
+/** Repository operations that only read; every other operation mutates and needs human approval. */
+val READ_ONLY_REPOSITORY_OPERATIONS: Set<String> = setOf("status", "fetch")
+
+fun TaskExecutor.RepositoryOperation.isMutation(): Boolean = operation.trim() !in READ_ONLY_REPOSITORY_OPERATIONS
+
+/** The executor that actually does the work: a [TaskExecutor.Distributed] placement is unwrapped. */
+fun TaskExecutor?.withoutPlacement(): TaskExecutor? = (this as? TaskExecutor.Distributed)?.delegate ?: this
+
 object WorkflowGraphValidator {
     fun validate(definition: WorkflowDefinition): List<WorkflowValidationError> {
         val errors = mutableListOf<WorkflowValidationError>()
@@ -82,10 +90,11 @@ object WorkflowGraphValidator {
                 errors += WorkflowValidationError.MissingConditionTarget(task.id, conditionTarget)
             }
 
-            val repositoryOperation = task.executor as? TaskExecutor.RepositoryOperation
+            // A repository operation placed on another device is still a repository operation.
+            val repositoryOperation = task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation
             if (
                 repositoryOperation != null &&
-                repositoryOperation.operation.trim() !in setOf("status", "fetch") &&
+                repositoryOperation.isMutation() &&
                 !hasHumanApprovalAncestor(task.id)
             ) {
                 errors += WorkflowValidationError.MissingRepositoryMutationApproval(task.id)

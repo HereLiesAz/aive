@@ -163,7 +163,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Audit provider payloads so users can see what context leaves the device before execution.
 - [x] Add optional redaction/exclusion rules for files/artifacts/context sent to providers.
 - [x] Add clear data deletion controls for local workflow state.
-- [x] Keep analytics/telemetry opt-in if product analytics are ever introduced; update the privacy policy before shipping any such collection. GitHub-release crash/ANR reporting is opt-in and disclosed in `docs/PRIVACY.md`; Play builds have none.
+- [x] Keep analytics/telemetry opt-in if product analytics are ever introduced; update the privacy policy before shipping any such collection. GitHub-release crash/ANR reporting is disclosed in `docs/PRIVACY.md`; Play builds have none.
+- [ ] At the production release, make GitHub-release crash/ANR reporting opt-in: set `CrashReportPolicy.DEFAULT_ENABLED = false` and update `docs/PRIVACY.md` (it is on by default during pre-release).
 - [x] Add dependency/security scanning without blocking development on noisy non-actionable findings.
 - [x] Threat-model repository write access, workflow injection, malicious artifacts, prompt injection, and compromised provider responses.
 

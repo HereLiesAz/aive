@@ -1,11 +1,16 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.ScriptRunner
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
+import com.hereliesaz.geministrator.workflow.isMutation
 import com.hereliesaz.geministrator.workflow.isSystemExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -26,10 +31,20 @@ fun interface DistributedWorkloadRunner {
     fun supports(envelope: DistributedTaskEnvelope): Boolean = true
 }
 
+/**
+ * Runs pool leases with this device's own integrations and credentials.
+ *
+ * A lease is only a request from another pool member, so it is re-checked here before anything
+ * runs: the workflow must validate, the task must really be a distributed placement of the
+ * delegated executor, a mutating repository operation must have a completed human-approval gate
+ * in the submitted run, and work that uses this device's repository credentials must target a
+ * repository of a project linked on this device ([trustedRepositories]).
+ */
 class SystemExecutorDistributedWorkloadRunner(
     private val integrations: TaskExecutorIntegrationRegistry,
     private val nowEpochMillis: () -> Long,
     private val pollIntervalMillis: Long = 1_000,
+    private val trustedRepositories: suspend () -> Collection<RepositoryRef> = { emptyList() },
 ) : DistributedWorkloadRunner {
     override fun supports(envelope: DistributedTaskEnvelope): Boolean =
         envelope.delegatedExecutor.isSystemExecutor() &&
@@ -40,6 +55,9 @@ class SystemExecutorDistributedWorkloadRunner(
         envelope: DistributedTaskEnvelope,
         onProgress: suspend (DistributedExecutionProgress) -> Unit,
     ): DistributedExecutionResult {
+        leaseRefusal(envelope)?.let { reason ->
+            return DistributedExecutionResult(status = TaskRunStatus.Failed, failureMessage = "Lease refused: $reason")
+        }
         val integration = integrations.integrationFor(envelope.delegatedExecutor, envelope.project)
             ?: return DistributedExecutionResult(
                 status = TaskRunStatus.Failed,
@@ -107,6 +125,56 @@ class SystemExecutorDistributedWorkloadRunner(
             execution = integration.reconcile(context())
         }
     }
+
+    private suspend fun leaseRefusal(envelope: DistributedTaskEnvelope): String? {
+        val definition = envelope.definition
+        if (WorkflowGraphValidator.validate(definition).isNotEmpty()) return "the submitted workflow does not validate"
+        val declared = definition.tasks.firstOrNull { it.id == envelope.task.id }
+            ?: return "the task is not part of the submitted workflow"
+        if ((declared.executor as? TaskExecutor.Distributed)?.delegate != envelope.delegatedExecutor) {
+            return "the task is not a distributed placement of the requested executor"
+        }
+        val delegate = envelope.delegatedExecutor
+        if (delegate is TaskExecutor.RepositoryOperation && delegate.isMutation() &&
+            !hasCompletedApprovalAncestor(envelope, declared.id)
+        ) {
+            return "repository operation '${delegate.operation}' has no completed human approval"
+        }
+        if (delegate.usesRepositoryCredentials()) {
+            val repository = envelope.project.repository ?: return "the project has no linked repository"
+            if (trustedRepositories().none { it.sameRepositoryAs(repository) }) {
+                return "${repository.owner}/${repository.name} is not linked to a project on this device"
+            }
+        }
+        return null
+    }
+
+    private fun hasCompletedApprovalAncestor(envelope: DistributedTaskEnvelope, taskId: TaskDefinitionId): Boolean {
+        val tasks = envelope.definition.tasks.associateBy { it.id }
+        val visited = mutableSetOf<TaskDefinitionId>()
+        fun visit(id: TaskDefinitionId): Boolean {
+            if (!visited.add(id)) return false
+            return tasks[id]?.dependsOn.orEmpty().any { dependencyId ->
+                val dependency = tasks[dependencyId] ?: return@any false
+                val approved = dependency.executor is TaskExecutor.HumanApproval &&
+                    envelope.run.taskRuns[dependencyId]?.status == TaskRunStatus.Completed
+                approved || visit(dependencyId)
+            }
+        }
+        return visit(taskId)
+    }
+
+    private fun TaskExecutor.usesRepositoryCredentials(): Boolean = when (this) {
+        is TaskExecutor.RepositoryOperation, is TaskExecutor.GitHubAction -> true
+        is TaskExecutor.Script -> runner is ScriptRunner.GitHubActions
+        else -> false
+    }
+
+    private fun RepositoryRef.sameRepositoryAs(other: RepositoryRef): Boolean =
+        source == other.source &&
+            owner.equals(other.owner, ignoreCase = true) &&
+            name.equals(other.name, ignoreCase = true) &&
+            (localPath == null || localPath == other.localPath)
 
     private fun TaskRun.apply(execution: TaskExecutorExecution): TaskRun = copy(
         status = execution.status,

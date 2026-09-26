@@ -12,7 +12,7 @@ Android ships in two flavors. The **GitHub release** flavor (APKs published on G
 
 - The current source does **not** include advertising SDKs.
 - The current source does **not** include third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry SDKs.
-- The GitHub release flavor for Android has **opt-in** crash/ANR reporting. It is off until you turn it on. It is first-party code that posts to a first-party relay, not a telemetry SDK. See [Crash and ANR reports](#crash-and-anr-reports-github-release-flavor-only).
+- The GitHub release flavor for Android has crash/ANR reporting that is **on by default while The Aive is pre-release**; you can turn it off in Settings. It becomes opt-in (off by default) with the production release. It is first-party code that posts to a first-party relay, not a telemetry SDK. See [Crash and ANR reports](#crash-and-anr-reports-github-release-flavor-only).
 - The Aive does **not** sell personal information.
 - Workflow state is stored locally by the application unless it must be sent to an external service to perform work you requested.
 - External providers process data under their own privacy policies and retention practices.
@@ -92,7 +92,7 @@ Google Play builds do not include the accessibility service or its manifest entr
 
 The Android GitHub release flavor includes automatic crash and app-not-responding (ANR) reporting. The Google Play, desktop, and web builds have no crash reporting.
 
-- **Opt-in.** Reporting is off until you turn on **Settings → Crash Reports**. While it is off, nothing is recorded or sent.
+- **On by default during pre-release.** Until the production release, reporting is on unless you turn off **Settings → Crash Reports**; from the production release it will be off until you turn it on. While it is off, nothing is recorded or sent.
 - **Destination.** Reports are sent over HTTPS to `https://workflows.hereliesaz.workers.dev/crash-report/aive`. This is a relay operated by the project maintainer. It files or deduplicates issues on the public `HereLiesAz/aive` GitHub issue tracker, so **report contents become publicly visible**. The app holds no GitHub credential. The fixed key it sends to the relay is a spam filter, not a secret.
 - **What is sent**, exactly:
   - package name
@@ -138,7 +138,7 @@ Repository secrets used by GitHub Actions remain within GitHub Actions and are n
 
 ## Analytics, advertising, and tracking
 
-The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The only diagnostics are the opt-in crash/ANR reports described above, and they exist only in the Android GitHub release flavor.
+The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The only diagnostics are the crash/ANR reports described above (on by default during pre-release, opt-in from the production release), and they exist only in the Android GitHub release flavor.
 
 The public web build may still be subject to ordinary infrastructure logging performed by its hosting platform or network intermediaries. The repository's GitHub Pages hosting and GitHub itself are governed by GitHub's own policies.
 

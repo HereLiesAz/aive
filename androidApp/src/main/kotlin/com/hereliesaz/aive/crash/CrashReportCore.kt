@@ -56,13 +56,13 @@ object CrashSignatures {
 }
 
 /**
- * Opt-in setting (off until the user enables it), first-report notice flag, and per-app-version signature dedup.
+ * On/off setting (default [DEFAULT_ENABLED]), first-report notice flag, and per-app-version signature dedup.
  * A signature is sent at most once per app version (crash loops file one report, not hundreds);
  * the relay adds server-side dedup across versions/devices by commenting on the open issue.
  */
 class CrashReportPolicy(private val store: CrashReportKeyValueStore, private val maxRemembered: Int = 200) {
     var enabled: Boolean
-        get() = store.getBoolean(KEY_ENABLED, false)
+        get() = store.getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
         set(value) = store.putBoolean(KEY_ENABLED, value)
 
     val firstReportNoticeShown: Boolean get() = store.getBoolean(KEY_NOTICE_SHOWN, false)
@@ -89,6 +89,12 @@ class CrashReportPolicy(private val store: CrashReportKeyValueStore, private val
     }
 
     companion object {
+        /**
+         * On by default while The Aive is pre-release (users can turn it off in Settings).
+         * Flip to false when the production release is published: reporting then becomes opt-in.
+         */
+        const val DEFAULT_ENABLED = true
+
         const val KEY_ENABLED = "auto-report-enabled"
         const val KEY_NOTICE_SHOWN = "first-report-notice-shown"
         const val KEY_SENT = "sent-signatures"

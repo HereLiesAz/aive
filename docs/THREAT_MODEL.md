@@ -20,7 +20,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | GitHub runner ↔ Agent/script | Prompt or script source, repository checkout, job token (runner only) | Inside the user's repository's Actions |
 | Device ↔ Local Git (desktop) | Snapshot reads, isolated worktrees, commits, bounded Git commands | Both (local) |
 | Device ↔ Compute relay ↔ Pool devices | Node descriptors, task lease envelopes, progress, results | Both |
-| Device ↔ Crash relay (Android GitHub flavor, opt-in) | Crash/ANR reports → public GitHub issues | Outbound |
+| Device ↔ Crash relay (Android GitHub flavor; on by default pre-release) | Crash/ANR reports → public GitHub issues | Outbound |
 | Device ↔ Gemini app (Android GitHub flavor, opt-in) | Prompt typed into Gemini, reply read from screen/clipboard | Both (on-device) |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
@@ -170,13 +170,12 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 **Mitigations in place**
 - Operation strings are parsed into a fixed vocabulary. Remote operations are REST calls. Local operations are fixed `ProcessBuilder` argument lists, not shell commands.
 - Branch names are validated: they cannot be empty, cannot start with `-`, and cannot contain NUL or newline characters.
-- `WorkflowGraphValidator` rejects any `RepositoryOperation` task other than `status` or `fetch` that lacks a `HumanApproval` ancestor.
+- `WorkflowGraphValidator` rejects any `RepositoryOperation` task other than `status` or `fetch` that lacks a `HumanApproval` ancestor, including one placed on another device through `TaskExecutor.Distributed`.
 - No remote operation merges, deletes, or force-pushes.
 - Remote repository credentials are scoped to `github.com` and `gitlab.com`.
 - Failures are normalized into failed tasks and follow the workflow's retry/escalation policy.
 
 **Remaining gaps**
-- The approval check inspects only `task.executor`. A `RepositoryOperation` wrapped in `TaskExecutor.Distributed` is not checked.
 - Operations do not reject protected branches up front. They rely on the host's branch protection.
 - Workspace agents (OpenCode, GitLab, Local, Jules) write branches without a `HumanApproval` task. Plan approval is optional per task.
 
@@ -195,7 +194,7 @@ No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkf
 
 **Threats**
 - Anyone holding the pool's shared bearer token can join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
-- A rogue member can publish leases that make sharing devices run repository operations or dispatch GitHub Actions, using those devices' credentials, against any repository named in the envelope.
+- A rogue member can publish leases that try to make sharing devices run repository operations or dispatch GitHub Actions with those devices' credentials.
 - A rogue member can re-register an existing node ID to displace it.
 - A worker can return fabricated results.
 - The relay can be reached over plain `ws://`.
@@ -206,12 +205,13 @@ No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkf
 - The relay requires `Authorization: Bearer <token>`. It rejects mismatched protocol versions and caps frames at 8 MiB.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued.
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
+- Workers re-check every lease before running it (`SystemExecutorDistributedWorkloadRunner`): the submitted workflow must validate; the task must be a distributed placement of the requested executor; a mutating repository operation needs a completed `HumanApproval` ancestor in the submitted run; and work that uses the worker's repository credentials (repository operations, GitHub Actions, GitHub-backed scripts) runs only against a repository of a project linked on the worker's own device. Anything else fails the lease as refused.
 - Relay tokens are stored in the platform credential store.
 
 **Remaining gaps**
 - There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted.
 - Envelopes are not end-to-end encrypted, so the relay operator sees them in plaintext.
-- Workers do not re-validate approval gates. They also do not restrict leases to projects linked on the worker.
+- A pool member can still forge a run that claims its approval gate completed; the worker cannot verify that without signed approvals. The allow-list limits the damage to repositories the worker's owner already linked.
 - Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
 
 ### Attached spreadsheet and SQL surfaces (role surfaces)
@@ -231,7 +231,7 @@ No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkf
 - Flowchart surfaces are read-only and parsed by The Aive rather than executing browser content.
 - Surface mutations are accepted only for declared writable aliases and are keyed by task run/attempt/index to suppress ordinary reconciliation replay.
 
-### Crash relay (Android GitHub flavor, opt-in)
+### Crash relay (Android GitHub flavor)
 
 **Threats**
 - Sensitive data leaks into a public issue through an exception message or ANR trace.
@@ -239,7 +239,7 @@ No shipped platform currently registers a `NestedWorkflowClient`. A `NestedWorkf
 - Reporting happens without consent.
 
 **Mitigations in place**
-- Reporting exists only in the GitHub flavor. It is off by default and must be enabled in Settings. Disabling it deletes pending reports.
+- Reporting exists only in the GitHub flavor and is disclosed in `docs/PRIVACY.md`. It is on by default until the production release (`CrashReportPolicy.DEFAULT_ENABLED`), then becomes opt-in. It can be turned off in Settings, which deletes pending reports.
 - The payload is fixed: device and app metadata, plus a stack trace truncated to 38,000 characters. No workflow content or credentials are added.
 - Historic ANRs are not backfilled on first enable.
 - The app holds no GitHub credential. The relay files issues with its own server-side token. The shipped relay key is only a spam filter.
@@ -310,8 +310,7 @@ The following invariants must hold regardless of the integration used:
 - Cryptographic signing of exported run bundles.
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Per-session provider response content hashing to detect replay.
-- Unwrap `TaskExecutor.Distributed` when enforcing the repository-mutation approval rule.
-- Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and worker-side approval re-validation and project allow-listing.
+- Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and signed approvals so workers can verify gates rather than trust the submitted run.
 - The OpenCode result artifact is parsed without the size bounds applied to script-runner results.
 - OpenCode resume looks only at the 50 most recent dispatches. A run older than that is not found and is dispatched again.
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.

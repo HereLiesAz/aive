@@ -34,7 +34,7 @@ Clients also send a node heartbeat every 15 s and reconnect with exponential bac
 
 ## What nodes accept
 
-Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Advertised `supportedExecutorKinds`:
+Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Before running a lease the runner re-checks it and refuses (fails the lease) unless the submitted workflow validates, the task really is a distributed placement of the requested executor, any mutating repository operation has a completed human-approval ancestor in the submitted run, and credential-using work (repository operations, GitHub Actions, GitHub-backed scripts) targets a repository of a project linked on the worker's own device. Advertised `supportedExecutorKinds`:
 
 - Android — `script`; `github-action` and `repository-operation` with a GitHub token; `repository-operation` with a GitLab token.
 - Desktop — `repository-operation`; `github-action` with a GitHub token.

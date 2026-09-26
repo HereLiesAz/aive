@@ -27,9 +27,11 @@ All notable changes to **The Aive** are documented here from the current product
 - GitHub repositories get an automatic coding agent: OpenCode (open source) runs headless on GitHub Actions with a free OpenCode Zen model, no key. Aive installs `.github/workflows/aive-opencode-agent.yml` on the default branch (and keeps it in step with the app), streams every agent step into the run's progress through a check run, and returns the work as a pushed `aive/opencode-*` branch plus patch. The GitHub token needs Contents, Actions, Checks and Workflows access.
 - Jules is never chosen automatically; it runs only where a role names it, since it reports almost nothing between plan approval and completion.
 - New hosted LLM providers with free tiers: Ollama Cloud, Z.ai (GLM-4.7-Flash), Cloudflare Workers AI (`ACCOUNT_ID:API_TOKEN`), and three that work with no key at all: Kilo Gateway, LLM7 and OVHcloud AI Endpoints. Keyless providers are linked by saving a blank key and are tried last for planning.
-- GitHub-release crash/ANR reporting is opt-in: off until enabled in Settings (it was on by default). It is disclosed in `docs/PRIVACY.md`; Play builds still have no crash reporter.
+- GitHub-release crash/ANR reporting stays on by default during pre-release (turn it off in Settings) and becomes opt-in at the production release (`CrashReportPolicy.DEFAULT_ENABLED`). It is now disclosed in `docs/PRIVACY.md`; Play builds still have no crash reporter.
 - The GitHub-release installed-Gemini accessibility bridge now shows a disclosure (what it reads, when, and where the text goes) before sending you to Accessibility settings, and stays inert unless the in-app opt-in is on. The disclosure, like the bridge, is absent from Play builds.
 - Documentation brought in line with shipped behavior (privacy policy, threat model, architecture, index, versioning, roadmap checkboxes); stray patch and CI-trigger files removed.
+- Repository operations placed on another device (`TaskExecutor.Distributed`) now need the same human approval as local ones.
+- Compute-pool workers re-check every lease before running it: the workflow must validate, a repository mutation needs a completed approval in the submitted run, and anything using the worker's repository credentials must target a repository of a project linked on that device.
 
 ## Foundation — before 0.9.6
 
