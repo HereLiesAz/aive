@@ -67,6 +67,8 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.onnxruntime.android)
             implementation(libs.cryptography.provider.jdk.bc)
+            // Overrides the provider's vulnerable transitive bcprov 1.83.
+            implementation(libs.bouncycastle.bcprov)
         }
 
         getByName("desktopMain").dependencies {

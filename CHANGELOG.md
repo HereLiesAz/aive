@@ -32,6 +32,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Documentation brought in line with shipped behavior (privacy policy, threat model, architecture, index, versioning, roadmap checkboxes); stray patch and CI-trigger files removed.
 - Repository operations placed on another device (`TaskExecutor.Distributed`) now need the same human approval as local ones.
 - Compute-pool workers re-check every lease before running it: the workflow must validate, a repository mutation needs a completed approval in the submitted run, and anything using the worker's repository credentials must target a repository of a project linked on that device.
+- BouncyCastle (`bcprov-jdk18on`, pulled in by the Android cryptography provider) is pinned to 1.86, fixing the five advisories on 1.83 (two critical, two high, one moderate).
 
 ## Foundation — before 0.9.6
 
