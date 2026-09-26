@@ -23,6 +23,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.events.TaskFailed
 import com.hereliesaz.geministrator.decideFailureEscalation
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
@@ -54,6 +55,10 @@ import kotlin.test.assertTrue
  * AIVE_LIVE_RUNTIME_VERIFICATION=1 and either AIVE_LIVE_PROVIDER, the first configured
  * OpenAI/Anthropic/Gemini/xAI credential, or a real local Ollama endpoint. Central acceptance
  * bootstraps Ollama automatically when no hosted-provider credential is configured.
+ *
+ * AIVE_LIVE_PROVIDER may also name any OpenAI-compatible hosted provider from
+ * [HostedLlmProviders] (e.g. `groq`, `llm7`). Its credential comes from
+ * AIVE_LIVE_HOSTED_CREDENTIAL; keyless providers (`llm7`, `kilo`, `ovhcloud`) need none.
  */
 class ProviderNeutralLiveRuntimeVerificationTest {
     @Test
@@ -107,13 +112,14 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         val releaseTaskId = TaskDefinitionId("release-approval")
 
         val (providerRunId, exportedProject) = try {
-            val awaitingApproval = awaitLive(firstRuntime, "initial provider plan approval") { live ->
+            val awaitingApproval = awaitLive(firstRuntime, "initial provider plan approval", failFastTask = providerTaskId) { live ->
                 live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
             val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(providerTaskId)
             assertEquals(WorkflowRunStatus.AwaitingHuman, awaitingApproval.presentation.run.status)
             assertEquals(null, taskRun.progress, "Provider plan/progress text must not fabricate a percentage")
             val runId = assertNotNull(taskRun.providerRunId)
+            println("[live] provider ${providerConfig.providerId.value} plan: ${taskRun.progressMessage}")
             val projectExport = assertNotNull(firstRuntime.exportCurrentProjectFile())
             runId to projectExport.content
         } finally {
@@ -139,7 +145,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         )
 
         try {
-            val resumed = awaitLive(resumedRuntime, "resumed provider plan approval") { live ->
+            val resumed = awaitLive(resumedRuntime, "resumed provider plan approval", failFastTask = providerTaskId) { live ->
                 live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
             assertEquals(
@@ -150,10 +156,13 @@ class ProviderNeutralLiveRuntimeVerificationTest {
 
             resumedRuntime.approveTask(providerTaskId)
 
-            val escalated = awaitLive(resumedRuntime, "failure escalation") { live ->
+            val escalated = awaitLive(resumedRuntime, "failure escalation", failFastTask = providerTaskId) { live ->
                 live.presentation.run.taskRuns.getValue(failOnceTaskId).status == TaskRunStatus.Escalated
             }
             assertEquals(TaskRunStatus.Completed, escalated.presentation.run.taskRuns.getValue(providerTaskId).status)
+            escalated.presentation.run.taskRuns.getValue(providerTaskId).artifacts.forEach { artifact ->
+                println("[live] provider artifact ${artifact.kind}: ${artifact.textContent?.take(400)}")
+            }
             assertEquals(WorkflowRunStatus.AwaitingHuman, escalated.presentation.run.status)
 
             resumedRuntime.decideFailureEscalation(
@@ -213,6 +222,14 @@ class ProviderNeutralLiveRuntimeVerificationTest {
     private fun liveProviderConfig(): LiveProviderConfig {
         val requested = System.getenv("AIVE_LIVE_PROVIDER")?.trim()?.lowercase().orEmpty()
         if (requested == "ollama") return ollamaProviderConfig()
+        HostedLlmProviders.entry(requested)?.let { spec ->
+            return LiveProviderConfig(
+                providerId = AgentProviderId(spec.id),
+                apiKey = System.getenv("AIVE_LIVE_HOSTED_CREDENTIAL")?.trim()?.takeIf(String::isNotEmpty)
+                    ?: com.hereliesaz.geministrator.ProviderCatalog.ANONYMOUS_CREDENTIAL,
+                model = System.getenv("AIVE_LIVE_HOSTED_MODEL")?.trim()?.takeIf(String::isNotEmpty),
+            )
+        }
 
         val candidates = listOf(
             "openai" to "OPENAI_API_KEY",
@@ -224,7 +241,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             candidates.firstOrNull { it.first == requested }
                 ?: error(
                     "AIVE_LIVE_PROVIDER must be one of: " +
-                        (candidates.map { it.first } + "ollama").joinToString(),
+                        (candidates.map { it.first } + "ollama" + HostedLlmProviders.entries.map { it.id }).joinToString(),
                 )
         } else {
             candidates.firstOrNull { (_, envName) -> !System.getenv(envName).isNullOrBlank() }
@@ -269,7 +286,9 @@ class ProviderNeutralLiveRuntimeVerificationTest {
                     baseUrl = checkNotNull(config.baseUrl) { "Ollama base URL is not configured" },
                 ),
             )
-            else -> error("Unsupported live provider ${config.providerId.value}")
+            else -> HostedLlmProviders.entry(config.providerId.value)?.let { spec ->
+                HostedLlmProviders.create(spec, config.apiKey, config.model ?: spec.defaultModel)
+            } ?: error("Unsupported live provider ${config.providerId.value}")
         }
     }
 
@@ -339,12 +358,24 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         runtime: ApplicationRuntime,
         label: String,
         timeoutMillis: Long = 300_000L,
+        /** Stop waiting as soon as this task fails, reporting the provider's reason instead of timing out. */
+        failFastTask: TaskDefinitionId? = null,
         predicate: (ApplicationRuntimeState.Live) -> Boolean,
     ): ApplicationRuntimeState.Live {
+        val startedAt = System.currentTimeMillis()
         val result = withTimeoutOrNull(timeoutMillis) {
             while (true) {
                 when (val state = runtime.state.value) {
-                    is ApplicationRuntimeState.Live -> if (predicate(state)) return@withTimeoutOrNull state
+                    is ApplicationRuntimeState.Live -> {
+                        if (predicate(state)) return@withTimeoutOrNull state
+                        if (failFastTask != null && state.presentation.run.taskRuns[failFastTask]?.status == TaskRunStatus.Failed) {
+                            val reason = runtime.loadRunTimeline()
+                                .filterIsInstance<TaskFailed>()
+                                .lastOrNull { it.taskDefinitionId == failFastTask }
+                                ?.reason
+                            error("$label failed because ${failFastTask.value} failed: ${reason ?: "no reason recorded"}")
+                        }
+                    }
                     is ApplicationRuntimeState.Disconnected ->
                         error("$label failed because runtime disconnected: ${state.message}")
                     is ApplicationRuntimeState.ResumeFailed ->
@@ -355,6 +386,8 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             }
             error("unreachable")
         }
+        // Printed evidence for the acceptance record (visible in the test report's system-out).
+        result?.let { println("[live] $label reached after ${System.currentTimeMillis() - startedAt} ms") }
         return result ?: error(
             "$label timed out after ${timeoutMillis}ms; last runtime state=${runtime.state.value}",
         )

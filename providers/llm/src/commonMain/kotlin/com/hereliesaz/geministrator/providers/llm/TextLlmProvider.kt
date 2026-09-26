@@ -242,19 +242,30 @@ open class TextLlmProvider(
         append("Return only the concrete work product for this assigned role. Do not claim repository access, shell execution, tests, or changes you did not actually perform.")
     }.trim()
 
+    /**
+     * The artifact kind for a text response: the task's declared artifact contract first, then the
+     * role, and only then keywords in the objective (matched as whole words, so "qa" does not match
+     * "equal" and role boilerplate mentioning failures does not turn a plan into a failure analysis).
+     */
     private fun inferArtifactKind(request: AgentTaskRequest): ArtifactKind {
         val roleId = request.orchestrationContext.roleId?.value
         val signal = "${request.roleInstructions}\n${request.objective}".lowercase()
+        when {
+            roleId == "hall-monitor" -> return ArtifactKind.HallMonitorReport
+            roleId == "antagonist" && "hall monitor" in signal -> return ArtifactKind.HallMonitorReview
+        }
+        request.requiredArtifacts.firstOrNull()?.let { return it }
+        ROLE_ARTIFACT_KINDS[roleId]?.let { return it }
+        val words = Regex("[a-z]+").findAll(request.objective.lowercase()).map { it.value }.toSet()
         return when {
-            roleId == "hall-monitor" -> ArtifactKind.HallMonitorReport
-            roleId == "antagonist" && "hall monitor" in signal -> ArtifactKind.HallMonitorReview
-            "release" in signal -> ArtifactKind.Release
-            "failure" in signal || "root cause" in signal -> ArtifactKind.FailureAnalysis
-            "verify" in signal || "verification" in signal || "qa" in signal -> ArtifactKind.Verification
-            "review" in signal -> ArtifactKind.Review
-            "architect" in signal || "architecture" in signal -> ArtifactKind.Architecture
-            "design" in signal || "ux" in signal -> ArtifactKind.Design
-            "requirement" in signal || "product" in signal -> ArtifactKind.Requirement
+            "release" in words -> ArtifactKind.Release
+            "failure" in words || "root" in words && "cause" in words -> ArtifactKind.FailureAnalysis
+            "verify" in words || "verification" in words || "qa" in words -> ArtifactKind.Verification
+            "review" in words -> ArtifactKind.Review
+            "architect" in words || "architecture" in words -> ArtifactKind.Architecture
+            "design" in words || "ux" in words -> ArtifactKind.Design
+            "requirement" in words || "requirements" in words || "product" in words -> ArtifactKind.Requirement
+            "plan" in words -> ArtifactKind.TaskPlan
             else -> ArtifactKind.Research
         }
     }
@@ -267,6 +278,20 @@ open class TextLlmProvider(
         ?.lowercase()
         ?.takeIf { it in setOf("pass", "revise", "reject") }
 }
+
+private val ROLE_ARTIFACT_KINDS: Map<String, ArtifactKind> = mapOf(
+    "orchestrator" to ArtifactKind.TaskPlan,
+    "product-manager" to ArtifactKind.Requirement,
+    "researcher" to ArtifactKind.Research,
+    "architect" to ArtifactKind.Architecture,
+    "epa-representative" to ArtifactKind.EnvironmentSpecification,
+    "ux-designer" to ArtifactKind.Design,
+    "qa-engineer" to ArtifactKind.Verification,
+    "adversarial-reviewer" to ArtifactKind.Review,
+    "code-reviewer" to ArtifactKind.Review,
+    "recovery-engineer" to ArtifactKind.FailureAnalysis,
+    "release-engineer" to ArtifactKind.Release,
+)
 
 class OpenAiProvider(
     apiKeyProvider: LlmApiKeyProvider,

@@ -44,6 +44,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Build and stage both JS and Wasm outputs for GitHub Pages.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
 - [ ] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
+  - Desktop JVM passed locally against Kilo Gateway on 2026-09-26 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). Still needs the centralized run, and Android, JS and Wasm.
 
 ## P0 — Compound inference foundation
 

@@ -78,6 +78,32 @@ class ProviderBackedManagedSessionGatewayTest {
     }
 
     @Test
+    fun providerFailureReasonIsKeptAsTheSessionsLastStatus() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = FailingProvider()
+        val handle = ManagedSessionHandle(
+            taskRunId = TaskRunId("failing-task"),
+            providerId = provider.id,
+            providerRunId = ProviderRunId("failing-run"),
+        )
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider)),
+                scope,
+            )
+            gateway.reconnect(handle, ManagedSessionStatus.Running)
+
+            withTimeout(2_000L) {
+                while (gateway.status(handle) != ManagedSessionStatus.Failed) delay(25L)
+            }
+
+            assertEquals("HTTP 503: upstream unavailable", gateway.progress(handle)?.message)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun requestAwareReconnectReconstructsProviderLocalSessionWithoutRedispatch() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = RecordingReconnectProvider()
@@ -221,6 +247,18 @@ private class PlanPreviewProvider : AgentProvider {
                 summary = "1. Inspect repository\n2. Implement approved change",
             ),
         )
+    }
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
+}
+
+private class FailingProvider : AgentProvider {
+    override val id = AgentProviderId("failing")
+    override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.RepositoryRead))
+    override suspend fun start(request: AgentTaskRequest) = AgentRunHandle(ProviderRunId("failing-run"))
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
+        emit(AgentEvent.Failed(runId, "HTTP 503: upstream unavailable"))
     }
     override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
     override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
