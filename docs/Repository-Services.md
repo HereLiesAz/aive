@@ -37,7 +37,7 @@ When both a GitLab repository credential and a supported LLM provider are connec
 
 GitLab workspace execution does not claim shell or test execution. Tests remain separate execution work until a GitLab CI executor is connected.
 
-GitLab.com and self-managed GitLab repository URLs are mapped to that host's `/api/v4` endpoint.
+Only GitLab.com is supported (`https://gitlab.com/api/v4`); repository operations reject other hosts, so self-managed GitLab instances do not work yet.
 
 ### Local Git
 
