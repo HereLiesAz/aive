@@ -22,7 +22,8 @@ prove the complete durable lifecycle:
 14. reconstruct the runtime again and prove the terminal result remains completed.
 
 The workflow is intentionally provider-neutral. It may use OpenAI, Anthropic, Gemini, or xAI when
-the corresponding credential is configured. When no hosted-provider credential is available, the
+the corresponding credential is configured, or a keyless provider (`kilo`, `llm7`, `ovhcloud`) when
+the `provider` dispatch input names one. When no hosted-provider credential is available, the
 central acceptance workflow bootstraps a real local Ollama server and exercises Aive's existing
 OpenAI-compatible provider transport against SmolLM2. Jules is not part of this acceptance
 requirement.
@@ -48,7 +49,6 @@ timeout.
   Plan gate reached in 12–18 s; the provider's artifact was a `TaskPlan`.
 - 2026-09-26, desktop JVM, LLM7 (no key): passed once (8.2 s), then failed on HTTP 503 and later
   HTTP 429 "Daily token quota exceeded". Anonymous keyless tiers are not reliable enough for a gate.
-
 These are local runs, not the centralized verification below.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
