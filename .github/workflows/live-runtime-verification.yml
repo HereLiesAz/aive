@@ -1,0 +1,139 @@
+name: Live Runtime Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Provider to verify (openai, anthropic, gemini, xai, ollama, or keyless kilo, llm7, ovhcloud); blank selects the first configured credential"
+        required: false
+        type: string
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: live-runtime-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-runtime:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'acceptance/live-runtime-verification') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AIVE_LIVE_RUNTIME_VERIFICATION: "1"
+      AIVE_LIVE_PROVIDER: ${{ inputs.provider }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Check out pinned h2g2
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/conveyance-h2g2
+          ref: 060231873e51d64082c43208a585a6ebb4a71ed5
+          path: vendor/conveyance-h2g2
+
+      - name: Check out pinned Conveyance
+        uses: actions/checkout@v7
+        with:
+          repository: HereLiesAz/Conveyance
+          ref: ec32af47a3dbe36fc87cd4643c54121ed702579d
+          path: vendor/conveyance-h2g2/vendor/Conveyance
+
+      - name: Select or bootstrap live provider
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          requested="${AIVE_LIVE_PROVIDER:-}"
+          use_ollama=false
+
+          if [ -n "$requested" ] && [ "$requested" != "ollama" ]; then
+            case "$requested" in
+              openai) required="${OPENAI_API_KEY:-}" ;;
+              anthropic) required="${ANTHROPIC_API_KEY:-}" ;;
+              gemini) required="${GEMINI_API_KEY:-}" ;;
+              xai) required="${XAI_API_KEY:-}" ;;
+              # Keyless hosted providers: the test links them without a credential.
+              kilo|llm7|ovhcloud) required="keyless" ;;
+              *)
+                echo "::error::AIVE_LIVE_PROVIDER must be one of: openai, anthropic, gemini, xai, ollama, kilo, llm7, ovhcloud"
+                exit 1
+                ;;
+            esac
+            test -n "$required" || {
+              echo "::error::The requested provider '$requested' has no configured credential."
+              exit 1
+            }
+          elif [ "$requested" = "ollama" ]; then
+            use_ollama=true
+          elif [ -z "${OPENAI_API_KEY:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${GEMINI_API_KEY:-}" ] && [ -z "${XAI_API_KEY:-}" ]; then
+            use_ollama=true
+          fi
+
+          if [ "$use_ollama" = true ]; then
+            echo "No hosted-provider credential selected; bootstrapping real local Ollama inference."
+            curl -fsSL https://ollama.com/install.sh | sh
+            nohup env OLLAMA_HOST=127.0.0.1:11434 ollama serve >"${RUNNER_TEMP}/ollama.log" 2>&1 &
+            for attempt in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then
+                break
+              fi
+              if [ "$attempt" -eq 60 ]; then
+                cat "${RUNNER_TEMP}/ollama.log" || true
+                echo "::error::Ollama did not become ready."
+                exit 1
+              fi
+              sleep 1
+            done
+            ollama pull smollm2:135m-instruct-q2_K
+
+            echo "AIVE_LIVE_PROVIDER=ollama" >> "$GITHUB_ENV"
+            echo "AIVE_LIVE_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1" >> "$GITHUB_ENV"
+            echo "AIVE_LIVE_OLLAMA_MODEL=smollm2:135m-instruct-q2_K" >> "$GITHUB_ENV"
+
+            response="$(curl -fsS http://127.0.0.1:11434/v1/chat/completions \
+              -H 'Content-Type: application/json' \
+              -d '{"model":"smollm2:135m-instruct-q2_K","messages":[{"role":"user","content":"Reply with OK."}],"stream":false}')"
+            python - "$response" <<'PY'
+          import json
+          import sys
+
+          payload = json.loads(sys.argv[1])
+          text = payload["choices"][0]["message"]["content"].strip()
+          if not text:
+              raise SystemExit("Ollama smoke response contained no assistant text")
+          print("Ollama live provider ready:", text[:120])
+          PY
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run live runtime lifecycle verification
+        run: |
+          ./gradlew \
+            :providers:llm:desktopTest \
+            --tests com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest \
+            --no-daemon \
+            --stacktrace
+
+      - name: Print live verification report on failure
+        if: failure()
+        shell: bash
+        run: |
+          find providers/llm/build/test-results -type f -name '*.xml' -print -exec cat {} \; || true

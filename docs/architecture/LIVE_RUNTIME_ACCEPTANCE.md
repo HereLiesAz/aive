@@ -22,7 +22,8 @@ prove the complete durable lifecycle:
 14. reconstruct the runtime again and prove the terminal result remains completed.
 
 The workflow is intentionally provider-neutral. It may use OpenAI, Anthropic, Gemini, or xAI when
-the corresponding credential is configured. When no hosted-provider credential is available, the
+the corresponding credential is configured, or a keyless provider (`kilo`, `llm7`, `ovhcloud`) when
+the `provider` dispatch input names one. When no hosted-provider credential is available, the
 central acceptance workflow bootstraps a real local Ollama server and exercises Aive's existing
 OpenAI-compatible provider transport against SmolLM2. Jules is not part of this acceptance
 requirement.
