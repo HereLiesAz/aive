@@ -49,6 +49,7 @@ timeout.
   Plan gate reached in 12–18 s; the provider's artifact was a `TaskPlan`.
 - 2026-09-26, desktop JVM, LLM7 (no key): passed once (8.2 s), then failed on HTTP 503 and later
   HTTP 429 "Daily token quota exceeded". Anonymous keyless tiers are not reliable enough for a gate.
+
 These are local runs, not the centralized verification below.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
