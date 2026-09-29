@@ -1,11 +1,5 @@
-package com.hereliesaz.aive
+package com.hereliesaz.geministrator.memory
 
-import com.hereliesaz.geministrator.memory.MemoryAttentionPolicy
-import com.hereliesaz.geministrator.memory.MemoryAttentionState
-import com.hereliesaz.geministrator.memory.MemoryNode
-import com.hereliesaz.geministrator.memory.MemoryNodeId
-import com.hereliesaz.geministrator.memory.MemoryNodeKind
-import com.hereliesaz.geministrator.memory.MemoryRecallHit
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

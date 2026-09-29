@@ -1,10 +1,6 @@
-package com.hereliesaz.aive
+package com.hereliesaz.geministrator.memory
 
-import com.hereliesaz.geministrator.memory.MemoryAttentionGate
-import com.hereliesaz.geministrator.memory.MemoryAttentionPolicy
-import com.hereliesaz.geministrator.memory.MemoryAttentionState
-import com.hereliesaz.geministrator.memory.MemoryNodeKind
-import com.hereliesaz.geministrator.memory.MemoryRecallHit
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 

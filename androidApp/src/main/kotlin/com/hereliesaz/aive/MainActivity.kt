@@ -367,6 +367,7 @@ class MainActivity : ComponentActivity() {
                             computeCredentialStore.clear()
                             computeToken = null
                         },
+                        memoryLayer = memoryRuntime.controller,
                         crashReportingSetting = if (CrashReporting.isSupported) {
                             CrashReportingSetting(crashReportingEnabled) { enabled ->
                                 CrashReporting.setEnabled(this, enabled)

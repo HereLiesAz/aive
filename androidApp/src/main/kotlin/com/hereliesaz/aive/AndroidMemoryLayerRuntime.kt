@@ -7,15 +7,14 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
-import com.hereliesaz.geministrator.memory.AgentMemoryLayer
 import com.hereliesaz.geministrator.memory.HostedMemoryGenerativeRuntime
-import com.hereliesaz.geministrator.memory.MemoryEngineAssembly
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLocalModelManager
+import com.hereliesaz.geministrator.memory.MemoryLocalModelStatus
 import com.hereliesaz.geministrator.memory.MemoryEngineProvider
-import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
 import com.hereliesaz.geministrator.memory.MemoryStageEngine
-import com.hereliesaz.geministrator.memory.assembleAgents
 import com.hereliesaz.geministrator.memory.SettingsMemoryStore
 import com.hereliesaz.geministrator.memory.androidSqlMemoryStore
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingInferenceRuntime
@@ -25,7 +24,6 @@ import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeModelAdapter
 import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.EmbeddingAssociationLinkerMicroAgent
 import com.hereliesaz.geministrator.memory.MemoryComputePreference
-import com.hereliesaz.geministrator.memory.MemoryConsolidationResult
 import com.hereliesaz.geministrator.memory.MemoryEmbeddingInferenceRequest
 import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
 import com.hereliesaz.geministrator.memory.MemoryGenerativeInferenceRequest
@@ -33,19 +31,7 @@ import com.hereliesaz.geministrator.memory.MemoryMicroAgent
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentArtifact
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
-import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
-import com.hereliesaz.geministrator.memory.MemoryPromptRecall
-import com.hereliesaz.geministrator.memory.MemoryQuery
-import com.hereliesaz.geministrator.memory.MemoryRecallHit
-import com.hereliesaz.geministrator.memory.MemoryResolution
-import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
-import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
-import com.hereliesaz.geministrator.providers.AgentEvent
-import com.hereliesaz.geministrator.providers.AgentTaskRequest
-import com.hereliesaz.geministrator.providers.PromptContextBlock
-import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
-import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
 import io.ktor.client.HttpClient
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -58,6 +44,9 @@ import java.nio.ShortBuffer
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
@@ -67,8 +56,6 @@ import kotlinx.coroutines.sync.withLock
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import kotlin.math.sqrt
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 internal data class InstalledMemoryModel(
     val role: MemoryMicroAgentRole,
@@ -86,6 +73,19 @@ internal class AndroidMemoryModelInstaller(
     private val installedByArtifactId = ConcurrentHashMap<String, InstalledMemoryModel>()
     private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()
+
+    /** Installed and complete, without downloading. */
+    fun isInstalled(role: MemoryMicroAgentRole): Boolean {
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        return findInstalled(role, bundle, File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}")) != null
+    }
+
+    suspend fun remove(role: MemoryMicroAgentRole) = mutex.withLock {
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        installedByArtifactId.remove(bundle.runtimeArtifactId)
+        File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
+        File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
+    }
 
     suspend fun ensureInstalled(role: MemoryMicroAgentRole): InstalledMemoryModel = mutex.withLock {
         val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
@@ -458,6 +458,49 @@ internal class AndroidEpoch8EmbeddingAdapter(
         OnnxTensor.createTensor(environment, LongBuffer.wrap(values), shape)
 }
 
+/** Epoch-8 on-device clerks: what is installed, and downloads/removals on request. */
+private class AndroidMemoryLocalModels(
+    private val installer: AndroidMemoryModelInstaller,
+    private val scope: CoroutineScope,
+) : MemoryLocalModelManager {
+    private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
+    override val models: StateFlow<List<MemoryLocalModelStatus>> = mutableModels.asStateFlow()
+
+    init {
+        scope.launch { refresh() }
+    }
+
+    override suspend fun install(role: MemoryMicroAgentRole) {
+        mark(role) { it.copy(installing = true, error = null) }
+        val failure = runCatching { installer.ensureInstalled(role) }.exceptionOrNull()
+        refresh()
+        failure?.let { error -> mark(role) { it.copy(error = error.message ?: error::class.simpleName) } }
+    }
+
+    override suspend fun remove(role: MemoryMicroAgentRole) {
+        installer.remove(role)
+        refresh()
+    }
+
+    private fun refresh() {
+        mutableModels.value = MemoryEpoch8ModelCatalog.all.map { bundle ->
+            MemoryLocalModelStatus(
+                role = bundle.role,
+                name = bundle.releaseAssetName,
+                installed = installer.isInstalled(bundle.role),
+            )
+        }
+    }
+
+    private fun mark(role: MemoryMicroAgentRole, change: (MemoryLocalModelStatus) -> MemoryLocalModelStatus) {
+        mutableModels.value = mutableModels.value.map { if (it.role == role) change(it) else it }
+    }
+}
+
+/**
+ * Android's memory: the shared [MemoryLayerController] over the SQLite store, with the epoch-8
+ * clerks as the local engine and the app's providers as the hosted engine.
+ */
 internal class AndroidMemoryLayerRuntime(
     context: Context,
     httpClient: HttpClient,
@@ -480,6 +523,7 @@ internal class AndroidMemoryLayerRuntime(
         artifactResolver = resolver,
         modelAdapter = AndroidEpoch8EmbeddingAdapter(installer),
     )
+
     /**
      * Answers hosted memory stages: (providerId or null for the default, model or null, prompt) to
      * text. Set by the activity once provider credentials are known; unset means hosted stages fail
@@ -505,8 +549,6 @@ internal class AndroidMemoryLayerRuntime(
             }
     }
 
-    /** The user's memory setup; see [updateSettings]. */
-    val settings = MemoryLayerSettingsStore.createDefault()
     /**
      * SQLite store. Built on the IO dispatcher (see MainActivity), so the one-time import of the
      * older Settings-backed graph runs before anything can bank into the new database.
@@ -514,162 +556,23 @@ internal class AndroidMemoryLayerRuntime(
     private val store = androidSqlMemoryStore(context).also { store ->
         runBlocking { store.importLegacy(SettingsMemoryStore.createDefault()) }
     }
-    private val drainMutex = Mutex()
 
-    /** What each stage actually runs after fallbacks, for display. */
-    @Volatile
-    var engines: MemoryEngineAssembly = settings.state.value.assembleAgents(engineProvider)
-        private set
+    /** The memory layer the Memory screen controls. */
+    val controller = MemoryLayerController(
+        store = store,
+        settingsStore = MemoryLayerSettingsStore.createDefault(),
+        engineProvider = engineProvider,
+        scope = scope,
+        localModels = AndroidMemoryLocalModels(installer, scope),
+    )
 
-    @Volatile
-    private var layer = AgentMemoryLayer.createWithMicroAgents(store, engines.agents, settings.state.value.policy)
+    fun attach() = controller.attach()
 
-    /** Applies a settings change: the layer is rebuilt between packets, never during one. */
-    suspend fun updateSettings(transform: (MemoryLayerSettings) -> MemoryLayerSettings) {
-        drainMutex.withLock {
-            val next = settings.update(transform)
-            engines = next.assembleAgents(engineProvider)
-            layer = AgentMemoryLayer.createWithMicroAgents(store, engines.agents, next.policy)
-        }
-        scope.launch { drainConsolidationQueue() }
-    }
-
-    private val active: Boolean get() = settings.state.value.enabled
-    /** Attention Deficit Dial state, one per agent (task run). Adjust via [setAttentionLevel]. */
-    val attention = PerAgentAttention()
-
-    /** Turns the dial for agents that have not started yet. */
-    fun setDefaultAttentionLevel(level: Float) { attention.defaultLevel = level }
-
-    /** Turns one running agent's dial persistently. */
-    suspend fun setAttentionLevel(taskRunId: String, level: Float) = attention.setLevel(taskRunId, level)
-
-    /** Temporarily lowers one agent's dial; its own token use recovers it. */
-    suspend fun suppressAttention(taskRunId: String, level: Float) = attention.suppress(taskRunId, level)
-
-    val observer: MemorySessionObserver = object : MemorySessionObserver {
-        override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
-            if (!active) return
-            layer.sessionObserver.onSessionStarted(handle, request)
-        }
-
-        override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
-            if (!active) return
-            layer.sessionObserver.onSessionEvent(handle, event)
-            val text = when (event) {
-                is AgentEvent.Message -> event.content
-                is AgentEvent.PlanGenerated -> event.summary
-                else -> null
-            }
-            attention.forAgent(handle.taskRunId.value).consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
-        }
-
-        override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
-            if (!active) return
-            layer.sessionObserver.onSessionFinished(handle, status)
-            attention.forget(handle.taskRunId.value)
-            scope.launch { drainConsolidationQueue() }
-        }
-    }
-
-    private val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
-        if (!active) return@MemoryPromptContextProvider MemoryPromptRecall()
-        val context = request.orchestrationContext
-        // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
-        val agentAttention = attention.forAgent(request.taskRunId.value)
-        agentAttention.consumeTokens(
-            AttentionGatedRecall.approximateTokens(
-                request.objective + request.roleInstructions,
-                APPROXIMATE_CHARS_PER_TOKEN,
-            ),
-        )
-        val hitsById = linkedMapOf<String, MemoryRecallHit>()
-
-        queryPlan.queries.forEach { querySpec ->
-            val resolution = when (querySpec.resolution) {
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.Category -> MemoryResolution.Category
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.Summary -> MemoryResolution.Summary
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.Phrase -> MemoryResolution.Phrase
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.Entity,
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.Action,
-                -> MemoryResolution.Tag
-                com.hereliesaz.geministrator.orchestration.MemoryResolution.GranularEvidence -> MemoryResolution.Context
-            }
-            val recall = layer.tool.grip(
-                MemoryQuery(
-                    text = querySpec.text,
-                    resolution = resolution,
-                    maxResults = MAX_RECALL_RESULTS,
-                    projectId = context.projectId?.value,
-                    workflowRunId = context.workflowRunId?.value,
-                    workflowDefinitionId = context.workflowDefinitionId?.value,
-                    taskRunId = request.taskRunId.value,
-                    taskDefinitionId = context.taskDefinitionId?.value,
-                    roleId = context.roleId?.value,
-                ),
-            )
-            recall.hits.forEach { hit ->
-                val key = hit.node.id.value
-                val current = hitsById[key]
-                if (current == null || hit.score > current.score) {
-                    hitsById[key] = hit
-                }
-            }
-        }
-
-        val ranked = hitsById.values
-            .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
-            .take(MAX_RECALL_RESULTS)
-        // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
-        val hits = agentAttention.select(ranked)
-
-        if (hits.isEmpty()) {
-            MemoryPromptRecall()
-        } else {
-            val content = hits.joinToString("\n\n") { hit ->
-                "[${"%.2f".format(hit.score)}] ${hit.node.kind.name}: ${hit.node.text}"
-            }.take(MAX_RECALL_CHARS)
-            MemoryPromptRecall(
-                blocks = listOf(PromptContextBlock("Relevant memory", content)),
-                memoryAddresses = hits
-                    .mapTo(linkedSetOf()) { hit -> "memory-node:${hit.node.id.value}" },
-                maxContextTokens = MAX_RECALL_CHARS / APPROXIMATE_CHARS_PER_TOKEN,
-            )
-        }
-    }
-
-    fun attach() {
-        MemoryRuntimeBridge.observer = observer
-        MemoryRuntimeBridge.promptContextProvider = promptContextProvider
-        scope.launch { drainConsolidationQueue() }
-    }
-
-    fun detach() {
-        if (MemoryRuntimeBridge.observer === observer) {
-            MemoryRuntimeBridge.reset()
-        }
-    }
-
-    @OptIn(ExperimentalTime::class)
-    private suspend fun drainConsolidationQueue() = drainMutex.withLock {
-        while (true) {
-            if (!active || settings.state.value.consolidationPaused) return@withLock
-            when (layer.consolidateOne(Clock.System.now().toEpochMilliseconds())) {
-                MemoryConsolidationResult.Idle -> return@withLock
-                else -> Unit
-            }
-        }
-    }
+    fun detach() = controller.detach()
 
     override fun close() {
         detach()
         scope.cancel()
         sessionManager.close()
-    }
-
-    private companion object {
-        const val MAX_RECALL_RESULTS = 6
-        const val MAX_RECALL_CHARS = 6_000
-        const val APPROXIMATE_CHARS_PER_TOKEN = 4
     }
 }

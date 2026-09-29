@@ -56,6 +56,16 @@ import kotlinx.coroutines.CancellationException
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
+import com.hereliesaz.geministrator.providers.llm.memoryTextApi
+import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
+import com.hereliesaz.geministrator.memory.desktopSqlMemoryStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
@@ -82,6 +92,16 @@ fun main() {
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationUtilities = DesktopOrchestrationSpecialists.utilities(DesktopOrchestrationSpecialistInstaller(httpClient))
+    // Memory: SQLite under ~/.aive/memory, programmatic stages by default, hosted stages on request.
+    // Attached before App builds the runtime, whose session gateway captures the observer.
+    val memoryEngines = HostedMemoryEngineProvider(desktopMemoryPlatform())
+    val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val memoryLayer = MemoryLayerController(
+        store = desktopSqlMemoryStore(),
+        settingsStore = MemoryLayerSettingsStore.createDefault(),
+        engineProvider = memoryEngines,
+        scope = memoryScope,
+    ).also { it.attach() }
 
     try {
         application {
@@ -173,6 +193,13 @@ fun main() {
                         )
                     } else {
                         cloud
+                    }
+                }
+                LaunchedEffect(credentials) {
+                    memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
+                        val api = memoryTextApi(credentials, providerId, model)
+                            ?: error("Memory provider ${providerId ?: "(default)"} is not configured")
+                        api.generate(prompt).text
                     }
                 }
                 val localPlannerSetting = LocalPlannerSetting(
@@ -274,11 +301,14 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
+                        memoryLayer = memoryLayer,
                     )
                 }
             }
         }
     } finally {
+        memoryLayer.detach()
+        memoryScope.cancel()
         localPlanner.close()
         httpClient.close()
     }
@@ -551,3 +581,12 @@ private fun desktopDistributedExecutorKinds(
 
 private fun Map<String, String>.cleanKey(id: String): String? =
     this[id]?.trim()?.takeIf(String::isNotEmpty)
+
+private fun desktopMemoryPlatform(): MemoryMicroAgentPlatform {
+    val os = System.getProperty("os.name", "").lowercase()
+    return when {
+        "win" in os -> MemoryMicroAgentPlatform.Windows
+        "mac" in os -> MemoryMicroAgentPlatform.MacOS
+        else -> MemoryMicroAgentPlatform.Linux
+    }
+}

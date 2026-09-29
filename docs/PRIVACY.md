@@ -40,7 +40,7 @@ The current persistence backend uses platform-local storage:
 - Desktop/JVM: Java Preferences
 - Web: browser localStorage
 
-Agent memory (banked session text and the graph derived from it) is kept in a SQLite database: on Android, `aive-memory.db` in the app's private database directory; on desktop, `~/.aive/memory/memory.db`. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.
+Agent memory (banked session text and the graph derived from it) is kept in a SQLite database: on Android, `aive-memory.db` in the app's private database directory; on desktop, `~/.aive/memory/memory.db`. On the web it is kept in browser localStorage. The Memory screen can export, forget or clear it. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.
 
 Memory stages run on-device by default. If you set a memory stage to a hosted model, the text of each packet that stage processes (bounded excerpts of banked session text or memory nodes) is sent to the provider you chose for that stage.
 

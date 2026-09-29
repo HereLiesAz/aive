@@ -167,3 +167,18 @@ class HostedMemoryGenerativeRuntime(
         }
     }
 }
+
+/**
+ * Engines for platforms without on-device memory models: hosted stages call [hostedTextGenerator],
+ * which the app sets from its current provider credentials; local stages fall back to programmatic.
+ */
+class HostedMemoryEngineProvider(private val platform: MemoryMicroAgentPlatform) : MemoryEngineProvider {
+    /** (providerId or null for the default, model or null, prompt) to text. */
+    var hostedTextGenerator: (suspend (providerId: String?, model: String?, prompt: String) -> String)? = null
+
+    override fun hostedAgent(role: MemoryMicroAgentRole, engine: MemoryStageEngine): MemoryMicroAgent =
+        HostedMemoryGenerativeRuntime.agent(role, engine, platform) { prompt ->
+            val generate = hostedTextGenerator ?: error("No hosted provider is configured for memory")
+            generate(engine.providerId, engine.model, prompt)
+        }
+}

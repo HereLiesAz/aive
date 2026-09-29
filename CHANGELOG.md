@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Added a Memory screen on every platform: the memory pipeline live in the terrarium, per-stage engines, tuning, queue retry/discard, on-device model install/remove, and forget/export/import of stored memory. Desktop and web now have memory.
 - Memory stages default to deterministic on-device clerks (no download) and can each be switched to a local model or a configured hosted provider; memory can be turned off or its consolidation paused.
 - Moved agent memory to SQLite (SQLDelight) with a one-time import of the older graph, and made memory commits, recall and association refresh substantially faster.
 - Added composable role execution/data surfaces: AI providers, GitHub Actions, isolated JavaScript, and GitHub-backed JavaScript/Python can share attached CSV/TSV/XLSX/public Google Sheets, SQLite query surfaces, and native Mermaid flowcharts; writable local spreadsheet/SQLite surfaces accept replay-safe script mutations.

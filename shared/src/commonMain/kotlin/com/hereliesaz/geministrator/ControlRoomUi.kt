@@ -60,6 +60,7 @@ enum class ControlRoomDestination(val label: String) {
     Inbox("Inbox"),
     Repositories("Repositories"),
     Compute("Compute"),
+    Memory("Memory"),
     AddOns("AZPHALT STORE"),
     Settings("Settings"),
 }
@@ -141,6 +142,7 @@ fun ControlRoom(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -208,6 +210,7 @@ fun ControlRoom(
                     onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     crashReportingSetting = crashReportingSetting,
                     localPlannerSetting = localPlannerSetting,
+                    memoryLayer = memoryLayer,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -268,6 +271,7 @@ fun ControlRoom(
                     onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     crashReportingSetting = crashReportingSetting,
                     localPlannerSetting = localPlannerSetting,
+                    memoryLayer = memoryLayer,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -422,6 +426,7 @@ private fun MainDestination(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -487,6 +492,11 @@ private fun MainDestination(
                 onAssignWorkflow = onAssignWorkflowCompute,
                 onAssignRole = onAssignRoleCompute,
                 onAssignTask = onAssignTaskCompute,
+                modifier = Modifier.fillMaxSize(),
+            )
+            ControlRoomDestination.Memory -> MemoryLayerScreen(
+                controller = memoryLayer,
+                connectedProviderIds = connectedProviderIds,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.AddOns -> AzphaltStoreScreen(

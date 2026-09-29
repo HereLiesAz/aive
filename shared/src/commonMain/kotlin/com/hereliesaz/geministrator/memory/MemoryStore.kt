@@ -16,6 +16,12 @@ interface MemoryStore {
 
     /** Returns false when [expectedRevision] is stale. */
     suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation): Boolean
+
+    /**
+     * Replaces the whole graph: import, forgetting an episode, clearing. The only operation that can
+     * remove records; ordinary consolidation is append-only.
+     */
+    suspend fun replace(snapshot: MemorySnapshot)
 }
 
 class InMemoryMemoryStore(
@@ -23,7 +29,7 @@ class InMemoryMemoryStore(
 ) : MemoryStore {
     private val mutex = Mutex()
     private var snapshot = initial
-    private val ids = MemoryIdIndex(initial)
+    private var ids = MemoryIdIndex(initial)
 
     override suspend fun read(): MemorySnapshot = mutex.withLock { snapshot }
 
@@ -33,6 +39,13 @@ class InMemoryMemoryStore(
             snapshot = snapshot.applyMutation(mutation, ids)
             true
         }
+
+    override suspend fun replace(snapshot: MemorySnapshot) {
+        mutex.withLock {
+            this.snapshot = snapshot
+            ids = MemoryIdIndex(snapshot)
+        }
+    }
 }
 
 class MemoryStoreCorruptionException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
@@ -83,8 +96,7 @@ class SettingsMemoryStore(
             true
         }
 
-    /** Replaces the whole graph (import, forget, clear). */
-    suspend fun replace(snapshot: MemorySnapshot) {
+    override suspend fun replace(snapshot: MemorySnapshot) {
         mutex.withLock {
             loadUnlocked()
             writeCompacted(snapshot)

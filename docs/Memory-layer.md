@@ -88,6 +88,25 @@ Every abstraction must preserve provenance so a later agent can descend back to 
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
 
+### Memory screen
+
+The **Memory** destination (every platform) is the whole layer in one place, driven by the shared
+`MemoryLayerController`:
+
+- **Terrarium:** an intake plus one creature per stage, in pipeline order. A creature is active while
+  its stage processes a packet, ready while entries wait for it, blocked when entries are parked
+  there, and complete once it has produced memories; the link into the working stage carries.
+- **Engines:** tap a creature to choose Programmatic, Local model or Hosted (with provider and model)
+  for each of its clerks; fallbacks and their reasons are shown.
+- **Queue:** waiting and parked counts; retry or discard parked entries.
+- **Tuning:** attempts before parking, packet size, similarity needed to condense, batch size.
+- **On-device models:** install or remove each clerk's model where the platform has them (Android).
+- **Stored memory:** counts, forget one episode (and what came only from it), export/import JSON,
+  forget everything. Memory can be switched off or its consolidation paused.
+
+Android and desktop store memory in SQLite; the web build uses browser storage until the SQLite
+worker is wired.
+
 ### Engines
 
 Every stage runs on one of three engines, chosen per stage in `MemoryLayerSettings`
