@@ -41,12 +41,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeSource
 
 /**
  * Opt-in live acceptance test for the production runtime through the shared provider contract.
@@ -59,12 +62,22 @@ import kotlin.test.assertTrue
  * AIVE_LIVE_PROVIDER may also name any OpenAI-compatible hosted provider from
  * [HostedLlmProviders] (e.g. `groq`, `llm7`). Its credential comes from
  * AIVE_LIVE_HOSTED_CREDENTIAL; keyless providers (`llm7`, `kilo`, `ovhcloud`) need none.
+ *
+ * The test lives in the common test tree and runs on every target. Settings are read through
+ * [liveEnv]: the process environment on desktop, instrumentation arguments on an Android device,
+ * and the Karma client configuration (`karma.config.d/live-runtime-verification.js`) in JS and
+ * Wasm browsers. Browsers enforce CORS, so there only providers that allow cross-origin calls work
+ * (`llm7`, `ovhcloud`; Kilo sends no CORS headers). All waiting uses real time on
+ * [Dispatchers.Default], never the virtual time of the test scheduler.
  */
 class ProviderNeutralLiveRuntimeVerificationTest {
     @Test
-    fun launchApproveExecuteEscalateRestartResumeAndComplete() = runBlocking {
-        if (System.getenv(OPT_IN_ENV) != "1") return@runBlocking
+    fun launchApproveExecuteEscalateRestartResumeAndComplete() = runTest(timeout = 30.minutes) {
+        if (liveEnv(OPT_IN_ENV) != "1") return@runTest
+        withContext(Dispatchers.Default) { verifyLiveRuntime() }
+    }
 
+    private suspend fun verifyLiveRuntime() {
         val providerConfig = liveProviderConfig()
 
         val settings = MapSettings()
@@ -220,14 +233,14 @@ class ProviderNeutralLiveRuntimeVerificationTest {
     )
 
     private fun liveProviderConfig(): LiveProviderConfig {
-        val requested = System.getenv("AIVE_LIVE_PROVIDER")?.trim()?.lowercase().orEmpty()
+        val requested = liveEnv("AIVE_LIVE_PROVIDER")?.trim()?.lowercase().orEmpty()
         if (requested == "ollama") return ollamaProviderConfig()
         HostedLlmProviders.entry(requested)?.let { spec ->
             return LiveProviderConfig(
                 providerId = AgentProviderId(spec.id),
-                apiKey = System.getenv("AIVE_LIVE_HOSTED_CREDENTIAL")?.trim()?.takeIf(String::isNotEmpty)
+                apiKey = liveEnv("AIVE_LIVE_HOSTED_CREDENTIAL")?.trim()?.takeIf(String::isNotEmpty)
                     ?: com.hereliesaz.geministrator.ProviderCatalog.ANONYMOUS_CREDENTIAL,
-                model = System.getenv("AIVE_LIVE_HOSTED_MODEL")?.trim()?.takeIf(String::isNotEmpty),
+                model = liveEnv("AIVE_LIVE_HOSTED_MODEL")?.trim()?.takeIf(String::isNotEmpty),
             )
         }
 
@@ -244,10 +257,10 @@ class ProviderNeutralLiveRuntimeVerificationTest {
                         (candidates.map { it.first } + "ollama" + HostedLlmProviders.entries.map { it.id }).joinToString(),
                 )
         } else {
-            candidates.firstOrNull { (_, envName) -> !System.getenv(envName).isNullOrBlank() }
+            candidates.firstOrNull { (_, envName) -> !liveEnv(envName).isNullOrBlank() }
                 ?: return ollamaProviderConfig()
         }
-        val apiKey = System.getenv(selected.second)?.trim().orEmpty()
+        val apiKey = liveEnv(selected.second)?.trim().orEmpty()
         check(apiKey.isNotEmpty()) {
             "${selected.second} is required for AIVE_LIVE_PROVIDER=${selected.first}"
         }
@@ -260,11 +273,11 @@ class ProviderNeutralLiveRuntimeVerificationTest {
     private fun ollamaProviderConfig(): LiveProviderConfig = LiveProviderConfig(
         providerId = AgentProviderId("ollama"),
         apiKey = "ollama",
-        baseUrl = System.getenv("AIVE_LIVE_OLLAMA_BASE_URL")
+        baseUrl = liveEnv("AIVE_LIVE_OLLAMA_BASE_URL")
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: "http://127.0.0.1:11434/v1",
-        model = System.getenv("AIVE_LIVE_OLLAMA_MODEL")
+        model = liveEnv("AIVE_LIVE_OLLAMA_MODEL")
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?: "smollm2:135m-instruct-q2_K",
@@ -362,7 +375,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         failFastTask: TaskDefinitionId? = null,
         predicate: (ApplicationRuntimeState.Live) -> Boolean,
     ): ApplicationRuntimeState.Live {
-        val startedAt = System.currentTimeMillis()
+        val startedAt = TimeSource.Monotonic.markNow()
         val result = withTimeoutOrNull(timeoutMillis) {
             while (true) {
                 when (val state = runtime.state.value) {
@@ -387,7 +400,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             error("unreachable")
         }
         // Printed evidence for the acceptance record (visible in the test report's system-out).
-        result?.let { println("[live] $label reached after ${System.currentTimeMillis() - startedAt} ms") }
+        result?.let { println("[live] $label reached after ${startedAt.elapsedNow().inWholeMilliseconds} ms") }
         return result ?: error(
             "$label timed out after ${timeoutMillis}ms; last runtime state=${runtime.state.value}",
         )

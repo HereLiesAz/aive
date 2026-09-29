@@ -8,7 +8,7 @@ import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -44,7 +44,7 @@ class TextLlmProviderArtifactKindTest {
     )
 
     @Test
-    fun declaredArtifactWinsOverRoleAndKeywords() = runBlocking<Unit> {
+    fun declaredArtifactWinsOverRoleAndKeywords() = runTest {
         assertEquals(
             ArtifactKind.TaskPlan,
             kindFor(request("Analyse the failure and release it", roleId = "qa-engineer", required = setOf(ArtifactKind.TaskPlan))),
@@ -52,7 +52,7 @@ class TextLlmProviderArtifactKindTest {
     }
 
     @Test
-    fun roleWinsOverKeywordsInInstructions() = runBlocking<Unit> {
+    fun roleWinsOverKeywordsInInstructions() = runTest {
         // Instructions that mention failure recovery must not turn an orchestrator's plan into a failure analysis.
         assertEquals(
             ArtifactKind.TaskPlan,
@@ -67,7 +67,7 @@ class TextLlmProviderArtifactKindTest {
     }
 
     @Test
-    fun keywordsReadOnlyTheObjectiveAsWholeWords() = runBlocking<Unit> {
+    fun keywordsReadOnlyTheObjectiveAsWholeWords() = runTest {
         assertEquals(
             ArtifactKind.Research,
             kindFor(request("Summarise prerelease notes", instructions = "Mention any failure or QA concern.")),

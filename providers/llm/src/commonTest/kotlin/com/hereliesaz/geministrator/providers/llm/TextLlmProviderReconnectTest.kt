@@ -7,7 +7,7 @@ import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class TextLlmProviderReconnectTest {
     @Test
-    fun reconstructedApprovedSessionResumesSameProviderRunWithoutRedispatch() = runBlocking {
+    fun reconstructedApprovedSessionResumesSameProviderRunWithoutRedispatch() = runTest {
         var calls = 0
         val api = object : TextGenerationApi {
             override suspend fun generate(prompt: String): TextGenerationResult {

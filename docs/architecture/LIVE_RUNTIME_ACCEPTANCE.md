@@ -39,6 +39,49 @@ AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=kilo \
   ./gradlew :providers:llm:desktopTest --tests '*ProviderNeutralLiveRuntimeVerificationTest'
 ~~~
 
+The test lives in `providers/llm/src/commonTest` and runs on every target. Each target reads the
+same settings from a different place: desktop from the process environment, an Android device from
+instrumentation arguments, and JS/Wasm browsers from the Karma client configuration that
+`providers/llm/karma.config.d/live-runtime-verification.js` fills from the Gradle environment. With
+`AIVE_LIVE_RUNTIME_VERIFICATION` unset the test skips on every target, and a live run never reuses an
+up-to-date or cached Gradle test result.
+
+Browsers enforce CORS. The Kilo Gateway (`https://api.kilo.ai/api/gateway`) sends no
+`Access-Control-Allow-Origin` header, so it cannot be called from a browser; the keyless providers
+that work there are `llm7` and `ovhcloud`, which both send `access-control-allow-origin: *`. Both are
+rate-limited anonymous tiers, and LLM7's catalog default (`GLM-5.3-Flash`) answered HTTP 400
+"currently unavailable" on 2026-09-29, so name a model LLM7 serves, such as its `default` alias,
+through `AIVE_LIVE_HOSTED_MODEL`. Web builds resolve h2g2 from Maven Local (see `settings.gradle.kts`),
+so publish it first, as CI does:
+
+~~~
+./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
+  :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal
+./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
+
+AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=llm7 AIVE_LIVE_HOSTED_MODEL=default \
+  ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true \
+  :providers:llm:jsBrowserTest :providers:llm:wasmJsBrowserTest \
+  --tests 'com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest'
+~~~
+
+Use the fully qualified class name: in the browser test runner the `*ProviderNeutral...Test` pattern
+matches no test, and the task then succeeds without running anything. Karma needs a Chrome binary
+(`CHROME_BIN`; when running as root, a wrapper that adds `--no-sandbox`). When `HTTPS_PROXY` is set,
+the Karma config starts the headless browser with `--proxy-server` pointing at it, and the browser
+must trust that proxy's certificate authority. In the browser the `[live]` lines appear only in the
+test report's system-out (`providers/llm/build/test-results/<task>/`), not on the console.
+
+On an Android device or emulator the settings are instrumentation runner arguments. No CORS applies
+there, so Kilo should be usable; no device run has been recorded yet:
+
+~~~
+./gradlew :providers:llm:connectedAndroidDeviceTest \
+  -Pandroid.testInstrumentationRunnerArguments.AIVE_LIVE_RUNTIME_VERIFICATION=1 \
+  -Pandroid.testInstrumentationRunnerArguments.AIVE_LIVE_PROVIDER=kilo \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest
+~~~
+
 The test prints `[live]` lines (time to each gate, the provider's plan, and the kind of each provider
 artifact) to the test report's system-out. If the provider task fails while a plan or escalation is
 awaited, the test stops at once and reports the provider's reason instead of waiting out the
@@ -53,6 +96,21 @@ timeout.
 - 2026-09-28, desktop JVM in a cloud container, Kilo Gateway (no key), `main` at `dccfa26a`: passed
   in 26 s. Plan gate after 12.5 s, failure escalation after 10.3 s; the provider's artifact was a
   `TaskPlan`.
+
+- 2026-09-29, JS in headless Chromium 141 (Karma, through the container's HTTPS proxy), LLM7 with
+  `AIVE_LIVE_HOSTED_MODEL=default` (no key): passed. Plan gate after 4.2 s, failure escalation after
+  3.3 s, release gate after 3.0 s; the provider's artifact was a `TaskPlan`.
+- 2026-09-29, Wasm in headless Chromium 141, same LLM7 setup: passed. Plan gate after 2.1 s, failure
+  escalation after 1.0 s, release gate after 3.1 s; the provider's artifact was a `TaskPlan`.
+- 2026-09-29, JS in headless Chromium, LLM7 with its catalog default model: failed at once with
+  HTTP 400 "Model 'GLM-5.3-Flash' is currently unavailable" (`model_unavailable`).
+- 2026-09-29, JS and Wasm in headless Chromium, OVHcloud (no key, default
+  `Qwen3-Coder-30B-A3B-Instruct`): failed. OVHcloud answered HTTP 429 "API rate limit exceeded"
+  (checked from the same browser and with curl), and the provider task stayed in `Planning` with no
+  progress message until the 300 s plan-gate timeout, instead of failing with the provider's reason.
+  A JS retry after the limit had briefly cleared timed out the same way.
+- 2026-09-29, desktop JVM, Kilo Gateway (no key), after the move to the common test tree: passed.
+  Plan gate after 11.5 s, failure escalation after 60.6 s; the provider's artifact was a `TaskPlan`.
 
 These are local runs, not the centralized verification below.
 
