@@ -2,7 +2,7 @@ package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,7 +29,7 @@ class TextGenerationOrchestrationAgentRuntimeTest {
         )
 
     @Test
-    fun parsesFencedPlanAndSendsPacket() = runBlocking {
+    fun parsesFencedPlanAndSendsPacket() = runTest {
         val prompts = mutableListOf<String>()
         val plan = runtimeReplying(
             """
@@ -49,16 +49,16 @@ class TextGenerationOrchestrationAgentRuntimeTest {
     }
 
     @Test
-    fun rejectsPlanUsingUnavailableRole() {
+    fun rejectsPlanUsingUnavailableRole() = runTest {
         val runtime = runtimeReplying(
             """{"steps":[{"id":"a","name":"A","objective":"Do A","roleId":"designer"}]}""",
         )
-        assertFailsWith<IllegalArgumentException> { runBlocking { runtime.plan(packet) } }
+        assertFailsWith<IllegalArgumentException> { runtime.plan(packet) }
     }
 
     @Test
-    fun rejectsReplyWithoutJson() {
+    fun rejectsReplyWithoutJson() = runTest {
         val runtime = runtimeReplying("I cannot help with that.")
-        assertFailsWith<IllegalArgumentException> { runBlocking { runtime.plan(packet) } }
+        assertFailsWith<IllegalArgumentException> { runtime.plan(packet) }
     }
 }
