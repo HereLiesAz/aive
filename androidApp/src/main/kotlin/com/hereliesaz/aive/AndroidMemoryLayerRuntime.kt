@@ -8,6 +8,14 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
 import com.hereliesaz.geministrator.memory.AgentMemoryLayer
+import com.hereliesaz.geministrator.memory.HostedMemoryGenerativeRuntime
+import com.hereliesaz.geministrator.memory.MemoryEngineAssembly
+import com.hereliesaz.geministrator.memory.MemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerSettings
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
+import com.hereliesaz.geministrator.memory.MemoryStageEngine
+import com.hereliesaz.geministrator.memory.assembleAgents
 import com.hereliesaz.geministrator.memory.SettingsMemoryStore
 import com.hereliesaz.geministrator.memory.androidSqlMemoryStore
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingInferenceRuntime
@@ -472,14 +480,33 @@ internal class AndroidMemoryLayerRuntime(
         artifactResolver = resolver,
         modelAdapter = AndroidEpoch8EmbeddingAdapter(installer),
     )
-    private val agents: List<MemoryMicroAgent> = MemoryMicroAgentRole.entries.map { role ->
-        val model = MemoryEpoch8ModelCatalog.modelSpec(role)
-        if (role == MemoryMicroAgentRole.AssociationLinker) {
-            EmbeddingAssociationLinkerMicroAgent(model, embeddingRuntime)
-        } else {
-            StructuredMemoryMicroAgent(role, model, generativeRuntime)
+    /**
+     * Answers hosted memory stages: (providerId or null for the default, model or null, prompt) to
+     * text. Set by the activity once provider credentials are known; unset means hosted stages fail
+     * visibly in the queue rather than silently.
+     */
+    @Volatile
+    var hostedTextGenerator: (suspend (providerId: String?, model: String?, prompt: String) -> String)? = null
+
+    private val engineProvider = object : MemoryEngineProvider {
+        override fun localAgent(role: MemoryMicroAgentRole): MemoryMicroAgent {
+            val model = MemoryEpoch8ModelCatalog.modelSpec(role)
+            return if (role == MemoryMicroAgentRole.AssociationLinker) {
+                EmbeddingAssociationLinkerMicroAgent(model, embeddingRuntime)
+            } else {
+                StructuredMemoryMicroAgent(role, model, generativeRuntime)
+            }
         }
+
+        override fun hostedAgent(role: MemoryMicroAgentRole, engine: MemoryStageEngine): MemoryMicroAgent =
+            HostedMemoryGenerativeRuntime.agent(role, engine, MemoryMicroAgentPlatform.Android) { prompt ->
+                val generate = hostedTextGenerator ?: error("No hosted provider is configured for memory")
+                generate(engine.providerId, engine.model, prompt)
+            }
     }
+
+    /** The user's memory setup; see [updateSettings]. */
+    val settings = MemoryLayerSettingsStore.createDefault()
     /**
      * SQLite store. Built on the IO dispatcher (see MainActivity), so the one-time import of the
      * older Settings-backed graph runs before anything can bank into the new database.
@@ -487,8 +514,27 @@ internal class AndroidMemoryLayerRuntime(
     private val store = androidSqlMemoryStore(context).also { store ->
         runBlocking { store.importLegacy(SettingsMemoryStore.createDefault()) }
     }
-    private val layer = AgentMemoryLayer.createWithMicroAgents(store, agents)
     private val drainMutex = Mutex()
+
+    /** What each stage actually runs after fallbacks, for display. */
+    @Volatile
+    var engines: MemoryEngineAssembly = settings.state.value.assembleAgents(engineProvider)
+        private set
+
+    @Volatile
+    private var layer = AgentMemoryLayer.createWithMicroAgents(store, engines.agents, settings.state.value.policy)
+
+    /** Applies a settings change: the layer is rebuilt between packets, never during one. */
+    suspend fun updateSettings(transform: (MemoryLayerSettings) -> MemoryLayerSettings) {
+        drainMutex.withLock {
+            val next = settings.update(transform)
+            engines = next.assembleAgents(engineProvider)
+            layer = AgentMemoryLayer.createWithMicroAgents(store, engines.agents, next.policy)
+        }
+        scope.launch { drainConsolidationQueue() }
+    }
+
+    private val active: Boolean get() = settings.state.value.enabled
     /** Attention Deficit Dial state, one per agent (task run). Adjust via [setAttentionLevel]. */
     val attention = PerAgentAttention()
 
@@ -503,10 +549,12 @@ internal class AndroidMemoryLayerRuntime(
 
     val observer: MemorySessionObserver = object : MemorySessionObserver {
         override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
+            if (!active) return
             layer.sessionObserver.onSessionStarted(handle, request)
         }
 
         override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
+            if (!active) return
             layer.sessionObserver.onSessionEvent(handle, event)
             val text = when (event) {
                 is AgentEvent.Message -> event.content
@@ -517,6 +565,7 @@ internal class AndroidMemoryLayerRuntime(
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
+            if (!active) return
             layer.sessionObserver.onSessionFinished(handle, status)
             attention.forget(handle.taskRunId.value)
             scope.launch { drainConsolidationQueue() }
@@ -524,6 +573,7 @@ internal class AndroidMemoryLayerRuntime(
     }
 
     private val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
+        if (!active) return@MemoryPromptContextProvider MemoryPromptRecall()
         val context = request.orchestrationContext
         // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
         val agentAttention = attention.forAgent(request.taskRunId.value)
@@ -603,6 +653,7 @@ internal class AndroidMemoryLayerRuntime(
     @OptIn(ExperimentalTime::class)
     private suspend fun drainConsolidationQueue() = drainMutex.withLock {
         while (true) {
+            if (!active || settings.state.value.consolidationPaused) return@withLock
             when (layer.consolidateOne(Clock.System.now().toEpochMilliseconds())) {
                 MemoryConsolidationResult.Idle -> return@withLock
                 else -> Unit
