@@ -85,15 +85,15 @@ class OrchestrationDatasetGeneratorTest {
             OrchestrationUtilityRole.MemoryQueryComposer ->
                 assertEquals(json.decodeFromString<MemoryQueryPlan>(expected), family.composeMemoryQueries(json.decodeFromString(input)))
             OrchestrationUtilityRole.ContextPacker ->
-                assertEquals(json.decodeFromString<ContextPackingPlan>(expected), family.packContext(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<ContextPackingPlan>(expected), family.packContext(json.decodeFromString<ContextPackingModelInput>(input).toInput()))
             OrchestrationUtilityRole.AgentRouter ->
-                assertEquals(json.decodeFromString<AgentRoute>(expected), family.routeAgent(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<AgentRoute>(expected), family.routeAgent(json.decodeFromString<AgentRoutingModelInput>(input).toInput()))
             OrchestrationUtilityRole.ToolRouter ->
                 assertEquals(json.decodeFromString<ToolRoute>(expected), family.routeTool(json.decodeFromString(input)))
             OrchestrationUtilityRole.HandoffComposer ->
                 assertEquals(json.decodeFromString<HandoffPacket>(expected), family.composeHandoff(json.decodeFromString(input)))
             OrchestrationUtilityRole.EscalationGate ->
-                assertEquals(json.decodeFromString<EscalationResult>(expected), family.evaluateEscalation(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<EscalationResult>(expected), family.evaluateEscalation(json.decodeFromString<CapabilityAssessmentModelInput>(input).assessment))
             OrchestrationUtilityRole.CompletionGate ->
                 assertEquals(json.decodeFromString<CompletionResult>(expected), family.evaluateCompletion(json.decodeFromString(input)))
             OrchestrationUtilityRole.ExecutionStateSummarizer -> {

@@ -89,9 +89,9 @@ class GuardedModelBackedOrchestrationUtilities(
     override fun packContext(input: ContextPackingInput): ContextPackingPlan {
         val baseline = fallback.packContext(input)
         val byId = input.evidence.associateBy(ContextEvidence::id)
-        return infer<ContextPackingInput, ContextPackingPlan>(
+        return infer<ContextPackingModelInput, ContextPackingPlan>(
             OrchestrationUtilityRole.ContextPacker,
-            input,
+            ContextPackingModelInput.of(input),
             baseline,
         ) { candidate ->
             val selected = candidate.selectedEvidenceIds
@@ -121,9 +121,9 @@ class GuardedModelBackedOrchestrationUtilities(
     override fun routeAgent(input: AgentRoutingInput): AgentRoute {
         val baseline = fallback.routeAgent(input)
         val candidates = input.candidates.associateBy(AgentRouteCandidate::id)
-        return infer<AgentRoutingInput, AgentRoute>(
+        return infer<AgentRoutingModelInput, AgentRoute>(
             OrchestrationUtilityRole.AgentRouter,
-            input,
+            AgentRoutingModelInput.of(input),
             baseline,
         ) { candidate ->
             if (candidate.decision == AgentRouteDecision.Escalate) {
@@ -191,9 +191,9 @@ class GuardedModelBackedOrchestrationUtilities(
 
     override fun evaluateEscalation(input: CapabilityAssessment): EscalationResult {
         val baseline = fallback.evaluateEscalation(input)
-        return infer<CapabilityAssessment, EscalationResult>(
+        return infer<CapabilityAssessmentModelInput, EscalationResult>(
             OrchestrationUtilityRole.EscalationGate,
-            input,
+            CapabilityAssessmentModelInput.of(input),
             baseline,
         ) { candidate ->
             candidate.recommendedTier.isNotBlank() &&

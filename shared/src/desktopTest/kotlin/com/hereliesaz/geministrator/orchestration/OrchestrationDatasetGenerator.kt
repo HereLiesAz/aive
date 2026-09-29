@@ -332,11 +332,11 @@ object OrchestrationDatasetGenerator {
     }
 
     private fun memory(input: MemoryQueryInput) = encode(input, baseline.composeMemoryQueries(input))
-    private fun context(input: ContextPackingInput) = encode(input, baseline.packContext(input))
-    private fun agent(input: AgentRoutingInput) = encode(input, baseline.routeAgent(input))
+    private fun context(input: ContextPackingInput) = encode(ContextPackingModelInput.of(input), baseline.packContext(input))
+    private fun agent(input: AgentRoutingInput) = encode(AgentRoutingModelInput.of(input), baseline.routeAgent(input))
     private fun tool(input: ToolRoutingInput) = encode(input, baseline.routeTool(input))
     private fun handoff(input: HandoffInput) = encode(input, baseline.composeHandoff(input))
-    private fun escalation(input: CapabilityAssessment) = encode(input, baseline.evaluateEscalation(input))
+    private fun escalation(input: CapabilityAssessment) = encode(CapabilityAssessmentModelInput.of(input), baseline.evaluateEscalation(input))
     private fun completion(input: CompletionInput) = encode(input, baseline.evaluateCompletion(input))
     private fun verification(input: VerificationPlanningInput) = encode(input, baseline.planVerification(input))
 
