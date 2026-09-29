@@ -8,6 +8,8 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
 import com.hereliesaz.geministrator.memory.AgentMemoryLayer
+import com.hereliesaz.geministrator.memory.SettingsMemoryStore
+import com.hereliesaz.geministrator.memory.androidSqlMemoryStore
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingInferenceRuntime
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingModelAdapter
 import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeInferenceRuntime
@@ -49,6 +51,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -477,7 +480,14 @@ internal class AndroidMemoryLayerRuntime(
             StructuredMemoryMicroAgent(role, model, generativeRuntime)
         }
     }
-    private val layer = AgentMemoryLayer.createDefaultWithMicroAgents(agents)
+    /**
+     * SQLite store. Built on the IO dispatcher (see MainActivity), so the one-time import of the
+     * older Settings-backed graph runs before anything can bank into the new database.
+     */
+    private val store = androidSqlMemoryStore(context).also { store ->
+        runBlocking { store.importLegacy(SettingsMemoryStore.createDefault()) }
+    }
+    private val layer = AgentMemoryLayer.createWithMicroAgents(store, agents)
     private val drainMutex = Mutex()
     /** Attention Deficit Dial state, one per agent (task run). Adjust via [setAttentionLevel]. */
     val attention = PerAgentAttention()
