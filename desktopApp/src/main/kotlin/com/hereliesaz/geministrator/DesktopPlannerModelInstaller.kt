@@ -18,8 +18,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 
 /** The optional desktop planner model, published as split parts on a GitHub release. */
 internal object DesktopPlannerModel {
@@ -110,7 +108,7 @@ internal class DesktopPlannerModelInstaller(
                 deleteRecursively()
                 mkdirs()
             }
-            extractTarGz(archive, extracted)
+            extractTarGzSafely(archive, extracted)
             locate(extracted) ?: error("Planner archive has no ONNX model and tokenizer")
 
             destination.deleteRecursively()
@@ -171,26 +169,6 @@ internal class DesktopPlannerModelInstaller(
         val response = httpClient.get(url)
         check(response.status.isSuccess()) { "Download failed: ${response.status}" }
         return response.bodyAsText()
-    }
-
-    private fun extractTarGz(archive: File, destination: File) {
-        val root = destination.canonicalFile
-        TarArchiveInputStream(GzipCompressorInputStream(BufferedInputStream(FileInputStream(archive)))).use { tar ->
-            while (true) {
-                val entry = tar.nextEntry ?: break
-                val output = File(root, entry.name).canonicalFile
-                check(output.path == root.path || output.path.startsWith(root.path + File.separator)) {
-                    "Unsafe archive entry: ${entry.name}"
-                }
-                when {
-                    entry.isDirectory -> output.mkdirs()
-                    entry.isFile -> {
-                        output.parentFile?.mkdirs()
-                        BufferedOutputStream(FileOutputStream(output)).use { tar.copyTo(it) }
-                    }
-                }
-            }
-        }
     }
 
     private fun sha256(file: File): String {

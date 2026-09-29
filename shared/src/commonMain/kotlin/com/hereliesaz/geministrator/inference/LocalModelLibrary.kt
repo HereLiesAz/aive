@@ -167,6 +167,8 @@ class LocalModelLibrary(
     fun specialist(specialistId: String): LocalModelSpecialistDescriptor =
         specialistsById[specialistId] ?: error("Unknown local model specialist $specialistId")
 
+    fun hasSpecialist(specialistId: String): Boolean = specialistId in specialistsById
+
     fun allSpecialists(): List<LocalModelSpecialistDescriptor> = specialistsById.values.toList()
 
     fun combinedWith(other: LocalModelLibrary): LocalModelLibrary =

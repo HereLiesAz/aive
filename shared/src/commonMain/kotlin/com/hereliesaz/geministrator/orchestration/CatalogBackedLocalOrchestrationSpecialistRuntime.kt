@@ -43,25 +43,19 @@ class CatalogBackedLocalOrchestrationSpecialistRuntime(
 ) : LocalOrchestrationSpecialistRuntime {
     override fun infer(role: OrchestrationUtilityRole, inputJson: String): String? {
         val specialistId = OrchestrationSpecialistIds.specialistId(role)
+        // A specialist that has not been released yet is the normal case: fall back silently.
+        if (!library.hasSpecialist(specialistId)) return null
         val plan = try {
             library.plan(
                 specialistId = specialistId,
                 runtime = runtimeCapabilities,
             )
         } catch (e: Exception) {
-            // Distinguish missing specialist (expected) from unexpected failures (log a warning).
-            val message = e.message.orEmpty()
-            if (message.contains("not found", ignoreCase = true) ||
-                message.contains("not installed", ignoreCase = true) ||
-                message.contains("unavailable", ignoreCase = true)
-            ) {
-                // Specialist simply not installed — fall back silently.
-                return null
-            }
+            // Released, but nothing this runtime can load: worth a warning, still a fallback.
             println("WARNING: CatalogBackedLocalOrchestrationSpecialistRuntime: " +
                 "library.plan failed for specialist '$specialistId': $e")
             return null
-        } ?: return null
+        }
 
         return try {
             executor.generate(role, plan, inputJson)

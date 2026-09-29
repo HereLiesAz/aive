@@ -40,3 +40,6 @@ package-lock.json
 
 # Logs
 *.log
+
+# Rust build output from the BITCOS native library
+native/bitcos/target/

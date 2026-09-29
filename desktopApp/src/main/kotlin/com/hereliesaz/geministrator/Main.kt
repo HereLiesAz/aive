@@ -81,6 +81,7 @@ fun main() {
     val httpClient = HttpClient(CIO)
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
+    val orchestrationUtilities = DesktopOrchestrationSpecialists.utilities(DesktopOrchestrationSpecialistInstaller(httpClient))
 
     try {
         application {
@@ -232,6 +233,7 @@ fun main() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        orchestrationUtilities = orchestrationUtilities,
                         projectFileService = projectFileService,
                         availableRepositorySources = RepositorySource.entries.toSet(),
                         onPickLocalRepository = ::pickLocalGitFolder,

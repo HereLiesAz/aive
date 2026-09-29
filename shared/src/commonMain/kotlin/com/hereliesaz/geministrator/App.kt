@@ -39,7 +39,9 @@ import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LaunchProgress
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import kotlinx.coroutines.launch
 
 @Composable
@@ -66,6 +68,7 @@ fun App(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: SettingsWorkflowPersistence.createDefault() }
@@ -89,6 +92,7 @@ fun App(
                 persistence = workflowPersistence,
                 executorIntegrations = executorIntegrations,
                 roleSurfaceRuntime = roleSurfaceRuntime,
+                orchestrationUtilities = orchestrationUtilities,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
