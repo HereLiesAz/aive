@@ -41,22 +41,27 @@ role (default 2000).
 ## 2. Train on Kaggle
 
 Open `aive_orchestration_specialists.ipynb` on Kaggle, add the dataset, use a GPU accelerator with
-internet on, and run all cells. For each role it:
+internet on, and run all cells. It trains **one multi-task model** for all nine roles; each row carries
+its role's system prompt, which is how the model knows which contract it is answering. Then it:
 
-1. trains a LoRA adapter on Qwen2.5-0.5B-Instruct (loss on the answer only);
-2. gates the adapter on the test and adversarial splits (`json_exact`, thresholds from the config);
+1. trains one LoRA adapter on Qwen2.5-0.5B-Instruct over every role's rows (loss on the answer only);
+2. gates the adapter **per role** on that role's test and adversarial splits (`json_exact`, thresholds
+   from the role's config);
 3. merges, exports ONNX (fp32 graph), then quantizes weights only to INT8 with MatMulNBits.
    Activations and logits stay float32, which the app's ONNX Runtime loop expects. Dynamic INT8
    (quantized activations) is not used: it broke these models outright in testing;
-4. gates the **exported INT8 model** on CPU with ONNX Runtime;
-5. packages `aive-orchestration-<role>-int8.tar.gz` (`model.onnx`, `tokenizer.json`, configs,
-   `model-manifest.json`) and adds it to `catalog.json`.
+4. gates the **exported INT8 model** per role on CPU with ONNX Runtime;
+5. packages one `aive-orchestration-utilities-int8.tar.gz` (`model.onnx`, `tokenizer.json`, configs,
+   `model-manifest.json` with per-role scores) and writes `catalog.json`, in which every role that
+   passed both gates points at that one artifact.
 
-A role that fails either gate is reported and not packaged. Progress is kept in `state.json`, so a
-restarted session resumes where it stopped.
+A role that fails either gate is left out of the catalog; the others still ship. One download (about
+640 MB compressed) serves every released role, and the app loads one ONNX session for all of them.
+Updating one role means retraining the shared model. Progress is kept in `state.json`, so a restarted
+session resumes where it stopped.
 
 To publish, add a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`, set
-`UPLOAD = True`, and run the last cell. It uploads the passing archives and `catalog.json` to the
+`UPLOAD = True`, and run the last cell. It uploads the archive and `catalog.json` to the
 `orchestration-utilities-v1` pre-release.
 
 ## 3. Register the release

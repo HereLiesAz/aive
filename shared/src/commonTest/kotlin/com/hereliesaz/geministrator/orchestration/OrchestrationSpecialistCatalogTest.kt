@@ -37,6 +37,26 @@ class OrchestrationSpecialistCatalogTest {
         assertEquals("aive-orchestration-tool-router-int8.tar.gz", assertIs<LocalModelLoadPlan.MergedModel>(plan).model.assetName)
     }
 
+    /** The multi-task release: every passing role points at the same archive. */
+    @Test
+    fun rolesCanShareOneArtifact() {
+        val artifact = """{"logicalArtifactId":"orchestration:utilities:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct",
+            "releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-utilities-v1",
+            "assetName":"aive-orchestration-utilities-int8.tar.gz","sha256":"${"c".repeat(64)}",
+            "format":"onnx","precision":"int8","kind":"MergedModel"}"""
+        val library = OrchestrationSpecialistCatalog.parse(
+            """{"specialists":[
+              {"specialistId":"orchestration:tool-router","mergedVariants":[$artifact]},
+              {"specialistId":"orchestration:completion-gate","mergedVariants":[$artifact]}]}""",
+        )
+        val runtime = LocalModelRuntimeCapabilities(runtimeId = "desktop", supportedFormats = setOf("onnx"), supportedPrecisions = setOf("int8"))
+        val models = listOf("orchestration:tool-router", "orchestration:completion-gate").map {
+            assertIs<LocalModelLoadPlan.MergedModel>(library.plan(it, runtime)).model
+        }
+        assertEquals(1, models.distinct().size)
+        assertEquals(1, library.allArtifacts().size)
+    }
+
     @Test
     fun rejectsIdsOutsideTheOrchestrationFamily() {
         assertFailsWith<IllegalArgumentException> {
