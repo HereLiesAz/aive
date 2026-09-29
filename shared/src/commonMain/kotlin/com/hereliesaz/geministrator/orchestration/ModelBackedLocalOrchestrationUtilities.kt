@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.orchestration
 
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.serialization.Serializable
@@ -17,10 +18,40 @@ fun interface LocalOrchestrationSpecialistRuntime {
     fun infer(role: OrchestrationUtilityRole, inputJson: String): String?
 }
 
+/**
+ * Compact specialist input for the Execution State Summarizer: exactly the facts the summary is built
+ * from, in run order. Full definitions and runs are several thousand tokens of defaults a small
+ * on-device model cannot afford.
+ */
 @Serializable
-private data class ExecutionStateModelInput(
-    val definition: WorkflowDefinition,
-    val run: WorkflowRun,
+internal data class ExecutionStateModelInput(
+    val tasks: List<ExecutionStateTask>,
+) {
+    companion object {
+        fun of(definition: WorkflowDefinition, run: WorkflowRun): ExecutionStateModelInput {
+            val names = definition.tasks.associate { it.id to it.name }
+            return ExecutionStateModelInput(
+                run.taskRuns.map { (id, taskRun) ->
+                    ExecutionStateTask(
+                        name = names[id] ?: id.value,
+                        status = taskRun.status,
+                        artifacts = taskRun.artifacts.map { it.id.value },
+                        blockingCode = taskRun.blockingReason?.code,
+                        blockingMessage = taskRun.blockingReason?.message,
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Serializable
+internal data class ExecutionStateTask(
+    val name: String,
+    val status: TaskRunStatus,
+    val artifacts: List<String> = emptyList(),
+    val blockingCode: String? = null,
+    val blockingMessage: String? = null,
 )
 
 /**
@@ -37,6 +68,8 @@ class GuardedModelBackedOrchestrationUtilities(
     private val json: Json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
+        // WorkflowDefinition/WorkflowRun key maps by AgentProviderId; matches SettingsWorkflowPersistence.
+        allowStructuredMapKeys = true
     },
 ) : LocalOrchestrationUtilityFamily {
     override fun composeMemoryQueries(input: MemoryQueryInput): MemoryQueryPlan {
@@ -196,7 +229,7 @@ class GuardedModelBackedOrchestrationUtilities(
         val baseline = fallback.summarizeExecution(definition, run)
         return infer<ExecutionStateModelInput, ExecutionStateSummary>(
             OrchestrationUtilityRole.ExecutionStateSummarizer,
-            ExecutionStateModelInput(definition, run),
+            ExecutionStateModelInput.of(definition, run),
             baseline,
         ) { candidate ->
             candidate.completedSteps.toSet() == baseline.completedSteps.toSet() &&
