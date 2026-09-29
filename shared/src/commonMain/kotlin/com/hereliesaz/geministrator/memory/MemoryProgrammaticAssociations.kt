@@ -16,15 +16,57 @@ class MemoryProgrammaticAssociator(
     private val store: MemoryStore,
     private val maxEdgesPerRefresh: Int = 256,
 ) {
+    private val cache = ProgrammaticAssociationCache()
+    /** Store revision right after this associator's own last commit; unchanged means nothing to derive. */
+    private var settledRevision: Long? = null
+
     init {
         require(maxEdgesPerRefresh > 0)
     }
 
-    /** Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time. */
-    suspend fun refresh(nowEpochMillis: Long): Int =
-        store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
-            snapshot.programmaticAssociationCandidates(nowEpochMillis, Int.MAX_VALUE)
+    /**
+     * Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time, and returns how
+     * many were added. One full pass, then only the condensation-overlap rule reruns: it is the only
+     * rule that reads association edges, so it is the only one the pass's own edges can feed.
+     */
+    suspend fun refresh(nowEpochMillis: Long): Int {
+        if (store.read().revision == settledRevision) return 0
+        cache.trim()
+        var total = store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
+            snapshot.programmaticAssociationCandidates(nowEpochMillis, Int.MAX_VALUE, cache)
         }
+        if (total > 0) {
+            while (true) {
+                val added = store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
+                    snapshot.programmaticAssociationCandidates(nowEpochMillis, Int.MAX_VALUE, cache, overlapOnly = true)
+                }
+                if (added == 0) break
+                total += added
+            }
+        }
+        settledRevision = store.read().revision
+        return total
+    }
+}
+
+/** Per-node derivations that depend only on immutable node text. */
+internal class ProgrammaticAssociationCache {
+    private val identifiers = hashMapOf<MemoryNodeId, Set<ExactMemoryIdentifier>>()
+    private val keys = hashMapOf<MemoryNodeId, String>()
+
+    fun identifiers(node: MemoryNode): Set<ExactMemoryIdentifier> =
+        identifiers.getOrPut(node.id) { node.text.exactMemoryIdentifiers() }
+
+    fun key(node: MemoryNode): String = keys.getOrPut(node.id) { node.text.normalizedMemoryKey() }
+
+    fun trim() {
+        if (identifiers.size > MAX_ENTRIES) identifiers.clear()
+        if (keys.size > MAX_ENTRIES) keys.clear()
+    }
+
+    private companion object {
+        const val MAX_ENTRIES = 200_000
+    }
 }
 
 /**
@@ -53,6 +95,8 @@ internal suspend fun MemoryStore.commitEdgesInChunks(
 internal fun MemorySnapshot.programmaticAssociationCandidates(
     nowEpochMillis: Long,
     limit: Int,
+    cache: ProgrammaticAssociationCache? = null,
+    overlapOnly: Boolean = false,
 ): List<MemoryEdge> {
     if (limit <= 0 || nodes.size < 2) return emptyList()
 
@@ -145,6 +189,21 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         val supportCount: Int,
     )
 
+    // Associative evidence by endpoint, keeping each edge's position so every generalized node reads its
+    // sources' evidence in the same global order a full edge scan would.
+    val evidenceByEndpoint = if (condensedSourcesByGeneralized.isEmpty()) {
+        emptyMap()
+    } else {
+        buildMap<MemoryNodeId, MutableList<IndexedValue<MemoryEdge>>> {
+            edges.forEachIndexed { position, edge ->
+                if (!edge.relation.isAssociativeEvidence()) return@forEachIndexed
+                val indexed = IndexedValue(position, edge)
+                getOrPut(edge.from) { mutableListOf() } += indexed
+                if (edge.to != edge.from) getOrPut(edge.to) { mutableListOf() } += indexed
+            }
+        }
+    }
+
     val overlapContributions = mutableListOf<CondensationOverlap>()
     condensedSourcesByGeneralized.forEach { (generalizedId, sourceIds) ->
         if (sourceIds.size < 2) return@forEach
@@ -153,8 +212,11 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         val evidenceByTargetAndSource =
             linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<MemoryEdge>>>()
 
-        edges.asSequence()
-            .filter { it.relation.isAssociativeEvidence() }
+        sourceIds.asSequence()
+            .flatMap { evidenceByEndpoint[it].orEmpty() }
+            .distinctBy { it.index }
+            .sortedBy { it.index }
+            .map { it.value }
             .forEach { edge ->
                 val sourceId = when {
                     edge.from in sourceIdSet -> edge.from
@@ -217,10 +279,12 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             )
         }
 
+    if (overlapOnly) return candidates.values.take(limit)
+
     // Exact semantic cue identity is a bookkeeping fact, not a semantic inference.
     activeNodes
         .filter { it.kind == MemoryNodeKind.NounTag || it.kind == MemoryNodeKind.VerbTag || it.kind == MemoryNodeKind.Category }
-        .groupBy { "${it.kind.name}:${it.text.normalizedMemoryKey()}" }
+        .groupBy { "${it.kind.name}:${cache?.key(it) ?: it.text.normalizedMemoryKey()}" }
         .entries
         .sortedBy { it.key }
         .map { it.value }
@@ -239,7 +303,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     val identifierGroups = linkedMapOf<String, MutableList<MemoryNode>>()
     activeNodes.forEach { node ->
         val projectNamespace = node.singleProjectNamespace(episodeById)
-        node.text.exactMemoryIdentifiers().forEach { identifier ->
+        (cache?.identifiers(node) ?: node.text.exactMemoryIdentifiers()).forEach { identifier ->
             val groupingKey = when (identifier.scope) {
                 IdentifierScope.Global -> "global:${identifier.value}"
                 IdentifierScope.Project -> projectNamespace?.let { "project:$it:${identifier.value}" }
@@ -429,12 +493,12 @@ private fun MemoryNode.singleProjectNamespace(
 private fun String.normalizedMemoryKey(): String =
     trim().lowercase().replace(Regex("\\s+"), " ")
 
-private enum class IdentifierScope {
+internal enum class IdentifierScope {
     Global,
     Project,
 }
 
-private data class ExactMemoryIdentifier(
+internal data class ExactMemoryIdentifier(
     val value: String,
     val scope: IdentifierScope,
 )
