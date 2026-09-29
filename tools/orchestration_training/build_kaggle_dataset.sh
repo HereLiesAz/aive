@@ -46,4 +46,5 @@ print(f"{len(roles)} roles written to {out}")
 PY
 
 (cd "$out/.." && rm -f aive-orchestration-corpus.zip && zip -qr aive-orchestration-corpus.zip aive-orchestration-corpus)
-echo "zip: $out/../aive-orchestration-corpus.zip"
+cp "$out/../aive-orchestration-corpus.zip" "$root/tools/orchestration_training/aive-orchestration-corpus.zip"
+echo "zip: $out/../aive-orchestration-corpus.zip (copied next to the notebook; commit it)"

@@ -40,8 +40,9 @@ role (default 2000).
 
 ## 2. Train on Kaggle
 
-Open `aive_orchestration_specialists.ipynb` on Kaggle, add the dataset, use a GPU accelerator with
-internet on, and run all cells. `MODE` in the first config cell chooses what it builds:
+Open `aive_orchestration_specialists.ipynb` on Kaggle, use a GPU accelerator with internet on, and
+run all cells. Attaching the Kaggle dataset is optional: without it, the notebook downloads
+`aive-orchestration-corpus.zip` (committed next to it, rebuilt by `build_kaggle_dataset.sh`) from GitHub. `MODE` in the first config cell chooses what it builds:
 
 | `MODE` | Builds | Download | Updating one role |
 |---|---|---|---|
