@@ -41,6 +41,13 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
+import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
+import com.hereliesaz.geministrator.memory.SettingsMemoryStore
+import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
 private const val JULES_API_KEY_STORAGE_KEY = "haive.julesApiKey"
 private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
@@ -52,6 +59,15 @@ private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    // Memory in browser storage (the Settings log store; SQLite needs the sql.js worker, not wired
+    // yet). Programmatic stages by default; attached before App builds the runtime.
+    val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
+    val memoryLayer = MemoryLayerController(
+        store = SettingsMemoryStore.createDefault(),
+        settingsStore = MemoryLayerSettingsStore.createDefault(),
+        engineProvider = memoryEngines,
+        scope = MainScope(),
+    ).also { it.attach() }
     ComposeViewport(viewportContainerId = "webApp") {
         if (window.location.search.contains("terrariumPreview=1")) {
             TerrariumVisualProofScreen()
@@ -67,6 +83,13 @@ fun main() {
             credentials = readWebProviderCredentials()
             repositoryCredentials = readWebRepositoryCredentials()
             credentialsLoaded = true
+        }
+        LaunchedEffect(credentials) {
+            memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
+                val api = memoryTextApi(credentials, providerId, model)
+                    ?: error("Memory provider ${providerId ?: "(default)"} is not configured")
+                api.generate(prompt).text
+            }
         }
         var configuringProviderId by remember { mutableStateOf<String?>(null) }
         var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
@@ -141,6 +164,7 @@ fun main() {
                     WebCredentialStore.remove(providerStorageKey(disconnectedProviderId))
                     credentials = credentials - disconnectedProviderId
                 },
+                memoryLayer = memoryLayer,
             )
         }
     }

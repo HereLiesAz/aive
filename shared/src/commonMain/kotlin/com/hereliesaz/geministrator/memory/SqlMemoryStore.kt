@@ -51,8 +51,7 @@ class SqlMemoryStore(
             true
         }
 
-    /** Replaces the whole graph (import, forget, clear). */
-    suspend fun replace(snapshot: MemorySnapshot) {
+    override suspend fun replace(snapshot: MemorySnapshot) {
         mutex.withLock {
             database.transaction {
                 deleteAll()
