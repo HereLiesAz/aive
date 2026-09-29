@@ -45,8 +45,9 @@ internet on, and run all cells. For each role it:
 
 1. trains a LoRA adapter on Qwen2.5-0.5B-Instruct (loss on the answer only);
 2. gates the adapter on the test and adversarial splits (`json_exact`, thresholds from the config);
-3. merges, exports ONNX (fp32 graph, then dynamic INT8), which keeps float32 logits as the app's ONNX
-   Runtime loop expects;
+3. merges, exports ONNX (fp32 graph), then quantizes weights only to INT8 with MatMulNBits.
+   Activations and logits stay float32, which the app's ONNX Runtime loop expects. Dynamic INT8
+   (quantized activations) is not used: it broke these models outright in testing;
 4. gates the **exported INT8 model** on CPU with ONNX Runtime;
 5. packages `aive-orchestration-<role>-int8.tar.gz` (`model.onnx`, `tokenizer.json`, configs,
    `model-manifest.json`) and adds it to `catalog.json`.

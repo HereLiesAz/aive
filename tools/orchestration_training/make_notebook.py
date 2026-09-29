@@ -27,7 +27,7 @@ md("""
 # Aive orchestration specialists: train, gate, export
 
 Trains one LoRA specialist per local orchestration utility on **Qwen2.5-0.5B-Instruct**, gates it on
-held-out and adversarial splits, merges it, exports ONNX (fp32, then dynamic INT8) in the layout the
+held-out and adversarial splits, merges it, exports ONNX (fp32, then weight-only INT8) in the layout the
 app loads (`model.onnx` + `tokenizer.json`, KV-cache inputs, float32 logits), re-gates the **exported
 INT8 model** with ONNX Runtime, and packages release archives plus `catalog.json`.
 
@@ -43,7 +43,7 @@ deterministic baseline for any role without a released specialist.
 """)
 
 code("""
-%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnxruntime
+%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22"
 """)
 
 code(r'''
@@ -199,8 +199,11 @@ def torch_gate(slug):
 
 code(r'''
 from optimum.exporters.onnx import main_export
-from optimum.onnxruntime import ORTModelForCausalLM, ORTQuantizer
-from optimum.onnxruntime.configuration import AutoQuantizationConfig
+import onnx
+from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+from optimum.onnxruntime import ORTModelForCausalLM
+
+QUANT_OPS = ("MatMul",)
 
 def export(slug):
     """Merge the adapter and export fp32 ONNX, then quantize. Each stage resumes if its output exists."""
@@ -222,11 +225,16 @@ def export(slug):
         for f in fp32.iterdir():
             if f.is_file() and not f.name.startswith("model.onnx"):
                 shutil.copy2(f, int8 / f.name)
-        # fp32 graph -> dynamic INT8 keeps float32 inputs/outputs, which is what the app's ORT loop reads.
-        ORTQuantizer.from_pretrained(fp32, file_name="model.onnx").quantize(
-            AutoQuantizationConfig.avx2(is_static=False, per_channel=False), save_dir=int8, file_suffix="",
+        # Weight-only INT8 (MatMulNBits): weights are quantized, activations and logits stay float32.
+        # Dynamic INT8 (quantized activations) wrecks these small models: in a probe it took a model
+        # scoring 2/5 in fp32 to 0/5, with or without the LM head excluded; weight-only INT8 kept 2/5.
+        model = onnx.load(str(fp32 / "model.onnx"))
+        quantizer = MatMulNBitsQuantizer(
+            model, bits=8, block_size=32, is_symmetric=True, accuracy_level=4, op_types_to_quantize=QUANT_OPS,
         )
-        gc.collect()
+        quantizer.process()
+        quantizer.model.save_model_to_file(str(int8 / "model.onnx"), use_external_data_format=True)
+        del model, quantizer; gc.collect()
     assert (int8 / "model.onnx").is_file() and (int8 / "tokenizer.json").is_file(), "app needs model.onnx + tokenizer.json"
     shutil.rmtree(fp32, ignore_errors=True)
     return int8
