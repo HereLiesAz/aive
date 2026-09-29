@@ -1,5 +1,4 @@
 import haive.build.BrandAssets
-import haive.build.BrandLoaderVerifier
 import org.gradle.api.tasks.Exec
 
 plugins {
@@ -9,19 +8,18 @@ plugins {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
-val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
 val generatedAndroidBrandResDir = layout.buildDirectory.dir("generated/brand/android/res")
 val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
-    inputs.files(brandSourceLogo, brandSourceAnimation)
+    inputs.files(brandSourceLogo)
     outputs.dir(generatedAndroidBrandResDir)
     doLast {
+        // Start clean so assets dropped from the pipeline never linger.
+        generatedAndroidBrandResDir.get().asFile.deleteRecursively()
         val outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable")
-        BrandAssets.generateLoader(
+        BrandAssets.generateSplashLogo(
             logoSource = brandSourceLogo.asFile,
-            animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
         )
-        BrandLoaderVerifier.verify(outputDir)
     }
 }
 

@@ -1,5 +1,4 @@
 import haive.build.BrandAssets
-import haive.build.BrandLoaderVerifier
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -9,24 +8,23 @@ plugins {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
-val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
 val generatedWebBrandDir = layout.buildDirectory.dir("generated/brand/web")
 val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
-    inputs.files(brandSourceLogo, brandSourceAnimation)
+    inputs.files(brandSourceLogo)
     outputs.dir(generatedWebBrandDir)
     doLast {
+        // Start clean so assets dropped from the pipeline never linger.
+        generatedWebBrandDir.get().asFile.deleteRecursively()
         val outputDir = generatedWebBrandDir.get().asFile
         BrandAssets.generateWeb(
             source = brandSourceLogo.asFile,
             outputDir = outputDir,
         )
-        BrandAssets.generateLoader(
+        BrandAssets.generateSplashLogo(
             logoSource = brandSourceLogo.asFile,
-            animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
             maxDimension = 256,
         )
-        BrandLoaderVerifier.verify(outputDir)
     }
 }
 
@@ -110,4 +108,10 @@ tasks.matching { task ->
 
         }
     }
+}
+
+// The webpack tasks above copy the brand assets next to the bundle (GitHub Pages stages from there);
+// the distribution also receives them from resources. The copies are identical.
+tasks.matching { it.name.endsWith("BrowserDistribution") }.configureEach {
+    (this as? AbstractCopyTask)?.duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

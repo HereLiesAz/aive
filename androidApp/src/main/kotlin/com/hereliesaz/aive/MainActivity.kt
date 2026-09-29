@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -73,7 +76,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -136,7 +138,6 @@ class MainActivity : ComponentActivity() {
         removeRetiredOnDevicePlannerFiles()
 
         setContent {
-            var splashFinished by remember { mutableStateOf(false) }
             var startupReady by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
@@ -157,8 +158,8 @@ class MainActivity : ComponentActivity() {
                 updateCoordinator.checkForUpdates()
             }
 
-            if (!splashFinished || !startupReady) {
-                HaiveSplashScreen(onSplashFinished = { splashFinished = true })
+            if (!startupReady) {
+                HaiveSplashScreen()
             } else {
                 var credentials by remember { mutableStateOf(initialCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
@@ -404,7 +405,7 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            if (splashFinished && startupReady) {
+            if (startupReady) {
                 AndroidUpdatePrompt(
                     state = updateCoordinator.state,
                     onInstallGithubUpdate = updateCoordinator::installDownloadedUpdate,
@@ -450,30 +451,20 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** The static logo shown until startup is ready. */
 @Composable
-fun HaiveSplashScreen(onSplashFinished: () -> Unit) {
-    var animationStarted by remember { mutableStateOf(false) }
-
-    LaunchedEffect(animationStarted) {
-        if (animationStarted) {
-            delay(4000)
-            onSplashFinished()
-        }
-    }
-    LaunchedEffect(Unit) {
-        delay(6000)
-        if (!animationStarted) onSplashFinished()
-    }
-
+fun HaiveSplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0D1026)),
         contentAlignment = Alignment.Center,
     ) {
-        AiveLoadingAnimation(
+        Image(
+            painter = painterResource(R.drawable.haive_splash_logo),
+            contentDescription = null,
             modifier = Modifier.size(280.dp),
-            onAnimationStarted = { animationStarted = true },
+            contentScale = ContentScale.Fit,
         )
     }
 }

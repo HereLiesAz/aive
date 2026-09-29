@@ -1,5 +1,4 @@
 import haive.build.BrandAssets
-import haive.build.BrandLoaderVerifier
 import org.gradle.api.tasks.Exec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
@@ -33,23 +32,22 @@ kotlin {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
-val brandSourceAnimation = rootProject.layout.projectDirectory.file("branding/haive_splash.gif")
 val generatedDesktopBrandDir = layout.buildDirectory.dir("generated/brand/desktop")
 val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
-    inputs.files(brandSourceLogo, brandSourceAnimation)
+    inputs.files(brandSourceLogo)
     outputs.dir(generatedDesktopBrandDir)
     doLast {
+        // Start clean so assets dropped from the pipeline never linger.
+        generatedDesktopBrandDir.get().asFile.deleteRecursively()
         val outputDir = generatedDesktopBrandDir.get().asFile
         BrandAssets.generateDesktop(
             source = brandSourceLogo.asFile,
             outputDir = outputDir,
         )
-        BrandAssets.generateLoader(
+        BrandAssets.generateSplashLogo(
             logoSource = brandSourceLogo.asFile,
-            animationSource = brandSourceAnimation.asFile,
             outputDir = outputDir,
         )
-        BrandLoaderVerifier.verify(outputDir)
     }
 }
 

@@ -14,32 +14,14 @@
 </head>
 <body>
     <div id="haiveSplash" role="status" aria-live="polite" aria-label="Loading The Aive">
-        <img id="haiveSplashFrame0" src="haive_loader_frame0.png" alt="" aria-hidden="true" />
-        <img id="haiveSplashAnimation" data-src="haive_loader.gif" alt="" aria-hidden="true" />
+        <img id="haiveSplashLogo" src="haive_splash_logo.png" alt="" aria-hidden="true" />
     </div>
     <div id="webApp"></div>
     <script>
         (() => {
             const app = document.getElementById("webApp");
             const splash = document.getElementById("haiveSplash");
-            const frame0 = document.getElementById("haiveSplashFrame0");
-            const animation = document.getElementById("haiveSplashAnimation");
             if (!app || !splash) return;
-
-            const revealAnimation = () => {
-                if (!animation || !frame0) return;
-                animation.classList.add("haive-loader-running");
-                frame0.classList.add("haive-loader-replaced");
-            };
-
-            const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
-            if (animation && !reduceMotion) {
-                animation.addEventListener("load", revealAnimation, { once: true });
-                animation.src = animation.dataset.src;
-                if (animation.complete) revealAnimation();
-            } else if (animation) {
-                animation.remove();
-            }
 
             const dismissSplash = () => {
                 splash.classList.add("haive-splash-ready");
