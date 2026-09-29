@@ -17,7 +17,9 @@ import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REVIEW_VERDICT_METADATA
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -109,7 +111,7 @@ open class TextLlmProvider(
 
         if (session.request.requirePlanApproval) {
             if (!session.planGenerated.value) {
-                val preview = api.generate(renderPrompt(session.request))
+                val preview = generateOrFail(runId, session) ?: return@flow
                 session.planResult = preview
                 session.planGenerated.value = true
                 emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
@@ -124,7 +126,7 @@ open class TextLlmProvider(
             // In-process sessions deliver the generation the user approved. A session
             // reconstructed by reconnect() after a restart only has the durable plan
             // flag, not the generation itself, so it executes exactly once here.
-            val result = session.planResult ?: api.generate(renderPrompt(session.request))
+            val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -135,7 +137,7 @@ open class TextLlmProvider(
                 mutex.withLock { sessions.remove(runId) }
                 return@flow
             }
-            val result = api.generate(renderPrompt(session.request))
+            val result = generateOrFail(runId, session) ?: return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -143,6 +145,24 @@ open class TextLlmProvider(
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
+    }
+
+    /**
+     * A provider refusal (HTTP 429, 5xx, bad key, unreachable host) fails the run at once with the
+     * provider's reason. Letting it escape would read as an observer transport fault, which the
+     * gateway retries with backoff while the task sits in Planning until the plan gate times out.
+     */
+    private suspend fun FlowCollector<AgentEvent>.generateOrFail(
+        runId: ProviderRunId,
+        session: Session,
+    ): TextGenerationResult? = try {
+        api.generate(renderPrompt(session.request))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        emit(AgentEvent.Failed(runId, "$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}"))
+        mutex.withLock { sessions.remove(runId) }
+        null
     }
 
     override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
