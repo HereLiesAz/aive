@@ -88,6 +88,18 @@ Every abstraction must preserve provenance so a later agent can descend back to 
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
 
+### Failure and output contract
+
+- Every generative clerk answers one JSON object with `sections`, `nodes` and/or `links`. Any other
+  shape is rejected as a failure, never read as "nothing to add". The epoch-8 releases were trained on
+  a different schema (`{"mutations":[{op,target_ref,payload}]}`), so their answers are rejected until
+  they are retrained on this contract.
+- A queue entry that fails `MemoryConsolidationPolicy.maxAttempts` times (default 3) is parked: it
+  stays `Failed` with its `lastError`, and consolidation moves on to the next entry.
+- `DO_NOT_CONDENSE` is a valid answer. The cluster is recorded in `declinedCondensations` and not
+  offered again until its membership changes. A cluster that fails `maxAttempts` times is declined the
+  same way, so one bad cluster cannot keep an entry from completing.
+
 ## Confidence semantics
 
 If a schema contains `confidence`, it means **derivation fidelity**:

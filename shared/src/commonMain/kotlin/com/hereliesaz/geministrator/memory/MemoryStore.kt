@@ -137,6 +137,7 @@ private fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation): MemoryS
 
     return copy(
         revision = revision + 1,
+        declinedCondensations = (declinedCondensations + mutation.condensationDeclinesToAdd).distinct(),
         episodes = episodes + mutation.episodesToAdd,
         sections = sections + mutation.sectionsToAdd,
         nodes = nodes + mutation.nodesToAdd,
