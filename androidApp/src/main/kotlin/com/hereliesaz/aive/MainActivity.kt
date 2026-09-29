@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
+import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
@@ -189,6 +190,14 @@ class MainActivity : ComponentActivity() {
                         repositoryHttpClient = repositoryHttpClient,
                         installedGeminiApi = installedGeminiApi,
                     )
+                }
+                // Hosted memory stages use whichever provider each stage names, with current credentials.
+                LaunchedEffect(credentials) {
+                    memoryRuntime.hostedTextGenerator = { providerId, model, prompt ->
+                        val api = memoryTextApi(credentials, providerId, model)
+                            ?: error("Memory provider ${providerId ?: "(default)"} is not configured")
+                        api.generate(prompt).text
+                    }
                 }
                 // Planning runs on the linked cloud LLM; with none linked, App uses the starter workflow.
                 val planningRuntime = remember(credentials) {

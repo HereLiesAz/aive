@@ -20,10 +20,17 @@ class MemoryLexicalAssociator(
         require(maxEdgesPerRefresh > 0)
     }
 
-    /** Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time. */
+    /** Store revision right after this associator's own last commit; unchanged means nothing to derive. */
+    private var settledRevision: Long? = null
+
+    /**
+     * Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time. Lexical rules read
+     * no association edges, so one pass reaches the fixed point.
+     */
     suspend fun refresh(nowEpochMillis: Long): Int {
+        if (store.read().revision == settledRevision) return 0
         if (analyses.size > MAX_CACHED_ANALYSES) analyses.clear()
-        return store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
+        val added = store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
             snapshot.lexicalAssociationCandidates(
                 nowEpochMillis = nowEpochMillis,
                 lexicon = lexicon,
@@ -31,6 +38,8 @@ class MemoryLexicalAssociator(
                 analysisCache = analyses,
             )
         }
+        settledRevision = store.read().revision
+        return added
     }
 
     private companion object {

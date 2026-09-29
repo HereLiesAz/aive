@@ -142,6 +142,9 @@ class MemoryConsolidator(
     private val manager: MemoryManagerAgent,
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
 ) {
+    /** Node text is immutable, so each node is tokenized once for neighborhood search. */
+    private val neighborhoodTerms = hashMapOf<MemoryNodeId, Set<String>>()
+
     /**
      * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
      * packets; entries at the same priority remain FIFO by sequence. An entry that has failed
@@ -406,11 +409,13 @@ class MemoryConsolidator(
             remainingChars > 0 &&
             remainingItems > 0
         ) {
+            if (neighborhoodTerms.size > MAX_CACHED_TERMS) neighborhoodTerms.clear()
             snapshot.relatedNeighborhood(
                 episodeId = entry.episodeId,
                 needles = selected,
                 maxItems = remainingItems,
                 maxChars = remainingChars,
+                termsOf = { node -> neighborhoodTerms.getOrPut(node.id) { node.text.memoryTerms().toSet() } },
             )
         } else {
             emptyList()
@@ -736,11 +741,14 @@ private fun MemorySnapshot.episodeNodes(
         .sortedWith(compareBy<MemoryNode> { it.kind.ordinal }.thenBy { it.createdAtEpochMillis }.thenBy { it.id.value })
 }
 
+private const val MAX_CACHED_TERMS = 200_000
+
 private fun MemorySnapshot.relatedNeighborhood(
     episodeId: MemoryEpisodeId,
     needles: List<MemoryWorkItem>,
     maxItems: Int,
     maxChars: Int,
+    termsOf: (MemoryNode) -> Set<String> = { it.text.memoryTerms().toSet() },
 ): List<MemoryWorkItem> {
     val terms = needles.flatMap { it.text.memoryTerms() }.toSet()
     if (terms.isEmpty() || maxItems <= 0 || maxChars <= 0) return emptyList()
@@ -749,7 +757,7 @@ private fun MemorySnapshot.relatedNeighborhood(
         .asSequence()
         .filter { episodeId !in it.sourceEpisodeIds }
         .map { node ->
-            val candidateTerms = node.text.memoryTerms().toSet()
+            val candidateTerms = termsOf(node)
             val overlap = terms.count { it in candidateTerms }
             node to overlap
         }

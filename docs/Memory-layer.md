@@ -88,6 +88,22 @@ Every abstraction must preserve provenance so a later agent can descend back to 
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
 
+### Engines
+
+Every stage runs on one of three engines, chosen per stage in `MemoryLayerSettings`
+(persisted by `MemoryLayerSettingsStore`):
+
+| Engine | What runs | Notes |
+|---|---|---|
+| Programmatic (default) | `ProgrammaticMemoryClerks` | Deterministic, nothing downloaded |
+| Local model | The platform's installed on-device clerk | Epoch-8 on Android today |
+| Hosted model | A configured provider's text API, through `StructuredMemoryMicroAgent` | Not for AssociationLinker (embeddings) |
+
+`assembleAgents` builds the clerks; a stage whose engine is unavailable on the platform runs
+programmatically and the reason is reported. Settings also carry `enabled` (off: nothing banked or
+recalled, stored memory kept), `consolidationPaused` (banking continues, consolidation waits) and the
+consolidation `policy`. Changes apply between packets.
+
 ### Storage
 
 The graph lives in SQLite through SQLDelight (`SqlMemoryStore`; schema in

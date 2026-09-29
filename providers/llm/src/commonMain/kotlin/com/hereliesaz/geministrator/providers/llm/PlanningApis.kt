@@ -20,3 +20,24 @@ fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? 
         }
     }
 }
+
+/**
+ * The text API a hosted memory stage should use: [providerId] (a ProviderCatalog id) with an optional
+ * [model] override, or the planning default when [providerId] is null. Null when that provider is
+ * not configured (keyless hosted providers need no credential).
+ */
+fun memoryTextApi(credentials: Map<String, String>, providerId: String?, model: String?): TextGenerationApi? {
+    if (providerId == null) return configuredPlanningApi(credentials)
+    val credential = credentials[providerId]?.trim()?.takeIf(String::isNotEmpty)
+    fun key() = credential?.let { value -> LlmApiKeyProvider { value } }
+    return when (providerId) {
+        ProviderCatalog.GEMINI_ID -> key()?.let { if (model != null) GeminiGenerateContentApi(it, model = model) else GeminiGenerateContentApi(it) }
+        ProviderCatalog.OPENAI_ID -> key()?.let { if (model != null) OpenAiResponsesApi(it, model = model) else OpenAiResponsesApi(it) }
+        ProviderCatalog.ANTHROPIC_ID -> key()?.let { if (model != null) AnthropicMessagesApi(it, model = model) else AnthropicMessagesApi(it) }
+        ProviderCatalog.XAI_ID -> key()?.let { if (model != null) XaiResponsesApi(it, model = model) else XaiResponsesApi(it) }
+        else -> HostedLlmProviders.entries.firstOrNull { it.id == providerId }?.let { spec ->
+            val usable = credential ?: if (spec.keyOptional) ProviderCatalog.ANONYMOUS_CREDENTIAL else return null
+            runCatching { HostedLlmProviders.textApi(spec, usable, model ?: spec.defaultModel) }.getOrNull()
+        }
+    }
+}
