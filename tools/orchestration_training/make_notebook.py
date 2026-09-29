@@ -51,6 +51,9 @@ baseline for any role without a released specialist.
 """)
 
 code("""
+# Kaggle images ship torchao 0.10; current peft refuses to import next to a torchao older than 0.16.
+# Nothing here uses torchao, so remove it. If peft was already imported in this session, restart it.
+%pip uninstall -y -q torchao
 %pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22"
 """)
 
