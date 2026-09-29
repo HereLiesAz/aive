@@ -42,11 +42,13 @@ import io.ktor.client.HttpClient
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
-import com.hereliesaz.geministrator.memory.SettingsMemoryStore
+import com.hereliesaz.geministrator.memory.DeferredMemoryStore
+import com.hereliesaz.geministrator.memory.openWebMemoryStore
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
 private const val JULES_API_KEY_STORAGE_KEY = "haive.julesApiKey"
@@ -59,14 +61,18 @@ private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    // Memory in browser storage (the Settings log store; SQLite needs the sql.js worker, not wired
-    // yet). Programmatic stages by default; attached before App builds the runtime.
+    // Memory in SQLite persisted in OPFS (opened in a worker; the old Settings log is imported once).
+    // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
+    val memoryScope = MainScope()
+    val memoryStore = memoryScope.async {
+        openWebMemoryStore { reason -> println("Aive memory: SQLite unavailable ($reason)") }
+    }
     val memoryLayer = MemoryLayerController(
-        store = SettingsMemoryStore.createDefault(),
+        store = DeferredMemoryStore(memoryStore),
         settingsStore = MemoryLayerSettingsStore.createDefault(),
         engineProvider = memoryEngines,
-        scope = MainScope(),
+        scope = memoryScope,
     ).also { it.attach() }
     ComposeViewport(viewportContainerId = "webApp") {
         if (window.location.search.contains("terrariumPreview=1")) {

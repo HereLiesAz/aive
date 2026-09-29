@@ -13,6 +13,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 internal data class AgentRoutingModelInput(
+    /**
+     * Ids of the eligible candidates in routing order, first so the model reads it first: select the
+     * first, fall back to the second, escalate when empty. Trained adapters ignored per-candidate
+     * `eligible` flags (picking ineligible or cheaper agents), so the answer is copied, not filtered.
+     */
+    val eligibleInRoutingOrder: List<String>,
     val requiredCapabilities: Set<String>,
     val requiredContextTokens: Int,
     val requiredContextType: String,
@@ -29,11 +35,8 @@ internal data class AgentRoutingModelInput(
     )
 
     companion object {
-        fun of(input: AgentRoutingInput): AgentRoutingModelInput = AgentRoutingModelInput(
-            requiredCapabilities = input.requiredCapabilities,
-            requiredContextTokens = input.requiredContextTokens,
-            requiredContextType = input.requiredContextType,
-            candidates = input.candidates
+        fun of(input: AgentRoutingInput): AgentRoutingModelInput {
+            val candidates = input.candidates
                 .sortedWith(compareBy<AgentRouteCandidate> { it.preferenceRank }.thenBy { it.estimatedCost }.thenBy { it.id })
                 .map { candidate ->
                     val fits = candidate.contextLimitTokens >= input.requiredContextTokens
@@ -49,8 +52,15 @@ internal data class AgentRoutingModelInput(
                         hasRequiredCapabilities = capable,
                         eligible = candidate.available && fits && capable,
                     )
-                },
-        )
+                }
+            return AgentRoutingModelInput(
+                eligibleInRoutingOrder = candidates.filter { it.eligible }.map { it.id },
+                requiredCapabilities = input.requiredCapabilities,
+                requiredContextTokens = input.requiredContextTokens,
+                requiredContextType = input.requiredContextType,
+                candidates = candidates,
+            )
+        }
     }
 }
 

@@ -1,0 +1,11 @@
+{
+  "name": "aive-memory-worker",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "SQLDelight web-worker protocol over SQLite (sqlite-wasm) persisted in OPFS.",
+  "main": "memory.worker.js",
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "3.53.4-build1"
+  }
+}

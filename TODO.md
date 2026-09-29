@@ -43,8 +43,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Preserve reconstructable workflow-created events and strict approval-gate identity with legacy compatibility.
 - [x] Build and stage both JS and Wasm outputs for GitHub Pages.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
-- [ ] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
-  - Desktop JVM passed locally against Kilo Gateway on 2026-09-26 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). Still needs the centralized run, and Android, JS and Wasm.
+- [x] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
+  - Centralized run [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915) passed against Kilo Gateway (no key) on 2026-09-29; JS and Wasm passed locally against LLM7 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). No Android run is recorded yet.
 
 ## P0 — Compound inference foundation
 
@@ -69,14 +69,15 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [ ] Create/import a project.
 - [ ] Define an objective.
 - [ ] Materialize a workflow definition.
-- [ ] Approve any required plan/specification gates.
-- [ ] Dispatch provider-backed work through a configured real provider.
+- [x] Approve any required plan/specification gates.
+- [x] Dispatch provider-backed work through a configured real provider.
 - [ ] Reconcile provider progress without fabricating percentages.
-- [ ] Persist and resume the run after process/browser restart.
-- [ ] Collect artifacts.
-- [ ] Run verification/review stages.
-- [ ] Reach a terminal run state with a clear outcome.
+- [x] Persist and resume the run after process/browser restart.
+- [x] Collect artifacts.
+- [x] Run verification/review stages.
+- [x] Reach a terminal run state with a clear outcome.
 - [ ] Verify this flow on Android, Desktop, JS, and Wasm where provider/browser constraints permit.
+  - The ticked steps above are exercised by the live lifecycle test, which builds its project, objective and workflow in code; the centralized run covers Desktop JVM, local runs cover JS and Wasm. Android and the in-app project/objective path remain.
 
 ## P1 — GitHub as a first-class executor/integration
 

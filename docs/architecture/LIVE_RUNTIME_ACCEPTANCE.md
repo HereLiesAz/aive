@@ -49,9 +49,9 @@ up-to-date or cached Gradle test result.
 Browsers enforce CORS. The Kilo Gateway (`https://api.kilo.ai/api/gateway`) sends no
 `Access-Control-Allow-Origin` header, so it cannot be called from a browser; the keyless providers
 that work there are `llm7` and `ovhcloud`, which both send `access-control-allow-origin: *`. Both are
-rate-limited anonymous tiers, and LLM7's catalog default (`GLM-5.3-Flash`) answered HTTP 400
-"currently unavailable" on 2026-09-29, so name a model LLM7 serves, such as its `default` alias,
-through `AIVE_LIVE_HOSTED_MODEL`. Web builds resolve h2g2 from Maven Local (see `settings.gradle.kts`),
+rate-limited anonymous tiers. LLM7's catalog default is its `default` alias (a named model,
+`GLM-5.3-Flash`, answered HTTP 400 "currently unavailable" on 2026-09-29);
+`AIVE_LIVE_HOSTED_MODEL` still overrides it. Web builds resolve h2g2 from Maven Local (see `settings.gradle.kts`),
 so publish it first, as CI does:
 
 ~~~
@@ -108,7 +108,10 @@ timeout.
   `Qwen3-Coder-30B-A3B-Instruct`): failed. OVHcloud answered HTTP 429 "API rate limit exceeded"
   (checked from the same browser and with curl), and the provider task stayed in `Planning` with no
   progress message until the 300 s plan-gate timeout, instead of failing with the provider's reason.
-  A JS retry after the limit had briefly cleared timed out the same way.
+  A JS retry after the limit had briefly cleared timed out the same way. Fixed since: a hosted
+  text provider's refusal now ends the run as `Failed` with the provider's reason (for example
+  "OVHcloud: HTTP 429 …") instead of reaching the gateway as an observer fault that it retried with
+  backoff.
 - 2026-09-29, desktop JVM, Kilo Gateway (no key), after the move to the common test tree: passed.
   Plan gate after 11.5 s, failure escalation after 60.6 s; the provider's artifact was a `TaskPlan`.
 

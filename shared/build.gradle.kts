@@ -13,6 +13,9 @@ plugins {
 
 val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
 
+/** Browser memory database worker (SQLite in OPFS); see memory-worker/memory.worker.js. */
+val memoryWorkerPackage: File = layout.projectDirectory.dir("memory-worker").asFile
+
 kotlin {
     androidLibrary {
         namespace = "com.hereliesaz.geministrator.shared"
@@ -87,10 +90,12 @@ kotlin {
         getByName("jsMain").dependencies {
             implementation(npm("onnxruntime-web", libs.versions.onnxruntime.get()))
             implementation(libs.sqldelight.web.worker.driver)
+            implementation(npm("aive-memory-worker", memoryWorkerPackage))
         }
 
         getByName("wasmJsMain").dependencies {
             implementation(libs.sqldelight.web.worker.driver)
+            implementation(npm("aive-memory-worker", memoryWorkerPackage))
         }
 
         commonTest.dependencies {

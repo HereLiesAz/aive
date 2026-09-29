@@ -154,7 +154,9 @@ object HostedLlmProviders {
             id = LLM7_ID,
             displayName = "LLM7",
             baseUrl = "https://api.llm7.io/v1",
-            defaultModel = "GLM-5.3-Flash",
+            // LLM7's own alias for whatever it currently serves; named models come and go
+            // (GLM-5.3-Flash answered HTTP 400 model_unavailable on 2026-09-29).
+            defaultModel = "default",
             keyOptional = true,
         ),
         HostedLlmProviderSpec(

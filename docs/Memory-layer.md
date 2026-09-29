@@ -104,8 +104,13 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
 - **Stored memory:** counts, forget one episode (and what came only from it), export/import JSON,
   forget everything. Memory can be switched off or its consolidation paused.
 
-Android and desktop store memory in SQLite; the web build uses browser storage until the SQLite
-worker is wired.
+Every platform stores memory in SQLite through one `SqlMemoryStore`. On the web the database
+lives in the Origin Private File System, opened in a worker (`shared/memory-worker/`, the official
+SQLite WebAssembly build with its `opfs-sahpool` VFS, which needs no COOP/COEP headers).
+`openWebMemoryStore` creates or migrates the schema through `PRAGMA user_version` and imports the
+older browser-storage log once. A browser without OPFS keeps that browser-storage store. A second
+tab cannot open the database while the first holds it; it gets memory that lasts only for the
+session rather than a second copy that would diverge.
 
 ### Engines
 
