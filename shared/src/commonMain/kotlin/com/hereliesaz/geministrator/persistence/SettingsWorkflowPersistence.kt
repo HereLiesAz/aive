@@ -33,6 +33,11 @@ class SettingsWorkflowPersistence(
     private val json: Json = defaultJson,
 ) : WorkflowPersistence {
 
+    /** Inference state shares this store's backing [settings]: the app's durable store for the default instance. */
+    override val inferenceSettings: Settings by lazy {
+        com.hereliesaz.geministrator.workflow.chunkedInferenceSettings(settings)
+    }
+
     override val projects: ProjectRepository = object : ProjectRepository {
         override suspend fun put(project: Project) = update { snapshot ->
             snapshot.copy(projects = snapshot.projects.upsert(project) { it.id == project.id })

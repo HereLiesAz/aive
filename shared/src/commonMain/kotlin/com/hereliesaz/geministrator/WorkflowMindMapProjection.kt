@@ -174,14 +174,8 @@ private fun TaskRunStatus?.toH2g2State(): H2g2WorkflowState = when (this) {
     TaskRunStatus.Failed, TaskRunStatus.Cancelled -> H2g2WorkflowState.Failed
 }
 
-private fun TaskRun.displayProgress(): Float? = progress ?: when (status) {
-    TaskRunStatus.Planning -> .14f
-    TaskRunStatus.AwaitingApproval -> .24f
-    TaskRunStatus.Running, TaskRunStatus.Retrying -> .52f
-    TaskRunStatus.Verifying -> .82f
-    TaskRunStatus.Completed -> 1f
-    else -> null
-}
+/** Only progress an executor reported; a finished task is full. Status alone never implies a fraction. */
+private fun TaskRun.displayProgress(): Float? = progress ?: if (status == TaskRunStatus.Completed) 1f else null
 
 internal fun executorMotion(executor: TaskExecutor): H2g2WorkflowMotion = when (executor) {
     is TaskExecutor.GitHubAction -> H2g2WorkflowMotion.Pulse

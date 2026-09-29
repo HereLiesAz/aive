@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -52,7 +53,7 @@ class HallMonitorSolutionTrialServiceTest {
         val planner = CapturingPlanner()
         val service = HallMonitorSolutionTrialService(
             persistence = fixture.persistence,
-            providerRegistry = AgentProviderRegistry(emptyList()),
+            providerRegistry = AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings()),
         )
 
         val trial = service.launch(
@@ -89,7 +90,7 @@ class HallMonitorSolutionTrialServiceTest {
     fun refusesSecondConcurrentTrialOfSameSolution() = runTest {
         val fixture = fixture()
         val planner = CapturingPlanner()
-        val service = HallMonitorSolutionTrialService(fixture.persistence, AgentProviderRegistry(emptyList()))
+        val service = HallMonitorSolutionTrialService(fixture.persistence, AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings()))
 
         service.launch(fixture.sourceRun, "latency-plateau", 0, planner, 100L)
         val refreshedSource = assertNotNull(fixture.persistence.runs.get(fixture.sourceRun.id))

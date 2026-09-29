@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.persistence
 
+import com.russhwolf.settings.Settings
+
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.Project
@@ -58,6 +60,13 @@ interface WorkflowPersistence : FailureEscalationDecisionStore {
     val roles: RoleRepository
     val artifacts: ArtifactRepository
     val approvalGates: ApprovalGateRepository
+
+    /**
+     * Where the compound-inference state belonging to this workflow store lives. Defaults to the
+     * platform's durable store; a store that is not the app's own (a test's, a scratch import)
+     * overrides it so its inference bindings never leak into the app's.
+     */
+    val inferenceSettings: Settings get() = com.hereliesaz.geministrator.workflow.durableInferenceSettings()
 
     /**
      * Replace the workflow-definition and role catalogs.

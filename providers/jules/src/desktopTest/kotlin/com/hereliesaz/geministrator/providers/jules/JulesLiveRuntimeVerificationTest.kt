@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.jules
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.ApplicationRuntime
 import com.hereliesaz.geministrator.ApplicationRuntimeState
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -75,7 +76,7 @@ class JulesLiveRuntimeVerificationTest {
 
         WorkflowLaunchService(
             preparer = WorkflowDefinitionPreparer(
-                providerRegistry = AgentProviderRegistry(listOf(firstProvider)),
+                providerRegistry = AgentProviderRegistry(listOf(firstProvider), inferenceSettings = InMemorySettings()),
                 roles = BuiltInRoles.all,
             ),
             persistence = persistence,

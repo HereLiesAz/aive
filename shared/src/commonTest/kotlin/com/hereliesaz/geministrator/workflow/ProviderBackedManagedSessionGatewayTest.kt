@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -37,7 +38,7 @@ class ProviderBackedManagedSessionGatewayTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             try {
                 val gateway = ProviderBackedManagedSessionGateway(
-                    AgentProviderRegistry(listOf(CancellingCapabilitiesProvider())),
+                    AgentProviderRegistry(listOf(CancellingCapabilitiesProvider()), inferenceSettings = InMemorySettings()),
                     scope,
                 )
 
@@ -61,7 +62,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.Planning)
@@ -88,7 +89,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.Running)
@@ -122,7 +123,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
 
@@ -151,7 +152,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
 
@@ -183,7 +184,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.Running)
@@ -211,7 +212,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.AwaitingApproval)

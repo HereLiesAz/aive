@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.inference
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AcceptanceCriterion
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -175,7 +176,7 @@ class BlueprintInferenceFabricTest {
     fun providerGatewayRoutesEveryStartedAgentSessionThroughFabric(): Unit = runBlocking {
         val fabric = BlueprintCompoundInferenceFabric()
         val provider = CapturingInferenceProvider()
-        val registry = AgentProviderRegistry(listOf(provider), fabric)
+        val registry = AgentProviderRegistry(listOf(provider), fabric, inferenceSettings = InMemorySettings())
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             val gateway = ProviderBackedManagedSessionGateway(registry, scope)

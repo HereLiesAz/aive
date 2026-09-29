@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskRunId
@@ -42,7 +43,7 @@ class MemoryPromptInjectionTest {
                 )
             }
             val gateway = ProviderBackedManagedSessionGateway(
-                providerRegistry = AgentProviderRegistry(listOf(provider)),
+                providerRegistry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope = scope,
                 orchestrationUtilities = utilities,
             )

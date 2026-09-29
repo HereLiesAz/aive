@@ -59,10 +59,15 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
 
     reportLaunchProgress("Gathering available agent roles…")
     val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    // Offer the planner only roles a linked provider can staff: a step for any other role could
+    // never be dispatched. With nothing staffable, keep them all so the failure names the gap.
+    val plannerRoles = launchRoles
+        .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired) }
+        .ifEmpty { launchRoles }
     val packet = OrchestrationPacket(
         objective = cleanObjective,
         currentState = "new-workflow",
-        availableAgents = launchRoles.map { role ->
+        availableAgents = plannerRoles.map { role ->
             OrchestrationRole(
                 id = role.id.value,
                 name = role.name,
@@ -71,7 +76,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         },
         instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
     )
-    reportLaunchProgress("Asking the planner for a workflow (${launchRoles.size} roles available)…")
+    reportLaunchProgress("Asking the planner for a workflow (${plannerRoles.size} roles available)…")
     val plan = orchestrationRuntime.plan(packet)
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
     reportLaunchProgress("Assembling workflow…")
