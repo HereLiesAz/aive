@@ -39,14 +39,17 @@ class AgentProviderRegistry(
     localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
     /**
      * Backing store for the default fabric and genealogy graph when those are not given; see
-     * [com.hereliesaz.geministrator.persistence.WorkflowPersistence.inferenceSettings].
+     * [com.hereliesaz.geministrator.persistence.WorkflowPersistence.inferenceSettings]. Null means
+     * the platform's durable store, opened only if a default is actually needed.
      */
-    inferenceSettings: Settings = durableInferenceSettings(),
+    inferenceSettings: Settings? = null,
 ) {
+    private val defaultSettings: Settings by lazy { inferenceSettings ?: durableInferenceSettings() }
+
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = genealogyGovernance
-        ?: InferenceGenealogyGovernanceRuntime(graph = SettingsInferenceGenealogyGraph(inferenceSettings))
+        ?: InferenceGenealogyGovernanceRuntime(graph = SettingsInferenceGenealogyGraph(defaultSettings))
     private val defaultedFabric: CompoundInferenceFabric = inferenceFabric
-        ?: SettingsCompoundInferenceFabric(SettingsInferenceStateStore(inferenceSettings))
+        ?: SettingsCompoundInferenceFabric(SettingsInferenceStateStore(defaultSettings))
 
     val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
         delegate = defaultedFabric.withLocalModelLibrary(localModelLibrary),
