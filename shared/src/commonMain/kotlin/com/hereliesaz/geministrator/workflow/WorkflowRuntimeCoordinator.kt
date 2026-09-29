@@ -723,7 +723,7 @@ class WorkflowRuntimeCoordinator(
                                 providerRunId = null,
                                 externalRunId = decision.externalRunId,
                                 blockingReason = null,
-                                progress = 0f,
+                                progress = null,
                                 progressMessage = decision.progressMessage,
                             )
                         ),

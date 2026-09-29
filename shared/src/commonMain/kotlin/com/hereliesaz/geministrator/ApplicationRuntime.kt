@@ -737,6 +737,7 @@ class ApplicationRuntime private constructor(
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
             val registry = providerRegistry ?: AgentProviderRegistry(
                 providers = providers,
+                inferenceSettings = persistence.inferenceSettings,
                 orchestrationUtilities = orchestrationUtilities,
                 localModelLibrary = localModelLibrary,
             )

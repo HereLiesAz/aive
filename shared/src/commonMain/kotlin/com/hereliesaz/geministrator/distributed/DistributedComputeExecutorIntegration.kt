@@ -42,7 +42,6 @@ class DistributedComputeExecutorIntegration(
         return TaskExecutorExecution(
             status = TaskRunStatus.Running,
             externalRunId = leaseId,
-            progress = 0f,
             progressMessage = "Waiting for an eligible compute node",
         )
     }
@@ -63,7 +62,7 @@ class DistributedComputeExecutorIntegration(
             -> TaskExecutorExecution(
                 status = TaskRunStatus.Running,
                 externalRunId = leaseId,
-                progress = state.progress ?: 0f,
+                progress = state.progress,
                 progressMessage = state.progressMessage ?: "Waiting for an eligible compute node",
             )
 

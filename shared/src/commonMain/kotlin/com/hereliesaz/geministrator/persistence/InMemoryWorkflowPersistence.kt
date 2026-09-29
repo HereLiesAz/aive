@@ -21,6 +21,9 @@ import kotlinx.coroutines.sync.withLock
 
 class InMemoryWorkflowPersistence : WorkflowPersistence {
     private val mutex = Mutex()
+
+    /** Nothing here outlives the process, so neither does its inference state. */
+    override val inferenceSettings: com.russhwolf.settings.Settings = InMemorySettings()
     private val projectItems = mutableMapOf<ProjectId, Project>()
     private val definitionItems = mutableMapOf<WorkflowDefinitionId, WorkflowDefinition>()
     private val runItems = mutableMapOf<WorkflowRunId, WorkflowRun>()

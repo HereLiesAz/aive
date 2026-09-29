@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -68,7 +69,7 @@ class WorkflowEngineFoundationTest {
             AgentProviderId("capable"),
             setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite),
         )
-        val registry = AgentProviderRegistry(listOf(basic, capable))
+        val registry = AgentProviderRegistry(listOf(basic, capable), inferenceSettings = InMemorySettings())
 
         assertEquals(
             capable.id,

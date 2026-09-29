@@ -116,7 +116,7 @@ class WorkflowMindMapProjectionTest {
         val projection = projectWorkflowMindMap(definition, run, BuiltInRoles.all)
         val implementation = projection.bands.flatMap { it.nodes }.first { it.id == "implementation" }
 
-        assertEquals(.82f, implementation.progress)
+        assertEquals(null, implementation.progress, "no reported progress means no bar, not a guess from status")
         assertEquals(H2g2WorkflowState.Active, implementation.state)
     }
 

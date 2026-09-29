@@ -6,7 +6,6 @@ The current Aive mark is defined by the source assets in `branding/`.
 
 - `branding/haive_logo.png` — current color logo, icon and splash source
 - `branding/haive_monochrome.png` — monochrome logo source
-- `branding/haive_animation1.mp4` / `branding/haive_animation2.mp4` — extended motion assets
 
 Desktop `.png`, `.ico`, and `.icns` package icons and Web favicon/PWA sizes are generated deterministically from `haive_logo.png` during the build. Stale checked-in Desktop/Web icon derivatives are not retained.
 

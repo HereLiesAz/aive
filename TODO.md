@@ -69,9 +69,10 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [ ] Create/import a project.
 - [ ] Define an objective.
 - [ ] Materialize a workflow definition.
+  - Implemented and unit-tested (`ApplicationRuntimeObjectiveLaunchTest`); the live test `launchFromObjectiveThroughTheLivePlanner` takes the app's own launch path (project name + objective → hosted planner → persisted DAG → dispatch to the real provider) and passed locally against Kilo on 2026-09-29. These three tick with its first centralized run.
 - [x] Approve any required plan/specification gates.
 - [x] Dispatch provider-backed work through a configured real provider.
-- [ ] Reconcile provider progress without fabricating percentages.
+- [x] Reconcile provider progress without fabricating percentages.
 - [x] Persist and resume the run after process/browser restart.
 - [x] Collect artifacts.
 - [x] Run verification/review stages.

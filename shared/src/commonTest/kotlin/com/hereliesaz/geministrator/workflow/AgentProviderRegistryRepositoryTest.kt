@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -34,6 +35,7 @@ class AgentProviderRegistryRepositoryTest {
         val registry = AgentProviderRegistry(
             providers = listOf(githubOnly, gitLabCapable),
             orchestrationUtilities = utilities,
+            inferenceSettings = InMemorySettings(),
         )
 
         val selected = registry.select(
@@ -61,6 +63,7 @@ class AgentProviderRegistryRepositoryTest {
                     supportedSources = setOf(RepositorySource.GitHub),
                 ),
             ),
+            inferenceSettings = InMemorySettings(),
         )
 
         val failure = assertFailsWith<IllegalStateException> {
@@ -92,7 +95,7 @@ class AgentProviderRegistryRepositoryTest {
             supportedSources = setOf(RepositorySource.GitLab),
             capabilities = setOf(AgentCapability.Research),
         )
-        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable))
+        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable), inferenceSettings = InMemorySettings())
 
         val selected = registry.select(
             ProviderSelectionRequest(
@@ -116,7 +119,7 @@ class AgentProviderRegistryRepositoryTest {
             supportedSources = setOf(RepositorySource.GitHub),
             explicitOnly = true,
         )
-        val registry = AgentProviderRegistry(listOf(julesLike))
+        val registry = AgentProviderRegistry(listOf(julesLike), inferenceSettings = InMemorySettings())
         val github = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub)
 
         val failure = assertFailsWith<IllegalStateException> {
@@ -150,7 +153,7 @@ class AgentProviderRegistryRepositoryTest {
             id = AgentProviderId("automatic"),
             supportedSources = setOf(RepositorySource.GitHub),
         )
-        val registry = AgentProviderRegistry(listOf(julesLike, automatic))
+        val registry = AgentProviderRegistry(listOf(julesLike, automatic), inferenceSettings = InMemorySettings())
 
         val selected = registry.select(
             ProviderSelectionRequest(

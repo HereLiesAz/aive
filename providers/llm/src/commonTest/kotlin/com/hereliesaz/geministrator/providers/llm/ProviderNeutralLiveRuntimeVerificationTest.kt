@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.ApplicationRuntime
 import com.hereliesaz.geministrator.ApplicationRuntimeState
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -25,6 +26,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.TaskFailed
 import com.hereliesaz.geministrator.decideFailureEscalation
+import com.hereliesaz.geministrator.launchOrchestratedWorkflow
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -77,6 +79,68 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         withContext(Dispatchers.Default) { verifyLiveRuntime() }
     }
 
+    /**
+     * The app's own launch path: a project name and an objective go through the real planner (the
+     * same provider as a text API), the planned DAG is materialized and persisted, and its first
+     * provider task is dispatched to the real provider. Covers create project → define objective →
+     * materialize workflow, which [launchApproveExecuteEscalateRestartResumeAndComplete] builds in code.
+     */
+    @Test
+    fun launchFromObjectiveThroughTheLivePlanner() = runTest(timeout = 30.minutes) {
+        if (liveEnv(OPT_IN_ENV) != "1") return@runTest
+        withContext(Dispatchers.Default) { verifyObjectiveLaunch() }
+    }
+
+    private suspend fun verifyObjectiveLaunch() {
+        val providerConfig = liveProviderConfig()
+        val persistence = SettingsWorkflowPersistence(MapSettings(), storageKey = "aive.live.objective.launch")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val runtime = ApplicationRuntime.create(
+            providers = listOf(liveProvider(providerConfig)),
+            scope = scope,
+            persistence = persistence,
+        )
+        val objective = "Write a one-paragraph summary of what a smoke test is. Do not access or modify a repository."
+        try {
+            runtime.launchOrchestratedWorkflow(
+                projectName = "Live objective launch",
+                objective = objective,
+                orchestrationRuntime = TextGenerationOrchestrationAgentRuntime(plannerApi(providerConfig)),
+            )
+            val dispatched = awaitLive(runtime, "planned workflow dispatched to the provider") { live ->
+                live.presentation.run.taskRuns.values.firstOrNull { it.status == TaskRunStatus.Failed }?.let { failed ->
+                    error("Planned task ${failed.taskDefinitionId.value} failed: ${failed.progressMessage}")
+                }
+                live.presentation.run.taskRuns.values.any {
+                    it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Completed
+                }
+            }
+            val presentation = dispatched.presentation
+            assertEquals("Live objective launch", presentation.project.name)
+            assertEquals(objective, presentation.run.objective)
+            assertTrue(presentation.definition.tasks.isNotEmpty(), "The planner must produce at least one task")
+            presentation.definition.tasks.forEach { println("[live] planned task ${it.id.value}: ${it.name}") }
+            presentation.run.taskRuns.values
+                .filter { it.status != TaskRunStatus.Completed }
+                .forEach { assertEquals(null, it.progress, "No task may show a percentage its executor did not report") }
+            assertEquals(presentation.project.id, persistence.projects.all().single().id, "The launched project is persisted")
+        } finally {
+            runtime.close()
+            scope.cancel()
+        }
+    }
+
+    /** The provider as a plain text API, the way the app hands a linked LLM to the planner. */
+    private fun plannerApi(config: LiveProviderConfig): TextGenerationApi = when (config.providerId.value) {
+        "ollama" -> OpenAiCompatibleChatApi(
+            apiKeyProvider = LlmApiKeyProvider { config.apiKey },
+            model = checkNotNull(config.model) { "Ollama model is not configured" },
+            baseUrl = checkNotNull(config.baseUrl) { "Ollama base URL is not configured" },
+        )
+        else -> memoryTextApi(mapOf(config.providerId.value to config.apiKey), config.providerId.value, config.model)
+            ?: error("No planner text API for ${config.providerId.value}")
+    }
+
     private suspend fun verifyLiveRuntime() {
         val providerConfig = liveProviderConfig()
 
@@ -95,7 +159,7 @@ class ProviderNeutralLiveRuntimeVerificationTest {
 
         WorkflowLaunchService(
             preparer = WorkflowDefinitionPreparer(
-                providerRegistry = AgentProviderRegistry(listOf(firstProvider)),
+                providerRegistry = AgentProviderRegistry(listOf(firstProvider), inferenceSettings = InMemorySettings()),
                 roles = BuiltInRoles.all,
             ),
             persistence = persistence,

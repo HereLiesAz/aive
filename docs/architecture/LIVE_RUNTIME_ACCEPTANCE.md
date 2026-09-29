@@ -114,6 +114,16 @@ timeout.
   backoff.
 - 2026-09-29, desktop JVM, Kilo Gateway (no key), after the move to the common test tree: passed.
   Plan gate after 11.5 s, failure escalation after 60.6 s; the provider's artifact was a `TaskPlan`.
+- 2026-09-29, desktop JVM, Kilo Gateway (no key), `launchFromObjectiveThroughTheLivePlanner`:
+  project name and objective through `launchOrchestratedWorkflow` with Kilo as the planner, the
+  planned DAG persisted, and its task dispatched to Kilo: passed twice (8.5 s and 12.5 s to the
+  first provider response). Earlier attempts failed twice. Once, `kilo-auto` returned an empty
+  reply ("did not contain assistant text"). The router picks a different model per request; this
+  did not recur, and the launch reports it as a failure rather than retrying. Three times, the plan
+  used a role no linked provider could staff ("No agent provider satisfies required capabilities
+  [Research]"). Fixed: the planner is now offered only roles a linked provider can staff.
+- Same day, both live tests after test runtimes stopped sharing the platform's durable inference
+  store (each workflow store now carries its own): the lifecycle test passed in 25 s.
 
 These are local runs, not the centralized verification below.
 

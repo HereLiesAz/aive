@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AcceptanceCriterion
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -54,7 +55,7 @@ class WorkflowGovernanceTest {
             ),
         )
         val preparer = WorkflowDefinitionPreparer(
-            providerRegistry = AgentProviderRegistry(listOf(worker, epa)),
+            providerRegistry = AgentProviderRegistry(listOf(worker, epa), inferenceSettings = InMemorySettings()),
             roles = BuiltInRoles.all,
         )
         val implementationId = TaskDefinitionId("implement")
