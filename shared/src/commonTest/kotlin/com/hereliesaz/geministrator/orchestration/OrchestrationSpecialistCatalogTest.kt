@@ -57,6 +57,27 @@ class OrchestrationSpecialistCatalogTest {
         assertEquals(1, library.allArtifacts().size)
     }
 
+    /** Both shapes in one catalog: the runtime's adapter support decides which one loads. */
+    @Test
+    fun runtimeChoosesBetweenMergedAndSharedBaseAdapter() {
+        fun artifact(id: String, kind: String, fmt: String, extra: String = "") =
+            """{"logicalArtifactId":"$id","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive",
+               "releaseTag":"orchestration-utilities-v1","assetName":"$id.bin","sha256":"${"d".repeat(64)}",
+               "format":"$fmt","precision":"int8","kind":"$kind"$extra}"""
+        val library = OrchestrationSpecialistCatalog.parse(
+            """{"specialists":[{"specialistId":"orchestration:tool-router",
+                "mergedVariants":[${artifact("orchestration:utilities:int8", "MergedModel", "onnx")}],
+                "sharedBaseVariants":[${artifact("orchestration:base:int8", "SharedBase", "onnx")}],
+                "adapter":${artifact("orchestration:tool-router:lora:v1", "Adapter", "safetensors", ",\"adapterId\":\"tool-router-v1\"")}}]}""",
+        )
+        val merged = LocalModelRuntimeCapabilities(runtimeId = "desktop", supportedFormats = setOf("onnx"), supportedPrecisions = setOf("int8"))
+        val adapters = merged.copy(supportedFormats = setOf("onnx", "safetensors"), supportsSharedBaseAdapters = true)
+
+        assertIs<LocalModelLoadPlan.MergedModel>(library.plan("orchestration:tool-router", merged))
+        val plan = assertIs<LocalModelLoadPlan.SharedBaseAdapter>(library.plan("orchestration:tool-router", adapters))
+        assertEquals("tool-router-v1", plan.adapter.adapterId)
+    }
+
     @Test
     fun rejectsIdsOutsideTheOrchestrationFamily() {
         assertFailsWith<IllegalArgumentException> {

@@ -17,6 +17,9 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Greedy decoding for an Optimum `text-generation-with-past` ONNX export (Qwen2.5 layout: KV cache
  * inputs, float logits). Shared by the local planner and the orchestration specialists.
+ *
+ * `extraInputs` feeds graph inputs the loop does not produce itself (a role's LoRA weights on a shared
+ * base). The caller owns those tensors; they are reused across every step and never closed here.
  */
 internal class DesktopOrtCausalGenerator(
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment(),
@@ -31,6 +34,7 @@ internal class DesktopOrtCausalGenerator(
         maxNewTokens: Int,
         progress: (String) -> Unit = {},
         writingLabel: String = "Writing",
+        extraInputs: Map<String, OnnxTensor> = emptyMap(),
     ): String {
         val config = loadModelConfig(modelRoot)
         val promptIds = tokenizer.encode(prompt).ids
@@ -63,6 +67,7 @@ internal class DesktopOrtCausalGenerator(
                     previousResult = previous,
                     config = config,
                     owned = owned,
+                    extraInputs = extraInputs,
                 )
                 val isFinalChunk = chunkIndex == chunks.lastIndex
                 val chunkResult = try {
@@ -92,6 +97,7 @@ internal class DesktopOrtCausalGenerator(
                     previousResult = currentResult,
                     config = config,
                     owned = owned,
+                    extraInputs = extraInputs,
                 )
                 val nextResult = try {
                     session.run(nextInputs)
@@ -114,9 +120,14 @@ internal class DesktopOrtCausalGenerator(
         previousResult: OrtSession.Result?,
         config: ModelConfig,
         owned: MutableList<OnnxTensor>,
+        extraInputs: Map<String, OnnxTensor>,
     ): Map<String, OnnxTensor> {
         val inputs = linkedMapOf<String, OnnxTensor>()
         session.inputInfo.forEach { (name, nodeInfo) ->
+            extraInputs[name]?.let { supplied ->
+                inputs[name] = supplied
+                return@forEach
+            }
             val tensorInfo = nodeInfo.info as? TensorInfo
                 ?: error("Unsupported non-tensor model input $name")
             val borrowsPreviousResult = name.startsWith("past_key_values.") && previousResult != null

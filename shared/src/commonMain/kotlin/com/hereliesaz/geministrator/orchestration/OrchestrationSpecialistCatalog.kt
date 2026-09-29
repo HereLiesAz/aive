@@ -11,7 +11,9 @@ import kotlinx.serialization.json.Json
  * Released local orchestration specialists.
  *
  * [RELEASED] is the `catalog.json` written by `tools/orchestration_training/aive_orchestration_specialists.ipynb`
- * for the roles that passed both gates. Register a new release with
+ * for the roles that passed both gates. A role may list a merged multi-task model, a shared base plus its
+ * own adapter, or both; [LocalModelLibrary.plan] picks per runtime (shared base + adapter only when the
+ * runtime advertises adapter support). Register a new release with
  * `python3 tools/orchestration_training/register_catalog.py <catalog.json>`, which rewrites the constant.
  * An empty catalog is valid: every utility then uses its deterministic baseline.
  */
@@ -33,7 +35,9 @@ object OrchestrationSpecialistCatalog {
                 }
                 LocalModelSpecialistDescriptor(
                     specialistId = specialist.specialistId,
-                    mergedVariants = specialist.mergedVariants.map(CatalogArtifact::toDescriptor),
+                    mergedVariants = specialist.mergedVariants.map { it.toDescriptor(LocalModelArtifactKind.MergedModel) },
+                    sharedBaseVariants = specialist.sharedBaseVariants.map { it.toDescriptor(LocalModelArtifactKind.SharedBase) },
+                    adapter = specialist.adapter?.toDescriptor(LocalModelArtifactKind.Adapter),
                 )
             },
         )
@@ -47,7 +51,9 @@ object OrchestrationSpecialistCatalog {
     @Serializable
     private data class CatalogSpecialist(
         val specialistId: String,
-        val mergedVariants: List<CatalogArtifact>,
+        val mergedVariants: List<CatalogArtifact> = emptyList(),
+        val sharedBaseVariants: List<CatalogArtifact> = emptyList(),
+        val adapter: CatalogArtifact? = null,
     )
 
     @Serializable
@@ -61,10 +67,11 @@ object OrchestrationSpecialistCatalog {
         val format: String,
         val precision: String? = null,
         val kind: LocalModelArtifactKind,
+        val adapterId: String? = null,
         val capabilities: Set<String> = emptySet(),
     ) {
-        fun toDescriptor(): LocalModelArtifactDescriptor {
-            require(kind == LocalModelArtifactKind.MergedModel) { "$logicalArtifactId: only merged models are released" }
+        fun toDescriptor(expected: LocalModelArtifactKind): LocalModelArtifactDescriptor {
+            require(kind == expected) { "$logicalArtifactId: expected a $expected artifact, got $kind" }
             return LocalModelArtifactDescriptor(
                 logicalArtifactId = logicalArtifactId,
                 foundationModelId = foundationModelId,
@@ -75,6 +82,7 @@ object OrchestrationSpecialistCatalog {
                 format = format,
                 precision = precision,
                 kind = kind,
+                adapterId = adapterId,
                 capabilities = capabilities,
             )
         }

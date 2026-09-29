@@ -15,20 +15,26 @@ KOTLIN = Path(__file__).resolve().parents[2] / (
     "shared/src/commonMain/kotlin/com/hereliesaz/geministrator/orchestration/OrchestrationSpecialistCatalog.kt"
 )
 FIELDS = ("logicalArtifactId", "foundationModelId", "releaseRepository", "releaseTag", "assetName", "sha256",
-          "format", "precision", "kind", "capabilities")
+          "format", "precision", "kind", "adapterId", "capabilities")
+
+
+def artifact(v):
+    return {k: v[k] for k in FIELDS if k in v}
 
 
 def main(path):
     catalog = json.loads(Path(path).read_text())
-    specialists = [
-        {
-            "specialistId": s["specialistId"],
-            "mergedVariants": [{k: v[k] for k in FIELDS if k in v} for v in s["mergedVariants"]],
-        }
-        for s in sorted(catalog["specialists"], key=lambda s: s["specialistId"])
-    ]
+    specialists = []
+    for s in sorted(catalog["specialists"], key=lambda s: s["specialistId"]):
+        entry = {"specialistId": s["specialistId"]}
+        for key in ("mergedVariants", "sharedBaseVariants"):
+            if s.get(key):
+                entry[key] = [artifact(v) for v in s[key]]
+        if s.get("adapter"):
+            entry["adapter"] = artifact(s["adapter"])
+        specialists.append(entry)
     for s in specialists:
-        for v in s["mergedVariants"]:
+        for v in s.get("mergedVariants", []) + s.get("sharedBaseVariants", []) + ([s["adapter"]] if "adapter" in s else []):
             if not re.fullmatch(r"[0-9a-f]{64}", v["sha256"]):
                 raise SystemExit(f"{v['logicalArtifactId']}: sha256 is not a lowercase SHA-256 digest")
     compact = json.dumps({"specialists": specialists}, separators=(",", ":"))
