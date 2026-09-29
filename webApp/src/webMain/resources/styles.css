@@ -37,22 +37,6 @@ body {
     object-fit: contain;
 }
 
-#haiveSplashFrame0 {
-    opacity: 1;
-}
-
-#haiveSplashAnimation {
-    opacity: 0;
-}
-
-#haiveSplashAnimation.haive-loader-running {
-    opacity: 1;
-}
-
-#haiveSplashFrame0.haive-loader-replaced {
-    opacity: 0;
-}
-
 #haiveSplash.haive-splash-ready {
     opacity: 0;
     pointer-events: none;
@@ -61,13 +45,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
     #haiveSplash {
         transition: none;
-    }
-
-    #haiveSplashAnimation {
-        display: none;
-    }
-
-    #haiveSplashFrame0 {
-        opacity: 1;
     }
 }
