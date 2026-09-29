@@ -203,26 +203,30 @@ from optimum.onnxruntime import ORTModelForCausalLM, ORTQuantizer
 from optimum.onnxruntime.configuration import AutoQuantizationConfig
 
 def export(slug):
+    """Merge the adapter and export fp32 ONNX, then quantize. Each stage resumes if its output exists."""
     root = WORK / slug
     merged, fp32, int8 = root / "merged", root / "onnx_fp32", root / "onnx_int8"
-    for d in (merged, fp32, int8):
-        shutil.rmtree(d, ignore_errors=True)
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-    model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32)
-    model = PeftModel.from_pretrained(model, root / "adapter").merge_and_unload()
-    model.save_pretrained(merged, safe_serialization=True)
-    tokenizer.save_pretrained(merged)
-    del model; gc.collect()
-    # fp32 graph -> dynamic INT8 keeps float32 inputs/outputs, which is what the app's ORT loop reads.
-    main_export(str(merged), fp32, task="text-generation-with-past", device="cpu")
-    shutil.rmtree(merged, ignore_errors=True)  # free the checkpoint before quantizing (disk)
-    int8.mkdir(parents=True)
-    for f in fp32.iterdir():
-        if f.is_file() and not f.name.startswith("model.onnx"):
-            shutil.copy2(f, int8 / f.name)
-    ORTQuantizer.from_pretrained(fp32, file_name="model.onnx").quantize(
-        AutoQuantizationConfig.avx2(is_static=False, per_channel=False), save_dir=int8, file_suffix="",
-    )
+    if not (fp32 / "model.onnx").is_file():
+        shutil.rmtree(merged, ignore_errors=True); shutil.rmtree(fp32, ignore_errors=True)
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+        model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32)
+        model = PeftModel.from_pretrained(model, root / "adapter").merge_and_unload()
+        model.save_pretrained(merged, safe_serialization=True)
+        tokenizer.save_pretrained(merged)
+        del model; gc.collect()
+        main_export(str(merged), fp32, task="text-generation-with-past", device="cpu")
+        shutil.rmtree(merged, ignore_errors=True)  # free the checkpoint before quantizing (disk)
+    if not (int8 / "model.onnx").is_file():
+        shutil.rmtree(int8, ignore_errors=True)
+        int8.mkdir(parents=True)
+        for f in fp32.iterdir():
+            if f.is_file() and not f.name.startswith("model.onnx"):
+                shutil.copy2(f, int8 / f.name)
+        # fp32 graph -> dynamic INT8 keeps float32 inputs/outputs, which is what the app's ORT loop reads.
+        ORTQuantizer.from_pretrained(fp32, file_name="model.onnx").quantize(
+            AutoQuantizationConfig.avx2(is_static=False, per_channel=False), save_dir=int8, file_suffix="",
+        )
+        gc.collect()
     assert (int8 / "model.onnx").is_file() and (int8 / "tokenizer.json").is_file(), "app needs model.onnx + tokenizer.json"
     shutil.rmtree(fp32, ignore_errors=True)
     return int8
