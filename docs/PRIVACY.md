@@ -40,6 +40,8 @@ The current persistence backend uses platform-local storage:
 - Desktop/JVM: Java Preferences
 - Web: browser localStorage
 
+Agent memory (banked session text and the graph derived from it) is kept in a SQLite database: on Android, `aive-memory.db` in the app's private database directory; on desktop, `~/.aive/memory/memory.db`. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.
+
 This data is used to restore workflows and continue runs after the application or browser restarts.
 
 The Android app sets `allowBackup="true"`. If Android device backup is on, the system may include The Aive's app data in your device backup under Google's backup terms. Stored credentials are encrypted with an Android Keystore key, and that key is not included in the backup, so restored credential ciphertext cannot be decrypted. You have to reconnect providers after a restore.

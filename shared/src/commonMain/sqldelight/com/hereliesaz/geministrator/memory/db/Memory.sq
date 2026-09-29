@@ -1,0 +1,121 @@
+-- The memory graph. Rows are append-only except queue entries and the revision.
+-- `body` holds the complete record as JSON; the other columns exist to be queried and indexed.
+-- Row order (rowid) is insertion order, which the snapshot preserves.
+
+CREATE TABLE memory_meta (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE memory_episode (
+    id TEXT NOT NULL PRIMARY KEY,
+    project_id TEXT,
+    created_at INTEGER NOT NULL,
+    body TEXT NOT NULL
+);
+
+CREATE TABLE memory_section (
+    id TEXT NOT NULL PRIMARY KEY,
+    episode_id TEXT NOT NULL,
+    body TEXT NOT NULL
+);
+
+CREATE INDEX memory_section_episode ON memory_section(episode_id);
+
+CREATE TABLE memory_node (
+    id TEXT NOT NULL PRIMARY KEY,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    body TEXT NOT NULL
+);
+
+CREATE INDEX memory_node_kind ON memory_node(kind);
+
+CREATE TABLE memory_edge (
+    id TEXT NOT NULL PRIMARY KEY,
+    from_id TEXT NOT NULL,
+    to_id TEXT NOT NULL,
+    relation TEXT NOT NULL,
+    body TEXT NOT NULL
+);
+
+CREATE INDEX memory_edge_from ON memory_edge(from_id);
+CREATE INDEX memory_edge_to ON memory_edge(to_id);
+CREATE INDEX memory_edge_relation ON memory_edge(relation);
+
+CREATE TABLE memory_queue (
+    id TEXT NOT NULL PRIMARY KEY,
+    sequence INTEGER NOT NULL UNIQUE,
+    episode_id TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    status TEXT NOT NULL,
+    body TEXT NOT NULL
+);
+
+CREATE TABLE memory_declined_condensation (
+    cluster_key TEXT NOT NULL PRIMARY KEY
+);
+
+revision:
+SELECT value FROM memory_meta WHERE key = 'revision';
+
+setRevision:
+INSERT OR REPLACE INTO memory_meta(key, value) VALUES ('revision', ?);
+
+allEpisodes:
+SELECT body FROM memory_episode ORDER BY rowid;
+
+allSections:
+SELECT body FROM memory_section ORDER BY rowid;
+
+allNodes:
+SELECT body FROM memory_node ORDER BY rowid;
+
+allEdges:
+SELECT body FROM memory_edge ORDER BY rowid;
+
+allQueue:
+SELECT body FROM memory_queue ORDER BY sequence;
+
+allDeclined:
+SELECT cluster_key FROM memory_declined_condensation ORDER BY rowid;
+
+insertEpisode:
+INSERT INTO memory_episode(id, project_id, created_at, body) VALUES (?, ?, ?, ?);
+
+insertSection:
+INSERT INTO memory_section(id, episode_id, body) VALUES (?, ?, ?);
+
+insertNode:
+INSERT INTO memory_node(id, kind, text, created_at, body) VALUES (?, ?, ?, ?, ?);
+
+insertEdge:
+INSERT INTO memory_edge(id, from_id, to_id, relation, body) VALUES (?, ?, ?, ?, ?);
+
+upsertQueue:
+INSERT OR REPLACE INTO memory_queue(id, sequence, episode_id, stage, status, body) VALUES (?, ?, ?, ?, ?, ?);
+
+insertDeclined:
+INSERT OR IGNORE INTO memory_declined_condensation(cluster_key) VALUES (?);
+
+deleteMeta:
+DELETE FROM memory_meta;
+
+deleteEpisodes:
+DELETE FROM memory_episode;
+
+deleteSections:
+DELETE FROM memory_section;
+
+deleteNodes:
+DELETE FROM memory_node;
+
+deleteEdges:
+DELETE FROM memory_edge;
+
+deleteQueue:
+DELETE FROM memory_queue;
+
+deleteDeclined:
+DELETE FROM memory_declined_condensation;

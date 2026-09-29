@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.sqldelight)
 }
 
 val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
@@ -61,6 +62,8 @@ kotlin {
             implementation(libs.kmp.zip)
             implementation(libs.cryptography.core)
             implementation(libs.cryptography.provider.optimal)
+            implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.async.extensions)
         }
 
         getByName("androidMain").dependencies {
@@ -69,9 +72,11 @@ kotlin {
             implementation(libs.cryptography.provider.jdk.bc)
             // Overrides the provider's vulnerable transitive bcprov 1.83.
             implementation(libs.bouncycastle.bcprov)
+            implementation(libs.sqldelight.android.driver)
         }
 
         getByName("desktopMain").dependencies {
+            implementation(libs.sqldelight.sqlite.driver)
             if (isMacHost) {
                 implementation(libs.onnxruntime)
             } else {
@@ -81,6 +86,11 @@ kotlin {
 
         getByName("jsMain").dependencies {
             implementation(npm("onnxruntime-web", libs.versions.onnxruntime.get()))
+            implementation(libs.sqldelight.web.worker.driver)
+        }
+
+        getByName("wasmJsMain").dependencies {
+            implementation(libs.sqldelight.web.worker.driver)
         }
 
         commonTest.dependencies {
@@ -92,6 +102,16 @@ kotlin {
     }
 }
 
+
+sqldelight {
+    databases {
+        create("MemoryDatabase") {
+            packageName.set("com.hereliesaz.geministrator.memory.db")
+            // The browser driver is asynchronous; generating suspend queries keeps one store for all targets.
+            generateAsync.set(true)
+        }
+    }
+}
 
 compose.resources {
     packageOfResClass = "com.hereliesaz.geministrator.resources"

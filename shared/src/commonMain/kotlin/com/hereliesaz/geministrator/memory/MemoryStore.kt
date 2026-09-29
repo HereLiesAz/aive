@@ -190,7 +190,7 @@ internal class MemoryIdIndex(snapshot: MemorySnapshot) {
 private fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation): MemorySnapshot =
     applyMutation(mutation, MemoryIdIndex(this))
 
-private fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation, ids: MemoryIdIndex): MemorySnapshot {
+internal fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation, ids: MemoryIdIndex): MemorySnapshot {
     val newEpisodes = hashSetOf<MemoryEpisodeId>()
     mutation.episodesToAdd.forEach { episode ->
         require(episode.id !in ids.episodes && newEpisodes.add(episode.id)) {

@@ -88,6 +88,16 @@ Every abstraction must preserve provenance so a later agent can descend back to 
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
 
+### Storage
+
+The graph lives in SQLite through SQLDelight (`SqlMemoryStore`; schema in
+`shared/src/commonMain/sqldelight/.../Memory.sq`). One row per episode, section, node, edge, queue
+entry and declined cluster; each row holds the full record as JSON plus indexed columns (node kind,
+edge endpoints and relation, episode) for querying. A commit is one transaction containing only its
+own rows. Queries are generated as suspend functions so the same store runs on the browser's
+asynchronous worker driver. `SettingsMemoryStore` remains for platforms not yet on SQLite and as the
+source of the one-time import.
+
 ### Failure and output contract
 
 - Every generative clerk answers one JSON object with `sections`, `nodes` and/or `links`. Any other

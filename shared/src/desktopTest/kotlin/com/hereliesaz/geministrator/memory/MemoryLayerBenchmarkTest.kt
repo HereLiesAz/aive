@@ -7,7 +7,8 @@ import kotlin.test.Test
 import kotlin.time.measureTime
 
 /**
- * Opt-in throughput check for the memory layer on a persisted store:
+ * Opt-in throughput check for the memory layer on a persisted store (SQLite; set
+ * `AIVE_MEMORY_BENCHMARK_STORE=settings` for the Settings log store):
  * `AIVE_MEMORY_BENCHMARK=<sessions> ./gradlew :shared:desktopTest --tests '*MemoryLayerBenchmarkTest'`.
  * Prints consolidation, commit and recall timings; asserts nothing.
  */
@@ -15,7 +16,11 @@ class MemoryLayerBenchmarkTest {
     @Test
     fun benchmark() = runBlocking {
         val sessions = System.getenv("AIVE_MEMORY_BENCHMARK")?.toIntOrNull() ?: return@runBlocking
-        val store = SettingsMemoryStore(MapSettings())
+        val store: MemoryStore = if (System.getenv("AIVE_MEMORY_BENCHMARK_STORE") == "settings") {
+            SettingsMemoryStore(MapSettings())
+        } else {
+            desktopSqlMemoryStore(java.io.File.createTempFile("aive-memory-benchmark", ".db").apply { deleteOnExit() })
+        }
         val layer = AgentMemoryLayer.createWithMicroAgents(store, ProgrammaticMemoryClerks.all { 1L })
         val random = Random(7)
         var packets = 0
@@ -38,7 +43,7 @@ class MemoryLayerBenchmarkTest {
             repeat(RECALLS) { layer.tool.grip(MemoryQuery(queries[it % queries.size])) }
         }
         println(
-            "memory benchmark: sessions=$sessions packets=$packets nodes=${snapshot.nodes.size} " +
+            "memory benchmark: store=${store::class.simpleName} sessions=$sessions packets=$packets nodes=${snapshot.nodes.size} " +
                 "edges=${snapshot.edges.size} | consolidation=$consolidation " +
                 "(${consolidation / sessions}/session) | commit=${commit / COMMITS} | grip=${recall / RECALLS}",
         )
