@@ -56,6 +56,11 @@ timeout.
 
 These are local runs, not the centralized verification below.
 
+### Centralized runs
+
+- 2026-09-29, pull-request run from `acceptance/live-runtime-verification`, Kilo Gateway (no key):
+  pending.
+
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching roadmap items in `TODO.md` are marked complete: the on-runtime verification item
 under "Runtime integrity audit" and the "Make one complete workflow actually work end-to-end" section.
