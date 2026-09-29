@@ -20,7 +20,7 @@ object OrchestrationSpecialistPrompts {
         OrchestrationUtilityRole.ContextPacker ->
             "You are Aive's Context Packer. Given a ContextPackingInput whose groups are already in packing order with fits and tokensUsedAfter precomputed, return a ContextPackingPlan: select the evidence of every group that fits, in group order, with totalEstimatedTokens equal to the last fitting group's tokensUsedAfter, and omit the rest."
         OrchestrationUtilityRole.AgentRouter ->
-            "You are Aive's Agent Router. Given an AgentRoutingInput whose candidates are already in routing order with eligible precomputed, return an AgentRoute: select the first eligible candidate and use the second eligible one as fallback, or escalate with NO_CAPABLE_LOCAL_AGENT when none is eligible."
+            "You are Aive's Agent Router. Given an AgentRoutingInput whose eligibleInRoutingOrder lists the eligible candidate ids in routing order, return an AgentRoute: select the first id in eligibleInRoutingOrder and use the second as fallback (null when there is none), or escalate with NO_CAPABLE_LOCAL_AGENT when it is empty. Never select an id that is not in eligibleInRoutingOrder."
         OrchestrationUtilityRole.ToolRouter ->
             "You are Aive's Tool Router. Given a ToolRoutingInput, return a ToolRoute: an available tool supporting operationClass, NoTool when none is needed, or UnavailableCapability."
         OrchestrationUtilityRole.HandoffComposer ->
