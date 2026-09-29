@@ -20,7 +20,7 @@ import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -33,7 +33,7 @@ import kotlin.test.assertTrue
 
 class GitLabWorkspaceAgentProviderTest {
     @Test
-    fun commitsValidatedFileActionsToNestedGitLabRepository() = runBlocking {
+    fun commitsValidatedFileActionsToNestedGitLabRepository() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val engine = MockEngine { request ->
             requests += request
@@ -115,7 +115,7 @@ class GitLabWorkspaceAgentProviderTest {
     }
 
     @Test
-    fun approvalPreventsBranchAndCommitUntilAccepted() = runBlocking {
+    fun approvalPreventsBranchAndCommitUntilAccepted() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val engine = MockEngine { request ->
             requests += request
@@ -173,7 +173,7 @@ class GitLabWorkspaceAgentProviderTest {
     }
 
     @Test
-    fun unsafeModelPathFailsBeforeAnyRepositoryWrite() = runBlocking {
+    fun unsafeModelPathFailsBeforeAnyRepositoryWrite() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val engine = MockEngine { request ->
             requests += request

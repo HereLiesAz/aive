@@ -11,7 +11,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -20,7 +20,7 @@ import kotlin.test.assertFailsWith
 
 class LlmRestApisTest {
     @Test
-    fun openAiParsesResponseTextAndUsage() = runBlocking {
+    fun openAiParsesResponseTextAndUsage() = runTest {
         var authorization: String? = null
         val client = mockJsonClient { request ->
             authorization = request.headers[HttpHeaders.Authorization]
@@ -49,7 +49,7 @@ class LlmRestApisTest {
     }
 
     @Test
-    fun anthropicSendsApiKeyAndParsesText() = runBlocking {
+    fun anthropicSendsApiKeyAndParsesText() = runTest {
         var apiKey: String? = null
         val client = mockJsonClient { request ->
             apiKey = request.headers["x-api-key"]
@@ -78,7 +78,7 @@ class LlmRestApisTest {
     }
 
     @Test
-    fun geminiSendsApiKeyAndParsesText() = runBlocking {
+    fun geminiSendsApiKeyAndParsesText() = runTest {
         var apiKey: String? = null
         val client = mockJsonClient { request ->
             apiKey = request.headers["x-goog-api-key"]
@@ -107,7 +107,7 @@ class LlmRestApisTest {
     }
 
     @Test
-    fun providerHttpErrorPreservesStatusAndBody() = runBlocking {
+    fun providerHttpErrorPreservesStatusAndBody() = runTest {
         val client = mockJsonClient {
             respond(
                 content = "{\"error\":{\"message\":\"quota exhausted\"}}",

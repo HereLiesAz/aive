@@ -10,7 +10,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -20,7 +20,7 @@ import kotlin.test.assertNull
 
 class OpenAiCompatibleChatApiTest {
     @Test
-    fun sendsBearerModelAndParsesUsage() = runBlocking {
+    fun sendsBearerModelAndParsesUsage() = runTest {
         var authorization: String? = null
         var requestBody = ""
         var requestUrl = ""
@@ -64,7 +64,7 @@ class OpenAiCompatibleChatApiTest {
     }
 
     @Test
-    fun preservesProviderHttpFailure() = runBlocking {
+    fun preservesProviderHttpFailure() = runTest {
         val client = HttpClient(MockEngine {
             respond(
                 content = "{\"error\":{\"message\":\"model unavailable\"}}",
@@ -107,7 +107,7 @@ class OpenAiCompatibleChatApiTest {
     }
 
     @Test
-    fun keylessEndpointSendsNoAuthorization() = runBlocking {
+    fun keylessEndpointSendsNoAuthorization() = runTest {
         var sawAuthorization = true
         val client = HttpClient(MockEngine { request ->
             sawAuthorization = request.headers[HttpHeaders.Authorization] != null
