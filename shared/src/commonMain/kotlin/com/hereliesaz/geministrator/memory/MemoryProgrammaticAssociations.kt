@@ -20,15 +20,33 @@ class MemoryProgrammaticAssociator(
         require(maxEdgesPerRefresh > 0)
     }
 
-    suspend fun refresh(nowEpochMillis: Long): Int {
-        while (true) {
-            val snapshot = store.read()
-            val edges = snapshot.programmaticAssociationCandidates(nowEpochMillis, maxEdgesPerRefresh)
-            if (edges.isEmpty()) return 0
-            if (store.commit(snapshot.revision, MemoryStoreMutation(edgesToAdd = edges))) {
-                return edges.size
-            }
+    /** Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time. */
+    suspend fun refresh(nowEpochMillis: Long): Int =
+        store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
+            snapshot.programmaticAssociationCandidates(nowEpochMillis, Int.MAX_VALUE)
         }
+}
+
+/**
+ * Computes candidates once and commits them in chunks of [chunkSize], instead of recomputing the whole
+ * graph for every chunk. Returns how many edges were added; on a concurrent write it recomputes.
+ */
+internal suspend fun MemoryStore.commitEdgesInChunks(
+    chunkSize: Int,
+    candidates: (MemorySnapshot) -> List<MemoryEdge>,
+): Int {
+    while (true) {
+        val snapshot = read()
+        val edges = candidates(snapshot)
+        if (edges.isEmpty()) return 0
+        var revision = snapshot.revision
+        var added = 0
+        for (chunk in edges.chunked(chunkSize)) {
+            if (!commit(revision, MemoryStoreMutation(edgesToAdd = chunk))) break
+            revision += 1
+            added += chunk.size
+        }
+        if (added > 0) return added
     }
 }
 
@@ -49,8 +67,12 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     val activeNodeIds = activeNodes.mapTo(hashSetOf(), MemoryNode::id)
     val existingIds = edges.mapTo(hashSetOf()) { it.id }
     val episodeById = episodes.associateBy(MemoryEpisode::id)
+    val activeByEpisode = hashMapOf<MemoryEpisodeId, MutableList<MemoryNode>>()
+    activeNodes.forEach { node ->
+        node.sourceEpisodeIds.forEach { activeByEpisode.getOrPut(it) { mutableListOf() } += node }
+    }
     val anchors = episodes.mapNotNull { episode ->
-        activeNodes.anchorForEpisode(episode.id)?.let { episode.id to it }
+        activeByEpisode[episode.id]?.anchorForEpisode(episode.id)?.let { episode.id to it }
     }.toMap()
     val candidates = linkedMapOf<MemoryEdgeId, MemoryEdge>()
 
