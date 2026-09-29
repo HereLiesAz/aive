@@ -36,7 +36,7 @@ internal fun TechnicalInspector(
     modifier: Modifier = Modifier,
 ) {
     if (liveWorkflow == null) {
-        TechnicalInspector(selectedTaskId = selectedTaskId, modifier = modifier)
+        EmptyTechnicalInspector("No run is loaded.", modifier)
         return
     }
 
@@ -44,7 +44,7 @@ internal fun TechnicalInspector(
     val task = liveWorkflow.definition.tasks.firstOrNull { it.id == taskId }
     val taskRun = liveWorkflow.run.taskRuns[taskId]
     if (task == null || taskRun == null) {
-        TechnicalInspector(selectedTaskId = selectedTaskId, modifier = modifier)
+        EmptyTechnicalInspector("Task $selectedTaskId is not part of the current run.", modifier)
         return
     }
 

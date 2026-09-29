@@ -250,15 +250,6 @@ private fun MutableList<AgentProvider>.addGitLabWorkspaceProvider(
     )
 }
 
-internal fun configuredWebProviders(julesApiKey: String?): List<AgentProvider> =
-    configuredWebProviders(
-        julesApiKey
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?.let { mapOf(ProviderCatalog.JULES_ID to it) }
-            .orEmpty(),
-    )
-
 internal fun configuredWebExecutorIntegrations(
     githubToken: String?,
     gitlabToken: String?,

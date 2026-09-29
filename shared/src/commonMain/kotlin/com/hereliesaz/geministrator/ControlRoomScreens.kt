@@ -66,31 +66,15 @@ import com.hereliesaz.geministrator.events.WorkflowCreated
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.events.WorkflowFailed
 
+/** The inspector with nothing live to show: says so instead of showing sample data. */
 @Composable
-internal fun TechnicalInspector(selectedTaskId: String, modifier: Modifier = Modifier) {
-    val node = ActiveWorkflow.firstOrNull { it.id == selectedTaskId } ?: ActiveWorkflow.first()
+internal fun EmptyTechnicalInspector(message: String, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.background(Azphalt.Ink).verticalScroll(rememberScrollState()).padding(18.dp),
+        modifier = modifier.background(Azphalt.Ink).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("INSPECTOR", style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-        Text(node.position.uppercase(), style = AzphaltType.section, color = Azphalt.White)
-        Text(node.assignment, style = AzphaltType.body, color = Azphalt.White)
-        InspectorLine("STATE", node.state.label)
-        InspectorLine("STAFFING", node.staffing ?: "Unstaffed")
-        InspectorLine("ATTEMPT", if (node.id == "implementation") "1 of 2" else "1")
-        InspectorLine("PROVIDER RUN", if (node.staffing != null) "sessions/9b2e" else "—")
-        InspectorLine("PROMPT REUSE", if (node.staffing != null) "Session scoped" else "—")
-        InspectorLine("CACHE HIT", "Not reported")
-        AzphaltPill("Message agent", "message", onClick = {}, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable
-private fun InspectorLine(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(label, style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-        Text(value, style = AzphaltType.body, color = Azphalt.White)
+        Text(message, style = AzphaltType.body, color = Azphalt.White)
     }
 }
 
@@ -649,26 +633,6 @@ private data class ArtifactEntry(
     val children: List<ArtifactEntry> = emptyList(),
 )
 
-private val ArtifactTree = listOf(
-    ArtifactEntry("spec", "Specification", "Approved product and architecture inputs", listOf(
-        ArtifactEntry("requirements", "Requirements", "Product Manager · approved"),
-        ArtifactEntry("architecture", "Architecture", "Architect · approved"),
-    )),
-    ArtifactEntry("pretests", "Pre-code verification", "Crash Test Dummy", listOf(
-        ArtifactEntry("acceptance", "Acceptance test plan", "4 scenarios"),
-        ArtifactEntry("contract", "Contract tests", "7 contracts"),
-        ArtifactEntry("failure", "Failure scenarios", "5 cases"),
-    )),
-    ArtifactEntry("environment", "Environment", "EPA Representative", listOf(
-        ArtifactEntry("runtime", "Runtime", "JDK 17 · ephemeral"),
-        ArtifactEntry("network", "Network", "Restricted"),
-    )),
-    ArtifactEntry("implementation-artifacts", "Implementation", "Jules · active", listOf(
-        ArtifactEntry("changes", "Code change", "Pending completion"),
-        ArtifactEntry("command", "Command output", "3 recent commands"),
-    )),
-)
-
 @Composable
 internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading, modifier: Modifier = Modifier) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -688,8 +652,10 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
                     )
                 },
             )
-        }.takeIf { it.isNotEmpty() } ?: ArtifactTree
-    } else ArtifactTree
+        }
+    } else {
+        emptyList()
+    }
 
     var openId by remember(displayTree) { mutableStateOf(displayTree.firstOrNull()?.id) }
     var previewId by remember { mutableStateOf<String?>(null) }
@@ -704,8 +670,12 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
             AzphaltPill("Search", "artifact-search", onClick = {})
             AzphaltPill("Storage", "artifact-storage", onClick = {})
         }
-        if (liveWorkflow != null && displayTree === ArtifactTree) {
-            Text("No artifacts produced yet.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        if (displayTree.isEmpty()) {
+            Text(
+                if (liveWorkflow != null) "No artifacts produced yet." else "No run is loaded.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
         }
         displayTree.forEachIndexed { rootIndex, entry ->
             val open = openId == entry.id
@@ -761,171 +731,6 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
             )
         }
     }
-}
-
-@Composable
-internal fun SettingsScreen(
-    connectedProviderIds: Set<String> = emptySet(),
-    onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
-    onClearWorkflowData: () -> Unit = {},
-    onExportJson: suspend () -> String? = { null },
-    onImportJson: (String) -> Unit = {},
-    onExportDiagnosticBundle: suspend () -> String? = { null },
-    onReconfigureProvider: (String) -> Unit = {},
-    onShareText: ((String) -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    var exportedJson by remember { mutableStateOf<String?>(null) }
-    var diagnosticBundle by remember { mutableStateOf<String?>(null) }
-    var importDraft by remember { mutableStateOf("") }
-    var importMode by remember { mutableStateOf(false) }
-    var clearConfirm by remember { mutableStateOf(false) }
-    var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
-    var healthChecking by remember { mutableStateOf(false) }
-    Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("SETTINGS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
-        SectionLabel("Providers")
-        if (connectedProviderIds.isNotEmpty()) {
-            connectedProviderIds.forEach { providerId ->
-                val health = healthResults?.get(providerId)
-                ProviderRecord(
-                    name = providerId,
-                    state = if (health != null) health.substringBefore(" ·") else "Connected",
-                    auth = health ?: "Credential present",
-                    onReconfigure = { onReconfigureProvider(providerId) },
-                )
-            }
-            if (healthChecking) {
-                LaunchedEffect(Unit) {
-                    healthResults = onCheckProviderHealth()
-                    healthChecking = false
-                }
-            }
-            AzphaltPill(if (healthResults == null) "Check provider health" else "Refresh health", "health-check", onClick = { healthChecking = true; healthResults = null }, modifier = Modifier.fillMaxWidth())
-        } else {
-            ProviderRecord("Jules", "Not configured", "No credential")
-            ProviderRecord("Codex", "Not configured", "No credential")
-            ProviderRecord("Claude", "Not configured", "No credential")
-        }
-        SectionLabel("Data")
-        var exportTriggered by remember { mutableStateOf(false) }
-        if (exportTriggered) {
-            LaunchedEffect(Unit) {
-                exportedJson = onExportJson()
-                exportTriggered = false
-            }
-        }
-        if (exportedJson == null) {
-            AzphaltPill("Export workflow data to JSON", "export-trigger", onClick = { exportTriggered = true }, modifier = Modifier.fillMaxWidth())
-        } else {
-            OutlinedTextField(
-                value = exportedJson!!,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Exported JSON (${exportedJson!!.length} chars)") },
-                modifier = Modifier.fillMaxWidth().height(160.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (onShareText != null) {
-                    val json = exportedJson!!
-                    AzphaltPill("Share", "export-share", onClick = { onShareText(json) })
-                }
-                AzphaltPill("Dismiss", "export-dismiss", onClick = { exportedJson = null })
-            }
-        }
-        if (!importMode) {
-            AzphaltPill("Import data from JSON", "import-mode-enter", onClick = { importMode = true }, modifier = Modifier.fillMaxWidth())
-        } else {
-            OutlinedTextField(
-                value = importDraft,
-                onValueChange = { importDraft = it },
-                label = { Text("Paste exported JSON") },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill("Import", "import-confirm", onClick = {
-                    if (importDraft.isNotBlank()) {
-                        onImportJson(importDraft)
-                        importDraft = ""
-                        importMode = false
-                    }
-                })
-                AzphaltPill("Cancel", "import-cancel", onClick = {
-                    importDraft = ""
-                    importMode = false
-                })
-            }
-        }
-        SectionLabel("Diagnostics")
-        var diagnosticTriggered by remember { mutableStateOf(false) }
-        if (diagnosticTriggered) {
-            LaunchedEffect(Unit) {
-                diagnosticBundle = onExportDiagnosticBundle()
-                diagnosticTriggered = false
-            }
-        }
-        if (diagnosticBundle == null) {
-            AzphaltPill("Export diagnostic bundle", "diagnostic-trigger", onClick = { diagnosticTriggered = true }, modifier = Modifier.fillMaxWidth())
-        } else {
-            AzphaltRecord(
-                seed = "diagnostic-result",
-                eyebrow = "Diagnostic",
-                title = "Run diagnostic bundle",
-                body = diagnosticBundle!!.take(300).let { if (diagnosticBundle!!.length > 300) "$it…" else it },
-                endCap = "${diagnosticBundle!!.length} chars",
-                onClick = { diagnosticBundle = null },
-            )
-        }
-        SectionLabel("Privacy")
-        if (!clearConfirm) {
-            AzphaltPill("Delete all workflow data", "clear-data-enter", onClick = { clearConfirm = true }, modifier = Modifier.fillMaxWidth())
-        } else {
-            AzphaltRecord(
-                seed = "clear-confirm",
-                eyebrow = "Destructive",
-                title = "Delete all workflow data?",
-                body = "Permanently removes all projects, runs, events, and artifacts from this device. Export first if you want a backup.",
-                endCap = "Irreversible",
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill("Delete everything", "clear-data-confirm", onClick = {
-                    onClearWorkflowData()
-                    clearConfirm = false
-                })
-                AzphaltPill("Cancel", "clear-data-cancel", onClick = { clearConfirm = false })
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProviderRecord(name: String, state: String, auth: String, onReconfigure: (() -> Unit)? = null) {
-    var reconfigureConfirm by remember { mutableStateOf(false) }
-    AzphaltRecord(
-        seed = "provider-$name",
-        eyebrow = "Provider",
-        title = name,
-        body = auth,
-        endCap = state,
-        well = if (onReconfigure != null) {
-            {
-                if (!reconfigureConfirm) {
-                    AzphaltPill("Reconfigure credential", "reconfigure-$name", onClick = { reconfigureConfirm = true })
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("This will clear the stored credential and return to setup.", style = AzphaltType.body, color = Azphalt.White)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AzphaltPill("Clear and reconfigure", "reconfigure-$name-confirm", onClick = { onReconfigure(); reconfigureConfirm = false })
-                            AzphaltPill("Cancel", "reconfigure-$name-cancel", onClick = { reconfigureConfirm = false })
-                        }
-                    }
-                }
-            }
-        } else null,
-    )
 }
 
 @Composable

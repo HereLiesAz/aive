@@ -574,15 +574,6 @@ private fun MutableList<AgentProvider>.addGitLabWorkspaceProvider(
     )
 }
 
-internal fun configuredAndroidProviders(julesApiKey: String?): List<AgentProvider> =
-    configuredAndroidProviders(
-        julesApiKey
-            ?.trim()
-            ?.takeIf(String::isNotEmpty)
-            ?.let { mapOf(ProviderCatalog.JULES_ID to it) }
-            .orEmpty(),
-    )
-
 internal fun configuredAndroidExecutorIntegrations(
     context: android.content.Context,
     repositoryCredentials: Map<String, String>,
