@@ -215,6 +215,7 @@ def export(slug):
     del model; gc.collect()
     # fp32 graph -> dynamic INT8 keeps float32 inputs/outputs, which is what the app's ORT loop reads.
     main_export(str(merged), fp32, task="text-generation-with-past", device="cpu")
+    shutil.rmtree(merged, ignore_errors=True)  # free the checkpoint before quantizing (disk)
     int8.mkdir(parents=True)
     for f in fp32.iterdir():
         if f.is_file() and not f.name.startswith("model.onnx"):
@@ -223,7 +224,7 @@ def export(slug):
         AutoQuantizationConfig.avx2(is_static=False, per_channel=False), save_dir=int8, file_suffix="",
     )
     assert (int8 / "model.onnx").is_file() and (int8 / "tokenizer.json").is_file(), "app needs model.onnx + tokenizer.json"
-    shutil.rmtree(merged, ignore_errors=True); shutil.rmtree(fp32, ignore_errors=True)
+    shutil.rmtree(fp32, ignore_errors=True)
     return int8
 
 def onnx_gate(slug, int8):
