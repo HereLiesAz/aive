@@ -82,14 +82,39 @@ WORK = Path("/kaggle/working/aive-orchestration")
 STATE_FILE = WORK / "state.json"
 WORK.mkdir(parents=True, exist_ok=True)
 
-def find_dataset():
-    for manifest in Path("/kaggle/input").rglob("manifest.json"):
-        data = json.loads(manifest.read_text())
-        if data.get("schema") == 1 and "roles" in data:
-            return manifest.parent, data
-    raise FileNotFoundError("Add the aive-orchestration-corpus dataset to this notebook")
+# Used when no Kaggle dataset is attached: the same corpus, committed next to this notebook.
+CORPUS_URLS = [
+    f"https://raw.githubusercontent.com/HereLiesAz/aive/{ref}/tools/orchestration_training/aive-orchestration-corpus.zip"
+    for ref in ("main", "claude/amazing-fermi-3o92qn")
+]
 
-DATA, MANIFEST = find_dataset()
+def find_dataset():
+    for root in (Path("/kaggle/input"), WORK / "corpus"):
+        for manifest in root.rglob("manifest.json") if root.exists() else []:
+            data = json.loads(manifest.read_text())
+            if data.get("schema") == 1 and "roles" in data:
+                return manifest.parent, data
+    return None
+
+def download_corpus():
+    import io, urllib.request, zipfile
+    for url in CORPUS_URLS:
+        try:
+            payload = urllib.request.urlopen(url, timeout=60).read()
+        except Exception as failure:
+            print(f"  {url}: {failure}")
+            continue
+        zipfile.ZipFile(io.BytesIO(payload)).extractall(WORK / "corpus")
+        print(f"downloaded corpus from {url}")
+        return
+    raise FileNotFoundError("No dataset attached and the corpus download failed; attach aive-orchestration-corpus or turn on internet")
+
+found = find_dataset()
+if found is None:
+    download_corpus()
+    found = find_dataset()
+
+DATA, MANIFEST = found
 for slug, entry in MANIFEST["roles"].items():
     for key in ("corpus", "config"):
         digest = hashlib.sha256((DATA / entry[key]).read_bytes()).hexdigest()

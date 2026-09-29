@@ -194,6 +194,12 @@ data class MemorySnapshot(
     val nodes: List<MemoryNode> = emptyList(),
     val edges: List<MemoryEdge> = emptyList(),
     val queue: List<MemoryQueueEntry> = emptyList(),
+    /**
+     * Condensation clusters that were declined (e.g. `DO_NOT_CONDENSE`) or kept failing, keyed by
+     * their sorted member IDs. The same cluster is not offered again; a cluster that gains or loses
+     * members has a new key and is.
+     */
+    val declinedCondensations: List<String> = emptyList(),
 )
 
 @Serializable
@@ -203,6 +209,7 @@ data class MemoryStoreMutation(
     val nodesToAdd: List<MemoryNode> = emptyList(),
     val edgesToAdd: List<MemoryEdge> = emptyList(),
     val queueUpserts: List<MemoryQueueEntry> = emptyList(),
+    val condensationDeclinesToAdd: List<String> = emptyList(),
 )
 
 @Serializable
@@ -267,6 +274,12 @@ data class MemoryConsolidationPolicy(
     val maxMutationsPerPacket: Int = 96,
     val minimumSimilarityWeight: Float = 0.82f,
     val condensationBatchSize: Int = 3,
+    /**
+     * Failed attempts before a queue entry is parked (left `Failed`, skipped by consolidation, error
+     * kept in `lastError`). A condensation cluster that exhausts its attempts is declined instead,
+     * so the entry can finish.
+     */
+    val maxAttempts: Int = 3,
     val maxSimilarPerKind: Map<MemoryNodeKind, Int> = mapOf(
         MemoryNodeKind.Context to 8,
         MemoryNodeKind.NounTag to 12,
@@ -282,6 +295,7 @@ data class MemoryConsolidationPolicy(
         require(maxMutationsPerPacket > 0)
         require(minimumSimilarityWeight in 0f..1f)
         require(condensationBatchSize >= 2)
+        require(maxAttempts > 0)
         require(maxSimilarPerKind.values.all { it >= 2 })
     }
 }
