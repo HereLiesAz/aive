@@ -16,12 +16,12 @@ import kotlin.test.assertTrue
 class ConfiguredAndroidProvidersTest {
     @Test
     fun blankCredentialLeavesProviderRegistryEmpty() {
-        assertTrue(configuredAndroidProviders("   ").isEmpty())
+        assertTrue(configuredAndroidProviders(credentials = mapOf(ProviderCatalog.JULES_ID to "   ")).isEmpty())
     }
 
     @Test
-    fun storedCredentialConfiguresJulesProvider() {
-        val providers = configuredAndroidProviders(" test-key ")
+    fun storedJulesCredentialConfiguresJulesProvider() {
+        val providers = configuredAndroidProviders(credentials = mapOf(ProviderCatalog.JULES_ID to " test-key "))
 
         assertEquals(1, providers.size)
         assertEquals(AgentProviderId("jules"), providers.single().id)

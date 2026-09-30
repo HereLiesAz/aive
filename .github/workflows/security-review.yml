@@ -1,0 +1,16 @@
+name: Security Review
+
+# OpenCode review of every pull request in The Aive, posted as one comment and updated on each push.
+# Replaces the Jules review and triage workflows. Bound by hash to HereLiesAz/workflows'
+# opencode-security-review.yml, which runs it centrally (read-only agent, OpenCode's free model with a
+# Gemini fallback) and replaces this file with a tracker. Advisory: findings never fail the check.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Runs centrally from HereLiesAz/workflows (opencode-security-review.yml)."

@@ -141,7 +141,7 @@ jobs:
         run: |
           ./gradlew             :androidApp:lintVitalPlayRelease             :androidApp:lintVitalGithubRelease             --build-cache --no-daemon
 
-      - name: Report Failure to Jules
+      - name: Report build failure
         if: failure() && steps.gradle-build.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/github-script@v9
         with:
@@ -154,6 +154,6 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
-              body: `/jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
-              labels: ['jules', 'bug']
+              body: `The main-branch build failed.\n\n**Log (last 4000 characters):**\n\`\`\`\n${logTail}\n\`\`\``,
+              labels: ['bug']
             });
