@@ -39,12 +39,33 @@ shape to use.
   Roles train and update independently.
 - **`both`** (default): builds both.
 
-**Setup**
-1. Add the dataset `hereliesaz/aive-orchestration-corpus` (built by
-   `tools/orchestration_training/build_kaggle_dataset.sh`).
-2. Accelerator: GPU (T4 or P100). Internet: on.
-3. Optional upload: add a Kaggle secret `GITHUB_TOKEN` (contents: write on `HereLiesAz/aive`) and set
-   `UPLOAD = True` below.
+---
+
+## Environment & Pipeline Linkage (Local ↔ Cloud ↔ App)
+
+### 1. Credentials Handshake
+Configure secrets once:
+- **Local**: `~/.kaggle/kaggle.json` (Kaggle Settings → *Create New Token*)
+- **Colab**: Secrets (key icon) → `KAGGLE_USERNAME`, `KAGGLE_KEY`, `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`)
+- **Kaggle**: Add-ons → Secrets → `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`)
+
+### 2. Operational Loop
+1. **Local Mint → Cloud**:
+   ```bash
+   tools/orchestration_training/build_kaggle_dataset.sh
+   kaggle datasets version -p build/kaggle/aive-orchestration-corpus -m "refresh"
+   git add tools/orchestration_training/aive-orchestration-corpus.zip && git commit -m "chore: update corpus" && git push
+   ```
+2. **Cloud GPU Execution (Colab / Kaggle)**:
+   - Accelerator: GPU (T4 or P100), Internet: on.
+   - Set `UPLOAD = True` below to push packages and `catalog.json` to GitHub Release `orchestration-utilities-v1`.
+   - Run all cells.
+3. **Cloud → Local Ingestion**:
+   ```bash
+   curl -LO https://github.com/HereLiesAz/aive/releases/download/orchestration-utilities-v1/catalog.json
+   python3 tools/orchestration_training/register_catalog.py catalog.json
+   git commit -am "feat: register released orchestration specialists"
+   ```
 
 A role that fails a gate is left out of the catalog. The runtime guard falls back to the deterministic
 baseline for any role without a released specialist.

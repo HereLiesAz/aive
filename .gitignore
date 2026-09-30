@@ -43,3 +43,5 @@ package-lock.json
 
 # Rust build output from the BITCOS native library
 native/bitcos/target/
+
+.kaggle/
