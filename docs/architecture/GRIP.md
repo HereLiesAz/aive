@@ -1,6 +1,6 @@
 # GRIP memory recall
 
-GRIP is Haive's memory-specific direct-recall operation.
+GRIP is The Aive's memory-specific direct-recall operation.
 
 **GRIP = Global Regular IMpression Print.**
 

@@ -1,6 +1,6 @@
 # Temporal memory and programmatic associations
 
-This document defines Haive's deterministic time-bucketing and non-model association rules. It is normative for memory-backend work.
+This document defines The Aive's deterministic time-bucketing and non-model association rules. It is normative for memory-backend work.
 
 ## Principle
 
@@ -45,7 +45,7 @@ Temporal compaction is therefore retrieval/index compaction, not memory deletion
 
 Project IDs are memory metadata, not memory-isolation boundaries.
 
-Different saved/cloned projects use different memory-store locations. If two project IDs occur inside the same `MemoryStore`, Haive should assume that they are intentionally part of the same remembered working universe and permit associations between them.
+Different saved/cloned projects use different memory-store locations. If two project IDs occur inside the same `MemoryStore`, The Aive should assume that they are intentionally part of the same remembered working universe and permit associations between them.
 
 This matters when one orchestration works on two projects at once. The context switch itself, shared time window, shared task/workflow run, shared identifier, or shared semantic cue may be exactly what lets a later agent remember that the two pieces of work were connected.
 
@@ -150,7 +150,7 @@ When multiple independent association edges connect the same pair of nodes, thei
 
 Repeated supporting associations should strengthen memory indefinitely in the sense that every additional independent piece of evidence can increase associative strength, while the increase has diminishing returns and approaches a ceiling asymptotically.
 
-For independent association weights `w1 ... wn`, Haive uses complementary exponential accumulation:
+For independent association weights `w1 ... wn`, The Aive uses complementary exponential accumulation:
 
 ```text
 combined = 1 - Π(1 - wi)

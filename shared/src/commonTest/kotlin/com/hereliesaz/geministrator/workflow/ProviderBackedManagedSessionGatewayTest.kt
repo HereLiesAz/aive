@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -37,7 +38,7 @@ class ProviderBackedManagedSessionGatewayTest {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             try {
                 val gateway = ProviderBackedManagedSessionGateway(
-                    AgentProviderRegistry(listOf(CancellingCapabilitiesProvider())),
+                    AgentProviderRegistry(listOf(CancellingCapabilitiesProvider()), inferenceSettings = InMemorySettings()),
                     scope,
                 )
 
@@ -61,7 +62,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.Planning)
@@ -72,6 +73,32 @@ class ProviderBackedManagedSessionGatewayTest {
 
             assertEquals(null, gateway.progress(handle)?.fraction)
             assertEquals("1. Inspect repository\n2. Implement approved change", gateway.progress(handle)?.message)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun providerFailureReasonIsKeptAsTheSessionsLastStatus() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = FailingProvider()
+        val handle = ManagedSessionHandle(
+            taskRunId = TaskRunId("failing-task"),
+            providerId = provider.id,
+            providerRunId = ProviderRunId("failing-run"),
+        )
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope,
+            )
+            gateway.reconnect(handle, ManagedSessionStatus.Running)
+
+            withTimeout(2_000L) {
+                while (gateway.status(handle) != ManagedSessionStatus.Failed) delay(25L)
+            }
+
+            assertEquals("HTTP 503: upstream unavailable", gateway.progress(handle)?.message)
         } finally {
             scope.cancel()
         }
@@ -96,7 +123,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
 
@@ -125,7 +152,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
 
@@ -157,7 +184,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.Running)
@@ -185,7 +212,7 @@ class ProviderBackedManagedSessionGatewayTest {
         )
         try {
             val gateway = ProviderBackedManagedSessionGateway(
-                AgentProviderRegistry(listOf(provider)),
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
                 scope,
             )
             gateway.reconnect(handle, ManagedSessionStatus.AwaitingApproval)
@@ -221,6 +248,18 @@ private class PlanPreviewProvider : AgentProvider {
                 summary = "1. Inspect repository\n2. Implement approved change",
             ),
         )
+    }
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
+}
+
+private class FailingProvider : AgentProvider {
+    override val id = AgentProviderId("failing")
+    override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.RepositoryRead))
+    override suspend fun start(request: AgentTaskRequest) = AgentRunHandle(ProviderRunId("failing-run"))
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
+        emit(AgentEvent.Failed(runId, "HTTP 503: upstream unavailable"))
     }
     override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
     override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted

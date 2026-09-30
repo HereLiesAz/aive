@@ -4,11 +4,13 @@ This is the canonical near-term roadmap for The Aive. It is ordered by product d
 
 Tracking issue: #35
 
+A checked box means implemented and covered by automated tests. It does not mean verified live on a device or runtime: that evidence comes only from a successful centralized Live Runtime Verification run ([`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)) and is tracked by the unchecked on-runtime verification item and the "Make one complete workflow actually work end-to-end" section below.
+
 ## P0 — Make the runtime model correct
 
 - [x] Separate **task responsibility** from **executor identity**.
   - `TaskDefinition` must stop assuming every task is backed by a `RoleDefinitionId`.
-  - Introduce an executor-neutral contract that can represent role-backed agent work, GitHub Actions, test runners, deployments, repository operations, human approvals, external services, and nested Haive workflows.
+  - Introduce an executor-neutral contract that can represent role-backed agent work, GitHub Actions, test runners, deployments, repository operations, human approvals, external services, and nested Aive workflows.
   - Preserve role semantics for responsibility/authority without forcing non-agent work to masquerade as an employee.
 - [x] Refactor dispatch around executor capabilities rather than role-only provider assignment.
 - [x] Update workflow validation for the new executor model.
@@ -41,7 +43,8 @@ Tracking issue: #35
 - [x] Preserve reconstructable workflow-created events and strict approval-gate identity with legacy compatibility.
 - [x] Build and stage both JS and Wasm outputs for GitHub Pages.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
-- [ ] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
+- [x] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
+  - Centralized run [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915) passed against Kilo Gateway (no key) on 2026-09-29; JS and Wasm passed locally against LLM7 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). No Android run is recorded yet.
 
 ## P0 — Compound inference foundation
 
@@ -56,9 +59,9 @@ Tracking issue: #35
 - [x] Make task/data planning resource-aware and capable of choosing an implemented execution topology rather than only honoring the already-authorized strategy.
 - [x] Implement centralized mixture-of-agents as a governed proposer → genealogy gate → aggregator → verifier subgraph with bounded candidate and aggregation budgets.
 - [x] Generalize the Epoch-8 FP16/INT8/LoRA specialist assets into a reusable local model library with shared-base residency where supported and merged-model fallback where not.
-- [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models. Prompt/program optimization, held-out/adversarial gates, manifests, and bundles exist; remaining work is specialist training/export, catalog registration, and runtime consumption.
-- [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner. Contracts, deterministic baselines, unit tests, production runtime wiring, and the injectable specialist-family seam exist; remaining work is releasing trained specialist artifacts and selecting them through that seam.
-- [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them. Deployment-readiness gates are documented; the remaining benchmark requires task-equivalent BitNet specialists and same-machine quality/performance measurements.
+- [ ] Build the DSPy/GEPA/MIPRO-style offline optimization and release pipeline for small specialist/control models. Prompt/program optimization, held-out/adversarial gates, manifests, and bundles exist. For the orchestration specialists, `tools/orchestration_training/` now covers the rest up to release: a contract-exact Kaggle corpus, a notebook that trains, gates, exports (weight-only INT8), re-gates the exported model and packages it, and `OrchestrationSpecialistCatalog` for registration. Remaining work is running it on Kaggle and releasing specialists that pass.
+- [ ] Finish the local orchestration utility family: Memory Query Composer, Context Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State Summarizer, and Verification Planner. Contracts, deterministic baselines, unit tests, production runtime wiring, and the injectable specialist-family seam exist. Desktop selects released specialists through that seam behind `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS=1`; remaining work is releasing trained specialists, an Android executor, and an install surface.
+- [ ] Benchmark BitNet b1.58-native specialist models against the existing Qwen/ONNX family before adopting them. The gate review is done and BitNet was not adopted (`docs/architecture/BITNET_B1_58_ADOPTION_BENCHMARK.md`); the same-machine quality/performance benchmark still requires task-equivalent BitNet specialists.
 - [x] Implement Skeleton-of-Thought as a governed skeleton → independence analysis → parallel expansion → aggregation → verification strategy after the inference fabric is established.
 
 ## P0 — Make one complete workflow actually work end-to-end
@@ -66,21 +69,23 @@ Tracking issue: #35
 - [ ] Create/import a project.
 - [ ] Define an objective.
 - [ ] Materialize a workflow definition.
-- [ ] Approve any required plan/specification gates.
-- [ ] Dispatch provider-backed work through a configured real provider.
-- [ ] Reconcile provider progress without fabricating percentages.
-- [ ] Persist and resume the run after process/browser restart.
-- [ ] Collect artifacts.
-- [ ] Run verification/review stages.
-- [ ] Reach a terminal run state with a clear outcome.
+  - Implemented and unit-tested (`ApplicationRuntimeObjectiveLaunchTest`); the live test `launchFromObjectiveThroughTheLivePlanner` takes the app's own launch path (project name + objective → hosted planner → persisted DAG → dispatch to the real provider) and passed locally against Kilo on 2026-09-29. These three tick with its first centralized run.
+- [x] Approve any required plan/specification gates.
+- [x] Dispatch provider-backed work through a configured real provider.
+- [x] Reconcile provider progress without fabricating percentages.
+- [x] Persist and resume the run after process/browser restart.
+- [x] Collect artifacts.
+- [x] Run verification/review stages.
+- [x] Reach a terminal run state with a clear outcome.
 - [ ] Verify this flow on Android, Desktop, JS, and Wasm where provider/browser constraints permit.
+  - The ticked steps above are exercised by the live lifecycle test, which builds its project, objective and workflow in code; the centralized run covers Desktop JVM, local runs cover JS and Wasm. Android and the in-app project/objective path remain.
 
 ## P1 — GitHub as a first-class executor/integration
 
 - [x] Add a repository integration boundary separate from agent providers.
 - [x] Represent GitHub Actions jobs/steps as real workflow execution rather than agent roles.
 - [x] Read workflow run/job/step status and project it into task progress.
-- [x] Capture build/test artifacts and attach them to Haive task/run artifacts.
+- [x] Capture build/test artifacts and attach them to Aive task/run artifacts.
 - [x] Support repository operations needed by workflows: branch, commit, PR, merge-state checks, and release metadata.
 - [x] Add explicit approval/policy boundaries before destructive or publishing operations.
 - [x] Handle GitHub failures, cancellation, reruns, and stale runs cleanly.
@@ -105,6 +110,10 @@ Tracking issue: #35
 - [x] Implement prompt-reuse telemetry without making cache behavior part of workflow correctness.
 - [x] Add a second provider to prove interchangeability; native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers now share the provider-neutral task contract.
 - [x] Test provider substitution for the same role/task contract.
+- [x] Make Jules explicit-only: it runs where a role names it and is never selected automatically.
+- [x] Add the OpenCode agent on GitHub Actions as the automatic coding agent for GitHub repositories, with per-step progress.
+- [x] Verify the OpenCode agent runner on real GitHub infrastructure. Live run on `HereLiesAz/test` (2026-09-26): the runner created its check run and streamed the step log, OpenCode's free model fixed a planted bug, the runner pushed the fix to an `aive/opencode-*` branch, and the `aive-result` artifact matched what the app parses.
+- [ ] Verify the app's own dispatch path end to end: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. The live run above was started by a push trigger, because the test session could not call `workflow_dispatch`.
 
 ## P1 — Persistence and recovery
 
@@ -112,7 +121,8 @@ Tracking issue: #35
 - [x] Add corruption/recovery handling and a user-visible recovery path.
 - [x] Ensure active provider/executor sessions reconnect rather than duplicate after restart.
 - [x] Add run export/import for debugging and portability.
-- [x] Decide when Settings-backed storage has reached its scale limit and implement SQL/IndexedDB backends behind the existing repository contracts.
+- [x] Decide when Settings-backed storage has reached its scale limit (triggers documented in `docs/architecture/STORAGE_SCALE.md`).
+- [ ] Implement SQL/IndexedDB backends behind the existing repository contracts once a documented trigger is hit. Only Settings-backed storage exists today.
 - [x] Add retention/deletion controls consistent with `docs/PRIVACY.md`.
 
 ## P1 — H2G2 execution surface
@@ -157,7 +167,8 @@ Tracking issue: #35
 - [x] Audit provider payloads so users can see what context leaves the device before execution.
 - [x] Add optional redaction/exclusion rules for files/artifacts/context sent to providers.
 - [x] Add clear data deletion controls for local workflow state.
-- [x] Keep analytics/telemetry opt-in if product analytics are ever introduced; update the privacy policy before shipping any such collection.
+- [x] Keep analytics/telemetry opt-in if product analytics are ever introduced; update the privacy policy before shipping any such collection. GitHub-release crash/ANR reporting is disclosed in `docs/PRIVACY.md`; Play builds have none.
+- [ ] At the production release, make GitHub-release crash/ANR reporting opt-in: set `CrashReportPolicy.DEFAULT_ENABLED = false` and update `docs/PRIVACY.md` (it is on by default during pre-release).
 - [x] Add dependency/security scanning without blocking development on noisy non-actionable findings.
 - [x] Threat-model repository write access, workflow injection, malicious artifacts, prompt injection, and compromised provider responses.
 
@@ -172,7 +183,7 @@ Tracking issue: #35
 
 ## P2 — Workflow composition
 
-- [x] Nested Haive workflows as executors.
+- [x] Nested Aive workflows as executors.
 - [x] Reusable workflow fragments/subgraphs.
 - [x] Conditional branches grounded in explicit outputs/evidence.
 - [x] Fan-out/fan-in helpers without hiding the underlying DAG.
@@ -183,7 +194,7 @@ Tracking issue: #35
 - [x] Final Android adaptive-icon safe-zone check at launcher sizes.
 - [ ] Validate monochrome/themed Android icon on supported launchers.
 - [x] Final Play Store icon/screenshots/feature graphic.
-- [x] Splash/loading treatment using the approved Haive mark.
+- [x] Splash/loading treatment using the approved Aive mark.
 - [x] Make the privacy-policy URL stable for Play Store listing.
 - [x] Audit all user-facing text for leftover Geministrator branding; internal historical package names may remain only where intentionally preserved.
 

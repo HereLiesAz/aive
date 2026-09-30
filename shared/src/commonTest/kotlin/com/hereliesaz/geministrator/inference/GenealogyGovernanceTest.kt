@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.inference
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AcceptanceCriterion
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactId
@@ -172,6 +173,7 @@ class GenealogyGovernanceTest {
         val registry = AgentProviderRegistry(
             providers = emptyList(),
             inferenceFabric = underlyingFabric,
+            inferenceSettings = InMemorySettings(),
         )
         val request = AgentTaskRequest(
             taskRunId = TaskRunId("governed-task"),

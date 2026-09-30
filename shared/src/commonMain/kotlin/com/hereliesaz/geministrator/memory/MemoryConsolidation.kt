@@ -129,6 +129,12 @@ sealed interface MemoryConsolidationResult {
         val stage: MemoryConsolidationStage,
         val reason: String,
     ) : MemoryConsolidationResult
+
+    /** A condensation cluster was declined (or kept failing) and will not be offered again. */
+    data class Declined(
+        val queueId: MemoryQueueId,
+        val reason: String,
+    ) : MemoryConsolidationResult
 }
 
 class MemoryConsolidator(
@@ -136,16 +142,21 @@ class MemoryConsolidator(
     private val manager: MemoryManagerAgent,
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
 ) {
+    /** Node text is immutable, so each node is tokenized once for neighborhood search. */
+    private val neighborhoodTerms = hashMapOf<MemoryNodeId, Set<String>>()
+
     /**
      * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
-     * packets; entries at the same priority remain FIFO by sequence.
+     * packets; entries at the same priority remain FIFO by sequence. An entry that has failed
+     * [MemoryConsolidationPolicy.maxAttempts] times is parked and skipped, so one permanent failure
+     * cannot hold the head of the queue forever.
      */
     suspend fun processNext(nowEpochMillis: Long): MemoryConsolidationResult {
         while (true) {
             val snapshot = store.read()
             val entry = snapshot.queue
                 .asSequence()
-                .filter { it.status != MemoryQueueStatus.Complete }
+                .filter { it.status != MemoryQueueStatus.Complete && !it.isParked() }
                 .sortedWith(
                     compareByDescending<MemoryQueueEntry> { it.priority.ordinal }
                         .thenBy { it.sequence },
@@ -203,16 +214,20 @@ class MemoryConsolidator(
                 throw cancelled
             } catch (failure: Throwable) {
                 val reason = failure.message ?: failure::class.simpleName ?: "Memory manager failed"
-                markFailed(processing, reason)
-                return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
+                return failed(processing, plan, reason)
+            }
+
+            if (entry.stage == MemoryConsolidationStage.Condensation && batch.size == 0) {
+                val reason = "Condensation declined"
+                decline(processing, requireNotNull(plan.clusterKey), reason)
+                return MemoryConsolidationResult.Declined(entry.id, reason)
             }
 
             try {
                 validateBatch(entry.stage, plan, batch)
             } catch (failure: Throwable) {
                 val reason = failure.message ?: "Invalid memory mutation batch"
-                markFailed(processing, reason)
-                return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
+                return failed(processing, plan, reason)
             }
 
             while (true) {
@@ -264,6 +279,44 @@ class MemoryConsolidator(
         }
     }
 
+    private fun MemoryQueueEntry.isParked(): Boolean =
+        status == MemoryQueueStatus.Failed && attempt >= policy.maxAttempts
+
+    /**
+     * Records a failed attempt. A condensation cluster that has used up its attempts is declined
+     * rather than parking the entry: the entry's own stages are done, only that cluster is stuck.
+     */
+    private suspend fun failed(
+        entry: MemoryQueueEntry,
+        plan: PacketPlan,
+        reason: String,
+    ): MemoryConsolidationResult {
+        val clusterKey = plan.clusterKey
+        if (clusterKey != null && entry.attempt + 1 >= policy.maxAttempts) {
+            decline(entry, clusterKey, reason)
+            return MemoryConsolidationResult.Declined(entry.id, reason)
+        }
+        markFailed(entry, reason)
+        return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
+    }
+
+    private suspend fun decline(entry: MemoryQueueEntry, clusterKey: String, reason: String) {
+        while (true) {
+            val snapshot = store.read()
+            val current = snapshot.queue.firstOrNull { it.id == entry.id } ?: return
+            if (current.stage != entry.stage) return
+            val next = current.copy(status = MemoryQueueStatus.Pending, attempt = 0, lastError = reason.take(1_000))
+            if (
+                store.commit(
+                    snapshot.revision,
+                    MemoryStoreMutation(queueUpserts = listOf(next), condensationDeclinesToAdd = listOf(clusterKey)),
+                )
+            ) {
+                return
+            }
+        }
+    }
+
     private suspend fun markFailed(entry: MemoryQueueEntry, reason: String) {
         while (true) {
             val snapshot = store.read()
@@ -290,16 +343,21 @@ class MemoryConsolidator(
                 .asSequence()
                 .filter { it.status != MemoryQueueStatus.Complete && it.id != entry.id }
                 .mapTo(linkedSetOf()) { it.episodeId }
-            val cluster = snapshot.findCondensationCluster(
+            val declined = snapshot.declinedCondensations.toHashSet()
+            val (cluster, items) = snapshot.condensationClusters(
                 policy = policy,
                 protectedEpisodeIds = protectedEpisodeIds,
                 projectId = episode.projectId,
-            ) ?: return null
-            val items = cluster
-                .map(MemoryNode::asWorkItem)
-                .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
-            if (items.size < 2) return null
-            val packetKey = "condense-${items.map { it.id }.sorted().joinToString("|").hashCode().toString(16)}"
+            )
+                .map { cluster ->
+                    cluster to cluster
+                        .map(MemoryNode::asWorkItem)
+                        .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
+                }
+                .firstOrNull { (_, items) -> items.size >= 2 && items.clusterKey() !in declined }
+                ?: return null
+            val clusterKey = items.clusterKey()
+            val packetKey = "condense-${clusterKey.hashCode().toString(16)}"
             return PacketPlan(
                 packet = MemoryWorkPacket(
                     queueId = entry.id,
@@ -312,6 +370,7 @@ class MemoryConsolidator(
                 consumed = items.size,
                 hasMore = true,
                 condensationKind = cluster.first().kind,
+                clusterKey = clusterKey,
             )
         }
 
@@ -350,11 +409,13 @@ class MemoryConsolidator(
             remainingChars > 0 &&
             remainingItems > 0
         ) {
+            if (neighborhoodTerms.size > MAX_CACHED_TERMS) neighborhoodTerms.clear()
             snapshot.relatedNeighborhood(
                 episodeId = entry.episodeId,
                 needles = selected,
                 maxItems = remainingItems,
                 maxChars = remainingChars,
+                termsOf = { node -> neighborhoodTerms.getOrPut(node.id) { node.text.memoryTerms().toSet() } },
             )
         } else {
             emptyList()
@@ -509,8 +570,11 @@ class MemoryConsolidator(
         val consumed: Int,
         val hasMore: Boolean,
         val condensationKind: MemoryNodeKind? = null,
+        val clusterKey: String? = null,
     )
 }
+
+private fun List<MemoryWorkItem>.clusterKey(): String = map { it.id }.sorted().joinToString("|")
 
 private fun MemoryConsolidationStage.next(): MemoryConsolidationStage = when (this) {
     MemoryConsolidationStage.Sectioning -> MemoryConsolidationStage.Salience
@@ -677,11 +741,14 @@ private fun MemorySnapshot.episodeNodes(
         .sortedWith(compareBy<MemoryNode> { it.kind.ordinal }.thenBy { it.createdAtEpochMillis }.thenBy { it.id.value })
 }
 
+private const val MAX_CACHED_TERMS = 200_000
+
 private fun MemorySnapshot.relatedNeighborhood(
     episodeId: MemoryEpisodeId,
     needles: List<MemoryWorkItem>,
     maxItems: Int,
     maxChars: Int,
+    termsOf: (MemoryNode) -> Set<String> = { it.text.memoryTerms().toSet() },
 ): List<MemoryWorkItem> {
     val terms = needles.flatMap { it.text.memoryTerms() }.toSet()
     if (terms.isEmpty() || maxItems <= 0 || maxChars <= 0) return emptyList()
@@ -690,7 +757,7 @@ private fun MemorySnapshot.relatedNeighborhood(
         .asSequence()
         .filter { episodeId !in it.sourceEpisodeIds }
         .map { node ->
-            val candidateTerms = node.text.memoryTerms().toSet()
+            val candidateTerms = termsOf(node)
             val overlap = terms.count { it in candidateTerms }
             node to overlap
         }
@@ -710,11 +777,12 @@ private fun MemorySnapshot.relatedNeighborhood(
     }
 }
 
-private fun MemorySnapshot.findCondensationCluster(
+/** Candidate clusters, largest first; each trimmed to the members with the strongest similarity. */
+private fun MemorySnapshot.condensationClusters(
     policy: MemoryConsolidationPolicy,
     protectedEpisodeIds: Set<MemoryEpisodeId> = emptySet(),
     projectId: String? = null,
-): List<MemoryNode>? {
+): Sequence<List<MemoryNode>> {
     val superseded = edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
@@ -736,7 +804,7 @@ private fun MemorySnapshot.findCondensationCluster(
             it.to in activeById &&
             activeById[it.from]?.kind == activeById[it.to]?.kind
     }
-    if (similarEdges.isEmpty()) return null
+    if (similarEdges.isEmpty()) return emptySequence()
 
     val adjacency = mutableMapOf<MemoryNodeId, MutableSet<MemoryNodeId>>()
     similarEdges.forEach { edge ->
@@ -764,14 +832,18 @@ private fun MemorySnapshot.findCondensationCluster(
         if (componentNodes.size > threshold) qualifying += componentNodes
     }
 
-    val chosen = qualifying.maxByOrNull { it.size } ?: return null
     val weights = similarEdges
         .flatMap { edge -> listOf(edge.from to edge.weight, edge.to to edge.weight) }
         .groupBy({ it.first }, { it.second })
         .mapValues { (_, values) -> values.sum() }
-    return chosen
-        .sortedByDescending { weights[it.id] ?: 0f }
-        .take(policy.condensationBatchSize)
+    return qualifying
+        .sortedByDescending { it.size }
+        .asSequence()
+        .map { component ->
+            component
+                .sortedByDescending { weights[it.id] ?: 0f }
+                .take(policy.condensationBatchSize)
+        }
 }
 
 private fun instructionFor(stage: MemoryConsolidationStage): String = when (stage) {

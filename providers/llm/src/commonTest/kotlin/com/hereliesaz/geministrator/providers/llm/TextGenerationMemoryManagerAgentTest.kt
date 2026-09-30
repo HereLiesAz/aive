@@ -9,7 +9,7 @@ import com.hereliesaz.geministrator.memory.MemoryRelationKind
 import com.hereliesaz.geministrator.memory.MemorySectionId
 import com.hereliesaz.geministrator.memory.MemoryWorkItem
 import com.hereliesaz.geministrator.memory.MemoryWorkPacket
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 class TextGenerationMemoryManagerAgentTest {
     @Test
-    fun generatedNodeInheritsPacketProvenanceAndUsesPacketScopedIds() = runBlocking {
+    fun generatedNodeInheritsPacketProvenanceAndUsesPacketScopedIds() = runTest {
         val api = object : TextGenerationApi {
             override suspend fun generate(prompt: String): TextGenerationResult = TextGenerationResult(
                 text = """
@@ -79,7 +79,7 @@ class TextGenerationMemoryManagerAgentTest {
     }
 
     @Test
-    fun modelCannotClaimProvenanceOutsideItsPacket() = runBlocking {
+    fun modelCannotClaimProvenanceOutsideItsPacket() = runTest {
         val api = object : TextGenerationApi {
             override suspend fun generate(prompt: String): TextGenerationResult = TextGenerationResult(
                 text = """

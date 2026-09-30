@@ -11,9 +11,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ModelBackedLocalOrchestrationUtilitiesTest {
     private val json = Json { encodeDefaults = true }
@@ -207,5 +209,36 @@ class ModelBackedLocalOrchestrationUtilitiesTest {
         )
 
         assertNull(runtime.infer(OrchestrationUtilityRole.MemoryQueryComposer, "{}"))
+    }
+
+    @Test
+    fun releasedSpecialistWithNoLoadableArtifactFallsBack() {
+        val specialistId = OrchestrationSpecialistIds.specialistId(OrchestrationUtilityRole.ToolRouter)
+        val library = LocalModelLibrary(
+            listOf(
+                LocalModelSpecialistDescriptor(
+                    specialistId = specialistId,
+                    standalone = LocalModelArtifactDescriptor(
+                        logicalArtifactId = "tool-router",
+                        foundationModelId = "foundation",
+                        releaseRepository = "HereLiesAz/aive",
+                        releaseTag = "test",
+                        assetName = "tool-router.gguf",
+                        sha256 = "2".repeat(64),
+                        format = "gguf",
+                        kind = LocalModelArtifactKind.Standalone,
+                    ),
+                ),
+            ),
+        )
+        assertTrue(library.hasSpecialist(specialistId))
+        assertFalse(library.hasSpecialist("orchestration:absent"))
+        val runtime = CatalogBackedLocalOrchestrationSpecialistRuntime(
+            library = library,
+            runtimeCapabilities = LocalModelRuntimeCapabilities(runtimeId = "test", supportedFormats = setOf("onnx")),
+            executor = LocalOrchestrationModelExecutor { _, _, _ -> error("must not run") },
+        )
+
+        assertNull(runtime.infer(OrchestrationUtilityRole.ToolRouter, "{}"))
     }
 }

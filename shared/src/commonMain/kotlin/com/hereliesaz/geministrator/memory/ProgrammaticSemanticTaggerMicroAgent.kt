@@ -109,7 +109,11 @@ internal fun Collection<MemoryMicroAgent>.withProgrammaticSemanticFastPaths(): L
     when (agent.role) {
         MemoryMicroAgentRole.NounTagger,
         MemoryMicroAgentRole.VerbTagger,
-        -> if (agent is ProgrammaticSemanticTaggerMicroAgent) agent else ProgrammaticSemanticTaggerMicroAgent(agent)
+        -> if (agent is ProgrammaticSemanticTaggerMicroAgent || agent is ProgrammaticMemoryMicroAgent) {
+            agent
+        } else {
+            ProgrammaticSemanticTaggerMicroAgent(agent)
+        }
         else -> agent
     }
 }

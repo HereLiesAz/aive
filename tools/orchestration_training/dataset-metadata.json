@@ -1,0 +1,8 @@
+{
+  "title": "Aive Orchestration Specialist Corpus",
+  "id": "hereliesaz/aive-orchestration-corpus",
+  "subtitle": "Contract-exact training data for The Aive's nine local orchestration specialists",
+  "description": "Generated from the Kotlin contracts in HereLiesAz/aive by OrchestrationDatasetGenerator. Each <role>.jsonl row has id, input (the exact JSON the runtime sends), expected (the deterministic baseline's answer), split (train/validation/test/adversarial) and tags. Each <role>.config.json carries the specialist ID, foundation model, system prompt and release gates. manifest.json records the source commit and SHA-256 of every file.",
+  "licenses": [{ "name": "Apache 2.0" }],
+  "keywords": ["text generation", "json"]
+}

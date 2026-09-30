@@ -1,12 +1,12 @@
-# Haive Memory Clerks — Training and Deployment Contract
+# The Aive Memory Clerks — Training and Deployment Contract
 
-This document is normative for Haive's local memory-clerk model family.
+This document is normative for The Aive's local memory-clerk model family.
 
 Memory clerks organize what was thought, said, done, requested, observed, or produced. They do not decide what should be thought.
 
 ## Architecture
 
-Haive uses two distinct local-inference families:
+The Aive uses two distinct local-inference families:
 
 1. **Eight structured generative clerks** based presumptively on `Qwen/Qwen2.5-0.5B-Instruct`, with specialist LoRA/PEFT adapters where practical.
 2. **One semantic association clerk** based on a compact MiniLM-style embedding model and cosine similarity.
@@ -87,6 +87,68 @@ session context
 Every abstraction must preserve provenance so a later agent can descend back to its source episode.
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
+
+### Memory screen
+
+The **Memory** destination (every platform) is the whole layer in one place, driven by the shared
+`MemoryLayerController`:
+
+- **Terrarium:** an intake plus one creature per stage, in pipeline order. A creature is active while
+  its stage processes a packet, ready while entries wait for it, blocked when entries are parked
+  there, and complete once it has produced memories; the link into the working stage carries.
+- **Engines:** tap a creature to choose Programmatic, Local model or Hosted (with provider and model)
+  for each of its clerks; fallbacks and their reasons are shown.
+- **Queue:** waiting and parked counts; retry or discard parked entries.
+- **Tuning:** attempts before parking, packet size, similarity needed to condense, batch size.
+- **On-device models:** install or remove each clerk's model where the platform has them (Android).
+- **Stored memory:** counts, forget one episode (and what came only from it), export/import JSON,
+  forget everything. Memory can be switched off or its consolidation paused.
+
+Every platform stores memory in SQLite through one `SqlMemoryStore`. On the web the database
+lives in the Origin Private File System, opened in a worker (`shared/memory-worker/`, the official
+SQLite WebAssembly build with its `opfs-sahpool` VFS, which needs no COOP/COEP headers).
+`openWebMemoryStore` creates or migrates the schema through `PRAGMA user_version` and imports the
+older browser-storage log once. A browser without OPFS keeps that browser-storage store. A second
+tab cannot open the database while the first holds it; it gets memory that lasts only for the
+session rather than a second copy that would diverge.
+
+### Engines
+
+Every stage runs on one of three engines, chosen per stage in `MemoryLayerSettings`
+(persisted by `MemoryLayerSettingsStore`):
+
+| Engine | What runs | Notes |
+|---|---|---|
+| Programmatic (default) | `ProgrammaticMemoryClerks` | Deterministic, nothing downloaded |
+| Local model | The platform's installed on-device clerk | Epoch-8 on Android today |
+| Hosted model | A configured provider's text API, through `StructuredMemoryMicroAgent` | Not for AssociationLinker (embeddings) |
+
+`assembleAgents` builds the clerks; a stage whose engine is unavailable on the platform runs
+programmatically and the reason is reported. Settings also carry `enabled` (off: nothing banked or
+recalled, stored memory kept), `consolidationPaused` (banking continues, consolidation waits) and the
+consolidation `policy`. Changes apply between packets.
+
+### Storage
+
+The graph lives in SQLite through SQLDelight (`SqlMemoryStore`; schema in
+`shared/src/commonMain/sqldelight/.../Memory.sq`). One row per episode, section, node, edge, queue
+entry and declined cluster; each row holds the full record as JSON plus indexed columns (node kind,
+edge endpoints and relation, episode) for querying. A commit is one transaction containing only its
+own rows. Queries are generated as suspend functions so the same store runs on the browser's
+asynchronous worker driver. `SettingsMemoryStore` remains for platforms not yet on SQLite and as the
+source of the one-time import.
+
+### Failure and output contract
+
+- Every generative clerk answers one JSON object with `sections`, `nodes` and/or `links`. Any other
+  shape is rejected as a failure, never read as "nothing to add". The epoch-8 releases were trained on
+  a different schema (`{"mutations":[{op,target_ref,payload}]}`), so their answers are rejected until
+  they are retrained on this contract.
+- A queue entry that fails `MemoryConsolidationPolicy.maxAttempts` times (default 3) is parked: it
+  stays `Failed` with its `lastError`, and consolidation moves on to the next entry.
+- `DO_NOT_CONDENSE` is a valid answer. The cluster is recorded in `declinedCondensations` and not
+  offered again until its membership changes. A cluster that fails `maxAttempts` times is declined the
+  same way, so one bad cluster cannot keep an entry from completing.
 
 ## Confidence semantics
 
@@ -321,7 +383,7 @@ To validate conscious conflict reasoning:
 
 1. Store two semantically related memories containing differing information.
 2. `AssociationLinker` links them only by similarity/relatedness.
-3. A normal orchestrated Haive agent recalls both.
+3. A normal orchestrated Aive agent recalls both.
 4. That agent may consciously notice and reason about the discrepancy.
 5. Its reasoning becomes ordinary session context.
 6. The resulting episode later passes through the same clerical pipeline.

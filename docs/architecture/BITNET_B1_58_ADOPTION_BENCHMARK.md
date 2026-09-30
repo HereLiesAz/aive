@@ -2,9 +2,9 @@
 
 Date: 2026-09-19
 
-Status: **BENCHMARKED — DO NOT ADOPT YET**
+Status: **GATE REVIEW DONE — NOT ADOPTED; SAME-MACHINE BENCHMARK NOT RUN**
 
-This is the required pre-adoption comparison for native BitNet b1.58 specialists. The benchmark is intentionally gate-ordered: deployment/runtime correctness is evaluated before expensive quality or throughput testing. A candidate that cannot satisfy the product's supported local-runtime contract is not eligible to replace the existing family, regardless of a favorable synthetic tokens/second result.
+This is the pre-adoption comparison for native BitNet b1.58 specialists. It is gate-ordered: deployment/runtime correctness is evaluated before expensive quality or throughput testing. A candidate that cannot satisfy the product's supported local-runtime contract is not eligible to replace the existing family, regardless of a favorable synthetic tokens/second result.
 
 ## Candidates
 
@@ -71,6 +71,6 @@ A future BitNet candidate may be reconsidered only after all of the following ex
 
 Only after those gates pass should a same-hardware performance benchmark be used to choose a production family.
 
-## Why this completes the pre-adoption benchmark
+## Roadmap status
 
-The roadmap requirement is explicitly **before adopting them**. The candidate was compared against the actual released Aive family using the product's hard runtime and release requirements, failed those gates, and therefore was not adopted. This keeps BitNet experimental without fabricating a performance conclusion from non-comparable upstream numbers.
+The gate review is done: the candidate was compared against the released Aive family on the product's hard runtime and release requirements, failed them, and was not adopted. The same-machine quality/performance benchmark the roadmap asks for has **not** been run, because no task-equivalent BitNet specialist exists to measure. The `TODO.md` item stays open until the re-entry criteria above are met and that benchmark is recorded here; nothing here is a performance conclusion drawn from non-comparable upstream numbers.

@@ -13,21 +13,37 @@ class MemoryLexicalAssociator(
     private val lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
     private val maxEdgesPerRefresh: Int = 256,
 ) {
+    /** Node text never changes, so each node is analyzed once per associator. */
+    private val analyses = hashMapOf<MemoryNodeId, MemoryLexicalAnalysis>()
+
     init {
         require(maxEdgesPerRefresh > 0)
     }
 
+    /** Store revision right after this associator's own last commit; unchanged means nothing to derive. */
+    private var settledRevision: Long? = null
+
+    /**
+     * Adds every currently derivable edge, committed [maxEdgesPerRefresh] at a time. Lexical rules read
+     * no association edges, so one pass reaches the fixed point.
+     */
     suspend fun refresh(nowEpochMillis: Long): Int {
-        while (true) {
-            val snapshot = store.read()
-            val edges = snapshot.lexicalAssociationCandidates(
+        if (store.read().revision == settledRevision) return 0
+        if (analyses.size > MAX_CACHED_ANALYSES) analyses.clear()
+        val added = store.commitEdgesInChunks(maxEdgesPerRefresh) { snapshot ->
+            snapshot.lexicalAssociationCandidates(
                 nowEpochMillis = nowEpochMillis,
                 lexicon = lexicon,
-                limit = maxEdgesPerRefresh,
+                limit = Int.MAX_VALUE,
+                analysisCache = analyses,
             )
-            if (edges.isEmpty()) return 0
-            if (store.commit(snapshot.revision, MemoryStoreMutation(edgesToAdd = edges))) return edges.size
         }
+        settledRevision = store.read().revision
+        return added
+    }
+
+    private companion object {
+        const val MAX_CACHED_ANALYSES = 200_000
     }
 }
 
@@ -35,6 +51,7 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
     nowEpochMillis: Long,
     lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
     limit: Int,
+    analysisCache: MutableMap<MemoryNodeId, MemoryLexicalAnalysis>? = null,
 ): List<MemoryEdge> {
     if (limit <= 0 || nodes.size < 2) return emptyList()
 
@@ -46,7 +63,12 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
     if (active.size < 2) return emptyList()
 
     val existingIds = edges.mapTo(hashSetOf(), MemoryEdge::id)
-    val analyses = active.associate { node -> node.id to memoryLexicalFeatures(node.text, lexicon) }
+    val analyses = active.associate { node ->
+        node.id to (
+            analysisCache?.getOrPut(node.id) { memoryLexicalFeatures(node.text, lexicon) }
+                ?: memoryLexicalFeatures(node.text, lexicon)
+            )
+    }
     val candidates = linkedMapOf<MemoryEdgeId, MemoryEdge>()
 
     data class Signal(

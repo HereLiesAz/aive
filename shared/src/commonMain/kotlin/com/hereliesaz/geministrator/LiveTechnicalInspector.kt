@@ -22,6 +22,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import kotlinx.coroutines.launch
 
 @Composable
@@ -35,7 +36,7 @@ internal fun TechnicalInspector(
     modifier: Modifier = Modifier,
 ) {
     if (liveWorkflow == null) {
-        TechnicalInspector(selectedTaskId = selectedTaskId, modifier = modifier)
+        EmptyTechnicalInspector("No run is loaded.", modifier)
         return
     }
 
@@ -43,7 +44,7 @@ internal fun TechnicalInspector(
     val task = liveWorkflow.definition.tasks.firstOrNull { it.id == taskId }
     val taskRun = liveWorkflow.run.taskRuns[taskId]
     if (task == null || taskRun == null) {
-        TechnicalInspector(selectedTaskId = selectedTaskId, modifier = modifier)
+        EmptyTechnicalInspector("Task $selectedTaskId is not part of the current run.", modifier)
         return
     }
 
@@ -119,6 +120,15 @@ internal fun TechnicalInspector(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+        }
+        if (taskRun.awaitsNestedHumanApproval()) {
+            AzphaltPill(
+                label = "Approve nested gate",
+                seed = "approve-nested-$selectedTaskId",
+                endCap = "Proceed",
+                onClick = { onApproveTask(selectedTaskId) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         if (taskRun.status == TaskRunStatus.Escalated) {
             AzphaltPill(

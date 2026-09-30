@@ -9,10 +9,7 @@ import javax.swing.JWindow
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
-/**
- * Desktop bootstrap that paints the exact logo frame immediately, then swaps in the
- * transparent animated loader as soon as the GIF is decoded.
- */
+/** Desktop bootstrap that shows the static logo until the app's first window appears. */
 fun main() {
     val splash = createDesktopSplash()
     val icon = loadImage("haive-icon-color.png")
@@ -43,8 +40,8 @@ fun main() {
 
 private fun createDesktopSplash(): JWindow? {
     if (GraphicsEnvironment.isHeadless()) return null
-    val firstFrame = loadImage("haive_loader_frame0.png") ?: return null
-    val label = JLabel(firstFrame)
+    val logo = loadImage("haive_splash_logo.png") ?: return null
+    val label = JLabel(logo)
     var result: JWindow? = null
     SwingUtilities.invokeAndWait {
         result = JWindow().apply {
@@ -56,20 +53,6 @@ private fun createDesktopSplash(): JWindow? {
             isAlwaysOnTop = true
             isVisible = true
         }
-    }
-
-    Thread({
-        val animated = loadImage("haive_loader.gif") ?: return@Thread
-        SwingUtilities.invokeLater {
-            if (result?.isDisplayable == true) {
-                label.icon = animated
-                result?.pack()
-                result?.setLocationRelativeTo(null)
-            }
-        }
-    }, "haive-splash-loader").apply {
-        isDaemon = true
-        start()
     }
 
     return result

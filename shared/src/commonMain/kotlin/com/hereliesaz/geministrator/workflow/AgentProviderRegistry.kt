@@ -32,19 +32,28 @@ data class ProviderSelectionRequest(
 
 class AgentProviderRegistry(
     providers: Collection<AgentProvider>,
-    inferenceFabric: CompoundInferenceFabric = SettingsCompoundInferenceFabric(
-        SettingsInferenceStateStore(durableInferenceSettings()),
-    ),
-    val genealogyGovernance: InferenceGenealogyGovernanceRuntime = InferenceGenealogyGovernanceRuntime(
-        graph = SettingsInferenceGenealogyGraph(durableInferenceSettings()),
-    ),
+    inferenceFabric: CompoundInferenceFabric? = null,
+    genealogyGovernance: InferenceGenealogyGovernanceRuntime? = null,
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
     localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
+    /**
+     * Backing store for the default fabric and genealogy graph when those are not given; see
+     * [com.hereliesaz.geministrator.persistence.WorkflowPersistence.inferenceSettings]. Null means
+     * the platform's durable store, opened only if a default is actually needed.
+     */
+    inferenceSettings: Settings? = null,
 ) {
+    private val defaultSettings: Settings by lazy { inferenceSettings ?: durableInferenceSettings() }
+
+    val genealogyGovernance: InferenceGenealogyGovernanceRuntime = genealogyGovernance
+        ?: InferenceGenealogyGovernanceRuntime(graph = SettingsInferenceGenealogyGraph(defaultSettings))
+    private val defaultedFabric: CompoundInferenceFabric = inferenceFabric
+        ?: SettingsCompoundInferenceFabric(SettingsInferenceStateStore(defaultSettings))
+
     val inferenceFabric: CompoundInferenceFabric = GovernedCompoundInferenceFabric(
-        delegate = inferenceFabric.withLocalModelLibrary(localModelLibrary),
-        governance = genealogyGovernance,
+        delegate = defaultedFabric.withLocalModelLibrary(localModelLibrary),
+        governance = this.genealogyGovernance,
     )
     private val providersById = providers.associateBy { it.id }
 
@@ -55,6 +64,12 @@ class AgentProviderRegistry(
     val providerIds: Set<AgentProviderId> get() = providersById.keys
 
     fun provider(id: AgentProviderId): AgentProvider? = providersById[id]
+
+    /** Whether a provider [select] may choose on its own supports every capability in [required]. */
+    suspend fun canStaff(required: Set<AgentCapability>): Boolean =
+        providersById.values
+            .filterNot { it.explicitOnly }
+            .any { it.capabilities().supported.containsAll(required) }
 
     suspend fun select(request: ProviderSelectionRequest): AgentProvider {
         val required = buildSet {
@@ -85,9 +100,12 @@ class AgentProviderRegistry(
             else -> Unit
         }
 
+        // Explicit-only providers join the candidates only as the role's preferred provider.
         val ordered = buildList {
             request.preferredProviderId?.let { providersById[it] }?.let(::add)
-            providersById.values.forEach { provider -> if (provider !in this) add(provider) }
+            providersById.values.forEach { provider ->
+                if (provider !in this && !provider.explicitOnly) add(provider)
+            }
         }
 
         val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
@@ -134,12 +152,20 @@ class AgentProviderRegistry(
         } else {
             ""
         }
-        error("No agent provider satisfies required capabilities $required$repositorySuffix")
+        val explicitOnlyHint = providersById.values
+            .filter { it.explicitOnly && it !in ordered }
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(prefix = ". Not chosen automatically: ", postfix = " (assign to a role to use)") { it.id.value }
+            .orEmpty()
+        error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint")
     }
 }
 
-private fun durableInferenceSettings(): Settings = ChunkedStringSettings(
-    delegate = Settings(),
+/** The app's durable inference store (platform default [Settings]). */
+internal fun durableInferenceSettings(): Settings = chunkedInferenceSettings(Settings())
+
+internal fun chunkedInferenceSettings(delegate: Settings): Settings = ChunkedStringSettings(
+    delegate = delegate,
     chunkedKeys = setOf(
         SettingsInferenceStateStore.DEFAULT_STORAGE_KEY,
         SettingsInferenceGenealogyGraph.DEFAULT_STORAGE_KEY,

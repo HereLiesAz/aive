@@ -46,6 +46,7 @@ class ProviderBackedManagedSessionGateway(
         const val APPROXIMATE_CHARS_PER_TOKEN = 4
         const val OBSERVER_RETRY_MILLIS = 1_000L
         const val MAX_OBSERVER_FAILURES = 10
+        const val MAX_FAILURE_MESSAGE_CHARS = 500
     }
 
     private data class SessionSnapshot(
@@ -300,13 +301,19 @@ class ProviderBackedManagedSessionGateway(
                     if (!handle.isTerminal()) delay(OBSERVER_RETRY_MILLIS)
                 } catch (failure: CancellationException) {
                     throw failure
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
                     consecutiveFailures++
                     if (consecutiveFailures >= MAX_OBSERVER_FAILURES) {
                         val failed = mutex.withLock {
                             val current = snapshots[handle] ?: return@withLock false
                             if (current.status != ManagedSessionStatus.Completed && !current.status.isTerminal()) {
-                                snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
+                                snapshots[handle] = current.copy(
+                                    status = ManagedSessionStatus.Failed,
+                                    progress = ManagedSessionProgress(
+                                        message = failure.message?.takeIf { it.isNotBlank() }?.take(MAX_FAILURE_MESSAGE_CHARS)
+                                            ?: failure::class.simpleName,
+                                    ),
+                                )
                                 true
                             } else {
                                 false
@@ -465,7 +472,11 @@ class ProviderBackedManagedSessionGateway(
                         message = current.progress?.message,
                     ),
                 )
-                is AgentEvent.Failed -> current.copy(status = ManagedSessionStatus.Failed)
+                // Keep the provider's reason; it becomes the task's last status and the failure reason.
+                is AgentEvent.Failed -> current.copy(
+                    status = ManagedSessionStatus.Failed,
+                    progress = ManagedSessionProgress(message = effectiveEvent.reason.takeIf { it.isNotBlank() }),
+                )
                 is AgentEvent.UsageReported -> current.copy(
                     pendingUsage = ManagedSessionUsage(
                         inputTokens = effectiveEvent.inputTokens,

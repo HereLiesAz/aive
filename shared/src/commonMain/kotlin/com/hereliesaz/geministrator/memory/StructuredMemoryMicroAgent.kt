@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.memory
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -43,10 +44,18 @@ class StructuredMemoryMicroAgent(
         require(result.text.length <= model.maxOutputChars) {
             "${role.name} output has ${result.text.length} chars; limit is ${model.maxOutputChars}"
         }
-        val proposal = json.decodeFromString(
-            MicroAgentProposal.serializer(),
-            result.text.extractMicroAgentJson(),
-        )
+        if (role == MemoryMicroAgentRole.CondensationRewriter && result.text.isCondensationDecline()) {
+            // A legitimate answer, not a failure: the consolidator records the cluster as declined.
+            return MemoryMutationBatch()
+        }
+        val element = json.parseToJsonElement(result.text.extractMicroAgentJson())
+        // Unknown keys are ignored, so an answer in another schema (e.g. the epoch-8 training format
+        // `{"mutations":[...]}`) would otherwise decode to an empty proposal and silently drop the packet.
+        require(element is JsonObject && PROPOSAL_KEYS.any(element::containsKey)) {
+            "${role.name} output does not follow the sections/nodes/links contract" +
+                ((element as? JsonObject)?.keys?.let { " (keys: ${it.joinToString()})" } ?: "")
+        }
+        val proposal = json.decodeFromJsonElement(MicroAgentProposal.serializer(), element)
         return proposal.toMutationBatch(packet, role, nowEpochMillis())
     }
 
@@ -217,6 +226,14 @@ private fun MemoryWorkItem.microSourceEpisodeIds(): List<MemoryEpisodeId> = meta
 
 private fun MemoryWorkItem.microSourceSectionIds(): List<MemorySectionId> = metadata["sourceSectionIds"]
     .orEmpty().split(',').map(String::trim).filter(String::isNotEmpty).map(::MemorySectionId)
+
+private val PROPOSAL_KEYS = setOf("sections", "nodes", "links")
+
+/** `DO_NOT_CONDENSE` alone, or as the whole answer before any JSON, is a decline. */
+private fun String.isCondensationDecline(): Boolean {
+    val marker = indexOf("DO_NOT_CONDENSE")
+    return marker >= 0 && indexOf('{').let { it < 0 || it > marker }
+}
 
 private fun String.extractMicroAgentJson(): String {
     val cleaned = trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()

@@ -17,7 +17,9 @@ import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REVIEW_VERDICT_METADATA
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -109,7 +111,7 @@ open class TextLlmProvider(
 
         if (session.request.requirePlanApproval) {
             if (!session.planGenerated.value) {
-                val preview = api.generate(renderPrompt(session.request))
+                val preview = generateOrFail(runId, session) ?: return@flow
                 session.planResult = preview
                 session.planGenerated.value = true
                 emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
@@ -121,9 +123,10 @@ open class TextLlmProvider(
                 return@flow
             }
             emit(AgentEvent.PlanApproved(runId))
-            val result = requireNotNull(session.planResult) {
-                "Plan result was not stored; cannot deliver the approved output"
-            }
+            // In-process sessions deliver the generation the user approved. A session
+            // reconstructed by reconnect() after a restart only has the durable plan
+            // flag, not the generation itself, so it executes exactly once here.
+            val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -134,7 +137,7 @@ open class TextLlmProvider(
                 mutex.withLock { sessions.remove(runId) }
                 return@flow
             }
-            val result = api.generate(renderPrompt(session.request))
+            val result = generateOrFail(runId, session) ?: return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -142,6 +145,24 @@ open class TextLlmProvider(
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
+    }
+
+    /**
+     * A provider refusal (HTTP 429, 5xx, bad key, unreachable host) fails the run at once with the
+     * provider's reason. Letting it escape would read as an observer transport fault, which the
+     * gateway retries with backoff while the task sits in Planning until the plan gate times out.
+     */
+    private suspend fun FlowCollector<AgentEvent>.generateOrFail(
+        runId: ProviderRunId,
+        session: Session,
+    ): TextGenerationResult? = try {
+        api.generate(renderPrompt(session.request))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        emit(AgentEvent.Failed(runId, "$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}"))
+        mutex.withLock { sessions.remove(runId) }
+        null
     }
 
     override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
@@ -241,19 +262,30 @@ open class TextLlmProvider(
         append("Return only the concrete work product for this assigned role. Do not claim repository access, shell execution, tests, or changes you did not actually perform.")
     }.trim()
 
+    /**
+     * The artifact kind for a text response: the task's declared artifact contract first, then the
+     * role, and only then keywords in the objective (matched as whole words, so "qa" does not match
+     * "equal" and role boilerplate mentioning failures does not turn a plan into a failure analysis).
+     */
     private fun inferArtifactKind(request: AgentTaskRequest): ArtifactKind {
         val roleId = request.orchestrationContext.roleId?.value
         val signal = "${request.roleInstructions}\n${request.objective}".lowercase()
+        when {
+            roleId == "hall-monitor" -> return ArtifactKind.HallMonitorReport
+            roleId == "antagonist" && "hall monitor" in signal -> return ArtifactKind.HallMonitorReview
+        }
+        request.requiredArtifacts.firstOrNull()?.let { return it }
+        ROLE_ARTIFACT_KINDS[roleId]?.let { return it }
+        val words = Regex("[a-z]+").findAll(request.objective.lowercase()).map { it.value }.toSet()
         return when {
-            roleId == "hall-monitor" -> ArtifactKind.HallMonitorReport
-            roleId == "antagonist" && "hall monitor" in signal -> ArtifactKind.HallMonitorReview
-            "release" in signal -> ArtifactKind.Release
-            "failure" in signal || "root cause" in signal -> ArtifactKind.FailureAnalysis
-            "verify" in signal || "verification" in signal || "qa" in signal -> ArtifactKind.Verification
-            "review" in signal -> ArtifactKind.Review
-            "architect" in signal || "architecture" in signal -> ArtifactKind.Architecture
-            "design" in signal || "ux" in signal -> ArtifactKind.Design
-            "requirement" in signal || "product" in signal -> ArtifactKind.Requirement
+            "release" in words -> ArtifactKind.Release
+            "failure" in words || "root" in words && "cause" in words -> ArtifactKind.FailureAnalysis
+            "verify" in words || "verification" in words || "qa" in words -> ArtifactKind.Verification
+            "review" in words -> ArtifactKind.Review
+            "architect" in words || "architecture" in words -> ArtifactKind.Architecture
+            "design" in words || "ux" in words -> ArtifactKind.Design
+            "requirement" in words || "requirements" in words || "product" in words -> ArtifactKind.Requirement
+            "plan" in words -> ArtifactKind.TaskPlan
             else -> ArtifactKind.Research
         }
     }
@@ -266,6 +298,20 @@ open class TextLlmProvider(
         ?.lowercase()
         ?.takeIf { it in setOf("pass", "revise", "reject") }
 }
+
+private val ROLE_ARTIFACT_KINDS: Map<String, ArtifactKind> = mapOf(
+    "orchestrator" to ArtifactKind.TaskPlan,
+    "product-manager" to ArtifactKind.Requirement,
+    "researcher" to ArtifactKind.Research,
+    "architect" to ArtifactKind.Architecture,
+    "epa-representative" to ArtifactKind.EnvironmentSpecification,
+    "ux-designer" to ArtifactKind.Design,
+    "qa-engineer" to ArtifactKind.Verification,
+    "adversarial-reviewer" to ArtifactKind.Review,
+    "code-reviewer" to ArtifactKind.Review,
+    "recovery-engineer" to ArtifactKind.FailureAnalysis,
+    "release-engineer" to ArtifactKind.Release,
+)
 
 class OpenAiProvider(
     apiKeyProvider: LlmApiKeyProvider,

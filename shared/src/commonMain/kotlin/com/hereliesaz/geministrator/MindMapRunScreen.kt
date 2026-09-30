@@ -47,7 +47,8 @@ internal fun MindMapRunScreen(
     onImportProjectFile: suspend (String) -> String? = { null },
     onRecoverFromCorruption: () -> Unit = {},
     onRetryRuntime: () -> Unit = {},
-    onReconfigureProvider: (String) -> Unit = {},
+    /** Opens Settings, where every linked provider can be reconfigured. */
+    onOpenSettings: () -> Unit = {},
     onValidateWorkflow: () -> List<String> = { emptyList() },
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
     onPickLocalRepository: (() -> String?)? = null,
@@ -157,9 +158,9 @@ internal fun MindMapRunScreen(
                         modifier = Modifier.weight(1f),
                     )
                     AzphaltPill(
-                        "Reconfigure Jules",
-                        "reconfigure-jules",
-                        onClick = { onReconfigureProvider("jules") },
+                        "Provider settings",
+                        "provider-settings",
+                        onClick = onOpenSettings,
                         modifier = Modifier.weight(1f),
                     )
                 }

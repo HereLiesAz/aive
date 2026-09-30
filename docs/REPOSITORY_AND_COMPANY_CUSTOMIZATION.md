@@ -18,4 +18,4 @@ Users can add, edit, remove, reorder, reroute, and save orchestration roles. Edi
 
 The saved collection is authoritative for new workflow construction. Starter tasks and injected test/environment-planning tasks resolve roles by authority rather than assuming a fixed built-in role ID.
 
-Removed roles are retained internally as disabled definitions so historical or already-running workflows can still resolve the role they were created with. Resetting restores Haive's built-in role definitions and order while retaining removed custom definitions only for historical compatibility.
+Removed roles are retained internally as disabled definitions so historical or already-running workflows can still resolve the role they were created with. Resetting restores The Aive's built-in role definitions and order while retaining removed custom definitions only for historical compatibility.

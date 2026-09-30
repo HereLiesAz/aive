@@ -60,40 +60,10 @@ enum class ControlRoomDestination(val label: String) {
     Inbox("Inbox"),
     Repositories("Repositories"),
     Compute("Compute"),
+    Memory("Memory"),
     AddOns("AZPHALT STORE"),
     Settings("Settings"),
 }
-
-internal enum class WorkState(val label: String) {
-    Complete("Complete"),
-    Working("Working"),
-    Waiting("Waiting"),
-    Gate("Gate"),
-    Blocked("Blocked"),
-}
-
-internal data class WorkNode(
-    val id: String,
-    val position: String,
-    val assignment: String,
-    val state: WorkState,
-    val progress: Float? = null,
-    val staffing: String? = null,
-    val detail: String? = null,
-    val injectedReason: String? = null,
-)
-
-internal val ActiveWorkflow = listOf(
-    WorkNode("product", "Product Manager", "Define authentication requirements", WorkState.Complete, detail = "Requirements approved"),
-    WorkNode("architect", "Architect", "Define authentication architecture", WorkState.Complete, staffing = "Jules", detail = "Plan approved"),
-    WorkNode("pre-code", "Crash Test Dummy", "Build pre-code verification contract", WorkState.Complete, staffing = "Jules", detail = "4 verification artifacts", injectedReason = "Pre-code verification policy"),
-    WorkNode("epa", "EPA Representative", "Specify execution environment", WorkState.Complete, staffing = "Jules", detail = "Ephemeral · restricted network", injectedReason = "Provider environment policy"),
-    WorkNode("implementation", "Implementation Engineer", "Implement authentication", WorkState.Working, progress = .62f, staffing = "Jules", detail = "Attempt 1 · active 08:41"),
-    WorkNode("post-code", "Crash Test Dummy", "Author regression tests", WorkState.Waiting, staffing = "Jules", detail = "Waiting for implementation", injectedReason = "Post-code test policy"),
-    WorkNode("qa", "QA Engineer", "Falsify completion claims", WorkState.Blocked, detail = "Blocked by post-code tests"),
-    WorkNode("review", "Code Reviewer", "Review implementation independently", WorkState.Blocked, detail = "Blocked by QA"),
-    WorkNode("release", "Release Engineer", "Approve integration and release", WorkState.Blocked, detail = "Blocked by review"),
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,6 +111,7 @@ fun ControlRoom(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -167,6 +138,7 @@ fun ControlRoom(
                 CompactNavigation(destination, onDestinationSelected)
                 MainDestination(
                     destination = destination,
+                    onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
@@ -208,6 +180,7 @@ fun ControlRoom(
                     onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     crashReportingSetting = crashReportingSetting,
                     localPlannerSetting = localPlannerSetting,
+                    memoryLayer = memoryLayer,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -227,6 +200,7 @@ fun ControlRoom(
                 )
                 MainDestination(
                     destination = destination,
+                    onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
@@ -268,6 +242,7 @@ fun ControlRoom(
                     onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                     crashReportingSetting = crashReportingSetting,
                     localPlannerSetting = localPlannerSetting,
+                    memoryLayer = memoryLayer,
                     azphaltStoreService = azphaltStoreService,
                     azphaltPackageImportRequest = azphaltPackageImportRequest,
                     onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -422,6 +397,7 @@ private fun MainDestination(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -429,6 +405,7 @@ private fun MainDestination(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     runtimeState: ApplicationRuntimeState,
+    onOpenSettings: () -> Unit = {},
 ) {
     AzphaltPlaceTransition(target = destination, modifier = modifier.fillMaxSize()) { place ->
         when (place) {
@@ -441,7 +418,7 @@ private fun MainDestination(
                 onImportProjectFile = onImportProjectFile,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
-                onReconfigureProvider = onReconfigureProvider,
+                onOpenSettings = onOpenSettings,
                 onValidateWorkflow = onValidateWorkflow,
                 availableRepositorySources = availableRepositorySources,
                 onPickLocalRepository = onPickLocalRepository,
@@ -487,6 +464,11 @@ private fun MainDestination(
                 onAssignWorkflow = onAssignWorkflowCompute,
                 onAssignRole = onAssignRoleCompute,
                 onAssignTask = onAssignTaskCompute,
+                modifier = Modifier.fillMaxSize(),
+            )
+            ControlRoomDestination.Memory -> MemoryLayerScreen(
+                controller = memoryLayer,
+                connectedProviderIds = connectedProviderIds,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.AddOns -> AzphaltStoreScreen(

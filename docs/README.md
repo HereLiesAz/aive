@@ -21,13 +21,33 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md) defines the product boundaries, runtime model, executor model, workflow UI, provider boundary, and delivery architecture.
 
+### Distributed compute
+
+[`architecture/DISTRIBUTED_COMPUTE.md`](architecture/DISTRIBUTED_COMPUTE.md) defines `TaskExecutor.Distributed` placement, the `computeRelay/` WebSocket relay, relay tokens, delegation targets, lease claim/heartbeat/progress/requeue behavior, the executor kinds Android and Desktop nodes accept, and the `MeshCrypto` pairing/encryption primitives.
+
+### Role execution sources
+
+[`architecture/ROLE_EXECUTION_SOURCES.md`](architecture/ROLE_EXECUTION_SOURCES.md) defines how a role's execution source (agent/provider, GitHub Actions, JavaScript, Python) is kept separate from role identity, and the Aive task envelope supplied to system-backed roles.
+
+### Workflow composition
+
+[`architecture/WORKFLOW_COMPOSITION.md`](architecture/WORKFLOW_COMPOSITION.md) defines recursive composition: a role is the smallest workflow, and any role-task or workflow node may be replaced by another workflow graph, with shared workflow/role libraries.
+
 ### Compound inference
 
 [`architecture/COMPOUND_INFERENCE.md`](architecture/COMPOUND_INFERENCE.md) defines the forward compound-inference architecture: centralized mixture-of-agents as governed DAG subgraphs, genealogy-based governance, Blueprint-style inference infrastructure, the local specialist/LoRA model library, DSPy optimization, governed Skeleton-of-Thought execution, and later ternary-model experiments. It preserves the existing human-like memory/reconsolidation authority boundary.
 
+### Genealogy governance
+
+[`architecture/GENEALOGY_GOVERNANCE.md`](architecture/GENEALOGY_GOVERNANCE.md) defines the structural trust layer for compound inference: information ancestry, independence, circular derivation, and missing provenance, without making epistemic judgments.
+
 ### BITCOS ternary runtime
 
 [`architecture/BITCOS.md`](architecture/BITCOS.md) defines The Aive's experimental BITCOS weight encoding, HBCS container, converter, native Rust decoder, Android/Desktop bridge, capability gating, and the remaining fused-kernel/model-family work.
+
+### BitNet b1.58 adoption benchmark
+
+[`architecture/BITNET_B1_58_ADOPTION_BENCHMARK.md`](architecture/BITNET_B1_58_ADOPTION_BENCHMARK.md) records the gate-ordered pre-adoption review of native BitNet b1.58 specialists against the Epoch-8 Qwen/ONNX baseline (not adopted).
 
 ### Memory banking and attention
 
@@ -53,6 +73,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/PERSISTENCE.md`](architecture/PERSISTENCE.md) defines what survives restarts, where it is stored, what must never enter workflow persistence, the provider/executor resume invariants, and how interrupted Android model downloads retain resumable partial bytes outside workflow state.
 
+### Storage scale
+
+[`architecture/STORAGE_SCALE.md`](architecture/STORAGE_SCALE.md) records the current Settings-based workflow storage approach and the thresholds that would trigger migration to a structured backend.
+
 ### Versioning and releases
 
 [`VERSIONING.md`](VERSIONING.md) defines the four-part build identity, immutable exact-build tags, patch-grouped GitHub Releases, centralized release/version policy, desktop package-version mapping, and Google Play versionCode rules.
@@ -69,10 +93,40 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/PROMPT_CACHING.md`](architecture/PROMPT_CACHING.md) defines provider-neutral prompt reuse. Caching is an optimization and never workflow semantics.
 
+### Repository services
+
+[`Repository-Services.md`](Repository-Services.md) describes GitHub, GitLab, and Local Git repository sources, their repository-operation vocabularies, the GitLab workspace agent, orchestration artifacts, and failure behavior.
+
+[`Local-Git-Repository-Operations.md`](Local-Git-Repository-Operations.md) defines the Desktop-only Local Git operation strings, their fixed process arguments, and the `CommandOutput` artifacts they emit.
+
+[`REPOSITORY_AND_COMPANY_CUSTOMIZATION.md`](REPOSITORY_AND_COMPANY_CUSTOMIZATION.md) describes connected-repository search on the run setup screen and custom swarm roster management.
+
+### Memory and orchestration model training
+
+[`Memory-layer.md`](Memory-layer.md) is the training and deployment contract for the local memory-clerk model family.
+
+[`Orchestration_layer.md`](Orchestration_layer.md) is the Kaggle training sequence for the orchestration model family.
+
+### Research background
+
+[`Agentic Memory System Research.md`](Agentic%20Memory%20System%20Research.md) and [`Composite Frontier Model Architectures.md`](Composite%20Frontier%20Model%20Architectures.md) are background research reports on hierarchical agent memory and compound AI systems. They are not product specifications.
+
+### Swarm terrarium
+
+[`swarm-terrarium/README.md`](swarm-terrarium/README.md) is the terrarium design brief for the 2D workflow-node mascots. [`swarm-terrarium/all_prompts.md`](swarm-terrarium/all_prompts.md) holds the role-specific rigging prompts, and [`swarm-terrarium/characters/001_orchestrator/rig/README.md`](swarm-terrarium/characters/001_orchestrator/rig/README.md) describes the first-pass Orchestrator puppet rig.
+
+### Branding
+
+[`BRANDING.md`](BRANDING.md) defines the canonical brand source assets in `branding/` and the icons and loader animations generated from them.
+
+### Threat model
+
+[`THREAT_MODEL.md`](THREAT_MODEL.md) identifies trust boundaries, threat actors, attack surfaces by integration, invariants, and open items.
+
 ### Privacy
 
 [`PRIVACY.md`](PRIVACY.md) describes what the current app stores, what may leave the device when a user invokes an external provider, how credentials are handled, and the current analytics/tracking policy.
 
 ## Naming
 
-The product name is **The Aive**. Technical artifact names may use `haive`. The Android application ID is `com.hereliesaz.aive`.
+The product name is **The Aive**. Technical artifact names may use `haive`. The Google Play Android application ID is `com.hereliesaz.aive`; GitHub-release Android builds keep `com.hereliesaz.haive` permanently so existing installs upgrade in place.

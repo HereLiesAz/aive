@@ -16,12 +16,12 @@ import kotlin.test.assertTrue
 class ConfiguredAndroidProvidersTest {
     @Test
     fun blankCredentialLeavesProviderRegistryEmpty() {
-        assertTrue(configuredAndroidProviders("   ").isEmpty())
+        assertTrue(configuredAndroidProviders(credentials = mapOf(ProviderCatalog.JULES_ID to "   ")).isEmpty())
     }
 
     @Test
-    fun storedCredentialConfiguresJulesProvider() {
-        val providers = configuredAndroidProviders(" test-key ")
+    fun storedJulesCredentialConfiguresJulesProvider() {
+        val providers = configuredAndroidProviders(credentials = mapOf(ProviderCatalog.JULES_ID to " test-key "))
 
         assertEquals(1, providers.size)
         assertEquals(AgentProviderId("jules"), providers.single().id)
@@ -31,7 +31,7 @@ class ConfiguredAndroidProvidersTest {
     fun everyHostedCredentialConfiguresItsProvider() {
         HostedLlmProviders.entries.forEach { spec ->
             val providers = configuredAndroidProviders(
-                credentials = mapOf(spec.id to "key-${spec.id}"),
+                credentials = mapOf(spec.id to if (spec.accountScoped) "account:key-${spec.id}" else "key-${spec.id}"),
             )
             assertTrue(
                 providers.any { it.id == AgentProviderId(spec.id) },

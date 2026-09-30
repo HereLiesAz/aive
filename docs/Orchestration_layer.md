@@ -1,10 +1,10 @@
-Haive Orchestration Models — Kaggle Training Sequence
+The Aive Orchestration Models — Kaggle Training Sequence
 
-This training series begins after the Haive Memory Clerk model family is substantially complete.
+This training series begins after the Aive Memory Clerk model family is substantially complete.
 
 The Memory Clerks organize historical information.
 
-The models in this series help Haive decide:
+The models in this series help The Aive decide:
 
 - what context is needed
 - what memory to retrieve
@@ -71,7 +71,7 @@ They are coordinators, not merely clerks.
 
 Tier 3 — Working / Conscious Reasoning Agents
 
-Do NOT attempt to replace Haive's strongest available general-purpose reasoning models merely for architectural purity.
+Do NOT attempt to replace The Aive's strongest available general-purpose reasoning models merely for architectural purity.
 
 These agents perform substantive work such as:
 
@@ -92,13 +92,13 @@ The orchestration system should be able to ESCALATE to these models.
 
 Prompt 0 — Build the Shared Orchestration Training Framework
 
-Build a reusable Kaggle framework for Haive orchestration models.
+Build a reusable Kaggle framework for Aive orchestration models.
 
 Do not train individual roles yet.
 
 Core architectural distinction
 
-Haive has:
+The Aive has:
 
 Memory Clerks
 
@@ -232,7 +232,7 @@ This should be one of the first orchestration models trained.
 
 Purpose
 
-Translate the current task/state into effective queries against Haive's hierarchical memory system.
+Translate the current task/state into effective queries against The Aive's hierarchical memory system.
 
 Memory resolution levels include roughly:
 
@@ -1349,7 +1349,7 @@ Benchmark:
 
 Prompt 16 — Determine the Optimal Local Reasoning Ceiling
 
-Run an empirical experiment to determine how much orchestration reasoning Haive should perform locally.
+Run an empirical experiment to determine how much orchestration reasoning The Aive should perform locally.
 
 Compare:
 
@@ -1439,7 +1439,7 @@ Requests enough evidence to substantiate completion.
 
 ---
 
-Prompt 18 — Package the Haive Orchestration Model Family
+Prompt 18 — Package the Aive Orchestration Model Family
 
 Produce:
 
@@ -1481,13 +1481,13 @@ Package:
 - licenses
 - integration documentation
 
-Produce an integration guide for Haive's orchestration layer.
+Produce an integration guide for The Aive's orchestration layer.
 
 ---
 
 Final Architectural Principle
 
-The Haive model hierarchy should behave approximately like this:
+The Aive model hierarchy should behave approximately like this:
 
 Memory Clerks
 

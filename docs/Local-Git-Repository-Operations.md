@@ -1,6 +1,6 @@
 # Local Git repository operations
 
-Desktop Haive can link a local Git working tree and execute bounded repository operations through `TaskExecutor.RepositoryOperation`.
+On Desktop, The Aive can link a local Git working tree and execute bounded repository operations through `TaskExecutor.RepositoryOperation`.
 
 Supported operation strings:
 

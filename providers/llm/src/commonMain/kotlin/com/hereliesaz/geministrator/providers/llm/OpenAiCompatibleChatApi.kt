@@ -27,6 +27,8 @@ class OpenAiCompatibleChatApi(
     private val model: String,
     baseUrl: String,
     private val extraHeaders: Map<String, String> = emptyMap(),
+    /** False for keyless free endpoints: a blank key then sends no Authorization header. */
+    private val requireApiKey: Boolean = true,
     client: HttpClient = openAiCompatibleClient(),
 ) : TextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
@@ -41,10 +43,10 @@ class OpenAiCompatibleChatApi(
 
     override suspend fun generate(prompt: String): TextGenerationResult {
         val apiKey = apiKeyProvider.getApiKey().trim()
-        require(apiKey.isNotEmpty()) { "API key is not configured" }
+        require(apiKey.isNotEmpty() || !requireApiKey) { "API key is not configured" }
 
         val response = client.post("$baseUrl/chat/completions") {
-            header(HttpHeaders.Authorization, "Bearer $apiKey")
+            if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
             extraHeaders.forEach { (name, value) -> header(name, value) }
             contentType(ContentType.Application.Json)
             setBody(

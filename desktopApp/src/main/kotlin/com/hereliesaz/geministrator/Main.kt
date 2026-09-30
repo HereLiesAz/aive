@@ -37,8 +37,10 @@ import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiResponsesApi
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
 import com.hereliesaz.geministrator.workflow.GitHubRestActionsClient
+import com.hereliesaz.geministrator.workflow.GitHubRestOpenCodeRunnerClient
 import com.hereliesaz.geministrator.workflow.GitHubRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
+import com.hereliesaz.geministrator.workflow.OpenCodeActionsAgentProvider
 import com.hereliesaz.geministrator.workflow.GitLabRestRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegration
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
@@ -54,6 +56,16 @@ import kotlinx.coroutines.CancellationException
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
+import com.hereliesaz.geministrator.providers.llm.memoryTextApi
+import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
+import com.hereliesaz.geministrator.memory.desktopSqlMemoryStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
@@ -79,6 +91,17 @@ fun main() {
     val httpClient = HttpClient(CIO)
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
+    val orchestrationUtilities = DesktopOrchestrationSpecialists.utilities(DesktopOrchestrationSpecialistInstaller(httpClient))
+    // Memory: SQLite under ~/.aive/memory, programmatic stages by default, hosted stages on request.
+    // Attached before App builds the runtime, whose session gateway captures the observer.
+    val memoryEngines = HostedMemoryEngineProvider(desktopMemoryPlatform())
+    val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val memoryLayer = MemoryLayerController(
+        store = desktopSqlMemoryStore(),
+        settingsStore = MemoryLayerSettingsStore.createDefault(),
+        engineProvider = memoryEngines,
+        scope = memoryScope,
+    ).also { it.attach() }
 
     try {
         application {
@@ -172,6 +195,13 @@ fun main() {
                         cloud
                     }
                 }
+                LaunchedEffect(credentials) {
+                    memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
+                        val api = memoryTextApi(credentials, providerId, model)
+                            ?: error("Memory provider ${providerId ?: "(default)"} is not configured")
+                        api.generate(prompt).text
+                    }
+                }
                 val localPlannerSetting = LocalPlannerSetting(
                     status = localPlannerStatus,
                     downloadSize = DesktopPlannerModel.downloadSizeLabel,
@@ -230,6 +260,7 @@ fun main() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        orchestrationUtilities = orchestrationUtilities,
                         projectFileService = projectFileService,
                         availableRepositorySources = RepositorySource.entries.toSet(),
                         onPickLocalRepository = ::pickLocalGitFolder,
@@ -270,11 +301,14 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
+                        memoryLayer = memoryLayer,
                     )
                 }
             }
         }
     } finally {
+        memoryLayer.detach()
+        memoryScope.cancel()
         localPlanner.close()
         httpClient.close()
     }
@@ -286,7 +320,17 @@ internal fun configuredDesktopProviders(
     repositoryHttpClient: HttpClient? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+    val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
     addAll(HostedLlmProviders.configured(credentials))
+    // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
+    // model, no key; needs only the linked GitHub token.
+    if (githubToken != null && repositoryHttpClient != null) {
+        add(
+            OpenCodeActionsAgentProvider(
+                GitHubRestOpenCodeRunnerClient(GitHubTokenProvider { githubToken }, repositoryHttpClient),
+            ),
+        )
+    }
     credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
         add(
             JulesProvider(
@@ -537,3 +581,12 @@ private fun desktopDistributedExecutorKinds(
 
 private fun Map<String, String>.cleanKey(id: String): String? =
     this[id]?.trim()?.takeIf(String::isNotEmpty)
+
+private fun desktopMemoryPlatform(): MemoryMicroAgentPlatform {
+    val os = System.getProperty("os.name", "").lowercase()
+    return when {
+        "win" in os -> MemoryMicroAgentPlatform.Windows
+        "mac" in os -> MemoryMicroAgentPlatform.MacOS
+        else -> MemoryMicroAgentPlatform.Linux
+    }
+}

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -34,6 +35,7 @@ class AgentProviderRegistryRepositoryTest {
         val registry = AgentProviderRegistry(
             providers = listOf(githubOnly, gitLabCapable),
             orchestrationUtilities = utilities,
+            inferenceSettings = InMemorySettings(),
         )
 
         val selected = registry.select(
@@ -61,6 +63,7 @@ class AgentProviderRegistryRepositoryTest {
                     supportedSources = setOf(RepositorySource.GitHub),
                 ),
             ),
+            inferenceSettings = InMemorySettings(),
         )
 
         val failure = assertFailsWith<IllegalStateException> {
@@ -92,7 +95,7 @@ class AgentProviderRegistryRepositoryTest {
             supportedSources = setOf(RepositorySource.GitLab),
             capabilities = setOf(AgentCapability.Research),
         )
-        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable))
+        val registry = AgentProviderRegistry(listOf(githubOnly, gitLabCapable), inferenceSettings = InMemorySettings())
 
         val selected = registry.select(
             ProviderSelectionRequest(
@@ -108,6 +111,59 @@ class AgentProviderRegistryRepositoryTest {
 
         assertEquals(gitLabCapable.id, selected.id)
     }
+
+    @Test
+    fun explicitOnlyProviderIsNeverChosenAutomatically() = runBlocking {
+        val julesLike = SourceAwareProvider(
+            id = AgentProviderId("jules"),
+            supportedSources = setOf(RepositorySource.GitHub),
+            explicitOnly = true,
+        )
+        val registry = AgentProviderRegistry(listOf(julesLike), inferenceSettings = InMemorySettings())
+        val github = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub)
+
+        val failure = assertFailsWith<IllegalStateException> {
+            registry.select(
+                ProviderSelectionRequest(
+                    requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                    repository = github,
+                ),
+            )
+        }
+        assertTrue(failure.message.orEmpty().contains("assign to a role"))
+
+        val preferred = registry.select(
+            ProviderSelectionRequest(
+                preferredProviderId = julesLike.id,
+                requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                repository = github,
+            ),
+        )
+        assertEquals(julesLike.id, preferred.id)
+    }
+
+    @Test
+    fun explicitOnlyProviderYieldsToAutomaticProviders() = runBlocking {
+        val julesLike = SourceAwareProvider(
+            id = AgentProviderId("jules"),
+            supportedSources = setOf(RepositorySource.GitHub),
+            explicitOnly = true,
+        )
+        val automatic = SourceAwareProvider(
+            id = AgentProviderId("automatic"),
+            supportedSources = setOf(RepositorySource.GitHub),
+        )
+        val registry = AgentProviderRegistry(listOf(julesLike, automatic), inferenceSettings = InMemorySettings())
+
+        val selected = registry.select(
+            ProviderSelectionRequest(
+                requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
+                repository = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub),
+            ),
+        )
+
+        assertEquals(automatic.id, selected.id)
+    }
 }
 
 private class SourceAwareProvider(
@@ -117,6 +173,7 @@ private class SourceAwareProvider(
         AgentCapability.RepositoryRead,
         AgentCapability.RepositoryWrite,
     ),
+    override val explicitOnly: Boolean = false,
 ) : AgentProvider {
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(capabilities)
 

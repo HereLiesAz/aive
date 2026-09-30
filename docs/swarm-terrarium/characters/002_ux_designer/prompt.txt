@@ -1,38 +1,91 @@
-Use ONLY docs/swarm-terrarium/characters/002_ux_designer/approved_character.png as the visual authority. Reconstruct that exact approved UX Designer as independent 2D puppet-rig parts. Do not redesign, reinterpret, simplify, restyle, recolor, or borrow anatomy from any other node creature.
+NODE 002 — UX DESIGNER
+2D RIG BODY-PART SPRITE SHEET PROMPT
 
-STYLE AND MATCHING
-Preserve the approved character's exact coral/pink/orange/deep-indigo palette, smooth glossy 2D vector-like gradients, highlight placement, outline treatment, body proportions, asymmetry, tendril shapes, bulb sizes, branching pattern, heart-shaped terminal, eye design, and long underside gestation limb. The finished parts must reassemble into the approved character with no visible style or silhouette drift.
+VISUAL AUTHORITY
+Use ONLY the single human-approved character preview image attached to this image-generation call.
+Ignore every other image in the conversation, repository, prior generations, full character sheets, neighboring nodes, and remembered designs.
+The role/name "Ux Designer" is metadata only. Never invent anatomy, props, colors, symbols, or effects from the role name.
+If the approved preview is not attached, do not generate the sprite sheet.
 
-STRICT 2D RIGGING RULES
-This is layered 2D puppet art, NOT a 3D model, exploded model, mechanical assembly, toy, or cutaway.
-- NEVER draw holes, sockets, tubes, cavities, rims, ports, connector collars, recessed eye sockets, exposed cross-sections, or visible cut faces.
-- NEVER make the body hollow.
-- The BODY/CORE layer must be a complete uninterrupted version of the approved body with the entire face surface filled in behind both eyes. NO eyes and NO eye-shaped holes or depressions on the body layer.
-- Every movable part is a flat layered artwork asset. Joint boundaries are ordinary 2D silhouette edges.
-- Extend hidden portions of limbs underneath neighboring parts so rotation cannot expose gaps. These overlap extensions must continue the same colors/shading; they are not plugs or sockets.
-- Do not bake one movable part into another.
+TASK
+Create exactly ONE transparent PNG sprite sheet containing ONLY the separated 2D rig assets required to reconstruct the character shown in the approved preview.
+This is a faithful decomposition/copy task, NOT a redesign, concept-art task, character sheet, exploded mechanical diagram, or opportunity to "improve" the character.
 
-REQUIRED INDEPENDENT PARTS
-1. body_core — complete face/body, no eyes, no holes, no tendrils, no gestation limb.
-2. left_eye_outer/ring matching the approved left eye.
-3. left_eye_black oval.
-4. left_eye_highlight(s), separated only if useful for eye motion.
-5. right_eye_outer/ring.
-6. right_eye_black oval.
-7. right_eye_highlight(s), separated only if useful for eye motion.
-8. blink/eyelid overlays shaped from the approved eye design and palette; these sit ON TOP of the intact body and must not require a socket.
-9. Every approved upper/side dendritic appendage as its own independent rig chain. Preserve each appendage's exact unique length, curvature, branch locations, terminal bulbs, and asymmetry. Where a chain needs more than one moving section, divide it into base/mid/tip pieces with generous hidden 2D overlap.
-10. Preserve the distinctive heart-shaped terminal/branch as its exact own appendage part(s), not a generic heart prop.
-11. The underside gestation limb as independent sequential 2D pieces following the approved serpentine path.
-12. Both elongated intermediate gestation pods as separate parts.
-13. The large terminal gestation egg as a separate part.
-14. Any other visible movable element in approved_character.png that is not listed above.
+SOURCE FIDELITY — COPY, DO NOT REDESIGN
+Treat every visible source pixel as binding visual information.
+Preserve each source-visible part as faithfully as possible: exact silhouette, shape, orientation, asymmetry, relative size, color placement, texture, facets, gradients, highlights, shading, translucency, markings, and finish.
+Do not restyle, recolor, simplify, beautify, regularize, symmetrize, smooth, sharpen, add detail, remove detail, or correct unusual anatomy.
+Do not borrow anything from another node or from a previous generated rig sheet.
+Do not add bloom, outer glow, aura, halo, haze, drop shadow, contact shadow, colored fringe, matte, or background lighting around any asset.
 
-COMPLETENESS
-Count and reproduce EVERY visible tendril, every branch-off, every terminal bulb, both eyes, the heart terminal, every gestation segment/pod/egg, and every small movable appendage visible in approved_character.png. Missing a small branch is failure. Adding an unapproved branch is failure.
+EXACT DECOMPOSITION RULES
+1. BODY / CORE
+- Include the central body/core exactly ONCE at source-relative size and orientation.
+- The body/core contains NO eyes, pupils, irises, eyelids, or eye artwork.
+- Continue the surrounding body surface naturally behind removed eyes.
+- NEVER create eye holes, sockets, rims, cavities, ports, cut faces, recessed wells, exposed interiors, connector collars, or mechanical attachment points.
+- Keep integral surface markings and non-articulating texture on the body.
+- Do not detach an integral bump/spike/marking unless the reference clearly shows a distinct movable structure with its own root/neck.
 
-OUTPUT
-Create one transparent PNG sprite sheet containing only the independent rig parts, widely spaced so each can later be extracted by rectangular bounds without touching another part. No text, labels, arrows, guides, background, checkerboard baked into pixels, assembled duplicate, alternate poses, alternate views, or generic spare parts. Preserve source-relative scale: do not enlarge tiny parts or shrink the body merely to fill the sheet.
+2. EYES
+- Include each actual visible eye exactly ONCE as a separate complete eye asset.
+- Preserve its exact source appearance and scale.
+- Do not bake any eye back onto the body.
+- Do not invent extra eyes or mirrored copies.
 
-FINAL SELF-CHECK BEFORE RETURNING
-Mentally reassemble every part in the exact approved pose. Verify: intact face under eyes; zero 3D holes/sockets; exact part count; exact branches/bulbs; exact heart terminal; exact gestation anatomy; exact colors and silhouettes. If any part would not reconstruct approved_character.png faithfully, regenerate before returning.
+3. EYELIDS — THE ONLY PERMITTED NEW PARTS
+- For EACH actual eye, add exactly ONE upper eyelid overlay and ONE lower eyelid overlay.
+- Match the eye curvature, local palette, lighting, and style.
+- Eyelids remain separate from body and eye.
+- Eyelids are the ONLY assets allowed that are not visibly present in the reference.
+
+4. APPENDAGES / LIMBS / TENDRILS / BRANCHES
+- Every visibly distinct continuous appendage appears exactly ONCE.
+- Keep each continuous appendage WHOLE. Do NOT arbitrarily split it into base/mid/tip pieces.
+- A branching appendage is ONE asset from body root through every visible fork and terminal belonging to that branch.
+- Preserve exact curvature, fork locations, thickness changes, terminal sizes, and asymmetry.
+- Extend only the hidden root enough to overlap slightly beneath the body during rigging, using the same local paint/shading; this is part of the SAME asset.
+- Do not create sockets, caps, plugs, joint balls, collars, or generic replacement limbs.
+
+5. TAILS / LOWER CHAINS / GESTATION-LIKE STRUCTURES
+- Preserve every visible continuous tail/lower structure exactly as shown.
+- If visually continuous, keep it as ONE asset.
+- If visibly distinct disconnected/jointed pieces exist, preserve those real pieces separately exactly once.
+- Do not invent segmentation for animation convenience.
+
+6. PROPS AND DETACHED ELEMENTS
+- Include each real visible prop, tool, detached floating element, or effect exactly ONCE at source-relative scale.
+- If a prop is visibly separable from a limb, keep it separate.
+- Do not add role-themed props/effects not visible in the approved preview.
+
+COUNT / DUPLICATION RULE
+Every actual visible occurrence in the preview is represented exactly once.
+Similar-looking but visibly separate bulbs, branches, leaves, gems, drops, or pieces are each real instances and appear once at their own size.
+Do NOT add mirrored counterparts, duplicates, alternates, spares, expression variants, pose variants, back views, side views, generic replacements, or "helpful" extras.
+If uncertain whether something should become a new asset, KEEP IT ATTACHED rather than invent another part.
+
+SPRITE-SHEET LAYOUT
+- True transparent background.
+- No background color/gradient, glow, haze, shadow, matte, checkerboard, or decorative field.
+- Do NOT include the original assembled character or reference image anywhere.
+- Do NOT include any assembled duplicate.
+- No text, labels, numbers, arrows, captions, guides, boxes, grid, borders, legends, or diagrams.
+- Keep every asset fully visible, non-overlapping, and separated by generous transparent space.
+- Preserve source-relative scale; never enlarge small parts or shrink the body merely to fill the canvas.
+- Keep source orientation unless rotation is absolutely required to prevent overlap.
+
+FINAL PRE-FLIGHT CHECK
+- Body exactly once, with NO eyes.
+- Natural intact body surface behind removed eyes; NO holes/sockets.
+- Every actual eye exactly once as a separate asset.
+- Exactly one upper and one lower eyelid per actual eye.
+- Every other visible continuous body part exactly once.
+- No source-visible part missing.
+- No non-source body part except eyelids.
+- No repeated body part.
+- No assembled character.
+- No other character design leakage.
+- No glow, matte, background, labels, or presentation graphics.
+- Parts recompose into the exact approved preview with no redesign drift.
+
+Return ONLY the transparent PNG sprite sheet.

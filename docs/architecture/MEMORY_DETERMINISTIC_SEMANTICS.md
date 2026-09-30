@@ -1,6 +1,6 @@
 # Deterministic-first memory semantics
 
-Haive should spend model inference where interpretation or abstraction is genuinely required, not where structure can be derived cheaply and reproducibly.
+The Aive should spend model inference where interpretation or abstraction is genuinely required, not where structure can be derived cheaply and reproducibly.
 
 The governing rule is:
 
@@ -10,7 +10,7 @@ This document defines how deterministic semantic processing coexists with the ep
 
 ## Evidence layers
 
-Haive deliberately distinguishes three kinds of association evidence.
+The Aive deliberately distinguishes three kinds of association evidence.
 
 ### 1. Bookkeeping facts
 
@@ -42,7 +42,7 @@ These edges carry both `deterministic=true` and `heuristic=true`. The first mean
 
 The built-in `RuleBasedMemoryLexicon` is deliberately conservative and dependency-free. It provides bounded technical-action normalization plus light noun morphology. `MemoryLexicon` is the extension seam for a compact WordNet/VerbNet-derived implementation inspired by Convey's deterministic noun and verb classifiers.
 
-Until that richer lexical resource is shipped and benchmarked, Haive must not claim WordNet-level sense resolution from the default rule-based implementation.
+Until that richer lexical resource is shipped and benchmarked, The Aive must not claim WordNet-level sense resolution from the default rule-based implementation.
 
 ### 3. Embedding similarity
 
@@ -89,7 +89,7 @@ Programmatic nodes record:
 
 The lexical analyzer adopts the useful shape of Convey's deterministic semantic code without pretending that its lightweight built-in parser is a full dependency parser.
 
-For a sentence with a confidently known verb, Haive may derive weak structural signatures such as:
+For a sentence with a confidently known verb, The Aive may derive weak structural signatures such as:
 
 - `(subject, verb)`
 - `(verb, object)`
