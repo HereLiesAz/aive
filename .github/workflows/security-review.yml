@@ -15,7 +15,7 @@ jobs:
   central:
     name: Start
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 100
     outputs:
       run_id: ${{ steps.locate.outputs.run_id }}
     steps:
@@ -26,7 +26,7 @@ jobs:
           STATUS_CONTEXT: .github/workflows/security-review.yml
           TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
-        run: "set -euo pipefail\ncreated_at=\"$(gh api \"repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\" --jq .created_at)\"\nthreshold=\"$(date -u -d \"$created_at - 5 seconds\" +%s)\"\n# The gateway skips some events a tracker still sees (unmatched filters, forks, manual\n# runs, CI-skip pushes). No central status within 20 minutes means no central run.\nfor _ in $(seq 1 80); do\n  url=\"$(gh api \"repos/$GITHUB_REPOSITORY/statuses/$TARGET_SHA?per_page=100\" --jq \\\n    \"[.[] | select(.context == \\\"$STATUS_CONTEXT\\\" and ((.updated_at | fromdateiso8601) >= $threshold))][0].target_url // empty\")\"\n  run_id=\"$(sed -nE 's#.*/HereLiesAz/workflows/actions/runs/([0-9]+).*#\\1#p' <<<\"$url\")\"\n  if [[ -n \"$run_id\" ]]; then\n    echo \"run_id=$run_id\" >> \"$GITHUB_OUTPUT\"\n    echo \"Run: $url\"\n    exit 0\n  fi\n  sleep 15\ndone\necho \"::notice::No run of this workflow was started for this event.\"\n"
+        run: "set -euo pipefail\ncreated_at=\"$(gh api \"repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\" --jq .created_at)\"\nthreshold=\"$(date -u -d \"$created_at - 5 seconds\" +%s)\"\n# The gateway skips some events a tracker still sees (unmatched filters, forks, manual\n# runs, CI-skip pushes). No central status within 90 minutes means no central run.\n# The window is long on purpose: a gateway run can sit queued behind the account's\n# concurrent-job limit for over an hour when long builds are running (2026-09-29:\n# Graffux pushes at 17:04 and 17:46 were routed at 18:28 and 19:12), and a shorter\n# window gave up on runs that then built and published anyway.\nfor _ in $(seq 1 360); do\n  url=\"$(gh api \"repos/$GITHUB_REPOSITORY/statuses/$TARGET_SHA?per_page=100\" --jq \\\n    \"[.[] | select(.context == \\\"$STATUS_CONTEXT\\\" and ((.updated_at | fromdateiso8601) >= $threshold))][0].target_url // empty\")\"\n  run_id=\"$(sed -nE 's#.*/HereLiesAz/workflows/actions/runs/([0-9]+).*#\\1#p' <<<\"$url\")\"\n  if [[ -n \"$run_id\" ]]; then\n    echo \"run_id=$run_id\" >> \"$GITHUB_OUTPUT\"\n    echo \"Run: $url\"\n    exit 0\n  fi\n  sleep 15\ndone\necho \"::notice::No run of this workflow was started for this event.\"\n"
   policy_secret_preflight:
     name: policy_secret_preflight
     needs:
