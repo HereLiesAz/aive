@@ -292,6 +292,7 @@ internal fun ProviderSettingsScreen(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -477,6 +478,54 @@ internal fun ProviderSettingsScreen(
                     AzphaltPill(
                         "Retry install (${setting.downloadSize})",
                         "local-planner-retry",
+                        onClick = setting.onInstall,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+
+        localOrchestrationSpecialistSetting?.let { setting ->
+            ProviderSectionLabel("Local Orchestration")
+            Text(
+                "Runs released orchestration utility specialists on this device. " +
+                    "${setting.releasedRoles} of ${setting.totalRoles} roles currently have released models; " +
+                    "unreleased roles keep the deterministic implementation.",
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            when (val status = setting.status) {
+                LocalOrchestrationSpecialistStatus.NotInstalled -> AzphaltPill(
+                    "Install released specialists",
+                    "local-orchestration-install",
+                    onClick = setting.onInstall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                is LocalOrchestrationSpecialistStatus.Installing -> AzphaltRecord(
+                    seed = "local-orchestration-installing",
+                    eyebrow = "Local orchestration",
+                    title = "Installing",
+                    body = status.progress,
+                    endCap = "…",
+                )
+                LocalOrchestrationSpecialistStatus.Installed -> AzphaltPill(
+                    "Local specialists installed: remove",
+                    "local-orchestration-remove",
+                    selected = true,
+                    onClick = setting.onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                is LocalOrchestrationSpecialistStatus.Failed -> {
+                    AzphaltRecord(
+                        seed = "local-orchestration-failed",
+                        eyebrow = "Local orchestration",
+                        title = "Install failed",
+                        body = status.message,
+                        endCap = "Retry",
+                    )
+                    AzphaltPill(
+                        "Retry specialist install",
+                        "local-orchestration-retry",
                         onClick = setting.onInstall,
                         modifier = Modifier.fillMaxWidth(),
                     )
