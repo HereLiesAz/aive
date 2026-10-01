@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
@@ -175,6 +176,7 @@ class MainActivity : ComponentActivity() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 var crashReportingEnabled by remember { mutableStateOf(CrashReporting.isEnabled(this@MainActivity)) }
+                val uiScope = rememberCoroutineScope()
                 var localOrchestrationStatus by remember {
                     mutableStateOf<LocalOrchestrationSpecialistStatus>(
                         if (orchestrationSpecialistInstaller.allReleasedInstalled()) {
@@ -194,7 +196,7 @@ class MainActivity : ComponentActivity() {
                     onInstall = install@{
                         if (localOrchestrationStatus is LocalOrchestrationSpecialistStatus.Installing) return@install
                         localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing("Starting…")
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        uiScope.launch {
                             localOrchestrationStatus = try {
                                 withContext(Dispatchers.IO) {
                                     orchestrationSpecialistInstaller.installReleased { progress ->
@@ -213,7 +215,7 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onRemove = {
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        uiScope.launch {
                             withContext(Dispatchers.IO) {
                                 orchestrationSpecialistInstaller.removeReleased()
                             }
