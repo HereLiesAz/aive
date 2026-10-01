@@ -634,6 +634,11 @@ notebook = {
     "nbformat": 4,
     "nbformat_minor": 5,
 }
-target = Path(__file__).with_name("aive_orchestration_specialists.ipynb")
-target.write_text(json.dumps(notebook, indent=1) + "\n")
-print("wrote", target)
+targets = [
+    Path(__file__).with_name("aive_orchestration_specialists.ipynb"),
+    Path(__file__).resolve().parents[2] / "aive_orchestration_specialists.ipynb",
+]
+rendered = json.dumps(notebook, indent=1) + "\n"
+for target in targets:
+    target.write_text(rendered)
+    print("wrote", target)
