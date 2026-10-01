@@ -157,7 +157,7 @@ def get_github_status():
     found = False
     assets = []
     try:
-        res = subprocess.run(["curl.exe", "-s", "-I", "--max-time", "4", "https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v1"],
+        res = subprocess.run(["curl.exe", "-s", "-I", "--max-time", "4", "https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v2"],
                              capture_output=True, text=True, timeout=5)
         if "HTTP/1.1 200" in res.stdout or "HTTP/2 200" in res.stdout:
             found = True
@@ -165,10 +165,10 @@ def get_github_status():
         pass
 
     data = {
-        "tag": "orchestration-utilities-v1",
+        "tag": "orchestration-utilities-v2",
         "released": found,
         "assets": assets,
-        "url": "https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v1"
+        "url": "https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v2"
     }
     cache["github_release"] = {"data": data, "last_check": now}
     return data
