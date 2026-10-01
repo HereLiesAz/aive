@@ -83,7 +83,7 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, runtimeGeneration) {
+    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
