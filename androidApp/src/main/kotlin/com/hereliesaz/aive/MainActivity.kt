@@ -102,6 +102,13 @@ class MainActivity : ComponentActivity() {
     private val orchestrationSpecialistInstaller by lazy {
         AndroidOrchestrationSpecialistInstaller(this, repositoryHttpClient)
     }
+    private val orchestrationSpecialistExecutorDelegate = lazy {
+        AndroidLocalOrchestrationModelExecutor(orchestrationSpecialistInstaller)
+    }
+    private val orchestrationSpecialistExecutor by orchestrationSpecialistExecutorDelegate
+
+    private fun orchestrationSpecialistExecutorDelegateInitialized(): Boolean =
+        orchestrationSpecialistExecutorDelegate.isInitialized()
     private var installedGeminiReady by mutableStateOf(false)
     private val memoryRuntimeDelegate = lazy {
         AndroidMemoryLayerRuntime(
@@ -187,7 +194,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 val orchestrationUtilities = remember(localOrchestrationStatus) {
-                    AndroidOrchestrationSpecialists.utilities(orchestrationSpecialistInstaller)
+                    AndroidOrchestrationSpecialists.utilities(
+                        installer = orchestrationSpecialistInstaller,
+                        executor = orchestrationSpecialistExecutor,
+                    )
                 }
                 val localOrchestrationSetting = LocalOrchestrationSpecialistSetting(
                     status = localOrchestrationStatus,
@@ -216,10 +226,17 @@ class MainActivity : ComponentActivity() {
                     },
                     onRemove = {
                         uiScope.launch {
-                            withContext(Dispatchers.IO) {
-                                orchestrationSpecialistInstaller.removeReleased()
+                            localOrchestrationStatus = try {
+                                withContext(Dispatchers.IO) {
+                                    orchestrationSpecialistExecutor.reset()
+                                    orchestrationSpecialistInstaller.removeReleased()
+                                }
+                                LocalOrchestrationSpecialistStatus.NotInstalled
+                            } catch (failure: Throwable) {
+                                LocalOrchestrationSpecialistStatus.Failed(
+                                    failure.message ?: failure::class.simpleName.orEmpty(),
+                                )
                             }
-                            localOrchestrationStatus = LocalOrchestrationSpecialistStatus.NotInstalled
                         }
                     },
                 )
@@ -501,6 +518,9 @@ class MainActivity : ComponentActivity() {
         azphaltHost.close()
         if (memoryRuntimeDelegate.isInitialized()) {
             memoryRuntime.close()
+        }
+        if (orchestrationSpecialistExecutorDelegateInitialized()) {
+            orchestrationSpecialistExecutor.close()
         }
         repositoryHttpClient.close()
         super.onDestroy()

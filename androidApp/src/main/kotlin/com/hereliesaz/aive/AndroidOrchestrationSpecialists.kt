@@ -48,7 +48,10 @@ internal object AndroidOrchestrationSpecialists {
 
     fun releasedRoleCount(): Int = OrchestrationSpecialistCatalog.released().allSpecialists().size
 
-    fun utilities(installer: AndroidOrchestrationSpecialistInstaller): LocalOrchestrationUtilityFamily =
+    fun utilities(
+        installer: AndroidOrchestrationSpecialistInstaller,
+        executor: AndroidLocalOrchestrationModelExecutor,
+    ): LocalOrchestrationUtilityFamily =
         if (!installer.hasAnyInstalledReleasedArtifact()) {
             DeterministicLocalOrchestrationUtilities
         } else {
@@ -56,7 +59,7 @@ internal object AndroidOrchestrationSpecialists {
                 runtime = CatalogBackedLocalOrchestrationSpecialistRuntime(
                     library = OrchestrationSpecialistCatalog.released(),
                     runtimeCapabilities = runtimeCapabilities,
-                    executor = AndroidLocalOrchestrationModelExecutor(installer),
+                    executor = executor,
                 ),
             )
         }
@@ -177,9 +180,21 @@ internal class AndroidOrchestrationSpecialistInstaller(
 
 internal class AndroidLocalOrchestrationModelExecutor(
     private val installer: AndroidOrchestrationSpecialistInstaller,
-    private val sessions: AndroidOrtMemorySessionManager = AndroidOrtMemorySessionManager(),
-) : LocalOrchestrationModelExecutor {
+) : LocalOrchestrationModelExecutor, AutoCloseable {
     private val generator = AndroidOrchestrationCausalGenerator()
+    @Volatile
+    private var sessions = AndroidOrtMemorySessionManager()
+
+    @Synchronized
+    fun reset() {
+        sessions.close()
+        sessions = AndroidOrtMemorySessionManager()
+    }
+
+    @Synchronized
+    override fun close() {
+        sessions.close()
+    }
 
     override fun generate(
         role: OrchestrationUtilityRole,
