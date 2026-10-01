@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -105,6 +106,58 @@ class OpenCodeActionsAgentProviderTest {
     }
 
     @Test
+    fun approvedWorkflowInstallSurvivesProviderRestartAndReconnectsByRunName() = runBlocking<Unit> {
+        val client = FakeRunnerClient(installed = null)
+        val firstProvider = provider(client)
+        val request = request(requirePlanApproval = false)
+        val runId = ProviderRunId("opencode:task-1:restart")
+
+        // Simulate the durable provider run that existed before process death.
+        firstProvider.reconnect(
+            runId = runId,
+            request = request,
+            planGenerated = true,
+            planApproved = false,
+            planPreview = null,
+        )
+        val firstObserve = async { firstProvider.observe(runId).toList() }
+        repeat(20) { yield() }
+
+        assertEquals(null, client.written)
+        assertEquals(null, client.dispatchedTask)
+
+        firstProvider.approvePlan(runId)
+        repeat(100) {
+            if (client.dispatchCount == 1) return@repeat
+            yield()
+        }
+        assertEquals("template-v2", client.written)
+        assertContains(client.dispatchedTask.orEmpty(), OpenCodeActionsAgentProvider.runName(runId))
+        assertEquals(1, client.dispatchCount)
+        firstObserve.cancelAndJoin()
+
+        // Recreate the provider as a process restart would. The durable run ID + request + approved
+        // plan state are restored by ApplicationRuntime; the GitHub run itself is rediscovered by
+        // the deterministic run-name rather than dispatched again.
+        client.existingRunName = OpenCodeActionsAgentProvider.runName(runId)
+        client.polls = 0
+        val restartedProvider = provider(client)
+        restartedProvider.reconnect(
+            runId = runId,
+            request = request,
+            planGenerated = true,
+            planApproved = true,
+            planPreview = "Approving this will install ${OpenCodeAgentWorkflow.PATH} by committing it directly to main.",
+        )
+        val resumedEvents = restartedProvider.observe(runId).toList()
+
+        assertEquals(1, client.dispatchCount, "Restart must follow the existing workflow_dispatch run")
+        assertTrue(resumedEvents.none { it is AgentEvent.PlanGenerated })
+        assertTrue(resumedEvents.none { it is AgentEvent.PlanApproved })
+        assertIs<AgentEvent.Completed>(resumedEvents.last())
+    }
+
+    @Test
     fun bundledWorkflowRunsOpenCodeAndStreamsToACheckRun() = runBlocking<Unit> {
         val template = OpenCodeAgentWorkflow.template()
 
@@ -126,7 +179,8 @@ class OpenCodeActionsAgentProviderTest {
         var written: String? = null
         var dispatchedTask: String? = null
         var existingRunName: String? = null
-        private var polls = 0
+        var dispatchCount: Int = 0
+        var polls: Int = 0
 
         override suspend fun defaultBranch(repository: RepositoryRef) = "main"
 
@@ -138,7 +192,10 @@ class OpenCodeActionsAgentProviderTest {
         }
 
         override suspend fun dispatch(repository: RepositoryRef, branch: String, taskJson: String): String {
+            dispatchCount += 1
             dispatchedTask = taskJson
+            existingRunName = Regex("\\\"checkName\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"")
+                .find(taskJson)?.groupValues?.get(1)
             return "77"
         }
 

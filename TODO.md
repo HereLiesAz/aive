@@ -113,7 +113,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Make Jules explicit-only: it runs where a role names it and is never selected automatically.
 - [x] Add the OpenCode agent on GitHub Actions as the automatic coding agent for GitHub repositories, with per-step progress.
 - [x] Verify the OpenCode agent runner on real GitHub infrastructure. Live run on `HereLiesAz/test` (2026-09-26): the runner created its check run and streamed the step log, OpenCode's free model fixed a planted bug, the runner pushed the fix to an `aive/opencode-*` branch, and the `aive-result` artifact matched what the app parses.
-- [ ] Verify the app's own dispatch path end to end: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. The live run above was started by a push trigger, because the test session could not call `workflow_dispatch`.
+- [ ] Verify the app's own dispatch path end to end against live GitHub: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. Automated regression coverage now exercises that complete durable sequence—including a mid-run provider recreation with no redispatch—but a live external run through the app is still required before ticking this item.
 
 ## P1 — Persistence and recovery
 
