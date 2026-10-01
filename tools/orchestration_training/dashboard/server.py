@@ -157,13 +157,10 @@ def get_github_status():
     found = False
     assets = []
     try:
-        res = subprocess.run(["curl.exe", "-s", "--max-time", "3", "https://api.github.com/repos/HereLiesAz/aive/releases/tags/orchestration-utilities-v1"],
-                             capture_output=True, text=True, timeout=4)
-        if res.returncode == 0 and '"status": "404"' not in res.stdout:
-            rel = json.loads(res.stdout)
-            if "tag_name" in rel:
-                found = True
-                assets = [{"name": a["name"], "size": a["size"], "url": a["browser_download_url"]} for a in rel.get("assets", [])]
+        res = subprocess.run(["curl.exe", "-s", "-I", "--max-time", "4", "https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v1"],
+                             capture_output=True, text=True, timeout=5)
+        if "HTTP/1.1 200" in res.stdout or "HTTP/2 200" in res.stdout:
+            found = True
     except Exception:
         pass
 
