@@ -107,9 +107,9 @@ def train_role(slug, out_dir):
         model=model,
         args=TrainingArguments(
             output_dir=str(out_dir / "checkpoints"),
-            per_device_train_batch_size=2,
-            per_device_eval_batch_size=2,
-            gradient_accumulation_steps=4,
+            per_device_train_batch_size=1,
+            per_device_eval_batch_size=1,
+            gradient_accumulation_steps=8,
             num_train_epochs=EPOCHS,
             learning_rate=LEARNING_RATE,
             lr_scheduler_type="cosine",

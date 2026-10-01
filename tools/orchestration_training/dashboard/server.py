@@ -77,13 +77,35 @@ def get_local_training_progress():
 
         # Gating results if any
         gates = {}
-        for line in lines:
-            gm = re.search(r'\[([\w\-]+)\] GATES: test ([\d\.]+) \(.*?\), adv ([\d\.]+) \(.*?\) -> (PASS|FAIL)', line)
-            if gm:
-                gates[gm.group(1)] = {"test": float(gm.group(2)), "adv": float(gm.group(3)), "passed": gm.group(4) == "PASS"}
+        # Check for failure or completion
+        has_oom = "CUDA error: out of memory" in content
+        has_error = "Traceback (most recent call last)" in content or has_oom or "RuntimeError:" in content
+        is_complete = "Local training complete!" in content
+        
+        status_text = "RUNNING"
+        if has_oom:
+            status_text = "FAILED (CUDA OOM)"
+        elif has_error:
+            status_text = "FAILED"
+        elif is_complete:
+            status_text = "COMPLETED"
+        elif step == 0 and total == 0:
+            status_text = "INITIALIZING"
+
+        is_active = (not has_error) and (not is_complete) and (step < total or total == 0)
+
+        # Also load local_results.json if it exists
+        local_results_file = ROOT / "build" / "local_training" / "local_results.json"
+        if local_results_file.exists():
+            try:
+                lr = json.loads(local_results_file.read_text())
+                gates.update(lr)
+            except Exception:
+                pass
 
         return {
-            "active": step < total or total == 0,
+            "active": is_active,
+            "status": status_text,
             "role": current_role,
             "step": step,
             "total": total,
