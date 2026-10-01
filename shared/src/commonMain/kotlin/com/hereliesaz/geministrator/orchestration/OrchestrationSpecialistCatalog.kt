@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
  */
 object OrchestrationSpecialistCatalog {
     // register_catalog.py:begin
-    const val RELEASED: String = """{"specialists":[]}"""
+    const val RELEASED: String = """{"specialists":[{"specialistId":"orchestration:agent-router","mergedVariants":[{"logicalArtifactId":"orchestration:utilities:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-utilities-v1","assetName":"aive-orchestration-utilities-int8.tar.gz","sha256":"b8b47322f685f777f36b514591b985a2d3820644174f7ad09d993f66645c2437","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["agent-router","handoff-composer","orchestration-utility"]}]},{"specialistId":"orchestration:handoff-composer","mergedVariants":[{"logicalArtifactId":"orchestration:utilities:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-utilities-v1","assetName":"aive-orchestration-utilities-int8.tar.gz","sha256":"b8b47322f685f777f36b514591b985a2d3820644174f7ad09d993f66645c2437","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["agent-router","handoff-composer","orchestration-utility"]}]}]}"""
     // register_catalog.py:end
 
     private val json = Json { ignoreUnknownKeys = true }
