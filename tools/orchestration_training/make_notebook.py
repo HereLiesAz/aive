@@ -627,12 +627,35 @@ print(f"catalog: {len(catalog['specialists'])} roles; assets in {ASSETS}; done i
 ''')
 
 code(r'''
-# Upload the archive and the catalog. Commit catalog.json to the repo afterwards so the app can
-# register the released specialists (tools/orchestration_training/README.md).
+# Upload directly only for an explicitly credentialed manual run. Centralized Kaggle execution leaves
+# UPLOAD false and publishes the compact output from HereLiesAz/workflows after the kernel completes.
 if UPLOAD:
     upload(sorted(ASSETS.glob("*.tar.gz")) + sorted(ASSETS.glob("*.safetensors")) + [ASSETS / "catalog.json"])
 else:
-    print("UPLOAD is False; assets are in", ASSETS)
+    export_root = Path("/kaggle/working/orchestration-v2-output")
+    if export_root.exists():
+        shutil.rmtree(export_root)
+    export_assets = export_root / "assets"
+    export_assets.mkdir(parents=True)
+    for path in ASSETS.iterdir():
+        if path.is_file():
+            shutil.copy2(path, export_assets / path.name)
+    if STATE_FILE.exists():
+        shutil.copy2(STATE_FILE, export_root / "state.json")
+    (export_root / "run-summary.json").write_text(json.dumps({
+        "releaseTag": RELEASE_TAG,
+        "mode": MODE,
+        "rolesRequested": SLUGS,
+        "releasedRoles": [entry["specialistId"] for entry in catalog["specialists"]],
+    }, indent=2) + "\n")
+    # Keep Kaggle/GitHub artifact output bounded to the actual release payload.
+    for child in WORK.iterdir():
+        if child != export_root:
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+    print("compact release output:", export_root)
 ''')
 
 notebook = {
