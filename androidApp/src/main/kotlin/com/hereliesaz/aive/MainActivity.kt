@@ -228,15 +228,10 @@ class MainActivity : ComponentActivity() {
                     },
                     onRemove = {
                         uiScope.launch {
-                            localOrchestrationStatus = try {
-                                withContext(Dispatchers.IO) {
-                                    orchestrationSpecialistExecutor.reset()
-                                    orchestrationSpecialistInstaller.removeReleased()
-                                }
-                                LocalOrchestrationSpecialistStatus.NotInstalled
-                            } catch (failure: Throwable) {
-                                LocalOrchestrationSpecialistStatus.Failed(
-                                    failure.message ?: failure::class.simpleName.orEmpty(),
+                            localOrchestrationStatus = withContext(Dispatchers.IO) {
+                                removeLocalOrchestrationSpecialists(
+                                    resetExecutor = { orchestrationSpecialistExecutor.reset() },
+                                    removeArtifacts = { orchestrationSpecialistInstaller.removeReleased() },
                                 )
                             }
                         }
