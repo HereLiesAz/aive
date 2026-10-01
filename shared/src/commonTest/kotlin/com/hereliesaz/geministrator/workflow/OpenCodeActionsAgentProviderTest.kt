@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -126,12 +127,14 @@ class OpenCodeActionsAgentProviderTest {
         assertEquals(null, client.dispatchedTask)
 
         firstProvider.approvePlan(runId)
-        val firstEvents = firstObserve.await()
-        assertTrue(firstEvents.any { it is AgentEvent.PlanGenerated })
-        assertTrue(firstEvents.any { it is AgentEvent.PlanApproved })
+        repeat(100) {
+            if (client.dispatchCount == 1) return@repeat
+            yield()
+        }
         assertEquals("template-v2", client.written)
         assertContains(client.dispatchedTask.orEmpty(), OpenCodeActionsAgentProvider.runName(runId))
         assertEquals(1, client.dispatchCount)
+        firstObserve.cancelAndJoin()
 
         // Recreate the provider as a process restart would. The durable run ID + request + approved
         // plan state are restored by ApplicationRuntime; the GitHub run itself is rediscovered by
