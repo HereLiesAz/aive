@@ -118,8 +118,14 @@ jobs:
       - name: Verify release immutability policy
         run: python3 .github/scripts/verify_release_immutability.py
 
-      - name: Verify orchestration notebook copies are synchronized
-        run: cmp -s aive_orchestration_specialists.ipynb tools/orchestration_training/aive_orchestration_specialists.ipynb
+      - name: Verify orchestration notebooks match their generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/orchestration_training/make_notebook.py
+          git diff --exit-code -- \
+            aive_orchestration_specialists.ipynb \
+            tools/orchestration_training/aive_orchestration_specialists.ipynb
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
