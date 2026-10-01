@@ -228,6 +228,7 @@ class MainActivity : ComponentActivity() {
                         uiScope.launch {
                             localOrchestrationStatus = try {
                                 withContext(Dispatchers.IO) {
+                                    orchestrationSpecialistExecutor.reset()
                                     orchestrationSpecialistInstaller.removeReleased()
                                 }
                                 LocalOrchestrationSpecialistStatus.NotInstalled
