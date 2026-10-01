@@ -1,4 +1,5 @@
-orchestration-utilities-v2
-trigger=2026-10-01T13:12:00Z
+orchestration-utilities-v3
+trigger=2026-10-01T13:20:00Z
 purpose=train-and-gate-all-orchestration-specialists
 mode=both
+supersedes=56e8ed69987fb382d80cc7ab8291479b7b2e9ea4
