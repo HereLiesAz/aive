@@ -93,4 +93,6 @@ python3 tools/orchestration_training/register_catalog.py catalog.json
 This writes the released specialists into `OrchestrationSpecialistCatalog.RELEASED`. Commit that change.
 On desktop, `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS=1` turns the specialists on and
 `AIVE_ORCHESTRATION_SPECIALIST_MODE=adapters` prefers base + adapter over the merged model (default
-`merged`). Other platforms still need a `LocalOrchestrationModelExecutor` (see `TODO.md`).
+`merged`). Android installs released artifacts explicitly from Settings and supports both merged INT8
+models and the shared INT8 base + fp16 adapter shape. Platforms without a local executor keep the
+deterministic utility family.
