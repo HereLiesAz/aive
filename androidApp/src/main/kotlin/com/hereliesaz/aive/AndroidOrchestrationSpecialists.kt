@@ -159,10 +159,14 @@ internal class AndroidOrchestrationSpecialistInstaller(
     }
 
     suspend fun removeReleased() = mutex.withLock {
-        releasedArtifacts().forEach { artifact ->
+        // Remove every artifact the released catalog knows about, not only the load plan Android
+        // currently prefers. A device may still have a merged model from an older app version after
+        // a newer catalog starts preferring shared-base adapters.
+        OrchestrationSpecialistCatalog.released().allArtifacts().forEach { artifact ->
             if (artifact.kind == LocalModelArtifactKind.Adapter) {
-                adapterFile(artifact).delete()
-                File(adapterFile(artifact).path + ".sha256").delete()
+                val file = adapterFile(artifact)
+                file.delete()
+                File(file.path + ".sha256").delete()
             } else {
                 directory(artifact).deleteRecursively()
             }
