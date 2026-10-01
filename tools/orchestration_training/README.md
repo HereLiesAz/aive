@@ -82,7 +82,7 @@ kept in `state.json`, so a restarted session resumes where it stopped.
 
 To publish, add a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`, set
 `UPLOAD = True`, and run the last cell. It uploads the archives, adapter files and `catalog.json` to the
-`orchestration-utilities-v2` pre-release. Release assets are immutable: reruns may reuse an identical existing asset, but a changed same-name asset requires a new release tag. The currently shipped Agent Router/Handoff Composer bundle remains pinned to v1.
+`orchestration-utilities-v3` pre-release. Release assets are immutable: reruns may reuse an identical existing asset, but a changed same-name asset requires a new release tag. The currently shipped Agent Router/Handoff Composer bundle remains pinned to v1.
 
 ## 3. Register the release
 
