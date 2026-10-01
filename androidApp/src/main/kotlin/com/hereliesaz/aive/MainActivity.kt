@@ -234,6 +234,8 @@ class MainActivity : ComponentActivity() {
                                     orchestrationSpecialistInstaller.removeReleased()
                                 }
                                 LocalOrchestrationSpecialistStatus.NotInstalled
+                            } catch (failure: CancellationException) {
+                                throw failure
                             } catch (failure: Throwable) {
                                 LocalOrchestrationSpecialistStatus.Failed(
                                     failure.message ?: failure::class.simpleName.orEmpty(),
