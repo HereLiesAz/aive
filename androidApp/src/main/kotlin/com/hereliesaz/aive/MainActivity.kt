@@ -29,6 +29,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.CrashReportingSetting
+import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
+import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
 import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
@@ -38,6 +40,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
 import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
 import com.hereliesaz.geministrator.providers.jules.JulesProvider
 import com.hereliesaz.geministrator.providers.jules.JulesRestApi
@@ -95,6 +98,9 @@ class MainActivity : ComponentActivity() {
         }
     }
     private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
+    private val orchestrationSpecialistInstaller by lazy {
+        AndroidOrchestrationSpecialistInstaller(this, repositoryHttpClient)
+    }
     private var installedGeminiReady by mutableStateOf(false)
     private val memoryRuntimeDelegate = lazy {
         AndroidMemoryLayerRuntime(
@@ -169,6 +175,52 @@ class MainActivity : ComponentActivity() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 var crashReportingEnabled by remember { mutableStateOf(CrashReporting.isEnabled(this@MainActivity)) }
+                var localOrchestrationStatus by remember {
+                    mutableStateOf<LocalOrchestrationSpecialistStatus>(
+                        if (orchestrationSpecialistInstaller.allReleasedInstalled()) {
+                            LocalOrchestrationSpecialistStatus.Installed
+                        } else {
+                            LocalOrchestrationSpecialistStatus.NotInstalled
+                        },
+                    )
+                }
+                val orchestrationUtilities = remember(localOrchestrationStatus) {
+                    AndroidOrchestrationSpecialists.utilities(orchestrationSpecialistInstaller)
+                }
+                val localOrchestrationSetting = LocalOrchestrationSpecialistSetting(
+                    status = localOrchestrationStatus,
+                    releasedRoles = AndroidOrchestrationSpecialists.releasedRoleCount(),
+                    totalRoles = OrchestrationUtilityRole.entries.size,
+                    onInstall = install@{
+                        if (localOrchestrationStatus is LocalOrchestrationSpecialistStatus.Installing) return@install
+                        localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing("Starting…")
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            localOrchestrationStatus = try {
+                                withContext(Dispatchers.IO) {
+                                    orchestrationSpecialistInstaller.installReleased { progress ->
+                                        runOnUiThread {
+                                            localOrchestrationStatus =
+                                                LocalOrchestrationSpecialistStatus.Installing(progress)
+                                        }
+                                    }
+                                }
+                                LocalOrchestrationSpecialistStatus.Installed
+                            } catch (failure: Throwable) {
+                                LocalOrchestrationSpecialistStatus.Failed(
+                                    failure.message ?: failure::class.simpleName.orEmpty(),
+                                )
+                            }
+                        }
+                    },
+                    onRemove = {
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            withContext(Dispatchers.IO) {
+                                orchestrationSpecialistInstaller.removeReleased()
+                            }
+                            localOrchestrationStatus = LocalOrchestrationSpecialistStatus.NotInstalled
+                        }
+                    },
+                )
 
                 val installedGeminiApi = remember(credentials, installedGeminiReady) {
                     if (!installedGeminiReady) {
@@ -323,6 +375,7 @@ class MainActivity : ComponentActivity() {
                     else -> App(
                         providers = providers,
                         executorIntegrations = executorIntegrations,
+                        orchestrationUtilities = orchestrationUtilities,
                         roleSurfaceRuntime = roleSurfaceRuntime,
                         orchestrationRuntime = planningRuntime,
                         persistence = azphaltHost.persistence,
@@ -369,6 +422,7 @@ class MainActivity : ComponentActivity() {
                             computeToken = null
                         },
                         memoryLayer = memoryRuntime.controller,
+                        localOrchestrationSpecialistSetting = localOrchestrationSetting,
                         crashReportingSetting = if (CrashReporting.isSupported) {
                             CrashReportingSetting(crashReportingEnabled) { enabled ->
                                 CrashReporting.setEnabled(this, enabled)
