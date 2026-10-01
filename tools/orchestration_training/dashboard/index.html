@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIVE // Orchestration Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(15, 20, 30, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.12);
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --cyan: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.25);
+      --purple: #a855f7;
+      --purple-glow: rgba(168, 85, 247, 0.25);
+      --amber: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(ellipse at 15% 0%, rgba(0, 240, 255, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 10%, rgba(168, 85, 247, 0.07) 0%, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tag {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      font-weight: 600;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .pulse {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 10px var(--green);
+      animation: pulse 1.8s infinite;
+      margin-right: 6px;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      border-color: var(--card-hover);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .node-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .node-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+    }
+    .badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .badge.running {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+    .badge.cyan {
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+    }
+    .badge.purple {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--purple);
+      border: 1px solid rgba(168, 85, 247, 0.4);
+    }
+    .badge.amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+    }
+    .metric-label { color: var(--text-muted); }
+    .metric-val { font-weight: 600; color: #fff; }
+
+    .progress-bar-wrap {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 12px 0 6px 0;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .bar-cyan { background: linear-gradient(90deg, #00b4d8, var(--cyan)); box-shadow: 0 0 10px var(--cyan-glow); }
+    .bar-purple { background: linear-gradient(90deg, #6366f1, var(--purple)); box-shadow: 0 0 10px var(--purple-glow); }
+
+    .matrix-section {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--card-border);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .status-pill {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .status-pill.active { background: rgba(0, 240, 255, 0.15); color: var(--cyan); border: 1px solid rgba(0, 240, 255, 0.3); }
+    .status-pill.pending { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); }
+    .status-pill.done { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .terminal-section {
+      background: #050608;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px 20px;
+    }
+    .terminal-header {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .terminal-body {
+      background: transparent;
+      height: 160px;
+      overflow-y: auto;
+      font-size: 0.78rem;
+      line-height: 1.5;
+      color: #94a3b8;
+    }
+    .log-line {
+      margin-bottom: 2px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .log-line.cyan { color: var(--cyan); }
+    .log-line.green { color: var(--green); }
+    .log-line.amber { color: var(--amber); }
+
+    a {
+      color: var(--cyan);
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    a:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="pulse"></span>
+      <h1>AIVE Specialist Orchestration</h1>
+      <span class="tag">TRI-ENGINE CLUSTER</span>
+    </div>
+    <div class="header-right">
+      <span id="clock">00:00:00</span>
+      <span style="color: var(--card-border);">|</span>
+      <span>AUTONOMOUS DISPATCH</span>
+    </div>
+  </header>
+
+  <!-- 3 Engine Cards -->
+  <div class="grid-3">
+
+    <!-- Node 1: Local RTX 2050 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="node-title">Node 01 &bull; Local GPU</div>
+          <div class="node-name">RTX 2050 (4 GB)</div>
+        </div>
+        <span id="local-badge" class="badge cyan">ACTIVE</span>
+      </div>
+
+      <div class="metric-row">
+        <span class="metric-label">Assigned Roles:</span>
+        <span class="metric-val" style="color: var(--cyan);">tool, completion, escalation</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Current Role:</span>
+        <span class="metric-val" id="local-role">tool-router</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Step Progress:</span>
+        <span class="metric-val" id="local-steps">0 / 350</span>
+      </div>
+
+      <div class="progress-bar-wrap">
+        <div id="local-progress-bar" class="progress-bar bar-cyan"></div>
+      </div>
+
+      <div class="metric-row" style="font-size: 0.75rem; margin-top: 6px;">
+        <span id="local-pct">0%</span>
+        <span id="local-eta">ETA: Calculating...</span>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div class="metric-row">
+          <span class="metric-label">GPU Load / Temp:</span>
+          <span class="metric-val" id="local-gpu-load">--% &bull; --&deg;C</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">VRAM Usage:</span>
+          <span class="metric-val" id="local-vram">-- / 4096 MiB</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Node 2: Kaggle Cloud Worker -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="node-title">Node 02 &bull; Cloud Batch</div>
+          <div class="node-name">Kaggle Tesla T4 (16 GB)</div>
+        </div>
+        <span id="kaggle-badge" class="badge purple">RUNNING</span>
+      </div>
+
+      <div class="metric-row">
+        <span class="metric-label">Assigned:</span>
+        <span class="metric-val" style="color: var(--purple);">Multitask (9 Roles) + INT8 ONNX</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Kernel Ref:</span>
+        <span class="metric-val"><a href="https://www.kaggle.com/code/hereliesaz/aive-orchestration-specialists" target="_blank">hereliesaz/aive-specialists</a></span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Execution Mode:</span>
+        <span class="metric-val">Headless Daemon (v6)</span>
+      </div>
+
+      <div class="progress-bar-wrap">
+        <div id="kaggle-bar" class="progress-bar bar-purple" style="width: 75%;"></div>
+      </div>
+
+      <div class="metric-row" style="font-size: 0.75rem; margin-top: 6px;">
+        <span>Multi-task Training & ONNX Export</span>
+        <span id="kaggle-elapsed">Cloud Batch Running</span>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div class="metric-row">
+          <span class="metric-label">Destination Release:</span>
+          <span class="metric-val"><a href="https://github.com/HereLiesAz/aive/releases/tag/orchestration-utilities-v1" target="_blank">orchestration-utilities-v1</a></span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Release State:</span>
+          <span class="metric-val" id="release-state">Pending Assets Upload</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Node 3: Colab Interactive Hot-Standby -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="node-title">Node 03 &bull; Cloud Interactive</div>
+          <div class="node-name">Colab Tesla T4 (15 GB)</div>
+        </div>
+        <span class="badge amber">HOT STANDBY</span>
+      </div>
+
+      <div class="metric-row">
+        <span class="metric-label">Assigned Roles:</span>
+        <span class="metric-val" style="color: var(--amber);">memory, handoff, summarizer</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Mode:</span>
+        <span class="metric-val">Interactive Adapters</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Live Notebook:</span>
+        <span class="metric-val"><a href="https://colab.research.google.com/github/HereLiesAz/aive/blob/main/aive_orchestration_specialists.ipynb" target="_blank">Open in Google Colab ↗</a></span>
+      </div>
+
+      <div style="margin-top: 36px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <div class="metric-row">
+          <span class="metric-label">Purpose:</span>
+          <span class="metric-val">Visual debugging / Generation probes</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Synchronized Commit:</span>
+          <span class="metric-val" style="color: #94a3b8;">bdcf98a3 (main)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Specialist Matrix Table -->
+  <div class="matrix-section">
+    <div class="section-title">
+      <span>The 9 Orchestration Specialists // Registry Status</span>
+      <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted);">Qwen2.5-0.5B-Instruct &bull; Rank 16 LoRA</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Specialist ID</th>
+          <th>Role Slug</th>
+          <th>Assigned Engine</th>
+          <th>Shape</th>
+          <th>Gates (Test / Adv)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="roles-tbody">
+        <!-- Dynamically rendered -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Terminal Log View -->
+  <div class="terminal-section">
+    <div class="terminal-header">
+      <span>Live Local Training Log Feed (RTX 2050)</span>
+      <span id="log-speed">-- s/it</span>
+    </div>
+    <div class="terminal-body" id="log-body">
+      <div class="log-line">Connecting to live mission control stream...</div>
+    </div>
+  </div>
+
+  <script>
+    const ROLES = [
+      { id: "orchestration:router:tool", slug: "tool-router", engine: "Local (RTX 2050)", shape: "Adapter" },
+      { id: "orchestration:gate:completion", slug: "completion-gate", engine: "Local (RTX 2050)", shape: "Adapter" },
+      { id: "orchestration:gate:escalation", slug: "escalation-gate", engine: "Local (RTX 2050)", shape: "Adapter" },
+      { id: "orchestration:composer:memory-query", slug: "memory-query-composer", engine: "Colab (T4)", shape: "Adapter" },
+      { id: "orchestration:composer:handoff", slug: "handoff-composer", engine: "Colab (T4)", shape: "Adapter" },
+      { id: "orchestration:summarizer:execution-state", slug: "execution-state-summarizer", engine: "Colab (T4)", shape: "Adapter" },
+      { id: "orchestration:packer:context", slug: "context-packer", engine: "Kaggle (T4)", shape: "Multitask & Adapter" },
+      { id: "orchestration:router:agent", slug: "agent-router", engine: "Kaggle (T4)", shape: "Multitask & Adapter" },
+      { id: "orchestration:planner:verification", slug: "verification-planner", engine: "Kaggle (T4)", shape: "Multitask & Adapter" }
+    ];
+
+    async function poll() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        console.error("Poll error:", e);
+      }
+    }
+
+    function render(data) {
+      document.getElementById('clock').innerText = data.timestamp || new Date().toLocaleTimeString();
+
+      // 1. Local GPU
+      const gpu = data.gpu;
+      if (gpu && gpu.online) {
+        document.getElementById('local-gpu-load').innerText = `${gpu.utilization}% • ${gpu.temp}°C (${gpu.power}W)`;
+        document.getElementById('local-vram').innerText = `${gpu.memory_used} / ${gpu.memory_total} MiB`;
+      }
+
+      // 2. Local Training Progress
+      const lt = data.local_training;
+      if (lt) {
+        document.getElementById('local-role').innerText = lt.role || 'None';
+        document.getElementById('local-steps').innerText = `${lt.step} / ${lt.total}`;
+        document.getElementById('local-progress-bar').style.width = `${lt.percent}%`;
+        document.getElementById('local-pct').innerText = `${lt.percent}% Completed`;
+        document.getElementById('local-eta').innerText = `ETA: ${lt.remaining || '--'} (${lt.speed || '--'})`;
+        document.getElementById('log-speed').innerText = lt.speed || '';
+        
+        // Logs
+        if (lt.recent_logs && lt.recent_logs.length > 0) {
+          const logBox = document.getElementById('log-body');
+          logBox.innerHTML = lt.recent_logs.map(l => `<div class="log-line ${l.includes('it/s') || l.includes('s/it') ? 'cyan' : ''}">${escapeHtml(l)}</div>`).join('');
+          logBox.scrollTop = logBox.scrollHeight;
+        }
+      }
+
+      // 3. Kaggle Status
+      if (data.kaggle) {
+        document.getElementById('kaggle-badge').innerText = data.kaggle.status;
+      }
+
+      // 4. GitHub Release
+      if (data.github) {
+        document.getElementById('release-state').innerText = data.github.released ? `Released (${data.github.assets.length} assets)` : 'Pending Assets Upload';
+      }
+
+      // 5. Roles Table
+      const tbody = document.getElementById('roles-tbody');
+      tbody.innerHTML = ROLES.map(r => {
+        let statusHtml = '<span class="status-pill pending">QUEUED</span>';
+        let gatesHtml = '<span style="color: var(--text-muted);">&mdash;</span>';
+
+        if (lt && lt.gates && lt.gates[r.slug]) {
+          const g = lt.gates[r.slug];
+          statusHtml = g.passed ? '<span class="status-pill done">GATED PASS</span>' : '<span class="status-pill" style="background: rgba(239, 68, 68, 0.2); color: var(--red);">FAIL</span>';
+          gatesHtml = `<span style="color: ${g.passed ? 'var(--green)' : 'var(--red)'};">${g.test.toFixed(3)} / ${g.adv.toFixed(3)}</span>`;
+        } else if (lt && lt.role === r.slug && lt.active) {
+          statusHtml = `<span class="status-pill active">TRAINING (${lt.percent}%)</span>`;
+        } else if (r.engine.includes("Kaggle") && data.kaggle && data.kaggle.status === "RUNNING") {
+          statusHtml = '<span class="status-pill active" style="background: rgba(168, 85, 247, 0.15); color: var(--purple);">BATCH RUNNING</span>';
+        }
+
+        return `
+          <tr>
+            <td style="font-weight: 600; color: #fff;">${r.id}</td>
+            <td style="color: var(--cyan);">${r.slug}</td>
+            <td>${r.engine}</td>
+            <td>${r.shape}</td>
+            <td>${gatesHtml}</td>
+            <td>${statusHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    setInterval(poll, 2000);
+    poll();
+  </script>
+</body>
+</html>
