@@ -58,11 +58,11 @@ Configure secrets once:
    ```
 2. **Cloud GPU Execution (Colab / Kaggle)**:
    - Accelerator: GPU (T4 or P100), Internet: on.
-   - Set `UPLOAD = True` below to push packages and `catalog.json` to GitHub Release `orchestration-utilities-v2`.
+   - Set `UPLOAD = True` below to push packages and `catalog.json` to GitHub Release `orchestration-utilities-v3`.
    - Run all cells.
 3. **Cloud → Local Ingestion**:
    ```bash
-   curl -LO https://github.com/HereLiesAz/aive/releases/download/orchestration-utilities-v2/catalog.json
+   curl -LO https://github.com/HereLiesAz/aive/releases/download/orchestration-utilities-v3/catalog.json
    python3 tools/orchestration_training/register_catalog.py catalog.json
    git commit -am "feat: register released orchestration specialists"
    ```
@@ -84,15 +84,15 @@ from pathlib import Path
 
 BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 RELEASE_REPOSITORY = "HereLiesAz/aive"
-RELEASE_TAG = "orchestration-utilities-v2"
+RELEASE_TAG = "orchestration-utilities-v3"
 UPLOAD = False                       # True: push the archive and catalog to the GitHub release (needs GITHUB_TOKEN secret)
 ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]
 MODE = "both"                        # "multitask", "adapters" or "both"
-ARTIFACT_ID = "orchestration:utilities:int8"
+ARTIFACT_ID = "orchestration:utilities:v3:int8"
 ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"
-BASE_ARTIFACT_ID = "orchestration:base:int8"
+BASE_ARTIFACT_ID = "orchestration:base:v3:int8"
 BASE_ASSET_NAME = "aive-orchestration-base-int8.tar.gz"
-ADAPTER_VERSION = "v1"
+ADAPTER_VERSION = "v3"
 assert MODE in ("multitask", "adapters", "both")
 
 MAX_LENGTH = 1024                    # prompt + answer tokens; longer rows are skipped and counted
@@ -632,7 +632,7 @@ code(r'''
 if UPLOAD:
     upload(sorted(ASSETS.glob("*.tar.gz")) + sorted(ASSETS.glob("*.safetensors")) + [ASSETS / "catalog.json"])
 else:
-    export_root = Path("/kaggle/working/orchestration-v2-output")
+    export_root = Path("/kaggle/working/orchestration-v3-output")
     if export_root.exists():
         shutil.rmtree(export_root)
     export_assets = export_root / "assets"
