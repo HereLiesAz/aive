@@ -21,3 +21,20 @@ sealed interface LocalPlannerStatus {
 
     data class Failed(val message: String) : LocalPlannerStatus
 }
+
+
+/** Settings hook for released on-device orchestration specialists. */
+data class LocalOrchestrationSpecialistSetting(
+    val status: LocalOrchestrationSpecialistStatus,
+    val releasedRoles: Int,
+    val totalRoles: Int,
+    val onInstall: () -> Unit,
+    val onRemove: () -> Unit,
+)
+
+sealed interface LocalOrchestrationSpecialistStatus {
+    data object NotInstalled : LocalOrchestrationSpecialistStatus
+    data class Installing(val progress: String) : LocalOrchestrationSpecialistStatus
+    data object Installed : LocalOrchestrationSpecialistStatus
+    data class Failed(val message: String) : LocalOrchestrationSpecialistStatus
+}

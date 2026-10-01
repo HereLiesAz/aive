@@ -68,6 +68,7 @@ fun App(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
 ) {
@@ -82,7 +83,7 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, runtimeGeneration) {
+    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -547,6 +548,7 @@ fun App(
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                         crashReportingSetting = crashReportingSetting,
                         localPlannerSetting = localPlannerSetting,
+                        localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         memoryLayer = memoryLayer,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
