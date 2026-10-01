@@ -238,6 +238,7 @@ internal class AndroidLocalOrchestrationModelExecutor(
         }
     }
 
+    @Synchronized
     override fun generate(
         role: OrchestrationUtilityRole,
         plan: LocalModelLoadPlan,
