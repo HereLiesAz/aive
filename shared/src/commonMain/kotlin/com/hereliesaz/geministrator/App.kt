@@ -68,6 +68,7 @@ fun App(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
+    localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
 ) {
@@ -547,6 +548,7 @@ fun App(
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                         crashReportingSetting = crashReportingSetting,
                         localPlannerSetting = localPlannerSetting,
+                        localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         memoryLayer = memoryLayer,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
