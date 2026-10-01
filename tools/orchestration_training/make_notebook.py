@@ -58,11 +58,11 @@ Configure secrets once:
    ```
 2. **Cloud GPU Execution (Colab / Kaggle)**:
    - Accelerator: GPU (T4 or P100), Internet: on.
-   - Set `UPLOAD = True` below to push packages and `catalog.json` to GitHub Release `orchestration-utilities-v1`.
+   - Set `UPLOAD = True` below to push packages and `catalog.json` to GitHub Release `orchestration-utilities-v2`.
    - Run all cells.
 3. **Cloud → Local Ingestion**:
    ```bash
-   curl -LO https://github.com/HereLiesAz/aive/releases/download/orchestration-utilities-v1/catalog.json
+   curl -LO https://github.com/HereLiesAz/aive/releases/download/orchestration-utilities-v2/catalog.json
    python3 tools/orchestration_training/register_catalog.py catalog.json
    git commit -am "feat: register released orchestration specialists"
    ```
@@ -84,7 +84,7 @@ from pathlib import Path
 
 BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 RELEASE_REPOSITORY = "HereLiesAz/aive"
-RELEASE_TAG = "orchestration-utilities-v1"
+RELEASE_TAG = "orchestration-utilities-v2"
 UPLOAD = False                       # True: push the archive and catalog to the GitHub release (needs GITHUB_TOKEN secret)
 ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]
 MODE = "both"                        # "multitask", "adapters" or "both"
@@ -551,14 +551,22 @@ def upload(paths):
     if r.status_code == 404:
         r = requests.post(f"{api}/releases", headers=headers, json={
             "tag_name": RELEASE_TAG, "name": RELEASE_TAG, "prerelease": True,
-            "body": "Local orchestration specialists: one multi-task Qwen2.5-0.5B, ONNX weight-only INT8. See catalog.json.",
+            "body": "Local orchestration specialists: gated multitask and per-role adapter releases for Qwen2.5-0.5B. See catalog.json.",
         })
     r.raise_for_status()
     release = r.json()
-    existing = {a["name"]: a["id"] for a in release.get("assets", [])}
+    existing = {a["name"]: a for a in release.get("assets", [])}
     for path in paths:
-        if path.name in existing:
-            requests.delete(f"{api}/releases/assets/{existing[path.name]}", headers=headers).raise_for_status()
+        digest = "sha256:" + sha256(path)
+        current = existing.get(path.name)
+        if current is not None:
+            if current.get("digest") == digest:
+                print("already uploaded", path.name, digest)
+                continue
+            raise RuntimeError(
+                f"{RELEASE_TAG}/{path.name} already exists with a different digest; "
+                "release assets are immutable. Bump RELEASE_TAG before publishing a changed artifact."
+            )
         with open(path, "rb") as f:
             up = requests.post(
                 f"https://uploads.github.com/repos/{RELEASE_REPOSITORY}/releases/{release['id']}/assets",
@@ -566,7 +574,10 @@ def upload(paths):
                 headers={**headers, "Content-Type": "application/octet-stream"}, timeout=3600,
             )
         up.raise_for_status()
-        print("uploaded", path.name)
+        uploaded = up.json()
+        if uploaded.get("digest") not in (None, digest):
+            raise RuntimeError(f"GitHub reported unexpected digest for {path.name}: {uploaded.get('digest')}")
+        print("uploaded", path.name, digest)
 ''')
 
 code(r'''
@@ -616,12 +627,35 @@ print(f"catalog: {len(catalog['specialists'])} roles; assets in {ASSETS}; done i
 ''')
 
 code(r'''
-# Upload the archive and the catalog. Commit catalog.json to the repo afterwards so the app can
-# register the released specialists (tools/orchestration_training/README.md).
+# Upload directly only for an explicitly credentialed manual run. Centralized Kaggle execution leaves
+# UPLOAD false and publishes the compact output from HereLiesAz/workflows after the kernel completes.
 if UPLOAD:
     upload(sorted(ASSETS.glob("*.tar.gz")) + sorted(ASSETS.glob("*.safetensors")) + [ASSETS / "catalog.json"])
 else:
-    print("UPLOAD is False; assets are in", ASSETS)
+    export_root = Path("/kaggle/working/orchestration-v2-output")
+    if export_root.exists():
+        shutil.rmtree(export_root)
+    export_assets = export_root / "assets"
+    export_assets.mkdir(parents=True)
+    for path in ASSETS.iterdir():
+        if path.is_file():
+            shutil.copy2(path, export_assets / path.name)
+    if STATE_FILE.exists():
+        shutil.copy2(STATE_FILE, export_root / "state.json")
+    (export_root / "run-summary.json").write_text(json.dumps({
+        "releaseTag": RELEASE_TAG,
+        "mode": MODE,
+        "rolesRequested": SLUGS,
+        "releasedRoles": [entry["specialistId"] for entry in catalog["specialists"]],
+    }, indent=2) + "\n")
+    # Keep Kaggle/GitHub artifact output bounded to the actual release payload.
+    for child in WORK.iterdir():
+        if child != export_root:
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+    print("compact release output:", export_root)
 ''')
 
 notebook = {
@@ -634,6 +668,11 @@ notebook = {
     "nbformat": 4,
     "nbformat_minor": 5,
 }
-target = Path(__file__).with_name("aive_orchestration_specialists.ipynb")
-target.write_text(json.dumps(notebook, indent=1) + "\n")
-print("wrote", target)
+targets = [
+    Path(__file__).with_name("aive_orchestration_specialists.ipynb"),
+    Path(__file__).resolve().parents[2] / "aive_orchestration_specialists.ipynb",
+]
+rendered = json.dumps(notebook, indent=1) + "\n"
+for target in targets:
+    target.write_text(rendered)
+    print("wrote", target)

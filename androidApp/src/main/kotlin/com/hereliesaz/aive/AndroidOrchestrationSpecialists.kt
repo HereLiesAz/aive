@@ -8,6 +8,7 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
 import com.hereliesaz.geministrator.inference.LocalModelArtifactDescriptor
+import com.hereliesaz.geministrator.inference.LocalModelArtifactKind
 import com.hereliesaz.geministrator.inference.LocalModelLoadPlan
 import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
 import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
@@ -42,8 +43,9 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 internal object AndroidOrchestrationSpecialists {
     val runtimeCapabilities = LocalModelRuntimeCapabilities(
         runtimeId = "android-onnxruntime",
-        supportedFormats = setOf("onnx"),
-        supportedPrecisions = setOf("int8"),
+        supportedFormats = setOf("onnx", "safetensors"),
+        supportedPrecisions = setOf("int8", "fp16"),
+        supportsSharedBaseAdapters = true,
     )
 
     fun releasedRoleCount(): Int = OrchestrationSpecialistCatalog.released().allSpecialists().size
@@ -75,14 +77,14 @@ internal class AndroidOrchestrationSpecialistInstaller(
 
     fun releasedArtifacts(): List<LocalModelArtifactDescriptor> {
         val library = OrchestrationSpecialistCatalog.released()
-        return library.allSpecialists().mapNotNull { specialist ->
+        return library.allSpecialists().flatMap { specialist ->
             runCatching {
                 when (val plan = library.plan(specialist.specialistId, AndroidOrchestrationSpecialists.runtimeCapabilities)) {
-                    is LocalModelLoadPlan.MergedModel -> plan.model
-                    is LocalModelLoadPlan.Standalone -> plan.model
-                    is LocalModelLoadPlan.SharedBaseAdapter -> null
+                    is LocalModelLoadPlan.MergedModel -> listOf(plan.model)
+                    is LocalModelLoadPlan.Standalone -> listOf(plan.model)
+                    is LocalModelLoadPlan.SharedBaseAdapter -> listOf(plan.base, plan.adapter)
                 }
-            }.getOrNull()
+            }.getOrDefault(emptyList())
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
     }
 
@@ -94,6 +96,13 @@ internal class AndroidOrchestrationSpecialistInstaller(
     }
 
     fun installed(artifact: LocalModelArtifactDescriptor): File? {
+        if (artifact.kind == LocalModelArtifactKind.Adapter) {
+            val file = adapterFile(artifact)
+            val marker = File(file.path + ".sha256")
+            return file.takeIf {
+                it.isFile && marker.isFile && marker.readText().trim() == artifact.sha256
+            }
+        }
         val dir = directory(artifact)
         val marker = File(dir, INSTALLED_MARKER)
         return dir.takeIf {
@@ -112,42 +121,64 @@ internal class AndroidOrchestrationSpecialistInstaller(
             if (installed(artifact) != null) return@forEachIndexed
             onProgress("Downloading ${artifactIndex + 1}/${artifacts.size}: ${artifact.assetName}")
             val staging = File(installRoot, ".staging").apply { mkdirs() }
-            val archive = File(staging, artifact.assetName)
+            val downloaded = File(staging, artifact.assetName)
             downloader.downloadVerified(
                 url = artifact.downloadUrl,
-                output = archive,
+                output = downloaded,
                 expectedSha256 = artifact.sha256,
             )
             onProgress("Installing ${artifact.assetName}")
-            val extracted = File(staging, "${artifact.logicalArtifactId.safeName()}.extracted").apply {
-                deleteRecursively()
-                mkdirs()
+            if (artifact.kind == LocalModelArtifactKind.Adapter) {
+                val destination = adapterFile(artifact)
+                destination.parentFile?.mkdirs()
+                downloaded.copyTo(destination, overwrite = true)
+                downloaded.delete()
+                File(destination.path + ".sha256").writeText(artifact.sha256 + "\n")
+            } else {
+                val extracted = File(staging, "${artifact.logicalArtifactId.safeName()}.extracted").apply {
+                    deleteRecursively()
+                    mkdirs()
+                }
+                extractTarGzSafely(downloaded, extracted)
+                require(File(extracted, "model.onnx").isFile) { "Archive has no model.onnx" }
+                require(File(extracted, "tokenizer.json").isFile) { "Archive has no tokenizer.json" }
+                require(File(extracted, "config.json").isFile) { "Archive has no config.json" }
+                File(extracted, INSTALLED_MARKER).writeText(artifact.sha256 + "\n")
+                val destination = directory(artifact)
+                destination.deleteRecursively()
+                destination.parentFile?.mkdirs()
+                if (!extracted.renameTo(destination)) {
+                    extracted.copyRecursively(destination, overwrite = true)
+                    extracted.deleteRecursively()
+                }
+                downloaded.delete()
             }
-            extractTarGzSafely(archive, extracted)
-            require(File(extracted, "model.onnx").isFile) { "Archive has no model.onnx" }
-            require(File(extracted, "tokenizer.json").isFile) { "Archive has no tokenizer.json" }
-            require(File(extracted, "config.json").isFile) { "Archive has no config.json" }
-            File(extracted, INSTALLED_MARKER).writeText(artifact.sha256 + "\n")
-            val destination = directory(artifact)
-            destination.deleteRecursively()
-            destination.parentFile?.mkdirs()
-            if (!extracted.renameTo(destination)) {
-                extracted.copyRecursively(destination, overwrite = true)
-                extracted.deleteRecursively()
-            }
-            archive.delete()
             check(installed(artifact) != null) { "Orchestration specialist did not install correctly" }
         }
         onProgress("Installed ${artifacts.size} released orchestration model artifact(s)")
     }
 
     suspend fun removeReleased() = mutex.withLock {
-        releasedArtifacts().forEach { directory(it).deleteRecursively() }
+        // Remove every artifact the released catalog knows about, not only the load plan Android
+        // currently prefers. A device may still have a merged model from an older app version after
+        // a newer catalog starts preferring shared-base adapters.
+        OrchestrationSpecialistCatalog.released().allArtifacts().forEach { artifact ->
+            if (artifact.kind == LocalModelArtifactKind.Adapter) {
+                val file = adapterFile(artifact)
+                file.delete()
+                File(file.path + ".sha256").delete()
+            } else {
+                directory(artifact).deleteRecursively()
+            }
+        }
         File(installRoot, ".staging").deleteRecursively()
     }
 
     private fun directory(artifact: LocalModelArtifactDescriptor) =
         File(installRoot, artifact.logicalArtifactId.safeName())
+
+    private fun adapterFile(artifact: LocalModelArtifactDescriptor) =
+        File(installRoot, "adapters/${artifact.logicalArtifactId.safeName()}.safetensors")
 
     private fun String.safeName() = replace(Regex("[^A-Za-z0-9._-]"), "_")
 
@@ -182,30 +213,67 @@ internal class AndroidLocalOrchestrationModelExecutor(
     private val installer: AndroidOrchestrationSpecialistInstaller,
 ) : LocalOrchestrationModelExecutor, AutoCloseable {
     private val generator = AndroidOrchestrationCausalGenerator()
+    private val adapters = object : LinkedHashMap<String, AndroidLoraAdapter>(ADAPTER_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, AndroidLoraAdapter>,
+        ): Boolean = (size > ADAPTER_CACHE_SIZE).also { evict ->
+            if (evict) eldest.value.close()
+        }
+    }
     @Volatile
     private var sessions = AndroidOrtMemorySessionManager()
 
     @Synchronized
     fun reset() {
         sessions.close()
+        synchronized(adapters) {
+            adapters.values.forEach(AndroidLoraAdapter::close)
+            adapters.clear()
+        }
         sessions = AndroidOrtMemorySessionManager()
     }
 
     @Synchronized
     override fun close() {
         sessions.close()
+        synchronized(adapters) {
+            adapters.values.forEach(AndroidLoraAdapter::close)
+            adapters.clear()
+        }
     }
 
+    @Synchronized
     override fun generate(
         role: OrchestrationUtilityRole,
         plan: LocalModelLoadPlan,
         inputJson: String,
     ): String? {
-        val artifact = when (plan) {
-            is LocalModelLoadPlan.MergedModel -> plan.model
-            is LocalModelLoadPlan.Standalone -> plan.model
-            is LocalModelLoadPlan.SharedBaseAdapter -> return null
+        return when (plan) {
+            is LocalModelLoadPlan.MergedModel -> run(role, plan.model, inputJson, emptyMap())
+            is LocalModelLoadPlan.Standalone -> run(role, plan.model, inputJson, emptyMap())
+            is LocalModelLoadPlan.SharedBaseAdapter -> {
+                val file = installer.installed(plan.adapter) ?: return null
+                synchronized(adapters) {
+                    val adapter = adapters.getOrPut(plan.adapter.sha256) {
+                        AndroidLoraAdapter.load(file)
+                    }
+                    val expectedBase = adapter.metadata["base"]
+                    require(expectedBase == null || expectedBase == plan.base.logicalArtifactId) {
+                        "Adapter base does not match selected shared base"
+                    }
+                    run(role, plan.base, inputJson, adapter.tensors)
+                }
+            }
         }
+    }
+
+
+    private fun run(
+        role: OrchestrationUtilityRole,
+        artifact: LocalModelArtifactDescriptor,
+        inputJson: String,
+        extraInputs: Map<String, OnnxTensor>,
+    ): String? {
         val root = installer.installed(artifact) ?: return null
         val prepared = runBlocking {
             sessions.sessionFor(
@@ -229,8 +297,13 @@ internal class AndroidLocalOrchestrationModelExecutor(
                     append("<|im_end|>\n<|im_start|>assistant\n")
                 },
                 maxNewTokens = 512,
+                extraInputs = extraInputs,
             )
         }
+    }
+
+    private companion object {
+        const val ADAPTER_CACHE_SIZE = 3
     }
 }
 
@@ -245,6 +318,7 @@ private class AndroidOrchestrationCausalGenerator(
         modelRoot: File,
         prompt: String,
         maxNewTokens: Int,
+        extraInputs: Map<String, OnnxTensor> = emptyMap(),
     ): String {
         val config = loadModelConfig(modelRoot)
         val promptIds = tokenizer.encode(prompt).ids
@@ -259,7 +333,7 @@ private class AndroidOrchestrationCausalGenerator(
         try {
             val owned = mutableListOf<OnnxTensor>()
             activeResult = try {
-                session.run(buildInputs(session, promptIds, totalLength, null, config, owned))
+                session.run(buildInputs(session, promptIds, totalLength, null, config, owned, extraInputs))
             } finally {
                 owned.forEach(OnnxTensor::close)
             }
@@ -275,7 +349,7 @@ private class AndroidOrchestrationCausalGenerator(
                 totalLength += 1
                 val nextOwned = mutableListOf<OnnxTensor>()
                 val nextResult = try {
-                    session.run(buildInputs(session, longArrayOf(nextToken), totalLength, current, config, nextOwned))
+                    session.run(buildInputs(session, longArrayOf(nextToken), totalLength, current, config, nextOwned, extraInputs))
                 } finally {
                     nextOwned.forEach(OnnxTensor::close)
                 }
@@ -295,9 +369,14 @@ private class AndroidOrchestrationCausalGenerator(
         previousResult: OrtSession.Result?,
         config: ModelConfig,
         owned: MutableList<OnnxTensor>,
+        extraInputs: Map<String, OnnxTensor>,
     ): Map<String, OnnxTensor> {
         val inputs = linkedMapOf<String, OnnxTensor>()
         session.inputInfo.forEach { (name, nodeInfo) ->
+            extraInputs[name]?.let { supplied ->
+                inputs[name] = supplied
+                return@forEach
+            }
             val tensorInfo = nodeInfo.info as? TensorInfo ?: error("Unsupported non-tensor model input")
             val borrowed = name.startsWith("past_key_values.") && previousResult != null
             val tensor = when {

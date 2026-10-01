@@ -1,0 +1,16 @@
+name: Orchestration Specialist Training
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.orchestration-training-run'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  kaggle:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Centralized by HereLiesAz/workflows"

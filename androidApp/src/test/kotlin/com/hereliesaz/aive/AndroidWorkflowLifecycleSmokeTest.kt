@@ -4,6 +4,11 @@ import com.hereliesaz.geministrator.ApplicationRuntime
 import com.hereliesaz.geministrator.ApplicationRuntimeState
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep
+import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
+import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
+import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -29,9 +34,83 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AndroidWorkflowLifecycleSmokeTest {
+    @Test
+    fun androidObjectiveLaunchPlansMaterializesAndDispatches() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val provider = AndroidLifecycleProvider()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val packets = mutableListOf<OrchestrationPacket>()
+        val planner = object : OrchestrationAgentRuntime {
+            override suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan {
+                packets += packet
+                return OrchestrationPlan(
+                    listOf(
+                        OrchestrationPlanStep(
+                            id = "implementation",
+                            name = "Implement objective",
+                            objective = "Implement the requested Android objective",
+                            roleId = BuiltInRoles.ImplementationEngineer.id.value,
+                        ),
+                    ),
+                )
+            }
+
+            override suspend fun repair(packet: OrchestrationPacket): OrchestrationPlan = plan(packet)
+        }
+        val runtime = ApplicationRuntime.create(
+            providers = listOf(provider),
+            scope = scope,
+            persistence = persistence,
+            providerRegistry = AgentProviderRegistry(
+                providers = listOf(provider),
+                inferenceFabric = BlueprintCompoundInferenceFabric(),
+                genealogyGovernance = InferenceGenealogyGovernanceRuntime(),
+            ),
+        )
+
+        try {
+            runtime.launchOrchestratedWorkflow(
+                projectName = " Android objective proof ",
+                objective = " Implement the requested objective ",
+                orchestrationRuntime = planner,
+            )
+
+            withTimeout(10_000L) {
+                while (provider.startedTaskIds.isEmpty()) delay(25L)
+            }
+
+            val packet = packets.single()
+            assertEquals("Implement the requested objective", packet.objective)
+            assertTrue(
+                BuiltInRoles.ImplementationEngineer.id.value in packet.availableAgents.map { it.id },
+                "Implementation Engineer must be offered to the planner when the provider can staff it",
+            )
+
+            val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
+            val project = persistence.projects.get(live.presentation.run.projectId)
+                ?: error("Objective launch project was not persisted")
+            assertEquals("Android objective proof", project.name)
+            assertEquals("Implement the requested objective", live.presentation.run.objective)
+            assertTrue(
+                live.presentation.definition.tasks.any { it.id == TaskDefinitionId("implementation") },
+                "The planned implementation step must materialize into the persisted DAG",
+            )
+            assertEquals(
+                live.presentation.definition.id,
+                persistence.definitions.all().single().id,
+                "The materialized definition must be persisted before execution",
+            )
+            assertTrue(provider.startedTaskIds.isNotEmpty(), "The materialized Android workflow must dispatch provider work")
+        } finally {
+            runtime.close()
+            scope.cancel()
+        }
+    }
+
     @Test
     fun androidRuntimeCompletesGovernedWorkflowLifecycle() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
