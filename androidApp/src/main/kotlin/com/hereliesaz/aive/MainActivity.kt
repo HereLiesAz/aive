@@ -217,6 +217,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 LocalOrchestrationSpecialistStatus.Installed
+                            } catch (failure: CancellationException) {
+                                throw failure
                             } catch (failure: Throwable) {
                                 LocalOrchestrationSpecialistStatus.Failed(
                                     failure.message ?: failure::class.simpleName.orEmpty(),
