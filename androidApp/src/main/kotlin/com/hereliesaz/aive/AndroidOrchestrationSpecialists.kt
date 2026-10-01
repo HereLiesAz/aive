@@ -180,10 +180,18 @@ internal class AndroidOrchestrationSpecialistInstaller(
 
 internal class AndroidLocalOrchestrationModelExecutor(
     private val installer: AndroidOrchestrationSpecialistInstaller,
-    private val sessions: AndroidOrtMemorySessionManager = AndroidOrtMemorySessionManager(),
 ) : LocalOrchestrationModelExecutor, AutoCloseable {
     private val generator = AndroidOrchestrationCausalGenerator()
+    @Volatile
+    private var sessions = AndroidOrtMemorySessionManager()
 
+    @Synchronized
+    fun reset() {
+        sessions.close()
+        sessions = AndroidOrtMemorySessionManager()
+    }
+
+    @Synchronized
     override fun close() {
         sessions.close()
     }
