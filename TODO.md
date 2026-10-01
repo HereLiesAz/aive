@@ -78,7 +78,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Run verification/review stages.
 - [x] Reach a terminal run state with a clear outcome.
 - [ ] Verify this flow on Android, Desktop, JS, and Wasm where provider/browser constraints permit.
-  - The ticked steps above are exercised by the live lifecycle test, which builds its project, objective and workflow in code; the centralized run covers Desktop JVM, local runs cover JS and Wasm. Android and the in-app project/objective path remain.
+  - The ticked steps above are exercised by the live lifecycle test. Desktop JVM is covered by centralized live verification; local runs cover JS and Wasm. Android unit CI now covers the real project name + objective → planner → materialized persisted DAG → provider dispatch path (`AndroidWorkflowLifecycleSmokeTest`), but a physical-device/in-app acceptance run is still not recorded.
 
 ## P1 — GitHub as a first-class executor/integration
 
