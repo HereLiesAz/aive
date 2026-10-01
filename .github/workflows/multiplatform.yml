@@ -118,10 +118,11 @@ jobs:
       - name: Verify release immutability policy
         run: python3 .github/scripts/verify_release_immutability.py
 
-      - name: Verify orchestration notebooks match their generator
+      - name: Verify orchestration training tooling
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m unittest discover -s tools/orchestration_training -p 'test_*.py'
           python3 tools/orchestration_training/make_notebook.py
           git diff --exit-code -- \
             aive_orchestration_specialists.ipynb \
