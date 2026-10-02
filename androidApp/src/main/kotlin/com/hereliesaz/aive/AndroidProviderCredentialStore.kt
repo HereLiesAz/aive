@@ -35,6 +35,7 @@ internal class AndroidProviderCredentialStore(context: Context) {
     }
 
     fun readAll(): Map<String, String> = buildMap {
+        purgeRetired()
         ProviderCatalog.entries.forEach { entry ->
             read(entry.id)?.let { put(entry.id, it) }
         }
@@ -64,6 +65,17 @@ internal class AndroidProviderCredentialStore(context: Context) {
             .commit()
     }
 
+    /** Deletes credentials of providers the app no longer supports, including the old Jules key alias. */
+    private fun purgeRetired() {
+        ProviderCatalog.RETIRED_PROVIDER_IDS
+            .filter { preferences.contains(ciphertextKey(it)) || preferences.contains(ivKey(it)) }
+            .forEach(::clear)
+        runCatching {
+            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+            if (keyStore.containsAlias(RETIRED_JULES_KEY_ALIAS)) keyStore.deleteEntry(RETIRED_JULES_KEY_ALIAS)
+        }
+    }
+
     private fun ciphertextKey(providerId: String) = "$providerId.ciphertext"
     private fun ivKey(providerId: String) = "$providerId.iv"
 
@@ -88,6 +100,8 @@ internal class AndroidProviderCredentialStore(context: Context) {
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "haive.provider.api-key"
+        /** Keystore key of the removed Jules-only credential store. */
+        const val RETIRED_JULES_KEY_ALIAS = "haive.jules.api-key"
         const val PREFERENCES_NAME = "haive.credentials"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128

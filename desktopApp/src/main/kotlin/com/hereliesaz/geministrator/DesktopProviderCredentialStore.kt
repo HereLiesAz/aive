@@ -21,6 +21,8 @@ internal class DesktopProviderCredentialStore {
     }
 
     fun readAll(): Map<String, String> = buildMap {
+        // Providers the app no longer supports leave no credential behind.
+        ProviderCatalog.RETIRED_PROVIDER_IDS.forEach(::clear)
         ProviderCatalog.entries.forEach { entry ->
             read(entry.id)?.let { put(entry.id, it) }
         }

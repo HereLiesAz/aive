@@ -11,7 +11,6 @@ data class ProviderCatalogEntry(
 )
 
 object ProviderCatalog {
-    const val JULES_ID = "jules"
     const val OPENAI_ID = "openai"
     const val ANTHROPIC_ID = "anthropic"
     const val GEMINI_ID = "gemini"
@@ -34,6 +33,12 @@ object ProviderCatalog {
     const val KILO_ID = "kilo"
     const val LLM7_ID = "llm7"
     const val OVHCLOUD_ID = "ovhcloud"
+
+    /**
+     * Providers the app no longer supports. Credential stores delete what they still hold for these
+     * so a removed integration leaves no key behind.
+     */
+    val RETIRED_PROVIDER_IDS: Set<String> = setOf("jules")
 
     /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
     const val ANONYMOUS_CREDENTIAL = "anonymous"
@@ -197,15 +202,6 @@ object ProviderCatalog {
             credentialLabel = "OVHcloud AI token (optional)",
             description = "Qwen, Llama, Mistral and gpt-oss with no key: 2 requests a minute per IP.",
             keyOptional = true,
-        ),
-        // Last: explicit-only, it never staffs a role on its own.
-        ProviderCatalogEntry(
-            id = JULES_ID,
-            displayName = "Jules",
-            apiKeyUrl = "https://jules.google.com/settings#api",
-            credentialLabel = "Jules API key",
-            description = "Repository coding agent with remote sessions and pull-request output. " +
-                "Background tasks only: it reports little progress, so it runs only where a role names it.",
         ),
     )
 

@@ -62,7 +62,7 @@ class WorkflowPersistenceTest {
                     taskRunIdFactory = { TaskRunId("task-run") },
                 ).taskRuns.getValue(taskId).copy(
                     status = TaskRunStatus.Running,
-                    assignedProviderId = AgentProviderId("jules"),
+                    assignedProviderId = AgentProviderId("remote-agent"),
                     providerRunId = ProviderRunId("sessions/123"),
                 ),
             ),
@@ -104,7 +104,7 @@ private class ResumeRecordingGateway : ManagedSessionGateway {
     var createCount: Int = 0
     val reconnected = mutableListOf<Pair<ManagedSessionHandle, ManagedSessionStatus>>()
 
-    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = AgentProviderId("jules")
+    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = AgentProviderId("remote-agent")
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
         createCount += 1

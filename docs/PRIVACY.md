@@ -54,7 +54,6 @@ The Aive works with external services only when you connect them and assign work
 
 - **Hosted LLM providers.** OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud, Z.ai, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply.
 - **Keyless free tiers.** Kilo Gateway, LLM7, and OVHcloud AI Endpoints can be linked without a key. Prompts then go to those gateways unauthenticated, and their rate limits are keyed by your IP address.
-- **Jules** (`jules.googleapis.com`). This is Google's repository coding agent. It works on a repository already connected to your Jules account.
 - **GitLab workspace agents** (gitlab.com). A linked LLM provider receives a bounded file tree and selected file contents from your GitLab project. The Aive then uses your GitLab token to commit the model's changes to a new `haive/...` branch.
 - **Local Git workspace agents** (desktop only). A linked LLM provider receives a bounded snapshot of files from your local repository. Changes are committed to a new local `haive/...` branch. Nothing is pushed unless a separate repository operation pushes it.
 - **GitHub Actions executors and script runners.** The Aive uses your GitHub token to dispatch workflows in your repository. The task context, and for script roles the script source, are sent as `workflow_dispatch` inputs.
@@ -132,9 +131,9 @@ Provider API keys, OAuth tokens, passwords, keystore contents, service-account c
 
 A workflow may store the **name** of a required secret, but not its value.
 
-Where credentials are stored today:
+Where credentials are stored today (a key for a provider the app no longer supports, such as Jules, is deleted the next time credentials are read):
 
-- **Android.** Provider, Jules, repository, and relay credentials are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.
+- **Android.** Provider, repository, and relay credentials are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.
 - **Desktop.** Credentials are kept in the macOS Keychain, the Linux Secret Service (`secret-tool`), or Windows DPAPI. If none of these is available, the credential is refused instead of being stored in plain text.
 - **Web.** Credentials are stored in the browser's localStorage for the site, encrypted with a non-extractable AES-GCM key kept in the site's IndexedDB. A copy of the storage alone does not reveal them, but code running on the page can still use the key. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) store them unencrypted.
 

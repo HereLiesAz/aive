@@ -186,8 +186,8 @@ interface AgentProvider {
 
     /**
      * True for providers that must never be picked automatically: they run only where a role
-     * prefers them or a task requires them by id (e.g. Jules, which reports too little progress to
-     * drive a workflow).
+     * prefers them or a task requires them by id (for example, an agent that reports too little
+     * progress to drive a workflow).
      */
     val explicitOnly: Boolean get() = false
 

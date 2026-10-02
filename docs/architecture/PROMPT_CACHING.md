@@ -25,11 +25,9 @@ Provider capability reporting may describe mechanisms such as:
 
 The workflow engine may prefer reuse but must behave identically when no cache exists.
 
-## Jules
+## Providers without cache controls
 
-The currently exposed Jules REST activity/session model provides session continuity but does not document a first-class prompt-cache resource or exact cache-hit controls. The Jules adapter should therefore use only behavior that the API actually exposes and must not fabricate cache telemetry.
-
-For separate sessions, The Aive should still keep stable prompt structure deterministic so provider-side reuse remains possible without becoming a dependency.
+A provider that documents no prompt-cache resource or cache-hit controls must not fabricate cache telemetry. The Aive still keeps stable prompt structure deterministic so provider-side reuse remains possible without becoming a dependency.
 
 ## Other providers
 

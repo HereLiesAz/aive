@@ -11,9 +11,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.providers.AgentProvider
-import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
-import com.hereliesaz.geministrator.providers.jules.JulesProvider
-import com.hereliesaz.geministrator.providers.jules.JulesRestApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -51,7 +48,6 @@ import com.hereliesaz.geministrator.memory.DeferredMemoryStore
 import com.hereliesaz.geministrator.memory.openWebMemoryStore
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
-private const val JULES_API_KEY_STORAGE_KEY = "haive.julesApiKey"
 private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
 private const val ANTHROPIC_API_KEY_STORAGE_KEY = "haive.anthropicApiKey"
 private const val GEMINI_API_KEY_STORAGE_KEY = "haive.geminiApiKey"
@@ -182,15 +178,6 @@ internal fun configuredWebProviders(
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     addAll(HostedLlmProviders.configured(credentials))
-    credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
-        add(
-            JulesProvider(
-                JulesRestApi(
-                    JulesApiKeyProvider { key },
-                ),
-            ),
-        )
-    }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
         add(OpenAiProvider(keyProvider))
@@ -305,6 +292,8 @@ internal fun configuredWebRepositoryDiscovery(
 }
 
 private suspend fun readWebProviderCredentials(): Map<String, String> = buildMap {
+    // Providers the app no longer supports leave no credential behind ("haive.julesApiKey" included).
+    ProviderCatalog.RETIRED_PROVIDER_IDS.forEach { WebCredentialStore.remove(providerStorageKey(it)) }
     ProviderCatalog.entries.forEach { entry ->
         WebCredentialStore.read(providerStorageKey(entry.id))?.let { put(entry.id, it) }
     }
@@ -317,7 +306,6 @@ private suspend fun readWebRepositoryCredentials(): Map<String, String> = buildM
 }
 
 private fun providerStorageKey(providerId: String): String = when (providerId) {
-    ProviderCatalog.JULES_ID -> JULES_API_KEY_STORAGE_KEY
     ProviderCatalog.OPENAI_ID -> OPENAI_API_KEY_STORAGE_KEY
     ProviderCatalog.ANTHROPIC_ID -> ANTHROPIC_API_KEY_STORAGE_KEY
     ProviderCatalog.GEMINI_ID -> GEMINI_API_KEY_STORAGE_KEY

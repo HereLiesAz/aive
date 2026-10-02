@@ -122,7 +122,7 @@ class WorkflowApprovalServiceTest {
             gateway,
             service,
             gate,
-            ManagedSessionHandle(TaskRunId("task-run"), AgentProviderId("jules"), ProviderRunId("session")),
+            ManagedSessionHandle(TaskRunId("task-run"), AgentProviderId("remote-agent"), ProviderRunId("session")),
         )
     }
 }
@@ -151,7 +151,7 @@ private class ApprovalGateway(
     var approvalCalls: Int = 0
     var cancelCalls: Int = 0
     var sessionStatus: ManagedSessionStatus = ManagedSessionStatus.AwaitingApproval
-    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = AgentProviderId("jules")
+    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = AgentProviderId("remote-agent")
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle = error("not used")
     override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus = sessionStatus
     override suspend fun message(handle: ManagedSessionHandle, message: String): ProviderActionResult = ProviderActionResult.Accepted
