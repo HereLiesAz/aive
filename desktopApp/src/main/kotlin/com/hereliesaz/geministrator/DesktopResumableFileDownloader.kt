@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.HttpHeaders
@@ -92,94 +92,103 @@ internal class DesktopResumableFileDownloader(
         for (attempt in 1..maxAttempts) {
             val requestedOffset = partial.takeIf(File::isFile)?.length() ?: 0L
             try {
-                val response = httpClient.get(url) {
+                // prepareGet/execute streams the body; a plain get() would buffer the whole
+                // asset (hundreds of MB) in memory before the first byte reaches the file.
+                var alreadyComplete = false
+                httpClient.prepareGet(url) {
                     if (requestedOffset > 0L) {
                         header(HttpHeaders.Range, "bytes=$requestedOffset-")
                     }
-                }
-
-                if (response.status == HttpStatusCode.RequestedRangeNotSatisfiable) {
-                    if (partial.isFile &&
-                        knownTotal != null &&
-                        partial.length() == knownTotal &&
-                        sha256(partial) == normalizedSha
-                    ) {
-                        finalizePartial(partial, output)
-                        return@withContext output
+                }.execute { response ->
+                    if (response.status == HttpStatusCode.RequestedRangeNotSatisfiable) {
+                        if (partial.isFile &&
+                            knownTotal != null &&
+                            partial.length() == knownTotal &&
+                            sha256(partial) == normalizedSha
+                        ) {
+                            alreadyComplete = true
+                            return@execute
+                        }
+                        partial.delete()
+                        throw IOException("Server rejected resume range for ${output.name}")
                     }
-                    partial.delete()
-                    throw IOException("Server rejected resume range for ${output.name}")
-                }
 
-                check(response.status.isSuccess()) {
-                    "Download failed for ${output.name}: ${response.status}"
-                }
-
-                val contentRange = parseContentRange(response.headers[HttpHeaders.ContentRange])
-                val append = requestedOffset > 0L && response.status == HttpStatusCode.PartialContent
-
-                if (append) {
-                    val range = contentRange
-                        ?: throw IOException("Resume response for ${output.name} omitted Content-Range")
-                    if (range.start != requestedOffset) {
-                        throw IOException(
-                            "Resume response for ${output.name} started at ${range.start}, " +
-                                "expected $requestedOffset",
-                        )
+                    check(response.status.isSuccess()) {
+                        "Download failed for ${output.name}: ${response.status}"
                     }
-                }
 
-                val responseLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-                val reportedTotal = when {
-                    contentRange?.total != null -> contentRange.total
-                    responseLength != null && append -> requestedOffset + responseLength
-                    responseLength != null -> responseLength
-                    else -> null
-                }
+                    val contentRange = parseContentRange(response.headers[HttpHeaders.ContentRange])
+                    val append = requestedOffset > 0L && response.status == HttpStatusCode.PartialContent
 
-                if (knownTotal != null && reportedTotal != null && knownTotal != reportedTotal) {
-                    val retainShortInitialResponse =
-                        requestedOffset == 0L &&
-                            response.status == HttpStatusCode.OK &&
-                            reportedTotal < knownTotal
-                    if (!retainShortInitialResponse) {
-                        throw IOException(
-                            "Download size changed for ${output.name}: expected $knownTotal bytes, " +
-                                "server reports $reportedTotal bytes",
-                        )
+                    if (append) {
+                        val range = contentRange
+                            ?: throw IOException("Resume response for ${output.name} omitted Content-Range")
+                        if (range.start != requestedOffset) {
+                            throw IOException(
+                                "Resume response for ${output.name} started at ${range.start}, " +
+                                    "expected $requestedOffset",
+                            )
+                        }
                     }
-                }
-                if (knownTotal == null) knownTotal = reportedTotal
 
-                // A 200 after a Range request means the origin ignored Range. Start clean rather
-                // than appending a second full copy of the asset.
-                FileOutputStream(partial, append).buffered().use { stream ->
-                    val channel = response.bodyAsChannel()
-                    val buffer = ByteArray(256 * 1024)
-                    var received = if (append) requestedOffset else 0L
-                    var lastReportMillis = 0L
-                    while (true) {
-                        val count = channel.readAvailable(buffer, 0, buffer.size)
-                        if (count < 0) break
-                        if (count == 0) continue
-                        stream.write(buffer, 0, count)
-                        received += count
-                        val now = System.currentTimeMillis()
-                        if (now - lastReportMillis >= PROGRESS_INTERVAL_MILLIS) {
-                            lastReportMillis = now
-                            onProgress(DownloadProgress.Transferring(received, knownTotal))
+                    val responseLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
+                    val reportedTotal = when {
+                        contentRange?.total != null -> contentRange.total
+                        responseLength != null && append -> requestedOffset + responseLength
+                        responseLength != null -> responseLength
+                        else -> null
+                    }
+
+                    val expectedTotal = knownTotal
+                    if (expectedTotal != null && reportedTotal != null && expectedTotal != reportedTotal) {
+                        val retainShortInitialResponse =
+                            requestedOffset == 0L &&
+                                response.status == HttpStatusCode.OK &&
+                                reportedTotal < expectedTotal
+                        if (!retainShortInitialResponse) {
+                            throw IOException(
+                                "Download size changed for ${output.name}: expected $knownTotal bytes, " +
+                                    "server reports $reportedTotal bytes",
+                            )
+                        }
+                    }
+                    if (knownTotal == null) knownTotal = reportedTotal
+
+                    // A 200 after a Range request means the origin ignored Range. Start clean rather
+                    // than appending a second full copy of the asset.
+                    FileOutputStream(partial, append).buffered().use { stream ->
+                        val channel = response.bodyAsChannel()
+                        val buffer = ByteArray(256 * 1024)
+                        var received = if (append) requestedOffset else 0L
+                        var lastReportMillis = 0L
+                        while (true) {
+                            val count = channel.readAvailable(buffer, 0, buffer.size)
+                            if (count < 0) break
+                            if (count == 0) continue
+                            stream.write(buffer, 0, count)
+                            received += count
+                            val now = System.currentTimeMillis()
+                            if (now - lastReportMillis >= PROGRESS_INTERVAL_MILLIS) {
+                                lastReportMillis = now
+                                onProgress(DownloadProgress.Transferring(received, knownTotal))
+                            }
                         }
                     }
                 }
+                if (alreadyComplete) {
+                    finalizePartial(partial, output)
+                    return@withContext output
+                }
 
                 val currentSize = partial.length()
-                if (knownTotal != null && currentSize < knownTotal) {
+                val total = knownTotal
+                if (total != null && currentSize < total) {
                     throw IOException(
                         "Incomplete download for ${output.name}: expected $knownTotal bytes, " +
                             "received $currentSize bytes",
                     )
                 }
-                if (knownTotal != null && currentSize > knownTotal) {
+                if (total != null && currentSize > total) {
                     partial.delete()
                     throw IOException(
                         "Oversized download for ${output.name}: expected $knownTotal bytes, " +
