@@ -50,6 +50,7 @@ import javax.swing.JFileChooser
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
@@ -63,6 +64,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
 
 fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
@@ -88,7 +90,8 @@ fun main() {
     val httpClient = HttpClient(CIO)
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
-    val orchestrationUtilities = DesktopOrchestrationSpecialists.utilities(DesktopOrchestrationSpecialistInstaller(httpClient))
+    val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
+    val orchestrationSpecialistExecutor = DesktopLocalOrchestrationModelExecutor(orchestrationSpecialistInstaller)
     // Memory: SQLite under ~/.aive/memory, programmatic stages by default, hosted stages on request.
     // Attached before App builds the runtime, whose session gateway captures the observer.
     val memoryEngines = HostedMemoryEngineProvider(desktopMemoryPlatform())
@@ -225,6 +228,54 @@ fun main() {
                         }
                     },
                 )
+                var localOrchestrationStatus by remember {
+                    mutableStateOf<LocalOrchestrationSpecialistStatus>(
+                        if (orchestrationSpecialistInstaller.allReleasedInstalled()) {
+                            LocalOrchestrationSpecialistStatus.Installed
+                        } else {
+                            LocalOrchestrationSpecialistStatus.NotInstalled
+                        },
+                    )
+                }
+                val orchestrationUtilities = remember(localOrchestrationStatus) {
+                    DesktopOrchestrationSpecialists.utilities(orchestrationSpecialistInstaller, orchestrationSpecialistExecutor)
+                }
+                val localOrchestrationSetting = LocalOrchestrationSpecialistSetting(
+                    status = localOrchestrationStatus,
+                    releasedRoles = DesktopOrchestrationSpecialists.releasedRoleCount(),
+                    totalRoles = OrchestrationUtilityRole.entries.size,
+                    onInstall = install@{
+                        if (localOrchestrationStatus is LocalOrchestrationSpecialistStatus.Installing) return@install
+                        localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing("Starting…")
+                        uiScope.launch {
+                            localOrchestrationStatus = try {
+                                orchestrationSpecialistInstaller.installReleased { line ->
+                                    localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing(line)
+                                }
+                                LocalOrchestrationSpecialistStatus.Installed
+                            } catch (cancelled: CancellationException) {
+                                localOrchestrationStatus = LocalOrchestrationSpecialistStatus.NotInstalled
+                                throw cancelled
+                            } catch (failure: Throwable) {
+                                LocalOrchestrationSpecialistStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                            }
+                        }
+                    },
+                    onRemove = {
+                        uiScope.launch {
+                            localOrchestrationStatus = try {
+                                // reset() waits for a running generation; keep it off the UI thread.
+                                withContext(Dispatchers.IO) { orchestrationSpecialistExecutor.reset() }
+                                orchestrationSpecialistInstaller.removeReleased()
+                                LocalOrchestrationSpecialistStatus.NotInstalled
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (failure: Throwable) {
+                                LocalOrchestrationSpecialistStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                            }
+                        }
+                    },
+                )
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
                 }
@@ -298,6 +349,7 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
+                        localOrchestrationSpecialistSetting = localOrchestrationSetting,
                         memoryLayer = memoryLayer,
                     )
                 }

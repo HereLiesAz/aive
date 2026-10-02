@@ -17,59 +17,43 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistPrompts
 import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
 import io.ktor.client.HttpClient
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
  * Local orchestration specialists on desktop.
  *
- * Off unless `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS=1` (or `-Daive.localOrchestrationSpecialists=true`).
- * Even when on, a role only uses a model that is released in [OrchestrationSpecialistCatalog] and
- * installed with [DesktopOrchestrationSpecialistInstaller]; inference never downloads. Every answer
- * still passes [GuardedModelBackedOrchestrationUtilities], so the deterministic baseline remains the
- * floor.
- *
- * `AIVE_ORCHESTRATION_SPECIALIST_MODE` (or `-Daive.orchestrationSpecialistMode`) picks the release shape
- * when a catalog offers both:
- * - `merged` (default): one multi-task model serves every role.
- * - `adapters`: one shared base plus a small LoRA file per role. A role with no adapter falls back to
- *   the merged model.
+ * Used once any released artifact is installed from Settings, as on Android. A role only uses a model
+ * that is released in [OrchestrationSpecialistCatalog] and installed with
+ * [DesktopOrchestrationSpecialistInstaller]; inference never downloads. When a catalog offers both
+ * shapes, a role prefers the shared base plus its LoRA file over the merged model. Every answer still
+ * passes [GuardedModelBackedOrchestrationUtilities], so the deterministic baseline remains the floor.
  */
 internal object DesktopOrchestrationSpecialists {
-    val enabled: Boolean
-        get() = System.getenv("AIVE_LOCAL_ORCHESTRATION_SPECIALISTS") == "1" ||
-            System.getProperty("aive.localOrchestrationSpecialists") == "true"
+    val runtimeCapabilities = LocalModelRuntimeCapabilities(
+        runtimeId = "desktop-onnxruntime",
+        supportedFormats = setOf("onnx", "safetensors"),
+        supportedPrecisions = setOf("int8", "fp16"),
+        supportsSharedBaseAdapters = true,
+    )
 
-    val adaptersMode: Boolean
-        get() = (System.getenv("AIVE_ORCHESTRATION_SPECIALIST_MODE")
-            ?: System.getProperty("aive.orchestrationSpecialistMode")) == "adapters"
+    fun releasedRoleCount(): Int = OrchestrationSpecialistCatalog.released().allSpecialists().size
 
-    val runtimeCapabilities: LocalModelRuntimeCapabilities
-        get() = if (adaptersMode) {
-            LocalModelRuntimeCapabilities(
-                runtimeId = "desktop-onnxruntime",
-                supportedFormats = setOf("onnx", "safetensors"),
-                supportedPrecisions = setOf("int8", "fp16"),
-                supportsSharedBaseAdapters = true,
-            )
-        } else {
-            LocalModelRuntimeCapabilities(
-                runtimeId = "desktop-onnxruntime",
-                supportedFormats = setOf("onnx"),
-                supportedPrecisions = setOf("int8"),
-            )
-        }
-
-    fun utilities(installer: DesktopOrchestrationSpecialistInstaller): LocalOrchestrationUtilityFamily =
-        if (!enabled) {
+    fun utilities(
+        installer: DesktopOrchestrationSpecialistInstaller,
+        executor: DesktopLocalOrchestrationModelExecutor,
+    ): LocalOrchestrationUtilityFamily =
+        if (!installer.hasAnyInstalledReleasedArtifact()) {
             DeterministicLocalOrchestrationUtilities
         } else {
             GuardedModelBackedOrchestrationUtilities(
                 runtime = CatalogBackedLocalOrchestrationSpecialistRuntime(
                     library = OrchestrationSpecialistCatalog.released(),
                     runtimeCapabilities = runtimeCapabilities,
-                    executor = DesktopLocalOrchestrationModelExecutor(installer),
+                    executor = executor,
                 ),
             )
         }
@@ -86,6 +70,63 @@ internal class DesktopOrchestrationSpecialistInstaller(
 ) {
     private val mutex = Mutex()
     private val downloader = DesktopResumableFileDownloader(httpClient)
+
+    /** The artifacts the released catalog's preferred load plans need on desktop. */
+    fun releasedArtifacts(): List<LocalModelArtifactDescriptor> {
+        val library = OrchestrationSpecialistCatalog.released()
+        return library.allSpecialists().flatMap { specialist ->
+            runCatching {
+                when (val plan = library.plan(specialist.specialistId, DesktopOrchestrationSpecialists.runtimeCapabilities)) {
+                    is LocalModelLoadPlan.MergedModel -> listOf(plan.model)
+                    is LocalModelLoadPlan.Standalone -> listOf(plan.model)
+                    is LocalModelLoadPlan.SharedBaseAdapter -> listOf(plan.base, plan.adapter)
+                }
+            }.getOrDefault(emptyList())
+        }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
+    }
+
+    fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
+
+    fun allReleasedInstalled(): Boolean {
+        val artifacts = releasedArtifacts()
+        return artifacts.isNotEmpty() && artifacts.all { installed(it) != null }
+    }
+
+    /** Installs every released artifact; [onProgress] receives human-readable status lines. */
+    suspend fun installReleased(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val artifacts = releasedArtifacts()
+        require(artifacts.isNotEmpty()) { "No released orchestration specialists are compatible with desktop" }
+        artifacts.forEachIndexed { index, artifact ->
+            val label = "${index + 1}/${artifacts.size} ${artifact.assetName}"
+            install(artifact) { event ->
+                when (event) {
+                    is DownloadProgress.Transferring -> onProgress("Downloading $label: ${formatTransfer(event.received, event.total)}")
+                    DownloadProgress.Verifying -> onProgress("Verifying $label…")
+                }
+            }
+        }
+    }
+
+    /**
+     * Removes every artifact the released catalog knows about, not only the preferred load plans: an
+     * older install may hold a merged model after the catalog starts preferring shared-base adapters.
+     */
+    suspend fun removeReleased() = mutex.withLock {
+        withContext(Dispatchers.IO) { removeAll() }
+    }
+
+    private fun removeAll() {
+        OrchestrationSpecialistCatalog.released().allArtifacts().forEach { artifact ->
+            if (artifact.kind == LocalModelArtifactKind.Adapter) {
+                val file = adapterFile(artifact)
+                file.delete()
+                File(file.path + ".sha256").delete()
+            } else {
+                directory(artifact).deleteRecursively()
+            }
+        }
+        File(installRoot, ".staging").deleteRecursively()
+    }
 
     /** The unpacked model directory for [artifact], or null. Cheap: compares the recorded digest only. */
     fun installed(artifact: LocalModelArtifactDescriptor): File? {
@@ -160,14 +201,28 @@ internal class DesktopOrchestrationSpecialistInstaller(
  */
 internal class DesktopLocalOrchestrationModelExecutor(
     private val installer: DesktopOrchestrationSpecialistInstaller,
-    private val sessions: DesktopOrtMemorySessionManager = DesktopOrtMemorySessionManager(),
     private val generator: DesktopOrtCausalGenerator = DesktopOrtCausalGenerator(),
 ) : LocalOrchestrationModelExecutor {
+    private var sessions = DesktopOrtMemorySessionManager()
+
     private val adapters = object : LinkedHashMap<String, DesktopLoraAdapter>(ADAPTER_CACHE_SIZE, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopLoraAdapter>): Boolean =
             (size > ADAPTER_CACHE_SIZE).also { evict -> if (evict) eldest.value.close() }
     }
 
+    /** Closes every session and cached adapter, so installed files can be removed. */
+    @Synchronized
+    fun reset() {
+        sessions.close()
+        synchronized(adapters) {
+            adapters.values.forEach(DesktopLoraAdapter::close)
+            adapters.clear()
+        }
+        sessions = DesktopOrtMemorySessionManager()
+    }
+
+    // Synchronized with [reset]: a run must not read a session or adapter that is being closed.
+    @Synchronized
     override fun generate(role: OrchestrationUtilityRole, plan: LocalModelLoadPlan, inputJson: String): String? =
         when (plan) {
             is LocalModelLoadPlan.MergedModel -> run(role, plan.model, inputJson, emptyMap())

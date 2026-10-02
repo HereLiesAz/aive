@@ -29,6 +29,13 @@ internal sealed interface DownloadProgress {
     data object Verifying : DownloadProgress
 }
 
+/** "12 of 640 MB (2%)", or "12 MB" when the total is unknown. */
+internal fun formatTransfer(received: Long, total: Long?): String {
+    val mb = 1024L * 1024L
+    if (total == null || total <= 0L) return "${received / mb} MB"
+    return "${received / mb} of ${total / mb} MB (${(received * 100 / total).coerceIn(0L, 100L)}%)"
+}
+
 /**
  * Resumable downloader for large desktop runtime artifacts (ported from the Android downloader).
  *
