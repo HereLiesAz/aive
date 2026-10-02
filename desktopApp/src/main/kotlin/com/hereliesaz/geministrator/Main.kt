@@ -55,6 +55,7 @@ import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentR
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
+import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
@@ -92,15 +93,19 @@ fun main() {
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
     val orchestrationSpecialistExecutor = DesktopLocalOrchestrationModelExecutor(orchestrationSpecialistInstaller)
-    // Memory: SQLite under ~/.aive/memory, programmatic stages by default, hosted stages on request.
-    // Attached before App builds the runtime, whose session gateway captures the observer.
+    // Memory: SQLite under ~/.aive/memory, programmatic stages by default; local (installed epoch-8
+    // clerks) or hosted stages on request. Attached before App builds the runtime, whose session
+    // gateway captures the observer.
     val memoryEngines = HostedMemoryEngineProvider(desktopMemoryPlatform())
     val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val memoryModelInstaller = DesktopMemoryModelInstaller(httpClient)
+    val memorySessions = DesktopOrtMemorySessionManager()
     val memoryLayer = MemoryLayerController(
         store = desktopSqlMemoryStore(),
         settingsStore = MemoryLayerSettingsStore.createDefault(),
-        engineProvider = memoryEngines,
+        engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
+        localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
     ).also { it.attach() }
 
     try {
@@ -358,6 +363,8 @@ fun main() {
     } finally {
         memoryLayer.detach()
         memoryScope.cancel()
+        memorySessions.close()
+        orchestrationSpecialistExecutor.reset()
         localPlanner.close()
         httpClient.close()
     }
