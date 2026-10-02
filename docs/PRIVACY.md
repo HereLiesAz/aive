@@ -117,7 +117,7 @@ Like any web request, a report reveals your IP address to the relay's host. The 
 - **Android GitHub release flavor.** The app periodically checks the public GitHub Releases API for `HereLiesAz/aive`, without authentication. When a newer APK is available, the app downloads it from GitHub Releases, verifies GitHub's published SHA-256 digest when one is present, and installs it only after you confirm.
 - **Android Google Play flavor.** Updates go through Google Play's in-app update API under Google Play's terms.
 - **Azphalt package catalog.** When you open the Store, The Aive contacts the package repository (`https://azphalt.store` by default). It searches and downloads packages, checks revocations, and sends the IDs and versions of the packages you installed from that repository to check for updates.
-- **Local models.** Optional on-device models, such as the local planner and local memory models, are downloaded from GitHub Releases.
+- **Local models.** Optional on-device models, such as the local planner, local orchestration helpers and local memory models, are downloaded from GitHub Releases.
 
 ## Source repositories
 

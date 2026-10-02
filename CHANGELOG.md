@@ -4,6 +4,9 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Desktop can now install the released local orchestration helpers from Settings, as Android can; the `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS` and `AIVE_ORCHESTRATION_SPECIALIST_MODE` environment switches are gone.
+- Desktop memory stages set to a local model now run the installed epoch-8 models (install/remove per stage on the Memory screen) instead of falling back to programmatic.
+- Large model downloads on Android and desktop now stream to disk instead of being buffered in memory first.
 - Removed the Jules provider. Any Jules key still stored on a device is deleted the next time credentials load.
 - Added a Memory screen on every platform: the memory pipeline live in the terrarium, per-stage engines, tuning, queue retry/discard, on-device model install/remove, and forget/export/import of stored memory. Desktop and web now have memory.
 - Memory stages default to deterministic on-device clerks (no download) and can each be switched to a local model or a configured hosted provider; memory can be turned off or its consolidation paused.

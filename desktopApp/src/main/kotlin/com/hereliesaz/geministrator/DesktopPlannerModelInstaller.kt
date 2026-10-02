@@ -184,12 +184,6 @@ internal class DesktopPlannerModelInstaller(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun formatTransfer(received: Long, total: Long?): String {
-        val mb = 1024L * 1024L
-        if (total == null || total <= 0L) return "${received / mb} MB"
-        return "${received / mb} of ${total / mb} MB (${(received * 100 / total).coerceIn(0L, 100L)}%)"
-    }
-
     private data class ReleaseAsset(
         val name: String,
         val downloadUrl: String,

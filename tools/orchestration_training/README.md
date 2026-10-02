@@ -82,7 +82,7 @@ kept in `state.json`, so a restarted session resumes where it stopped.
 
 To publish, add a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`, set
 `UPLOAD = True`, and run the last cell. It uploads the archives, adapter files and `catalog.json` to the
-`orchestration-utilities-v3` pre-release. Release assets are immutable: reruns may reuse an identical existing asset, but a changed same-name asset requires a new release tag. The currently shipped Agent Router/Handoff Composer bundle remains pinned to v1.
+`orchestration-utilities-v3` pre-release. Release assets are immutable: reruns may reuse an identical existing asset, but a changed same-name asset requires a new release tag. No v3 run has passed its gates yet; the shipped Agent Router/Handoff Composer bundle remains pinned to v1.
 
 ## 3. Register the release
 
@@ -91,8 +91,7 @@ python3 tools/orchestration_training/register_catalog.py catalog.json
 ~~~
 
 This writes the released specialists into `OrchestrationSpecialistCatalog.RELEASED`. Commit that change.
-On desktop, `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS=1` turns the specialists on and
-`AIVE_ORCHESTRATION_SPECIALIST_MODE=adapters` prefers base + adapter over the merged model (default
-`merged`). Android installs released artifacts explicitly from Settings and supports both merged INT8
-models and the shared INT8 base + fp16 adapter shape. Platforms without a local executor keep the
-deterministic utility family.
+Android and desktop install released artifacts explicitly from **Settings → Local Orchestration**
+(SHA-256 verified; nothing downloads during inference) and use them once any is installed. Both
+support merged INT8 models and the shared INT8 base + fp16 adapter shape, and prefer the adapter shape
+when the catalog offers both. The web keeps the deterministic utility family.
