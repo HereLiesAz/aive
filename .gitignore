@@ -45,3 +45,7 @@ package-lock.json
 native/bitcos/target/
 
 .kaggle/
+
+# Python bytecode
+__pycache__/
+*.pyc
