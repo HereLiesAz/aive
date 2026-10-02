@@ -21,7 +21,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 ## Repository map
 
 - `shared/` — domain, orchestration, persistence, policies, runtime projection, shared Compose UI
-- `providers/` — provider adapters: `jules/` (Jules) and `llm/` (native OpenAI, Anthropic, Gemini, and xAI adapters, OpenAI-compatible hosted providers, GitLab workspace agent)
+- `providers/` — provider adapters: `llm/` (native OpenAI, Anthropic, Gemini, and xAI adapters, OpenAI-compatible hosted providers, GitLab workspace agent)
 - `androidApp/` — Android launcher
 - `desktopApp/` — Desktop launcher
 - `webApp/` — browser launcher (includes `mesh-crypto.js`, the Web Crypto AES-GCM backend for `MeshCrypto` on JS/Wasm)

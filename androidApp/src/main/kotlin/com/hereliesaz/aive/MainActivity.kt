@@ -42,9 +42,6 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
-import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
-import com.hereliesaz.geministrator.providers.jules.JulesProvider
-import com.hereliesaz.geministrator.providers.jules.JulesRestApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -79,6 +76,7 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
@@ -557,15 +555,6 @@ internal fun configuredAndroidProviders(
         add(
             OpenCodeActionsAgentProvider(
                 GitHubRestOpenCodeRunnerClient(GitHubTokenProvider { githubToken }, repositoryHttpClient),
-            ),
-        )
-    }
-    credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
-        add(
-            JulesProvider(
-                JulesRestApi(
-                    JulesApiKeyProvider { key },
-                ),
             ),
         )
     }

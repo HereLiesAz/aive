@@ -32,7 +32,7 @@ jobs:
         uses: gradle/actions/dependency-submission@v6
         with:
           dependency-graph: generate-and-submit
-          dependency-graph-include-projects: ':androidApp|:desktopApp|:webApp|:shared|:providers:jules'
+          dependency-graph-include-projects: ':androidApp|:desktopApp|:webApp|:shared|:providers:llm'
           dependency-graph-include-configurations: '.*[Rr]untime.*'
           dependency-graph-continue-on-failure: false
           additional-arguments: '-Phaive.useLocalH2g2=false'

@@ -44,7 +44,7 @@ object OpenCodeAgentWorkflow {
 /**
  * Runs the open-source OpenCode agent on GitHub Actions against a linked GitHub repository.
  *
- * Unlike Jules, every agent step (file read, command, edit, message) streams back: the runner
+ * Every agent step (file read, command, edit, message) streams back: the runner
  * writes them to a check run that this provider polls. The workflow file is installed, and kept in
  * step with this app version, on the repository's default branch before the first dispatch.
  * Changes come back as a pushed branch plus a patch artifact.

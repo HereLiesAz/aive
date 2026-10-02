@@ -4,7 +4,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 
 ## Assets
 
-- Provider, repository-service (GitHub/GitLab), Jules, and compute-relay credentials.
+- Provider, repository-service (GitHub/GitLab), and compute-relay credentials.
 - Repository contents and history on GitHub, GitLab, and local working trees.
 - Workflow definitions, run state, artifacts, and approval decisions.
 - Data in attached role surfaces (spreadsheets, SQLite databases).
@@ -14,7 +14,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 
 | Boundary | What crosses it | Direction |
 |---|---|---|
-| Device ↔ Provider (hosted LLMs, keyless gateways, Jules) | Task objectives, role instructions, context artifacts, acceptance criteria, repository snapshots (workspace agents) | Outbound, responses inbound |
+| Device ↔ Provider (hosted LLMs, keyless gateways, OpenCode) | Task objectives, role instructions, context artifacts, acceptance criteria, repository snapshots (workspace agents) | Outbound, responses inbound |
 | Device ↔ GitHub API | Workflow dispatch and inputs, run status, check runs, artifact downloads, workflow-file installs, repository operations | Both |
 | Device ↔ GitLab API | Repository tree/file reads, workspace-agent commits, repository operations | Both |
 | GitHub runner ↔ Agent/script | Prompt or script source, repository checkout, job token (runner only) | Inside the user's repository's Actions |
@@ -28,11 +28,11 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 
 ## Threat Actors
 
-- **Compromised provider**: A provider (Jules or other) returns malicious content disguised as task output. Examples include code that overwrites secrets, instructions injected into artifact text, and a fabricated approval status.
+- **Compromised provider**: A provider returns malicious content disguised as task output. Examples include code that overwrites secrets, instructions injected into artifact text, and a fabricated approval status.
 - **Logging free-tier gateway**: A keyless or free model gateway (Kilo, LLM7, OVHcloud anonymous tier, OpenCode Zen free models) retains or trains on prompts.
 - **Malicious workflow definition**: A definition author (or import) injects a task objective, role instruction, or acceptance criterion designed to exfiltrate data or execute privileged operations.
 - **Malicious artifact**: A prior task produces an artifact (code, text, data) whose content is interpreted as instructions by a downstream provider or executor.
-- **Malicious repository content**: Files in the target repository contain prompt-injection aimed at an agent that reads them (OpenCode, GitLab/Local workspace agents, Jules).
+- **Malicious repository content**: Files in the target repository contain prompt-injection aimed at an agent that reads them (OpenCode, GitLab/Local workspace agents).
 - **GitHub Actions workflow injection**: An attacker with write access to the repository triggers workflows with controlled inputs, or a workflow file references untrusted external actions.
 - **Repository write abuse**: An executor or integration that performs repository operations (branch, commit, PR/MR, push) is tricked into writing malicious content or granting access.
 - **Prompt injection via context**: User-controlled content (project name, objective text, imported artifacts) propagates into provider prompts and attempts to redirect agent behavior.
@@ -42,7 +42,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 
 ## Attack Surface by Integration
 
-### Provider (Jules / agent sessions / hosted LLMs)
+### Provider (agents / hosted LLMs)
 
 **Threats**
 - Prompt injection: context artifacts contain `IGNORE PREVIOUS INSTRUCTIONS` style attacks directed at the provider model.
@@ -179,7 +179,7 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 
 **Remaining gaps**
 - Operations do not reject protected branches up front. They rely on the host's branch protection.
-- Workspace agents (OpenCode, GitLab, Local, Jules) write branches without a `HumanApproval` task. Plan approval is optional per task.
+- Workspace agents (OpenCode, GitLab, Local) write branches without a `HumanApproval` task. Plan approval is optional per task.
 
 ### Nested workflows
 

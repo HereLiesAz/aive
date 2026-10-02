@@ -114,12 +114,12 @@ class AgentProviderRegistryRepositoryTest {
 
     @Test
     fun explicitOnlyProviderIsNeverChosenAutomatically() = runBlocking {
-        val julesLike = SourceAwareProvider(
-            id = AgentProviderId("jules"),
+        val explicitAgent = SourceAwareProvider(
+            id = AgentProviderId("explicit-agent"),
             supportedSources = setOf(RepositorySource.GitHub),
             explicitOnly = true,
         )
-        val registry = AgentProviderRegistry(listOf(julesLike), inferenceSettings = InMemorySettings())
+        val registry = AgentProviderRegistry(listOf(explicitAgent), inferenceSettings = InMemorySettings())
         val github = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub)
 
         val failure = assertFailsWith<IllegalStateException> {
@@ -134,18 +134,18 @@ class AgentProviderRegistryRepositoryTest {
 
         val preferred = registry.select(
             ProviderSelectionRequest(
-                preferredProviderId = julesLike.id,
+                preferredProviderId = explicitAgent.id,
                 requiredCapabilities = setOf(AgentCapability.RepositoryWrite),
                 repository = github,
             ),
         )
-        assertEquals(julesLike.id, preferred.id)
+        assertEquals(explicitAgent.id, preferred.id)
     }
 
     @Test
     fun explicitOnlyProviderYieldsToAutomaticProviders() = runBlocking {
-        val julesLike = SourceAwareProvider(
-            id = AgentProviderId("jules"),
+        val explicitAgent = SourceAwareProvider(
+            id = AgentProviderId("explicit-agent"),
             supportedSources = setOf(RepositorySource.GitHub),
             explicitOnly = true,
         )
@@ -153,7 +153,7 @@ class AgentProviderRegistryRepositoryTest {
             id = AgentProviderId("automatic"),
             supportedSources = setOf(RepositorySource.GitHub),
         )
-        val registry = AgentProviderRegistry(listOf(julesLike, automatic), inferenceSettings = InMemorySettings())
+        val registry = AgentProviderRegistry(listOf(explicitAgent, automatic), inferenceSettings = InMemorySettings())
 
         val selected = registry.select(
             ProviderSelectionRequest(

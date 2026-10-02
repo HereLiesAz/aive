@@ -65,7 +65,7 @@ class WorkflowMindMapProjectionTest {
                     taskDefinitionId = implementationId,
                     status = TaskRunStatus.Running,
                     assignedRoleId = BuiltInRoles.ImplementationEngineer.id,
-                    assignedProviderId = AgentProviderId("jules"),
+                    assignedProviderId = AgentProviderId("remote-agent"),
                     progress = .67f,
                     progressMessage = "Writing verification code",
                 ),
@@ -84,7 +84,7 @@ class WorkflowMindMapProjectionTest {
         assertEquals(H2g2WorkflowState.Complete, nodes.getValue("product").state)
         assertEquals(H2g2WorkflowState.Active, nodes.getValue("implementation").state)
         assertEquals(.67f, nodes.getValue("implementation").progress)
-        assertTrue(nodes.getValue("implementation").detail.orEmpty().contains("jules"))
+        assertTrue(nodes.getValue("implementation").detail.orEmpty().contains("remote-agent"))
         assertTrue(nodes.getValue("implementation").detail.orEmpty().contains("Writing verification code"))
         assertEquals(H2g2WorkflowState.Blocked, nodes.getValue("qa").state)
     }
@@ -104,7 +104,7 @@ class WorkflowMindMapProjectionTest {
                     taskDefinitionId = implementationId,
                     status = TaskRunStatus.Verifying,
                     assignedRoleId = BuiltInRoles.ImplementationEngineer.id,
-                    assignedProviderId = AgentProviderId("jules"),
+                    assignedProviderId = AgentProviderId("remote-agent"),
                     progressMessage = "Frontend verification",
                 ),
                 qaId to taskRun(qaId, TaskRunStatus.Blocked, BuiltInRoles.QaEngineer.id.value),

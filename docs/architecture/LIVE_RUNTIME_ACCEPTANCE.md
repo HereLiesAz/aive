@@ -26,8 +26,7 @@ the corresponding credential is configured, or a keyless provider (`kilo`, `llm7
 the `provider` dispatch input names one. Pull-request runs from `acceptance/live-runtime-verification`
 take no input and use `kilo`. When a manual run names no provider and no hosted-provider credential
 is available, the central acceptance workflow bootstraps a real local Ollama server and exercises Aive's existing
-OpenAI-compatible provider transport against SmolLM2. Jules is not part of this acceptance
-requirement.
+OpenAI-compatible provider transport against SmolLM2.
 
 `AIVE_LIVE_PROVIDER` may also name any hosted OpenAI-compatible provider (for example `groq` or
 `kilo`). Its key comes from `AIVE_LIVE_HOSTED_CREDENTIAL` and its model from

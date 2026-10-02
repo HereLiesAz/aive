@@ -103,14 +103,14 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## P1 — Provider system
 
-- [x] Finish Jules as the reference provider implementation.
+- [x] Finish a reference provider implementation (Jules; removed in 0.9.6).
 - [x] Define provider configuration UI and secure credential handling per platform.
 - [x] Add provider health/capability reporting.
 - [x] Add provider-neutral token/cost/latency telemetry where providers expose it.
 - [x] Implement prompt-reuse telemetry without making cache behavior part of workflow correctness.
 - [x] Add a second provider to prove interchangeability; native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers now share the provider-neutral task contract.
 - [x] Test provider substitution for the same role/task contract.
-- [x] Make Jules explicit-only: it runs where a role names it and is never selected automatically.
+- [x] Support explicit-only providers: they run where a role names them and are never selected automatically.
 - [x] Add the OpenCode agent on GitHub Actions as the automatic coding agent for GitHub repositories, with per-step progress.
 - [x] Verify the OpenCode agent runner on real GitHub infrastructure. Live run on `HereLiesAz/test` (2026-09-26): the runner created its check run and streamed the step log, OpenCode's free model fixed a planted bug, the runner pushed the fix to an `aive/opencode-*` branch, and the `aive-result` artifact matched what the app parses.
 - [ ] Verify the app's own dispatch path end to end against live GitHub: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. Automated regression coverage now exercises that complete durable sequence—including a mid-run provider recreation with no redispatch—but a live external run through the app is still required before ticking this item.
@@ -148,7 +148,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## P1 — Delivery
 
-- [x] Keep `main` CI green across shared tests, Jules provider, Android, Desktop, JS, and Wasm.
+- [x] Keep `main` CI green across shared tests, providers, Android, Desktop, JS, and Wasm.
 - [x] Confirm Android release signing from reconstructed keystore material on CI.
 - [x] Add Google Play publishing using `PLAY_SERVICE_ACCOUNT_JSON` as a separate publishing job.
 - [x] Automatically publish the desired Google Play internal-testing track after a successful release build.

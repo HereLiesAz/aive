@@ -134,20 +134,8 @@ jobs:
       - name: Test semantic workflow renderer
         run: ./gradlew -p vendor/conveyance-h2g2 desktopTest
 
-      - name: Test Jules provider
-        run: ./gradlew :providers:jules:desktopTest
-
       - name: Test LLM providers
         run: ./gradlew :providers:llm:desktopTest
-
-      - name: Compile Jules provider Android
-        run: ./gradlew :providers:jules:compileAndroidMain
-
-      - name: Compile Jules provider JS
-        run: ./gradlew :providers:jules:compileKotlinJs
-
-      - name: Compile Jules provider Wasm
-        run: ./gradlew :providers:jules:compileKotlinWasmJs
 
       - name: Test Android provider bootstrap
         run: ./gradlew :androidApp:testPlayDebugUnitTest :androidApp:testGithubDebugUnitTest

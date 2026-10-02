@@ -41,9 +41,9 @@ CASES = [
     },
     {
         "id": "noun-components",
-        "text": "The workflow coordinator reconnects the Jules provider session after restart.",
+        "text": "The workflow coordinator reconnects the OpenCode provider run after restart.",
         "expected_kind": "NounTag",
-        "expected_terms": ["workflow coordinator", "Jules", "provider session"],
+        "expected_terms": ["workflow coordinator", "OpenCode", "provider run"],
     },
 ]
 

@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 class WorkflowConcurrencyTest {
     @Test
     fun providerLimitCanBeLowerThanGlobalConcurrencyLimit() = runBlocking {
-        val providerId = AgentProviderId("jules")
+        val providerId = AgentProviderId("remote-agent")
         val firstId = TaskDefinitionId("first")
         val secondId = TaskDefinitionId("second")
         val definition = WorkflowDefinition(

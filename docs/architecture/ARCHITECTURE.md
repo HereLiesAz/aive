@@ -36,7 +36,7 @@ Shared code must remain portable across all four targets.
 
 ~~~text
 shared/       domain, workflow engine, policies, persistence, shared Compose UI
-providers/    provider adapters: Jules, and llm (native and OpenAI-compatible hosted adapters)
+providers/    provider adapters: llm (native and OpenAI-compatible hosted adapters)
 computeRelay/ distributed compute relay server
 androidApp/   Android launcher
 desktopApp/   Desktop launcher
@@ -114,7 +114,7 @@ The engine owns:
 
 Progress belongs to `TaskRun`, not to agents.
 
-An executor may provide an exact fraction. When it does, the runtime preserves that value. Some executors, including the currently exposed Jules activity model, provide only qualitative progress. In that case The Aive may present lifecycle progress such as planning, running, and verifying without pretending it is an exact percentage.
+An executor may provide an exact fraction. When it does, the runtime preserves that value. Some executors provide only qualitative progress. In that case The Aive shows their status message and lifecycle state, and no percentage.
 
 This makes the same UI capable of representing both a provider activity like “Writing tests” and an automated executor that knows “7 of 11 steps complete.”
 
@@ -133,7 +133,10 @@ Registered agent providers are built from the configured credentials:
 - OpenCode on GitHub Actions (`OpenCodeActionsAgentProvider`) — the automatic coding agent for linked GitHub repositories; it needs only the linked GitHub token.
 - Text LLM providers from `providers/llm` — native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers.
 - GitLab workspace agent (`providers/llm`) for linked GitLab repositories, and the Desktop-only local workspace agent for linked Local Git projects. Both return validated file changes and commit them to a branch; neither executes repository code.
-- Jules — explicit-only (`AgentProvider.explicitOnly`). The registry never selects it automatically; it runs only as a role's preferred provider or when a task requires it by ID. Jules source IDs, session IDs, request payloads, credentials, and activity schemas remain inside the Jules adapter.
+
+A provider may declare itself explicit-only (`AgentProvider.explicitOnly`): the registry then never selects it automatically, and it runs only as a role's preferred provider or when a task requires it by ID. Provider-specific identifiers, payloads, credentials, and event schemas stay inside each adapter.
+
+Jules was removed in 0.9.6. Credential stores delete any Jules key they still hold (`ProviderCatalog.RETIRED_PROVIDER_IDS`).
 
 New providers implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
 

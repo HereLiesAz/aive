@@ -51,7 +51,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.shared)
-            implementation(projects.providers.jules)
             implementation(projects.providers.llm)
             implementation(compose.foundation)
             implementation(compose.material3)

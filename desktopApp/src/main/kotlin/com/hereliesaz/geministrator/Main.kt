@@ -17,9 +17,6 @@ import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
-import com.hereliesaz.geministrator.providers.jules.JulesApiKeyProvider
-import com.hereliesaz.geministrator.providers.jules.JulesProvider
-import com.hereliesaz.geministrator.providers.jules.JulesRestApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -331,15 +328,6 @@ internal fun configuredDesktopProviders(
             ),
         )
     }
-    credentials.cleanKey(ProviderCatalog.JULES_ID)?.let { key ->
-        add(
-            JulesProvider(
-                JulesRestApi(
-                    JulesApiKeyProvider { key },
-                ),
-            ),
-        )
-    }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
         add(OpenAiProvider(keyProvider))
@@ -509,7 +497,6 @@ private fun readDesktopRepositoryCredentials(
 
 private fun environmentProviderCredentials(): Map<String, String> = buildMap {
     listOf(
-        ProviderCatalog.JULES_ID to "JULES_API_KEY",
         ProviderCatalog.OPENAI_ID to "OPENAI_API_KEY",
         ProviderCatalog.ANTHROPIC_ID to "ANTHROPIC_API_KEY",
         ProviderCatalog.GEMINI_ID to "GEMINI_API_KEY",
