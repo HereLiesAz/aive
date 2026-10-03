@@ -586,9 +586,25 @@ def write_catalog(merged=None, merged_roles=(), base=None, adapters=None, scores
 code(r'''
 import requests
 
+def github_token():
+    """GITHUB_TOKEN from Kaggle secrets, Colab secrets, or the environment, whichever this runs on."""
+    try:
+        from kaggle_secrets import UserSecretsClient
+        return UserSecretsClient().get_secret("GITHUB_TOKEN")
+    except ImportError:
+        pass
+    try:
+        from google.colab import userdata
+        return userdata.get("GITHUB_TOKEN")
+    except ImportError:
+        pass
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise RuntimeError("No GITHUB_TOKEN: add it as a Kaggle or Colab secret, or set the environment variable")
+    return token
+
 def upload(paths):
-    from kaggle_secrets import UserSecretsClient
-    token = UserSecretsClient().get_secret("GITHUB_TOKEN")
+    token = github_token()
     api = f"https://api.github.com/repos/{RELEASE_REPOSITORY}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     r = requests.get(f"{api}/releases/tags/{RELEASE_TAG}", headers=headers)
