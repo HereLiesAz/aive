@@ -12,10 +12,11 @@ on:
       - '.github/workflows/dependency-submission.yml'
   workflow_dispatch:
 
-# Only the newest dependency snapshot matters: a later push replaces an earlier run
-# instead of queueing behind it and holding a runner.
+# One dependency submission per repository at a time: a burst of pushes uses a single
+# runner and only the newest snapshot runs, so this repo never crowds the account's
+# shared concurrent-job limit for other repositories.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.repository }}-dependency-submission
   cancel-in-progress: true
 
 permissions:
