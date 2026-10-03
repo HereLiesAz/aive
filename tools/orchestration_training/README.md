@@ -58,6 +58,11 @@ Each role trains, gates and ships on its own, so one role can be retrained witho
 
 A changed base needs a new version, and every adapter must be retrained against it.
 
+Each upload is mirrored to Kaggle as a new version of the `hereliesaz/aive-orchestration-specialists`
+model (variation `base` or the role's name; created private), unless `KAGGLE_MIRROR = False`; it needs
+`KAGGLE_USERNAME` and `KAGGLE_KEY` secrets. A role notebook on Kaggle with that model's `base`
+variation attached uses it instead of downloading the base from GitHub, after the same SHA-256 check.
+
 ### All roles in one notebook
 
 Open `aive_orchestration_specialists.ipynb` on Kaggle, use a GPU accelerator with internet on, and

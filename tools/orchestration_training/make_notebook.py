@@ -77,7 +77,7 @@ code("""
 # below, and optimum's exporter imports diffusers when present. Nothing here uses either, so remove
 # both. If peft or optimum was already imported in this session, restart it.
 %pip uninstall -y -q torchao diffusers
-%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22"
+%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=0.3"
 """)
 
 code(r'''
@@ -757,6 +757,7 @@ FAMILIES = {
         "register": "tools/orchestration_training/register_catalog.py",
         "version": "v4",
         "capability": "orchestration-utility",
+        "kaggle_model": "hereliesaz/aive-orchestration-specialists",
         "substitutions": [],
     },
     "memory": {
@@ -766,6 +767,7 @@ FAMILIES = {
         "register": "tools/memory_training/register_catalog.py",
         "version": "v1",
         "capability": "memory-clerk",
+        "kaggle_model": "hereliesaz/aive-memory-clerks",
         "substitutions": [
             ("MAX_LENGTH = 1024 ", "MAX_LENGTH = 3072 "),
             ("BATCH_SIZE = 4\n", "BATCH_SIZE = 1\n"),
@@ -779,35 +781,103 @@ FAMILIES = {
 }
 
 ROLE_RUN = r'''
-def fetch_base():
-    """The published shared base this role's adapter runs on: downloaded, verified and unpacked once."""
+def kaggle_credentials():
+    # KAGGLE_USERNAME and KAGGLE_KEY from Kaggle secrets when running there; kagglehub itself reads
+    # Colab secrets and the environment.
+    if os.environ.get("KAGGLE_KEY"):
+        return
+    try:
+        from kaggle_secrets import UserSecretsClient
+    except ImportError:
+        return
+    secrets = UserSecretsClient()
+    for name in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
+        try:
+            os.environ[name] = secrets.get_secret(name)
+        except Exception:
+            pass
+
+def upload_and_mirror(paths):
+    # Publish to the GitHub release, then the same files as a new version of this notebook's Kaggle
+    # model variation (created private on first upload).
+    upload(paths)
+    if not KAGGLE_MIRROR:
+        return
+    import kagglehub
+    kaggle_credentials()
+    mirror = WORK / "kaggle-mirror"
+    shutil.rmtree(mirror, ignore_errors=True)
+    mirror.mkdir(parents=True)
+    for path in paths:
+        try:
+            os.link(path, mirror / path.name)
+        except OSError:
+            shutil.copy2(path, mirror / path.name)
+    notes = f"{RELEASE_TAG}: " + ", ".join(f"{p.name} sha256:{sha256(p)}" for p in paths)
+    handle = f"{KAGGLE_MODEL}/onnx/{KAGGLE_VARIATION}"
+    kagglehub.model_upload(handle, str(mirror), license_name="Apache 2.0", version_notes=notes[:4000])
+    print("mirrored to Kaggle model", handle)
+
+def check_base(raw, archive):
+    data = json.loads(raw)
+    base = data["base"]
+    assert base["logicalArtifactId"] == BASE_ARTIFACT_ID, f"found {base['logicalArtifactId']}, not {BASE_ARTIFACT_ID}"
+    assert (data["loraRank"], data["loraAlpha"]) == (LORA_R, LORA_ALPHA), "the published base was exported for another LoRA shape"
+    assert sha256(archive) == base["sha256"], f"{archive} does not match its base.json"
+    return data, raw, archive
+
+def published_base(into):
+    # The published base as (base.json, its exact bytes, verified archive): from an attached Kaggle
+    # model when there is one, else downloaded from the GitHub release into [into]. None when it is
+    # not published yet.
     import urllib.request
-    root = WORK / "base"
-    int8 = root / "int8"
-    verified = int8 / ".verified-sha256"
+    attached = Path("/kaggle/input")
+    for manifest in attached.rglob("base.json") if attached.exists() else []:
+        raw = manifest.read_bytes()
+        base = json.loads(raw).get("base", {})
+        archive = manifest.parent / base.get("assetName", "")
+        if base.get("logicalArtifactId") == BASE_ARTIFACT_ID and archive.is_file():
+            print("base from attached Kaggle model:", manifest.parent)
+            return check_base(raw, archive)
     url = f"https://github.com/{RELEASE_REPOSITORY}/releases/download/{BASE_RELEASE_TAG}"
     try:
-        published = json.loads(urllib.request.urlopen(f"{url}/base.json", timeout=60).read())
+        raw = urllib.request.urlopen(f"{url}/base.json", timeout=60).read()
     except Exception as failure:
-        raise RuntimeError(
-            f"{BASE_RELEASE_TAG}/base.json is not published ({failure}). "
-            "Run this family's base notebook with UPLOAD = True first."
-        ) from None
-    base = published["base"]
-    assert base["logicalArtifactId"] == BASE_ARTIFACT_ID, f"{BASE_RELEASE_TAG} holds {base['logicalArtifactId']}, not {BASE_ARTIFACT_ID}"
-    assert (published["loraRank"], published["loraAlpha"]) == (LORA_R, LORA_ALPHA), "the published base was exported for another LoRA shape"
-    if not (verified.is_file() and verified.read_text().strip() == base["sha256"]):
-        shutil.rmtree(root, ignore_errors=True)
-        root.mkdir(parents=True)
-        archive = root / base["assetName"]
+        print(f"{BASE_RELEASE_TAG}/base.json is not available: {failure}")
+        return None
+    base = json.loads(raw)["base"]
+    into.mkdir(parents=True, exist_ok=True)
+    archive = into / base["assetName"]
+    if not (archive.is_file() and sha256(archive) == base["sha256"]):
         with urllib.request.urlopen(f"{url}/{base['assetName']}", timeout=600) as response, open(archive, "wb") as out:
             shutil.copyfileobj(response, out, 8 << 20)
-        assert sha256(archive) == base["sha256"], f"{base['assetName']} does not match {BASE_RELEASE_TAG}/base.json"
-        with tarfile.open(archive) as tar:
-            tar.extractall(int8, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+    print("base from GitHub release", BASE_RELEASE_TAG)
+    return check_base(raw, archive)
+
+def fetch_base():
+    """The published shared base this role's adapter runs on: verified and unpacked once."""
+    root = WORK / "base"
+    int8, cached = root / "int8", root / "base.json"
+    verified = int8 / ".verified-sha256"
+    if cached.is_file() and verified.is_file():
+        data = json.loads(cached.read_text())
+        if verified.read_text().strip() == data["base"]["sha256"]:
+            return data["base"], int8, json.loads((int8 / "lora-inputs.json").read_text())
+    found = published_base(root)
+    if found is None:
+        raise RuntimeError(
+            f"{BASE_RELEASE_TAG} is not published. Run this family's base notebook with UPLOAD = True "
+            "first, or attach its Kaggle model."
+        )
+    data, raw, archive = found
+    shutil.rmtree(int8, ignore_errors=True)
+    with tarfile.open(archive) as tar:
+        tar.extractall(int8, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+    if archive.parent == root:
         archive.unlink()
-        verified.write_text(base["sha256"] + "\n")
-    return base, int8, json.loads((int8 / "lora-inputs.json").read_text())
+    cached.write_bytes(raw)
+    verified.write_text(data["base"]["sha256"] + "\n")
+    return data["base"], int8, json.loads((int8 / "lora-inputs.json").read_text())
 
 started = time.time()
 slug = SLUGS[0]
@@ -841,19 +911,103 @@ print(f"{slug}: {'released' if adapters else 'not released'}; assets in {ASSETS}
 '''
 
 BASE_RUN = r"""
+def kaggle_credentials():
+    # KAGGLE_USERNAME and KAGGLE_KEY from Kaggle secrets when running there; kagglehub itself reads
+    # Colab secrets and the environment.
+    if os.environ.get("KAGGLE_KEY"):
+        return
+    try:
+        from kaggle_secrets import UserSecretsClient
+    except ImportError:
+        return
+    secrets = UserSecretsClient()
+    for name in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
+        try:
+            os.environ[name] = secrets.get_secret(name)
+        except Exception:
+            pass
+
+def upload_and_mirror(paths):
+    # Publish to the GitHub release, then the same files as a new version of this notebook's Kaggle
+    # model variation (created private on first upload).
+    upload(paths)
+    if not KAGGLE_MIRROR:
+        return
+    import kagglehub
+    kaggle_credentials()
+    mirror = WORK / "kaggle-mirror"
+    shutil.rmtree(mirror, ignore_errors=True)
+    mirror.mkdir(parents=True)
+    for path in paths:
+        try:
+            os.link(path, mirror / path.name)
+        except OSError:
+            shutil.copy2(path, mirror / path.name)
+    notes = f"{RELEASE_TAG}: " + ", ".join(f"{p.name} sha256:{sha256(p)}" for p in paths)
+    handle = f"{KAGGLE_MODEL}/onnx/{KAGGLE_VARIATION}"
+    kagglehub.model_upload(handle, str(mirror), license_name="Apache 2.0", version_notes=notes[:4000])
+    print("mirrored to Kaggle model", handle)
+
+def check_base(raw, archive):
+    data = json.loads(raw)
+    base = data["base"]
+    assert base["logicalArtifactId"] == BASE_ARTIFACT_ID, f"found {base['logicalArtifactId']}, not {BASE_ARTIFACT_ID}"
+    assert (data["loraRank"], data["loraAlpha"]) == (LORA_R, LORA_ALPHA), "the published base was exported for another LoRA shape"
+    assert sha256(archive) == base["sha256"], f"{archive} does not match its base.json"
+    return data, raw, archive
+
+def published_base(into):
+    # The published base as (base.json, its exact bytes, verified archive): from an attached Kaggle
+    # model when there is one, else downloaded from the GitHub release into [into]. None when it is
+    # not published yet.
+    import urllib.request
+    attached = Path("/kaggle/input")
+    for manifest in attached.rglob("base.json") if attached.exists() else []:
+        raw = manifest.read_bytes()
+        base = json.loads(raw).get("base", {})
+        archive = manifest.parent / base.get("assetName", "")
+        if base.get("logicalArtifactId") == BASE_ARTIFACT_ID and archive.is_file():
+            print("base from attached Kaggle model:", manifest.parent)
+            return check_base(raw, archive)
+    url = f"https://github.com/{RELEASE_REPOSITORY}/releases/download/{BASE_RELEASE_TAG}"
+    try:
+        raw = urllib.request.urlopen(f"{url}/base.json", timeout=60).read()
+    except Exception as failure:
+        print(f"{BASE_RELEASE_TAG}/base.json is not available: {failure}")
+        return None
+    base = json.loads(raw)["base"]
+    into.mkdir(parents=True, exist_ok=True)
+    archive = into / base["assetName"]
+    if not (archive.is_file() and sha256(archive) == base["sha256"]):
+        with urllib.request.urlopen(f"{url}/{base['assetName']}", timeout=600) as response, open(archive, "wb") as out:
+            shutil.copyfileobj(response, out, 8 << 20)
+    print("base from GitHub release", BASE_RELEASE_TAG)
+    return check_base(raw, archive)
+
 started = time.time()
-base_int8, mapping = export_base_with_lora_inputs()
-(base_int8 / "model-manifest.json").write_text(json.dumps({
-    "artifactId": BASE_ARTIFACT_ID, "foundationModelId": BASE_MODEL, "format": "onnx", "precision": "int8",
-    "weightQuantization": "MatMulNBits 8-bit, block 32, symmetric (LoRA inputs left float32)",
-    "loraInputs": len(mapping), "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "sourceCommit": MANIFEST["source_commit"],
-}, indent=2))
-base = descriptor(BASE_ARTIFACT_ID, tar_dir(base_int8, ASSETS / BASE_ASSET_NAME), "SharedBase", "int8",
-                  capabilities=[CAPABILITY, "lora-inputs"])
-# What every role notebook of this family downloads and verifies before gating its adapter.
-(ASSETS / "base.json").write_text(json.dumps(
-    {"base": base, "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "loraInputs": len(mapping)}, indent=2,
-))
+found = published_base(ASSETS)
+if found:
+    # Published already: mirror exactly those bytes. A new export would not match them, and release
+    # assets are immutable.
+    data, raw, archive = found
+    if archive.parent != ASSETS:
+        shutil.copy2(archive, ASSETS / archive.name)
+    (ASSETS / "base.json").write_bytes(raw)
+    base = data["base"]
+    print(f"{BASE_RELEASE_TAG} is already published; reusing it, not exporting a new base")
+else:
+    base_int8, mapping = export_base_with_lora_inputs()
+    (base_int8 / "model-manifest.json").write_text(json.dumps({
+        "artifactId": BASE_ARTIFACT_ID, "foundationModelId": BASE_MODEL, "format": "onnx", "precision": "int8",
+        "weightQuantization": "MatMulNBits 8-bit, block 32, symmetric (LoRA inputs left float32)",
+        "loraInputs": len(mapping), "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "sourceCommit": MANIFEST["source_commit"],
+    }, indent=2))
+    base = descriptor(BASE_ARTIFACT_ID, tar_dir(base_int8, ASSETS / BASE_ASSET_NAME), "SharedBase", "int8",
+                      capabilities=[CAPABILITY, "lora-inputs"])
+    # What every role notebook of this family downloads and verifies before gating its adapter.
+    (ASSETS / "base.json").write_text(json.dumps(
+        {"base": base, "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "loraInputs": len(mapping)}, indent=2,
+    ))
 catalog = {"specialists": []}
 print(f"{BASE_ARTIFACT_ID}: sha256 {base['sha256'][:12]}; assets in {ASSETS}; done in {(time.time() - started) / 60:.1f} min")
 """
@@ -868,10 +1022,13 @@ adapter, then the published INT8 shared base with this adapter's weights fed as 
 like a device. `catalog.json` lists the role only when both gates pass; a failing role ships nothing.
 
 1. **Base first**: the `{base_tag}` release must exist. Run `base.ipynb` in this folder once with
-   `UPLOAD = True`; this notebook downloads the base and verifies its SHA-256.
+   `UPLOAD = True`. On Kaggle, attach the `{spec['kaggle_model']}` model (variation `base`) to skip the
+   620 MB download; either way the base is checked against its SHA-256.
 2. **Train**: run all cells on a GPU with internet on. `UPLOAD = True` publishes the adapter and
-   `catalog.json` to the `{tag}` pre-release (needs a `GITHUB_TOKEN` secret with contents write).
-   Release assets are immutable; a changed adapter needs a new version.
+   `catalog.json` to the `{tag}` pre-release (`GITHUB_TOKEN` secret with contents write), then, with
+   `KAGGLE_MIRROR`, as a new version of the `{spec['kaggle_model']}` model, variation `{slug}`
+   (`KAGGLE_USERNAME` and `KAGGLE_KEY` secrets). Release assets are immutable; a changed adapter needs
+   a new version.
 3. **Register**: `python3 {spec['register']} catalog.json`, then commit. Other roles stay registered.
 
 {GENERATOR_NOTE}
@@ -887,8 +1044,11 @@ weights to INT8 (MatMulNBits; LoRA inputs stay float32), and packages it with `b
 {family} role notebook downloads and verifies. Each role then ships only its ~18 MB adapter.
 
 No training: a GPU is not needed. Run all cells with internet on and `UPLOAD = True` to publish the
-`{tag}` pre-release (needs a `GITHUB_TOKEN` secret with contents write). Publish it once, before any
-role notebook; a changed base needs a new version, and every adapter must be retrained against it.
+`{tag}` pre-release (`GITHUB_TOKEN` secret with contents write) and, with `KAGGLE_MIRROR`, the
+`{spec['kaggle_model']}` Kaggle model, variation `base` (`KAGGLE_USERNAME` and `KAGGLE_KEY` secrets;
+created private). Once published, a rerun reuses the published base instead of exporting a new one,
+so it can mirror an existing release. A changed base needs a new version, and every adapter must be
+retrained against it.
 
 {GENERATOR_NOTE}
 """
@@ -916,7 +1076,7 @@ def variant_cells(intro, substitutions, run, output_substitutions=()):
     return cells
 
 
-def config_substitutions(family, spec, tag, roles, body):
+def config_substitutions(family, spec, tag, roles, body, variation):
     version = spec["version"]
     return [
         ('RELEASE_TAG = "orchestration-utilities-v3"',
@@ -924,7 +1084,9 @@ def config_substitutions(family, spec, tag, roles, body):
         ('ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]',
          f"ROLES = {json.dumps(roles)}"),
         ('MODE = "both"                        # "multitask", "adapters" or "both"',
-         f'MODE = "adapters"                    # one adapter per role on the shared base\nCAPABILITY = "{spec["capability"]}"'),
+         f'MODE = "adapters"                    # one adapter per role on the shared base\nCAPABILITY = "{spec["capability"]}"\n'
+         f'KAGGLE_MIRROR = True                 # with UPLOAD: also publish to Kaggle (KAGGLE_USERNAME + KAGGLE_KEY secrets)\n'
+         f'KAGGLE_MODEL = "{spec["kaggle_model"]}"\nKAGGLE_VARIATION = "{variation}"'),
         ('ARTIFACT_ID = "orchestration:utilities:v3:int8"\n', ""),
         ('ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"\n', ""),
         ('BASE_ARTIFACT_ID = "orchestration:base:v3:int8"', f'BASE_ARTIFACT_ID = "{family}:base:{version}:int8"'),
@@ -939,6 +1101,7 @@ def config_substitutions(family, spec, tag, roles, body):
 
 
 OUTPUT_DIR = ('"/kaggle/working/orchestration-v3-output"', 'f"/kaggle/working/{RELEASE_TAG}-output"')
+MIRROR = ("if UPLOAD:\n    upload(", "if UPLOAD:\n    upload_and_mirror(")
 
 for family, spec in FAMILIES.items():
     with zipfile.ZipFile(ROOT / spec["corpus"]) as corpus:
@@ -953,18 +1116,18 @@ for family, spec in FAMILIES.items():
     files = {
         "base.ipynb": variant_cells(
             base_intro(family, spec, base_tag),
-            config_substitutions(family, spec, base_tag, slugs, f"Aive {family} shared base (INT8, LoRA inputs) for Qwen2.5-0.5B. See base.json."),
+            config_substitutions(family, spec, base_tag, slugs, f"Aive {family} shared base (INT8, LoRA inputs) for Qwen2.5-0.5B. See base.json.", "base"),
             BASE_RUN,
-            [OUTPUT_DIR, ('[ASSETS / "catalog.json"]', '[ASSETS / "base.json"]')],
+            [OUTPUT_DIR, MIRROR, ('[ASSETS / "catalog.json"]', '[ASSETS / "base.json"]')],
         ),
     }
     for slug in slugs:
         tag = f"{family}-{slug}-{version}"
         files[f"{slug}.ipynb"] = variant_cells(
             role_intro(family, spec, slug, tag, base_tag),
-            config_substitutions(family, spec, tag, [slug], f"Aive {spec['title']} {slug}: a gated LoRA adapter on {base_tag}. See catalog.json."),
+            config_substitutions(family, spec, tag, [slug], f"Aive {spec['title']} {slug}: a gated LoRA adapter on {base_tag}. See catalog.json.", slug),
             ROLE_RUN,
-            [OUTPUT_DIR],
+            [OUTPUT_DIR, MIRROR],
         )
     for name, cells in files.items():
         (out / name).write_text(json.dumps({**notebook, "cells": cells}, indent=1) + "\n")
