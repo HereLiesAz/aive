@@ -60,7 +60,7 @@ A changed base needs a new version, and every adapter must be retrained against 
 
 Each upload is mirrored to Kaggle as a new version of the `hereliesaz/aive-orchestration-specialists`
 model (variation `base` or the role's name; created private), unless `KAGGLE_MIRROR = False`; it needs a
-`KAGGLE_API_TOKEN` secret (or the legacy `KAGGLE_USERNAME` and `KAGGLE_KEY`). A role notebook on Kaggle with that model's `base`
+`KAGGLE_KEY` secret (a Kaggle API key, or a token from Kaggle > Settings > API). A role notebook on Kaggle with that model's `base`
 variation attached uses it instead of downloading the base from GitHub, after the same SHA-256 check.
 
 ### All roles in one notebook
