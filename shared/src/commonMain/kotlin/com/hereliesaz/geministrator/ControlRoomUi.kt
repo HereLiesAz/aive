@@ -479,6 +479,9 @@ private fun MainDestination(
                 service = azphaltStoreService,
                 importRequest = azphaltPackageImportRequest,
                 onImportHandled = onAzphaltPackageImportHandled,
+                connectedProviderIds = connectedProviderIds,
+                onConnectProvider = onReconfigureProvider,
+                onDisconnectProvider = onDisconnectProvider,
                 modifier = Modifier.fillMaxSize(),
             )
             ControlRoomDestination.Settings -> ProviderSettingsScreen(

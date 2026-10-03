@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
+import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
+
 data class ProviderCatalogEntry(
     val id: String,
     val displayName: String,
@@ -43,7 +46,8 @@ object ProviderCatalog {
     /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
     const val ANONYMOUS_CREDENTIAL = "anonymous"
 
-    val entries: List<ProviderCatalogEntry> = listOf(
+    /** The providers built into Aive. */
+    val builtInEntries: List<ProviderCatalogEntry> = listOf(
         ProviderCatalogEntry(
             id = OPENAI_ID,
             displayName = "OpenAI / Codex",
@@ -205,5 +209,26 @@ object ProviderCatalog {
         ),
     )
 
+    /**
+     * Built-in providers, then the language models installed from the Azphalt store, which come last
+     * so that planning, which takes the first linked provider, prefers a built-in one.
+     */
+    val entries: List<ProviderCatalogEntry>
+        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry)
+
     fun entry(id: String): ProviderCatalogEntry? = entries.firstOrNull { it.id == id }
+
+    private fun storeEntry(llm: InstalledStoreLlm) = ProviderCatalogEntry(
+        id = llm.providerId,
+        displayName = llm.name,
+        apiKeyUrl = llm.terms?.takeIf(String::isNotBlank) ?: llm.repositoryUrl,
+        credentialLabel = llm.keyLabel?.takeIf(String::isNotBlank)
+            ?: if (llm.keyOptional) "API key (optional)" else "API key",
+        description = listOfNotNull(
+            llm.description?.takeIf(String::isNotBlank),
+            llm.promptHandling,
+            "From the Azphalt store (${llm.packageId} ${llm.version}).",
+        ).joinToString(" "),
+        keyOptional = llm.keyOptional,
+    )
 }

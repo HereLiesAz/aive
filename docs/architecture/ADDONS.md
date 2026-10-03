@@ -4,6 +4,8 @@ The Aive consumes Azphalt `kind:"workflow"` and `kind:"role"` packages so workfl
 roles can be installed without exposing Aive internals to third-party packages. The Store also
 discovers `kind:"asset"` packages in Azphalt's `model` media domain so compatible ONNX, TFLite,
 LiteRT, task, and speech-model assets are visible from inside The Aive.
+It also lists `kind:"llm"` packages that it can call directly (see **Language models from the
+Store** below).
 
 ## Host identity and catalog discovery
 
@@ -22,6 +24,32 @@ centralized Azphalt deployment workflow verifies both the generated catalog and 
 `azphalt.store/packages` endpoint contain known Aive workflow/role packages after deployment.
 
 Model assets have their own install lifecycle and are never sent through the workflow/role installer.
+
+## Language models from the Store
+
+Azphalt `kind:"llm"` packages describe an off-device language model. The Aive uses the ones it can
+call **directly** (azphalt `spec/llm.md` § Direct use): `endpoint` tier, `openai-chat` among
+`endpoint.protocols`, an `https://` `baseUrl`, a default model, and a `dataHandling` disclosure. The
+keyless gateways (Kilo, LLM7, OVHcloud) qualify, and so do keyed endpoints such as Groq or Mistral.
+`sandbox-weights` packages and runner-only packages are not listed: they need a GitHub sandbox, which
+The Aive does not provision.
+
+- **Install:** the Store downloads the `.azp` and verifies its integrity, signature, publisher pin,
+  revocation and `compat`. It reads the `llm` block from the signed manifest, not from the
+  repository's summary, and shows where prompts go (`dataHandling`) and whether a key is needed. The
+  package's setup script never runs, and no GitHub access is used.
+- **Provider:** an installed package is recorded in `StoreLlmProviders` (settings key
+  `aive.azphalt.installed-llms.v1`) as provider `azphalt:<package id>`. `ProviderCatalog.entries`
+  and `HostedLlmProviders.entries` append these after the built-in providers, so settings, the
+  credential stores, role routing, memory stages and planning see them with no other wiring, and
+  planning still prefers a built-in provider. Built-in ids cannot be shadowed.
+- **Connect:** installing opens the usual credential screen. A key-optional package links with a blank
+  key, stored as the `anonymous` credential; a key is kept in the platform credential store and sent
+  only to the package's `baseUrl`, through the same OpenAI-compatible client as the built-in hosted
+  providers.
+- **Remove:** disconnects the provider (deleting its key) and forgets the package.
+
+Only Android builds the Store today, so installs happen there.
 On Android, The Aive currently accepts every model asset type defined by Azphalt:
 `onnx`, `tflite`, `litert`, `task`, `sherpa-bundle`, `vosk-bundle`, and generic `model`.
 Generic model packages are routed from their materialized contents when a known concrete format is

@@ -1,6 +1,10 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
+import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.russhwolf.settings.MapSettings
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -95,7 +99,7 @@ class OpenAiCompatibleChatApiTest {
 
     @Test
     fun hostedRegistryHasUniqueStableIds() {
-        val entries = HostedLlmProviders.entries
+        val entries = HostedLlmProviders.builtInEntries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)
         assertEquals(18, entries.size)
         entries.forEach { spec ->
@@ -103,6 +107,33 @@ class OpenAiCompatibleChatApiTest {
             check(spec.displayName.isNotBlank())
             check(spec.defaultModel.isNotBlank())
             check(spec.baseUrl.startsWith("https://"))
+        }
+    }
+
+    @Test
+    fun storeInstalledModelBecomesAHostedProviderUntilRemoved() {
+        StoreLlmProviders.useSettings(MapSettings())
+        val llm = InstalledStoreLlm(
+            packageId = "com.hereliesaz.azphalt.llm.ovhcloud",
+            version = "1.0.0",
+            repositoryUrl = "https://azphalt.store",
+            name = "OVHcloud (store)",
+            baseUrl = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+            defaultModel = "Qwen3-Coder-30B-A3B-Instruct",
+            auth = "optional-bearer",
+        )
+        try {
+            StoreLlmProviders.put(llm)
+            val spec = HostedLlmProviders.entry(llm.providerId)!!
+            assertEquals(llm.baseUrl, spec.baseUrl)
+            assertEquals(llm.providerId, HostedLlmProviders.entries.last().id)
+            val providers = HostedLlmProviders.configured(mapOf(llm.providerId to ProviderCatalog.ANONYMOUS_CREDENTIAL))
+            assertEquals(listOf(AgentProviderId(llm.providerId)), providers.map { it.id })
+            StoreLlmProviders.remove(llm.packageId)
+            assertNull(HostedLlmProviders.entry(llm.providerId))
+            assertEquals(emptyList(), HostedLlmProviders.configured(mapOf(llm.providerId to "key")))
+        } finally {
+            StoreLlmProviders.useSettings(MapSettings())
         }
     }
 

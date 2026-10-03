@@ -57,6 +57,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Provider completion requires explicit reconciliation. A provider claiming immediate success returns `Completed` only after the runtime polls and confirms.
 - Acceptance criteria are authored by the workflow definition, not the provider.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
+- Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation), and their endpoint comes from the signed manifest. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider, and they are listed after every built-in provider. Their setup scripts are never executed. As with the built-in hosted providers, responses are text that runs through the normal workflow approvals; Aive does not yet apply azphalt's rolling-delimiter tagging to them.
 
 **Remaining gaps**
 - No automated scanning of provider-returned artifacts for prompt injection before they are used as context for downstream tasks.

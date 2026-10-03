@@ -10,6 +10,7 @@ data class AzphaltStoreSnapshot(
     val installedModels: List<InstalledAzphaltModelPackage>,
     val updates: List<AzphaltPackageUpdate>,
     val revocations: List<AzphaltRevocation>,
+    val installedLlms: List<InstalledStoreLlm> = emptyList(),
 )
 
 enum class AzphaltDependencyStatus {
@@ -44,6 +45,18 @@ data class AzphaltPreparedModelInstall(
     val localImport: Boolean = false,
 )
 
+/** A verified `kind: "llm"` package Aive can call directly, ready to show its disclosure. */
+data class AzphaltPreparedLlmInstall(
+    val repositoryUrl: String,
+    val detail: AzphaltPackageDetail,
+    val version: String,
+    val verification: AzphaltPackageVerification,
+    val llm: AzphaltLlm,
+) {
+    val endpoint: AzphaltLlmEndpoint get() = requireNotNull(llm.endpoint)
+    val keyInput: AzphaltLlmInput? get() = llm.inputs.firstOrNull { it.id == endpoint.authInput }
+}
+
 data class AzphaltPreparedInstall(
     val repositoryUrl: String,
     val detail: AzphaltPackageDetail,
@@ -69,6 +82,7 @@ class AzphaltStoreService(
     private val installer: AzphaltWorkflowPackageInstaller,
     private val installStore: AzphaltInstallStore,
     private val modelInstaller: AzphaltModelPackageInstaller? = null,
+    private val llmRegistry: StoreLlmProviders = StoreLlmProviders,
 ) {
     private var cachedIndex: AzphaltRepositoryIndex? = null
     private val indexMutex = Mutex()
@@ -95,8 +109,11 @@ class AzphaltStoreService(
             mediaDomains = setOf("model"),
             page = page,
         )
-        val packages = (orchestration.packages + models.packages)
-            .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() }
+        // Only language models Aive can call directly (§ Direct use); sandbox-only ones are left out.
+        val llms = runCatching { repository.search(query = query, kinds = setOf("llm"), page = page) }
+            .getOrNull()?.packages.orEmpty()
+        val packages = (orchestration.packages + models.packages + llms)
+            .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() || it.isDirectLlmPackage() }
             .distinctBy(AzphaltPackageSummary::id)
         // total and pages are derived from the deduplicated merged list.
         // Summing the two individual totals would overcount packages that appear in both result sets.
@@ -128,6 +145,11 @@ class AzphaltStoreService(
                     .filter { it.repositoryUrl == repository.repositoryUrl }
                     .map { AzphaltInstalledPackageRef(it.packageId, it.version) },
             )
+            addAll(
+                installedLlms()
+                    .filter { it.repositoryUrl == repository.repositoryUrl }
+                    .map { AzphaltInstalledPackageRef(it.packageId, it.version) },
+            )
         }.distinctBy(AzphaltInstalledPackageRef::id)
         return repository.updates(local)
     }
@@ -143,7 +165,7 @@ class AzphaltStoreService(
         // Revocations are security state, not optional decoration. Propagate lookup failures instead
         // of rendering a dangerously reassuring empty list.
         val revocations = revocations()
-        return AzphaltStoreSnapshot(index, search.packages, installed, installedModels, updates, revocations)
+        return AzphaltStoreSnapshot(index, search.packages, installed, installedModels, updates, revocations, installedLlms())
     }
 
     suspend fun prepareModelInstall(
@@ -279,6 +301,93 @@ class AzphaltStoreService(
     suspend fun removeModel(packageId: String) {
         requireNotNull(modelInstaller) { "Model installation is unavailable on this host" }.remove(packageId)
     }
+
+    fun installedLlms(): List<InstalledStoreLlm> = llmRegistry.all()
+
+    /**
+     * Download and verify a `kind: "llm"` package and check that Aive can call it directly: the
+     * `endpoint` tier over `openai-chat`. Its setup script is never run.
+     */
+    suspend fun prepareLlmInstall(
+        packageId: String,
+        requestedVersion: String? = null,
+        entitlementToken: String? = null,
+    ): AzphaltPreparedLlmInstall {
+        val detail = repository.detail(packageId)
+        require(detail.kind == "llm") { "Azphalt language model package ${detail.id} must be kind llm" }
+        requireTargetsAive(detail.id, detail.targetApps)
+        val version = requestedVersion?.let(AzphaltRepositoryClient::requireVersion)
+            ?: detail.latest
+            ?: detail.version
+        requireNotRevoked(detail.id, version)
+        val bytes = repository.download(detail.id, version, entitlementToken)
+        val verification = verifier.verify(bytes, repositoryIndex().signingKeys)
+        val manifest = verification.packageContents.manifest
+        require(manifest.id == detail.id) { "Downloaded package id ${manifest.id} does not match repository package ${detail.id}" }
+        require(manifest.kind == "llm") { "Downloaded package ${manifest.id} is kind ${manifest.kind}" }
+        require(manifest.version == version) { "Downloaded package version ${manifest.version} does not match requested version $version" }
+        requireTargetsAive(manifest.id, manifest.targetApps)
+        val compat = azphaltCompatSatisfies(manifest.compat)
+        require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
+        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $HAIVE_AZPHALT_API_VERSION" }
+        require(listOf(manifest.entry, manifest.runtime, manifest.capabilities, manifest.app, manifest.mcp).all { it == null } &&
+            manifest.assets.isNullOrEmpty()) { "Language model package ${manifest.id} carries blocks an llm package must not" }
+        // The signed manifest decides, not the repository's summary of it.
+        val llm = requireNotNull(manifest.llm) { "Package ${manifest.id} has no llm block" }
+        llm.directUseProblem()?.let { problem -> throw IllegalArgumentException("${manifest.name} $problem") }
+        return AzphaltPreparedLlmInstall(
+            repositoryUrl = repository.repositoryUrl,
+            detail = detail,
+            version = version,
+            verification = verification,
+            llm = llm,
+        )
+    }
+
+    /** Record a prepared language model as a provider; linking it (with or without a key) is separate. */
+    suspend fun installLlm(
+        prepared: AzphaltPreparedLlmInstall,
+        nowEpochMillis: Long,
+        allowUntrustedSigner: Boolean = false,
+        allowPublisherChange: Boolean = false,
+    ): InstalledStoreLlm {
+        requireNotRevoked(prepared.detail.id, prepared.version)
+        val verification = prepared.verification
+        require(!verification.publisherChanged || allowPublisherChange) {
+            "Publisher key changed for ${prepared.detail.id}; explicit publisher-change approval is required"
+        }
+        require(!verification.packageContents.signed || verification.trusted || allowUntrustedSigner) {
+            "Signed package publisher is not trusted: ${verification.trustReason}"
+        }
+        val manifest = verification.packageContents.manifest
+        val endpoint = prepared.endpoint
+        val handling = requireNotNull(prepared.llm.dataHandling)
+        val installed = InstalledStoreLlm(
+            packageId = manifest.id,
+            version = manifest.version,
+            repositoryUrl = prepared.repositoryUrl,
+            name = manifest.name,
+            description = manifest.description,
+            baseUrl = requireNotNull(endpoint.baseUrl).trimEnd('/'),
+            defaultModel = requireNotNull(endpoint.defaultModel),
+            auth = endpoint.auth,
+            keyLabel = prepared.keyInput?.description,
+            prompts = handling.prompts,
+            modelPinned = handling.modelPinned,
+            operator = handling.operator,
+            terms = handling.terms,
+            installedAtEpochMillis = nowEpochMillis,
+        )
+        llmRegistry.put(installed)
+        if (verification.packageContents.signerPublicKey != null &&
+            (verification.pinnedPublisherKey == null || allowPublisherChange)
+        ) {
+            verifier.approvePublisher(verification)
+        }
+        return installed
+    }
+
+    fun removeLlm(packageId: String) = llmRegistry.remove(packageId)
 
     suspend fun prepareInstall(
         packageId: String,
