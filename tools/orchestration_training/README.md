@@ -11,7 +11,7 @@ for any model answer that is malformed or less conservative than the baseline.
 | `build_kaggle_dataset.sh` | Builds the Kaggle dataset from the Kotlin contracts |
 | `dataset-metadata.json` | Kaggle dataset identity (`hereliesaz/aive-orchestration-corpus`) |
 | `aive_orchestration_specialists.ipynb` | Kaggle notebook: train, gate, export, package, upload |
-| `make_notebook.py` | Source of the notebook; edit this, then regenerate |
+| `make_notebook.py` | Source of this notebook and of `tools/memory_training/aive_memory_clerks.ipynb`; edit this, then regenerate |
 | `register_catalog.py` | Registers a released `catalog.json` in the app |
 
 ## 1. Dataset
@@ -67,7 +67,8 @@ answering.
 
 **Adapters:**
 
-1. trains one LoRA adapter per role on that role's rows, and gates each in PyTorch;
+1. trains one LoRA adapter per role on that role's rows (at least `ADAPTER_MIN_STEPS` optimizer steps;
+   two epochs over one role were too few), and gates each in PyTorch;
 2. exports the base **once** with the LoRA branches left in, and turns every LoRA weight into a graph
    input (found by fingerprint, since the exporter renames and transposes them). Feeding a role's
    weights reproduces that role's merged model; feeding zeros reproduces the base. The base is then

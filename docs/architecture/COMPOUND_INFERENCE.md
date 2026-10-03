@@ -238,7 +238,7 @@ The Epoch-8 implementation is `MemoryEpoch8LocalModelLibrary`. It catalogs:
 - FP16 LoRA adapters for those specialists
 - the standalone INT8 association embedding specialist
 
-All release asset identities and SHA-256 digests are encoded in the reusable descriptors. `MemoryEpoch8ModelCatalog` remains a compatibility view over the generalized library so existing Android artifact IDs and install behavior remain stable. Its production artifact selection continues to prefer merged INT8 models.
+All release asset identities and SHA-256 digests are encoded in the reusable descriptors. `MemoryEpoch8ModelCatalog` is what the memory runtimes install: the epoch-8 Association Linker plus the generative clerks released in `MemoryClerkCatalog`. The epoch-8 generative INT8 models are described here as release metadata but not offered: they do not load in ONNX Runtime and answer in their training schema instead of the clerk contract.
 
 On Android, release-asset installation is resumable. Large memory/orchestration archives and split
 parts retain `.download` files across transport failures, refresh the stable GitHub release URL on
