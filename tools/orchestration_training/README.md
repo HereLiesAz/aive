@@ -50,8 +50,8 @@ Each role trains, gates and ships on its own, so one role can be retrained witho
    the base with every LoRA weight as a graph input (see **Adapters** below), quantizes it, and
    publishes `aive-orchestration-base-int8.tar.gz` plus `base.json` to the `orchestration-base-v4`
    pre-release.
-2. Run `notebooks/<role>.ipynb` on a GPU. It trains that role's adapter (at least
-   `ADAPTER_MIN_STEPS`), gates it in PyTorch, downloads the published base and verifies its SHA-256,
+2. Run `notebooks/<role>.ipynb` on a GPU. It trains that role's adapter (up to
+   `ADAPTER_MIN_STEPS` steps, stopping early on a validation plateau), gates it in PyTorch, downloads the published base and verifies its SHA-256,
    gates the adapter on it, and with `UPLOAD = True` publishes the adapter and a one-role
    `catalog.json` to `orchestration-<role>-v4`. A role that fails uploads nothing.
 3. Register each role's `catalog.json` (section 3); the roles registered before stay.
@@ -80,20 +80,24 @@ answering.
 
 **Multitask:**
 
-1. trains one LoRA adapter on Qwen2.5-0.5B-Instruct over every role's rows (loss on the answer only);
+1. trains one LoRA adapter on Qwen2.5-0.5B-Instruct over every role's rows (loss on the answer only).
+   Every run, multitask or adapter, stops at the first epoch whose validation loss improves on the best
+   by less than `PLATEAU_MIN_IMPROVEMENT` (5%) and keeps the best epoch's weights;
 2. gates the adapter **per role** on that role's test and adversarial splits (`json_exact`, thresholds
    from the role's config);
 3. merges, exports ONNX (fp32 graph), then quantizes weights only to INT8 with MatMulNBits.
    Activations and logits stay float32, which the app's ONNX Runtime loop expects. Dynamic INT8
    (quantized activations) is not used: it broke these models outright in testing;
-4. gates the **exported INT8 model** per role on CPU with ONNX Runtime;
+4. gates the **exported INT8 model** per role on CPU with ONNX Runtime, on a fixed sample of
+   `ONNX_GATE_TEST_ROWS` (100) test rows plus every adversarial row; the adapter gate already scored
+   every row on the GPU, and a full split on CPU takes hours per role (`None` scores every row);
 5. packages `aive-orchestration-utilities-int8.tar.gz` (`model.onnx`, `tokenizer.json`, configs,
    `model-manifest.json` with per-role scores).
 
 **Adapters:**
 
-1. trains one LoRA adapter per role on that role's rows (at least `ADAPTER_MIN_STEPS` optimizer steps;
-   two epochs over one role were too few), and gates each in PyTorch;
+1. trains one LoRA adapter per role on that role's rows (an epoch budget of `ADAPTER_MIN_STEPS`, 450,
+   optimizer steps, cut short on a validation plateau; two epochs over one role were too few), and gates each in PyTorch;
 2. exports the base **once** with the LoRA branches left in, and turns every LoRA weight into a graph
    input (found by fingerprint, since the exporter renames and transposes them). Feeding a role's
    weights reproduces that role's merged model; feeding zeros reproduces the base. The base is then

@@ -136,12 +136,67 @@ These are local runs, not the centralized verification below.
   Gateway (no key): passed. Central run
   [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915); the Gradle build
   including the lifecycle test took 4 m 52 s.
+- 2026-10-03, manual dispatch on `main` at `715489be`, Kilo Gateway (no key): passed, both the
+  lifecycle test (with the engine-owned plan gate) and `launchFromObjectiveThroughTheLivePlanner`.
+  Central run [37149991506](https://github.com/HereLiesAz/workflows/actions/runs/37149991506); the
+  verification job took 5 m 23 s.
+
+A manual run is started from the central gateway, not from this repository: dispatch
+`HereLiesAz/workflows` → *Central workflow gateway* with `repository` = `aive`,
+`source_workflow_path` = `live-runtime-verification.yml` and, for a keyless run,
+`inputs_json` = `{"provider":"kilo"}`. Dispatching `live-runtime-verification.yml` in this repository
+only runs its hand-off job, and pull requests from any branch other than
+`acceptance/live-runtime-verification` skip the verification job while reporting success.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching roadmap items in `TODO.md` are marked complete: the on-runtime verification item
 under "Runtime integrity audit" and the "Make one complete workflow actually work end-to-end" section.
 Other checked P0 items record implementation with automated test coverage, not live verification.
 
+
+## Manual acceptance runs
+
+Two roadmap items need a person, a device or a real repository, and cannot be proved by the central
+workflow. Record each run below with its date, build and evidence.
+
+### Android, in the app
+
+On a phone with the GitHub-flavor APK of the current `0.9.6` build:
+
+1. **Settings → providers:** link Kilo Gateway (keyless) and make it the default provider.
+2. **New project:** give it a name and an objective, for example "Write a haiku about memory and
+   save it as `haiku.md`".
+3. **Plan:** the planner materializes a workflow and its first task's plan is drafted and held for
+   approval. Check that no task shows a percentage it did not receive from the provider.
+4. **Restart:** force-stop the app from Android settings and reopen it. The run, its plan and its
+   state must come back unchanged; no second plan is drafted.
+5. **Approve** the plan. The task runs and completes; collect the artifact from the run's artifacts.
+6. **Terminal state:** approve any remaining gates until the run reports Completed. Force-stop and
+   reopen once more; it must still read Completed.
+
+Evidence: screenshots of the held plan before and after the restart, and of the completed run, plus
+the app version from Settings → About. With a computer and USB debugging, the same lifecycle also
+runs as an instrumented test (`connectedAndroidDeviceTest`, above).
+
+### GitHub dispatch, through the app
+
+With a GitHub token that can push to and run workflows on a test repository (`HereLiesAz/test`):
+
+1. **Settings → repositories:** add the token and link the test repository.
+2. **New project** on that repository, with an objective that needs a code change, for example
+   fixing a planted bug, and the OpenCode agent on GitHub Actions as the executor.
+3. **Workflow install:** the app asks to approve installing its workflow file in the repository.
+   Approve it and check the file lands on the default branch.
+4. **Dispatch:** the app starts the run with `workflow_dispatch` and finds it by its `run-name`.
+   The task shows the run's steps as they happen, linked to the run on GitHub.
+5. **Restart mid-run:** close the app (force-stop on Android) while the run is in progress and
+   reopen it. It must reattach to the same run, not dispatch a new one: the repository's Actions tab
+   shows one run.
+6. **Result:** the run pushes an `aive/opencode-*` branch, and the app collects its `aive-result`
+   artifact and reaches a terminal state.
+
+Evidence: the Actions run URL, the branch name, and the Actions tab showing a single run for the
+task.
 
 ## Android runtime recovery expectations
 

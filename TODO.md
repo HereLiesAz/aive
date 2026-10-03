@@ -67,10 +67,10 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## P0 — Make one complete workflow actually work end-to-end
 
-- [ ] Create/import a project.
-- [ ] Define an objective.
-- [ ] Materialize a workflow definition.
-  - Implemented and unit-tested (`ApplicationRuntimeObjectiveLaunchTest`); the live test `launchFromObjectiveThroughTheLivePlanner` takes the app's own launch path (project name + objective → hosted planner → persisted DAG → dispatch to the real provider) and passed locally against Kilo on 2026-09-29. These three tick with its first centralized run.
+- [x] Create/import a project.
+- [x] Define an objective.
+- [x] Materialize a workflow definition.
+  - The live test `launchFromObjectiveThroughTheLivePlanner` takes the app's own launch path (project name + objective → hosted planner → persisted DAG → dispatch to the real provider). It passed in its first centralized run, against Kilo on `main` at `715489be` (2026-10-03, [central run 37149991506](https://github.com/HereLiesAz/workflows/actions/runs/37149991506)), alongside the full lifecycle test.
 - [x] Approve any required plan/specification gates.
 - [x] Dispatch provider-backed work through a configured real provider.
 - [x] Reconcile provider progress without fabricating percentages.
@@ -79,7 +79,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Run verification/review stages.
 - [x] Reach a terminal run state with a clear outcome.
 - [ ] Verify this flow on Android, Desktop, JS, and Wasm where provider/browser constraints permit.
-  - The ticked steps above are exercised by the live lifecycle test. Desktop JVM is covered by centralized live verification; local runs cover JS and Wasm. Android unit CI now covers the real project name + objective → planner → materialized persisted DAG → provider dispatch path (`AndroidWorkflowLifecycleSmokeTest`), but a physical-device/in-app acceptance run is still not recorded.
+  - The ticked steps above are exercised by the live lifecycle test. Desktop JVM is covered by centralized live verification; local runs cover JS and Wasm. Android unit CI now covers the real project name + objective → planner → materialized persisted DAG → provider dispatch path (`AndroidWorkflowLifecycleSmokeTest`), but a physical-device/in-app acceptance run is still not recorded; its checklist is in `docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md` ("Manual acceptance runs").
 
 ## P1 — GitHub as a first-class executor/integration
 
@@ -114,7 +114,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Support explicit-only providers: they run where a role names them and are never selected automatically.
 - [x] Add the OpenCode agent on GitHub Actions as the automatic coding agent for GitHub repositories, with per-step progress.
 - [x] Verify the OpenCode agent runner on real GitHub infrastructure. Live run on `HereLiesAz/test` (2026-09-26): the runner created its check run and streamed the step log, OpenCode's free model fixed a planted bug, the runner pushed the fix to an `aive/opencode-*` branch, and the `aive-result` artifact matched what the app parses.
-- [ ] Verify the app's own dispatch path end to end against live GitHub: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. Automated regression coverage now exercises that complete durable sequence—including a mid-run provider recreation with no redispatch—but a live external run through the app is still required before ticking this item.
+- [ ] Verify the app's own dispatch path end to end against live GitHub: `workflow_dispatch` with `run-name` lookup, plan approval of the workflow install, and resume after restart. Automated regression coverage now exercises that complete durable sequence—including a mid-run provider recreation with no redispatch—but a live external run through the app is still required before ticking this item. Its checklist is in `docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md` ("Manual acceptance runs").
 
 ## P1 — Persistence and recovery
 

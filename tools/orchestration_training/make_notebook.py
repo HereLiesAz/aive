@@ -110,14 +110,22 @@ EPOCHS = 2                           # nine roles' worth of rows per epoch
 # A per-role adapter sees one role's rows (~1400), so two epochs are ~175 optimizer steps. That was
 # too few: Agent Router adapters picked ineligible candidates, dropped the fallback and preferred the
 # cheaper agent, while the multitask model (nine roles' rows) passed. Adapters train at least this
-# many optimizer steps.
-ADAPTER_MIN_STEPS = 700
+# many optimizer steps. 700 overshot: validation loss stopped improving near step 500, and the
+# remaining steps only fit the training rows harder. 450 stops near that plateau.
+ADAPTER_MIN_STEPS = 450
+# Every run also stops at the first epoch whose validation loss fails to improve on the best by this
+# fraction, and keeps the best epoch's weights. The step budget above is then a ceiling, not a target.
+PLATEAU_MIN_IMPROVEMENT = 0.05
 LEARNING_RATE = 2e-4
 # Per-device batch 4 x 4 accumulation keeps 16 rows per optimizer step on one GPU. Batch 8 ran a
 # 15 GB T4 out of memory: the logits alone are 8 x 1024 x 151936 floats (~5 GB).
 BATCH_SIZE = 4
 GRAD_ACCUM = 4
 LORA_R, LORA_ALPHA, LORA_DROPOUT = 16, 32, 0.05
+# The ONNX gates run on CPU, as a device would, and a full test split takes hours per role there. The
+# adapter gate already scored every row on the GPU; the ONNX gate confirms the export with a fixed
+# sample of test rows plus every adversarial row. None scores every test row.
+ONNX_GATE_TEST_ROWS = 100
 
 WORK = Path("/kaggle/working/aive-orchestration")
 STATE_FILE = WORK / "state.json"
@@ -208,6 +216,21 @@ import math
 import random
 from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
+from transformers import TrainerCallback
+
+class StopOnPlateau(TrainerCallback):
+    """Stop once an epoch's validation loss improves on the best by less than PLATEAU_MIN_IMPROVEMENT."""
+    def __init__(self):
+        self.best, self.stopped_epoch = None, None
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        loss = (metrics or {}).get("eval_loss")
+        if loss is None:
+            return
+        if self.best is None or loss < self.best * (1 - PLATEAU_MIN_IMPROVEMENT):
+            self.best = loss
+        elif state.epoch < args.num_train_epochs:
+            self.stopped_epoch = round(state.epoch)
+            control.should_training_stop = True
 
 def lora_config():
     """Every adapter and the shared base use this shape: an adapter only runs on a base exported with it."""
@@ -219,7 +242,8 @@ def lora_config():
 def train(slugs, out, min_steps=0):
     """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
 
-    [min_steps] raises the epoch count until training takes at least that many optimizer steps.
+    [min_steps] raises the epoch budget until it allows that many optimizer steps; StopOnPlateau ends
+    training sooner once validation loss levels off, and the best epoch's weights are kept.
     """
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     encoded, skipped = {"train": [], "validation": []}, {}
@@ -240,25 +264,31 @@ def train(slugs, out, min_steps=0):
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
     model = get_peft_model(model, lora_config())
+    plateau = StopOnPlateau()
     trainer = Trainer(
         model=model,
         args=TrainingArguments(
             output_dir=str(out / "checkpoints"), per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
             num_train_epochs=epochs, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
-            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="no", report_to=[], seed=8,
+            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="epoch", save_total_limit=2,
+            load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False, report_to=[], seed=8,
         ),
         train_dataset=Dataset.from_list(encoded["train"]),
         eval_dataset=Dataset.from_list(encoded["validation"]),
         data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100),
+        callbacks=[plateau],
     )
     trainer.train()
+    if plateau.stopped_epoch:
+        print(f"Validation loss levelled off: stopped after epoch {plateau.stopped_epoch} of {epochs}, kept the best epoch")
     model.save_pretrained(out)
     tokenizer.save_pretrained(out)
     shutil.rmtree(out / "checkpoints", ignore_errors=True)
     del trainer, model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
-    return {"trainRows": len(encoded["train"]), "epochs": epochs, "skippedTooLong": skipped}
+    return {"trainRows": len(encoded["train"]), "epochs": epochs, "stoppedAfterEpoch": plateau.stopped_epoch,
+            "bestEvalLoss": plateau.best, "skippedTooLong": skipped}
 ''')
 
 code(r'''
@@ -276,21 +306,25 @@ def score(generate_fn, tokenizer, config, rows):
 def max_new_tokens(tokenizer, row):
     return len(tokenizer(row["expected"], add_special_tokens=False)["input_ids"]) + 32
 
-def gate(slug, generate_fn, tokenizer, label):
+def gate(slug, generate_fn, tokenizer, label, test_rows=None):
+    """Score a role's test and adversarial splits. test_rows samples that many test rows (fixed seed)."""
     config, splits = load_role(slug)
     # An empty split proves nothing: say so instead of scoring it 0 and looking like a bad model.
     empty = [name for name in ("test", "adversarial") if not splits[name]]
     if empty:
         print(f"[{slug}] {label}: no {' or '.join(empty)} rows to judge it on -> FAIL")
         return {"test": 0.0, "adversarial": 0.0, "passed": False, "reason": f"no {' or '.join(empty)} rows"}
-    test, test_fail = score(generate_fn, tokenizer, config, splits["test"])
+    tests = splits["test"]
+    if test_rows is not None and len(tests) > test_rows:
+        tests = random.Random(f"{slug}:onnx-gate").sample(tests, test_rows)
+    test, test_fail = score(generate_fn, tokenizer, config, tests)
     adversarial, adv_fail = score(generate_fn, tokenizer, config, splits["adversarial"])
     gates = config["gates"]
     passed = test >= gates["min_test_score"] and adversarial >= gates["min_adversarial_score"]
-    print(f"[{slug}] {label}: test {test:.3f} (>= {gates['min_test_score']}), adversarial {adversarial:.3f} (>= {gates['min_adversarial_score']}) -> {'PASS' if passed else 'FAIL'}")
+    print(f"[{slug}] {label}: test {test:.3f} on {len(tests)}/{len(splits['test'])} rows (>= {gates['min_test_score']}), adversarial {adversarial:.3f} on {len(splits['adversarial'])} (>= {gates['min_adversarial_score']}) -> {'PASS' if passed else 'FAIL'}")
     for f in test_fail + adv_fail:
         print("   miss", f["id"], f["got"])
-    return {"test": test, "adversarial": adversarial, "passed": passed}
+    return {"test": test, "adversarial": adversarial, "testRows": len(tests), "adversarialRows": len(splits["adversarial"]), "passed": passed}
 
 def torch_gates(adapter, slugs):
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -367,7 +401,7 @@ def onnx_gates(int8, slugs):
         ids = tokenizer(prompt, return_tensors="pt")
         out = model.generate(**ids, max_new_tokens=max_new_tokens(tokenizer, row), do_sample=False)
         return tokenizer.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True)
-    results = {slug: gate(slug, generate, tokenizer, "onnx-int8") for slug in slugs}
+    results = {slug: gate(slug, generate, tokenizer, "onnx-int8", ONNX_GATE_TEST_ROWS) for slug in slugs}
     del model; gc.collect()
     return results
 ''')
@@ -481,7 +515,7 @@ def adapter_onnx_gates(int8, mapping, slugs):
         # Round-trip through the fp16 release file so the gate sees what ships.
         extra = {k: v.astype(np.float32) for k, v in load_file(str(save_adapter_file(slug, mapping))).items()}
         generate = lambda prompt, row: ort_generate(session, int8, tokenizer, prompt, max_new_tokens(tokenizer, row), extra)
-        results[slug] = gate(slug, generate, tokenizer, "onnx-int8+adapter")
+        results[slug] = gate(slug, generate, tokenizer, "onnx-int8+adapter", ONNX_GATE_TEST_ROWS)
     del session; gc.collect()
     return results
 
@@ -773,7 +807,7 @@ FAMILIES = {
             ("BATCH_SIZE = 4\n", "BATCH_SIZE = 1\n"),
             ("GRAD_ACCUM = 4\n", "GRAD_ACCUM = 16\n"),
             # Memory rows run ~3x longer than orchestration rows: 400 steps is ~6 epochs of one clerk.
-            ("ADAPTER_MIN_STEPS = 700\n", "ADAPTER_MIN_STEPS = 400\n"),
+            ("ADAPTER_MIN_STEPS = 450\n", "ADAPTER_MIN_STEPS = 400\n"),
             ("tools/orchestration_training/aive-orchestration-corpus.zip", "tools/memory_training/aive-memory-corpus.zip"),
             ("attach aive-orchestration-corpus", "attach aive-memory-corpus"),
         ],
