@@ -65,7 +65,7 @@ and a failing one costs only its own rerun.
    With `UPLOAD = True` it publishes `aive-memory-<clerk>-lora-v1.safetensors` and a one-clerk
    `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing.
 
-Uploading needs a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`. Release
+Uploading needs a `GITHUB_TOKEN` (Kaggle or Colab secret, or environment variable) with contents write on `HereLiesAz/aive`. Release
 assets are immutable: a changed adapter needs a new version, and a changed base needs a new version
 and every adapter retrained against it.
 
