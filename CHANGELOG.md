@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- The all-roles and per-role training notebooks are now one notebook: every adapter trains on the published shared base, a role already released is reused rather than retrained, and in one session each notebook picks up the work the others left. The all-roles orchestration notebook defaults to the single combined model, and memory gains an all-clerks notebook.
 - The training notebooks pin transformers below 4.58, the newest the ONNX exporter supports; transformers 5 broke the export step.
 - The training notebooks' CPU (ONNX) gates now score a fixed sample of 100 test rows plus every adversarial row, so a role no longer spends hours on CPU after its full GPU gate.
 - A complete workflow, from a project name and objective through the live planner, plan approval, execution, recovery and completion, now passes the centralized live verification against a real provider.

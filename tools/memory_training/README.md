@@ -11,7 +11,8 @@ released runs programmatically, with the reason shown on the Memory screen.
 | `build_kaggle_dataset.sh` | Builds the corpus from the running memory layer |
 | `dataset-metadata.json` | Kaggle dataset identity (`hereliesaz/aive-memory-corpus`) |
 | `aive-memory-corpus.zip` | The corpus, committed so the notebook can download it |
-| `notebooks/<role>.ipynb` | One Kaggle notebook per clerk: train, gate and publish that clerk's adapter |
+| `notebooks/all.ipynb` | Every clerk in one session: train, gate and publish each clerk's adapter |
+| `notebooks/<role>.ipynb` | The same notebook set to one clerk |
 | `notebooks/base.ipynb` | Exports and publishes the shared INT8 base every clerk's adapter runs on |
 | `register_catalog.py` | Registers a released `catalog.json` in `MemoryClerkCatalog` |
 
@@ -54,18 +55,25 @@ number of sessions (default 1500).
 Each clerk is its own LoRA adapter on one shared base, so a clerk trains, gates and ships on its own,
 and a failing one costs only its own rerun.
 
+`notebooks/all.ipynb` trains every clerk in one session and `notebooks/<clerk>.ipynb` one clerk; both
+are the same code (`tools/orchestration_training/make_notebook.py`) and publish each clerk the same
+way. They share one work folder (`/kaggle/working/aive-memory`), so in one session each resumes from
+what the others left. A clerk whose `memory-<clerk>-v1` release already exists is reused, not
+retrained (`REUSE_RELEASED`).
+
 1. Run `notebooks/base.ipynb` once with internet on and `UPLOAD = True`. It needs no GPU and no
    training: it exports Qwen2.5-0.5B-Instruct with every LoRA weight as a graph input, quantizes the
    weights only to INT8 (MatMulNBits; LoRA inputs stay float32), and publishes
    `aive-memory-base-int8.tar.gz` plus `base.json` to the `memory-base-v1` pre-release.
-2. Run `notebooks/<clerk>.ipynb` on a GPU with internet on. It trains that clerk's adapter (prompt +
+2. Run `notebooks/all.ipynb` or `notebooks/<clerk>.ipynb` on a GPU with internet on. Per clerk, it trains the adapter (prompt +
    answer up to 3072 tokens, a budget of `ADAPTER_MIN_STEPS` optimizer steps, stopping at the first
    epoch whose validation loss improves less than 5% and keeping the best epoch), gates it on the clerk's
    test and adversarial splits (`json_exact`, thresholds from the role's config), downloads the
    published base and verifies its SHA-256, and gates the adapter on it on CPU, exactly as it ships (100 sampled test rows plus every adversarial row;
    `ONNX_GATE_TEST_ROWS = None` scores them all).
    With `UPLOAD = True` it publishes `aive-memory-<clerk>-lora-v1.safetensors` and a one-clerk
-   `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing.
+   `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing. The `catalog.json` left in
+   the assets folder lists every released clerk, reused ones included.
 
 With `UPLOAD = True` each notebook also publishes the same files to Kaggle as a new version of the
 `hereliesaz/aive-memory-clerks` model (variation `base` or the clerk's name; created private), unless
@@ -84,7 +92,7 @@ and every adapter retrained against it.
 python3 tools/memory_training/register_catalog.py catalog.json
 ~~~
 
-Run it once per clerk's `catalog.json`. It writes the clerk into `MemoryClerkCatalog.RELEASED` and keeps
+Run it on the combined `catalog.json`, or once per clerk's. It writes the clerk into `MemoryClerkCatalog.RELEASED` and keeps
 the clerks registered before; commit that change. Android and desktop then list those stages on the
 Memory screen for install. Installing a clerk downloads the shared base once (~640 MB) and the clerk's
 adapter (~18 MB); the base is removed with the last clerk that uses it. A stage set to its local model
