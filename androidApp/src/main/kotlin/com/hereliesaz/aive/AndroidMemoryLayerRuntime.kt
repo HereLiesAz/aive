@@ -29,6 +29,7 @@ import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
 import com.hereliesaz.geministrator.memory.MemoryGenerativeInferenceRequest
 import com.hereliesaz.geministrator.memory.MemoryMicroAgent
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentArtifact
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPrompts
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
@@ -203,7 +204,9 @@ internal class AndroidEpoch8GenerativeAdapter(
     override suspend fun generate(session: OrtSession, request: MemoryGenerativeInferenceRequest): String {
         val installed = installer.ensureInstalled(request.artifact)
         HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
-            return generateCausalText(session, tokenizer, installed.root, request.prompt, MAX_NEW_TOKENS)
+            // Local clerks are trained on the chat-templated prompt; the raw prompt is for hosted engines.
+            val prompt = MemoryMicroAgentPrompts.chatPrompt(request.role, request.prompt)
+            return generateCausalText(session, tokenizer, installed.root, prompt, MAX_NEW_TOKENS)
         }
     }
 

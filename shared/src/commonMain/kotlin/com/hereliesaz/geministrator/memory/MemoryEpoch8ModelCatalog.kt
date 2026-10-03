@@ -71,6 +71,12 @@ object MemoryEpoch8ModelCatalog {
         return MemoryMicroAgentModelSpec(
             modelId = "${RELEASE_TAG}/${role.name}",
             quantization = bundle.quantization,
+            // Small packets keep prompt + answer within ~3k tokens, the length the local clerks are
+            // trained at (tools/memory_training); the router fits packets to these limits.
+            maxInputItems = LOCAL_MAX_INPUT_ITEMS,
+            maxInputChars = LOCAL_MAX_INPUT_CHARS,
+            maxOutputChars = LOCAL_MAX_OUTPUT_CHARS,
+            maxMutations = LOCAL_MAX_MUTATIONS,
             requirements = requirements,
             deployment = MemoryMicroAgentDeploymentManifest.portableOnnx(
                 artifactId = bundle.runtimeArtifactId,
@@ -78,6 +84,11 @@ object MemoryEpoch8ModelCatalog {
             ),
         )
     }
+
+    const val LOCAL_MAX_INPUT_ITEMS: Int = 8
+    const val LOCAL_MAX_INPUT_CHARS: Int = 6_000
+    const val LOCAL_MAX_OUTPUT_CHARS: Int = 4_000
+    const val LOCAL_MAX_MUTATIONS: Int = 48
 
     private fun bundle(role: MemoryMicroAgentRole): MemoryModelReleaseBundle {
         val artifact = MemoryEpoch8LocalModelLibrary.productionArtifactFor(role)
