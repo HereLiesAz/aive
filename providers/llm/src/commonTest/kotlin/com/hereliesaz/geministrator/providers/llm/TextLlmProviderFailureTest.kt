@@ -44,4 +44,26 @@ class TextLlmProviderFailureTest {
         assertIs<AgentEvent.Failed>(provider.observe(runId).toList().single())
         assertTrue(runCatching { provider.observe(runId).toList() }.isFailure)
     }
+
+    @Test
+    fun draftPlanAsksForAPlanOnlyAndRaisesTheProvidersRefusal() = runTest {
+        val prompts = mutableListOf<String>()
+        val planner = TextLlmProvider(
+            AgentProviderId("planner"),
+            "Planner",
+            object : TextGenerationApi {
+                override suspend fun generate(prompt: String): TextGenerationResult {
+                    prompts += prompt
+                    return TextGenerationResult("1. Read\n2. Write")
+                }
+            },
+        )
+        assertEquals("1. Read\n2. Write", planner.draftPlan(request(requirePlanApproval = true)))
+        assertTrue(prompts.single().contains("PLAN ONLY"))
+
+        val refused = runCatching {
+            TextLlmProvider(AgentProviderId("limited"), "Limited", refusing).draftPlan(request(requirePlanApproval = true))
+        }.exceptionOrNull()
+        assertEquals("Limited: HTTP 429 Too Many Requests", refused?.message)
+    }
 }

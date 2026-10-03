@@ -151,14 +151,35 @@ class WorkflowEngine(
                             requirePlanApproval = false,
                             promptContext = builtRequest.promptContext.copy(
                                 dynamicContext = builtRequest.promptContext.dynamicContext +
-                                    PromptContextBlock("Approved plan", approvedPlan),
+                                    PromptContextBlock(APPROVED_PLAN_CONTEXT_LABEL, approvedPlan),
                             ),
                         )
                     } else {
                         builtRequest
                     }
                     if (request.requirePlanApproval) {
-                        val drafted = sessionGateway.draftPlan(providerId, request)
+                        val drafted = try {
+                            sessionGateway.draftPlan(providerId, request)
+                        } catch (failure: ManagedSessionFailure) {
+                            // A provider refusal while drafting (HTTP 429, bad key) fails the task with
+                            // the provider's reason and goes through the task's retry policy.
+                            val reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan"
+                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
+                            eventSink.append(TaskFailed(nextRun.id, task.id, reason, nowEpochMillis))
+                            nextRun = handleFailure(
+                                definition = definition,
+                                run = nextRun.copy(
+                                    taskRuns = nextRun.taskRuns + (
+                                        task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
+                                    ),
+                                ),
+                                taskDefinitionId = task.id,
+                                retryReason = RetryReason.ProviderFailure,
+                                reason = "Executor failed. Last status: $reason",
+                                nowEpochMillis = nowEpochMillis,
+                            )
+                            continue
+                        }
                         if (drafted != null) {
                             // Engine-owned gate: hold the task with the drafted plan; no run exists yet.
                             TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.AwaitingApproval)

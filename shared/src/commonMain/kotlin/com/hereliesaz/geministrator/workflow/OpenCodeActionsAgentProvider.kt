@@ -85,12 +85,34 @@ class OpenCodeActionsAgentProvider(
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
         repository?.source == RepositorySource.GitHub
 
+    /**
+     * The engine-owned plan gate's draft: what OpenCode will do, and whether approving it installs or
+     * updates the workflow file on the default branch. Approving a plan that discloses that change is
+     * the consent [observe] otherwise asks for, so the run then dispatches without a second gate.
+     */
+    override suspend fun draftPlan(request: AgentTaskRequest): String {
+        val repository = requireNotNull(request.repository?.takeIf { supportsRepository(it) }) {
+            "OpenCode runs against a linked GitHub repository"
+        }
+        val branch = repository.defaultBranch ?: client.defaultBranch(repository)
+        val workflowChange = when (client.workflowFile(repository, branch)) {
+            workflowTemplate() -> null
+            null -> "install"
+            else -> "update"
+        }
+        return planSummary(request, workflowChange, branch)
+    }
+
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         require(supportsRepository(request.repository)) { "OpenCode runs against a linked GitHub repository" }
         val suffix = Random.nextLong().toULong().toString(36)
         val runId = ProviderRunId("$ID:${request.taskRunId.value}:$suffix")
         mutex.withLock {
-            sessions[runId] = Session(request, MutableStateFlow(!request.requirePlanApproval))
+            sessions[runId] = Session(
+                request = request,
+                approved = MutableStateFlow(!request.requirePlanApproval),
+                approvedWithWorkflowChange = request.approvedEnginePlan()?.contains(OpenCodeAgentWorkflow.PATH) == true,
+            )
         }
         return AgentRunHandle(runId)
     }

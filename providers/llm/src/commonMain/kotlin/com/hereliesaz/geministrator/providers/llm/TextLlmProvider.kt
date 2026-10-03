@@ -61,6 +61,26 @@ open class TextLlmProvider(
         promptCaching = PromptCacheCapabilities(modes = setOf(PromptCacheMode.Unsupported)),
     )
 
+    /**
+     * The engine-owned plan gate's draft: a numbered plan, not the work itself, so nothing is done
+     * before approval. After approval the engine starts the run with the plan in context and no
+     * provider-side gate. A refusal (HTTP 429, bad key) propagates, and the engine fails the task
+     * with this provider's reason.
+     */
+    override suspend fun draftPlan(request: AgentTaskRequest): String {
+        val prompt = renderPrompt(request) +
+            "PLAN ONLY\nReply with a short numbered plan for this task: the steps you will take and what each " +
+            "produces. Do not perform the task yet; it starts once the plan is approved.\n"
+        val draft = try {
+            api.generate(prompt).text
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            throw IllegalStateException("$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}", failure)
+        }
+        return draft.take(MAX_PLAN_PREVIEW_CHARS)
+    }
+
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         val runId = mutex.withLock {
             val sequence = nextSequence++

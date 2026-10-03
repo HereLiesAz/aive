@@ -17,6 +17,7 @@ import no.synth.kmpzip.io.ByteArrayOutputStream
 import no.synth.kmpzip.zip.ZipEntry
 import no.synth.kmpzip.zip.ZipOutputStream
 import kotlin.test.Test
+import com.hereliesaz.geministrator.providers.PromptContextBlock
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -88,6 +89,29 @@ class OpenCodeActionsAgentProviderTest {
         assertIs<AgentEvent.PlanGenerated>(events.first())
         assertTrue(events.any { it is AgentEvent.PlanApproved })
         assertEquals(null, client.written)
+        assertIs<AgentEvent.Completed>(events.last())
+    }
+
+    @Test
+    fun anApprovedEnginePlanThatDisclosesTheWorkflowUpdateDispatchesWithoutASecondGate() = runBlocking<Unit> {
+        val client = FakeRunnerClient(installed = "template-v1")
+        val provider = provider(client)
+
+        val draft = provider.draftPlan(request(requirePlanApproval = true))
+        assertContains(draft, "update ${OpenCodeAgentWorkflow.PATH} by committing it directly to main")
+        assertEquals(null, client.written, "drafting must not touch the repository")
+
+        val approved = request().let {
+            it.copy(
+                promptContext = it.promptContext.copy(
+                    dynamicContext = it.promptContext.dynamicContext + PromptContextBlock(APPROVED_PLAN_CONTEXT_LABEL, draft),
+                ),
+            )
+        }
+        val events = provider.observe(provider.start(approved).providerRunId).toList()
+
+        assertTrue(events.none { it is AgentEvent.PlanGenerated }, "the engine's approval already covered the workflow update")
+        assertEquals("template-v2", client.written)
         assertIs<AgentEvent.Completed>(events.last())
     }
 
