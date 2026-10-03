@@ -363,7 +363,10 @@ jobs:
 
   desktop-packages:
     name: Desktop installer (${{ matrix.platform }})
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Dependabot PRs skip the three-OS installer matrix: a batch of dependency bumps
+    # otherwise holds every concurrent runner (2026-10-03). They still get `build`,
+    # and main builds the installers once the bump merges.
+    if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
