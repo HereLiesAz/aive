@@ -72,7 +72,7 @@ uses that copy instead of downloading 620 MB from GitHub; the SHA-256 check is t
 `base.ipynb` after the base is published reuses it rather than exporting a new one, so it can
 mirror an existing release to Kaggle.
 
-Uploading needs a `GITHUB_TOKEN` (Kaggle or Colab secret, or environment variable) with contents write on `HereLiesAz/aive`, and `KAGGLE_USERNAME` plus `KAGGLE_KEY` for the Kaggle copy. Release
+Uploading needs a `GITHUB_TOKEN` (Kaggle or Colab secret, or environment variable) with contents write on `HereLiesAz/aive`, and a `KAGGLE_API_TOKEN` (Kaggle > Settings > API > Generate New Token; or the legacy `KAGGLE_USERNAME` plus `KAGGLE_KEY`) for the Kaggle copy. Release
 assets are immutable: a changed adapter needs a new version, and a changed base needs a new version
 and every adapter retrained against it.
 
