@@ -113,6 +113,9 @@ EPOCHS = 2                           # nine roles' worth of rows per epoch
 # many optimizer steps. 700 overshot: validation loss stopped improving near step 500, and the
 # remaining steps only fit the training rows harder. 450 stops near that plateau.
 ADAPTER_MIN_STEPS = 450
+# Every run also stops at the first epoch whose validation loss fails to improve on the best by this
+# fraction, and keeps the best epoch's weights. The step budget above is then a ceiling, not a target.
+PLATEAU_MIN_IMPROVEMENT = 0.05
 LEARNING_RATE = 2e-4
 # Per-device batch 4 x 4 accumulation keeps 16 rows per optimizer step on one GPU. Batch 8 ran a
 # 15 GB T4 out of memory: the logits alone are 8 x 1024 x 151936 floats (~5 GB).
@@ -213,6 +216,21 @@ import math
 import random
 from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
+from transformers import TrainerCallback
+
+class StopOnPlateau(TrainerCallback):
+    """Stop once an epoch's validation loss improves on the best by less than PLATEAU_MIN_IMPROVEMENT."""
+    def __init__(self):
+        self.best, self.stopped_epoch = None, None
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        loss = (metrics or {}).get("eval_loss")
+        if loss is None:
+            return
+        if self.best is None or loss < self.best * (1 - PLATEAU_MIN_IMPROVEMENT):
+            self.best = loss
+        elif state.epoch < args.num_train_epochs:
+            self.stopped_epoch = round(state.epoch)
+            control.should_training_stop = True
 
 def lora_config():
     """Every adapter and the shared base use this shape: an adapter only runs on a base exported with it."""
@@ -224,7 +242,8 @@ def lora_config():
 def train(slugs, out, min_steps=0):
     """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
 
-    [min_steps] raises the epoch count until training takes at least that many optimizer steps.
+    [min_steps] raises the epoch budget until it allows that many optimizer steps; StopOnPlateau ends
+    training sooner once validation loss levels off, and the best epoch's weights are kept.
     """
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     encoded, skipped = {"train": [], "validation": []}, {}
@@ -245,25 +264,31 @@ def train(slugs, out, min_steps=0):
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
     model = get_peft_model(model, lora_config())
+    plateau = StopOnPlateau()
     trainer = Trainer(
         model=model,
         args=TrainingArguments(
             output_dir=str(out / "checkpoints"), per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
             num_train_epochs=epochs, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
-            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="no", report_to=[], seed=8,
+            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="epoch", save_total_limit=2,
+            load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False, report_to=[], seed=8,
         ),
         train_dataset=Dataset.from_list(encoded["train"]),
         eval_dataset=Dataset.from_list(encoded["validation"]),
         data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100),
+        callbacks=[plateau],
     )
     trainer.train()
+    if plateau.stopped_epoch:
+        print(f"Validation loss levelled off: stopped after epoch {plateau.stopped_epoch} of {epochs}, kept the best epoch")
     model.save_pretrained(out)
     tokenizer.save_pretrained(out)
     shutil.rmtree(out / "checkpoints", ignore_errors=True)
     del trainer, model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
-    return {"trainRows": len(encoded["train"]), "epochs": epochs, "skippedTooLong": skipped}
+    return {"trainRows": len(encoded["train"]), "epochs": epochs, "stoppedAfterEpoch": plateau.stopped_epoch,
+            "bestEvalLoss": plateau.best, "skippedTooLong": skipped}
 ''')
 
 code(r'''

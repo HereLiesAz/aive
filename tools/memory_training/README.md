@@ -59,7 +59,8 @@ and a failing one costs only its own rerun.
    weights only to INT8 (MatMulNBits; LoRA inputs stay float32), and publishes
    `aive-memory-base-int8.tar.gz` plus `base.json` to the `memory-base-v1` pre-release.
 2. Run `notebooks/<clerk>.ipynb` on a GPU with internet on. It trains that clerk's adapter (prompt +
-   answer up to 3072 tokens, at least `ADAPTER_MIN_STEPS` optimizer steps), gates it on the clerk's
+   answer up to 3072 tokens, a budget of `ADAPTER_MIN_STEPS` optimizer steps, stopping at the first
+   epoch whose validation loss improves less than 5% and keeping the best epoch), gates it on the clerk's
    test and adversarial splits (`json_exact`, thresholds from the role's config), downloads the
    published base and verifies its SHA-256, and gates the adapter on it on CPU, exactly as it ships (100 sampled test rows plus every adversarial row;
    `ONNX_GATE_TEST_ROWS = None` scores them all).

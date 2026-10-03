@@ -12,7 +12,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Plan approval is now owned by the engine: the provider drafts a plan before any run starts, and the run begins only after you approve it. Rejecting a plan cancels nothing, and a held plan survives a restart unchanged.
 - Added a training pipeline for the local memory clerks (`tools/memory_training`): a corpus recorded from the running memory layer in the app's own answer contract, a Kaggle notebook, and catalog registration. Local memory runtimes now send the chat-templated prompt the clerks are trained on.
 - The broken epoch-8 generative memory models are no longer offered for install; a memory stage set to a local model runs programmatically until a trained clerk is released.
-- Orchestration helper adapters now train for at least 450 steps each: the Agent Router adapter had failed its gates with too few, and 700 trained past the point where validation loss stopped improving.
+- Every local model training run, orchestration and memory, now stops once validation loss stops improving and keeps its best epoch; orchestration adapters' step budget drops from 700 to 450, since 700 trained well past that point.
 - Desktop can now install the released local orchestration helpers from Settings, as Android can; the `AIVE_LOCAL_ORCHESTRATION_SPECIALISTS` and `AIVE_ORCHESTRATION_SPECIALIST_MODE` environment switches are gone.
 - Desktop memory stages set to a local model now run the installed epoch-8 models (install/remove per stage on the Memory screen) instead of falling back to programmatic.
 - Large model downloads on Android and desktop now stream to disk instead of being buffered in memory first.
