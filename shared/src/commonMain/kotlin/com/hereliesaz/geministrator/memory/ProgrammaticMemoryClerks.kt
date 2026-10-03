@@ -552,6 +552,17 @@ val MEMORY_CATEGORY_TAXONOMY: Map<String, Regex> = linkedMapOf(
 internal fun memoryCategoriesOf(text: String): List<String> =
     MEMORY_CATEGORY_TAXONOMY.filterValues { it.containsMatchIn(text) }.keys.toList()
 
+/**
+ * The taxonomy as the CategoryClassifier's instruction shows it, one category per line with its
+ * keywords (`*` = any ending). A clerk then matches words it can see instead of recalling the list.
+ */
+internal fun memoryCategoryGuide(): String = MEMORY_CATEGORY_TAXONOMY.entries.joinToString("\n") { (category, regex) ->
+    val keywords = regex.pattern.removePrefix("\\b(").removeSuffix(")\\b")
+        .replace("\\w*", "*").replace("\\w+", "*").replace("s?", "(s)").replace("[sz]", "z")
+        .split('|')
+    "$category: ${keywords.joinToString(", ")}"
+}
+
 // ---------------------------------------------------------------------------------------------
 // Associations: near-duplicate detection with hashed character trigrams (same kind only).
 // ---------------------------------------------------------------------------------------------

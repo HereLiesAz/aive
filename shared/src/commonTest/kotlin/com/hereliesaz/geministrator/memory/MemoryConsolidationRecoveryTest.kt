@@ -153,6 +153,40 @@ class MemoryConsolidationRecoveryTest {
         assertTrue(store.read().edges.none { it.relation == MemoryRelationKind.Supersedes })
     }
 
+    @Test
+    fun associationNeighborsOfTheSameKindComeFirstAndOtherKindsStillFollow() = runBlocking {
+        val old = episode("old")
+        val current = episode("current")
+        fun node(id: String, kind: MemoryNodeKind, text: String, episode: MemoryEpisode) =
+            MemoryNode(MemoryNodeId(id), kind, text, sourceEpisodeIds = setOf(episode.id), createdAtEpochMillis = 1L)
+        val store = InMemoryMemoryStore().apply {
+            commit(
+                0,
+                MemoryStoreMutation(
+                    episodesToAdd = listOf(old, current),
+                    nodesToAdd = listOf(
+                        // Shares more words with the needle, but is another kind.
+                        node("old-summary", MemoryNodeKind.Summary, "The API timeout setting is 30 seconds for every API request.", old),
+                        node("old-context", MemoryNodeKind.Context, "The API timeout is 30 seconds.", old),
+                        node("current-context", MemoryNodeKind.Context, "Again, the API timeout is 30 seconds.", current),
+                    ),
+                    queueUpserts = listOf(queued("q-current", 1, current.id).copy(stage = MemoryConsolidationStage.Associations)),
+                ),
+            )
+        }
+        var neighborhood = emptyList<MemoryWorkItem>()
+        val manager = object : MemoryManagerAgent {
+            override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
+                neighborhood = packet.neighborhood
+                return MemoryMutationBatch()
+            }
+        }
+
+        MemoryConsolidator(store, manager, policy).processNext(10L)
+
+        assertEquals(listOf("old-context", "old-summary"), neighborhood.map { it.id })
+    }
+
     private suspend fun condensationStore(
         texts: List<String> = listOf("a", "b", "c").map { "The connection pool is shared, note $it." },
     ): InMemoryMemoryStore {

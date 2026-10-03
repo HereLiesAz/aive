@@ -762,18 +762,25 @@ private fun MemorySnapshot.relatedNeighborhood(
 ): List<MemoryWorkItem> {
     val terms = needles.flatMap { it.text.memoryTerms() }.toSet()
     if (terms.isEmpty() || maxItems <= 0 || maxChars <= 0) return emptyList()
+    // Same-kind memories come first: the programmatic linker links only those, and only they can
+    // later condense together. Other kinds fill the remaining slots for linkers that relate across
+    // kinds (embeddings). A superseded memory is already represented by its condensation.
+    val kinds = needles.mapTo(hashSetOf()) { it.kind }
+    val superseded = edges
+        .filter { it.relation == MemoryRelationKind.Supersedes }
+        .mapTo(hashSetOf()) { it.to }
     var chars = 0
     val candidates = nodes
         .asSequence()
-        .filter { episodeId !in it.sourceEpisodeIds }
+        .filter { episodeId !in it.sourceEpisodeIds && it.id !in superseded }
         .map { node ->
             val candidateTerms = termsOf(node)
             val overlap = terms.count { it in candidateTerms }
-            node to overlap
+            Triple(node, "node:${node.kind.name}" in kinds, overlap)
         }
-        .filter { (_, overlap) -> overlap > 0 }
-        .sortedByDescending { (_, overlap) -> overlap }
-        .map { (node, _) -> node.asWorkItem() }
+        .filter { (_, _, overlap) -> overlap > 0 }
+        .sortedWith(compareByDescending<Triple<MemoryNode, Boolean, Int>> { it.second }.thenByDescending { it.third })
+        .map { (node, _, _) -> node.asWorkItem() }
         .toList()
 
     return buildList {
@@ -787,7 +794,11 @@ private fun MemorySnapshot.relatedNeighborhood(
     }
 }
 
-/** Candidate clusters, largest first; each trimmed to the members with the strongest similarity. */
+/**
+ * Candidate clusters, largest first. Each is trimmed to its largest group of members asserting the
+ * same values (`memoryClaimSignature`), strongest similarity first: members that differ stay apart,
+ * and the rest can still condense.
+ */
 private fun MemorySnapshot.condensationClusters(
     policy: MemoryConsolidationPolicy,
     protectedEpisodeIds: Set<MemoryEpisodeId> = emptySet(),
@@ -851,6 +862,9 @@ private fun MemorySnapshot.condensationClusters(
         .asSequence()
         .map { component ->
             component
+                .groupBy { memoryClaimSignature(it.text) }
+                .values
+                .maxWith(compareBy<List<MemoryNode>> { it.size }.thenBy { group -> group.sumOf { (weights[it.id] ?: 0f).toDouble() } })
                 .sortedByDescending { weights[it.id] ?: 0f }
                 .take(policy.condensationBatchSize)
         }

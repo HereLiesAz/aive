@@ -370,6 +370,12 @@ class MemoryMicroAgentRouter(
                 MemoryMicroAgentRole.VerbTagger -> appendLine(
                     "VERB means a semantic action/transformation, not merely an English verb. In code include calls, CRUD operations, parsing, validation, serialization, data-flow operations, build/test/deploy, Git/shell actions, HTTP methods, and actions implied by identifiers. Metadata '$CODE_VERB_HINTS' contains advisory candidates. A callable may simultaneously exist as a noun entity and imply a verb action.",
                 )
+                MemoryMicroAgentRole.CategoryClassifier -> {
+                    appendLine(
+                        "Use only this taxonomy. A summary belongs to a category when it contains one of the category's keywords as a whole word, in any case. Create one Category node per matching category, in this order, with every matching summary as a source and a Categorizes link to each. No keyword, no category.",
+                    )
+                    appendLine(memoryCategoryGuide())
+                }
                 MemoryMicroAgentRole.AssociationLinker -> appendLine(
                     "Associate memories only by topical or semantic relatedness. Do not infer contradiction, truth, falsity, conflict resolution, or which memory supersedes another. Conscious reconciliation belongs to a normal orchestrated agent and will later enter memory through ordinary session consolidation.",
                 )
