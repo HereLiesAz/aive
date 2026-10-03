@@ -23,6 +23,7 @@ import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeInferenceRuntime
 import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeModelAdapter
 import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.EmbeddingAssociationLinkerMicroAgent
+import com.hereliesaz.geministrator.memory.MemoryAdapterReleaseAsset
 import com.hereliesaz.geministrator.memory.MemoryComputePreference
 import com.hereliesaz.geministrator.memory.MemoryEmbeddingInferenceRequest
 import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
@@ -64,8 +65,15 @@ internal data class InstalledMemoryModel(
     val root: File,
     val onnxModel: File,
     val tokenizerJson: File,
+    /** The role's LoRA weights when it is an adapter on a shared base; null for a merged model. */
+    val adapterFile: File? = null,
 )
 
+/**
+ * Memory models under files/haive/memory. An adapter clerk installs its family's shared base once
+ * (under `shared/`, verified by SHA-256) plus its own verified LoRA file (under `adapters/`); the base
+ * is removed with the last adapter that runs on it.
+ */
 internal class AndroidMemoryModelInstaller(
     context: Context,
     private val httpClient: HttpClient,
@@ -78,31 +86,45 @@ internal class AndroidMemoryModelInstaller(
     /** Installed and complete, without downloading. */
     fun isInstalled(role: MemoryMicroAgentRole): Boolean {
         val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: return false
-        return findInstalled(role, bundle, File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}")) != null
+        return findInstalled(role, bundle) != null
     }
 
     suspend fun remove(role: MemoryMicroAgentRole) = mutex.withLock {
         val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: return@withLock
         installedByArtifactId.remove(bundle.runtimeArtifactId)
-        File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
+        val adapter = bundle.adapter
+        if (adapter == null) {
+            modelDirectory(bundle).deleteRecursively()
+        } else {
+            adapterPath(adapter).delete()
+            File(adapterPath(adapter).path + ".sha256").delete()
+            // The shared base goes with the last adapter that runs on it.
+            val baseInUse = MemoryEpoch8ModelCatalog.all.any {
+                it.role != role && it.modelArtifactId == bundle.modelArtifactId && verifiedAdapter(it) != null
+            }
+            if (!baseInUse) modelDirectory(bundle).deleteRecursively()
+        }
         File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
     }
 
     suspend fun ensureInstalled(role: MemoryMicroAgentRole): InstalledMemoryModel = mutex.withLock {
         val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: error("No local model is released for $role")
         installedByArtifactId[bundle.runtimeArtifactId]?.let { installed ->
-            if (installed.onnxModel.isFile && installed.tokenizerJson.isFile) return@withLock installed
+            if (installed.onnxModel.isFile && installed.tokenizerJson.isFile && installed.adapterFile?.isFile != false) {
+                return@withLock installed
+            }
         }
-
-        val destination = File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}")
-        findInstalled(role, bundle, destination)?.let { installed ->
+        findInstalled(role, bundle)?.let { installed ->
             installedByArtifactId[bundle.runtimeArtifactId] = installed
             return@withLock installed
         }
 
-        val staging = File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}")
-        staging.mkdirs()
-        try {
+        val destination = modelDirectory(bundle)
+        if (locateModel(role, bundle, destination) == null) {
+            val staging = File(installRoot, ".staging/${bundle.releaseTag}/${destination.name}")
+            staging.mkdirs()
+            // Verified parts and .download partials stay in staging on failure, so Retry Runtime
+            // resumes instead of throwing away hundreds of megabytes and restarting from byte zero.
             val archive = File(staging, bundle.releaseAssetName)
             downloader.downloadVerified(bundle.downloadUrl, archive, bundle.releaseAssetSha256)
             val extracted = File(staging, "extracted")
@@ -110,6 +132,7 @@ internal class AndroidMemoryModelInstaller(
             extracted.mkdirs()
             extractTarGzSafely(archive, extracted)
             locateInstalledModel(role, bundle, extracted)
+            if (bundle.adapter != null) File(extracted, INSTALLED_MARKER).writeText(bundle.releaseAssetSha256 + "\n")
 
             destination.parentFile?.mkdirs()
             destination.deleteRecursively()
@@ -118,20 +141,30 @@ internal class AndroidMemoryModelInstaller(
                 check(destination.isDirectory) { "Could not finalize memory model installation for $role" }
             }
             staging.deleteRecursively()
-            val installed = findInstalled(role, bundle, destination)
-                ?: error("Installed memory model could not be resolved for $role")
-            installedByArtifactId[bundle.runtimeArtifactId] = installed
-            installed
-        } catch (failure: Throwable) {
-            // Keep verified parts and .download partials so Retry Runtime resumes instead of
-            // throwing away hundreds of megabytes and restarting from byte zero.
-            throw failure
         }
+        bundle.adapter?.let { adapter ->
+            if (verifiedAdapter(bundle) == null) {
+                val staging = File(installRoot, ".staging/adapters").apply { mkdirs() }
+                val downloaded = File(staging, adapter.assetName)
+                downloader.downloadVerified(adapter.downloadUrl, downloaded, adapter.sha256)
+                val file = adapterPath(adapter)
+                file.parentFile?.mkdirs()
+                downloaded.copyTo(file, overwrite = true)
+                downloaded.delete()
+                File(file.path + ".sha256").writeText(adapter.sha256 + "\n")
+            }
+        }
+        val installed = findInstalled(role, bundle)
+            ?: error("Installed memory model could not be resolved for $role")
+        installedByArtifactId[bundle.runtimeArtifactId] = installed
+        installed
     }
 
     suspend fun ensureInstalled(artifact: MemoryMicroAgentArtifact): InstalledMemoryModel {
         installedByArtifactId[artifact.artifactId]?.let { installed ->
-            if (installed.onnxModel.isFile && installed.tokenizerJson.isFile) return installed
+            if (installed.onnxModel.isFile && installed.tokenizerJson.isFile && installed.adapterFile?.isFile != false) {
+                return installed
+            }
         }
         val bundle = MemoryEpoch8ModelCatalog.all.singleOrNull { it.runtimeArtifactId == artifact.artifactId }
             ?: error("Unknown Epoch-8 memory artifact ${artifact.artifactId}")
@@ -160,14 +193,20 @@ internal class AndroidMemoryModelInstaller(
         }
     }
 
-    private fun findInstalled(
-        role: MemoryMicroAgentRole,
-        bundle: MemoryModelReleaseBundle,
-        root: File,
-    ): InstalledMemoryModel? = if (root.isDirectory) {
-        runCatching { locateInstalledModel(role, bundle, root) }.getOrNull()
-    } else {
-        null
+    private fun findInstalled(role: MemoryMicroAgentRole, bundle: MemoryModelReleaseBundle): InstalledMemoryModel? {
+        val model = locateModel(role, bundle, modelDirectory(bundle)) ?: return null
+        if (bundle.adapter == null) return model
+        return verifiedAdapter(bundle)?.let { model.copy(adapterFile = it) }
+    }
+
+    /** The installed model in [root]; a shared base must also carry its verified digest. */
+    private fun locateModel(role: MemoryMicroAgentRole, bundle: MemoryModelReleaseBundle, root: File): InstalledMemoryModel? {
+        if (!root.isDirectory) return null
+        if (bundle.adapter != null) {
+            val marker = File(root, INSTALLED_MARKER)
+            if (!marker.isFile || marker.readText().trim() != bundle.releaseAssetSha256) return null
+        }
+        return runCatching { locateInstalledModel(role, bundle, root) }.getOrNull()
     }
 
     private fun locateInstalledModel(
@@ -184,6 +223,28 @@ internal class AndroidMemoryModelInstaller(
         return InstalledMemoryModel(role, bundle, root, onnx, tokenizer)
     }
 
+    private fun verifiedAdapter(bundle: MemoryModelReleaseBundle): File? {
+        val adapter = bundle.adapter ?: return null
+        val file = adapterPath(adapter)
+        val marker = File(file.path + ".sha256")
+        return file.takeIf { it.isFile && marker.isFile && marker.readText().trim() == adapter.sha256 }
+    }
+
+    private fun modelDirectory(bundle: MemoryModelReleaseBundle): File =
+        if (bundle.adapter == null) {
+            File(installRoot, "${bundle.releaseTag}/${bundle.role.name.lowercase()}")
+        } else {
+            File(installRoot, "shared/${bundle.modelArtifactId.safeName()}")
+        }
+
+    private fun adapterPath(adapter: MemoryAdapterReleaseAsset) =
+        File(installRoot, "adapters/${adapter.logicalArtifactId.safeName()}.safetensors")
+
+    private fun String.safeName() = replace(Regex("[^A-Za-z0-9._-]"), "_")
+
+    private companion object {
+        const val INSTALLED_MARKER = ".installed-sha256"
+    }
 }
 
 internal class InstallingAndroidMemoryArtifactResolver(
@@ -196,17 +257,38 @@ internal class InstallingAndroidMemoryArtifactResolver(
         installer.ensureInstalled(artifact).onnxModel.absolutePath
 }
 
+/**
+ * Runs a clerk on its installed model. An adapter clerk runs on the shared base with its LoRA weights
+ * as graph inputs; the most recently used adapters stay loaded (about 35 MB each as fp32).
+ */
 internal class AndroidEpoch8GenerativeAdapter(
     private val installer: AndroidMemoryModelInstaller,
 ) : AndroidOrtGenerativeModelAdapter {
     private val environment = OrtEnvironment.getEnvironment()
+
+    // Serialized: an adapter's tensors must not be evicted while a run still reads them.
+    private val adapterLock = Mutex()
+    private val adapters = object : LinkedHashMap<String, AndroidLoraAdapter>(ADAPTER_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AndroidLoraAdapter>): Boolean =
+            (size > ADAPTER_CACHE_SIZE).also { evict -> if (evict) eldest.value.close() }
+    }
 
     override suspend fun generate(session: OrtSession, request: MemoryGenerativeInferenceRequest): String {
         val installed = installer.ensureInstalled(request.artifact)
         HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
             // Local clerks are trained on the chat-templated prompt; the raw prompt is for hosted engines.
             val prompt = MemoryMicroAgentPrompts.chatPrompt(request.role, request.prompt)
-            return generateCausalText(session, tokenizer, installed.root, prompt, MAX_NEW_TOKENS)
+            val adapterFile = installed.adapterFile
+                ?: return generateCausalText(session, tokenizer, installed.root, prompt, MAX_NEW_TOKENS)
+            val adapterSha = checkNotNull(installed.bundle.adapter).sha256
+            return adapterLock.withLock {
+                val adapter = adapters.getOrPut(adapterSha) { AndroidLoraAdapter.load(adapterFile) }
+                val expectedBase = adapter.metadata["base"]
+                require(expectedBase == null || expectedBase == installed.bundle.modelArtifactId) {
+                    "${adapterFile.name} was trained for $expectedBase, not ${installed.bundle.modelArtifactId}"
+                }
+                generateCausalText(session, tokenizer, installed.root, prompt, MAX_NEW_TOKENS, adapter.tensors)
+            }
         }
     }
 
@@ -216,6 +298,7 @@ internal class AndroidEpoch8GenerativeAdapter(
         modelRoot: File,
         prompt: String,
         maxNewTokens: Int,
+        extraInputs: Map<String, OnnxTensor> = emptyMap(),
     ): String {
         val promptIds = tokenizer.encode(prompt).ids
         require(promptIds.isNotEmpty()) { "Tokenizer returned no prompt tokens" }
@@ -229,7 +312,7 @@ internal class AndroidEpoch8GenerativeAdapter(
         try {
             val owned = mutableListOf<OnnxTensor>()
             activeResult = try {
-                session.run(buildCausalInputs(session, promptIds, totalLength, null, config, owned))
+                session.run(buildCausalInputs(session, promptIds, totalLength, null, config, owned, extraInputs))
             } finally {
                 owned.forEach(OnnxTensor::close)
             }
@@ -249,6 +332,7 @@ internal class AndroidEpoch8GenerativeAdapter(
                             current,
                             config,
                             nextOwned,
+                            extraInputs,
                         ),
                     )
                 } finally {
@@ -270,9 +354,15 @@ internal class AndroidEpoch8GenerativeAdapter(
         previousResult: OrtSession.Result?,
         config: AttentionGeometry,
         owned: MutableList<OnnxTensor>,
+        extraInputs: Map<String, OnnxTensor>,
     ): Map<String, OnnxTensor> {
         val inputs = linkedMapOf<String, OnnxTensor>()
         session.inputInfo.forEach { (name, nodeInfo) ->
+            // Supplied by the caller (a role's LoRA weights) and owned by it: never closed here.
+            extraInputs[name]?.let { supplied ->
+                inputs[name] = supplied
+                return@forEach
+            }
             val tensorInfo = nodeInfo.info as? TensorInfo ?: error("Unsupported non-tensor memory input $name")
             val borrowed = name.startsWith("past_key_values.") && previousResult != null
             val tensor = when {
@@ -358,6 +448,7 @@ internal class AndroidEpoch8GenerativeAdapter(
 
     private companion object {
         const val MAX_NEW_TOKENS = 768
+        const val ADAPTER_CACHE_SIZE = 3
     }
 }
 
@@ -489,7 +580,7 @@ private class AndroidMemoryLocalModels(
         mutableModels.value = MemoryEpoch8ModelCatalog.all.map { bundle ->
             MemoryLocalModelStatus(
                 role = bundle.role,
-                name = bundle.releaseAssetName,
+                name = bundle.adapter?.assetName ?: bundle.releaseAssetName,
                 installed = installer.isInstalled(bundle.role),
             )
         }

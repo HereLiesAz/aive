@@ -10,8 +10,8 @@ import kotlinx.serialization.json.Json
 /**
  * Released local orchestration specialists.
  *
- * [RELEASED] is the `catalog.json` written by `tools/orchestration_training/aive_orchestration_specialists.ipynb`
- * for the roles that passed both gates. A role may list a merged multi-task model, a shared base plus its
+ * [RELEASED] merges the `catalog.json` files written by `tools/orchestration_training/aive_orchestration_specialists.ipynb`
+ * and the per-role notebooks in `tools/orchestration_training/notebooks`, for the roles that passed both gates. A role may list a merged multi-task model, a shared base plus its
  * own adapter, or both; [LocalModelLibrary.plan] picks per runtime (shared base + adapter only when the
  * runtime advertises adapter support). Register a new release with
  * `python3 tools/orchestration_training/register_catalog.py <catalog.json>`, which rewrites the constant.

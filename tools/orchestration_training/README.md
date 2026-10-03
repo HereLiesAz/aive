@@ -10,8 +10,10 @@ for any model answer that is malformed or less conservative than the baseline.
 |---|---|
 | `build_kaggle_dataset.sh` | Builds the Kaggle dataset from the Kotlin contracts |
 | `dataset-metadata.json` | Kaggle dataset identity (`hereliesaz/aive-orchestration-corpus`) |
-| `aive_orchestration_specialists.ipynb` | Kaggle notebook: train, gate, export, package, upload |
-| `make_notebook.py` | Source of this notebook and of `tools/memory_training/aive_memory_clerks.ipynb`; edit this, then regenerate |
+| `notebooks/<role>.ipynb` | One Kaggle notebook per role: train, gate and publish that role's adapter |
+| `notebooks/base.ipynb` | Exports and publishes the shared INT8 base every role's adapter runs on |
+| `aive_orchestration_specialists.ipynb` | All roles in one run (multitask and/or adapters); the central training workflow runs the root copy |
+| `make_notebook.py` | Source of every notebook here and in `tools/memory_training/notebooks`; edit this, then regenerate |
 | `register_catalog.py` | Registers a released `catalog.json` in the app |
 
 ## 1. Dataset
@@ -39,6 +41,24 @@ seed, not ground truth beyond the baseline. `AIVE_ORCHESTRATION_DATASET_ROWS` ch
 role (default 2000).
 
 ## 2. Train on Kaggle
+
+### One notebook per role
+
+Each role trains, gates and ships on its own, so one role can be retrained without touching the others:
+
+1. Run `notebooks/base.ipynb` once with `UPLOAD = True`. It needs no GPU and no training: it exports
+   the base with every LoRA weight as a graph input (see **Adapters** below), quantizes it, and
+   publishes `aive-orchestration-base-int8.tar.gz` plus `base.json` to the `orchestration-base-v4`
+   pre-release.
+2. Run `notebooks/<role>.ipynb` on a GPU. It trains that role's adapter (at least
+   `ADAPTER_MIN_STEPS`), gates it in PyTorch, downloads the published base and verifies its SHA-256,
+   gates the adapter on it, and with `UPLOAD = True` publishes the adapter and a one-role
+   `catalog.json` to `orchestration-<role>-v4`. A role that fails uploads nothing.
+3. Register each role's `catalog.json` (section 3); the roles registered before stay.
+
+A changed base needs a new version, and every adapter must be retrained against it.
+
+### All roles in one notebook
 
 Open `aive_orchestration_specialists.ipynb` on Kaggle, use a GPU accelerator with internet on, and
 run all cells. Attaching the Kaggle dataset is optional: without it, the notebook downloads
