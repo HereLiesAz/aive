@@ -97,6 +97,11 @@ assert MODE in ("multitask", "adapters", "both")
 
 MAX_LENGTH = 1024                    # prompt + answer tokens; longer rows are skipped and counted
 EPOCHS = 2                           # nine roles' worth of rows per epoch
+# A per-role adapter sees one role's rows (~1400), so two epochs are ~175 optimizer steps. That was
+# too few: Agent Router adapters picked ineligible candidates, dropped the fallback and preferred the
+# cheaper agent, while the multitask model (nine roles' rows) passed. Adapters train at least this
+# many optimizer steps.
+ADAPTER_MIN_STEPS = 700
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 8
 GRAD_ACCUM = 2
@@ -186,12 +191,16 @@ def save_state():
 ''')
 
 code(r'''
+import math
 import random
 from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 
-def train(slugs, out):
-    """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role."""
+def train(slugs, out, min_steps=0):
+    """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
+
+    [min_steps] raises the epoch count until training takes at least that many optimizer steps.
+    """
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     encoded, skipped = {"train": [], "validation": []}, {}
     for slug in slugs:
@@ -202,6 +211,8 @@ def train(slugs, out):
                 skipped[slug] = len(splits[name]) - len(rows)
             encoded[name] += rows
     random.Random(8).shuffle(encoded["train"])
+    steps_per_epoch = max(1, math.ceil(len(encoded["train"]) / (BATCH_SIZE * GRAD_ACCUM)))
+    epochs = max(EPOCHS, math.ceil(min_steps / steps_per_epoch))
     model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32).to(DEVICE)
     model = get_peft_model(model, LoraConfig(
         task_type=TaskType.CAUSAL_LM, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
@@ -212,7 +223,7 @@ def train(slugs, out):
         args=TrainingArguments(
             output_dir=str(out / "checkpoints"), per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
-            num_train_epochs=EPOCHS, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
+            num_train_epochs=epochs, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
             fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="no", report_to=[], seed=8,
         ),
         train_dataset=Dataset.from_list(encoded["train"]),
@@ -225,7 +236,7 @@ def train(slugs, out):
     shutil.rmtree(out / "checkpoints", ignore_errors=True)
     del trainer, model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
-    return {"trainRows": len(encoded["train"]), "skippedTooLong": skipped}
+    return {"trainRows": len(encoded["train"]), "epochs": epochs, "skippedTooLong": skipped}
 ''')
 
 code(r'''
@@ -606,7 +617,7 @@ if MODE in ("adapters", "both"):
     for slug in SLUGS:
         role = ad.setdefault(slug, {})
         if not role.get("trained"):
-            role["train"] = train([slug], WORK / "adapters" / slug); role["trained"] = True; save_state()
+            role["train"] = train([slug], WORK / "adapters" / slug, min_steps=ADAPTER_MIN_STEPS); role["trained"] = True; save_state()
         if "adapterGate" not in role:
             role["adapterGate"] = torch_gates(WORK / "adapters" / slug, [slug])[slug]; save_state()
     candidates = [s for s in SLUGS if ad[s]["adapterGate"]["passed"]]
