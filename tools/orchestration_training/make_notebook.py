@@ -110,8 +110,9 @@ EPOCHS = 2                           # nine roles' worth of rows per epoch
 # A per-role adapter sees one role's rows (~1400), so two epochs are ~175 optimizer steps. That was
 # too few: Agent Router adapters picked ineligible candidates, dropped the fallback and preferred the
 # cheaper agent, while the multitask model (nine roles' rows) passed. Adapters train at least this
-# many optimizer steps.
-ADAPTER_MIN_STEPS = 700
+# many optimizer steps. 700 overshot: validation loss stopped improving near step 500, and the
+# remaining steps only fit the training rows harder. 450 stops near that plateau.
+ADAPTER_MIN_STEPS = 450
 LEARNING_RATE = 2e-4
 # Per-device batch 4 x 4 accumulation keeps 16 rows per optimizer step on one GPU. Batch 8 ran a
 # 15 GB T4 out of memory: the logits alone are 8 x 1024 x 151936 floats (~5 GB).
@@ -781,7 +782,7 @@ FAMILIES = {
             ("BATCH_SIZE = 4\n", "BATCH_SIZE = 1\n"),
             ("GRAD_ACCUM = 4\n", "GRAD_ACCUM = 16\n"),
             # Memory rows run ~3x longer than orchestration rows: 400 steps is ~6 epochs of one clerk.
-            ("ADAPTER_MIN_STEPS = 700\n", "ADAPTER_MIN_STEPS = 400\n"),
+            ("ADAPTER_MIN_STEPS = 450\n", "ADAPTER_MIN_STEPS = 400\n"),
             ("tools/orchestration_training/aive-orchestration-corpus.zip", "tools/memory_training/aive-memory-corpus.zip"),
             ("attach aive-orchestration-corpus", "attach aive-memory-corpus"),
         ],
