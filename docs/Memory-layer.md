@@ -120,7 +120,7 @@ Every stage runs on one of three engines, chosen per stage in `MemoryLayerSettin
 | Engine | What runs | Notes |
 |---|---|---|
 | Programmatic (default) | `ProgrammaticMemoryClerks` | Deterministic, nothing downloaded |
-| Local model | The platform's installed on-device clerk | Epoch-8 on Android today |
+| Local model | The platform's installed on-device clerk | Android and desktop; only clerks released in `MemoryClerkCatalog` (`tools/memory_training`) and the epoch-8 Association Linker |
 | Hosted model | A configured provider's text API, through `StructuredMemoryMicroAgent` | Not for AssociationLinker (embeddings) |
 
 `assembleAgents` builds the clerks; a stage whose engine is unavailable on the platform runs
@@ -141,9 +141,11 @@ source of the one-time import.
 ### Failure and output contract
 
 - Every generative clerk answers one JSON object with `sections`, `nodes` and/or `links`. Any other
-  shape is rejected as a failure, never read as "nothing to add". The epoch-8 releases were trained on
-  a different schema (`{"mutations":[{op,target_ref,payload}]}`), so their answers are rejected until
-  they are retrained on this contract.
+  shape is rejected as a failure, never read as "nothing to add". The epoch-8 generative releases were
+  trained on a different schema (`{"mutations":[{op,target_ref,payload}]}`) and are no longer offered;
+  local clerks are retrained on this contract (`tools/memory_training`). Local models receive
+  `MemoryMicroAgentPrompts.chatPrompt`, the same chat template they are trained on; hosted engines get
+  the rendered packet alone.
 - A queue entry that fails `MemoryConsolidationPolicy.maxAttempts` times (default 3) is parked: it
   stays `Failed` with its `lastError`, and consolidation moves on to the next entry.
 - `DO_NOT_CONDENSE` is a valid answer. The cluster is recorded in `declinedCondensations` and not
