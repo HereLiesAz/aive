@@ -169,7 +169,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.javascriptengine)
-    implementation("androidx.core:core:1.17.0")
+    implementation("androidx.core:core:1.19.1")
     add("playImplementation", "com.google.android.play:app-update:2.1.0")
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
