@@ -136,6 +136,17 @@ These are local runs, not the centralized verification below.
   Gateway (no key): passed. Central run
   [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915); the Gradle build
   including the lifecycle test took 4 m 52 s.
+- 2026-10-03, manual dispatch on `main` at `715489be`, Kilo Gateway (no key): passed, both the
+  lifecycle test (with the engine-owned plan gate) and `launchFromObjectiveThroughTheLivePlanner`.
+  Central run [37149991506](https://github.com/HereLiesAz/workflows/actions/runs/37149991506); the
+  verification job took 5 m 23 s.
+
+A manual run is started from the central gateway, not from this repository: dispatch
+`HereLiesAz/workflows` → *Central workflow gateway* with `repository` = `aive`,
+`source_workflow_path` = `live-runtime-verification.yml` and, for a keyless run,
+`inputs_json` = `{"provider":"kilo"}`. Dispatching `live-runtime-verification.yml` in this repository
+only runs its hand-off job, and pull requests from any branch other than
+`acceptance/live-runtime-verification` skip the verification job while reporting success.
 
 A successful centralized Live Runtime Verification run against this branch is the evidence required
 before the matching roadmap items in `TODO.md` are marked complete: the on-runtime verification item
