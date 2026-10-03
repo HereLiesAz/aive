@@ -75,9 +75,11 @@ code("""
 # Kaggle images ship torchao 0.10; current peft refuses to import next to a torchao older than 0.16.
 # Some images (Colab) also ship a diffusers that cannot import against the huggingface_hub installed
 # below, and optimum's exporter imports diffusers when present. Nothing here uses either, so remove
-# both. If peft or optimum was already imported in this session, restart it.
+# both. optimum's ONNX exporter (optimum-onnx) imports helpers that transformers 5 removed, so pin
+# transformers below 4.58, the newest it supports. If transformers, peft or optimum was already
+# imported in this session, restart the kernel after this cell (the files stay) and run all again.
 %pip uninstall -y -q torchao diffusers
-%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=1.0"
+%pip install -q "transformers>=4.45,<4.58" "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=1.0"
 """)
 
 code(r'''
