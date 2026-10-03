@@ -86,7 +86,9 @@ answering.
 3. merges, exports ONNX (fp32 graph), then quantizes weights only to INT8 with MatMulNBits.
    Activations and logits stay float32, which the app's ONNX Runtime loop expects. Dynamic INT8
    (quantized activations) is not used: it broke these models outright in testing;
-4. gates the **exported INT8 model** per role on CPU with ONNX Runtime;
+4. gates the **exported INT8 model** per role on CPU with ONNX Runtime, on a fixed sample of
+   `ONNX_GATE_TEST_ROWS` (100) test rows plus every adversarial row; the adapter gate already scored
+   every row on the GPU, and a full split on CPU takes hours per role (`None` scores every row);
 5. packages `aive-orchestration-utilities-int8.tar.gz` (`model.onnx`, `tokenizer.json`, configs,
    `model-manifest.json` with per-role scores).
 

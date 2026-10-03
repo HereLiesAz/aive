@@ -118,6 +118,10 @@ LEARNING_RATE = 2e-4
 BATCH_SIZE = 4
 GRAD_ACCUM = 4
 LORA_R, LORA_ALPHA, LORA_DROPOUT = 16, 32, 0.05
+# The ONNX gates run on CPU, as a device would, and a full test split takes hours per role there. The
+# adapter gate already scored every row on the GPU; the ONNX gate confirms the export with a fixed
+# sample of test rows plus every adversarial row. None scores every test row.
+ONNX_GATE_TEST_ROWS = 100
 
 WORK = Path("/kaggle/working/aive-orchestration")
 STATE_FILE = WORK / "state.json"
@@ -276,21 +280,25 @@ def score(generate_fn, tokenizer, config, rows):
 def max_new_tokens(tokenizer, row):
     return len(tokenizer(row["expected"], add_special_tokens=False)["input_ids"]) + 32
 
-def gate(slug, generate_fn, tokenizer, label):
+def gate(slug, generate_fn, tokenizer, label, test_rows=None):
+    """Score a role's test and adversarial splits. test_rows samples that many test rows (fixed seed)."""
     config, splits = load_role(slug)
     # An empty split proves nothing: say so instead of scoring it 0 and looking like a bad model.
     empty = [name for name in ("test", "adversarial") if not splits[name]]
     if empty:
         print(f"[{slug}] {label}: no {' or '.join(empty)} rows to judge it on -> FAIL")
         return {"test": 0.0, "adversarial": 0.0, "passed": False, "reason": f"no {' or '.join(empty)} rows"}
-    test, test_fail = score(generate_fn, tokenizer, config, splits["test"])
+    tests = splits["test"]
+    if test_rows is not None and len(tests) > test_rows:
+        tests = random.Random(f"{slug}:onnx-gate").sample(tests, test_rows)
+    test, test_fail = score(generate_fn, tokenizer, config, tests)
     adversarial, adv_fail = score(generate_fn, tokenizer, config, splits["adversarial"])
     gates = config["gates"]
     passed = test >= gates["min_test_score"] and adversarial >= gates["min_adversarial_score"]
-    print(f"[{slug}] {label}: test {test:.3f} (>= {gates['min_test_score']}), adversarial {adversarial:.3f} (>= {gates['min_adversarial_score']}) -> {'PASS' if passed else 'FAIL'}")
+    print(f"[{slug}] {label}: test {test:.3f} on {len(tests)}/{len(splits['test'])} rows (>= {gates['min_test_score']}), adversarial {adversarial:.3f} on {len(splits['adversarial'])} (>= {gates['min_adversarial_score']}) -> {'PASS' if passed else 'FAIL'}")
     for f in test_fail + adv_fail:
         print("   miss", f["id"], f["got"])
-    return {"test": test, "adversarial": adversarial, "passed": passed}
+    return {"test": test, "adversarial": adversarial, "testRows": len(tests), "adversarialRows": len(splits["adversarial"]), "passed": passed}
 
 def torch_gates(adapter, slugs):
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -367,7 +375,7 @@ def onnx_gates(int8, slugs):
         ids = tokenizer(prompt, return_tensors="pt")
         out = model.generate(**ids, max_new_tokens=max_new_tokens(tokenizer, row), do_sample=False)
         return tokenizer.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True)
-    results = {slug: gate(slug, generate, tokenizer, "onnx-int8") for slug in slugs}
+    results = {slug: gate(slug, generate, tokenizer, "onnx-int8", ONNX_GATE_TEST_ROWS) for slug in slugs}
     del model; gc.collect()
     return results
 ''')
@@ -481,7 +489,7 @@ def adapter_onnx_gates(int8, mapping, slugs):
         # Round-trip through the fp16 release file so the gate sees what ships.
         extra = {k: v.astype(np.float32) for k, v in load_file(str(save_adapter_file(slug, mapping))).items()}
         generate = lambda prompt, row: ort_generate(session, int8, tokenizer, prompt, max_new_tokens(tokenizer, row), extra)
-        results[slug] = gate(slug, generate, tokenizer, "onnx-int8+adapter")
+        results[slug] = gate(slug, generate, tokenizer, "onnx-int8+adapter", ONNX_GATE_TEST_ROWS)
     del session; gc.collect()
     return results
 

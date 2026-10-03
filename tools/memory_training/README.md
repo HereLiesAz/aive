@@ -61,7 +61,8 @@ and a failing one costs only its own rerun.
 2. Run `notebooks/<clerk>.ipynb` on a GPU with internet on. It trains that clerk's adapter (prompt +
    answer up to 3072 tokens, at least `ADAPTER_MIN_STEPS` optimizer steps), gates it on the clerk's
    test and adversarial splits (`json_exact`, thresholds from the role's config), downloads the
-   published base and verifies its SHA-256, and gates the adapter on it on CPU, exactly as it ships.
+   published base and verifies its SHA-256, and gates the adapter on it on CPU, exactly as it ships (100 sampled test rows plus every adversarial row;
+   `ONNX_GATE_TEST_ROWS = None` scores them all).
    With `UPLOAD = True` it publishes `aive-memory-<clerk>-lora-v1.safetensors` and a one-clerk
    `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing.
 
