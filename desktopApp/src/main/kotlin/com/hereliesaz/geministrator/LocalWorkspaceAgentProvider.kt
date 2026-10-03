@@ -19,6 +19,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import com.hereliesaz.geministrator.workflow.approvedEnginePlan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -102,6 +103,23 @@ internal class LocalWorkspaceAgentProvider(
 
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
         repository?.source == RepositorySource.Local && !repository.localPath.isNullOrBlank()
+
+    /**
+     * The engine-owned plan gate's draft: the same plan [observe] would show, generated before any run
+     * so nothing starts until it is approved. After approval the run executes that plan text.
+     */
+    override suspend fun draftPlan(request: AgentTaskRequest): String {
+        require(supportsRepository(request.repository)) {
+            "$displayName workspace agent requires a linked Local Git repository"
+        }
+        if (taskMode(request) == TaskMode.Specification) {
+            return "Design a pre-code verification contract for: ${request.objective.trim()}".take(8_000)
+        }
+        val root = repositoryRoot(request)
+        val trackedFiles = trackedFiles(root)
+        require(trackedFiles.isNotEmpty()) { "Local Git repository has no tracked files" }
+        return generatePlan(request, root, trackedFiles).first.text.take(8_000)
+    }
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         require(supportsRepository(request.repository)) {
@@ -236,6 +254,12 @@ internal class LocalWorkspaceAgentProvider(
             require(trackedFiles.isNotEmpty()) { "Local Git repository has no tracked files" }
 
             var plan = session.plan
+            val enginePlan = session.request.approvedEnginePlan()
+            if (plan == null && enginePlan != null) {
+                // The plan a person approved at the engine's gate is the plan this run executes.
+                plan = WorkspacePlan(text = enginePlan, requestedFiles = parseRequestedFiles(enginePlan, trackedFiles))
+                session.plan = plan
+            }
             if (plan == null) {
                 val generated = generatePlan(session.request, root, trackedFiles)
                 plan = generated.first

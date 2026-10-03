@@ -114,7 +114,7 @@ The Aive installs `.github/workflows/aive-opencode-agent.yml` on the repository'
 - Checkout uses `persist-credentials: false`, so no Git credential is stored in the working copy.
 - The runner deletes `GITHUB_TOKEN` and the raw task from the agent process's environment. The runner, not the agent, pushes the result branch. It uses the token in a one-off remote URL and scrubs the token from push error text.
 - The workflow requests only `contents: write` and `checks: write`. The job token expires when the job ends, and the job has a 60-minute timeout.
-- The workflow contents are managed by the app. Before each dispatch The Aive compares the installed file with its bundled template. Installing or updating it always requires a person to approve a plan that says the file will be committed directly to the default branch, even for tasks that otherwise run without a plan gate.
+- The workflow contents are managed by the app. Before each dispatch The Aive compares the installed file with its bundled template. Installing or updating it always requires a person to approve a plan that says the file will be committed directly to the default branch, even for tasks that otherwise run without a plan gate. With the engine's plan gate that is the drafted plan; a run whose approved plan did not disclose the change stops for approval again before writing the file.
 - Results land on a new branch, never the default branch, and the task can require plan approval before dispatch. The patch is surfaced as a `CodeChange` artifact for review.
 - The prompt is capped at 50,000 characters to stay within GitHub's `workflow_dispatch` input limits.
 - The result artifact is bounded: at most 4 MB zipped and 2 MB of JSON.

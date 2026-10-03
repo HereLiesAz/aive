@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Plan approval is now owned by the engine: the provider drafts a plan before any run starts, and the run begins only after you approve it. Rejecting a plan cancels nothing, and a held plan survives a restart unchanged.
 - Added a training pipeline for the local memory clerks (`tools/memory_training`): a corpus recorded from the running memory layer in the app's own answer contract, a Kaggle notebook, and catalog registration. Local memory runtimes now send the chat-templated prompt the clerks are trained on.
 - The broken epoch-8 generative memory models are no longer offered for install; a memory stage set to a local model runs programmatically until a trained clerk is released.
 - Orchestration helper adapters now train for at least 700 steps each; the Agent Router adapter had failed its gates with too few.

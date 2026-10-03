@@ -124,6 +124,22 @@ Workflow events are executor-neutral. `ExecutorAssigned` records the concrete ex
 
 Task start, completion, failure, retry, escalation, approval, artifact, and workflow terminal events remain independent of executor type.
 
+## Plan approval
+
+The plan gate belongs to the engine, not the provider. For a task that requires plan approval, the
+engine asks the selected provider to draft a plan (`AgentProvider.draftPlan`) before any run exists
+and holds the task at `AwaitingApproval` with that plan (`TaskRun.isHeldAtEnginePlanGate`). Nothing is
+started, so a restart only restores the persisted plan and a rejection has no session to cancel; the
+retry drafts again. Approval makes the task `Ready`, and dispatch starts the run with the plan in an
+`Approved plan` context block and no second gate. A provider refusal while drafting fails the task with
+the provider's reason through the task's retry policy. Remote compute leaves an approved plan to the
+local provider that drafted it.
+
+Every bundled provider drafts this way: text LLMs draft a plan-only answer, the GitLab and Local
+workspace agents execute the approved plan text, and OpenCode's draft discloses a workflow
+install/update, so approving it is the consent that change needs. A provider whose `draftPlan` returns
+null still plans inside its run (`PlanGenerated` → `approvePlan`).
+
 ## Provider boundary
 
 Provider adapters translate external APIs into neutral runtime contracts.

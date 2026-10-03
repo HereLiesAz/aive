@@ -9,9 +9,10 @@ class PlanRejectionService(
     private val gateCoordinator: ApprovalGateCoordinator,
     private val sessionGateway: ManagedSessionGateway,
 ) {
+    /** Rejects a plan gate; [handle] is null for an engine-held plan, which has no session to cancel. */
     suspend fun rejectPlan(
         gateId: ApprovalGateId,
-        handle: ManagedSessionHandle,
+        handle: ManagedSessionHandle?,
         decidedByRoleId: RoleDefinitionId? = null,
         note: String? = null,
         nowEpochMillis: Long,
@@ -37,10 +38,10 @@ class PlanRejectionService(
             note = rejectionNote,
         )
 
-        when (val cancellation = sessionGateway.cancel(handle)) {
+        when (val cancellation = handle?.let { sessionGateway.cancel(it) } ?: ProviderActionResult.Accepted) {
             ProviderActionResult.Accepted -> Unit
             is ProviderActionResult.Rejected -> error(
-                "Provider session ${handle.providerRunId.value} could not be cancelled after plan rejection: " +
+                "Provider session ${handle?.providerRunId?.value} could not be cancelled after plan rejection: " +
                     cancellation.reason.ifBlank { "provider rejected cancellation" },
             )
         }

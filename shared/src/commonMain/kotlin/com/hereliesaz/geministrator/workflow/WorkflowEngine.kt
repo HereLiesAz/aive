@@ -134,7 +134,7 @@ class WorkflowEngine(
                     if (providerActive >= providerLimit) continue
 
                     val resolvedSurfaces = surfaceRuntime.resolve(role.surfaces)
-                    val request = buildProviderTaskRequest(
+                    val builtRequest = buildProviderTaskRequest(
                         project = project,
                         definition = definition,
                         run = nextRun,
@@ -144,6 +144,67 @@ class WorkflowEngine(
                         orchestrationUtilities = orchestrationUtilities,
                         resolvedSurfaces = resolvedSurfaces,
                     )
+                    val approvedPlan = taskRun.approvedEnginePlan()
+                    val request = if (approvedPlan != null) {
+                        // The engine already held this task at its gate; the run executes the approved plan.
+                        builtRequest.copy(
+                            requirePlanApproval = false,
+                            promptContext = builtRequest.promptContext.copy(
+                                dynamicContext = builtRequest.promptContext.dynamicContext +
+                                    PromptContextBlock(APPROVED_PLAN_CONTEXT_LABEL, approvedPlan),
+                            ),
+                        )
+                    } else {
+                        builtRequest
+                    }
+                    if (request.requirePlanApproval) {
+                        val drafted = try {
+                            sessionGateway.draftPlan(providerId, request)
+                        } catch (failure: ManagedSessionFailure) {
+                            // A provider refusal while drafting (HTTP 429, bad key) fails the task with
+                            // the provider's reason and goes through the task's retry policy.
+                            val reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan"
+                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
+                            eventSink.append(TaskFailed(nextRun.id, task.id, reason, nowEpochMillis))
+                            nextRun = handleFailure(
+                                definition = definition,
+                                run = nextRun.copy(
+                                    taskRuns = nextRun.taskRuns + (
+                                        task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
+                                    ),
+                                ),
+                                taskDefinitionId = task.id,
+                                retryReason = RetryReason.ProviderFailure,
+                                reason = "Executor failed. Last status: $reason",
+                                nowEpochMillis = nowEpochMillis,
+                            )
+                            continue
+                        }
+                        if (drafted != null) {
+                            // Engine-owned gate: hold the task with the drafted plan; no run exists yet.
+                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.AwaitingApproval)
+                            humanApprovalPending = true
+                            nextRun = nextRun.copy(
+                                taskRuns = nextRun.taskRuns + (
+                                    task.id to taskRun.copy(
+                                        status = TaskRunStatus.AwaitingApproval,
+                                        assignedRoleId = task.roleId ?: role.id,
+                                        executor = executor,
+                                        assignedProviderId = providerId,
+                                        providerRunId = null,
+                                        externalRunId = null,
+                                        blockingReason = null,
+                                        progress = null,
+                                        progressMessage = drafted,
+                                        providerPlan = drafted,
+                                    )
+                                ),
+                                updatedAtEpochMillis = nowEpochMillis,
+                            )
+                            eventSink.append(HumanDecisionRequired(nextRun.id, task.id, "Plan approval", nowEpochMillis))
+                            continue
+                        }
+                    }
                     pendingAgentDispatches += PendingAgentDispatch(
                         taskRun = taskRun,
                         task = task,
@@ -228,7 +289,8 @@ class WorkflowEngine(
                         blockingReason = null,
                         progress = null,
                         progressMessage = null,
-                        providerPlan = null,
+                        // An engine-approved plan stays visible on the task it is being executed for.
+                        providerPlan = pending.taskRun.approvedEnginePlan(),
                     )
                 ),
                 updatedAtEpochMillis = nowEpochMillis,
@@ -538,6 +600,16 @@ class WorkflowEngine(
     fun approvePlanGate(run: WorkflowRun, taskDefinitionId: TaskDefinitionId, nowEpochMillis: Long): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
+        if (taskRun.isHeldAtEnginePlanGate()) {
+            // No run exists yet: the approved plan makes the task dispatchable.
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Ready)
+            return run.copy(
+                taskRuns = run.taskRuns + (
+                    taskDefinitionId to taskRun.copy(status = TaskRunStatus.Ready, blockingReason = null, progressMessage = null)
+                ),
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+        }
         TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Running)
         return run.copy(
             taskRuns = run.taskRuns + (taskDefinitionId to taskRun.copy(status = TaskRunStatus.Running, blockingReason = null)),
@@ -562,6 +634,7 @@ class WorkflowEngine(
                     blockingReason = null,
                     progress = null,
                     progressMessage = null,
+                    providerPlan = null,
                 )),
                 updatedAtEpochMillis = nowEpochMillis,
             )

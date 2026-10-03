@@ -34,6 +34,8 @@ object TaskRunTransitions {
             TaskRunStatus.Cancelled,
         ),
         TaskRunStatus.AwaitingApproval to setOf(
+            // An approved engine-drafted plan: no run exists yet, so the task becomes dispatchable.
+            TaskRunStatus.Ready,
             TaskRunStatus.Running,
             TaskRunStatus.Failed,
             TaskRunStatus.Retrying,

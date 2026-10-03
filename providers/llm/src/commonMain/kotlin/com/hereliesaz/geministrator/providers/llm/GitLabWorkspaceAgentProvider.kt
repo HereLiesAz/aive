@@ -28,6 +28,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
+import com.hereliesaz.geministrator.workflow.approvedEnginePlan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +119,21 @@ class GitLabWorkspaceAgentProvider(
 
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
         repository?.source == RepositorySource.GitLab
+
+    /**
+     * The engine-owned plan gate's draft: the same plan [observe] would show, generated before any run
+     * so nothing starts until it is approved. After approval the run executes that plan text.
+     */
+    override suspend fun draftPlan(request: AgentTaskRequest): String {
+        require(supportsRepository(request.repository)) {
+            "$displayName GitLab workspace agent requires a linked GitLab repository"
+        }
+        if (isSpecificationTask(request)) {
+            return "Design a pre-code verification contract for: ${request.objective.trim()}".take(MAX_PLAN_PREVIEW_CHARS)
+        }
+        val context = loadRepositoryContext(request, tokenProvider.requireToken())
+        return generatePlan(request, context).first.text
+    }
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         require(supportsRepository(request.repository)) {
@@ -260,6 +276,12 @@ class GitLabWorkspaceAgentProvider(
             val context = loadRepositoryContext(session.request, token)
 
             var plan = session.plan
+            val enginePlan = session.request.approvedEnginePlan()
+            if (plan == null && enginePlan != null) {
+                // The plan a person approved at the engine's gate is the plan this run executes.
+                plan = WorkspacePlan(text = enginePlan, requestedFiles = parseRequestedFiles(enginePlan, context.trackedFiles))
+                session.plan = plan
+            }
             if (plan == null) {
                 val generated = generatePlan(session.request, context)
                 plan = generated.first

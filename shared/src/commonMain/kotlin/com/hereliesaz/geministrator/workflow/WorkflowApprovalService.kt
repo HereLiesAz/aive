@@ -42,9 +42,14 @@ class WorkflowApprovalService(
         )
     }
 
+    /**
+     * Approves a plan gate. [handle] is the provider session that drafted the plan, or null for an
+     * engine-held plan (see EnginePlanGate.kt): nothing runs yet, so the decision is only recorded and
+     * the next cycle makes the task dispatchable.
+     */
     suspend fun approvePlan(
         gateId: ApprovalGateId,
-        handle: ManagedSessionHandle,
+        handle: ManagedSessionHandle?,
         decidedByRoleId: RoleDefinitionId?,
         note: String?,
         nowEpochMillis: Long,
@@ -59,6 +64,18 @@ class WorkflowApprovalService(
             "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
         }
 
+        if (handle == null) {
+            require(gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
+                "Approval gate ${gateId.value} is already resolved"
+            }
+            return@withLock gateCoordinator.decide(
+                id = gateId,
+                approved = true,
+                decidedByRoleId = decidedByRoleId,
+                note = note,
+                nowEpochMillis = nowEpochMillis,
+            )
+        }
         if (gate.status == ApprovalGateStatus.Applying) {
             return@withLock recoverApplyingPlanGate(
                 gate = gate,

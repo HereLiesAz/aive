@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import com.hereliesaz.geministrator.workflow.isHeldAtEnginePlanGate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -188,17 +189,19 @@ class ProviderNeutralLiveRuntimeVerificationTest {
         val reviewTaskId = TaskDefinitionId("review")
         val releaseTaskId = TaskDefinitionId("release-approval")
 
-        val (providerRunId, exportedProject) = try {
+        val (heldPlan, exportedProject) = try {
             val awaitingApproval = awaitLive(firstRuntime, "initial provider plan approval", failFastTask = providerTaskId) { live ->
                 live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
             val taskRun = awaitingApproval.presentation.run.taskRuns.getValue(providerTaskId)
             assertEquals(WorkflowRunStatus.AwaitingHuman, awaitingApproval.presentation.run.status)
             assertEquals(null, taskRun.progress, "Provider plan/progress text must not fabricate a percentage")
-            val runId = assertNotNull(taskRun.providerRunId)
-            println("[live] provider ${providerConfig.providerId.value} plan: ${taskRun.progressMessage}")
+            // Engine-owned plan gate: the provider drafted the plan, but no provider run exists before approval.
+            assertTrue(taskRun.isHeldAtEnginePlanGate(), "The plan must be held by the engine, not a provider run")
+            val plan = assertNotNull(taskRun.providerPlan)
+            println("[live] provider ${providerConfig.providerId.value} plan: $plan")
             val projectExport = assertNotNull(firstRuntime.exportCurrentProjectFile())
-            runId to projectExport.content
+            plan to projectExport.content
         } finally {
             firstRuntime.close()
             firstScope.cancel()
@@ -225,11 +228,9 @@ class ProviderNeutralLiveRuntimeVerificationTest {
             val resumed = awaitLive(resumedRuntime, "resumed provider plan approval", failFastTask = providerTaskId) { live ->
                 live.presentation.run.taskRuns.getValue(providerTaskId).status == TaskRunStatus.AwaitingApproval
             }
-            assertEquals(
-                providerRunId,
-                resumed.presentation.run.taskRuns.getValue(providerTaskId).providerRunId,
-                "Restart must reconnect the same provider run instead of allocating a replacement",
-            )
+            val resumedTask = resumed.presentation.run.taskRuns.getValue(providerTaskId)
+            assertEquals(heldPlan, resumedTask.providerPlan, "Restart must restore the held plan instead of drafting a new one")
+            assertEquals(null, resumedTask.providerRunId, "No provider run may start before approval")
 
             resumedRuntime.approveTask(providerTaskId)
 

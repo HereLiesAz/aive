@@ -8,12 +8,12 @@ prove the complete durable lifecycle:
 
 1. create a project and materialize a workflow definition;
 2. define the workflow objective;
-3. start real provider-backed work and receive the provider plan;
-4. pause at the explicit human approval gate without inventing numeric progress;
+3. have the real provider draft the task's plan, with no provider run started;
+4. hold that plan at the explicit human approval gate without inventing numeric progress;
 5. export the project as an `.ive` bundle;
 6. reconstruct the runtime from a fresh durable store and import that project;
-7. reconnect the same provider run rather than allocating a replacement;
-8. approve provider execution and reach provider completion;
+7. restore the held plan unchanged, without drafting a new one or starting a run;
+8. approve the plan, start the provider run with it, and reach provider completion;
 9. exercise a deterministic failure and human escalation decision;
 10. retry the failed step only after approval;
 11. collect durable verification and review artifacts;
@@ -123,6 +123,10 @@ timeout.
   [Research]"). Fixed: the planner is now offered only roles a linked provider can staff.
 - Same day, both live tests after test runtimes stopped sharing the platform's durable inference
   store (each workflow store now carries its own): the lifecycle test passed in 25 s.
+- 2026-10-03, desktop JVM in a cloud container, Kilo Gateway (no key), after the move to the
+  engine-owned plan gate: passed in 88 s. The drafted plan was held after 23.6 s with no provider
+  run, restored unchanged after the restart, and executed after approval; failure escalation after
+  44.6 s.
 
 These are local runs, not the centralized verification below.
 
