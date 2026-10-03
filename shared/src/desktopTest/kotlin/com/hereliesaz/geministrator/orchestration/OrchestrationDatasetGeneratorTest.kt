@@ -89,7 +89,7 @@ class OrchestrationDatasetGeneratorTest {
             OrchestrationUtilityRole.AgentRouter ->
                 assertEquals(json.decodeFromString<AgentRoute>(expected), family.routeAgent(json.decodeFromString<AgentRoutingModelInput>(input).toInput()))
             OrchestrationUtilityRole.ToolRouter ->
-                assertEquals(json.decodeFromString<ToolRoute>(expected), family.routeTool(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<ToolRoute>(expected), family.routeTool(json.decodeFromString<ToolRoutingModelInput>(input).toInput()))
             OrchestrationUtilityRole.HandoffComposer ->
                 assertEquals(json.decodeFromString<HandoffPacket>(expected), family.composeHandoff(json.decodeFromString(input)))
             OrchestrationUtilityRole.EscalationGate ->

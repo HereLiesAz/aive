@@ -149,9 +149,9 @@ class GuardedModelBackedOrchestrationUtilities(
     override fun routeTool(input: ToolRoutingInput): ToolRoute {
         val baseline = fallback.routeTool(input)
         val capabilities = input.capabilities.associateBy(ToolCapability::id)
-        return infer<ToolRoutingInput, ToolRoute>(
+        return infer<ToolRoutingModelInput, ToolRoute>(
             OrchestrationUtilityRole.ToolRouter,
-            input,
+            ToolRoutingModelInput.of(input),
             baseline,
         ) { candidate ->
             if (candidate.decision != ToolRouteDecision.Tool) {

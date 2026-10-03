@@ -78,6 +78,39 @@ internal data class AgentCandidateFacts(
 )
 
 @Serializable
+internal data class ToolRoutingModelInput(
+    /**
+     * Ids of the available tools that support [operationClass], in routing order (preferenceRank,
+     * then id): select the first. Empty means UnavailableCapability, or NoTool when [operationClass]
+     * is blank. Trained adapters picked the first-listed supporting tool instead of the lowest rank.
+     */
+    val eligibleInRoutingOrder: List<String>,
+    val operationClass: String?,
+    /** In routing order: preferenceRank, then id. */
+    val capabilities: List<ToolCapability>,
+    val requiredInputs: List<String>,
+) {
+    fun toInput(): ToolRoutingInput = ToolRoutingInput(operationClass, capabilities, requiredInputs)
+
+    companion object {
+        fun of(input: ToolRoutingInput): ToolRoutingModelInput {
+            val operation = input.operationClass?.trim().orEmpty()
+            val ordered = input.capabilities.sortedWith(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
+            return ToolRoutingModelInput(
+                eligibleInRoutingOrder = if (operation.isEmpty()) {
+                    emptyList()
+                } else {
+                    ordered.filter { it.available && operation in it.operationClasses }.map { it.id }
+                },
+                operationClass = input.operationClass,
+                capabilities = ordered,
+                requiredInputs = input.requiredInputs,
+            )
+        }
+    }
+}
+
+@Serializable
 internal data class ContextPackingModelInput(
     val tokenBudget: Int,
     val evidence: List<ContextEvidence>,

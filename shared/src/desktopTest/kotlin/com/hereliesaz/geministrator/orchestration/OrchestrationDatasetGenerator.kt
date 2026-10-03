@@ -297,6 +297,29 @@ object OrchestrationDatasetGenerator {
                 operationClass = "test",
                 capabilities = listOf(ToolCapability("second", setOf("test"), preferenceRank = 2), ToolCapability("first", setOf("test"), preferenceRank = 1)),
             ),
+            // Equal rank: the id that sorts first wins, wherever it is listed.
+            ToolRoutingInput(
+                operationClass = "build",
+                capabilities = listOf(ToolCapability("zeta", setOf("build"), preferenceRank = 1), ToolCapability("alpha", setOf("build"), preferenceRank = 1)),
+            ),
+            // The best-ranked tool is down; the next one serves.
+            ToolRoutingInput(
+                operationClass = "lint",
+                capabilities = listOf(
+                    ToolCapability("primary", setOf("lint"), available = false, preferenceRank = 0),
+                    ToolCapability("backup", setOf("lint"), preferenceRank = 3),
+                ),
+                requiredInputs = listOf("path", "path"),
+            ),
+            // Only the last-listed tool supports the operation.
+            ToolRoutingInput(
+                operationClass = "deploy",
+                capabilities = listOf(
+                    ToolCapability("a", setOf("test"), preferenceRank = 0),
+                    ToolCapability("b", setOf("build"), preferenceRank = 0),
+                    ToolCapability("c", setOf("deploy", "test"), preferenceRank = 4),
+                ),
+            ),
         ).mapNotNull { valid { tool(it) } }
         OrchestrationUtilityRole.HandoffComposer -> listOf(
             HandoffInput(objective = ""),
@@ -334,7 +357,7 @@ object OrchestrationDatasetGenerator {
     private fun memory(input: MemoryQueryInput) = encode(input, baseline.composeMemoryQueries(input))
     private fun context(input: ContextPackingInput) = encode(ContextPackingModelInput.of(input), baseline.packContext(input))
     private fun agent(input: AgentRoutingInput) = encode(AgentRoutingModelInput.of(input), baseline.routeAgent(input))
-    private fun tool(input: ToolRoutingInput) = encode(input, baseline.routeTool(input))
+    private fun tool(input: ToolRoutingInput) = encode(ToolRoutingModelInput.of(input), baseline.routeTool(input))
     private fun handoff(input: HandoffInput) = encode(input, baseline.composeHandoff(input))
     private fun escalation(input: CapabilityAssessment) = encode(CapabilityAssessmentModelInput.of(input), baseline.evaluateEscalation(input))
     private fun completion(input: CompletionInput) = encode(input, baseline.evaluateCompletion(input))

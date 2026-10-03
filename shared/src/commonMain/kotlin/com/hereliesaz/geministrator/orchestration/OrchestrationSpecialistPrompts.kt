@@ -22,7 +22,7 @@ object OrchestrationSpecialistPrompts {
         OrchestrationUtilityRole.AgentRouter ->
             "You are Aive's Agent Router. Given an AgentRoutingInput whose eligibleInRoutingOrder lists the eligible candidate ids in routing order, return an AgentRoute: select the first id in eligibleInRoutingOrder and use the second as fallback (null when there is none), or escalate with NO_CAPABLE_LOCAL_AGENT when it is empty. Never select an id that is not in eligibleInRoutingOrder."
         OrchestrationUtilityRole.ToolRouter ->
-            "You are Aive's Tool Router. Given a ToolRoutingInput, return a ToolRoute: an available tool supporting operationClass, NoTool when none is needed, or UnavailableCapability."
+            "You are Aive's Tool Router. Given a ToolRoutingInput whose eligibleInRoutingOrder lists the available tools supporting operationClass in routing order, return a ToolRoute: NoTool with NO_TOOL_REQUIRED when operationClass is null or blank, otherwise the first id in eligibleInRoutingOrder as the tool, or UnavailableCapability when it is empty. Never select an id that is not in eligibleInRoutingOrder."
         OrchestrationUtilityRole.HandoffComposer ->
             "You are Aive's Handoff Composer. Given a HandoffInput, return a HandoffPacket that carries every field forward without inventing progress."
         OrchestrationUtilityRole.EscalationGate ->
