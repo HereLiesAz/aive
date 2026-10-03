@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- The training notebooks pin transformers below 4.58, the newest the ONNX exporter supports; transformers 5 broke the export step.
 - The training notebooks' CPU (ONNX) gates now score a fixed sample of 100 test rows plus every adversarial row, so a role no longer spends hours on CPU after its full GPU gate.
 - A complete workflow, from a project name and objective through the live planner, plan approval, execution, recovery and completion, now passes the centralized live verification against a real provider.
 - Memory now links similar memories across sessions much more often: the association step offers memories of the same kind first, then other kinds, and skips memories already condensed, so related memories, including ones that disagree, are far more likely to be recalled together. Within a group of similar memories, the ones that agree can now condense while the ones that differ stay separate.
