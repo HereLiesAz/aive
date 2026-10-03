@@ -65,7 +65,14 @@ and a failing one costs only its own rerun.
    With `UPLOAD = True` it publishes `aive-memory-<clerk>-lora-v1.safetensors` and a one-clerk
    `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing.
 
-Uploading needs a `GITHUB_TOKEN` (Kaggle or Colab secret, or environment variable) with contents write on `HereLiesAz/aive`. Release
+With `UPLOAD = True` each notebook also publishes the same files to Kaggle as a new version of the
+`hereliesaz/aive-memory-clerks` model (variation `base` or the clerk's name; created private), unless
+`KAGGLE_MIRROR = False`. On Kaggle, attach that model's `base` variation to a clerk notebook and it
+uses that copy instead of downloading 620 MB from GitHub; the SHA-256 check is the same. Rerunning
+`base.ipynb` after the base is published reuses it rather than exporting a new one, so it can
+mirror an existing release to Kaggle.
+
+Uploading needs a `GITHUB_TOKEN` (Kaggle or Colab secret, or environment variable) with contents write on `HereLiesAz/aive`, and `KAGGLE_USERNAME` plus `KAGGLE_KEY` for the Kaggle copy. Release
 assets are immutable: a changed adapter needs a new version, and a changed base needs a new version
 and every adapter retrained against it.
 
