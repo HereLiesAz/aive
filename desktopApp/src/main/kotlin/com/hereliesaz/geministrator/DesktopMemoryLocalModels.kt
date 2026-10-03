@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.memory.MemoryLocalModelManager
 import com.hereliesaz.geministrator.memory.MemoryLocalModelStatus
 import com.hereliesaz.geministrator.memory.MemoryMicroAgent
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentArtifact
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentPrompts
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
 import io.ktor.client.HttpClient
@@ -50,7 +51,7 @@ internal class DesktopMemoryModelInstaller(
 
     /** The installed bundle's root directory, or null. */
     fun installed(role: MemoryMicroAgentRole): File? {
-        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: return null
         val dir = directory(role)
         val marker = File(dir, INSTALLED_MARKER)
         return dir.takeIf {
@@ -66,7 +67,7 @@ internal class DesktopMemoryModelInstaller(
     suspend fun install(role: MemoryMicroAgentRole): File = mutex.withLock {
         installed(role)?.let { return@withLock it }
         withContext(Dispatchers.IO) {
-            val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+            val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: error("No local model is released for $role")
             val staging = File(installRoot, ".staging/${role.name.lowercase()}").apply { mkdirs() }
             // Verified parts and .download partials stay in staging on failure, so a retry resumes.
             val archive = downloader.downloadVerified(
@@ -135,7 +136,9 @@ private class DesktopEpoch8GenerativeAdapter(
             ?: error("The local model for ${request.artifact.artifactId} is not installed")
         return withContext(Dispatchers.Default) {
             HuggingFaceTokenizer.newInstance(root.toPath()).use { tokenizer ->
-                generator.generate(session, tokenizer, root, request.prompt, MAX_NEW_TOKENS)
+                // Local clerks are trained on the chat-templated prompt; the raw prompt is for hosted engines.
+                val prompt = MemoryMicroAgentPrompts.chatPrompt(request.role, request.prompt)
+                generator.generate(session, tokenizer, root, prompt, MAX_NEW_TOKENS)
             }
         }
     }
@@ -288,7 +291,8 @@ internal class DesktopMemoryEngineProvider(
     private val generativeRuntime = DesktopOrtGenerativeInferenceRuntime(sessions, resolver, DesktopEpoch8GenerativeAdapter(installer))
     private val embeddingRuntime = DesktopOrtEmbeddingInferenceRuntime(sessions, resolver, DesktopEpoch8EmbeddingAdapter(installer))
 
-    override fun localAgent(role: MemoryMicroAgentRole): MemoryMicroAgent {
+    override fun localAgent(role: MemoryMicroAgentRole): MemoryMicroAgent? {
+        if (MemoryEpoch8ModelCatalog.bundleFor(role) == null) return null
         val model = MemoryEpoch8ModelCatalog.modelSpec(role)
         return if (role == MemoryMicroAgentRole.AssociationLinker) {
             EmbeddingAssociationLinkerMicroAgent(model, embeddingRuntime)

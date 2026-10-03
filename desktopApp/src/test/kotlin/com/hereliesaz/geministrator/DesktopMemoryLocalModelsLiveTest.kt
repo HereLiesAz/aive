@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryConsolidationStage
 import com.hereliesaz.geministrator.memory.MemoryEpisodeId
+import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryQueueId
@@ -21,8 +22,9 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 /**
- * Downloads two released epoch-8 memory models and runs them through the desktop engine: the
- * Sectioner (generative) and the Association Linker (embeddings). About 0.6 GB; skipped unless
+ * Downloads released memory models and runs them through the desktop engine: the Sectioner clerk
+ * (generative, only once one is released in MemoryClerkCatalog) and the epoch-8 Association Linker
+ * (embeddings). Up to about 0.8 GB; skipped unless
  * `AIVE_LIVE_MEMORY_MODELS=1`. Models are cached under `AIVE_LIVE_MEMORY_MODEL_DIR` (default
  * build/live-memory-models) so reruns do not download again.
  */
@@ -40,11 +42,12 @@ class DesktopMemoryLocalModelsLiveTest {
             DesktopOrtMemorySessionManager().use { sessions ->
                 val installer = DesktopMemoryModelInstaller(httpClient, root)
                 val engines = DesktopMemoryEngineProvider(HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Linux), installer, sessions)
-                listOf(MemoryMicroAgentRole.Sectioner, MemoryMicroAgentRole.AssociationLinker).forEach { role ->
-                    assertNotNull(installer.install(role))
+                assertNotNull(installer.install(MemoryMicroAgentRole.AssociationLinker))
+                val sectioner = MemoryEpoch8ModelCatalog.bundleFor(MemoryMicroAgentRole.Sectioner)?.let {
+                    installer.install(MemoryMicroAgentRole.Sectioner)
+                    engines.localAgent(MemoryMicroAgentRole.Sectioner)
                 }
-
-                val sections = engines.localAgent(MemoryMicroAgentRole.Sectioner).process(
+                val sections = sectioner?.process(
                     MemoryWorkPacket(
                         queueId = MemoryQueueId("q"),
                         episodeId = MemoryEpisodeId("e"),
@@ -61,10 +64,10 @@ class DesktopMemoryLocalModelsLiveTest {
                         instruction = "section",
                     ),
                 )
-                println("[live] sectioner: ${sections.sectionsToAdd.size} section(s)")
-                assertTrue(sections.sectionsToAdd.isNotEmpty())
+                println("[live] sectioner: ${sections?.sectionsToAdd?.size ?: "not released"} section(s)")
+                if (sections != null) assertTrue(sections.sectionsToAdd.isNotEmpty())
 
-                val links = engines.localAgent(MemoryMicroAgentRole.AssociationLinker).process(
+                val links = assertNotNull(engines.localAgent(MemoryMicroAgentRole.AssociationLinker)).process(
                     MemoryWorkPacket(
                         queueId = MemoryQueueId("q"),
                         episodeId = MemoryEpisodeId("e"),
