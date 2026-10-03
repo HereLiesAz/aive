@@ -77,7 +77,7 @@ code("""
 # below, and optimum's exporter imports diffusers when present. Nothing here uses either, so remove
 # both. If peft or optimum was already imported in this session, restart it.
 %pip uninstall -y -q torchao diffusers
-%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=0.3"
+%pip install -q "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=1.0"
 """)
 
 code(r'''
@@ -782,20 +782,26 @@ FAMILIES = {
 
 ROLE_RUN = r'''
 def kaggle_credentials():
-    # KAGGLE_USERNAME and KAGGLE_KEY from Kaggle secrets when running there; kagglehub itself reads
-    # Colab secrets and the environment.
-    if os.environ.get("KAGGLE_KEY"):
-        return
+    # An API token (KAGGLE_API_TOKEN, from Kaggle Settings > API) or a legacy KAGGLE_USERNAME and
+    # KAGGLE_KEY pair. kagglehub reads the environment and Colab secrets itself; on Kaggle, copy
+    # them from Kaggle secrets. Fail here, before uploading, when there are none.
     try:
         from kaggle_secrets import UserSecretsClient
+        secrets = UserSecretsClient()
+        for name in ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"):
+            if not os.environ.get(name):
+                try:
+                    os.environ[name] = secrets.get_secret(name)
+                except Exception:
+                    pass
     except ImportError:
-        return
-    secrets = UserSecretsClient()
-    for name in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
-        try:
-            os.environ[name] = secrets.get_secret(name)
-        except Exception:
-            pass
+        pass
+    from kagglehub.config import get_kaggle_credentials
+    if get_kaggle_credentials() is None:
+        raise RuntimeError(
+            "No Kaggle credentials: add a KAGGLE_API_TOKEN secret (Kaggle > Settings > API > Generate New "
+            "Token) with notebook access, or set KAGGLE_MIRROR = False"
+        )
 
 def upload_and_mirror(paths):
     # Publish to the GitHub release, then the same files as a new version of this notebook's Kaggle
@@ -912,20 +918,26 @@ print(f"{slug}: {'released' if adapters else 'not released'}; assets in {ASSETS}
 
 BASE_RUN = r"""
 def kaggle_credentials():
-    # KAGGLE_USERNAME and KAGGLE_KEY from Kaggle secrets when running there; kagglehub itself reads
-    # Colab secrets and the environment.
-    if os.environ.get("KAGGLE_KEY"):
-        return
+    # An API token (KAGGLE_API_TOKEN, from Kaggle Settings > API) or a legacy KAGGLE_USERNAME and
+    # KAGGLE_KEY pair. kagglehub reads the environment and Colab secrets itself; on Kaggle, copy
+    # them from Kaggle secrets. Fail here, before uploading, when there are none.
     try:
         from kaggle_secrets import UserSecretsClient
+        secrets = UserSecretsClient()
+        for name in ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"):
+            if not os.environ.get(name):
+                try:
+                    os.environ[name] = secrets.get_secret(name)
+                except Exception:
+                    pass
     except ImportError:
-        return
-    secrets = UserSecretsClient()
-    for name in ("KAGGLE_USERNAME", "KAGGLE_KEY"):
-        try:
-            os.environ[name] = secrets.get_secret(name)
-        except Exception:
-            pass
+        pass
+    from kagglehub.config import get_kaggle_credentials
+    if get_kaggle_credentials() is None:
+        raise RuntimeError(
+            "No Kaggle credentials: add a KAGGLE_API_TOKEN secret (Kaggle > Settings > API > Generate New "
+            "Token) with notebook access, or set KAGGLE_MIRROR = False"
+        )
 
 def upload_and_mirror(paths):
     # Publish to the GitHub release, then the same files as a new version of this notebook's Kaggle
@@ -1027,7 +1039,7 @@ like a device. `catalog.json` lists the role only when both gates pass; a failin
 2. **Train**: run all cells on a GPU with internet on. `UPLOAD = True` publishes the adapter and
    `catalog.json` to the `{tag}` pre-release (`GITHUB_TOKEN` secret with contents write), then, with
    `KAGGLE_MIRROR`, as a new version of the `{spec['kaggle_model']}` model, variation `{slug}`
-   (`KAGGLE_USERNAME` and `KAGGLE_KEY` secrets). Release assets are immutable; a changed adapter needs
+   (`KAGGLE_API_TOKEN` secret, or `KAGGLE_USERNAME` and `KAGGLE_KEY`). Release assets are immutable; a changed adapter needs
    a new version.
 3. **Register**: `python3 {spec['register']} catalog.json`, then commit. Other roles stay registered.
 
@@ -1045,8 +1057,8 @@ weights to INT8 (MatMulNBits; LoRA inputs stay float32), and packages it with `b
 
 No training: a GPU is not needed. Run all cells with internet on and `UPLOAD = True` to publish the
 `{tag}` pre-release (`GITHUB_TOKEN` secret with contents write) and, with `KAGGLE_MIRROR`, the
-`{spec['kaggle_model']}` Kaggle model, variation `base` (`KAGGLE_USERNAME` and `KAGGLE_KEY` secrets;
-created private). Once published, a rerun reuses the published base instead of exporting a new one,
+`{spec['kaggle_model']}` Kaggle model, variation `base` (`KAGGLE_API_TOKEN` secret, or
+`KAGGLE_USERNAME` and `KAGGLE_KEY`; created private). Once published, a rerun reuses the published base instead of exporting a new one,
 so it can mirror an existing release. A changed base needs a new version, and every adapter must be
 retrained against it.
 
@@ -1085,7 +1097,7 @@ def config_substitutions(family, spec, tag, roles, body, variation):
          f"ROLES = {json.dumps(roles)}"),
         ('MODE = "both"                        # "multitask", "adapters" or "both"',
          f'MODE = "adapters"                    # one adapter per role on the shared base\nCAPABILITY = "{spec["capability"]}"\n'
-         f'KAGGLE_MIRROR = True                 # with UPLOAD: also publish to Kaggle (KAGGLE_USERNAME + KAGGLE_KEY secrets)\n'
+         f'KAGGLE_MIRROR = True                 # with UPLOAD: also publish to Kaggle (KAGGLE_API_TOKEN secret)\n'
          f'KAGGLE_MODEL = "{spec["kaggle_model"]}"\nKAGGLE_VARIATION = "{variation}"'),
         ('ARTIFACT_ID = "orchestration:utilities:v3:int8"\n', ""),
         ('ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"\n', ""),
