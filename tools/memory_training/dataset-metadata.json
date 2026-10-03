@@ -1,0 +1,8 @@
+{
+  "title": "Aive Memory Clerk Corpus",
+  "id": "hereliesaz/aive-memory-corpus",
+  "subtitle": "Contract-exact training data for The Aive's eight local memory clerks",
+  "description": "Generated from the running memory layer in HereLiesAz/aive by MemoryDatasetGenerator. Each <role>.jsonl row has id, input (the rendered packet the runtime sends as the user turn), expected (the programmatic clerk's answer in the sections/nodes/links contract, verified to decode back to the clerk's batch), split (train/validation/test/adversarial) and tags. Each <role>.config.json carries the specialist ID, foundation model, system prompt and release gates. manifest.json records the source commit and SHA-256 of every file.",
+  "licenses": [{ "name": "Apache 2.0" }],
+  "keywords": ["text generation", "json"]
+}

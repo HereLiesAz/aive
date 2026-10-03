@@ -21,77 +21,27 @@ data class MemoryModelReleaseBundle(
 }
 
 /**
- * Compatibility view used by the existing memory runtime.
+ * The memory models the runtime installs and runs: the epoch-8 embedding model for the Association
+ * Linker, and the clerks released in [MemoryClerkCatalog] for the eight generative stages.
  *
- * The reusable [MemoryEpoch8LocalModelLibrary] is authoritative for release metadata and variant
- * selection. This view deliberately exposes the current production-safe merged INT8 artifacts so
- * existing ONNX installers keep their stable runtime IDs while adapter-capable backends can use the
- * richer library directly.
+ * The epoch-8 generative releases are deliberately absent. Their INT8 models do not load in ONNX
+ * Runtime, and every variant answers in the epoch-8 training schema instead of the sections/nodes/links
+ * contract [StructuredMemoryMicroAgent] validates (`tools/memory_models`). [MemoryEpoch8LocalModelLibrary]
+ * still describes them as release metadata.
  */
 object MemoryEpoch8ModelCatalog {
     const val RELEASE_TAG: String = MemoryEpoch8LocalModelLibrary.RELEASE_TAG
 
-    val sectioner = bundle(MemoryMicroAgentRole.Sectioner)
-    val salience = bundle(MemoryMicroAgentRole.SalienceFilter)
-    val nounIndexer = bundle(MemoryMicroAgentRole.NounTagger)
-    val verbIndexer = bundle(MemoryMicroAgentRole.VerbTagger)
-    val phraseSynthesizer = bundle(MemoryMicroAgentRole.PhraseSynthesizer)
-    val summarySynthesizer = bundle(MemoryMicroAgentRole.SummarySynthesizer)
-    val categoryClassifier = bundle(MemoryMicroAgentRole.CategoryClassifier)
-    val associationLinker = bundle(MemoryMicroAgentRole.AssociationLinker)
-    val condensationRewriter = bundle(MemoryMicroAgentRole.CondensationRewriter)
+    /** Every installable bundle; a generative stage appears only once its clerk is released. */
+    val all: List<MemoryModelReleaseBundle>
+        get() = MemoryMicroAgentRole.entries.mapNotNull(::bundleFor)
 
-    val all: List<MemoryModelReleaseBundle> = listOf(
-        sectioner,
-        salience,
-        nounIndexer,
-        verbIndexer,
-        phraseSynthesizer,
-        summarySynthesizer,
-        categoryClassifier,
-        associationLinker,
-        condensationRewriter,
-    )
-
-    fun bundleFor(role: MemoryMicroAgentRole): MemoryModelReleaseBundle =
-        all.single { it.role == role }
-
-    /**
-     * Runtime spec for an installed epoch-8 bundle. The installer/resolver maps the logical
-     * artifact id to the extracted ONNX file; archive hashes stay on [MemoryModelReleaseBundle]
-     * because they verify the download, not the extracted model payload.
-     */
-    fun modelSpec(role: MemoryMicroAgentRole): MemoryMicroAgentModelSpec {
-        val bundle = bundleFor(role)
-        val requirements = if (role == MemoryMicroAgentRole.AssociationLinker) {
-            MemoryModelRequirements.embeddings()
+    fun bundleFor(role: MemoryMicroAgentRole): MemoryModelReleaseBundle? {
+        val artifact = if (role == MemoryMicroAgentRole.AssociationLinker) {
+            MemoryEpoch8LocalModelLibrary.productionArtifactFor(role)
         } else {
-            MemoryModelRequirements.generation()
+            MemoryClerkCatalog.released(role) ?: return null
         }
-        return MemoryMicroAgentModelSpec(
-            modelId = "${RELEASE_TAG}/${role.name}",
-            quantization = bundle.quantization,
-            // Small packets keep prompt + answer within ~3k tokens, the length the local clerks are
-            // trained at (tools/memory_training); the router fits packets to these limits.
-            maxInputItems = LOCAL_MAX_INPUT_ITEMS,
-            maxInputChars = LOCAL_MAX_INPUT_CHARS,
-            maxOutputChars = LOCAL_MAX_OUTPUT_CHARS,
-            maxMutations = LOCAL_MAX_MUTATIONS,
-            requirements = requirements,
-            deployment = MemoryMicroAgentDeploymentManifest.portableOnnx(
-                artifactId = bundle.runtimeArtifactId,
-                quantization = bundle.quantization,
-            ),
-        )
-    }
-
-    const val LOCAL_MAX_INPUT_ITEMS: Int = 8
-    const val LOCAL_MAX_INPUT_CHARS: Int = 6_000
-    const val LOCAL_MAX_OUTPUT_CHARS: Int = 4_000
-    const val LOCAL_MAX_MUTATIONS: Int = 48
-
-    private fun bundle(role: MemoryMicroAgentRole): MemoryModelReleaseBundle {
-        val artifact = MemoryEpoch8LocalModelLibrary.productionArtifactFor(role)
         return MemoryModelReleaseBundle(
             role = role,
             releaseTag = artifact.releaseTag,
@@ -101,4 +51,40 @@ object MemoryEpoch8ModelCatalog {
             quantization = artifact.precision ?: "int8",
         )
     }
+
+    /**
+     * Runtime spec for [role]'s local model. The installer/resolver maps the logical artifact id to
+     * the extracted ONNX file; archive hashes stay on [MemoryModelReleaseBundle] because they verify
+     * the download, not the extracted model payload. An unreleased role still gets a spec (with a
+     * placeholder artifact) so training data is fitted to the same limits.
+     */
+    fun modelSpec(role: MemoryMicroAgentRole): MemoryMicroAgentModelSpec {
+        val bundle = bundleFor(role)
+        val requirements = if (role == MemoryMicroAgentRole.AssociationLinker) {
+            MemoryModelRequirements.embeddings()
+        } else {
+            MemoryModelRequirements.generation()
+        }
+        val quantization = bundle?.quantization ?: "int8"
+        return MemoryMicroAgentModelSpec(
+            modelId = "${bundle?.releaseTag ?: "unreleased"}/${role.name}",
+            quantization = quantization,
+            // Small packets keep prompt + answer within ~3k tokens, the length the local clerks are
+            // trained at (tools/memory_training); the router fits packets to these limits.
+            maxInputItems = LOCAL_MAX_INPUT_ITEMS,
+            maxInputChars = LOCAL_MAX_INPUT_CHARS,
+            maxOutputChars = LOCAL_MAX_OUTPUT_CHARS,
+            maxMutations = LOCAL_MAX_MUTATIONS,
+            requirements = requirements,
+            deployment = MemoryMicroAgentDeploymentManifest.portableOnnx(
+                artifactId = bundle?.runtimeArtifactId ?: "${MemoryClerkCatalog.specialistId(role)}:unreleased",
+                quantization = quantization,
+            ),
+        )
+    }
+
+    const val LOCAL_MAX_INPUT_ITEMS: Int = 8
+    const val LOCAL_MAX_INPUT_CHARS: Int = 6_000
+    const val LOCAL_MAX_OUTPUT_CHARS: Int = 4_000
+    const val LOCAL_MAX_MUTATIONS: Int = 48
 }

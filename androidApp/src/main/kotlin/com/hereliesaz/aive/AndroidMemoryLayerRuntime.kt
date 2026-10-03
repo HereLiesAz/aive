@@ -77,19 +77,19 @@ internal class AndroidMemoryModelInstaller(
 
     /** Installed and complete, without downloading. */
     fun isInstalled(role: MemoryMicroAgentRole): Boolean {
-        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: return false
         return findInstalled(role, bundle, File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}")) != null
     }
 
     suspend fun remove(role: MemoryMicroAgentRole) = mutex.withLock {
-        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: return@withLock
         installedByArtifactId.remove(bundle.runtimeArtifactId)
         File(installRoot, "${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
         File(installRoot, ".staging/${bundle.releaseTag}/${role.name.lowercase()}").deleteRecursively()
     }
 
     suspend fun ensureInstalled(role: MemoryMicroAgentRole): InstalledMemoryModel = mutex.withLock {
-        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role)
+        val bundle = MemoryEpoch8ModelCatalog.bundleFor(role) ?: error("No local model is released for $role")
         installedByArtifactId[bundle.runtimeArtifactId]?.let { installed ->
             if (installed.onnxModel.isFile && installed.tokenizerJson.isFile) return@withLock installed
         }
@@ -536,7 +536,8 @@ internal class AndroidMemoryLayerRuntime(
     var hostedTextGenerator: (suspend (providerId: String?, model: String?, prompt: String) -> String)? = null
 
     private val engineProvider = object : MemoryEngineProvider {
-        override fun localAgent(role: MemoryMicroAgentRole): MemoryMicroAgent {
+        override fun localAgent(role: MemoryMicroAgentRole): MemoryMicroAgent? {
+            if (MemoryEpoch8ModelCatalog.bundleFor(role) == null) return null
             val model = MemoryEpoch8ModelCatalog.modelSpec(role)
             return if (role == MemoryMicroAgentRole.AssociationLinker) {
                 EmbeddingAssociationLinkerMicroAgent(model, embeddingRuntime)
