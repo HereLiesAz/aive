@@ -69,6 +69,39 @@ There is no memory-layer `ConflictResolver` role.
 
 `AssociationLinker` may emit only semantic relatedness such as `SimilarTo` and `AssociatedWith`. It must never infer or emit `ConflictsWith`.
 
+The engine enforces the boundary; it does not trust a clerk to keep it. Whatever runs a stage
+(programmatic, local model, hosted provider), `MemoryConsolidator` validates the answer in code:
+
+- Clerks only add. No answer edits or deletes a stored memory; `Supersedes` hides a representation
+  from recall and leaves it, and its provenance, in the store.
+- Every derived node and section must point at sources inside its packet, and keep its source episode.
+- A condensation cluster whose members assert different values (a number, a quoted string, or
+  negation in some but not all; `memoryClaimSignature`) is never offered to any clerk. Merging it would
+  pick a claim, and superseding the losers would hide the clash from recall.
+- A condensation must restate its sources' values unchanged (same claim signature), create exactly one
+  memory, and link every source through both `CondensedFrom` and `Supersedes`. Anything else is
+  rejected, and the cluster is declined once it keeps failing.
+- Forgetting an episode removes what was derived only from it; memories with other sources stay.
+
+### Why not a self-edited knowledge wiki
+
+Systems such as Google Research's WikiSkill (arXiv:2608.27454) keep agent experience as wiki pages an
+LLM maintainer edits in place, with no schema and no contradiction handling. This layer avoids that on
+purpose:
+
+- **No adjudication by the writer.** A maintainer that patches pages in place picks a winner whenever
+  evidence disagrees, and the losing evidence is gone. Here clashing memories are kept side by side and
+  never merged.
+- **No unaudited causes.** A model's own root-cause story becomes durable "knowledge" there. Clerks here
+  restate and organize source material; they never originate explanations or judgments.
+- **No knowledge outliving its evidence.** WikiSkill reverts skills but never the wiki, so lessons from
+  rejected runs keep steering. Here every derived memory carries provenance, and forgetting a source
+  removes what depended on it alone.
+- **Schema over prose.** Free-form pages cannot be validated; every clerk answer here is a typed
+  mutation checked before it is stored.
+- **Bounded work.** Clerks see bounded packets, never the whole store, so cost does not grow with
+  memory.
+
 ## Memory flow
 
 The intended pipeline is:
@@ -294,6 +327,10 @@ The program decides that a cluster is eligible for review. The clerk performs re
 Output either one faithful generalized representation or `DO_NOT_CONDENSE`.
 
 If combining memories would require deciding which substantive claim is correct, return `DO_NOT_CONDENSE`.
+
+Clusters that disagree on a value never reach the clerk (see **Governing boundary**), so the clerk's
+remaining judgment is whether agreeing members are truly redundant. Its output must keep their values
+exactly: no number, quoted string or negation added or dropped.
 
 `Supersedes` in this stage means a retrieval representation has been replaced by a compressed equivalent. It does not mean the source belief was declared false or obsolete. Original provenance must remain reachable.
 

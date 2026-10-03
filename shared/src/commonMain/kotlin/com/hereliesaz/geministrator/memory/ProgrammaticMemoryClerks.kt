@@ -660,13 +660,19 @@ private class ProgrammaticCondensationRewriter(now: () -> Long) :
  * True when the members disagree on a value: a number, a quoted string, or negation present in some
  * but not all. Choosing a representative would then choose a claim, which clerks never do.
  */
-internal fun condensationWouldAdjudicate(texts: List<String>): Boolean {
-    fun values(text: String) = (NUMBER.findAll(text) + QUOTED.findAll(text)).map { it.value.lowercase() }.toSet()
-    val valueSets = texts.map(::values)
-    if (valueSets.distinct().size > 1) return true
-    val negated = texts.map { NEGATION.containsMatchIn(it) }
-    return negated.distinct().size > 1
-}
+internal fun condensationWouldAdjudicate(texts: List<String>): Boolean =
+    texts.map(::memoryClaimSignature).distinct().size > 1
+
+/**
+ * The values a memory's text asserts: its numbers and quoted strings, and whether it negates. Two
+ * texts with different signatures make different claims, however similar they read.
+ */
+internal data class MemoryClaimSignature(val values: Set<String>, val negated: Boolean)
+
+internal fun memoryClaimSignature(text: String): MemoryClaimSignature = MemoryClaimSignature(
+    values = (NUMBER.findAll(text) + QUOTED.findAll(text)).map { it.value.lowercase() }.toSet(),
+    negated = NEGATION.containsMatchIn(text),
+)
 
 // ---------------------------------------------------------------------------------------------
 

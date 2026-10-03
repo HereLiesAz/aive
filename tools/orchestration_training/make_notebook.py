@@ -278,6 +278,11 @@ def max_new_tokens(tokenizer, row):
 
 def gate(slug, generate_fn, tokenizer, label):
     config, splits = load_role(slug)
+    # An empty split proves nothing: say so instead of scoring it 0 and looking like a bad model.
+    empty = [name for name in ("test", "adversarial") if not splits[name]]
+    if empty:
+        print(f"[{slug}] {label}: no {' or '.join(empty)} rows to judge it on -> FAIL")
+        return {"test": 0.0, "adversarial": 0.0, "passed": False, "reason": f"no {' or '.join(empty)} rows"}
     test, test_fail = score(generate_fn, tokenizer, config, splits["test"])
     adversarial, adv_fail = score(generate_fn, tokenizer, config, splits["adversarial"])
     gates = config["gates"]

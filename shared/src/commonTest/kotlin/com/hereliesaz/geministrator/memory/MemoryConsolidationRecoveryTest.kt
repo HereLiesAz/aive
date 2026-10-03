@@ -109,13 +109,60 @@ class MemoryConsolidationRecoveryTest {
         assertEquals(0, declined.size)
     }
 
-    private suspend fun condensationStore(): InMemoryMemoryStore {
+    @Test
+    fun aClusterThatDisagreesOnAValueIsNeverOffered() = runBlocking {
+        val store = condensationStore(texts = listOf("Max connections: 50.", "Max connections: 100.", "Max connections: 150."))
+        var calls = 0
+        val manager = object : MemoryManagerAgent {
+            override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
+                calls++
+                return MemoryMutationBatch()
+            }
+        }
+
+        assertIs<MemoryConsolidationResult.Completed>(MemoryConsolidator(store, manager, policy).processNext(10L))
+
+        assertEquals(0, calls, "no engine may be asked to merge memories that clash")
+        assertTrue(store.read().edges.none { it.relation == MemoryRelationKind.Supersedes })
+    }
+
+    @Test
+    fun aCondensationThatChangesAValueIsRejected() = runBlocking {
+        val store = condensationStore()
+        val manager = object : MemoryManagerAgent {
+            override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
+                val merged = MemoryNode(
+                    id = MemoryNodeId("merged"),
+                    kind = MemoryNodeKind.Context,
+                    text = "The connection pool is shared by 4 services.",
+                    sourceEpisodeIds = setOf(MemoryEpisodeId("source")),
+                    createdAtEpochMillis = 10L,
+                )
+                val edges = packet.items.flatMap { item ->
+                    listOf(MemoryRelationKind.CondensedFrom, MemoryRelationKind.Supersedes).map { relation ->
+                        MemoryEdge(MemoryEdgeId("${item.id}-$relation"), merged.id, MemoryNodeId(item.id), relation, createdAtEpochMillis = 10L)
+                    }
+                }
+                return MemoryMutationBatch(nodesToAdd = listOf(merged), edgesToAdd = edges)
+            }
+        }
+
+        val result = assertIs<MemoryConsolidationResult.Failed>(MemoryConsolidator(store, manager, policy).processNext(10L))
+
+        assertEquals("Condensation must restate its sources' values unchanged", result.reason)
+        assertTrue(store.read().edges.none { it.relation == MemoryRelationKind.Supersedes })
+    }
+
+    private suspend fun condensationStore(
+        texts: List<String> = listOf("a", "b", "c").map { "The connection pool is shared, note $it." },
+    ): InMemoryMemoryStore {
         val source = episode("source")
-        val nodes = (1..3).map { index ->
+        val nodes = texts.mapIndexed { offset, text ->
+            val index = offset + 1
             MemoryNode(
                 id = MemoryNodeId("c-$index"),
                 kind = MemoryNodeKind.Context,
-                text = "Max connections: ${index * 50}.",
+                text = text,
                 sourceEpisodeIds = setOf(source.id),
                 createdAtEpochMillis = index.toLong(),
             )
