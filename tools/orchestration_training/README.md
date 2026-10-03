@@ -71,12 +71,15 @@ run all cells. Attaching the Kaggle dataset is optional: without it, the noteboo
 
 | `MODE` | Builds | Download | Updating one role |
 |---|---|---|---|
-| `"multitask"` | one merged model for all nine roles | ~640 MB, once | retrain the shared model |
+| `"multitask"` (default) | one merged model for all nine roles | ~640 MB, once | retrain the shared model |
 | `"adapters"` | one shared base + one LoRA file per role | base ~640 MB + ~18 MB per role | retrain that role's adapter |
-| `"both"` (default) | both; the app picks at runtime | | |
+| `"both"` | both; the app picks at runtime | | |
 
 Every row carries its role's system prompt, which is how a multi-task model knows which contract it is
 answering.
+
+The per-role adapters come from `notebooks/<role>.ipynb`, on the published shared base. `"adapters"`
+here exports its own base, so its adapters cannot mix with those; it stays for a one-session rebuild.
 
 **Multitask:**
 

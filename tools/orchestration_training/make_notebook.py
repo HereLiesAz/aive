@@ -99,7 +99,7 @@ RELEASE_REPOSITORY = "HereLiesAz/aive"
 RELEASE_TAG = "orchestration-utilities-v3"
 UPLOAD = False                       # True: push the archive and catalog to the GitHub release (needs GITHUB_TOKEN secret)
 ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]
-MODE = "both"                        # "multitask", "adapters" or "both"
+MODE = "multitask"                   # "multitask", "adapters" or "both"; per-role adapters come from notebooks/<role>.ipynb
 ARTIFACT_ID = "orchestration:utilities:v3:int8"
 ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"
 BASE_ARTIFACT_ID = "orchestration:base:v3:int8"
@@ -1145,7 +1145,7 @@ def config_substitutions(family, spec, tag, roles, body, variation):
          f'RELEASE_TAG = "{tag}"\nBASE_RELEASE_TAG = "{family}-base-{version}"  # the shared base every role runs on'),
         ('ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]',
          f"ROLES = {json.dumps(roles)}"),
-        ('MODE = "both"                        # "multitask", "adapters" or "both"',
+        ('MODE = "multitask"                   # "multitask", "adapters" or "both"; per-role adapters come from notebooks/<role>.ipynb',
          f'MODE = "adapters"                    # one adapter per role on the shared base\nCAPABILITY = "{spec["capability"]}"\n'
          f'KAGGLE_MIRROR = True                 # with UPLOAD: also publish to Kaggle (KAGGLE_KEY secret)\n'
          f'KAGGLE_MODEL = "{spec["kaggle_model"]}"\nKAGGLE_VARIATION = "{variation}"'),
