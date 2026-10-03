@@ -86,6 +86,12 @@ from pathlib import Path
 
 os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")  # before torch is imported
 
+import importlib.util
+if importlib.util.find_spec("diffusers") is not None:
+    # optimum's ONNX exporter imports diffusers whenever it is installed, and the image's copy may not
+    # import against the huggingface_hub installed above. Fail now, not at the export hours from here.
+    raise RuntimeError("diffusers is still installed: run `!pip uninstall -y diffusers`, restart the runtime, and run all cells again")
+
 BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 RELEASE_REPOSITORY = "HereLiesAz/aive"
 RELEASE_TAG = "orchestration-utilities-v3"
