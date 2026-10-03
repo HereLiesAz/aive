@@ -11,11 +11,12 @@ released runs programmatically, with the reason shown on the Memory screen.
 | `build_kaggle_dataset.sh` | Builds the corpus from the running memory layer |
 | `dataset-metadata.json` | Kaggle dataset identity (`hereliesaz/aive-memory-corpus`) |
 | `aive-memory-corpus.zip` | The corpus, committed so the notebook can download it |
-| `aive_memory_clerks.ipynb` | Kaggle notebook: train, gate, export, package, upload |
+| `notebooks/<role>.ipynb` | One Kaggle notebook per clerk: train, gate and publish that clerk's adapter |
+| `notebooks/base.ipynb` | Exports and publishes the shared INT8 base every clerk's adapter runs on |
 | `register_catalog.py` | Registers a released `catalog.json` in `MemoryClerkCatalog` |
 
-The notebook is generated with the orchestration one by `tools/orchestration_training/make_notebook.py`
-(same training, gating and export code); edit that file and regenerate, never the notebook.
+The notebooks are generated with the orchestration ones by `tools/orchestration_training/make_notebook.py`
+(same training, gating and export code); edit that file and regenerate, never a notebook.
 
 ## 1. Corpus
 
@@ -46,16 +47,23 @@ generator produces more clusters. `AIVE_MEMORY_DATASET_SESSIONS` changes the num
 
 ## 2. Train on Kaggle
 
-Open `aive_memory_clerks.ipynb` on Kaggle, use a GPU accelerator with internet on, and run all cells.
-It trains one multitask LoRA on Qwen2.5-0.5B-Instruct (prompt + answer up to 3072 tokens), gates every
-role on its test and adversarial splits (`json_exact`, thresholds from the role's config), merges,
-exports ONNX, quantizes weights only to INT8, gates the exported model per role on CPU, and packages
-`aive-memory-clerks-int8.tar.gz` with a `catalog.json` listing only the passing roles. The memory
-runtimes load merged models only, so the notebook runs `MODE = "multitask"`.
+Each clerk is its own LoRA adapter on one shared base, so a clerk trains, gates and ships on its own,
+and a failing one costs only its own rerun.
 
-To publish, add a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`, set
-`UPLOAD = True`, and run the last cell: it uploads to the `memory-clerks-v1` pre-release. Release assets
-are immutable; a changed archive needs a new tag.
+1. Run `notebooks/base.ipynb` once with internet on and `UPLOAD = True`. It needs no GPU and no
+   training: it exports Qwen2.5-0.5B-Instruct with every LoRA weight as a graph input, quantizes the
+   weights only to INT8 (MatMulNBits; LoRA inputs stay float32), and publishes
+   `aive-memory-base-int8.tar.gz` plus `base.json` to the `memory-base-v1` pre-release.
+2. Run `notebooks/<clerk>.ipynb` on a GPU with internet on. It trains that clerk's adapter (prompt +
+   answer up to 3072 tokens, at least `ADAPTER_MIN_STEPS` optimizer steps), gates it on the clerk's
+   test and adversarial splits (`json_exact`, thresholds from the role's config), downloads the
+   published base and verifies its SHA-256, and gates the adapter on it on CPU, exactly as it ships.
+   With `UPLOAD = True` it publishes `aive-memory-<clerk>-lora-v1.safetensors` and a one-clerk
+   `catalog.json` to `memory-<clerk>-v1`. A clerk that fails uploads nothing.
+
+Uploading needs a Kaggle secret `GITHUB_TOKEN` with contents write on `HereLiesAz/aive`. Release
+assets are immutable: a changed adapter needs a new version, and a changed base needs a new version
+and every adapter retrained against it.
 
 ## 3. Register the release
 
@@ -63,6 +71,8 @@ are immutable; a changed archive needs a new tag.
 python3 tools/memory_training/register_catalog.py catalog.json
 ~~~
 
-This writes the released clerks into `MemoryClerkCatalog.RELEASED`; commit that change. Android and
-desktop then list those stages on the Memory screen for install, and a stage set to its local model
-runs it.
+Run it once per clerk's `catalog.json`. It writes the clerk into `MemoryClerkCatalog.RELEASED` and keeps
+the clerks registered before; commit that change. Android and desktop then list those stages on the
+Memory screen for install. Installing a clerk downloads the shared base once (~640 MB) and the clerk's
+adapter (~18 MB); the base is removed with the last clerk that uses it. A stage set to its local model
+runs on the base with that clerk's weights fed as graph inputs.

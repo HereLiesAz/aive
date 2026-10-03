@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Memory never merges memories that disagree on a value, whichever engine runs condensation, and a merged memory must keep its sources' values exactly; local and hosted clerks are held to the same rule as the built-in one.
+- Each local memory clerk now ships as its own small adapter on one shared base: installing a clerk downloads the base once, plus about 18 MB for the clerk. Each memory clerk and orchestration helper now has its own training notebook, so one can be retrained without the others.
 - Plan approval is now owned by the engine: the provider drafts a plan before any run starts, and the run begins only after you approve it. Rejecting a plan cancels nothing, and a held plan survives a restart unchanged.
 - Added a training pipeline for the local memory clerks (`tools/memory_training`): a corpus recorded from the running memory layer in the app's own answer contract, a Kaggle notebook, and catalog registration. Local memory runtimes now send the chat-templated prompt the clerks are trained on.
 - The broken epoch-8 generative memory models are no longer offered for install; a memory stage set to a local model runs programmatically until a trained clerk is released.

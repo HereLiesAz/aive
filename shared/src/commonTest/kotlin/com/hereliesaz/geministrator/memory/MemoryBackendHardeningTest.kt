@@ -315,7 +315,7 @@ class MemoryBackendHardeningTest {
             MemoryNode(
                 id = MemoryNodeId("$prefix-$index"),
                 kind = MemoryNodeKind.Context,
-                text = "$prefix context $index",
+                text = "$prefix context ${'a' + (index - 1)}", // no digits: members that differ in a number never condense
                 sourceEpisodeIds = setOf(episodeId),
                 createdAtEpochMillis = createdAt + index,
             )

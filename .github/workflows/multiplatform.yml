@@ -127,7 +127,10 @@ jobs:
           git diff --exit-code -- \
             aive_orchestration_specialists.ipynb \
             tools/orchestration_training/aive_orchestration_specialists.ipynb \
-            tools/memory_training/aive_memory_clerks.ipynb
+            tools/orchestration_training/notebooks \
+            tools/memory_training/notebooks
+          # A notebook the generator no longer writes must not linger either.
+          test -z "$(git status --porcelain -- tools/orchestration_training/notebooks tools/memory_training/notebooks)"
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest

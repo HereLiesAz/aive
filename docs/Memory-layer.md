@@ -69,6 +69,47 @@ There is no memory-layer `ConflictResolver` role.
 
 `AssociationLinker` may emit only semantic relatedness such as `SimilarTo` and `AssociatedWith`. It must never infer or emit `ConflictsWith`.
 
+The engine enforces the boundary; it does not trust a clerk to keep it. Whatever runs a stage
+(programmatic, local model, hosted provider), `MemoryConsolidator` validates the answer in code:
+
+- Clerks only add. No answer edits or deletes a stored memory; `Supersedes` hides a representation
+  from recall and leaves it, and its provenance, in the store.
+- Every derived node and section must point at sources inside its packet, and keep its source episode.
+- A condensation cluster whose members assert different values (a number, a quoted string, or
+  negation in some but not all; `memoryClaimSignature`) is never offered to any clerk. Merging it would
+  pick a claim, and superseding the rest would hide the differing traces from recall, which is where
+  an agent is meant to meet them.
+- A condensation must restate its sources' values unchanged (same claim signature), create exactly one
+  memory, and link every source through both `CondensedFrom` and `Supersedes`. Anything else is
+  rejected, and the cluster is declined once it keeps failing.
+- Forgetting an episode removes what was derived only from it; memories with other sources stay.
+
+Differing memories therefore stay separate, associated by similarity, so recall brings them to an
+ordinary agent together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and
+its reasoning is banked as new experience through the same pipeline
+(`docs/architecture/MEMORY_BANKING_AND_ATTENTION.md`).
+
+### Why not a self-edited knowledge wiki
+
+Google Research's WikiSkill (arXiv:2608.27454) keeps agent experience as wiki pages that a maintainer
+LLM edits in place, and walls the acting agent off from them. It puts conscious reasoning in the
+curator and keeps the thinker away from memory: the inverse of this layer.
+
+- **The curator does the thinking.** The maintainer analyses root causes, reconciles evidence and
+  patches pages in place, so a disagreement is settled by whoever writes, and the losing evidence is
+  gone. Here clerks only file; recognizing and reasoning about a conflict belongs to an ordinary agent.
+- **The thinker never meets the conflict.** WikiSkill's acting agent cannot read the wiki; it gets
+  only distilled skills. Here associated traces, clashing ones included, surface into the agent's
+  context; attention decides when, never whether they exist.
+- **Conclusions replace experience.** A maintainer's explanation becomes the page itself, unattributed
+  and read back as fact. Here an agent's conclusion is one more episode: attributed to its session,
+  stored beside the evidence it reasoned about, and open to being reconsidered the same way.
+- **Knowledge outlives its evidence.** WikiSkill reverts skills but never the wiki, so lessons drawn
+  from rejected runs keep steering. Here every derived memory carries provenance, and nothing is
+  destroyed because a curator judged it obsolete, wrong or contradictory.
+- **Prose over schema.** Free-form pages cannot be validated; every clerk answer here is a typed,
+  add-only mutation checked before it is stored, and clerks see bounded packets, never the whole store.
+
 ## Memory flow
 
 The intended pipeline is:
@@ -294,6 +335,10 @@ The program decides that a cluster is eligible for review. The clerk performs re
 Output either one faithful generalized representation or `DO_NOT_CONDENSE`.
 
 If combining memories would require deciding which substantive claim is correct, return `DO_NOT_CONDENSE`.
+
+Clusters that disagree on a value never reach the clerk (see **Governing boundary**), so the clerk's
+remaining judgment is whether agreeing members are truly redundant. Its output must keep their values
+exactly: no number, quoted string or negation added or dropped.
 
 `Supersedes` in this stage means a retrieval representation has been replaced by a compressed equivalent. It does not mean the source belief was declared false or obsolete. Original provenance must remain reachable.
 

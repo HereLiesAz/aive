@@ -133,7 +133,8 @@ def find_dataset():
     for root in (Path("/kaggle/input"), WORK / "corpus"):
         for manifest in root.rglob("manifest.json") if root.exists() else []:
             data = json.loads(manifest.read_text())
-            if data.get("schema") == 1 and "roles" in data:
+            # Both corpora may be attached; take the one that holds the requested roles.
+            if data.get("schema") == 1 and "roles" in data and set(ROLES or []) <= set(data["roles"]):
                 return manifest.parent, data
     return None
 
@@ -208,6 +209,13 @@ import random
 from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 
+def lora_config():
+    """Every adapter and the shared base use this shape: an adapter only runs on a base exported with it."""
+    return LoraConfig(
+        task_type=TaskType.CAUSAL_LM, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    )
+
 def train(slugs, out, min_steps=0):
     """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
 
@@ -231,10 +239,7 @@ def train(slugs, out, min_steps=0):
     # Recompute activations in the backward pass instead of keeping them: long rows fit in memory.
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
-    model = get_peft_model(model, LoraConfig(
-        task_type=TaskType.CAUSAL_LM, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    ))
+    model = get_peft_model(model, lora_config())
     trainer = Trainer(
         model=model,
         args=TrainingArguments(
@@ -273,6 +278,11 @@ def max_new_tokens(tokenizer, row):
 
 def gate(slug, generate_fn, tokenizer, label):
     config, splits = load_role(slug)
+    # An empty split proves nothing: say so instead of scoring it 0 and looking like a bad model.
+    empty = [name for name in ("test", "adversarial") if not splits[name]]
+    if empty:
+        print(f"[{slug}] {label}: no {' or '.join(empty)} rows to judge it on -> FAIL")
+        return {"test": 0.0, "adversarial": 0.0, "passed": False, "reason": f"no {' or '.join(empty)} rows"}
     test, test_fail = score(generate_fn, tokenizer, config, splits["test"])
     adversarial, adv_fail = score(generate_fn, tokenizer, config, splits["adversarial"])
     gates = config["gates"]
@@ -370,12 +380,13 @@ from onnx import numpy_helper
 from optimum.exporters.onnx import onnx_export_from_model
 from safetensors.numpy import load_file, save_file
 
-def export_base_with_lora_inputs(any_adapter):
+def export_base_with_lora_inputs(any_adapter=None):
     """Export the base with LoRA branches whose A/B weights are graph inputs; returns (int8 dir, mapping).
 
     The exporter renames and transposes weights, so each LoRA tensor is first filled with a unique
     fingerprint and found again by value. Feeding a role's adapter reproduces that role's merged model;
-    feeding zeros reproduces the base (verified to ~1e-4 on logits).
+    feeding zeros reproduces the base (verified to ~1e-4 on logits). Only the adapter's shape matters,
+    so without [any_adapter] a fresh one of `lora_config()` stands in.
     """
     root = WORK / "adapters"
     fp32, int8, mapping_file = root / "base_fp32", root / "base_int8", root / "lora-inputs.json"
@@ -383,7 +394,8 @@ def export_base_with_lora_inputs(any_adapter):
         return int8, json.loads(mapping_file.read_text())
     shutil.rmtree(fp32, ignore_errors=True)
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-    peft = PeftModel.from_pretrained(AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32), any_adapter).eval()
+    base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32)
+    peft = (PeftModel.from_pretrained(base_model, any_adapter) if any_adapter else get_peft_model(base_model, lora_config())).eval()
     lora = {n: p for n, p in peft.named_parameters() if "lora_" in n}
     fingerprints = {}
     with torch.no_grad():
@@ -710,69 +722,234 @@ for target in targets:
     print("wrote", target)
 
 
-MEMORY_INTRO = """
-# Aive memory clerks: train, gate, export
+# -------------------------------------------------------------------------------------------------
+# One notebook per role. Each family has a base notebook, which exports and publishes the shared INT8
+# base with LoRA weights as graph inputs, and one notebook per role, which trains, gates and publishes
+# only that role's adapter against the published base. Both reuse the cells above: the config cell is
+# rewritten by substitutions (each must apply) and the run and output cells are replaced.
+# -------------------------------------------------------------------------------------------------
+import zipfile
 
-Builds the eight generative memory clerks (Sectioner, Salience Filter, Noun Tagger, Verb Tagger, Phrase
-Synthesizer, Summary Synthesizer, Category Classifier, Condensation Rewriter) on
-**Qwen2.5-0.5B-Instruct** as one multitask model, in the layout the app loads (`model.onnx` +
-`tokenizer.json`, KV-cache inputs, float32 logits, weight-only INT8). Each role is gated twice (the
-trained adapter, then the exported ONNX model on CPU); only passing roles go into `catalog.json`.
+ROOT = Path(__file__).resolve().parents[2]
+GENERATOR_NOTE = "Generated by `tools/orchestration_training/make_notebook.py`; edit that file, not this notebook."
 
-The corpus comes from `MemoryDatasetGenerator`: packets recorded from the running memory layer, labelled
-with the programmatic clerks' answers in the sections/nodes/links contract. The prompt is
-`MemoryMicroAgentPrompts`: the role's system prompt and the rendered packet, which the app's local
-runtimes send in the same chat template.
+FAMILIES = {
+    "orchestration": {
+        "title": "orchestration specialist",
+        "corpus": "tools/orchestration_training/aive-orchestration-corpus.zip",
+        "notebooks": ROOT / "tools/orchestration_training/notebooks",
+        "register": "tools/orchestration_training/register_catalog.py",
+        "version": "v4",
+        "capability": "orchestration-utility",
+        "substitutions": [],
+    },
+    "memory": {
+        "title": "memory clerk",
+        "corpus": "tools/memory_training/aive-memory-corpus.zip",
+        "notebooks": ROOT / "tools/memory_training/notebooks",
+        "register": "tools/memory_training/register_catalog.py",
+        "version": "v1",
+        "capability": "memory-clerk",
+        "substitutions": [
+            ("MAX_LENGTH = 1024 ", "MAX_LENGTH = 3072 "),
+            ("BATCH_SIZE = 4\n", "BATCH_SIZE = 1\n"),
+            ("GRAD_ACCUM = 4\n", "GRAD_ACCUM = 16\n"),
+            # Memory rows run ~3x longer than orchestration rows: 400 steps is ~6 epochs of one clerk.
+            ("ADAPTER_MIN_STEPS = 700\n", "ADAPTER_MIN_STEPS = 400\n"),
+            ("tools/orchestration_training/aive-orchestration-corpus.zip", "tools/memory_training/aive-memory-corpus.zip"),
+            ("attach aive-orchestration-corpus", "attach aive-memory-corpus"),
+        ],
+    },
+}
 
-Generated by `tools/orchestration_training/make_notebook.py`; edit that file, not this notebook.
+ROLE_RUN = r'''
+def fetch_base():
+    """The published shared base this role's adapter runs on: downloaded, verified and unpacked once."""
+    import urllib.request
+    root = WORK / "base"
+    int8 = root / "int8"
+    verified = int8 / ".verified-sha256"
+    url = f"https://github.com/{RELEASE_REPOSITORY}/releases/download/{BASE_RELEASE_TAG}"
+    try:
+        published = json.loads(urllib.request.urlopen(f"{url}/base.json", timeout=60).read())
+    except Exception as failure:
+        raise RuntimeError(
+            f"{BASE_RELEASE_TAG}/base.json is not published ({failure}). "
+            "Run this family's base notebook with UPLOAD = True first."
+        ) from None
+    base = published["base"]
+    assert base["logicalArtifactId"] == BASE_ARTIFACT_ID, f"{BASE_RELEASE_TAG} holds {base['logicalArtifactId']}, not {BASE_ARTIFACT_ID}"
+    assert (published["loraRank"], published["loraAlpha"]) == (LORA_R, LORA_ALPHA), "the published base was exported for another LoRA shape"
+    if not (verified.is_file() and verified.read_text().strip() == base["sha256"]):
+        shutil.rmtree(root, ignore_errors=True)
+        root.mkdir(parents=True)
+        archive = root / base["assetName"]
+        with urllib.request.urlopen(f"{url}/{base['assetName']}", timeout=600) as response, open(archive, "wb") as out:
+            shutil.copyfileobj(response, out, 8 << 20)
+        assert sha256(archive) == base["sha256"], f"{base['assetName']} does not match {BASE_RELEASE_TAG}/base.json"
+        with tarfile.open(archive) as tar:
+            tar.extractall(int8, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+        archive.unlink()
+        verified.write_text(base["sha256"] + "\n")
+    return base, int8, json.loads((int8 / "lora-inputs.json").read_text())
 
-1. **Corpus**: `tools/memory_training/build_kaggle_dataset.sh` (commit the zip it writes).
-2. **Train**: run all cells on a GPU with internet on. `UPLOAD = True` publishes to the `memory-clerks-v1`
-   pre-release (needs a `GITHUB_TOKEN` secret with contents write); release assets are immutable.
-3. **Register**: `python3 tools/memory_training/register_catalog.py catalog.json`, then commit.
+started = time.time()
+slug = SLUGS[0]
+role = state.setdefault("adapters", {}).setdefault(slug, {})
+if not role.get("trained"):
+    role["train"] = train([slug], WORK / "adapters" / slug, min_steps=ADAPTER_MIN_STEPS); role["trained"] = True; save_state()
+if "adapterGate" not in role:
+    role["adapterGate"] = torch_gates(WORK / "adapters" / slug, [slug])[slug]; save_state()
+base, adapters, scores = None, {}, {}
+if role["adapterGate"]["passed"]:
+    base, base_int8, mapping = fetch_base()
+    if "onnxGate" not in role:
+        role["onnxGate"] = adapter_onnx_gates(base_int8, mapping, [slug])[slug]; save_state()
+    if role["onnxGate"]["passed"]:
+        scores[slug] = {"adapters": {"adapter": role["adapterGate"], "onnxInt8": role["onnxGate"]}}
+        specialist = load_role(slug)[0]["specialist_id"]
+        adapters[slug] = descriptor(
+            f"{specialist}:lora:{ADAPTER_VERSION}", save_adapter_file(slug, mapping), "Adapter", "fp16",
+            fmt="safetensors", adapter_id=f"{slug}-{ADAPTER_VERSION}", capabilities=[CAPABILITY, slug],
+        )
+if not adapters:
+    # The ONNX gate writes the adapter file to gate it; a failing one is not a release asset, and
+    # publishing an empty catalog would take this role's release tag for nothing.
+    for path in ASSETS.glob("*.safetensors"):
+        path.unlink()
+    if UPLOAD:
+        print("nothing passed: not uploading")
+        UPLOAD = False
+catalog = write_catalog(base=base, adapters=adapters, scores=scores)
+print(f"{slug}: {'released' if adapters else 'not released'}; assets in {ASSETS}; done in {(time.time() - started) / 60:.1f} min")
+'''
 
-A role that fails a gate is left out; a memory stage set to a local model it lacks runs programmatically.
+BASE_RUN = r"""
+started = time.time()
+base_int8, mapping = export_base_with_lora_inputs()
+(base_int8 / "model-manifest.json").write_text(json.dumps({
+    "artifactId": BASE_ARTIFACT_ID, "foundationModelId": BASE_MODEL, "format": "onnx", "precision": "int8",
+    "weightQuantization": "MatMulNBits 8-bit, block 32, symmetric (LoRA inputs left float32)",
+    "loraInputs": len(mapping), "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "sourceCommit": MANIFEST["source_commit"],
+}, indent=2))
+base = descriptor(BASE_ARTIFACT_ID, tar_dir(base_int8, ASSETS / BASE_ASSET_NAME), "SharedBase", "int8",
+                  capabilities=[CAPABILITY, "lora-inputs"])
+# What every role notebook of this family downloads and verifies before gating its adapter.
+(ASSETS / "base.json").write_text(json.dumps(
+    {"base": base, "loraRank": LORA_R, "loraAlpha": LORA_ALPHA, "loraInputs": len(mapping)}, indent=2,
+))
+catalog = {"specialists": []}
+print(f"{BASE_ARTIFACT_ID}: sha256 {base['sha256'][:12]}; assets in {ASSETS}; done in {(time.time() - started) / 60:.1f} min")
 """
 
-# (old, new) substitutions that turn the orchestration notebook into the memory one; each must apply.
-MEMORY_SUBSTITUTIONS = [
-    ('RELEASE_TAG = "orchestration-utilities-v3"', 'RELEASE_TAG = "memory-clerks-v1"'),
-    ('MODE = "both"                        # "multitask", "adapters" or "both"',
-     'MODE = "multitask"                   # the memory runtimes load merged models only'),
-    ('ARTIFACT_ID = "orchestration:utilities:v3:int8"', 'ARTIFACT_ID = "memory:clerks:v1:int8"'),
-    ('ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"', 'ASSET_NAME = "aive-memory-clerks-int8.tar.gz"'),
-    ('BASE_ARTIFACT_ID = "orchestration:base:v3:int8"', 'BASE_ARTIFACT_ID = "memory:base:v1:int8"'),
-    ('BASE_ASSET_NAME = "aive-orchestration-base-int8.tar.gz"', 'BASE_ASSET_NAME = "aive-memory-base-int8.tar.gz"'),
-    ('ADAPTER_VERSION = "v3"', 'ADAPTER_VERSION = "v1"'),
-    ('MAX_LENGTH = 1024 ', 'MAX_LENGTH = 3072 '),
-    ('BATCH_SIZE = 4\n', 'BATCH_SIZE = 1\n'),
-    ('GRAD_ACCUM = 4\n', 'GRAD_ACCUM = 16\n'),
-    ('Path("/kaggle/working/aive-orchestration")', 'Path("/kaggle/working/aive-memory")'),
-    ('tools/orchestration_training/aive-orchestration-corpus.zip', 'tools/memory_training/aive-memory-corpus.zip'),
-    ('attach aive-orchestration-corpus', 'attach aive-memory-corpus'),
-    ('f"aive-orchestration-{slug}-lora-{ADAPTER_VERSION}.safetensors"', 'f"aive-memory-{slug}-lora-{ADAPTER_VERSION}.safetensors"'),
-    ('"orchestration-utility"', '"memory-clerk"'),
-    ('"Local orchestration specialists: gated multitask and per-role adapter releases for Qwen2.5-0.5B. See catalog.json."',
-     '"Local memory clerks: a gated multitask release for Qwen2.5-0.5B. See catalog.json."'),
-    ('"/kaggle/working/orchestration-v3-output"', '"/kaggle/working/memory-clerks-v1-output"'),
-]
+
+def role_intro(family, spec, slug, tag, base_tag):
+    return f"""
+# Aive {spec['title']}: `{slug}`
+
+Trains one LoRA adapter for **{slug}** on **Qwen2.5-0.5B-Instruct** and gates it twice: the trained
+adapter, then the published INT8 shared base with this adapter's weights fed as graph inputs, on CPU
+like a device. `catalog.json` lists the role only when both gates pass; a failing role ships nothing.
+
+1. **Base first**: the `{base_tag}` release must exist. Run `base.ipynb` in this folder once with
+   `UPLOAD = True`; this notebook downloads the base and verifies its SHA-256.
+2. **Train**: run all cells on a GPU with internet on. `UPLOAD = True` publishes the adapter and
+   `catalog.json` to the `{tag}` pre-release (needs a `GITHUB_TOKEN` secret with contents write).
+   Release assets are immutable; a changed adapter needs a new version.
+3. **Register**: `python3 {spec['register']} catalog.json`, then commit. Other roles stay registered.
+
+{GENERATOR_NOTE}
+"""
 
 
-def memory_cells():
+def base_intro(family, spec, tag):
+    return f"""
+# Aive {spec['title']}s: shared base
+
+Exports **Qwen2.5-0.5B-Instruct** once with every LoRA weight as a graph **input**, quantizes the
+weights to INT8 (MatMulNBits; LoRA inputs stay float32), and packages it with `base.json`, which every
+{family} role notebook downloads and verifies. Each role then ships only its ~18 MB adapter.
+
+No training: a GPU is not needed. Run all cells with internet on and `UPLOAD = True` to publish the
+`{tag}` pre-release (needs a `GITHUB_TOKEN` secret with contents write). Publish it once, before any
+role notebook; a changed base needs a new version, and every adapter must be retrained against it.
+
+{GENERATOR_NOTE}
+"""
+
+
+def variant_cells(intro, substitutions, run, output_substitutions=()):
     cells = json.loads(json.dumps(CELLS))
-    cells[0]["source"] = MEMORY_INTRO.strip("\n").splitlines(keepends=True)
-    for old, new in MEMORY_SUBSTITUTIONS:
+    cells[0]["source"] = intro.strip("\n").splitlines(keepends=True)
+    for old, new in substitutions:
         hits = 0
         for cell in cells[1:]:
             text = "".join(cell["source"])
             if old in text:
                 hits += text.count(old)
                 cell["source"] = text.replace(old, new).splitlines(keepends=True)
-        assert hits, f"memory notebook substitution did not apply: {old!r}"
+        assert hits, f"notebook substitution did not apply: {old!r}"
+    run_cell = next(c for c in cells if "".join(c["source"]).startswith("started = time.time()"))
+    run_cell["source"] = run.strip("\n").splitlines(keepends=True)
+    output = next(c for c in cells if "".join(c["source"]).startswith("# Upload directly only"))
+    text = "".join(output["source"])
+    for old, new in output_substitutions:
+        assert old in text, f"output substitution did not apply: {old!r}"
+        text = text.replace(old, new)
+    output["source"] = text.splitlines(keepends=True)
     return cells
 
 
-memory_target = Path(__file__).resolve().parents[1] / "memory_training" / "aive_memory_clerks.ipynb"
-memory_target.parent.mkdir(exist_ok=True)
-memory_target.write_text(json.dumps({**notebook, "cells": memory_cells()}, indent=1) + "\n")
-print("wrote", memory_target)
+def config_substitutions(family, spec, tag, roles, body):
+    version = spec["version"]
+    return [
+        ('RELEASE_TAG = "orchestration-utilities-v3"',
+         f'RELEASE_TAG = "{tag}"\nBASE_RELEASE_TAG = "{family}-base-{version}"  # the shared base every role runs on'),
+        ('ROLES = None                         # None = every role in the dataset; or e.g. ["tool-router", "completion-gate"]',
+         f"ROLES = {json.dumps(roles)}"),
+        ('MODE = "both"                        # "multitask", "adapters" or "both"',
+         f'MODE = "adapters"                    # one adapter per role on the shared base\nCAPABILITY = "{spec["capability"]}"'),
+        ('ARTIFACT_ID = "orchestration:utilities:v3:int8"\n', ""),
+        ('ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"\n', ""),
+        ('BASE_ARTIFACT_ID = "orchestration:base:v3:int8"', f'BASE_ARTIFACT_ID = "{family}:base:{version}:int8"'),
+        ('BASE_ASSET_NAME = "aive-orchestration-base-int8.tar.gz"', f'BASE_ASSET_NAME = "aive-{family}-base-int8.tar.gz"'),
+        ('ADAPTER_VERSION = "v3"', f'ADAPTER_VERSION = "{version}"'),
+        ('Path("/kaggle/working/aive-orchestration")', f'Path("/kaggle/working/aive-{tag}")'),
+        ('f"aive-orchestration-{slug}-lora-{ADAPTER_VERSION}.safetensors"', f'f"aive-{family}-{{slug}}-lora-{{ADAPTER_VERSION}}.safetensors"'),
+        ('"Local orchestration specialists: gated multitask and per-role adapter releases for Qwen2.5-0.5B. See catalog.json."',
+         json.dumps(body)),
+        *spec["substitutions"],
+    ]
+
+
+OUTPUT_DIR = ('"/kaggle/working/orchestration-v3-output"', 'f"/kaggle/working/{RELEASE_TAG}-output"')
+
+for family, spec in FAMILIES.items():
+    with zipfile.ZipFile(ROOT / spec["corpus"]) as corpus:
+        manifest = next(n for n in corpus.namelist() if n.endswith("/manifest.json"))
+        slugs = sorted(json.loads(corpus.read(manifest))["roles"])
+    out = spec["notebooks"]
+    out.mkdir(parents=True, exist_ok=True)
+    for stale in out.glob("*.ipynb"):
+        stale.unlink()
+    version = spec["version"]
+    base_tag = f"{family}-base-{version}"
+    files = {
+        "base.ipynb": variant_cells(
+            base_intro(family, spec, base_tag),
+            config_substitutions(family, spec, base_tag, slugs, f"Aive {family} shared base (INT8, LoRA inputs) for Qwen2.5-0.5B. See base.json."),
+            BASE_RUN,
+            [OUTPUT_DIR, ('[ASSETS / "catalog.json"]', '[ASSETS / "base.json"]')],
+        ),
+    }
+    for slug in slugs:
+        tag = f"{family}-{slug}-{version}"
+        files[f"{slug}.ipynb"] = variant_cells(
+            role_intro(family, spec, slug, tag, base_tag),
+            config_substitutions(family, spec, tag, [slug], f"Aive {spec['title']} {slug}: a gated LoRA adapter on {base_tag}. See catalog.json."),
+            ROLE_RUN,
+            [OUTPUT_DIR],
+        )
+    for name, cells in files.items():
+        (out / name).write_text(json.dumps({**notebook, "cells": cells}, indent=1) + "\n")
+    print(f"wrote {len(files)} notebooks to {out.relative_to(ROOT)}")

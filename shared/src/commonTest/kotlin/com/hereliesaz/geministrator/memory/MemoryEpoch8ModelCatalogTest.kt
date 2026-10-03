@@ -42,8 +42,22 @@ class MemoryEpoch8ModelCatalogTest {
     @Test
     fun clerkCatalogReadsMergedInt8Models() {
         val catalog = """{"specialists":[{"specialistId":"memory:salience-filter","mergedVariants":[{"logicalArtifactId":"memory:clerks:v1:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"memory-clerks-v1","assetName":"aive-memory-clerks-int8.tar.gz","sha256":"${"c".repeat(64)}","format":"onnx","precision":"int8","kind":"MergedModel"}]}]}"""
-        val artifact = assertNotNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.SalienceFilter, catalog))
-        assertEquals("memory-clerks-v1", artifact.releaseTag)
+        val release = assertNotNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.SalienceFilter, catalog))
+        assertEquals("memory-clerks-v1", release.model.releaseTag)
+        assertNull(release.adapter)
         assertNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.Sectioner, catalog))
+    }
+
+    @Test
+    fun clerkCatalogPrefersAnAdapterOnTheSharedBase() {
+        val base = """{"logicalArtifactId":"memory:base:v1:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"memory-base-v1","assetName":"aive-memory-base-int8.tar.gz","sha256":"${"a".repeat(64)}","format":"onnx","precision":"int8","kind":"SharedBase"}"""
+        val adapter = """{"logicalArtifactId":"memory:sectioner:lora:v1","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"memory-sectioner-v1","assetName":"aive-memory-sectioner-lora-v1.safetensors","sha256":"${"b".repeat(64)}","format":"safetensors","precision":"fp16","kind":"Adapter","adapterId":"sectioner-v1"}"""
+        val merged = """{"logicalArtifactId":"memory:clerks:v1:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"memory-clerks-v1","assetName":"aive-memory-clerks-int8.tar.gz","sha256":"${"c".repeat(64)}","format":"onnx","precision":"int8","kind":"MergedModel"}"""
+        val catalog = """{"specialists":[{"specialistId":"memory:sectioner","mergedVariants":[$merged],"sharedBaseVariants":[$base],"adapter":$adapter}]}"""
+
+        val release = assertNotNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.Sectioner, catalog))
+
+        assertEquals("memory:base:v1:int8", release.model.logicalArtifactId)
+        assertEquals("aive-memory-sectioner-lora-v1.safetensors", release.adapter?.assetName)
     }
 }

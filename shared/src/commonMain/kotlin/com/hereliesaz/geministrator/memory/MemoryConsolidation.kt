@@ -354,7 +354,12 @@ class MemoryConsolidator(
                         .map(MemoryNode::asWorkItem)
                         .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
                 }
-                .firstOrNull { (_, items) -> items.size >= 2 && items.clusterKey() !in declined }
+                // A cluster whose members assert different values is never offered: merging it would
+                // pick a claim, whichever engine runs the clerk. Its members stay side by side.
+                .firstOrNull { (_, items) ->
+                    items.size >= 2 && items.clusterKey() !in declined &&
+                        !condensationWouldAdjudicate(items.map(MemoryWorkItem::text))
+                }
                 ?: return null
             val clusterKey = items.clusterKey()
             val packetKey = "condense-${clusterKey.hashCode().toString(16)}"
@@ -520,6 +525,11 @@ class MemoryConsolidator(
                 }
                 val generalized = batch.nodesToAdd.single()
                 require(generalized.kind == plan.condensationKind)
+                // The members agree (clashing clusters are never offered), so the generalized memory
+                // must assert exactly their values: none dropped, none invented, negation kept.
+                require(memoryClaimSignature(generalized.text) == memoryClaimSignature(plan.packet.items.first().text)) {
+                    "Condensation must restate its sources' values unchanged"
+                }
                 val expectedSourceEpisodes = plan.packet.items
                     .flatMap { item ->
                         item.metadata["sourceEpisodeIds"].orEmpty()
