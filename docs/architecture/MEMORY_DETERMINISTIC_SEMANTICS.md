@@ -109,7 +109,7 @@ The underlying graph traversal and ranking implementation remains unchanged. The
 
 ## Epoch-8 model release
 
-`MemoryEpoch8ModelCatalog` registers the published `memory-layer-epoch8` release and its INT8 specialist archives.
+`MemoryEpoch8ModelCatalog` lists the memory models the runtime installs: the `memory-layer-epoch8` Association Linker (embeddings) and the generative clerks released in `MemoryClerkCatalog` (`tools/memory_training`). The epoch-8 generative INT8 archives are no longer offered: they do not load in ONNX Runtime and answer in their training schema, not the clerk contract.
 
 The catalog stores role, release tag, archive asset name, archive SHA-256, logical runtime artifact id, and quantization.
 

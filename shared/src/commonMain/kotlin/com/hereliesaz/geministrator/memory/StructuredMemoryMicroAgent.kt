@@ -188,6 +188,85 @@ private fun MicroAgentProposal.toMutationBatch(
     )
 }
 
+/**
+ * The text a model-backed memory clerk sees. Hosted engines send [render] as the prompt; local
+ * models are trained on, and run with, [chatPrompt]: the role's [system] prompt and the rendered
+ * packet in the Qwen chat template. `MemoryDatasetGenerator` builds training rows from the same
+ * functions, so training and runtime cannot drift.
+ */
+object MemoryMicroAgentPrompts {
+    fun system(role: MemoryMicroAgentRole): String =
+        "You are Aive's ${role.name} memory clerk. Do only what the packet's instruction asks, using only the " +
+            "material it supplies. Reply with exactly one JSON object in the sections/nodes/links contract and nothing else."
+
+    fun render(packet: MemoryWorkPacket, role: MemoryMicroAgentRole): String = packet.renderMicroAgentPrompt(role)
+
+    fun chatPrompt(role: MemoryMicroAgentRole, prompt: String): String = buildString {
+        append("<|im_start|>system\n").append(system(role)).append("<|im_end|>\n")
+        append("<|im_start|>user\n").append(prompt).append("<|im_end|>\n")
+        append("<|im_start|>assistant\n")
+    }
+}
+
+/** Metadata the decoder adds or the programmatic clerks stamp; a model never writes these. */
+private val DERIVED_METADATA_KEYS = setOf("microAgentRole", "semanticSource")
+
+/**
+ * [this] batch as the JSON a model clerk would answer for [packet], or null when it cannot be
+ * expressed in the contract (a source or link endpoint the packet does not show). New nodes get
+ * local keys `n0`, `n1`, …; links to existing nodes use their visible IDs.
+ */
+internal fun MemoryMutationBatch.toMicroAgentProposalJson(packet: MemoryWorkPacket): String? {
+    val items = packet.items + packet.neighborhood
+    val visible = items.mapTo(hashSetOf(), MemoryWorkItem::id)
+    val visibleNodes = items.filter { it.kind.startsWith("node:") }.mapTo(hashSetOf(), MemoryWorkItem::id)
+    val keys = nodesToAdd.mapIndexed { index, node -> node.id to "n$index" }.toMap()
+
+    val sections = sectionsToAdd.map { section ->
+        val sourceIds = section.sourceChunkIds.map(MemoryChunkId::value)
+        if (sourceIds.isEmpty() || !sourceIds.all(visible::contains)) return null
+        MicroSectionDraft(section.text, sourceIds, section.metadata - DERIVED_METADATA_KEYS)
+    }
+    val nodes = nodesToAdd.map { node ->
+        val linked = edgesToAdd.flatMap { edge ->
+            when (node.id) {
+                edge.from -> listOf(edge.to.value)
+                edge.to -> listOf(edge.from.value)
+                else -> emptyList()
+            }
+        }
+        val sourceIds = items.filter { item ->
+            item.id in linked ||
+                MemorySectionId(item.id) in node.sourceSectionIds ||
+                item.microSourceSectionIds().let { it.isNotEmpty() && node.sourceSectionIds.containsAll(it) }
+        }.map(MemoryWorkItem::id)
+        if (sourceIds.isEmpty()) return null
+        MicroNodeDraft(
+            key = keys.getValue(node.id),
+            kind = node.kind.name,
+            text = node.text,
+            sourceIds = sourceIds,
+            salience = node.salience,
+            confidence = node.confidence,
+            metadata = node.metadata - DERIVED_METADATA_KEYS,
+        )
+    }
+    val links = edgesToAdd.map { edge ->
+        fun endpoint(id: MemoryNodeId): String? = keys[id] ?: id.value.takeIf(visibleNodes::contains)
+        MicroLinkDraft(
+            from = endpoint(edge.from) ?: return null,
+            to = endpoint(edge.to) ?: return null,
+            relation = edge.relation.name,
+            weight = edge.weight,
+            metadata = edge.metadata - DERIVED_METADATA_KEYS,
+        )
+    }
+    return PROPOSAL_JSON.encodeToString(MicroAgentProposal.serializer(), MicroAgentProposal(sections, nodes, links))
+}
+
+/** Compact, with defaults: a label states every field the decoder reads. */
+private val PROPOSAL_JSON = Json { encodeDefaults = true }
+
 private fun MemoryWorkPacket.renderMicroAgentPrompt(role: MemoryMicroAgentRole): String = buildString {
     appendLine("You are a local Haive memory micro-agent.")
     appendLine("ROLE: ${role.name}")

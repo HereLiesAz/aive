@@ -2,23 +2,30 @@ package com.hereliesaz.geministrator.memory
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MemoryEpoch8ModelCatalogTest {
     @Test
-    fun coversEveryMemoryRoleExactlyOnce() {
+    fun installsOnlyTheEmbeddingLinkerAndReleasedClerks() {
+        val released = MemoryClerkCatalog.parse(MemoryClerkCatalog.RELEASED).keys
         val bundles = MemoryEpoch8ModelCatalog.all
-
-        assertEquals(MemoryMicroAgentRole.entries.size, bundles.size)
-        assertEquals(MemoryMicroAgentRole.entries.toSet(), bundles.mapTo(linkedSetOf(), MemoryModelReleaseBundle::role))
-        assertEquals(bundles.size, bundles.map(MemoryModelReleaseBundle::releaseAssetName).distinct().size)
-        assertEquals(bundles.size, bundles.map(MemoryModelReleaseBundle::runtimeArtifactId).distinct().size)
-        assertTrue(bundles.all { it.releaseTag == MemoryEpoch8ModelCatalog.RELEASE_TAG })
+        assertEquals(MemoryMicroAgentRole.AssociationLinker, bundles.first().role)
+        assertEquals(
+            released,
+            bundles.filter { it.role != MemoryMicroAgentRole.AssociationLinker }
+                .mapTo(hashSetOf()) { MemoryClerkCatalog.specialistId(it.role) },
+        )
         assertTrue(bundles.all { it.releaseAssetSha256.matches(Regex("[0-9a-f]{64}")) })
+        assertEquals(
+            "haive-specialist_08_association_linker-onnx-epoch8.tar.gz",
+            MemoryEpoch8ModelCatalog.bundleFor(MemoryMicroAgentRole.AssociationLinker)?.releaseAssetName,
+        )
     }
 
     @Test
-    fun associationSpecialistUsesEmbeddingWorkloadAndOthersGenerate() {
+    fun unreleasedClerksHaveNoBundleButStillAModelSpec() {
         MemoryMicroAgentRole.entries.forEach { role ->
             val spec = MemoryEpoch8ModelCatalog.modelSpec(role)
             val expected = if (role == MemoryMicroAgentRole.AssociationLinker) {
@@ -28,22 +35,15 @@ class MemoryEpoch8ModelCatalogTest {
             }
             assertEquals(expected, spec.requirements.workload)
             assertTrue(spec.deployment.supportsAllHaivePlatforms())
+            assertEquals(MemoryEpoch8ModelCatalog.LOCAL_MAX_INPUT_ITEMS, spec.maxInputItems)
         }
     }
 
     @Test
-    fun catalogPointsAtPublishedEpoch8Assets() {
-        assertEquals(
-            "haive-specialist_03_noun_indexer-int8-epoch8.tar.gz",
-            MemoryEpoch8ModelCatalog.nounIndexer.releaseAssetName,
-        )
-        assertEquals(
-            "haive-specialist_04_verb_indexer-int8-epoch8.tar.gz",
-            MemoryEpoch8ModelCatalog.verbIndexer.releaseAssetName,
-        )
-        assertEquals(
-            "haive-specialist_08_association_linker-onnx-epoch8.tar.gz",
-            MemoryEpoch8ModelCatalog.associationLinker.releaseAssetName,
-        )
+    fun clerkCatalogReadsMergedInt8Models() {
+        val catalog = """{"specialists":[{"specialistId":"memory:salience-filter","mergedVariants":[{"logicalArtifactId":"memory:clerks:v1:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"memory-clerks-v1","assetName":"aive-memory-clerks-int8.tar.gz","sha256":"${"c".repeat(64)}","format":"onnx","precision":"int8","kind":"MergedModel"}]}]}"""
+        val artifact = assertNotNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.SalienceFilter, catalog))
+        assertEquals("memory-clerks-v1", artifact.releaseTag)
+        assertNull(MemoryClerkCatalog.released(MemoryMicroAgentRole.Sectioner, catalog))
     }
 }

@@ -97,6 +97,11 @@ assert MODE in ("multitask", "adapters", "both")
 
 MAX_LENGTH = 1024                    # prompt + answer tokens; longer rows are skipped and counted
 EPOCHS = 2                           # nine roles' worth of rows per epoch
+# A per-role adapter sees one role's rows (~1400), so two epochs are ~175 optimizer steps. That was
+# too few: Agent Router adapters picked ineligible candidates, dropped the fallback and preferred the
+# cheaper agent, while the multitask model (nine roles' rows) passed. Adapters train at least this
+# many optimizer steps.
+ADAPTER_MIN_STEPS = 700
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 8
 GRAD_ACCUM = 2
@@ -186,12 +191,16 @@ def save_state():
 ''')
 
 code(r'''
+import math
 import random
 from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 
-def train(slugs, out):
-    """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role."""
+def train(slugs, out, min_steps=0):
+    """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
+
+    [min_steps] raises the epoch count until training takes at least that many optimizer steps.
+    """
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     encoded, skipped = {"train": [], "validation": []}, {}
     for slug in slugs:
@@ -202,6 +211,8 @@ def train(slugs, out):
                 skipped[slug] = len(splits[name]) - len(rows)
             encoded[name] += rows
     random.Random(8).shuffle(encoded["train"])
+    steps_per_epoch = max(1, math.ceil(len(encoded["train"]) / (BATCH_SIZE * GRAD_ACCUM)))
+    epochs = max(EPOCHS, math.ceil(min_steps / steps_per_epoch))
     model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32).to(DEVICE)
     model = get_peft_model(model, LoraConfig(
         task_type=TaskType.CAUSAL_LM, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
@@ -212,7 +223,7 @@ def train(slugs, out):
         args=TrainingArguments(
             output_dir=str(out / "checkpoints"), per_device_train_batch_size=BATCH_SIZE,
             per_device_eval_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
-            num_train_epochs=EPOCHS, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
+            num_train_epochs=epochs, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
             fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="no", report_to=[], seed=8,
         ),
         train_dataset=Dataset.from_list(encoded["train"]),
@@ -225,7 +236,7 @@ def train(slugs, out):
     shutil.rmtree(out / "checkpoints", ignore_errors=True)
     del trainer, model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
-    return {"trainRows": len(encoded["train"]), "skippedTooLong": skipped}
+    return {"trainRows": len(encoded["train"]), "epochs": epochs, "skippedTooLong": skipped}
 ''')
 
 code(r'''
@@ -272,7 +283,7 @@ def torch_gates(adapter, slugs):
 code(r'''
 from optimum.exporters.onnx import main_export
 import onnx
-from onnxruntime.quantization.matmul_nbits_quantizer import MatMulNBitsQuantizer
+from onnxruntime.quantization.matmul_nbits_quantizer import DefaultWeightOnlyQuantConfig, MatMulNBitsQuantizer
 from optimum.onnxruntime import ORTModelForCausalLM
 
 QUANT_OPS = ("MatMul",)
@@ -290,8 +301,12 @@ def quantize_weights(fp32, int8):
         if f.is_file() and not f.name.startswith("model.onnx"):
             shutil.copy2(f, int8 / f.name)
     model = onnx.load(str(fp32 / "model.onnx"))
+    # bits goes through algo_config: older onnxruntime releases have no `bits` argument on the quantizer.
+    config = DefaultWeightOnlyQuantConfig(
+        block_size=32, is_symmetric=True, accuracy_level=4, op_types_to_quantize=QUANT_OPS, bits=8,
+    )
     quantizer = MatMulNBitsQuantizer(
-        model, bits=8, block_size=32, is_symmetric=True, accuracy_level=4, op_types_to_quantize=QUANT_OPS,
+        model, block_size=32, is_symmetric=True, accuracy_level=4, op_types_to_quantize=QUANT_OPS, algo_config=config,
     )
     quantizer.process()
     quantizer.model.save_model_to_file(str(int8 / "model.onnx"), use_external_data_format=True)
@@ -606,7 +621,7 @@ if MODE in ("adapters", "both"):
     for slug in SLUGS:
         role = ad.setdefault(slug, {})
         if not role.get("trained"):
-            role["train"] = train([slug], WORK / "adapters" / slug); role["trained"] = True; save_state()
+            role["train"] = train([slug], WORK / "adapters" / slug, min_steps=ADAPTER_MIN_STEPS); role["trained"] = True; save_state()
         if "adapterGate" not in role:
             role["adapterGate"] = torch_gates(WORK / "adapters" / slug, [slug])[slug]; save_state()
     candidates = [s for s in SLUGS if ad[s]["adapterGate"]["passed"]]
@@ -676,3 +691,71 @@ rendered = json.dumps(notebook, indent=1) + "\n"
 for target in targets:
     target.write_text(rendered)
     print("wrote", target)
+
+
+MEMORY_INTRO = """
+# Aive memory clerks: train, gate, export
+
+Builds the eight generative memory clerks (Sectioner, Salience Filter, Noun Tagger, Verb Tagger, Phrase
+Synthesizer, Summary Synthesizer, Category Classifier, Condensation Rewriter) on
+**Qwen2.5-0.5B-Instruct** as one multitask model, in the layout the app loads (`model.onnx` +
+`tokenizer.json`, KV-cache inputs, float32 logits, weight-only INT8). Each role is gated twice (the
+trained adapter, then the exported ONNX model on CPU); only passing roles go into `catalog.json`.
+
+The corpus comes from `MemoryDatasetGenerator`: packets recorded from the running memory layer, labelled
+with the programmatic clerks' answers in the sections/nodes/links contract. The prompt is
+`MemoryMicroAgentPrompts`: the role's system prompt and the rendered packet, which the app's local
+runtimes send in the same chat template.
+
+Generated by `tools/orchestration_training/make_notebook.py`; edit that file, not this notebook.
+
+1. **Corpus**: `tools/memory_training/build_kaggle_dataset.sh` (commit the zip it writes).
+2. **Train**: run all cells on a GPU with internet on. `UPLOAD = True` publishes to the `memory-clerks-v1`
+   pre-release (needs a `GITHUB_TOKEN` secret with contents write); release assets are immutable.
+3. **Register**: `python3 tools/memory_training/register_catalog.py catalog.json`, then commit.
+
+A role that fails a gate is left out; a memory stage set to a local model it lacks runs programmatically.
+"""
+
+# (old, new) substitutions that turn the orchestration notebook into the memory one; each must apply.
+MEMORY_SUBSTITUTIONS = [
+    ('RELEASE_TAG = "orchestration-utilities-v3"', 'RELEASE_TAG = "memory-clerks-v1"'),
+    ('MODE = "both"                        # "multitask", "adapters" or "both"',
+     'MODE = "multitask"                   # the memory runtimes load merged models only'),
+    ('ARTIFACT_ID = "orchestration:utilities:v3:int8"', 'ARTIFACT_ID = "memory:clerks:v1:int8"'),
+    ('ASSET_NAME = "aive-orchestration-utilities-int8.tar.gz"', 'ASSET_NAME = "aive-memory-clerks-int8.tar.gz"'),
+    ('BASE_ARTIFACT_ID = "orchestration:base:v3:int8"', 'BASE_ARTIFACT_ID = "memory:base:v1:int8"'),
+    ('BASE_ASSET_NAME = "aive-orchestration-base-int8.tar.gz"', 'BASE_ASSET_NAME = "aive-memory-base-int8.tar.gz"'),
+    ('ADAPTER_VERSION = "v3"', 'ADAPTER_VERSION = "v1"'),
+    ('MAX_LENGTH = 1024 ', 'MAX_LENGTH = 3072 '),
+    ('BATCH_SIZE = 8\n', 'BATCH_SIZE = 2\n'),
+    ('GRAD_ACCUM = 2\n', 'GRAD_ACCUM = 8\n'),
+    ('Path("/kaggle/working/aive-orchestration")', 'Path("/kaggle/working/aive-memory")'),
+    ('tools/orchestration_training/aive-orchestration-corpus.zip', 'tools/memory_training/aive-memory-corpus.zip'),
+    ('attach aive-orchestration-corpus', 'attach aive-memory-corpus'),
+    ('f"aive-orchestration-{slug}-lora-{ADAPTER_VERSION}.safetensors"', 'f"aive-memory-{slug}-lora-{ADAPTER_VERSION}.safetensors"'),
+    ('"orchestration-utility"', '"memory-clerk"'),
+    ('"Local orchestration specialists: gated multitask and per-role adapter releases for Qwen2.5-0.5B. See catalog.json."',
+     '"Local memory clerks: a gated multitask release for Qwen2.5-0.5B. See catalog.json."'),
+    ('"/kaggle/working/orchestration-v3-output"', '"/kaggle/working/memory-clerks-v1-output"'),
+]
+
+
+def memory_cells():
+    cells = json.loads(json.dumps(CELLS))
+    cells[0]["source"] = MEMORY_INTRO.strip("\n").splitlines(keepends=True)
+    for old, new in MEMORY_SUBSTITUTIONS:
+        hits = 0
+        for cell in cells[1:]:
+            text = "".join(cell["source"])
+            if old in text:
+                hits += text.count(old)
+                cell["source"] = text.replace(old, new).splitlines(keepends=True)
+        assert hits, f"memory notebook substitution did not apply: {old!r}"
+    return cells
+
+
+memory_target = Path(__file__).resolve().parents[1] / "memory_training" / "aive_memory_clerks.ipynb"
+memory_target.parent.mkdir(exist_ok=True)
+memory_target.write_text(json.dumps({**notebook, "cells": memory_cells()}, indent=1) + "\n")
+print("wrote", memory_target)
