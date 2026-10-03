@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.providers.AgentProvider
 
@@ -48,7 +49,8 @@ object HostedLlmProviders {
 
     private const val ACCOUNT_PLACEHOLDER = "{accountId}"
 
-    val entries: List<HostedLlmProviderSpec> = listOf(
+    /** The hosted providers built into Aive. */
+    val builtInEntries: List<HostedLlmProviderSpec> = listOf(
         HostedLlmProviderSpec(
             id = DEEPSEEK_ID,
             displayName = "DeepSeek",
@@ -168,9 +170,27 @@ object HostedLlmProviders {
         ),
     )
 
-    private val byId = entries.associateBy(HostedLlmProviderSpec::id)
+    private val builtInById = builtInEntries.associateBy(HostedLlmProviderSpec::id)
 
-    fun entry(id: String): HostedLlmProviderSpec? = byId[id]
+    /**
+     * Built-in providers, then the language models installed from the Azphalt store
+     * ([StoreLlmProviders]), which Aive calls directly over the same wire format. Store models come
+     * last, after the keyless built-ins, for the same reason those do.
+     */
+    val entries: List<HostedLlmProviderSpec>
+        get() = builtInEntries + storeEntries()
+
+    fun entry(id: String): HostedLlmProviderSpec? = builtInById[id] ?: storeEntries().firstOrNull { it.id == id }
+
+    private fun storeEntries(): List<HostedLlmProviderSpec> = StoreLlmProviders.all().map { llm ->
+        HostedLlmProviderSpec(
+            id = llm.providerId,
+            displayName = llm.name,
+            baseUrl = llm.baseUrl,
+            defaultModel = llm.defaultModel,
+            keyOptional = llm.keyOptional,
+        )
+    }
 
     fun create(
         spec: HostedLlmProviderSpec,

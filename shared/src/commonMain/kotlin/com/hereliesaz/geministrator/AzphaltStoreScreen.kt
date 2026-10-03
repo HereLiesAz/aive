@@ -26,11 +26,15 @@ import com.hereliesaz.geministrator.azphalt.AzphaltDependencyStatus
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
+import com.hereliesaz.geministrator.azphalt.AzphaltPreparedLlmInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedModelInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
+import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
+import com.hereliesaz.geministrator.azphalt.describePromptHandling
+import com.hereliesaz.geministrator.azphalt.isDirectLlmPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -42,6 +46,7 @@ private enum class AzphaltStoreCategory(val label: String) {
     Workflows("Workflows"),
     Roles("Roles"),
     Models("Models"),
+    Llms("LLMs"),
 }
 
 @OptIn(ExperimentalTime::class)
@@ -50,6 +55,9 @@ internal fun AzphaltStoreScreen(
     service: AzphaltStoreService?,
     importRequest: AzphaltPackageImportRequest? = null,
     onImportHandled: (Long) -> Unit = {},
+    connectedProviderIds: Set<String> = emptySet(),
+    onConnectProvider: (String) -> Unit = {},
+    onDisconnectProvider: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -63,6 +71,7 @@ internal fun AzphaltStoreScreen(
     val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
     var preparedModel by remember { mutableStateOf<AzphaltPreparedModelInstall?>(null) }
+    var preparedLlm by remember { mutableStateOf<AzphaltPreparedLlmInstall?>(null) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
     var allowPublisherChange by remember { mutableStateOf(false) }
@@ -157,6 +166,7 @@ internal fun AzphaltStoreScreen(
             AzphaltStoreCategory.Workflows -> item.kind == "workflow"
             AzphaltStoreCategory.Roles -> item.kind == "role"
             AzphaltStoreCategory.Models -> item.isModelAssetPackage()
+            AzphaltStoreCategory.Llms -> item.isDirectLlmPackage()
         }
     }
 
@@ -169,8 +179,8 @@ internal fun AzphaltStoreScreen(
     ) {
         Text("AZPHALT STORE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            snapshot?.repository?.name?.let { "$it · workflows, roles, and models for The Aive" }
-                ?: "Verified workflows, roles, and models for The Aive",
+            snapshot?.repository?.name?.let { "$it · workflows, roles, models, and LLMs for The Aive" }
+                ?: "Verified workflows, roles, models, and LLMs for The Aive",
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -191,7 +201,7 @@ internal fun AzphaltStoreScreen(
                 onClick = { if (!loading) refreshGeneration += 1 },
             )
             snapshot?.let { loaded ->
-                val count = loaded.installed.size + loaded.installedModels.size
+                val count = loaded.installed.size + loaded.installedModels.size + loaded.installedLlms.size
                 Text("$count installed", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
@@ -209,7 +219,7 @@ internal fun AzphaltStoreScreen(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search workflows, roles, and models") },
+            label = { Text("Search workflows, roles, models, and LLMs") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -224,6 +234,7 @@ internal fun AzphaltStoreScreen(
                     AzphaltStoreCategory.Workflows -> packages.count { it.kind == "workflow" }
                     AzphaltStoreCategory.Roles -> packages.count { it.kind == "role" }
                     AzphaltStoreCategory.Models -> packages.count(AzphaltPackageSummary::isModelAssetPackage)
+                    AzphaltStoreCategory.Llms -> packages.count(AzphaltPackageSummary::isDirectLlmPackage)
                 }
                 AzphaltPill(
                     label = item.label,
@@ -241,10 +252,60 @@ internal fun AzphaltStoreScreen(
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
         val installedModelsById = snapshot?.installedModels.orEmpty().associateBy(InstalledAzphaltModelPackage::packageId)
+        val installedLlmsById = snapshot?.installedLlms.orEmpty().associateBy(InstalledStoreLlm::packageId)
         val updatesById = snapshot?.updates.orEmpty().associateBy { it.id }
         val revoked = snapshot?.revocations.orEmpty().map { it.id to it.version }.toSet()
 
         visiblePackages.forEach { item ->
+            if (item.isDirectLlmPackage()) {
+                val installedLlm = installedLlmsById[item.id]
+                val selected = selectedPackageId == item.id
+                val isRevoked = (item.id to item.latest) in revoked ||
+                    (installedLlm != null && (item.id to installedLlm.version) in revoked)
+                StoreLlmRecord(
+                    item = item,
+                    installed = installedLlm,
+                    connected = installedLlm != null && installedLlm.providerId in connectedProviderIds,
+                    revoked = isRevoked,
+                    selected = selected,
+                    onSelect = {
+                        selectedPackageIdValue = if (selected) "" else item.id
+                        preparedLlm = preparedLlm?.takeIf { it.detail.id == item.id }
+                        error = null
+                        status = null
+                    },
+                    onPrepare = {
+                        if (!loading) {
+                            scope.launch {
+                                loading = true
+                                error = null
+                                status = null
+                                runCatching { service.prepareLlmInstall(item.id, item.latest) }
+                                    .onSuccess { plan ->
+                                        preparedLlm = plan
+                                        prepared = null
+                                        preparedModel = null
+                                        allowUntrustedSigner = false
+                                        allowPublisherChange = false
+                                    }
+                                    .onFailure { failure -> error = failure.message ?: "Language model package preparation failed." }
+                                loading = false
+                            }
+                        }
+                    },
+                    onConnect = { installedLlm?.let { onConnectProvider(it.providerId) } },
+                    onRemove = {
+                        installedLlm?.let { llm ->
+                            if (llm.providerId in connectedProviderIds) onDisconnectProvider(llm.providerId)
+                            service.removeLlm(llm.packageId)
+                            status = "Removed ${item.name}."
+                            preparedLlm = null
+                            refreshGeneration += 1
+                        }
+                    },
+                )
+                return@forEach
+            }
             val modelAsset = item.isModelAssetPackage()
             val installed = installedById[item.id]
             val installedModel = installedModelsById[item.id]
@@ -433,6 +494,40 @@ internal fun AzphaltStoreScreen(
             )
         }
 
+        preparedLlm?.let { plan ->
+            PreparedStoreLlmPanel(
+                prepared = plan,
+                allowUntrustedSigner = allowUntrustedSigner,
+                onAllowUntrustedSignerChanged = { allowUntrustedSigner = it },
+                allowPublisherChange = allowPublisherChange,
+                onAllowPublisherChangeChanged = { allowPublisherChange = it },
+                onInstall = {
+                    scope.launch {
+                        loading = true
+                        error = null
+                        status = null
+                        runCatching {
+                            service.installLlm(
+                                prepared = plan,
+                                nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                                allowUntrustedSigner = allowUntrustedSigner,
+                                allowPublisherChange = allowPublisherChange,
+                            )
+                        }.onSuccess { installed ->
+                            status = "Installed ${installed.name}. Connect it to use it" +
+                                if (installed.keyOptional) "; no key is needed." else " with your key."
+                            preparedLlm = null
+                            refreshGeneration += 1
+                            onConnectProvider(installed.providerId)
+                        }.onFailure { failure ->
+                            error = failure.message ?: "Language model installation failed."
+                        }
+                        loading = false
+                    }
+                },
+            )
+        }
+
         prepared?.let { plan ->
             PreparedAzphaltInstall(
                 prepared = plan,
@@ -492,6 +587,173 @@ internal fun AzphaltStoreScreen(
             )
         }
     }
+}
+
+@Composable
+private fun StoreLlmRecord(
+    item: AzphaltPackageSummary,
+    installed: InstalledStoreLlm?,
+    connected: Boolean,
+    revoked: Boolean,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    onPrepare: () -> Unit,
+    onConnect: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val llm = item.llm
+    val endpoint = llm?.endpoint
+    val keyless = endpoint?.auth != "required-bearer"
+    AzphaltRecord(
+        seed = "azphalt-llm-${item.id}",
+        eyebrow = listOfNotNull(
+            "LLM",
+            if (keyless) "No key needed" else "Needs a key",
+            llm?.dataHandling?.operator?.takeIf(String::isNotBlank),
+        ).joinToString(" · "),
+        title = item.name,
+        body = item.description ?: item.id,
+        endCap = when {
+            revoked -> "Revoked"
+            connected -> "Connected"
+            installed != null -> "Installed ${installed.version}"
+            else -> item.latest
+        },
+        selected = selected,
+        onClick = onSelect,
+        well = if (selected) {
+            {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    endpoint?.let {
+                        Text(
+                            "${it.defaultModel} at ${it.baseUrl}. Aive calls it directly; nothing runs on your GitHub.",
+                            style = AzphaltType.body,
+                            color = Azphalt.currentGround.onPage,
+                        )
+                    }
+                    llm?.dataHandling?.let { handling ->
+                        AzphaltNote(seed = "azphalt-llm-data-${item.id}", label = "PROMPTS", value = describePromptHandling(handling.operator, handling.prompts, handling.modelPinned))
+                    }
+                    when {
+                        revoked -> Text(
+                            "A repository revocation applies to this package/version. Installation is blocked.",
+                            style = AzphaltType.body,
+                            color = Azphalt.currentGround.onPage,
+                        )
+                        installed == null -> AzphaltPill(
+                            label = "Inspect install",
+                            seed = "azphalt-llm-prepare-${item.id}",
+                            endCap = item.latest,
+                            onClick = onPrepare,
+                        )
+                        else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AzphaltPill(
+                                label = if (connected) "Change key" else "Connect",
+                                seed = "azphalt-llm-connect-${item.id}",
+                                onClick = onConnect,
+                            )
+                            AzphaltPill(
+                                label = "Remove",
+                                seed = "azphalt-llm-remove-${item.id}",
+                                endCap = installed.version,
+                                onClick = onRemove,
+                            )
+                        }
+                    }
+                }
+            }
+        } else null,
+    )
+}
+
+@Composable
+private fun PreparedStoreLlmPanel(
+    prepared: AzphaltPreparedLlmInstall,
+    allowUntrustedSigner: Boolean,
+    onAllowUntrustedSignerChanged: (Boolean) -> Unit,
+    allowPublisherChange: Boolean,
+    onAllowPublisherChangeChanged: (Boolean) -> Unit,
+    onInstall: () -> Unit,
+) {
+    val verification = prepared.verification
+    val endpoint = prepared.endpoint
+    val handling = prepared.llm.dataHandling
+    AzphaltRecord(
+        seed = "azphalt-llm-prepared-${prepared.detail.id}",
+        eyebrow = "Verified language model",
+        title = "${prepared.detail.name} ${prepared.version}",
+        body = "${endpoint.defaultModel} at ${endpoint.baseUrl}",
+        endCap = if (verification.trusted) {
+            "Trusted"
+        } else if (verification.packageContents.signed) {
+            "Unknown signer"
+        } else {
+            "Unsigned"
+        },
+        selected = true,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                handling?.let {
+                    AzphaltNote(
+                        seed = "azphalt-llm-prepared-data",
+                        label = "WHERE PROMPTS GO",
+                        value = describePromptHandling(it.operator, it.prompts, it.modelPinned) +
+                            (it.terms?.takeIf(String::isNotBlank)?.let { terms -> " Terms: $terms" } ?: ""),
+                    )
+                }
+                AzphaltNote(
+                    seed = "azphalt-llm-prepared-key",
+                    label = "KEY",
+                    value = when (endpoint.auth) {
+                        "required-bearer" -> "Needs a key" + (prepared.keyInput?.description?.let { ": $it" } ?: ".")
+                        "optional-bearer" -> "No key needed" + (prepared.keyInput?.description?.let { "; $it" } ?: ".")
+                        else -> "No key needed."
+                    } + " A key you add is kept in this device's credential store and sent only to this endpoint.",
+                )
+                Text(
+                    "Aive calls this model directly. The package's GitHub setup script is not run, and no GitHub access is needed.",
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+                if (verification.packageContents.signed && !verification.trusted) {
+                    ConfirmationRow(
+                        checked = allowUntrustedSigner,
+                        onCheckedChange = onAllowUntrustedSignerChanged,
+                        text = "Install despite an unrecognized signing key",
+                    )
+                }
+                if (verification.publisherChanged) {
+                    ConfirmationRow(
+                        checked = allowPublisherChange,
+                        onCheckedChange = onAllowPublisherChangeChanged,
+                        text = "Approve publisher-key change for this package id",
+                    )
+                }
+                val trustReady = !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
+                val publisherReady = !verification.publisherChanged || allowPublisherChange
+                if (trustReady && publisherReady) {
+                    AzphaltPill(
+                        label = "Install and connect",
+                        seed = "azphalt-llm-install-${prepared.detail.id}",
+                        endCap = prepared.version,
+                        onClick = onInstall,
+                    )
+                } else {
+                    Text(
+                        if (!publisherReady) {
+                            "Publisher-key change requires explicit approval."
+                        } else {
+                            "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                        },
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
+            }
+        },
+    )
 }
 
 @Composable

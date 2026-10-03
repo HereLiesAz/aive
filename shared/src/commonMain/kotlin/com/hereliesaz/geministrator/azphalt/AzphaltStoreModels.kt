@@ -61,7 +61,69 @@ data class AzphaltPackageSummary(
     val preview: AzphaltPreview? = null,
     val nameLocalized: Map<String, String> = emptyMap(),
     val descriptionLocalized: Map<String, String> = emptyMap(),
+    val llm: AzphaltLlm? = null,
 )
+
+/**
+ * The `llm` block of a `kind: "llm"` package (azphalt spec/llm.md): an off-device language model.
+ * Aive uses only `endpoint`-tier packages that speak `openai-chat`, and calls them directly (§ Direct
+ * use): it never runs the package's setup script and never provisions a sandbox.
+ */
+@Serializable
+data class AzphaltLlm(
+    val tier: String,
+    val inputs: List<AzphaltLlmInput> = emptyList(),
+    val endpoint: AzphaltLlmEndpoint? = null,
+    val dataHandling: AzphaltLlmDataHandling? = null,
+    val role: String? = null,
+    val setup: JsonElement? = null,
+    val weights: JsonElement? = null,
+    val run: JsonElement? = null,
+)
+
+@Serializable
+data class AzphaltLlmInput(
+    val id: String,
+    val type: String? = null,
+    val password: Boolean = false,
+    val optional: Boolean = false,
+    val description: String? = null,
+)
+
+@Serializable
+data class AzphaltLlmEndpoint(
+    val protocols: List<String> = emptyList(),
+    val baseUrl: String? = null,
+    val defaultModel: String? = null,
+    val auth: String = "none",
+    val authInput: String? = null,
+)
+
+@Serializable
+data class AzphaltLlmDataHandling(
+    val prompts: String = "unknown",
+    val modelPinned: Boolean = false,
+    val operator: String? = null,
+    val terms: String? = null,
+)
+
+/** Why Aive cannot call this `llm` block directly, or null when it can (§ Direct use). */
+fun AzphaltLlm.directUseProblem(): String? {
+    val endpoint = endpoint ?: return "declares no endpoint"
+    return when {
+        tier != "endpoint" -> "runs only in a GitHub sandbox ($tier tier), which Aive does not provide"
+        "openai-chat" !in endpoint.protocols -> "does not offer the openai-chat protocol"
+        endpoint.baseUrl?.startsWith("https://", ignoreCase = true) != true -> "endpoint is not an https:// URL"
+        endpoint.defaultModel.isNullOrBlank() -> "names no default model"
+        endpoint.auth !in setOf("none", "optional-bearer", "required-bearer") -> "uses unknown auth ${endpoint.auth}"
+        endpoint.auth != "none" && inputs.none { it.id == endpoint.authInput } -> "names an undeclared key input"
+        dataHandling == null -> "does not say what the operator does with prompts"
+        else -> null
+    }
+}
+
+internal fun AzphaltPackageSummary.isDirectLlmPackage(): Boolean =
+    kind == "llm" && llm?.directUseProblem() == null
 
 
 private val AZPHALT_MODEL_ASSET_TYPES: Set<String> = setOf(
@@ -100,6 +162,7 @@ data class AzphaltPackageDetail(
     val priceStatus: String = "free",
     val manifest: AzphaltManifest? = null,
     val versions: List<AzphaltPackageVersion> = emptyList(),
+    val llm: AzphaltLlm? = null,
     val nameLocalized: Map<String, String> = emptyMap(),
     val descriptionLocalized: Map<String, String> = emptyMap(),
 )
@@ -147,6 +210,7 @@ data class AzphaltManifest(
     val files: Map<String, String> = emptyMap(),
     val workflow: AzphaltWorkflowManifest? = null,
     val role: AzphaltRoleManifest? = null,
+    val llm: AzphaltLlm? = null,
 )
 
 @Serializable
