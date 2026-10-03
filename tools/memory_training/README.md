@@ -41,9 +41,13 @@ each recorded packet is fitted exactly as the runtime fits it for a model:
 
 Like the orchestration corpus, it is a distillation seed: it teaches the contract and the conservative
 baseline, nothing beyond it. Condensation only happens when similar memories pile up, so the
-Condensation Rewriter has few rows and no adversarial ones; expect it to fail its gates until the
-generator produces more clusters. `AIVE_MEMORY_DATASET_SESSIONS` changes the number of sessions
-(default 1500).
+generator restates recurring facts (two per third session) and condenses clusters from three
+members instead of the runtime's eight or more; a packet looks the same either way. Adversarial
+condensation material restates facts with negation, quoted strings and several numbers, beside
+restatements that change a value, which never reach the clerk. The Category Classifier's
+instruction carries the taxonomy it is labelled with (`memoryCategoryGuide`). Every role must have
+rows in every split; the generator test fails otherwise. `AIVE_MEMORY_DATASET_SESSIONS` changes the
+number of sessions (default 1500).
 
 ## 2. Train on Kaggle
 

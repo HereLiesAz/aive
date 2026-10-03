@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Memory now links similar memories across sessions much more often: the association step offers memories of the same kind first, then other kinds, and skips memories already condensed, so related memories, including ones that disagree, are far more likely to be recalled together. Within a group of similar memories, the ones that agree can now condense while the ones that differ stay separate.
 - Memory never merges memories that disagree on a value, whichever engine runs condensation, and a merged memory must keep its sources' values exactly; local and hosted clerks are held to the same rule as the built-in one.
 - Each local memory clerk now ships as its own small adapter on one shared base: installing a clerk downloads the base once, plus about 18 MB for the clerk. Each memory clerk and orchestration helper now has its own training notebook, so one can be retrained without the others.
 - Plan approval is now owned by the engine: the provider drafts a plan before any run starts, and the run begins only after you approve it. Rejecting a plan cancels nothing, and a held plan survives a restart unchanged.

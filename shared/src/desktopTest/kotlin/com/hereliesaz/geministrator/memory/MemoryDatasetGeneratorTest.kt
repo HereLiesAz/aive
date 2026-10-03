@@ -15,8 +15,19 @@ class MemoryDatasetGeneratorTest {
             assertTrue(roleRows.isNotEmpty(), "no rows for $role")
             assertEquals(roleRows.size, roleRows.map { it.id }.distinct().size, "duplicate ids for $role")
             assertEquals(roleRows.size, roleRows.map { it.input }.distinct().size, "duplicate inputs for $role")
+            // An empty split cannot gate a clerk: the notebook would have nothing to judge it on.
+            val splits = roleRows.groupingBy { it.split }.eachCount()
+            listOf("train", "validation", "test", "adversarial").forEach { split ->
+                assertTrue((splits[split] ?: 0) > 0, "no $split rows for $role: $splits")
+            }
         }
-        assertTrue(rows.values.flatten().map { it.split }.toSet().containsAll(setOf("train", "validation", "test", "adversarial")))
+    }
+
+    @Test
+    fun theCategoryClerkSeesTheTaxonomyItIsLabelledWith() {
+        val guide = memoryCategoryGuide()
+        assertTrue("data: database, sql*, postgres*, schema*, migrat*, persist*, serializ*, json" in guide, guide)
+        rows.getValue(MemoryMicroAgentRole.CategoryClassifier).forEach { row -> assertTrue(guide in row.input, row.id) }
     }
 
     @Test

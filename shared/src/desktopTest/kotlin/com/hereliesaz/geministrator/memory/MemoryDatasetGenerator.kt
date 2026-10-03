@@ -44,9 +44,10 @@ object MemoryDatasetGenerator {
         val regular = (0 until sessions).map { index -> SyntheticSession(session(index, random), split(index, sessions)) }
         val adversarial = ADVERSARIAL.mapIndexed { index, text ->
             SyntheticSession(envelope("adversarial-$index", "Remember this.", text, sessions + index), "adversarial")
-        }
+        } + adversarialRestatements(sessions + ADVERSARIAL.size)
         dropped.clear()
-        val recorded = record(regular + adversarial)
+        // Adversarial sessions share one store, so their restatements meet and condense.
+        val recorded = record(regular.chunked(SESSIONS_PER_STORE) + listOf(adversarial))
         ROLES.forEach { role -> dropped[role to "recorded"] = recorded.count { it.role == role } }
         val seen = HashSet<Pair<MemoryMicroAgentRole, String>>()
         return ROLES.associateWith { role ->
@@ -89,8 +90,11 @@ object MemoryDatasetGenerator {
         val split: String,
     )
 
-    /** Consolidates [sessions] in order, recording every packet a generative clerk receives. */
-    private fun record(sessions: List<SyntheticSession>): List<Recorded> = runBlocking {
+    /**
+     * Consolidates each block of sessions in order, in a fresh store, recording every packet a
+     * generative clerk receives.
+     */
+    private fun record(blocks: List<List<SyntheticSession>>): List<Recorded> = runBlocking {
         val recorded = mutableListOf<Recorded>()
         var split = "train"
         val agents = ProgrammaticMemoryClerks.all { 1L }.map { clerk ->
@@ -113,9 +117,9 @@ object MemoryDatasetGenerator {
             }
         }
         // A fresh SQLite store per block keeps the graph, and each commit, bounded.
-        sessions.chunked(SESSIONS_PER_STORE).forEachIndexed { block, chunk ->
+        blocks.forEachIndexed { block, chunk ->
             val file = File.createTempFile("aive-memory-dataset", ".db").apply { deleteOnExit() }
-            val layer = AgentMemoryLayer.createWithMicroAgents(desktopSqlMemoryStore(file), agents)
+            val layer = AgentMemoryLayer.createWithMicroAgents(desktopSqlMemoryStore(file), agents, POLICY)
             chunk.forEachIndexed { offset, session ->
                 split = session.split
                 layer.queue.enqueueSession(session.envelope)
@@ -185,6 +189,15 @@ object MemoryDatasetGenerator {
 
     private const val SESSIONS_PER_STORE = 150
 
+    /**
+     * The runtime policy, except that clusters condense from three similar members instead of up to
+     * nine. A condensation packet looks the same either way (at most `condensationBatchSize` members);
+     * a lower threshold only produces more of them, which the Condensation Rewriter needs.
+     */
+    private val POLICY = MemoryConsolidationPolicy().let { default ->
+        default.copy(maxSimilarPerKind = default.maxSimilarPerKind.mapValues { 2 })
+    }
+
     private fun split(index: Int, total: Int): String = when {
         index < total * 70 / 100 -> "train"
         index < total * 85 / 100 -> "validation"
@@ -202,14 +215,16 @@ object MemoryDatasetGenerator {
 
     /**
      * A session mixing decisions, values, technical detail, plain prose and chatter. Every third one
-     * restates a recurring fact in a shared project, so similar memories pile up past the
-     * condensation threshold; some restatements change a value, which condensation must decline.
+     * restates two recurring facts in a shared project, so similar memories pile up past the
+     * condensation threshold; some restatements change a value, and those never condense.
      */
     private fun session(index: Int, random: Random): MemorySessionEnvelope {
         fun pick(list: List<String>) = list[random.nextInt(list.size)]
         if (index % 3 == 0) {
-            val fact = RECURRING[(index / 3) % RECURRING.size]
-            val text = "${pick(RESTATEMENTS)} ${fact.replace("{n}", pick(listOf("30", "30", "30", "45")))}"
+            val text = listOf(index / 3, index / 3 + RECURRING.size / 2).joinToString("\n\n") { turn ->
+                val fact = RECURRING[turn % RECURRING.size]
+                "${pick(RESTATEMENTS)} ${fact.replace("{n}", pick(listOf("30", "30", "30", "45")))}"
+            }
             return envelope("session-$index", "Note this.", text, index).copy(projectId = "project-recurring")
         }
         val subject = pick(SUBJECTS)
@@ -257,8 +272,40 @@ object MemoryDatasetGenerator {
         "Az prefers dark backgrounds for the studio site.",
         "The API timeout is {n} seconds.",
         "The mural sketch is due before the gallery opening.",
+        "The release build runs on the self-hosted runner.",
+        "Maya owns the onboarding flow.",
+        "The backup script runs every night at {n}:00.",
+        "Commit messages stay under 72 characters.",
+        "The invoice export uses the \"ledger\" template.",
+        "The studio lighting plan uses warm bulbs only.",
+        "Jordan reviews every database migration.",
+        "The travel budget is {n} dollars per trip.",
+        "The memory queue does not run during a deploy.",
     )
     private val RESTATEMENTS = listOf("Reminder:", "Again,", "For the record,", "Note:", "As before,")
+
+    /**
+     * Adversarial condensation material: facts restated three times with the same tricky values
+     * (negation, quoted strings, several numbers), which a condensation must keep exactly. Restatements
+     * that change a value are interleaved; those never reach the clerk and must stay apart.
+     */
+    private fun adversarialRestatements(firstIndex: Int): List<SyntheticSession> =
+        ADVERSARIAL_RECURRING.flatMapIndexed { fact, (text, changed) ->
+            (RESTATEMENTS.take(3).map { "$it $text" } + "Note: $changed").map { it to fact }
+        }.mapIndexed { offset, (text, fact) ->
+            val index = firstIndex + offset
+            SyntheticSession(
+                envelope("adversarial-restated-$offset", "Note this.", text, index).copy(projectId = "project-adversarial-$fact"),
+                "adversarial",
+            )
+        }
+
+    private val ADVERSARIAL_RECURRING = listOf(
+        "Az does not want verbose logs." to "Az wants verbose logs.",
+        "The banner must read \"Here lies Az\"." to "The banner must read \"Here lies AZ\".",
+        "The retry limit is 3 attempts with a 250 ms backoff." to "The retry limit is 5 attempts with a 250 ms backoff.",
+        "We never deploy on Fridays." to "We deploy on Fridays.",
+    )
 
     /** Edge cases: values that differ, negation, chatter-only, quoted strings, empty-ish content. */
     private val ADVERSARIAL = listOf(
