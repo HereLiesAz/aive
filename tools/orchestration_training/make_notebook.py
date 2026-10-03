@@ -82,6 +82,8 @@ code(r'''
 import gc, hashlib, json, os, shutil, tarfile, time
 from pathlib import Path
 
+os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")  # before torch is imported
+
 BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 RELEASE_REPOSITORY = "HereLiesAz/aive"
 RELEASE_TAG = "orchestration-utilities-v3"
@@ -103,8 +105,10 @@ EPOCHS = 2                           # nine roles' worth of rows per epoch
 # many optimizer steps.
 ADAPTER_MIN_STEPS = 700
 LEARNING_RATE = 2e-4
-BATCH_SIZE = 8
-GRAD_ACCUM = 2
+# Per-device batch 4 x 4 accumulation keeps 16 rows per optimizer step on one GPU. Batch 8 ran a
+# 15 GB T4 out of memory: the logits alone are 8 x 1024 x 151936 floats (~5 GB).
+BATCH_SIZE = 4
+GRAD_ACCUM = 4
 LORA_R, LORA_ALPHA, LORA_DROPOUT = 16, 32, 0.05
 
 WORK = Path("/kaggle/working/aive-orchestration")
@@ -211,9 +215,14 @@ def train(slugs, out, min_steps=0):
                 skipped[slug] = len(splits[name]) - len(rows)
             encoded[name] += rows
     random.Random(8).shuffle(encoded["train"])
-    steps_per_epoch = max(1, math.ceil(len(encoded["train"]) / (BATCH_SIZE * GRAD_ACCUM)))
+    # Trainer spreads each batch over every visible GPU (Kaggle's T4 x2), so count them.
+    devices = max(1, torch.cuda.device_count())
+    steps_per_epoch = max(1, math.ceil(len(encoded["train"]) / (BATCH_SIZE * GRAD_ACCUM * devices)))
     epochs = max(EPOCHS, math.ceil(min_steps / steps_per_epoch))
     model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32).to(DEVICE)
+    # Recompute activations in the backward pass instead of keeping them: long rows fit in memory.
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    model.enable_input_require_grads()
     model = get_peft_model(model, LoraConfig(
         task_type=TaskType.CAUSAL_LM, r=LORA_R, lora_alpha=LORA_ALPHA, lora_dropout=LORA_DROPOUT,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
@@ -728,8 +737,8 @@ MEMORY_SUBSTITUTIONS = [
     ('BASE_ASSET_NAME = "aive-orchestration-base-int8.tar.gz"', 'BASE_ASSET_NAME = "aive-memory-base-int8.tar.gz"'),
     ('ADAPTER_VERSION = "v3"', 'ADAPTER_VERSION = "v1"'),
     ('MAX_LENGTH = 1024 ', 'MAX_LENGTH = 3072 '),
-    ('BATCH_SIZE = 8\n', 'BATCH_SIZE = 2\n'),
-    ('GRAD_ACCUM = 2\n', 'GRAD_ACCUM = 8\n'),
+    ('BATCH_SIZE = 4\n', 'BATCH_SIZE = 1\n'),
+    ('GRAD_ACCUM = 4\n', 'GRAD_ACCUM = 16\n'),
     ('Path("/kaggle/working/aive-orchestration")', 'Path("/kaggle/working/aive-memory")'),
     ('tools/orchestration_training/aive-orchestration-corpus.zip', 'tools/memory_training/aive-memory-corpus.zip'),
     ('attach aive-orchestration-corpus', 'attach aive-memory-corpus'),
