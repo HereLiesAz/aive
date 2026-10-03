@@ -127,6 +127,14 @@ class ProviderBackedManagedSessionGateway(
         }
     }
 
+    override suspend fun draftPlan(providerId: AgentProviderId, request: AgentTaskRequest): String? {
+        val provider = providerRegistry.provider(providerId)
+            ?: throw ManagedSessionFailure.ProviderUnavailable("Provider ${providerId.value} is not registered")
+        return providerOperation("Unable to draft a plan with ${providerId.value}") {
+            provider.draftPlan(request.withRecalledMemory())?.trim()?.takeIf(String::isNotEmpty)
+        }
+    }
+
     private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
         val queryPlan = orchestrationUtilities.composeMemoryQueries(
             MemoryQueryInput(

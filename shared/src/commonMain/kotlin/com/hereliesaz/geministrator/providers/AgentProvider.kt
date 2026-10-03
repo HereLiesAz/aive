@@ -199,6 +199,17 @@ interface AgentProvider {
      */
     suspend fun supportsRepository(repository: RepositoryRef?): Boolean = true
 
+    /**
+     * Engine-owned plan gate. A provider that does not plan inside its own run drafts the plan for a
+     * [AgentTaskRequest.requirePlanApproval] task here, statelessly, before any run exists; the engine
+     * holds the task at its approval gate and calls [start] only after approval, with the approved
+     * plan in the request and [AgentTaskRequest.requirePlanApproval] false.
+     *
+     * Null (the default) means the provider plans natively inside its run (start → PlanGenerated →
+     * [approvePlan]), as Jules does.
+     */
+    suspend fun draftPlan(request: AgentTaskRequest): String? = null
+
     suspend fun start(request: AgentTaskRequest): AgentRunHandle
 
     /**

@@ -29,10 +29,8 @@ suspend fun ApplicationRuntime.rejectPlan(taskDefinitionId: TaskDefinitionId) {
     val providerId = requireNotNull(taskRun.assignedProviderId) {
         "Task ${taskDefinitionId.value} is not a provider plan approval"
     }
-    val providerRunId = requireNotNull(taskRun.providerRunId) {
-        "Task ${taskDefinitionId.value} has no provider run to reject"
-    }
-    val handle = ManagedSessionHandle(taskRun.id, providerId, providerRunId)
+    // An engine-held plan (no provider run yet) has no session to cancel.
+    val handle = taskRun.providerRunId?.let { ManagedSessionHandle(taskRun.id, providerId, it) }
     val now = Clock.System.now().toEpochMilliseconds()
     val gateId = ApprovalGateId(
         "plan:${presentation.run.id.value}:${taskDefinitionId.value}:${taskRun.attempt}",

@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
+import com.hereliesaz.geministrator.workflow.isHeldAtEnginePlanGate
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowEngine
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
@@ -291,8 +292,13 @@ class ApplicationRuntime private constructor(
 
             val now = nowEpochMillis()
             val nextState = if (taskRun.assignedProviderId != null) {
-                val handle = requireNotNull(snapshot.state.handles[taskDefinitionId]) {
-                    "Task ${taskDefinitionId.value} has no provider session to approve"
+                // An engine-held plan has no provider session yet; approval only records the decision.
+                val handle = if (taskRun.isHeldAtEnginePlanGate()) {
+                    null
+                } else {
+                    requireNotNull(snapshot.state.handles[taskDefinitionId]) {
+                        "Task ${taskDefinitionId.value} has no provider session to approve"
+                    }
                 }
                 val eventSink = RepositoryWorkflowEventSink(persistence.events)
                 val gateCoordinator = ApprovalGateCoordinator(

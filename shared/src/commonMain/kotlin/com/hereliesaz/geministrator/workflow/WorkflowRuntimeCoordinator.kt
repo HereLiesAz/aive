@@ -657,6 +657,8 @@ class WorkflowRuntimeCoordinator(
             if (task.computePlacement == com.hereliesaz.geministrator.domain.ComputePlacementPolicy.LocalOnly) continue
             if (taskRun.status != TaskRunStatus.Ready && taskRun.status != TaskRunStatus.Retrying) continue
             if (taskRun.externalRunId != null) continue
+            // An engine-approved plan is executed by the provider that drafted it, locally.
+            if (taskRun.approvedEnginePlan() != null) continue
 
             if (coordinator == null) {
                 if (task.computePlacement.allowsLocalFallback()) continue

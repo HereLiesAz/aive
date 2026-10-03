@@ -64,6 +64,12 @@ interface ManagedSessionGateway {
 
     suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle
 
+    /**
+     * The plan [providerId] drafts for [request] before any run starts, or null when that provider
+     * plans inside its own run. See [com.hereliesaz.geministrator.providers.AgentProvider.draftPlan].
+     */
+    suspend fun draftPlan(providerId: AgentProviderId, request: AgentTaskRequest): String? = null
+
     suspend fun reconnect(
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
