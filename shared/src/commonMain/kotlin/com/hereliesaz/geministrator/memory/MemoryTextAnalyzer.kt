@@ -55,6 +55,8 @@ internal data class MemoryVerbObject(
     /** The source text the pair was read from. */
     val span: String,
     val negated: Boolean,
+    /** The whole sentence the pair came from, verbatim. */
+    val sentence: String = span,
 )
 
 internal data class MemoryTextAnalysis(
@@ -108,7 +110,10 @@ internal class MemoryTextAnalyzer(private val resources: MemoryLanguageResources
                     val end = maxOf(verb.end, obj.end)
                     val span = sentence.source.substring(sentence.tokens[start].start, sentence.tokens[end - 1].end)
                     pairs.getOrPut("${verb.concept.key}|${obj.concept.key}") {
-                        MemoryVerbObject(verb.concept.key, obj.concept.key, text, span, verb.concept.negated)
+                        MemoryVerbObject(
+                            verb.concept.key, obj.concept.key, text, span, verb.concept.negated,
+                            sentence.source.substring(sentence.tokens.first().start, sentence.tokens.last().end),
+                        )
                     }
                 }
             }
