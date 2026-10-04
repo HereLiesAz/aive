@@ -506,17 +506,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
 
         val criteria = input.acceptanceCriteria.filter(String::isNotBlank)
         criteria.forEach { criterion ->
-            val lower = criterion.lowercase()
-            when {
-                "lint" in lower -> add("lint", "ACCEPTANCE_CRITERION", criterion)
-                "test" in lower -> add("test", "ACCEPTANCE_CRITERION", criterion)
-                "build" in lower || "compile" in lower -> add("build", "ACCEPTANCE_CRITERION", criterion)
-                "deploy" in lower || "endpoint" in lower || "health" in lower ->
-                    add("health-check", "ACCEPTANCE_CRITERION", criterion)
-                "source" in lower || "citation" in lower || "date" in lower ->
-                    add("source-verification", "ACCEPTANCE_CRITERION", criterion)
-                else -> add("evidence-check", "ACCEPTANCE_CRITERION", criterion)
-            }
+            add(verificationOperationFor(criterion), "ACCEPTANCE_CRITERION", criterion)
         }
 
         if (ArtifactKind.CodeChange in input.artifactKinds &&
@@ -538,5 +528,18 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         }
 
         return VerificationPlan(steps.values.toList())
+    }
+}
+
+/** The verification operation an acceptance criterion's wording calls for. */
+internal fun verificationOperationFor(criterion: String): String {
+    val lower = criterion.lowercase()
+    return when {
+        "lint" in lower -> "lint"
+        "test" in lower -> "test"
+        "build" in lower || "compile" in lower -> "build"
+        "deploy" in lower || "endpoint" in lower || "health" in lower -> "health-check"
+        "source" in lower || "citation" in lower || "date" in lower -> "source-verification"
+        else -> "evidence-check"
     }
 }
