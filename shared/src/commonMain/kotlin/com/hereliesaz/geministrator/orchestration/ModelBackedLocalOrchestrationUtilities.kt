@@ -74,9 +74,9 @@ class GuardedModelBackedOrchestrationUtilities(
 ) : LocalOrchestrationUtilityFamily {
     override fun composeMemoryQueries(input: MemoryQueryInput): MemoryQueryPlan {
         val baseline = fallback.composeMemoryQueries(input)
-        return infer<MemoryQueryInput, MemoryQueryPlan>(
+        return infer<MemoryQueryModelInput, MemoryQueryPlan>(
             OrchestrationUtilityRole.MemoryQueryComposer,
-            input,
+            MemoryQueryModelInput.of(input),
             baseline,
         ) { candidate ->
             candidate.queries.size <= input.maxQueries &&

@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- The Memory Query Composer specialist now receives its input already cleaned (trimmed, blank and repeated entries removed), so it can no longer turn a blank entry into a query.
 - The Memory Query Composer specialist now trains on blank objectives and blank or duplicate list entries, so a trained model returns an empty plan instead of inventing a query.
 - The Tool Router specialist now receives the eligible tools already in routing order, as the Agent Router does, so a trained model no longer has to rank them itself; its adversarial checks now cover rank ties, an unavailable best tool, and a supporting tool listed last.
 - The Store now offers hosted language models from Azphalt, including the keyless Kilo, LLM7 and OVHcloud gateways. Installing one shows where prompts go and whether a key is needed, then adds it as a provider you can use anywhere a provider is chosen; removing it disconnects it.
