@@ -66,13 +66,14 @@ private abstract class ProgrammaticClerk(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Sectioning: structural split (code fences whole, headings attached, paragraphs packed).
+// Sectioning: typed blocks (MemorySectioning.kt), typed blocks whole, prose split by topic and
+// sentence, neighbours packed.
 // ---------------------------------------------------------------------------------------------
 
 private class ProgrammaticSectioner(now: () -> Long) : ProgrammaticClerk(MemoryMicroAgentRole.Sectioner, now) {
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
         val pieces = packet.items.flatMap { item ->
-            item.text.structuralBlocks().map { block -> item to block }
+            item.text.structuralBlocks(MAX_SECTION_CHARS).map { block -> item to block }
         }
         if (pieces.isEmpty()) return MemoryMutationBatch()
         val totalChars = pieces.sumOf { it.second.length }
@@ -118,72 +119,6 @@ private class ProgrammaticSectioner(now: () -> Long) : ProgrammaticClerk(MemoryM
     }
 }
 
-/** Paragraphs and fenced code blocks; a heading line joins the block after it; long prose is split by sentence. */
-internal fun String.structuralBlocks(maxChars: Int = 1_200): List<String> {
-    val blocks = mutableListOf<String>()
-    val current = StringBuilder()
-    var inFence = false
-    var pendingHeading: String? = null
-
-    fun flush() {
-        val text = current.toString().trim()
-        current.clear()
-        if (text.isEmpty()) return
-        val withHeading = pendingHeading?.let { "$it\n$text" } ?: text
-        pendingHeading = null
-        blocks += withHeading
-    }
-
-    lines().forEach { line ->
-        val trimmed = line.trim()
-        when {
-            trimmed.startsWith("```") || trimmed.startsWith("~~~") -> {
-                if (!inFence) flush()
-                current.appendLine(line)
-                inFence = !inFence
-                if (!inFence) flush()
-            }
-            inFence -> current.appendLine(line)
-            trimmed.isEmpty() -> flush()
-            trimmed.startsWith("#") && trimmed.trimStart('#').startsWith(" ") -> {
-                flush()
-                pendingHeading = pendingHeading?.let { "$it\n$trimmed" } ?: trimmed
-            }
-            else -> current.appendLine(line)
-        }
-    }
-    flush()
-    pendingHeading?.let { blocks += it }
-
-    return blocks.flatMap { block ->
-        if (block.length <= maxChars || block.startsWith("```") || block.startsWith("~~~")) {
-            listOf(block)
-        } else {
-            block.splitBySentence(maxChars)
-        }
-    }
-}
-
-private fun String.splitBySentence(maxChars: Int): List<String> {
-    val sentences = SENTENCE_END.split(this).map(String::trim).filter(String::isNotEmpty)
-    val out = mutableListOf<String>()
-    val current = StringBuilder()
-    sentences.forEach { sentence ->
-        if (current.isNotEmpty() && current.length + sentence.length + 1 > maxChars) {
-            out += current.toString()
-            current.clear()
-        }
-        if (sentence.length > maxChars) {
-            sentence.chunked(maxChars).forEach { out += it }
-        } else {
-            if (current.isNotEmpty()) current.append(' ')
-            current.append(sentence)
-        }
-    }
-    if (current.isNotEmpty()) out += current.toString()
-    return out
-}
-
 // ---------------------------------------------------------------------------------------------
 // Salience: keep everything except bookkeeping noise and duplicates; score what is kept.
 // ---------------------------------------------------------------------------------------------
@@ -191,39 +126,66 @@ private fun String.splitBySentence(maxChars: Int): List<String> {
 private class ProgrammaticSalienceFilter(now: () -> Long) :
     ProgrammaticClerk(MemoryMicroAgentRole.SalienceFilter, now) {
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val seen = hashSetOf<String>()
         val createdAt = nowEpochMillis()
         val namespace = packet.namespace()
-        val nodes = packet.items.mapIndexedNotNull { index, section ->
-            val text = section.text.trim()
-            if (text.isNoise() || !seen.add(text.memorySemanticKey())) return@mapIndexedNotNull null
+        val prompts = packet.items.filter { it.metadata["sourceKind"] in PROMPT_KINDS }.map { it.text }
+        val idf = MemorySalienceFeatures.idf(packet.items.map { it.text })
+        val promptTerms = prompts.flatMap { MemorySalienceFeatures.terms(it) }.toSet()
+
+        data class Kept(val index: Int, val section: MemoryWorkItem, val text: String, val collapsed: Int, val shingles: Set<String>, var duplicates: Int = 0)
+        val seen = hashSetOf<String>()
+        val kept = mutableListOf<Kept>()
+        packet.items.forEachIndexed { index, section ->
+            val sourceKind = section.metadata["sourceKind"]
+            val prompt = sourceKind in PROMPT_KINDS
+            val (text, collapsed) = MemorySalienceFeatures.collapseRepeatedLines(section.text.trim())
+            // User prompts are never dropped; everything else loses noise and repeats.
+            if (!prompt && (text.isNoise() || MemorySalienceFeatures.isToolNoise(text))) return@forEachIndexed
+            if (text.isBlank()) return@forEachIndexed
+            val shingles = MemorySalienceFeatures.shingles(text)
+            if (!seen.add(text.memorySemanticKey())) {
+                kept.firstOrNull { it.text.memorySemanticKey() == text.memorySemanticKey() }?.let { it.duplicates++ }
+                return@forEachIndexed
+            }
+            val original = kept.firstOrNull { MemorySalienceFeatures.jaccard(it.shingles, shingles) >= NEAR_DUPLICATE }
+            if (original != null && !prompt) {
+                original.duplicates++
+                return@forEachIndexed
+            }
+            kept += Kept(index, section, text, collapsed, shingles)
+        }
+        val nodes = kept.map { item ->
+            val features = MemorySalienceFeatures.score(
+                text = item.text,
+                sourceKind = item.section.metadata["sourceKind"],
+                promptTerms = if (item.section.metadata["sourceKind"] in PROMPT_KINDS) emptySet() else promptTerms,
+                idf = idf,
+                duplicates = item.duplicates,
+            )
             MemoryNode(
-                id = MemoryNodeId("$namespace:node:$index"),
+                id = MemoryNodeId("$namespace:node:${item.index}"),
                 kind = MemoryNodeKind.Context,
-                text = text,
+                text = item.text,
                 sourceEpisodeIds = setOf(packet.episodeId),
-                sourceSectionIds = setOf(MemorySectionId(section.id)),
-                salience = salience(text, section.metadata["sourceKind"]),
+                sourceSectionIds = setOf(MemorySectionId(item.section.id)),
+                salience = features.score,
                 confidence = 1f,
                 createdAtEpochMillis = createdAt,
-                metadata = metadata(),
+                metadata = metadata(
+                    buildMap {
+                        put("salienceFeatures", features.explain())
+                        if (item.collapsed > 0) put("collapsedRepeatedLines", item.collapsed.toString())
+                        if (item.duplicates > 0) put("nearDuplicatesDropped", item.duplicates.toString())
+                    },
+                ),
             )
         }.take(model.maxMutations)
         return MemoryMutationBatch(nodesToAdd = nodes)
     }
 
-    private fun salience(text: String, sourceKind: String?): Float {
-        var score = when (sourceKind) {
-            MemorySourceKind.AgentNote.name -> 0.8f
-            MemorySourceKind.UserPrompt.name, MemorySourceKind.Objective.name -> 0.75f
-            MemorySourceKind.Failure.name -> 0.7f
-            MemorySourceKind.Plan.name -> 0.6f
-            else -> 0.5f
-        }
-        if (text.looksStronglyTechnical()) score += 0.1f
-        if (DECISION.containsMatchIn(text)) score += 0.15f
-        if (ERROR.containsMatchIn(text)) score += 0.1f
-        return score.coerceIn(0f, 1f)
+    private companion object {
+        val PROMPT_KINDS = setOf(MemorySourceKind.UserPrompt.name, MemorySourceKind.Objective.name)
+        const val NEAR_DUPLICATE = 0.8
     }
 }
 
@@ -757,17 +719,11 @@ private fun String.idPart(): String = buildString {
 @OptIn(ExperimentalTime::class)
 private fun programmaticNowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
-private val SENTENCE_END = Regex("(?<=[.!?])\\s+")
 private val WORD = Regex("[A-Za-z][A-Za-z0-9_'-]*")
 private val PHRASE_BOUNDARY = Regex("[.,;:!?()\\[\\]{}\"`\\n]+")
 private val NUMBER = Regex("\\b\\d+(?:[.,]\\d+)?\\b")
 private val QUOTED = Regex("\"[^\"]{1,80}\"|'[^'\\s][^']{0,79}'")
 private val NEGATION = Regex("\\b(not|never|no|none|cannot|can't|don't|doesn't|isn't|won't|without)\\b", RegexOption.IGNORE_CASE)
-private val DECISION = Regex(
-    "\\b(decid\\w*|chose|choose|prefer\\w*|must|never|always|should|instead|because|agreed|requirement)\\b",
-    RegexOption.IGNORE_CASE,
-)
-private val ERROR = Regex("\\b(error|exception|fail\\w*|crash\\w*|bug)\\b", RegexOption.IGNORE_CASE)
 private val ACKNOWLEDGEMENT = Regex(
     "^(ok(ay)?|done|thanks?( you)?|sure|got it|yes|no|on it|working on it|let me (check|look|see)[^.]*|sounds good)[.!]*$",
 )
