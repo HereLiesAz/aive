@@ -77,6 +77,8 @@ class GitLabWorkspaceAgentProvider(
         val phase: MutableStateFlow<Phase>,
         var plan: WorkspacePlan? = null,
         var planUsage: TextGenerationResult? = null,
+        /** Streams the run's generations; memory can interrupt one mid-thought (see [sendMessage]). */
+        val generation: InterruptibleGeneration,
     )
 
     private data class RepositoryContext(
@@ -143,6 +145,7 @@ class GitLabWorkspaceAgentProvider(
             nextSequence += 1L
             ProviderRunId("${id.value}/${request.taskRunId.value}/$nextSequence").also { providerRunId ->
                 sessions[providerRunId] = Session(
+                    generation = InterruptibleGeneration(api),
                     request = request,
                     phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
                 )
@@ -184,6 +187,7 @@ class GitLabWorkspaceAgentProvider(
             if (suffix != null) nextSequence = maxOf(nextSequence, suffix)
             if (runId !in sessions) {
                 sessions[runId] = Session(
+                    generation = InterruptibleGeneration(api),
                     request = request,
                     phase = MutableStateFlow(
                         if (request.requirePlanApproval && !planApproved) Phase.AwaitingApproval else Phase.Ready,
@@ -228,7 +232,7 @@ class GitLabWorkspaceAgentProvider(
                     return@flow
                 }
                 emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
-                val generated = api.generate(specificationPrompt(session.request))
+                val generated = session.generation.run(specificationPrompt(session.request)) { emit(AgentEvent.Thinking(runId, it)) }
                 val artifactKinds = session.request.requiredArtifacts.ifEmpty {
                     setOf(
                         ArtifactKind.AcceptanceTestPlan,
@@ -320,9 +324,9 @@ class GitLabWorkspaceAgentProvider(
                     AgentCapability.RepositoryWrite in session.request.requiredCapabilities
             if (!mutationRequested) {
                 emit(AgentEvent.Progress(runId, "Reviewing selected GitLab files"))
-                val review = api.generate(
+                val review = session.generation.run(
                     reviewPrompt(session.request, approvedPlan, context, snapshot.text),
-                )
+                ) { emit(AgentEvent.Thinking(runId, it)) }
                 emit(
                     AgentEvent.ArtifactProduced(
                         runId,
@@ -352,7 +356,9 @@ class GitLabWorkspaceAgentProvider(
             }
 
             emit(AgentEvent.Progress(runId, "Generating validated GitLab file changes"))
-            val generation = api.generate(changePrompt(session.request, approvedPlan, context, snapshot.text))
+            val generation = session.generation.run(changePrompt(session.request, approvedPlan, context, snapshot.text)) {
+                emit(AgentEvent.Thinking(runId, it))
+            }
             val changeSet = parseChangeSet(generation.text)
             validateChangeSet(
                 changeSet = changeSet,
@@ -423,10 +429,13 @@ class GitLabWorkspaceAgentProvider(
         }
     }
 
-    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
-        ProviderActionResult.Rejected(
+    /** Memory's `⟦memory⟧` messages interrupt a streaming generation; anything else is declined. */
+    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult {
+        if (sessionOrNull(runId)?.generation?.offer(message) == true) return ProviderActionResult.Accepted
+        return ProviderActionResult.Rejected(
             "$displayName GitLab workspace sessions are one-shot governed tasks; start a new task for follow-up work.",
         )
+    }
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult {
         val session = sessionOrNull(runId)

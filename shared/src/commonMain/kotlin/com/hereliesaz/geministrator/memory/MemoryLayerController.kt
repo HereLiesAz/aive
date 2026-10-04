@@ -96,6 +96,16 @@ class MemoryLayerController(
     )
 
     private val cueMutex = Mutex()
+
+    /** Links memories that keep being delivered together (adds edges only). */
+    private val coRecall = MemoryCoRecall(nowEpochMillis)
+
+    private fun recordCoRecall(hits: List<MemoryRecallHit>) {
+        if (hits.size < 2) return
+        val store = layer.store
+        val ids = hits.map { it.node.id }
+        scope.launch { runCatching { coRecall.recalledTogether(store, ids) } }
+    }
     private val cueSessions = mutableMapOf<String, CueSession>()
 
     private suspend fun cueSession(agentId: String, request: AgentTaskRequest? = null): CueSession = cueMutex.withLock {
@@ -406,6 +416,7 @@ class MemoryLayerController(
             session.protocolGiven = true
             session.pending.toList().also { session.pending.clear() } to first
         }
+        recordCoRecall(hits)
         // Hits a chronological query found read in time order, apart from the rest.
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
@@ -474,6 +485,7 @@ class MemoryLayerController(
                 val hits = recallSummaries(trigger, session.request)
                 val shown = if (trigger.deliberate) hits else gate.select(hits)
                 if (shown.isNotEmpty()) {
+                    recordCoRecall(shown)
                     deliver(
                         buildString {
                             append(MEMORY_MESSAGE_MARKER).append(' ').append(MemoryCueWatcher.hashtag(trigger.subject)).append('\n')

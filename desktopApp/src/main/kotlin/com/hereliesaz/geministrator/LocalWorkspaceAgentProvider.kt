@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
+import com.hereliesaz.geministrator.providers.llm.InterruptibleGeneration
 import com.hereliesaz.geministrator.providers.llm.TextGenerationResult
 import java.io.File
 import java.nio.file.Files
@@ -59,6 +60,8 @@ internal class LocalWorkspaceAgentProvider(
         var plan: WorkspacePlan? = null,
         var planUsage: TextGenerationResult? = null,
         var observationJob: Job? = null,
+        /** Streams the run's generations; memory can interrupt one mid-thought (see [sendMessage]). */
+        val generation: InterruptibleGeneration,
     )
 
     private data class WorkspacePlan(
@@ -131,6 +134,7 @@ internal class LocalWorkspaceAgentProvider(
         val session = Session(
             request = request,
             phase = MutableStateFlow(if (request.requirePlanApproval) Phase.AwaitingApproval else Phase.Ready),
+            generation = InterruptibleGeneration(api),
         )
         sessionsMutex.withLock {
             sessions[runId] = session
@@ -175,6 +179,7 @@ internal class LocalWorkspaceAgentProvider(
                         if (request.requirePlanApproval && !planApproved) Phase.AwaitingApproval else Phase.Ready,
                     ),
                     plan = restoredPlan,
+                    generation = InterruptibleGeneration(api),
                 ),
             )
         }
@@ -208,7 +213,7 @@ internal class LocalWorkspaceAgentProvider(
                     return@flow
                 }
                 emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
-                val generated = api.generate(specificationPrompt(session.request))
+                val generated = session.generation.run(specificationPrompt(session.request)) { emit(AgentEvent.Thinking(runId, it)) }
                 val artifactKinds = session.request.requiredArtifacts.ifEmpty {
                     setOf(
                         ArtifactKind.AcceptanceTestPlan,
@@ -290,6 +295,8 @@ internal class LocalWorkspaceAgentProvider(
                 baseCommit = baseCommit,
                 trackedFiles = trackedFiles,
                 plan = approvedPlan,
+                generation = session.generation,
+                onThinking = { emit(AgentEvent.Thinking(runId, it)) },
             )
 
             outcome.artifacts.forEach { artifact -> emit(AgentEvent.ArtifactProduced(runId, artifact)) }
@@ -327,10 +334,13 @@ internal class LocalWorkspaceAgentProvider(
         }
     }
 
-    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
-        ProviderActionResult.Rejected(
+    /** Memory's `⟦memory⟧` messages interrupt a streaming generation; anything else is declined. */
+    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult {
+        if (sessionOrNull(runId)?.generation?.offer(message) == true) return ProviderActionResult.Accepted
+        return ProviderActionResult.Rejected(
             "$displayName local workspace sessions are one-shot governed tasks; start a new task for follow-up work.",
         )
+    }
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult {
         val session = sessionOrNull(runId)
@@ -397,6 +407,8 @@ internal class LocalWorkspaceAgentProvider(
         baseCommit: String,
         trackedFiles: List<String>,
         plan: WorkspacePlan,
+        generation: InterruptibleGeneration,
+        onThinking: suspend (String) -> Unit,
     ): WorkspaceOutcome {
         val branch = workspaceBranch(request)
         val workspace = withContext(Dispatchers.IO) {
@@ -418,8 +430,8 @@ internal class LocalWorkspaceAgentProvider(
             val selectedFiles = selectFiles(plan, trackedFiles, request)
             val snapshot = buildSnapshot(workspace, selectedFiles)
             require(snapshot.isNotBlank()) { "No readable tracked source files were selected for the workspace task" }
-            val generation = api.generate(patchPrompt(request, plan, trackedFiles, snapshot))
-            val patch = extractUnifiedDiff(generation.text)
+            val generated = generation.run(patchPrompt(request, plan, trackedFiles, snapshot), onThinking)
+            val patch = extractUnifiedDiff(generated.text)
             require(patch.isNotBlank()) { "$displayName did not return a unified Git diff" }
             validatePatchPaths(patch)
 
@@ -492,7 +504,7 @@ internal class LocalWorkspaceAgentProvider(
             }
             WorkspaceOutcome(
                 artifacts = artifacts,
-                generationUsage = generation,
+                generationUsage = generated,
             )
         } finally {
             if (worktreeAdded) {
