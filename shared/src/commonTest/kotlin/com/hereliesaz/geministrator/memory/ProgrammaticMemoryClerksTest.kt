@@ -197,4 +197,58 @@ class ProgrammaticMemoryClerksTest {
         assertEquals(2, collapsed.text.lines().size, "repeated log lines not collapsed: ${collapsed.text}")
         assertEquals("6", collapsed.metadata["collapsedRepeatedLines"])
     }
+
+    @Test
+    fun summariesPickWholeSourceSentencesAndKeepValuesWhenTrimming() {
+        val extract = MemoryExtractiveSummary.summarize(
+            listOf(
+                "The Gradle build failed with exit code 137 because the daemon ran out of memory.",
+                "I raised the heap to 4 GB in gradle.properties.",
+                "The Gradle build failed with exit code 137 because the daemon ran out of memory again.",
+            ),
+        )!!
+        assertTrue(extract.sentences.all { it.endsWith(".") }, "not whole sentences: ${extract.sentences}")
+        assertEquals(1, extract.sentences.count { "exit code 137" in it }, "redundant sentence kept: ${extract.sentences}")
+        val long = "The cache (which the old SettingsMemoryStore wrote on every commit, see notes) is not used for 3 builds now " + "x".repeat(300)
+        val trimmed = MemoryExtractiveSummary.trim(long, 280)
+        assertEquals(memoryClaimSignature(long), memoryClaimSignature(trimmed))
+    }
+
+    @Test
+    fun categoriesNeedEnoughEvidenceAndMatchWholeWordsOnly() {
+        val lexicon = MemoryCategoryLexicon(null)
+        val hits = lexicon.classify("SettingsMemoryStore.commit() serializes the whole snapshot to JSON on every write.")
+        assertTrue(hits.any { it.category == "data" && it.evidence.any { e -> e.startsWith("serialize") } }, "hits: $hits")
+        // "ui" inside "build", "ci" inside "decision", "api" inside "rapid" are not words.
+        val none = lexicon.classify("A rapid decision about the build.").map { it.category }
+        assertFalse("ui" in none || "ci" in none || "api" in none, "substring hits: $none")
+        // One weak word is not enough.
+        assertTrue(lexicon.classify("Please check this.").isEmpty())
+        // Redirected phrase: test data is data, not testing.
+        assertFalse(lexicon.classify("Load the test data from the fixture table schema.").any { it.category == "testing" && it.score > 3.0 })
+    }
+
+    @Test
+    fun tagsLinkBySenseSynonymOrSpellingNotByBroaderTerm() {
+        fun tag(text: String, key: String, aliases: String = "") =
+            MemoryWorkItem(text, "node:NounTag", text, mapOf(TAG_KEY to key) + if (aliases.isEmpty()) emptyMap() else mapOf(TAG_ALIASES to aliases))
+        assertEquals(1f, MemorySimilarity.tags(tag("repo", "n:repository"), tag("repository", "n:repository")))
+        assertEquals(0.9f, MemorySimilarity.tags(tag("bug", "n:bug", "defect | fault"), tag("defect", "n:defect")))
+        assertTrue(MemorySimilarity.tags(tag("gradle build", "n:gradle build"), tag("gradle builds", "n:gradle builds")) >= 0.92f)
+        assertEquals(0f, MemorySimilarity.tags(tag("cache", "n:cache"), tag("storage", "n:storage")))
+    }
+
+    @Test
+    fun condensationKeepsTheRepresentativeAndAppendsOnlyUncoveredSentences() {
+        fun context(id: String, text: String) = MemoryWorkItem(id, "node:Context", text)
+        val result = MemoryCondensation.condense(
+            listOf(
+                context("a", "The build uses Gradle. It runs on the JDK toolchain."),
+                context("b", "The build uses Gradle. Configuration cache is enabled."),
+                context("c", "The build uses Gradle."),
+            ),
+        )
+        assertTrue("Configuration cache is enabled." in result.text && "JDK toolchain" in result.text, result.text)
+        assertEquals(1, Regex("uses Gradle").findAll(result.text).count(), "repeated sentence: ${result.text}")
+    }
 }

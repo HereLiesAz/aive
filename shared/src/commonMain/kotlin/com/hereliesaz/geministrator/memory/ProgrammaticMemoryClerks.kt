@@ -282,6 +282,7 @@ private class ProgrammaticTagger(
             put(TAG_OBJECTS, pairs.joinToString(TAG_LIST_SEPARATOR) { it.entityKey })
             put(TAG_PHRASES, pairs.joinToString(TAG_LIST_SEPARATOR) { it.text })
             put(TAG_SPANS, pairs.joinToString(TAG_LIST_SEPARATOR) { it.span.replace(TAG_LIST_SEPARATOR, " ") })
+            put(TAG_SENTENCES, pairs.joinToString(TAG_LIST_SEPARATOR) { it.sentence.replace(TAG_LIST_SEPARATOR, " ") })
         }
     }
 
@@ -300,6 +301,11 @@ internal const val TAG_NEGATED = "negated"
 internal const val TAG_OBJECTS = "objectKeys"
 internal const val TAG_PHRASES = "objectPhrases"
 internal const val TAG_SPANS = "objectSpans"
+internal const val TAG_SENTENCES = "objectSentences"
+
+/** Phrase node metadata: where in the source the pair was read. */
+internal const val PHRASE_SPAN = "span"
+internal const val PHRASE_SENTENCE = "sourceSentence"
 internal const val TAG_LIST_SEPARATOR = " | "
 
 internal fun String.nounTags(maxKeyphrases: Int = 6): List<String> {
@@ -412,7 +418,7 @@ private class ProgrammaticPhraseSynthesizer(now: () -> Long) :
                         salience = (verb.salience() + noun.salience()) / 2f,
                         confidence = 0.7f,
                         createdAtEpochMillis = createdAt,
-                        metadata = metadata(),
+                        metadata = metadata(sourceOf(verb, noun)),
                     )
                     listOf(verb, noun).forEachIndexed { part, tag ->
                         edges += MemoryEdge(
@@ -430,13 +436,26 @@ private class ProgrammaticPhraseSynthesizer(now: () -> Long) :
         return MemoryMutationBatch(nodesToAdd = nodes, edgesToAdd = edges)
     }
 
+    /** The span and sentence the tagger recorded for this verb-object pair, if it did. */
+    private fun sourceOf(verb: MemoryWorkItem, noun: MemoryWorkItem): Map<String, String> {
+        val keys = verb.metadata[TAG_OBJECTS]?.split(TAG_LIST_SEPARATOR) ?: return emptyMap()
+        val at = keys.indexOf(noun.metadata[TAG_KEY])
+        if (at < 0) return emptyMap()
+        return buildMap {
+            verb.metadata[TAG_SPANS]?.split(TAG_LIST_SEPARATOR)?.getOrNull(at)?.let { put(PHRASE_SPAN, it) }
+            verb.metadata[TAG_SENTENCES]?.split(TAG_LIST_SEPARATOR)?.getOrNull(at)?.let { put(PHRASE_SENTENCE, it) }
+        }
+    }
+
     private companion object {
         const val MAX_NOUNS_PER_VERB = 2
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// Summaries: the phrases of one section, listed. Nothing added.
+// ---------------------------------------------------------------------------------------------
+// Summaries: whole source sentences picked by SumBasic, trimmed by deletion only (MemorySynthesis.kt).
+// Phrases from a model-backed tagger carry no source sentence and are listed as before.
 // ---------------------------------------------------------------------------------------------
 
 private class ProgrammaticSummarySynthesizer(now: () -> Long) :
@@ -450,15 +469,7 @@ private class ProgrammaticSummarySynthesizer(now: () -> Long) :
         val edges = mutableListOf<MemoryEdge>()
         groups.values.forEach { phrases ->
             val distinct = phrases.distinctBy { it.text.memorySemanticKey() }
-            var text = ""
-            val used = mutableListOf<MemoryWorkItem>()
-            distinct.forEach { phrase ->
-                val next = if (text.isEmpty()) phrase.text.trim() else "$text; ${phrase.text.trim()}"
-                if (next.length <= MAX_SUMMARY_CHARS || used.isEmpty()) {
-                    text = next
-                    used += phrase
-                }
-            }
+            val (text, used, method) = extractive(distinct) ?: listed(distinct) ?: return@forEach
             if (used.isEmpty() || budget < 1 + used.size) return@forEach
             budget -= 1 + used.size
             val index = nodes.size
@@ -466,13 +477,13 @@ private class ProgrammaticSummarySynthesizer(now: () -> Long) :
             nodes += MemoryNode(
                 id = id,
                 kind = MemoryNodeKind.Summary,
-                text = text.replaceFirstChar(Char::uppercaseChar) + ".",
+                text = text,
                 sourceEpisodeIds = used.flatMapTo(linkedSetOf(packet.episodeId)) { it.sourceEpisodeIds() },
                 sourceSectionIds = used.flatMapTo(linkedSetOf()) { it.sourceSectionIds() },
                 salience = used.maxOf { it.salience() },
                 confidence = 0.7f,
                 createdAtEpochMillis = createdAt,
-                metadata = metadata(),
+                metadata = metadata(mapOf("summaryMethod" to method)),
             )
             used.forEachIndexed { part, phrase ->
                 edges += MemoryEdge(
@@ -488,22 +499,46 @@ private class ProgrammaticSummarySynthesizer(now: () -> Long) :
         return MemoryMutationBatch(nodesToAdd = nodes, edgesToAdd = edges)
     }
 
-    private companion object {
-        const val MAX_SUMMARY_CHARS = 280
+    /** Source sentences behind the phrases, chosen extractively; the phrases they cover are used. */
+    private fun extractive(phrases: List<MemoryWorkItem>): Triple<String, List<MemoryWorkItem>, String>? {
+        val bySentence = phrases.mapNotNull { phrase -> phrase.metadata[PHRASE_SENTENCE]?.takeIf(String::isNotBlank)?.let { it to phrase } }
+        if (bySentence.isEmpty()) return null
+        val support = bySentence.groupingBy { it.first }.eachCount()
+        val extract = MemoryExtractiveSummary.summarize(bySentence.map { it.first }.distinct(), support) ?: return null
+        val used = bySentence.filter { it.first in extract.sentences }.map { it.second }.distinctBy { it.id }
+        return Triple(extract.text, used, "extractive")
+    }
+
+    /** The phrases of one section, listed: the fallback when no source sentence is known. */
+    private fun listed(phrases: List<MemoryWorkItem>): Triple<String, List<MemoryWorkItem>, String>? {
+        var text = ""
+        val used = mutableListOf<MemoryWorkItem>()
+        phrases.forEach { phrase ->
+            val next = if (text.isEmpty()) phrase.text.trim() else "$text; ${phrase.text.trim()}"
+            if (next.length <= MemoryExtractiveSummary.MAX_CHARS || used.isEmpty()) {
+                text = next
+                used += phrase
+            }
+        }
+        if (used.isEmpty()) return null
+        return Triple(text.replaceFirstChar(Char::uppercaseChar) + ".", used, "phrases")
     }
 }
 
+
 // ---------------------------------------------------------------------------------------------
-// Categories: a fixed, inspectable taxonomy.
+// Categories: a fixed, inspectable taxonomy scored by a weighted lexicon (MemorySynthesis.kt); every
+// label records the terms that earned it.
 // ---------------------------------------------------------------------------------------------
 
 private class ProgrammaticCategoryClassifier(now: () -> Long) :
     ProgrammaticClerk(MemoryMicroAgentRole.CategoryClassifier, now) {
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        val members = linkedMapOf<String, MutableList<MemoryWorkItem>>()
+        val lexicon = MemoryCategoryLexicon(runCatching { MemoryLanguageResources.get().wordNet }.getOrNull())
+        val members = linkedMapOf<String, MutableList<Pair<MemoryWorkItem, MemoryCategoryHit>>>()
         packet.items.forEach { summary ->
-            memoryCategoriesOf(summary.text).forEach { category ->
-                members.getOrPut(category) { mutableListOf() } += summary
+            lexicon.classify(summary.text).forEach { hit ->
+                members.getOrPut(hit.category) { mutableListOf() } += summary to hit
             }
         }
         var budget = model.maxMutations
@@ -511,9 +546,10 @@ private class ProgrammaticCategoryClassifier(now: () -> Long) :
         val namespace = packet.namespace()
         val nodes = mutableListOf<MemoryNode>()
         val edges = mutableListOf<MemoryEdge>()
-        members.forEach { (category, summaries) ->
-            if (budget < 1 + summaries.size) return@forEach
-            budget -= 1 + summaries.size
+        members.entries.sortedBy { MemoryCategoryLexicon.CATEGORY_ORDER.indexOf(it.key) }.forEach { (category, hits) ->
+            if (budget < 1 + hits.size) return@forEach
+            budget -= 1 + hits.size
+            val summaries = hits.map { it.first }
             val id = MemoryNodeId("$namespace:node:$category")
             nodes += MemoryNode(
                 id = id,
@@ -526,20 +562,22 @@ private class ProgrammaticCategoryClassifier(now: () -> Long) :
                 createdAtEpochMillis = createdAt,
                 metadata = metadata(mapOf("taxonomy" to "builtin")),
             )
-            summaries.forEachIndexed { part, summary ->
+            hits.forEachIndexed { part, (summary, hit) ->
                 edges += MemoryEdge(
                     id = MemoryEdgeId("$namespace:edge:$category:$part"),
                     from = id,
                     to = MemoryNodeId(summary.id),
                     relation = MemoryRelationKind.Categorizes,
+                    weight = minOf(1.0, hit.score / (MemoryCategoryLexicon.MIN_SCORE * 3)).toFloat(),
                     createdAtEpochMillis = createdAt,
-                    metadata = metadata(),
+                    metadata = metadata(mapOf("score" to hit.score.toString(), "evidence" to hit.evidence.joinToString(", "))),
                 )
             }
         }
         return MemoryMutationBatch(nodesToAdd = nodes, edgesToAdd = edges)
     }
 }
+
 
 /** The built-in taxonomy, in display order. */
 val MEMORY_CATEGORY_TAXONOMY: Map<String, Regex> = linkedMapOf(
@@ -575,28 +613,30 @@ internal fun memoryCategoryGuide(): String = MEMORY_CATEGORY_TAXONOMY.entries.jo
 }
 
 // ---------------------------------------------------------------------------------------------
-// Associations: near-duplicate detection with hashed character trigrams (same kind only).
+// ---------------------------------------------------------------------------------------------
+// Associations: tags link by shared sense, synonym or spelling; longer text by tf-idf and
+// character trigrams (MemorySynthesis.kt). Same kind only.
 // ---------------------------------------------------------------------------------------------
 
 private class ProgrammaticAssociationLinker(
     now: () -> Long,
-    private val minimumSimilarity: Float = 0.82f,
-    private val maxLinksPerItem: Int = 6,
 ) : ProgrammaticClerk(MemoryMicroAgentRole.AssociationLinker, now) {
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
         val visible = (packet.items + packet.neighborhood).distinctBy(MemoryWorkItem::id)
         if (visible.size < 2) return MemoryMutationBatch()
-        val vectors = visible.associate { it.id to it.text.trigramVector() }
+        val idf = MemorySalienceFeatures.idf(visible.map { it.text })
         val emitted = hashSetOf<String>()
         val createdAt = nowEpochMillis()
         val edges = mutableListOf<MemoryEdge>()
         packet.items.forEach { source ->
+            val tag = source.kind in TAG_KINDS
+            val (threshold, limit) = if (tag) TAG_THRESHOLD to TAG_LINKS else TEXT_THRESHOLD to TEXT_LINKS
             visible.asSequence()
                 .filter { it.id != source.id && it.kind == source.kind }
-                .map { target -> target to cosine(vectors.getValue(source.id), vectors.getValue(target.id)) }
-                .filter { (_, similarity) -> similarity >= minimumSimilarity }
+                .map { target -> target to if (tag) MemorySimilarity.tags(source, target) else MemorySimilarity.text(source.text, target.text, idf) }
+                .filter { (_, similarity) -> similarity >= threshold }
                 .sortedByDescending { it.second }
-                .take(maxLinksPerItem)
+                .take(limit)
                 .forEach { (target, similarity) ->
                     val (from, to) = if (source.id <= target.id) source.id to target.id else target.id to source.id
                     val pair = "$from\u0000$to"
@@ -608,13 +648,22 @@ private class ProgrammaticAssociationLinker(
                         relation = MemoryRelationKind.SimilarTo,
                         weight = similarity,
                         createdAtEpochMillis = createdAt,
-                        metadata = metadata(mapOf("similarity" to "char-trigram-cosine")),
+                        metadata = metadata(mapOf("similarity" to if (tag) "tag-sense-synonym-spelling" else "tfidf-trigram")),
                     )
                 }
         }
         return MemoryMutationBatch(edgesToAdd = edges)
     }
+
+    private companion object {
+        val TAG_KINDS = setOf("node:${MemoryNodeKind.NounTag.name}", "node:${MemoryNodeKind.VerbTag.name}")
+        const val TAG_THRESHOLD = 0.75f
+        const val TAG_LINKS = 4
+        const val TEXT_THRESHOLD = 0.8f
+        const val TEXT_LINKS = 6
+    }
 }
+
 
 internal fun String.trigramVector(): Map<Int, Float> {
     val text = " ${lowercase().replace(Regex("\\s+"), " ").trim()} "
@@ -636,7 +685,9 @@ internal fun cosine(left: Map<Int, Float>, right: Map<Int, Float>): Float {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Condensation: keep the most representative member; decline when members differ in values.
+// ---------------------------------------------------------------------------------------------
+// Condensation: the most representative member plus sentences only other members contain
+// (MemorySynthesis.kt); decline when members differ in values.
 // ---------------------------------------------------------------------------------------------
 
 private class ProgrammaticCondensationRewriter(now: () -> Long) :
@@ -646,21 +697,25 @@ private class ProgrammaticCondensationRewriter(now: () -> Long) :
         if (items.size < 2 || condensationWouldAdjudicate(items.map { it.text })) return MemoryMutationBatch()
         val kind = items.first().kind.removePrefix("node:").let { runCatching { MemoryNodeKind.valueOf(it) }.getOrNull() }
             ?: return MemoryMutationBatch()
-        val vectors = items.map { it.text.trigramVector() }
-        val medoid = items.indices.maxBy { i -> items.indices.sumOf { j -> cosine(vectors[i], vectors[j]).toDouble() } }
+        val condensed = MemoryCondensation.condense(items)
         val createdAt = nowEpochMillis()
         val namespace = packet.namespace()
         val id = MemoryNodeId("$namespace:node:condensed")
         val node = MemoryNode(
             id = id,
             kind = kind,
-            text = items[medoid].text,
+            text = condensed.text,
             sourceEpisodeIds = items.flatMapTo(linkedSetOf()) { it.sourceEpisodeIds() },
             sourceSectionIds = items.flatMapTo(linkedSetOf()) { it.sourceSectionIds() },
             salience = items.maxOf { it.salience() },
             confidence = items.minOf { it.metadata["confidence"]?.toFloatOrNull() ?: 1f },
             createdAtEpochMillis = createdAt,
-            metadata = metadata(mapOf("representative" to items[medoid].id)),
+            metadata = metadata(
+                buildMap {
+                    put("representative", items[condensed.representative].id)
+                    if (condensed.appendedFrom.isNotEmpty()) put("appendedFrom", condensed.appendedFrom.joinToString(",") { items[it].id })
+                },
+            ),
         )
         val edges = items.flatMapIndexed { index, item ->
             listOf(MemoryRelationKind.CondensedFrom, MemoryRelationKind.Supersedes).map { relation ->
@@ -677,6 +732,7 @@ private class ProgrammaticCondensationRewriter(now: () -> Long) :
         return MemoryMutationBatch(nodesToAdd = listOf(node), edgesToAdd = edges)
     }
 }
+
 
 /**
  * True when the members disagree on a value: a number, a quoted string, or negation present in some

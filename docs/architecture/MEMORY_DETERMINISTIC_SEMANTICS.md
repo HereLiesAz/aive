@@ -91,6 +91,15 @@ The Sectioner (`MemorySectioning.kt`) splits structure first: typed blocks for h
 
 The Salience clerk (`MemorySalienceFeatures.kt`) drops acknowledgements, symbol-only text and whole sections of build-tool bookkeeping (up-to-date tasks, download progress), and near-duplicates (shingle Jaccard ≥ 0.8; word 3-shingles for prose, character 5-grams for code). Repeated tool-output lines collapse Drain-style to their first and last instance, copied verbatim, with the count in `collapsedRepeatedLines`. User prompts are never dropped. The score is a sum of recorded parts (`salienceFeatures`): source kind, technical text, decision/error/action-item cues, IDF-weighted overlap with the user's prompt, specificity, and repetition. It measures; it never judges whether a section is true.
 
+## Programmatic summaries, categories, similarity and condensation
+
+`MemorySynthesis.kt` holds the rest of the programmatic clerks. Each copies, selects or deletes source text, and none decides which of two texts is right.
+
+- **Summaries:** the tagger records each verb–object pair's source sentence, and the Phrase clerk carries it forward. The Summary clerk picks whole source sentences up to 280 characters using SumBasic (mean content-word probability, squared after each pick). It favours the first and last sentence, sentences behind several phrases, and outcome or error sentences, and rejects candidates that overlap a chosen one by Jaccard > 0.5. A sentence over the limit is shortened by deletion only, and a deletion that would change its numbers, quoted values or negation is refused. Phrases without a source sentence (from a model-backed tagger) are listed as before. `summaryMethod` records which path ran.
+- **Categories:** each category has a weighted lexicon of strong, medium and weak terms, plus redirects such as "test data" counting as data. Terms match whole words and identifier parts, never substrings. A label is assigned when its score is at least 3 and at least half the top score, with at most three per summary. WordNet synonyms of strong terms count at half weight, using computing senses only. Each `Categorizes` edge records its score and evidence. The regex taxonomy remains as the model clerk's guide.
+- **Similarity (SimilarTo):** tags link when they share a concept key (1.0), share a synonym (0.9), or differ only in spelling (Jaro–Winkler ≥ 0.92), with at most four links each. A broader term alone never links two tags. Longer text links at 0.6 tf-idf cosine plus 0.4 character-trigram cosine ≥ 0.8, with at most six links each.
+- **Condensation:** keeps the most representative member, then appends any member's sentences that are not already covered, in member order, up to a section's limit. `appendedFrom` records where they came from. Fusing sentences across members was rejected because it can produce a claim that no member made. Clusters whose values differ are still never condensed.
+
 ## Programmatic noun and verb clerks
 
 The default (programmatic) Noun and Verb clerks read text with `MemoryTextAnalyzer`, which runs on two shipped static resources and no model:
