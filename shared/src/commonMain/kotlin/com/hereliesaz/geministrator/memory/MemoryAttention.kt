@@ -45,6 +45,22 @@ data class MemoryAttentionPolicy(
     val echoWindowTokens: Int = 40,
     /** A word used twice within this many tokens calls for its memory. */
     val doublingWindowTokens: Int = 60,
+    /**
+     * How much a strongest hit's lead over the rest counts toward opening the gate: the gate reads
+     * `strongest + distinctnessWeight * (strongest - mean of the others)`. A memory that stands out
+     * opens more readily than one of many equally close matches. 0 disables it.
+     */
+    val distinctnessWeight: Float = 0.5f,
+    /**
+     * Once open, the gate stays open down to `threshold - hysteresis` and closes only below it, so
+     * recall does not flicker on and off around the threshold. 0 disables it.
+     */
+    val hysteresis: Float = 0.05f,
+    /**
+     * Cues come in small bursts: up to this many may surface back to back, then one more per cue
+     * interval of tokens (a token bucket), instead of exactly one per interval.
+     */
+    val cueBurst: Int = 2,
 ) {
     init {
         require(recoveryWindowTokens > 0)
@@ -64,6 +80,9 @@ data class MemoryAttentionPolicy(
         require(commonWordMinimumMemories >= 0)
         require(echoWindowTokens > 0)
         require(doublingWindowTokens > 0)
+        require(distinctnessWeight >= 0f)
+        require(hysteresis in 0f..1f)
+        require(cueBurst >= 1)
     }
 }
 

@@ -32,6 +32,13 @@ data class MemoryQueryInput(
     val chronologicalContextRequired: Boolean = false,
     val alreadyRetrievedEvidenceCount: Int = 0,
     val maxQueries: Int = 6,
+    /**
+     * How many stored memories contain each (lowercase) word, when the caller knows. Entries in each
+     * list are then queried rarest first; a word no memory holds goes last, since it can match nothing.
+     */
+    val termDocumentFrequency: Map<String, Int> = emptyMap(),
+    /** Words drawn from a first pass's results; non-empty asks for one second-pass query of them. */
+    val feedbackTerms: List<String> = emptyList(),
 )
 
 @Serializable
@@ -39,6 +46,10 @@ data class MemoryQuerySpec(
     val text: String,
     val resolution: MemoryResolution,
     val reasonCode: String,
+    /** Synonyms searched alongside [text] at reduced weight (actions only). */
+    val expansionTerms: List<String> = emptyList(),
+    /** Results are wanted in time order, not by score. */
+    val chronological: Boolean = false,
 )
 
 @Serializable
@@ -55,6 +66,13 @@ data class ContextEvidence(
     val required: Boolean = false,
     /** Evidence sharing the same non-null group is kept or dropped atomically to preserve disagreement. */
     val conflictGroup: String? = null,
+    /**
+     * The evidence's text, when the caller has it: ungrouped, non-required evidence that repeats a
+     * higher-ranked item nearly word for word is skipped. Overlap only; never which copy is right.
+     */
+    val text: String? = null,
+    /** Caller-declared: this item repeats the evidence with this id (treated like a detected repeat). */
+    val repeatOf: String? = null,
 )
 
 @Serializable
@@ -65,9 +83,12 @@ data class ContextPackingInput(
 
 @Serializable
 data class ContextPackingPlan(
+    /** In prompt order: the most important first, the next most important last, the rest between. */
     val selectedEvidenceIds: List<String>,
     val totalEstimatedTokens: Int,
     val omittedEvidenceIds: List<String>,
+    /** Omitted because they nearly repeat a selected item (a subset of [omittedEvidenceIds]). */
+    val repeatedEvidenceIds: List<String> = emptyList(),
 )
 
 @Serializable
@@ -79,6 +100,10 @@ data class AgentRouteCandidate(
     val available: Boolean = true,
     /** Lower values preserve explicit/preferred routing order without pretending rank is monetary cost. */
     val preferenceRank: Int = Int.MAX_VALUE,
+    /** Failures since this agent's last success; [CIRCUIT_OPEN_FAILURES] or more opens its circuit. */
+    val consecutiveFailures: Int = 0,
+    /** Share of recent runs that succeeded, 0..1; null when unknown (treated as 1). */
+    val successRate: Double? = null,
 )
 
 @Serializable
@@ -99,6 +124,8 @@ data class AgentRoute(
     val fallbackAgent: String? = null,
     val reasonCode: String,
     val requiredContextType: String,
+    /** Capable agents passed over because their circuit is open. */
+    val circuitOpen: List<String> = emptyList(),
 )
 
 @Serializable
@@ -144,6 +171,10 @@ data class HandoffInput(
     val nextAction: String? = null,
     val acceptanceCriteria: List<String> = emptyList(),
     val provenance: List<String> = emptyList(),
+    /** Where an item came from (item text -> source, e.g. "task-run:42"); kept with the item. */
+    val sources: Map<String, String> = emptyMap(),
+    /** Size limit for the rendered packet; sections are cut from the least important end to fit. */
+    val maxChars: Int? = null,
 )
 
 @Serializable
@@ -159,7 +190,13 @@ data class HandoffPacket(
     val provenance: List<String>,
     /** Structural gaps in the handoff, e.g. NEXT_ACTION_MISSING. */
     val warnings: List<String> = emptyList(),
-)
+    val sources: Map<String, String> = emptyMap(),
+    /** What was cut to fit the size limit, as "section: n dropped". */
+    val cuts: List<String> = emptyList(),
+) {
+    /** Fixed sections, most important first; empty sections are left out. */
+    fun render(): String = renderHandoff(this)
+}
 
 @Serializable
 data class CapabilityAssessment(
@@ -174,6 +211,12 @@ data class CapabilityAssessment(
     val requiredToolAvailable: Boolean = true,
     val hasEnoughEvidence: Boolean = true,
     val recommendedTier: String = "local",
+    /** Files the work is expected to touch, when known. */
+    val filesTouched: Int = 0,
+    /** Attempts already made at this task before this one. */
+    val retryCount: Int = 0,
+    /** Share of recent local attempts that failed, 0..1. */
+    val localFailureRate: Double = 0.0,
 )
 
 @Serializable
@@ -235,6 +278,10 @@ data class ExecutionStateSummary(
     val cancelledSteps: List<String> = emptyList(),
     /** Not-yet-finished task -> the nearest failed, blocked or approval-waiting task it depends on. */
     val blockedBy: Map<String, String> = emptyMap(),
+    /** The longest chain of unfinished tasks still to run, in order. */
+    val criticalPath: List<String> = emptyList(),
+    /** Stopped tasks grouped by the pattern of their blocking message (numbers, paths, quotes masked). */
+    val failureGroups: Map<String, List<String>> = emptyMap(),
 )
 
 @Serializable
@@ -243,6 +290,8 @@ data class VerificationPlanningInput(
     val acceptanceCriteria: List<String>,
     val artifactKinds: Set<ArtifactKind> = emptySet(),
     val targetPlatforms: List<String> = emptyList(),
+    /** Repository paths the change touched, when known; tests are picked from them. */
+    val changedFiles: List<String> = emptyList(),
 )
 
 @Serializable
@@ -251,6 +300,10 @@ data class VerificationStep(
     val operationClass: String,
     val reasonCode: String,
     val criterion: String? = null,
+    /** The platform this step runs on, when it runs once per platform. */
+    val platform: String? = null,
+    /** Test classes or files to run, when picked from changed files. */
+    val targets: List<String> = emptyList(),
 )
 
 @Serializable
@@ -281,93 +334,58 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
     override fun composeMemoryQueries(input: MemoryQueryInput): MemoryQueryPlan {
         require(input.maxQueries >= 1) { "maxQueries must be at least one" }
         val queries = linkedMapOf<String, MemoryQuerySpec>()
-        fun add(text: String, resolution: MemoryResolution, reason: String) {
-            val clean = text.trim()
+        fun add(spec: MemoryQuerySpec) {
+            val clean = spec.text.trim()
             if (clean.isNotEmpty() && queries.size < input.maxQueries) {
-                val key = "${resolution.name}:${clean.lowercase()}"
-                if (key !in queries) {
-                    queries[key] = MemoryQuerySpec(clean, resolution, reason)
-                }
+                val key = "${spec.resolution.name}:${clean.lowercase()}"
+                if (key !in queries) queries[key] = spec.copy(text = clean)
             }
         }
 
-        // The objective always gets a query (and the chronological one, when asked): one list of
-        // symbols, entities or actions can no longer use up every slot.
+        // The objective always gets a query (and the chronological and second-pass ones, when
+        // asked): one list of symbols, entities or actions can no longer use up every slot.
         val objective = input.objective.trim()
-        val reserved = (if (objective.isNotEmpty()) 1 else 0) + (if (input.chronologicalContextRequired && objective.isNotEmpty()) 1 else 0)
+        val feedback = feedbackQueryText(input)
+        val chronological = input.chronologicalContextRequired && objective.isNotEmpty()
+        val reserved = (if (objective.isNotEmpty()) 1 else 0) + (if (chronological) 1 else 0) + (if (feedback != null) 1 else 0)
+        val df = input.termDocumentFrequency
         val sources = listOf(
-            input.codeSymbols.map { Triple(it, MemoryResolution.GranularEvidence, "EXACT_SYMBOL") },
-            input.knownEntities.map { Triple(it, MemoryResolution.Entity, "KNOWN_ENTITY") },
-            input.knownActions.map { Triple(it, MemoryResolution.Action, "KNOWN_ACTION") },
+            rarestFirst(input.codeSymbols, df).map { MemoryQuerySpec(it, MemoryResolution.GranularEvidence, "EXACT_SYMBOL") },
+            rarestFirst(input.knownEntities, df).map { MemoryQuerySpec(it, MemoryResolution.Entity, "KNOWN_ENTITY") },
+            rarestFirst(input.knownActions, df).map {
+                MemoryQuerySpec(it, MemoryResolution.Action, "KNOWN_ACTION", expansionTerms = actionSynonyms(it))
+            },
         )
         // Round-robin across the three lists until only the reserved slots remain.
         val longest = sources.maxOf { it.size }
         for (i in 0 until longest) {
             sources.forEach { list ->
-                if (queries.size < input.maxQueries - reserved) list.getOrNull(i)?.let { (text, resolution, reason) -> add(text, resolution, reason) }
+                if (queries.size < input.maxQueries - reserved) list.getOrNull(i)?.let(::add)
             }
         }
-        if (objective.isNotEmpty()) add(objective, MemoryResolution.Summary, "OBJECTIVE_CONTEXT")
-        if (input.chronologicalContextRequired && objective.isNotEmpty()) {
-            add(objective, MemoryResolution.GranularEvidence, "CHRONOLOGICAL_EVIDENCE")
-        }
+        if (objective.isNotEmpty()) add(MemoryQuerySpec(objective, MemoryResolution.Summary, "OBJECTIVE_CONTEXT"))
+        if (chronological) add(MemoryQuerySpec(objective, MemoryResolution.GranularEvidence, "CHRONOLOGICAL_EVIDENCE", chronological = true))
+        feedback?.let { add(MemoryQuerySpec(it, MemoryResolution.Phrase, "RESULT_FEEDBACK")) }
 
         return MemoryQueryPlan(queries.values.toList(), enoughEvidence = false)
     }
 
     override fun packContext(input: ContextPackingInput): ContextPackingPlan {
-        require(input.tokenBudget >= 0) { "tokenBudget must be non-negative" }
-        require(input.evidence.all { it.id.isNotBlank() && it.estimatedTokens >= 0 }) {
-            "evidence ids must be non-blank and token estimates non-negative"
-        }
-        require(input.evidence.map { it.id }.distinct().size == input.evidence.size) {
-            "evidence ids must be unique"
-        }
-
-        val groups = input.evidence.groupBy { it.conflictGroup ?: "__single__:${it.id}" }
-        val ordered = groups.values.sortedWith(
-            compareByDescending<List<ContextEvidence>> { group -> group.any { it.required } }
-                .thenByDescending { group -> group.maxOfOrNull { it.priority } ?: 0 }
-                .thenBy { group -> group.sumOf { it.estimatedTokens } },
-        )
-
-        val selected = mutableListOf<ContextEvidence>()
-        var used = 0
-        for (group in ordered) {
-            val cost = group.sumOf { it.estimatedTokens }
-            val required = group.any { it.required }
-            if (used + cost <= input.tokenBudget) {
-                selected += group
-                used += cost
-            } else if (required) {
-                error(
-                    "Required context group ${group.first().conflictGroup ?: group.first().id} " +
-                        "does not fit token budget",
-                )
-            }
-        }
-        val selectedIds = selected.map { it.id }.toSet()
+        val packing = contextPacking(input)
+        val selected = packing.promptOrder
+        val selectedIds = selected.toSet()
         return ContextPackingPlan(
-            selectedEvidenceIds = selected.map { it.id },
-            totalEstimatedTokens = used,
+            selectedEvidenceIds = selected,
+            totalEstimatedTokens = packing.tokensUsed,
             omittedEvidenceIds = input.evidence.map { it.id }.filterNot(selectedIds::contains),
+            repeatedEvidenceIds = packing.repeatOf.keys.filterNot(selectedIds::contains),
         )
     }
 
     override fun routeAgent(input: AgentRoutingInput): AgentRoute {
         require(input.requiredContextTokens >= 0) { "requiredContextTokens must be non-negative" }
-        val eligible = input.candidates
-            .filter { candidate ->
-                candidate.available &&
-                    candidate.contextLimitTokens >= input.requiredContextTokens &&
-                    candidate.capabilities.containsAll(input.requiredCapabilities)
-            }
-            .sortedWith(
-                compareBy<AgentRouteCandidate> { it.preferenceRank }
-                    .thenBy { it.estimatedCost }
-                    .thenBy { it.id },
-            )
-
+        val routing = agentRouting(input)
+        val eligible = routing.eligible
         if (eligible.isEmpty()) {
             return AgentRoute(
                 decision = AgentRouteDecision.Escalate,
@@ -386,8 +404,9 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             decision = AgentRouteDecision.Local,
             selectedAgent = selected.id,
             fallbackAgent = fallback?.id,
-            reasonCode = "CAPABILITY_MATCH",
+            reasonCode = if (routing.halfOpen) "CIRCUIT_HALF_OPEN" else "CAPABILITY_MATCH",
             requiredContextType = input.requiredContextType,
+            circuitOpen = routing.open.map { it.id }.filterNot { it == selected.id },
         )
     }
 
@@ -429,22 +448,26 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         )
     }
 
-    override fun composeHandoff(input: HandoffInput): HandoffPacket = HandoffPacket(
-        objective = input.objective.trim(),
-        completed = input.completed.distinct(),
-        artifacts = input.artifacts.distinct(),
-        state = input.state,
-        unresolved = input.unresolved.distinct(),
-        failures = input.failures.distinct(),
-        nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty),
-        acceptanceCriteria = input.acceptanceCriteria.distinct(),
-        provenance = input.provenance.distinct(),
-        warnings = buildList {
-            val nextAction = input.nextAction?.trim().orEmpty()
-            if (nextAction.isEmpty() && (input.unresolved.isNotEmpty() || input.failures.isNotEmpty())) add("NEXT_ACTION_MISSING")
-            if (input.objective.isBlank()) add("OBJECTIVE_MISSING")
-        },
-    )
+    override fun composeHandoff(input: HandoffInput): HandoffPacket {
+        val nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty)
+        val full = HandoffPacket(
+            objective = input.objective.trim(),
+            completed = input.completed.distinct(),
+            artifacts = input.artifacts.distinct(),
+            state = input.state,
+            unresolved = input.unresolved.distinct(),
+            failures = input.failures.distinct(),
+            nextAction = nextAction,
+            acceptanceCriteria = input.acceptanceCriteria.distinct(),
+            provenance = input.provenance.distinct(),
+            warnings = buildList {
+                if (nextAction == null && (input.unresolved.isNotEmpty() || input.failures.isNotEmpty())) add("NEXT_ACTION_MISSING")
+                if (input.objective.isBlank()) add("OBJECTIVE_MISSING")
+            },
+            sources = input.sources,
+        )
+        return fitHandoff(full, input.maxChars)
+    }
 
     override fun evaluateEscalation(input: CapabilityAssessment): EscalationResult {
         val reasons = mutableListOf<String>()
@@ -457,6 +480,9 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         if (input.requiresCodebaseWideReasoning) reasons += "CODEBASE_WIDE_REASONING"
         if (input.requiresContradictionReconciliation) reasons += "CONTRADICTION_RECONCILIATION"
         if (input.requiresArchitecturalDecision) reasons += "ARCHITECTURAL_DECISION"
+        if (input.filesTouched >= BROAD_CHANGE_FILES) reasons += "BROAD_CHANGE"
+        if (input.retryCount >= REPEATED_RETRIES) reasons += "REPEATED_RETRIES"
+        if (input.localFailureRate >= HIGH_FAILURE_RATE) reasons += "HIGH_LOCAL_FAILURE_RATE"
 
         val decision = when {
             input.malformedInput || input.ambiguousObjective -> EscalationDecision.Escalate
@@ -573,19 +599,23 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             escalatedSteps = escalated,
             cancelledSteps = cancelled,
             blockedBy = blockedBy,
+            criticalPath = criticalPath(definition, run),
+            failureGroups = failureGroups(definition, run),
         )
     }
 
     override fun planVerification(input: VerificationPlanningInput): VerificationPlan {
         val steps = linkedMapOf<String, VerificationStep>()
-        fun add(operation: String, reason: String, criterion: String? = null) {
-            val key = "$operation|${criterion.orEmpty()}"
+        fun add(operation: String, reason: String, criterion: String? = null, platform: String? = null, targets: List<String> = emptyList()) {
+            val key = verificationStepKey(operation, criterion, platform, targets)
             if (key !in steps) {
                 steps[key] = VerificationStep(
                     id = "verify-${steps.size + 1}",
                     operationClass = operation,
                     reasonCode = reason,
                     criterion = criterion,
+                    platform = platform,
+                    targets = targets,
                 )
             }
         }
@@ -595,12 +625,19 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             verificationOperationsFor(criterion).forEach { add(it, "ACCEPTANCE_CRITERION", criterion) }
         }
 
-        if (ArtifactKind.CodeChange in input.artifactKinds &&
-            steps.values.none { it.operationClass == "build" || it.operationClass == "test" }
-        ) {
+        val platforms = input.targetPlatforms.map(String::trim).filter(String::isNotEmpty).distinct()
+        val code = ArtifactKind.CodeChange in input.artifactKinds
+        if (code && platforms.isNotEmpty()) {
+            // Build and test once on each platform the change targets.
+            platforms.forEach { platform ->
+                add("build", "TARGET_PLATFORM", platform = platform)
+                add("test", "TARGET_PLATFORM", platform = platform)
+            }
+        } else if (code && steps.values.none { it.operationClass == "build" || it.operationClass == "test" }) {
             add("build", "CODE_ARTIFACT")
             add("test", "CODE_ARTIFACT")
         }
+        testTargetsFor(input.changedFiles).takeIf { it.isNotEmpty() }?.let { add("test", "CHANGED_FILES", targets = it) }
         if (ArtifactKind.Research in input.artifactKinds &&
             steps.values.none { it.operationClass == "source-verification" }
         ) {
@@ -609,22 +646,35 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         if (ArtifactKind.Release in input.artifactKinds) {
             add("release-artifact-check", "RELEASE_ARTIFACT")
         }
-        input.targetPlatforms.distinct().forEach { platform ->
-            add("platform-check:$platform", "TARGET_PLATFORM")
-        }
+        if (!code) platforms.forEach { platform -> add("platform-check:$platform", "TARGET_PLATFORM") }
 
         return VerificationPlan(steps.values.toList())
     }
 }
 
-/** Escalation points from the caller's reasoning flags; [ESCALATION_THRESHOLD] or more escalates. */
+/**
+ * Escalation points from the caller's reasoning flags and cheap signals; [ESCALATION_THRESHOLD] or
+ * more escalates. Flags: multi-step 1, codebase-wide 2, architectural 3, contradiction 3. Signals:
+ * [BROAD_CHANGE_FILES] files touched 1 ([VERY_BROAD_CHANGE_FILES] 2), [REPEATED_RETRIES] retries 1,
+ * a local failure rate of [HIGH_FAILURE_RATE] or more 1.
+ */
 internal fun reasoningLoad(input: CapabilityAssessment): Int =
     (if (input.requiresMultiStepReasoning) 1 else 0) +
         (if (input.requiresCodebaseWideReasoning) 2 else 0) +
         (if (input.requiresArchitecturalDecision) 3 else 0) +
-        (if (input.requiresContradictionReconciliation) 3 else 0)
+        (if (input.requiresContradictionReconciliation) 3 else 0) +
+        (if (input.filesTouched >= VERY_BROAD_CHANGE_FILES) 2 else if (input.filesTouched >= BROAD_CHANGE_FILES) 1 else 0) +
+        (if (input.retryCount >= REPEATED_RETRIES) 1 else 0) +
+        (if (input.localFailureRate >= HIGH_FAILURE_RATE) 1 else 0)
 
 internal const val ESCALATION_THRESHOLD = 3
+internal const val BROAD_CHANGE_FILES = 20
+internal const val VERY_BROAD_CHANGE_FILES = 50
+internal const val REPEATED_RETRIES = 2
+internal const val HIGH_FAILURE_RATE = 0.5
+
+/** Failures in a row that open an agent's circuit; it is tried again only when every agent is open. */
+const val CIRCUIT_OPEN_FAILURES: Int = 3
 
 /** Task ids in dependency order (Kahn's algorithm; definition order breaks ties; cycles appended). */
 internal fun executionOrder(definition: WorkflowDefinition): List<com.hereliesaz.geministrator.domain.TaskDefinitionId> {

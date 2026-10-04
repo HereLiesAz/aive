@@ -281,15 +281,27 @@ class MemoryLayerController(
         }
     }
 
-    val promptContextProvider = MemoryPromptContextProvider { request, queryPlan ->
-        if (!active) return@MemoryPromptContextProvider MemoryPromptRecall()
+    val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
+        override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
+            recallForPrompt(request, queryPlan)
+
+        override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
+            if (!active) MemoryQueryHints() else runCatching { queryHintsFor(request.objective) }.getOrDefault(MemoryQueryHints())
+
+        override suspend fun feedbackTerms(
+            request: AgentTaskRequest,
+            queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
+        ): Map<String, Int> = if (!active) emptyMap() else runCatching { feedbackTermsFor(request, queryPlan) }.getOrDefault(emptyMap())
+    }
+
+    /** One grip per planned query; each hit keeps its best score and whether a chronological query found it. */
+    private suspend fun gripPlan(
+        request: AgentTaskRequest,
+        queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
+    ): Pair<List<MemoryRecallHit>, Set<String>> {
         val context = request.orchestrationContext
-        // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
-        val agentAttention = attention.forAgent(request.taskRunId.value)
-        agentAttention.consumeTokens(
-            AttentionGatedRecall.approximateTokens(request.objective + request.roleInstructions, APPROXIMATE_CHARS_PER_TOKEN),
-        )
         val hitsById = linkedMapOf<String, MemoryRecallHit>()
+        val chronological = HashSet<String>()
         queryPlan.queries.forEach { querySpec ->
             val resolution = when (querySpec.resolution) {
                 QueryResolution.Category -> MemoryResolution.Category
@@ -309,16 +321,82 @@ class MemoryLayerController(
                     taskRunId = request.taskRunId.value,
                     taskDefinitionId = context.taskDefinitionId?.value,
                     roleId = context.roleId?.value,
+                    expansionTerms = querySpec.expansionTerms,
                 ),
             )
             recall.hits.forEach { hit ->
                 val current = hitsById[hit.node.id.value]
                 if (current == null || hit.score > current.score) hitsById[hit.node.id.value] = hit
+                if (querySpec.chronological) chronological += hit.node.id.value
             }
         }
         val ranked = hitsById.values
             .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
             .take(MAX_RECALL_RESULTS)
+        return ranked to chronological
+    }
+
+    /** The objective's entities, actions and code symbols, with each word's memory count. */
+    private suspend fun queryHintsFor(objective: String): MemoryQueryHints {
+        if (objective.isBlank()) return MemoryQueryHints()
+        val code = extractCodeSemanticHints(objective)
+        // Never wait on loading the language data at task start; the clerks load it in the background.
+        val analysis = MemoryLanguageResources.loadedOrNull()?.let { resources -> runCatching { MemoryTextAnalyzer(resources).analyze(objective) }.getOrNull() }
+        val entities = analysis?.entities().orEmpty()
+            .filter { it.impliedBy == null && !it.negated }
+            .map { it.text }
+            .filterNot { entity -> code.nounCandidates.any { it.equals(entity, ignoreCase = true) } }
+            .distinctBy(String::lowercase)
+            .take(MAX_HINTS)
+        val actions = (analysis?.actions().orEmpty().filter { !it.negated }.map { it.key } + code.verbCandidates)
+            .distinctBy(String::lowercase)
+            .take(MAX_HINTS)
+        val symbols = code.nounCandidates.take(MAX_HINTS)
+        val words = (listOf(objective) + entities + actions + symbols)
+            .flatMap { com.hereliesaz.geministrator.orchestration.queryWords(it) }
+            .toSet()
+        val tool = layer.tool
+        return MemoryQueryHints(
+            entities = entities,
+            actions = actions,
+            codeSymbols = symbols,
+            documentFrequency = words.associateWith { tool.termFrequency(it).memories },
+        )
+    }
+
+    /**
+     * Uncommon words from the top first-pass results that the plan did not already ask about, with
+     * their memory counts. Reads only: nothing is gated, delivered or counted toward attention.
+     */
+    private suspend fun feedbackTermsFor(
+        request: AgentTaskRequest,
+        queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
+    ): Map<String, Int> {
+        val (ranked, _) = gripPlan(request, queryPlan)
+        if (ranked.isEmpty()) return emptyMap()
+        val asked = queryPlan.queries.flatMap { com.hereliesaz.geministrator.orchestration.queryWords(it.text) }.toSet()
+        val tool = layer.tool
+        val counts = linkedMapOf<String, Int>()
+        ranked.take(FEEDBACK_RESULTS).forEach { hit ->
+            MemorySalienceFeatures.terms(hit.node.text).filter { it !in asked && it !in counts }.forEach { term ->
+                counts[term] = tool.termFrequency(term).memories
+            }
+        }
+        return counts.filter { (word, count) -> count > 0 && !isCommonWord(tool, word) }
+            .entries.sortedBy { it.value }.take(FEEDBACK_TERMS).associate { it.key to it.value }
+    }
+
+    private suspend fun recallForPrompt(
+        request: AgentTaskRequest,
+        queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
+    ): MemoryPromptRecall {
+        if (!active) return MemoryPromptRecall()
+        // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
+        val agentAttention = attention.forAgent(request.taskRunId.value)
+        agentAttention.consumeTokens(
+            AttentionGatedRecall.approximateTokens(request.objective + request.roleInstructions, APPROXIMATE_CHARS_PER_TOKEN),
+        )
+        val (ranked, chronological) = gripPlan(request, queryPlan)
         // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
         val hits = agentAttention.select(ranked)
         val session = cueSession(request.taskRunId.value, request)
@@ -328,6 +406,8 @@ class MemoryLayerController(
             session.protocolGiven = true
             session.pending.toList().also { session.pending.clear() } to first
         }
+        // Hits a chronological query found read in time order, apart from the rest.
+        val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
             if (firstPrompt) add(PromptContextBlock("Memory protocol", MEMORY_PROTOCOL))
             // The user's prompt draws its own cue cloud, like any thought.
@@ -335,17 +415,27 @@ class MemoryLayerController(
             if (pending.isNotEmpty()) {
                 add(PromptContextBlock("Recalled on request", pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS)))
             }
-            if (hits.isNotEmpty()) {
+            if (relevant.isNotEmpty()) {
                 add(
                     PromptContextBlock(
                         "Relevant memory",
-                        hits.joinToString("\n\n") { "[${it.score.twoDecimals()}] ${it.node.kind.name}: ${it.node.text}" }
+                        relevant.joinToString("\n\n") { "[${it.score.twoDecimals()}] ${it.node.kind.name}: ${it.node.text}" }
+                            .take(MAX_RECALL_CHARS),
+                    ),
+                )
+            }
+            if (timeline.isNotEmpty()) {
+                add(
+                    PromptContextBlock(
+                        "Memory timeline",
+                        timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value })
+                            .joinToString("\n\n") { "${it.node.kind.name}: ${it.node.text}" }
                             .take(MAX_RECALL_CHARS),
                     ),
                 )
             }
         }
-        MemoryPromptRecall(
+        return MemoryPromptRecall(
             blocks = blocks,
             memoryAddresses = hits.mapTo(linkedSetOf()) { "memory-node:${it.node.id.value}" },
             maxContextTokens = if (hits.isEmpty() && pending.isEmpty()) null else MAX_RECALL_CHARS / APPROXIMATE_CHARS_PER_TOKEN,
@@ -504,6 +594,9 @@ class MemoryLayerController(
             "dwell on one (or write \"Let me see what I remember about …\") and more of it comes back."
 
         const val MAX_RECALL_RESULTS = 6
+        const val MAX_HINTS = 4
+        const val FEEDBACK_RESULTS = 3
+        const val FEEDBACK_TERMS = 5
         const val MAX_RECALL_CHARS = 6_000
         const val APPROXIMATE_CHARS_PER_TOKEN = 4
     }

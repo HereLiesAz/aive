@@ -124,6 +124,7 @@ class ProviderBackedManagedSessionGateway(
                 InferenceTerminalStatus.Failed,
                 failure.providerFailureMessage("Unable to start provider session"),
             )
+            providerRegistry.recordOutcome(provider.id, success = false)
             throw failure
         }
     }
@@ -137,21 +138,39 @@ class ProviderBackedManagedSessionGateway(
     }
 
     private suspend fun AgentTaskRequest.withRecalledMemory(): AgentTaskRequest {
-        val queryPlan = orchestrationUtilities.composeMemoryQueries(
-            MemoryQueryInput(
-                objective = objective,
-                maxQueries = MAX_MEMORY_QUERIES,
-            ),
-        )
-        if (queryPlan.enoughEvidence || queryPlan.queries.isEmpty()) return this
-
-        val recalled = try {
-            MemoryRuntimeBridge.promptContextProvider.recallFor(this, queryPlan)
+        val memory = MemoryRuntimeBridge.promptContextProvider
+        suspend fun <T> guarded(default: T, block: suspend () -> T): T = try {
+            block()
         } catch (failure: CancellationException) {
             throw failure
         } catch (_: Throwable) {
-            com.hereliesaz.geministrator.memory.MemoryPromptRecall()
+            default
         }
+
+        // The request's own terms and their rarity feed the composer; a first pass's uncommon
+        // result words feed one second-pass query.
+        val hints = guarded(com.hereliesaz.geministrator.memory.MemoryQueryHints()) { memory.queryHints(this) }
+        val queryInput = MemoryQueryInput(
+            objective = objective,
+            knownEntities = hints.entities,
+            knownActions = hints.actions,
+            codeSymbols = hints.codeSymbols,
+            termDocumentFrequency = hints.documentFrequency,
+            maxQueries = MAX_MEMORY_QUERIES,
+        )
+        var queryPlan = orchestrationUtilities.composeMemoryQueries(queryInput)
+        if (queryPlan.enoughEvidence || queryPlan.queries.isEmpty()) return this
+        val feedback = guarded(emptyMap()) { memory.feedbackTerms(this, queryPlan) }
+        if (feedback.isNotEmpty()) {
+            queryPlan = orchestrationUtilities.composeMemoryQueries(
+                queryInput.copy(
+                    feedbackTerms = feedback.keys.toList(),
+                    termDocumentFrequency = queryInput.termDocumentFrequency + feedback,
+                ),
+            )
+        }
+
+        val recalled = guarded(com.hereliesaz.geministrator.memory.MemoryPromptRecall()) { memory.recallFor(this, queryPlan) }
         if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty()) return this
 
         val evidence = recalled.blocks.mapIndexed { index, block ->
@@ -159,6 +178,7 @@ class ProviderBackedManagedSessionGateway(
                 id = "memory-context-$index",
                 estimatedTokens = approximateTokens(block.content),
                 priority = recalled.blocks.size - index,
+                text = block.content,
             )
         }
         val budget = recalled.maxContextTokens
@@ -169,10 +189,9 @@ class ProviderBackedManagedSessionGateway(
                 evidence = evidence,
             ),
         )
-        val selectedIds = packing.selectedEvidenceIds.toSet()
-        val selectedBlocks = recalled.blocks.filterIndexed { index, _ ->
-            "memory-context-$index" in selectedIds
-        }
+        // The packer's prompt order: the most important block first, the next most important last.
+        val blocksById = recalled.blocks.withIndex().associate { (index, block) -> "memory-context-$index" to block }
+        val selectedBlocks = packing.selectedEvidenceIds.mapNotNull(blocksById::get)
 
         return copy(
             promptContext = promptContext.copy(
@@ -341,6 +360,7 @@ class ProviderBackedManagedSessionGateway(
                                 InferenceTerminalStatus.Failed,
                                 "Provider observation failed repeatedly",
                             )
+                            providerRegistry.recordOutcome(handle.providerId, success = false)
                             recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
                         return@launch
@@ -538,6 +558,7 @@ class ProviderBackedManagedSessionGateway(
                 },
                 reason = (effectiveEvent as? AgentEvent.Failed)?.reason,
             )
+            providerRegistry.recordOutcome(handle.providerId, success = status == ManagedSessionStatus.Completed)
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
         }
     }

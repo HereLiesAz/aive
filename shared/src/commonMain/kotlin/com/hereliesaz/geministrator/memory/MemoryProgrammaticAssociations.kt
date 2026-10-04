@@ -290,11 +290,12 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         .map { it.value }
         .filter { it.size > 1 }
         .forEach { group ->
+            val key = group.first().let { "${it.kind.name}:${cache?.key(it) ?: it.text.normalizedMemoryKey()}" }
             group.distinctBy(MemoryNode::id)
                 .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
                 .forEach { (left, right) ->
-                    add(left, right, "exact-cue", 1f, left.text.normalizedMemoryKey())
+                    add(left, right, "exact-cue", 1f, left.text.normalizedMemoryKey(), extraMetadata = mapOf(EDGE_GROUP to key))
                 }
         }
 
@@ -318,7 +319,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             group.distinctBy(MemoryNode::id)
                 .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
-                .forEach { (left, right) -> add(left, right, "exact-identifier", 0.98f, identifier) }
+                .forEach { (left, right) -> add(left, right, "exact-identifier", 0.98f, identifier, extraMetadata = mapOf(EDGE_GROUP to identifier)) }
         }
 
     // Direct shared evidence provenance.
@@ -327,13 +328,12 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         .groupBy({ it.first }, { it.second })
         .entries
         .sortedBy { it.key.value }
-        .map { it.value }
-        .filter { it.size > 1 }
-        .forEach { group ->
+        .filter { it.value.size > 1 }
+        .forEach { (sectionId, group) ->
             group.distinctBy(MemoryNode::id)
                 .sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
-                .forEach { (left, right) -> add(left, right, "shared-provenance", 1f) }
+                .forEach { (left, right) -> add(left, right, "shared-provenance", 1f, extraMetadata = mapOf(EDGE_GROUP to sectionId.value)) }
         }
 
     fun associateEpisodeGroups(
@@ -341,12 +341,12 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         weight: Float,
         groups: Map<String, List<MemoryEpisode>>,
     ) {
-        groups.entries.sortedBy { it.key }.forEach { (_, group) ->
+        groups.entries.sortedBy { it.key }.forEach { (key, group) ->
             group.sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .mapNotNull { anchors[it.id] }
                 .distinctBy(MemoryNode::id)
                 .zipWithNext()
-                .forEach { (left, right) -> add(left, right, basis, weight) }
+                .forEach { (left, right) -> add(left, right, basis, weight, extraMetadata = mapOf(EDGE_GROUP to key)) }
         }
     }
 
@@ -403,12 +403,13 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
     )
 
     // Global chronological adjacency captures context switching, including an orchestration moving
-    // from one project to another. This records sequence only, never causation.
-    episodes
-        .sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
+    // from one project to another. This records sequence only, never causation. The link weakens
+    // with the time between the two episodes (see [adjacencyDecay]).
+    val chronological = episodes.sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
+    chronological
         .zipWithNext()
         .forEach { (leftEpisode, rightEpisode) ->
-            add(anchors[leftEpisode.id], anchors[rightEpisode.id], "sequence:adjacent-store", 0.68f)
+            add(anchors[leftEpisode.id], anchors[rightEpisode.id], "sequence:adjacent-store", 0.68f * adjacencyDecay(leftEpisode, rightEpisode))
         }
 
     // Same-project chronological adjacency is a slightly stronger bookkeeping signal.
@@ -420,9 +421,41 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
             group.sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
                 .zipWithNext()
                 .forEach { (leftEpisode, rightEpisode) ->
-                    add(anchors[leftEpisode.id], anchors[rightEpisode.id], "sequence:adjacent-project", 0.72f)
+                    add(anchors[leftEpisode.id], anchors[rightEpisode.id], "sequence:adjacent-project", 0.72f * adjacencyDecay(leftEpisode, rightEpisode))
                 }
         }
+
+    // Events: a run of episodes with no gap longer than [EVENT_GAP_MILLIS] is one event, however it
+    // falls across clock windows. Members link through the event (a hub at recall), in the
+    // temporal family, so an event and the clock buckets it overlaps count once per pair.
+    var event = mutableListOf<MemoryEpisode>()
+    fun closeEvent() {
+        if (event.size > 1) {
+            val key = "event:${event.first().id.value}"
+            event.mapNotNull { anchors[it.id] }.distinctBy(MemoryNode::id).zipWithNext().forEach { (left, right) ->
+                add(
+                    left = left,
+                    right = right,
+                    basis = "temporal:Event",
+                    weight = EVENT_WEIGHT,
+                    detail = key,
+                    extraMetadata = mapOf(
+                        "evidenceFamily" to "temporal-co-bucket",
+                        "evidencePolicy" to "latest",
+                        "temporalLevel" to "Event",
+                        EDGE_GROUP to key,
+                    ),
+                )
+            }
+        }
+        event = mutableListOf()
+    }
+    chronological.forEach { episode ->
+        val last = event.lastOrNull()
+        if (last != null && episode.createdAtEpochMillis - last.createdAtEpochMillis > EVENT_GAP_MILLIS) closeEvent()
+        event += episode
+    }
+    closeEvent()
 
     // Active temporal buckets provide bounded recency associations without any model inference.
     // They intentionally span project IDs within this store: temporal co-presence can be useful when
@@ -457,6 +490,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
                             "evidenceFamily" to "temporal-co-bucket",
                             "evidencePolicy" to "latest",
                             "temporalLevel" to bucket.level.name,
+                            EDGE_GROUP to bucket.id,
                         ),
                     )
                 }
@@ -464,6 +498,20 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
 
     return candidates.values.take(limit)
 }
+
+/**
+ * How much of a sequence link survives the time between two episodes: halved every
+ * [ADJACENCY_HALF_LIFE_MILLIS], never below [ADJACENCY_FLOOR] (order alone is still a fact).
+ */
+private fun adjacencyDecay(left: MemoryEpisode, right: MemoryEpisode): Float {
+    val gap = kotlin.math.abs(right.createdAtEpochMillis - left.createdAtEpochMillis).toDouble()
+    return maxOf(ADJACENCY_FLOOR, kotlin.math.exp(-kotlin.math.ln(2.0) * gap / ADJACENCY_HALF_LIFE_MILLIS).toFloat())
+}
+
+private const val ADJACENCY_HALF_LIFE_MILLIS = 6.0 * 60 * 60 * 1000
+private const val ADJACENCY_FLOOR = 0.25f
+private const val EVENT_GAP_MILLIS = 30L * 60 * 1000
+private const val EVENT_WEIGHT = 0.86f
 
 private fun List<MemoryNode>.anchorForEpisode(episodeId: MemoryEpisodeId): MemoryNode? =
     asSequence()

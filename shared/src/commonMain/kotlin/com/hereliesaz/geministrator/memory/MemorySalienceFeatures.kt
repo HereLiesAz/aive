@@ -6,15 +6,16 @@ import kotlin.math.roundToInt
 /*
  * Salience features for the programmatic Salience clerk. Every part of the score is recorded on the
  * node (`salienceFeatures`), so a score can be audited term by term. None of it judges whether a
- * section is true; it measures kind, cue words, relevance to the user's own prompt, specificity
- * and repetition.
+ * section is true; it measures kind, cue words, relevance to the user's own prompt, specificity,
+ * repetition and recency (position within the episode).
  */
 internal object MemorySalienceFeatures {
     data class Score(val score: Float, val parts: List<Pair<String, Float>>) {
         fun explain(): String = parts.joinToString(" ") { (name, value) -> "$name=${value.format()}" }
     }
 
-    fun score(text: String, sourceKind: String?, promptTerms: Set<String>, idf: Map<String, Double>, duplicates: Int): Score {
+    /** [position] is the section's place in its episode, 0 (first) to 1 (last): later sections carry outcomes. */
+    fun score(text: String, sourceKind: String?, promptTerms: Set<String>, idf: Map<String, Double>, duplicates: Int, position: Float = 0f): Score {
         val parts = mutableListOf<Pair<String, Float>>()
         parts += "kind" to when (sourceKind) {
             MemorySourceKind.AgentNote.name -> 0.8f
@@ -30,6 +31,7 @@ internal object MemorySalienceFeatures {
         relevance(text, promptTerms, idf).takeIf { it > 0f }?.let { parts += "promptRelevance" to 0.15f * it }
         specificity(text).takeIf { it > 0f }?.let { parts += "specificity" to 0.05f * it }
         if (duplicates > 0) parts += "repeated" to 0.05f * minOf(1f, duplicates / 2f)
+        if (position > 0f) parts += "recency" to 0.05f * position.coerceIn(0f, 1f)
         val total = parts.sumOf { it.second.toDouble() }.toFloat().coerceIn(0f, 1f)
         return Score((total * 100).roundToInt() / 100f, parts)
     }
@@ -87,7 +89,7 @@ internal object MemorySalienceFeatures {
     fun collapseRepeatedLines(text: String): Pair<String, Int> {
         val lines = text.lines()
         if (lines.size < 4) return text to 0
-        val templates = lines.map(::template)
+        val templates = lines.map(::lineTemplate)
         val counts = templates.groupingBy { it }.eachCount()
         val lastIndex = HashMap<String, Int>()
         templates.forEachIndexed { i, t -> lastIndex[t] = i }
@@ -103,7 +105,8 @@ internal object MemorySalienceFeatures {
         return if (dropped == 0) text to 0 else kept.joinToString("\n") to dropped
     }
 
-    private fun template(line: String): String = line.trim()
+    /** A line with its timestamps, quoted values, paths, hex and numbers masked. */
+    fun lineTemplate(line: String): String = line.trim()
         .replace(TIMESTAMP, "<t>").replace(QUOTED, "<q>").replace(PATHISH, "<p>").replace(HEX, "<h>").replace(NUMBER, "<n>")
 
     /** Whole sections of build-tool bookkeeping: up-to-date tasks, download progress, bars. */

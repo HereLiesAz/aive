@@ -27,6 +27,10 @@ fun interface LocalOrchestrationSpecialistRuntime {
 internal data class ExecutionStateModelInput(
     /** Every task in dependency order; runs without a definition follow. */
     val tasks: List<ExecutionStateTask>,
+    /** The longest chain of unfinished tasks, in order: copy as criticalPath. */
+    val criticalPath: List<String> = emptyList(),
+    /** Stopped tasks by "code: message pattern": copy as failureGroups. */
+    val failureGroups: Map<String, List<String>> = emptyMap(),
 ) {
     companion object {
         fun of(definition: WorkflowDefinition, run: WorkflowRun): ExecutionStateModelInput {
@@ -46,6 +50,8 @@ internal data class ExecutionStateModelInput(
                         dependsOn = dependencies[id].orEmpty().mapNotNull(position::get).sorted(),
                     )
                 },
+                criticalPath = criticalPath(definition, run),
+                failureGroups = failureGroups(definition, run),
             )
         }
     }
@@ -92,6 +98,20 @@ class GuardedModelBackedOrchestrationUtilities(
                 candidate.queries.all { it.text.isNotBlank() && it.reasonCode.isNotBlank() } &&
                 (!candidate.enoughEvidence || baseline.enoughEvidence) &&
                 (baseline.enoughEvidence || candidate.queries.isNotEmpty())
+        }.let { plan ->
+            if (plan === baseline) {
+                plan
+            } else {
+                // Synonyms and time ordering are lookups, not decisions: the baseline's always apply.
+                plan.copy(
+                    queries = plan.queries.map { query ->
+                        query.copy(
+                            expansionTerms = if (query.resolution == MemoryResolution.Action) actionSynonyms(query.text) else emptyList(),
+                            chronological = query.reasonCode == "CHRONOLOGICAL_EVIDENCE",
+                        )
+                    },
+                )
+            }
         }
     }
 
@@ -124,6 +144,8 @@ class GuardedModelBackedOrchestrationUtilities(
                 recomputedTokens <= input.tokenBudget &&
                 requiredIncluded &&
                 groupsAtomic
+        }.let { plan ->
+            if (plan === baseline) plan else plan.copy(repeatedEvidenceIds = baseline.repeatedEvidenceIds.filter(plan.omittedEvidenceIds::contains))
         }
     }
 
@@ -139,7 +161,12 @@ class GuardedModelBackedOrchestrationUtilities(
                 baseline.decision == AgentRouteDecision.Escalate
             } else {
                 val selected = candidate.selectedAgent?.let(candidates::get)
+                val open = baseline.circuitOpen.toSet()
                 selected != null &&
+                    selected.id !in open &&
+                    candidate.fallbackAgent !in open &&
+                    // A half-open trial is the baseline's one pick.
+                    (baseline.reasonCode != "CIRCUIT_HALF_OPEN" || (selected.id == baseline.selectedAgent && candidate.fallbackAgent == null)) &&
                     selected.available &&
                     selected.contextLimitTokens >= input.requiredContextTokens &&
                     selected.capabilities.containsAll(input.requiredCapabilities) &&
@@ -152,7 +179,7 @@ class GuardedModelBackedOrchestrationUtilities(
                     } != false &&
                     !(baseline.decision == AgentRouteDecision.Escalate)
             }
-        }
+        }.let { route -> if (route === baseline) route else route.copy(circuitOpen = baseline.circuitOpen) }
     }
 
     override fun routeTool(input: ToolRoutingInput): ToolRoute {
@@ -197,7 +224,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 candidate.nextAction == baseline.nextAction &&
                 candidate.acceptanceCriteria.toSet() == baseline.acceptanceCriteria.toSet() &&
                 candidate.provenance.toSet() == baseline.provenance.toSet()
-        }.copy(warnings = baseline.warnings)
+        }.copy(warnings = baseline.warnings, sources = baseline.sources, cuts = baseline.cuts)
     }
 
     override fun evaluateEscalation(input: CapabilityAssessment): EscalationResult {
@@ -255,7 +282,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 candidate.escalatedSteps.toSet() == baseline.escalatedSteps.toSet() &&
                 candidate.cancelledSteps.toSet() == baseline.cancelledSteps.toSet() &&
                 candidate.blockedBy == baseline.blockedBy
-        }
+        }.copy(criticalPath = baseline.criticalPath, failureGroups = baseline.failureGroups)
     }
 
     override fun planVerification(input: VerificationPlanningInput): VerificationPlan {
@@ -332,5 +359,5 @@ class GuardedModelBackedOrchestrationUtilities(
     }
 
     private fun stepKey(step: VerificationStep): String =
-        "${step.operationClass}|${step.criterion.orEmpty()}"
+        verificationStepKey(step.operationClass, step.criterion, step.platform, step.targets)
 }
