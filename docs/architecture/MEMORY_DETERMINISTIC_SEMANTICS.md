@@ -85,6 +85,12 @@ Programmatic nodes record:
 
 `AgentMemoryLayer.createWithMicroAgents(..., programmaticSemanticFastPaths = false)` disables the fast path for direct A/B comparison with the trained models.
 
+## Programmatic sectioning and salience
+
+The Sectioner (`MemorySectioning.kt`) splits structure first: typed blocks for headings, fenced code, stack traces, diff hunks, log runs, lists, tables, quotes and paragraphs; a heading joins the block after it. Typed blocks stay whole (oversized logs, traces and diffs split only between lines, diffs between hunks; fences never). Prose over 1,200 characters gets TextTiling topic boundaries when long enough to measure, then a recursive split (paragraphs, lines, sentences, clauses, words) that guarantees the limit; small neighbours merge back to at least 160. Sentences never split inside URLs, paths, versions, decimals, dotted identifiers or after common abbreviations.
+
+The Salience clerk (`MemorySalienceFeatures.kt`) drops acknowledgements, symbol-only text and whole sections of build-tool bookkeeping (up-to-date tasks, download progress), and near-duplicates (shingle Jaccard ≥ 0.8; word 3-shingles for prose, character 5-grams for code). Repeated tool-output lines collapse Drain-style to their first and last instance, copied verbatim, with the count in `collapsedRepeatedLines`. User prompts are never dropped. The score is a sum of recorded parts (`salienceFeatures`): source kind, technical text, decision/error/action-item cues, IDF-weighted overlap with the user's prompt, specificity, and repetition. It measures; it never judges whether a section is true.
+
 ## Programmatic noun and verb clerks
 
 The default (programmatic) Noun and Verb clerks read text with `MemoryTextAnalyzer`, which runs on two shipped static resources and no model:

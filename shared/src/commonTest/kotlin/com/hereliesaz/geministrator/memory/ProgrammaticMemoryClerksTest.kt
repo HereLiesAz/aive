@@ -121,4 +121,80 @@ class ProgrammaticMemoryClerksTest {
         assertTrue("clear cache" in phrases && "revert release" in phrases, "phrases: $phrases")
         assertFalse(phrases.any { it.startsWith("clear ") && it != "clear cache" }, "phrases: $phrases")
     }
+
+    @Test
+    fun sentencesNeverSplitInsideVersionsPathsIdentifiersOrAbbreviations() {
+        val sentences = memorySentences(
+            "Bumped Kotlin to v2.1.0, e.g. for `foo.bar()` in src/a.kt. It calls client.send() now! Done? Yes.",
+        )
+        assertEquals(
+            listOf("Bumped Kotlin to v2.1.0, e.g. for `foo.bar()` in src/a.kt.", "It calls client.send() now!", "Done?", "Yes."),
+            sentences,
+        )
+    }
+
+    @Test
+    fun typedBlocksKeepTracesDiffsLogsAndListsWhole() {
+        val text = """
+            Intro paragraph about the failure.
+            java.lang.IllegalStateException: boom
+                at com.example.Foo.bar(Foo.kt:10)
+                at com.example.Main.main(Main.kt:3)
+            diff --git a/x.kt b/x.kt
+            @@ -1,2 +1,2 @@
+            -val a = 1
+            +val a = 2
+            2026-10-04 01:00:00 INFO start
+            2026-10-04 01:00:01 INFO step
+            2026-10-04 01:00:02 ERROR stop
+            - first item
+            - second item
+              continued
+        """.trimIndent()
+        val types = text.typedBlocks().map { it.type }
+        assertEquals(
+            listOf(MemoryBlockType.Paragraph, MemoryBlockType.StackTrace, MemoryBlockType.Diff, MemoryBlockType.Log, MemoryBlockType.ListItems),
+            types,
+        )
+    }
+
+    @Test
+    fun longProseSplitsUnderTheLimitAtSentenceEnds() {
+        val prose = (1..60).joinToString(" ") { "Sentence number $it describes the gradle cache and the build." }
+        val blocks = prose.structuralBlocks(1_200)
+        assertTrue(blocks.size > 1 && blocks.all { it.length <= 1_200 }, "sizes: ${blocks.map { it.length }}")
+        assertTrue(blocks.all { it.endsWith(".") }, "a split landed mid-sentence")
+    }
+
+    @Test
+    fun salienceDropsToolNoiseAndNearDuplicatesButNeverUserPrompts() = runBlocking {
+        fun section(id: String, kind: MemorySourceKind, text: String) =
+            MemoryWorkItem(id, "section", text, mapOf("sourceKind" to kind.name))
+        val log = (1..8).joinToString("\n") { "2026-10-04 01:00:0$it INFO fetched chunk $it of 8 from cache" }
+        val packet = MemoryWorkPacket(
+            queueId = MemoryQueueId("q"),
+            episodeId = MemoryEpisodeId("e"),
+            stage = MemoryConsolidationStage.Salience,
+            packetKey = "p",
+            items = listOf(
+                section("s1", MemorySourceKind.UserPrompt, "ok"),
+                section("s2", MemorySourceKind.Message, "> Task :shared:compileKotlin UP-TO-DATE\n> Task :shared:jar UP-TO-DATE"),
+                section("s3", MemorySourceKind.AgentNote, "We decided to replace the settings store with an append-only log in MemoryLog.kt."),
+                section("s4", MemorySourceKind.AgentNote, "We decided to replace the settings store with an append-only log in MemoryLog.kt!"),
+                section("s5", MemorySourceKind.Artifact, log),
+            ),
+            instruction = "",
+        )
+        val nodes = ProgrammaticMemoryClerks.forRole(MemoryMicroAgentRole.SalienceFilter) { 1L }.process(packet).nodesToAdd
+        val texts = nodes.map { it.text }
+        assertTrue("ok" in texts, "user prompt dropped: $texts")
+        assertFalse(texts.any { "UP-TO-DATE" in it }, "tool noise kept: $texts")
+        assertEquals(1, texts.count { "append-only log" in it }, "near-duplicate kept: $texts")
+        val decision = nodes.single { "append-only log" in it.text }
+        assertEquals("1", decision.metadata["nearDuplicatesDropped"])
+        assertTrue("decision=" in decision.metadata["salienceFeatures"].orEmpty())
+        val collapsed = nodes.single { "fetched chunk" in it.text }
+        assertEquals(2, collapsed.text.lines().size, "repeated log lines not collapsed: ${collapsed.text}")
+        assertEquals("6", collapsed.metadata["collapsedRepeatedLines"])
+    }
 }
