@@ -77,6 +77,42 @@ internal data class AgentCandidateFacts(
     val eligible: Boolean,
 )
 
+/**
+ * The memory query input with its text already cleaned: the objective trimmed, and each list trimmed
+ * with blank entries and case-only repeats dropped, exactly as the baseline drops them. A trained
+ * adapter copied list entries verbatim, blanks included ("" and "\t" became queries), so it is never
+ * handed one.
+ */
+@Serializable
+internal data class MemoryQueryModelInput(
+    val objective: String,
+    val knownEntities: List<String>,
+    val knownActions: List<String>,
+    val codeSymbols: List<String>,
+    val chronologicalContextRequired: Boolean,
+    val alreadyRetrievedEvidenceCount: Int,
+    val maxQueries: Int,
+) {
+    fun toInput(): MemoryQueryInput = MemoryQueryInput(
+        objective, knownEntities, knownActions, codeSymbols, chronologicalContextRequired, alreadyRetrievedEvidenceCount, maxQueries,
+    )
+
+    companion object {
+        fun of(input: MemoryQueryInput): MemoryQueryModelInput {
+            fun clean(values: List<String>) = values.map(String::trim).filter(String::isNotEmpty).distinctBy(String::lowercase)
+            return MemoryQueryModelInput(
+                objective = input.objective.trim(),
+                knownEntities = clean(input.knownEntities),
+                knownActions = clean(input.knownActions),
+                codeSymbols = clean(input.codeSymbols),
+                chronologicalContextRequired = input.chronologicalContextRequired,
+                alreadyRetrievedEvidenceCount = input.alreadyRetrievedEvidenceCount,
+                maxQueries = input.maxQueries,
+            )
+        }
+    }
+}
+
 @Serializable
 internal data class ToolRoutingModelInput(
     /**

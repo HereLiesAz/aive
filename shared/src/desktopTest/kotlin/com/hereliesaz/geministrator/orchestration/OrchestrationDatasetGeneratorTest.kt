@@ -83,7 +83,7 @@ class OrchestrationDatasetGeneratorTest {
         val expected = row.expected
         when (role) {
             OrchestrationUtilityRole.MemoryQueryComposer ->
-                assertEquals(json.decodeFromString<MemoryQueryPlan>(expected), family.composeMemoryQueries(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<MemoryQueryPlan>(expected), family.composeMemoryQueries(json.decodeFromString<MemoryQueryModelInput>(input).toInput()))
             OrchestrationUtilityRole.ContextPacker ->
                 assertEquals(json.decodeFromString<ContextPackingPlan>(expected), family.packContext(json.decodeFromString<ContextPackingModelInput>(input).toInput()))
             OrchestrationUtilityRole.AgentRouter ->

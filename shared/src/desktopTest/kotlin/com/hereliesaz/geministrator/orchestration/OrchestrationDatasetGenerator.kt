@@ -367,7 +367,7 @@ object OrchestrationDatasetGenerator {
         ).mapNotNull { valid { verification(it) } }
     }
 
-    private fun memory(input: MemoryQueryInput) = encode(input, baseline.composeMemoryQueries(input))
+    private fun memory(input: MemoryQueryInput) = encode(MemoryQueryModelInput.of(input), baseline.composeMemoryQueries(input))
     private fun context(input: ContextPackingInput) = encode(ContextPackingModelInput.of(input), baseline.packContext(input))
     private fun agent(input: AgentRoutingInput) = encode(AgentRoutingModelInput.of(input), baseline.routeAgent(input))
     private fun tool(input: ToolRoutingInput) = encode(ToolRoutingModelInput.of(input), baseline.routeTool(input))
