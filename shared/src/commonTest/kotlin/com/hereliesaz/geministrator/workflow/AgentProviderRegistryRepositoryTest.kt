@@ -164,6 +164,20 @@ class AgentProviderRegistryRepositoryTest {
 
         assertEquals(automatic.id, selected.id)
     }
+
+    @Test
+    fun aProviderThatKeepsFailingIsPassedOverUntilItSucceedsAgain() = runBlocking {
+        val first = SourceAwareProvider(AgentProviderId("first"), setOf(RepositorySource.GitHub))
+        val second = SourceAwareProvider(AgentProviderId("second"), setOf(RepositorySource.GitHub))
+        val registry = AgentProviderRegistry(listOf(first, second), inferenceSettings = InMemorySettings())
+        val request = ProviderSelectionRequest(requiredCapabilities = setOf(AgentCapability.RepositoryWrite))
+
+        assertEquals(first.id, registry.select(request).id)
+        repeat(3) { registry.recordOutcome(first.id, success = false) }
+        assertEquals(second.id, registry.select(request).id, "three failures in a row open the circuit")
+        registry.recordOutcome(first.id, success = true)
+        assertEquals(first.id, registry.select(request).id, "a success closes it")
+    }
 }
 
 private class SourceAwareProvider(

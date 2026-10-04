@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MemoryPromptInjectionTest {
     @Test
@@ -65,6 +66,62 @@ class MemoryPromptInjectionTest {
             assertEquals(1, utilities.memoryQueryCalls)
             assertEquals(1, utilities.contextPackingCalls)
             assertEquals(1, plannedQueries)
+        } finally {
+            MemoryRuntimeBridge.reset()
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun requestTermsFeedTheComposerAndFirstPassWordsGetOneSecondPassQuery() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = RecordingStartProvider()
+        val utilities = RecordingLocalOrchestrationUtilities()
+        var finalPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan? = null
+        try {
+            MemoryRuntimeBridge.promptContextProvider = object : MemoryPromptContextProvider {
+                override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall {
+                    finalPlan = queryPlan
+                    return MemoryPromptRecall(
+                        blocks = listOf(
+                            PromptContextBlock("Memory protocol", "protocol"),
+                            PromptContextBlock("Memory", "#gateway"),
+                            PromptContextBlock("Relevant memory", "recalled"),
+                        ),
+                        memoryAddresses = setOf("memory-node:a"),
+                        maxContextTokens = 1_500,
+                    )
+                }
+
+                override suspend fun queryHints(request: AgentTaskRequest) =
+                    com.hereliesaz.geministrator.memory.MemoryQueryHints(entities = listOf("repository gateway"), documentFrequency = mapOf("gateway" to 2))
+
+                override suspend fun feedbackTerms(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
+                    mapOf("adapter" to 1)
+            }
+            val gateway = ProviderBackedManagedSessionGateway(
+                providerRegistry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope = scope,
+                orchestrationUtilities = utilities,
+            )
+            gateway.createSession(
+                ManagedSessionRequest(
+                    providerSelection = ProviderSelectionRequest(),
+                    taskRequest = AgentTaskRequest(
+                        taskRunId = TaskRunId("memory-two-pass"),
+                        objective = "Update the repository gateway",
+                        roleInstructions = "Implement the requested change.",
+                        acceptanceCriteria = emptyList(),
+                    ),
+                ),
+            )
+
+            val queries = requireNotNull(finalPlan).queries
+            assertEquals(2, utilities.memoryQueryCalls, "a first pass, then the second with result words")
+            assertTrue(queries.any { it.text == "repository gateway" && it.reasonCode == "KNOWN_ENTITY" })
+            assertTrue(queries.any { it.text == "adapter" && it.reasonCode == "RESULT_FEEDBACK" })
+            val labels = requireNotNull(provider.startedRequest).promptContext.dynamicContext.map { it.label }
+            assertEquals(listOf("Memory protocol", "Relevant memory", "Memory"), labels, "most important first, next most important last")
         } finally {
             MemoryRuntimeBridge.reset()
             scope.cancel()

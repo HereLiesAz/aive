@@ -22,6 +22,7 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.sync.withLock
 
 data class ProviderSelectionRequest(
     val preferredProviderId: AgentProviderId? = null,
@@ -56,6 +57,23 @@ class AgentProviderRegistry(
         governance = this.genealogyGovernance,
     )
     private val providersById = providers.associateBy { it.id }
+
+    /** Per-provider outcomes this process has seen: failures in a row and the last runs' results. */
+    private data class ProviderHealth(val consecutiveFailures: Int = 0, val recent: List<Boolean> = emptyList())
+
+    private val healthMutex = kotlinx.coroutines.sync.Mutex()
+    private val health = HashMap<AgentProviderId, ProviderHealth>()
+
+    /** Records how a provider run ended; feeds the router's circuit breaker and reliability. */
+    suspend fun recordOutcome(id: AgentProviderId, success: Boolean) = healthMutex.withLock {
+        val current = health[id] ?: ProviderHealth()
+        health[id] = ProviderHealth(
+            consecutiveFailures = if (success) 0 else current.consecutiveFailures + 1,
+            recent = (current.recent + success).takeLast(HEALTH_WINDOW),
+        )
+    }
+
+    private suspend fun healthOf(id: AgentProviderId): ProviderHealth = healthMutex.withLock { health[id] ?: ProviderHealth() }
 
     init {
         require(providersById.size == providers.size) { "Provider IDs must be unique" }
@@ -125,11 +143,14 @@ class AgentProviderRegistry(
                     requiredCapabilities = required.mapTo(linkedSetOf()) { it.name },
                     requiredContextTokens = 0,
                     candidates = eligibleProviders.mapIndexed { index, (provider, capabilities) ->
+                        val health = healthOf(provider.id)
                         AgentRouteCandidate(
                             id = provider.id.value,
                             capabilities = capabilities.mapTo(linkedSetOf()) { it.name },
                             // Preserve current preferred/registration ordering unless a specialist router overrides it.
                             preferenceRank = index,
+                            consecutiveFailures = health.consecutiveFailures,
+                            successRate = health.recent.takeIf { it.isNotEmpty() }?.let { runs -> runs.count { it }.toDouble() / runs.size },
                         )
                     },
                     requiredContextType = if (request.repository == null) "task" else "repository-task",
@@ -160,6 +181,8 @@ class AgentProviderRegistry(
         error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint")
     }
 }
+
+private const val HEALTH_WINDOW = 20
 
 /** The app's durable inference store (platform default [Settings]). */
 internal fun durableInferenceSettings(): Settings = chunkedInferenceSettings(Settings())

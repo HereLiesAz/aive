@@ -66,7 +66,6 @@ class GraphMemoryTool(
         val active = index.activeNodes(query)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
-        val episodesById = index.episodesById
         val queryLower = query.text.trim().lowercase()
         val weights = queryTermWeights(query)
         // Only nodes sharing a term (BM25F postings), plus exact-phrase matches, are scored.
@@ -75,11 +74,9 @@ class GraphMemoryTool(
             .asSequence()
             .filter { it.id in candidates || queryLower.length > 2 && index.lowerText(it).contains(queryLower) }
             .mapNotNull { node ->
+                // Relevance only; scope, salience, confidence and recency order hits by rank later.
                 val lexical = lexicalScore(weights, queryLower, node, index)
-                if (lexical <= 0f) return@mapNotNull null
-                // Scope affinity promotes a match; it cannot create one. Returned scores are clamped later.
-                val score = lexical * (1f + scopeAffinity(query, node, episodesById))
-                node to score
+                if (lexical <= 0f) null else node to lexical
             }
             .toList()
             .sortedWith(memorySeedComparator())
@@ -94,7 +91,6 @@ class GraphMemoryTool(
         val active = index.activeNodes(normalizedQuery)
         if (active.isEmpty()) return MemoryRecallBundle(normalizedQuery, emptyList())
 
-        val episodesById = index.episodesById
         val requestedPhrases = query.tags.map { it.trim().lowercase() }.filter(String::isNotEmpty)
         val requestedTerms = query.tags.flatMap(String::memoryTerms).toSet()
         val scoredSeeds = active
@@ -102,10 +98,7 @@ class GraphMemoryTool(
             .filter { it.kind in semanticCueKinds }
             .mapNotNull { node ->
                 val match = tagAddressScore(requestedPhrases, requestedTerms, node, index)
-                if (match <= 0f) return@mapNotNull null
-                // Do not clamp before sorting or exact tag matches would erase scope affinity.
-                val score = match + scopeAffinity(normalizedQuery, node, episodesById)
-                node to score
+                if (match <= 0f) null else node to match
             }
             .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
@@ -128,7 +121,7 @@ class GraphMemoryTool(
             start = nodeId,
             targetKinds = resolution.nodeKinds(),
             nodesById = nodesById,
-            adjacency = index.adjacency,
+            graph = index.graph,
             activeIds = index.activeIds,
             maxDepth = 6,
         )
@@ -169,7 +162,7 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
         .mapTo(hashSetOf()) { it.to }
     val active: List<MemoryNode> = snapshot.nodes.filter { it.id !in superseded }
     val activeIds: Set<MemoryNodeId> = active.mapTo(hashSetOf(), MemoryNode::id)
-    val adjacency: Map<MemoryNodeId, List<Neighbor>> by lazy { snapshot.adjacency() }
+    val graph: MemoryRecallGraph by lazy { snapshot.recallGraph() }
     val bm25: MemoryBm25Index by lazy { MemoryBm25Index(active) }
     private val terms = hashMapOf<MemoryNodeId, Set<String>>()
     private val lowerTexts = hashMapOf<MemoryNodeId, String>()
@@ -238,9 +231,8 @@ private fun MemoryRecallIndex.recallFromSeeds(
         if (depth == MAX_RECALL_DEPTH) break
         val next = linkedMapOf<MemoryNodeId, Float>()
         frontier.forEach { (id, value) ->
-            val neighbors = adjacency[id].orEmpty()
-            val fan = fanDamping(neighbors.size)
-            neighbors.forEach { neighbor ->
+            val fan = fanDamping(graph.links(id))
+            graph.neighbors(id).forEach { neighbor ->
                 val carried = value * neighbor.weight * fan
                 if (carried > 0f && carried > (next[neighbor.id] ?: 0f)) next[neighbor.id] = carried
             }
@@ -248,20 +240,15 @@ private fun MemoryRecallIndex.recallFromSeeds(
         frontier = next
     }
     bestPath.forEach { (nodeId, pathScore) ->
-        val targetNode = nodesById[nodeId] ?: return@forEach
-        val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
-        val projectedScore = (pathScore * (1f + hierarchyBoost * 0.5f)).coerceIn(0f, 1f)
-        projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
+        projected[nodeId] = max(projected[nodeId] ?: 0f, pathScore)
     }
 
-    val hits = projected.entries
-        .mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }
-        .sortedWith(memorySeedComparator())
+    val hits = fusedOrder(query, projected.entries.mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } })
         .take(query.maxResults)
         .map { (node, score) ->
             MemoryRecallHit(
                 node = node,
-                score = score.coerceIn(0f, 1f),
+                score = score,
                 conflicts = if (query.includeConflicts) {
                     conflictsFor(node.id, activeIds)
                 } else {
@@ -272,6 +259,46 @@ private fun MemoryRecallIndex.recallFromSeeds(
 
     return MemoryRecallBundle(query, hits)
 }
+
+/**
+ * Orders recall candidates by weighted reciprocal rank fusion (Cormack et al.) instead of adding
+ * signals and clamping: relevance (weight 2), scope affinity (0.4, when the query is scoped),
+ * salience (0.15), confidence (0.1) and recency (0.15), each as Σ w / (k + rank) with k = 10. The
+ * returned score stays the relevance itself (lexical match carried along the graph), so the
+ * attention gate's threshold keeps its meaning: how strongly the memory matched, never boosted.
+ */
+private fun MemoryRecallIndex.fusedOrder(query: MemoryQuery, candidates: List<Pair<MemoryNode, Float>>): List<Pair<MemoryNode, Float>> {
+    if (candidates.size <= 1) return candidates
+    val signals = buildList<Pair<Double, (Pair<MemoryNode, Float>) -> Double>> {
+        add(FUSION_RELEVANCE to { it.second.toDouble() })
+        if (query.hasAffinityConstraints()) add(FUSION_SCOPE to { scopeAffinity(query, it.first, episodesById).toDouble() })
+        add(FUSION_SALIENCE to { it.first.salience.toDouble() })
+        add(FUSION_CONFIDENCE to { it.first.confidence.toDouble() })
+        add(FUSION_RECENCY to { it.first.createdAtEpochMillis.toDouble() })
+    }
+    val fused = DoubleArray(candidates.size)
+    signals.forEach { (weight, value) ->
+        val values = candidates.map(value)
+        // Competition ranking: equal values share the better rank.
+        val rankOf = HashMap<Double, Int>()
+        values.sortedDescending().forEachIndexed { rank, v -> rankOf.getOrPut(v) { rank } }
+        values.forEachIndexed { i, v -> fused[i] += weight / (FUSION_K + 1 + rankOf.getValue(v)) }
+    }
+    return candidates.indices
+        .sortedWith(
+            compareByDescending<Int> { fused[it] }
+                .thenByDescending { candidates[it].second }
+                .thenBy { candidates[it].first.id.value },
+        )
+        .map(candidates::get)
+}
+
+private const val FUSION_K = 10.0
+private const val FUSION_RELEVANCE = 2.0
+private const val FUSION_SCOPE = 0.4
+private const val FUSION_SALIENCE = 0.15
+private const val FUSION_CONFIDENCE = 0.1
+private const val FUSION_RECENCY = 0.15
 
 private const val MAX_RECALL_DEPTH = 6
 
@@ -324,13 +351,62 @@ private data class Neighbor(
     val weight: Float,
 )
 
+/** A group of nodes sharing one feature (a session, a time bucket, a tag), joined through a hub. */
+private class MemoryHub(val members: List<MemoryNodeId>, val weight: Float, val family: String?) {
+    val positions: Map<MemoryNodeId, Int> = members.withIndex().associate { (i, id) -> id to i }
+}
+
+/**
+ * Traversal adjacency for GRIP. Pairwise edges are accumulated per pair as before. Edges that
+ * record a feature `group` are read as membership of that group instead of as a chain: every member
+ * reaches the others through one hub (the nearest [HUB_WINDOW] on each side, in time order), damped
+ * by the hub's size, so a shared session or time bucket links its members in one step rather than
+ * along a chain that grows with the group. A hub counts as one link for the walker's own fan.
+ */
+private class MemoryRecallGraph(
+    private val direct: Map<MemoryNodeId, List<Neighbor>>,
+    private val hubsOf: Map<MemoryNodeId, List<MemoryHub>>,
+) {
+    fun links(id: MemoryNodeId): Int = direct[id].orEmpty().size + hubsOf[id].orEmpty().size
+
+    /** Computed per call (no shared cache), so concurrent recalls never race on it. */
+    fun neighbors(id: MemoryNodeId): List<Neighbor> {
+        val hubs = hubsOf[id].orEmpty()
+        if (hubs.isEmpty()) return direct[id].orEmpty()
+        val independent = LinkedHashMap<MemoryNodeId, MutableList<Float>>()
+        val families = LinkedHashMap<MemoryNodeId, LinkedHashMap<String, Float>>()
+        direct[id].orEmpty().forEach { independent.getOrPut(it.id) { mutableListOf() } += it.weight }
+        hubs.forEach { hub ->
+            val at = hub.positions.getValue(id)
+            val weight = hub.weight * fanDamping(hub.members.size - 1)
+            for (i in maxOf(0, at - HUB_WINDOW)..minOf(hub.members.lastIndex, at + HUB_WINDOW)) {
+                val member = hub.members[i]
+                if (member == id) continue
+                val family = hub.family
+                if (family == null) {
+                    independent.getOrPut(member) { mutableListOf() } += weight
+                } else {
+                    val byFamily = families.getOrPut(member) { linkedMapOf() }
+                    byFamily[family] = maxOf(byFamily[family] ?: 0f, weight)
+                }
+            }
+        }
+        return (independent.keys + families.keys).distinct().map { target ->
+            Neighbor(target, accumulateAssociationStrength(independent[target].orEmpty() + families[target]?.values.orEmpty()))
+        }
+    }
+}
+
+private const val HUB_WINDOW = 32
+
 /**
  * Parallel graph facts between the same pair are accumulated only when they are independent
  * evidence. Correlated re-representations such as temporal rebucketing contribute once through the
- * canonical evidence-family policy before GRIP starts path traversal.
+ * canonical evidence-family policy before GRIP starts path traversal. Grouped edges become hubs.
  */
-private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
+private fun MemorySnapshot.recallGraph(): MemoryRecallGraph {
     val evidenceBySource = linkedMapOf<MemoryNodeId, LinkedHashMap<MemoryNodeId, MutableList<MemoryEdge>>>()
+    val groups = linkedMapOf<String, MutableList<MemoryEdge>>()
 
     fun add(from: MemoryNodeId, to: MemoryNodeId, edge: MemoryEdge) {
         val byTarget = evidenceBySource.getOrPut(from) { linkedMapOf() }
@@ -339,17 +415,47 @@ private fun MemorySnapshot.adjacency(): Map<MemoryNodeId, List<Neighbor>> {
 
     edges.forEach { edge ->
         if (!edge.relation.isRecallTraversable()) return@forEach
+        val group = edge.metadata[EDGE_GROUP]?.takeIf(String::isNotBlank)
+        if (group != null) {
+            groups.getOrPut("${edge.metadata["basis"].orEmpty()}|$group") { mutableListOf() } += edge
+            return@forEach
+        }
         add(edge.from, edge.to, edge)
         add(edge.to, edge.from, edge)
     }
 
-    return evidenceBySource.mapValues { (_, byTarget) ->
+    val direct = evidenceBySource.mapValues { (_, byTarget) ->
         byTarget.entries.mapNotNull { (target, evidence) ->
             val strength = accumulateAssociationEvidence(evidence)
             if (strength <= 0f) null else Neighbor(target, strength)
         }
     }
+    val created = nodes.associate { it.id to it.createdAtEpochMillis }
+    val hubsOf = HashMap<MemoryNodeId, MutableList<MemoryHub>>()
+    groups.values.forEach { groupEdges ->
+        val members = groupEdges.flatMap { listOf(it.from, it.to) }.distinct()
+            .sortedWith(compareBy<MemoryNodeId> { created[it] ?: 0L }.thenBy { it.value })
+        if (members.size < 2) return@forEach
+        // The newest edge's weight stands for the group (rebucketing rewrites weights).
+        val newest = groupEdges.maxWith(compareBy<MemoryEdge> { it.createdAtEpochMillis }.thenBy { it.id.value })
+        val hub = MemoryHub(members, newest.weight.coerceIn(0f, 1f), hubFamily(newest))
+        members.forEach { hubsOf.getOrPut(it) { mutableListOf() } += hub }
+    }
+    return MemoryRecallGraph(direct, hubsOf)
 }
+
+/** Correlated hubs (nested scopes; time buckets) count once per pair, like their chain edges did. */
+private fun hubFamily(edge: MemoryEdge): String? {
+    val basis = edge.metadata["basis"].orEmpty()
+    return when {
+        basis.startsWith("scope:") -> "scope"
+        basis.startsWith("temporal:") -> "temporal-co-bucket"
+        else -> null
+    }
+}
+
+/** Edge metadata naming the shared feature whose members the edge links (read as a hub). */
+internal const val EDGE_GROUP = "group"
 
 private fun MemoryQuery.hasHardScopeConstraints(): Boolean = projectId != null
 
@@ -416,7 +522,7 @@ private fun projectToKinds(
     start: MemoryNodeId,
     targetKinds: Set<MemoryNodeKind>,
     nodesById: Map<MemoryNodeId, MemoryNode>,
-    adjacency: Map<MemoryNodeId, List<Neighbor>>,
+    graph: MemoryRecallGraph,
     activeIds: Set<MemoryNodeId>,
     maxDepth: Int,
 ): Map<MemoryNodeId, TraversalPath> {
@@ -440,9 +546,8 @@ private fun projectToKinds(
 
         val next = linkedMapOf<MemoryNodeId, Float>()
         frontier.forEach { (id, edgeStrength) ->
-            val neighbors = adjacency[id].orEmpty()
-            val fan = fanDamping(neighbors.size)
-            neighbors.forEach { neighbor ->
+            val fan = fanDamping(graph.links(id))
+            graph.neighbors(id).forEach { neighbor ->
                 val cumulative = (edgeStrength * neighbor.weight * fan).coerceIn(0f, 1f)
                 if (cumulative <= 0f) return@forEach
                 val existing = next[neighbor.id]
@@ -474,8 +579,9 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
 }
 
 /**
- * Lexical relevance: BM25F normalized to 0..1 (0.6), an exact-phrase bonus (0.2), and the node's
- * own salience and confidence (0.2 together) once either matched.
+ * Lexical relevance in 0..1: BM25F normalized by the query's best possible score (0.8) and an
+ * exact-phrase match (0.2). Salience, confidence, scope and recency do not add to it; they order
+ * hits by rank ([fusedOrder]).
  */
 private fun lexicalScore(
     weights: Map<String, Double>,
@@ -486,8 +592,7 @@ private fun lexicalScore(
     val bm25 = index.bm25.score(node.id, weights)
     val exactBonus = if (queryLower.isNotEmpty() && index.lowerText(node).contains(queryLower)) 0.2f else 0f
     if (bm25 <= 0f && exactBonus <= 0f) return 0f
-    val semanticWeight = (node.salience * 0.12f) + (node.confidence * 0.08f)
-    return (bm25 * 0.6f + exactBonus + semanticWeight).coerceIn(0f, 1f)
+    return bm25 * 0.8f + exactBonus
 }
 
 /** The caller's terms at weight 1 (stopwords dropped unless nothing else is left); expansions at 0.4. */

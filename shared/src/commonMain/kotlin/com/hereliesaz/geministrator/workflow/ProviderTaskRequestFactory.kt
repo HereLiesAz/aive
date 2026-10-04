@@ -154,6 +154,12 @@ private fun buildUtilityPromptBlocks(
                 appendLine("Blocked: ${execution.blockedSteps.joinToString().ifBlank { "none" }}")
                 appendLine("Failed/escalated: ${execution.failedSteps.joinToString().ifBlank { "none" }}")
                 append("Awaiting approval: ${execution.waitingForApprovalSteps.joinToString().ifBlank { "none" }}")
+                if (execution.criticalPath.size > 1) append("\nCritical path: ${execution.criticalPath.joinToString(" → ")}")
+                if (execution.failureGroups.values.any { it.size > 1 }) {
+                    execution.failureGroups.filterValues { it.size > 1 }.forEach { (pattern, tasks) ->
+                        append("\nSame failure ($pattern): ${tasks.joinToString()}")
+                    }
+                }
             }
         },
     )
@@ -217,16 +223,15 @@ private fun buildUtilityPromptBlocks(
             nextAction = if (redactTaskNames) task.id.value else task.name,
             acceptanceCriteria = task.acceptanceCriteria.map { it.description },
             provenance = dependencies.map { (_, dependencyRun) -> "task-run:${dependencyRun.id.value}" },
+            sources = dependencies.associate { (dependencyId, dependencyRun) -> dependencyLabel(dependencyId) to "task-run:${dependencyRun.id.value}" },
+            maxChars = MAX_HANDOFF_CHARS,
         ),
     )
     val handoffBlock = PromptContextBlock(
         "Handoff",
         buildString {
             appendLine("Dependency gate: ${if (dependencies.isEmpty()) "no dependencies" else dependencyCompletion.decision.name}")
-            appendLine("Completed: ${handoff.completed.joinToString().ifBlank { "none" }}")
-            appendLine("Unresolved: ${handoff.unresolved.joinToString().ifBlank { "none" }}")
-            appendLine("Failures: ${handoff.failures.joinToString().ifBlank { "none" }}")
-            append("Artifacts: ${handoff.artifacts.joinToString().ifBlank { "none" }}")
+            append(handoff.render())
         },
     )
 
@@ -238,6 +243,8 @@ private fun buildUtilityPromptBlocks(
             requiredToolAvailable = true,
             hasEnoughEvidence = dependencyCompletion.unsatisfiedCriteria.isEmpty(),
             recommendedTier = "provider",
+            retryCount = ((run.taskRuns[task.id]?.attempt ?: 1) - 1).coerceAtLeast(0),
+            localFailureRate = run.failureRate(),
         ),
     )
     val escalationBlock = PromptContextBlock(
@@ -283,4 +290,16 @@ private fun buildUtilityPromptBlocks(
         add(escalationBlock)
         verificationBlock?.let(::add)
     }
+}
+
+/** Handoff blocks are cut to this size, least important sections first. */
+private const val MAX_HANDOFF_CHARS = 2_000
+
+/** Share of this run's finished tasks that failed, escalated or were cancelled; 0 when none finished. */
+private fun WorkflowRun.failureRate(): Double {
+    val finished = taskRuns.values.filter {
+        it.status in setOf(TaskRunStatus.Completed, TaskRunStatus.Failed, TaskRunStatus.Escalated, TaskRunStatus.Cancelled)
+    }
+    if (finished.isEmpty()) return 0.0
+    return finished.count { it.status != TaskRunStatus.Completed }.toDouble() / finished.size
 }

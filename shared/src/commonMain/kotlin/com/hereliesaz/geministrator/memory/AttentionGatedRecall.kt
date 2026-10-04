@@ -16,6 +16,10 @@ import kotlinx.coroutines.sync.withLock
  *    enough tokens have passed since the last cue) the result is silence: nothing is injected.
  *  - When the gate opens, the ranked recall surfaces and the cue interval is reset via
  *    [MemoryAttentionGate.markCueSurfaced].
+ *  - The gate reads the strongest hit plus part of its lead over the rest
+ *    ([MemoryAttentionPolicy.distinctnessWeight]); once open it stays open down to the threshold
+ *    less [MemoryAttentionPolicy.hysteresis]; and the interval is a token bucket that allows
+ *    [MemoryAttentionPolicy.cueBurst] cues back to back before it must refill.
  *
  * Token consumption (the documented recovery signal) is fed in via [consumeTokens]. The number of
  * tokens needed before the gate reopens scales with the dial: the cue interval interpolates from
@@ -35,6 +39,12 @@ internal class AttentionGatedRecall(
     private var tokens: Long = 0
     private val surfacedAt = LinkedHashMap<MemoryNodeId, Long>()
 
+    /** Cue credits: one is spent per surfacing; tokens refill one per cue interval, up to the burst. */
+    private var credits: Double = policy.cueBurst.toDouble()
+
+    /** The gate opened last time it was asked and has not closed since (hysteresis). */
+    private var open: Boolean = false
+
     suspend fun currentState(): MemoryAttentionState = mutex.withLock { state }
 
     suspend fun consumeTokens(tokenCount: Int) {
@@ -42,6 +52,7 @@ internal class AttentionGatedRecall(
         mutex.withLock {
             state = gate.consumeTokens(state, tokenCount)
             tokens += tokenCount
+            credits = minOf(policy.cueBurst.toDouble(), credits + tokenCount.toDouble() / gate.cuePolicy(state).minimumIntervalTokens)
         }
     }
 
@@ -65,9 +76,17 @@ internal class AttentionGatedRecall(
             tokens - shownAt >= window
         }
         if (novel.isEmpty()) return@withLock novel
-        val strongest = novel.maxOf { it.score }.coerceIn(0f, 1f)
-        val opens = if (ignoreInterval) strongest >= gate.cuePolicy(state).minimumSimilarity else gate.shouldSurfaceTags(state, strongest)
+        val scores = novel.map { it.score.coerceIn(0f, 1f) }.sortedDescending()
+        val strongest = scores.first()
+        val lead = if (scores.size > 1) strongest - scores.drop(1).average().toFloat() else 0f
+        val signal = (strongest + policy.distinctnessWeight * lead).coerceIn(0f, 1f)
+        val threshold = gate.cuePolicy(state).minimumSimilarity - if (open) policy.hysteresis else 0f
+        val similar = signal >= threshold
+        val opens = similar && (ignoreInterval || credits >= 1.0)
+        if (!similar) open = false
         if (opens) {
+            if (!ignoreInterval) credits -= 1.0
+            open = true
             state = gate.markCueSurfaced(state)
             novel.forEach { surfacedAt.remove(it.node.id); surfacedAt[it.node.id] = tokens }
             while (surfacedAt.size > RECENT_LIMIT) surfacedAt.remove(surfacedAt.keys.first())

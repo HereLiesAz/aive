@@ -26,25 +26,33 @@ internal data class AgentRoutingModelInput(
     val requiredCapabilities: Set<String>,
     val requiredContextTokens: Int,
     val requiredContextType: String,
-    /** In routing order: preferenceRank, then estimatedCost, then id. */
+    /** In routing order: preferenceRank, then cost per reliability, then id. */
     val candidates: List<AgentCandidateFacts>,
+    /** Capable agents passed over because their circuit is open. */
+    val circuitOpen: List<String> = emptyList(),
+    /** Every capable agent is open: the single eligible agent is a trial (reason CIRCUIT_HALF_OPEN). */
+    val halfOpen: Boolean = false,
 ) {
     fun toInput(): AgentRoutingInput = AgentRoutingInput(
         requiredCapabilities = requiredCapabilities,
         requiredContextTokens = requiredContextTokens,
         candidates = candidates.map {
-            AgentRouteCandidate(it.id, it.capabilities, it.estimatedCost, it.contextLimitTokens, it.available, it.preferenceRank)
+            AgentRouteCandidate(
+                it.id, it.capabilities, it.estimatedCost, it.contextLimitTokens, it.available, it.preferenceRank,
+                it.consecutiveFailures, it.successRate,
+            )
         },
         requiredContextType = requiredContextType,
     )
 
     companion object {
         fun of(input: AgentRoutingInput): AgentRoutingModelInput {
+            val routing = agentRouting(input)
+            val eligible = routing.eligible.map { it.id }.toSet()
+            val open = routing.open.map { it.id }.toSet()
             val candidates = input.candidates
-                .sortedWith(compareBy<AgentRouteCandidate> { it.preferenceRank }.thenBy { it.estimatedCost }.thenBy { it.id })
+                .sortedWith(agentRoutingOrder)
                 .map { candidate ->
-                    val fits = candidate.contextLimitTokens >= input.requiredContextTokens
-                    val capable = candidate.capabilities.containsAll(input.requiredCapabilities)
                     AgentCandidateFacts(
                         id = candidate.id,
                         capabilities = candidate.capabilities,
@@ -52,17 +60,23 @@ internal data class AgentRoutingModelInput(
                         contextLimitTokens = candidate.contextLimitTokens,
                         available = candidate.available,
                         preferenceRank = candidate.preferenceRank,
-                        fitsContext = fits,
-                        hasRequiredCapabilities = capable,
-                        eligible = candidate.available && fits && capable,
+                        fitsContext = candidate.contextLimitTokens >= input.requiredContextTokens,
+                        hasRequiredCapabilities = candidate.capabilities.containsAll(input.requiredCapabilities),
+                        eligible = candidate.id in eligible,
+                        consecutiveFailures = candidate.consecutiveFailures,
+                        successRate = candidate.successRate,
+                        circuitOpen = candidate.id in open,
+                        costPerReliability = costPerReliability(candidate),
                     )
                 }
             return AgentRoutingModelInput(
-                eligibleInRoutingOrder = candidates.filter { it.eligible }.map { it.id },
+                eligibleInRoutingOrder = routing.eligible.map { it.id },
                 requiredCapabilities = input.requiredCapabilities,
                 requiredContextTokens = input.requiredContextTokens,
                 requiredContextType = input.requiredContextType,
                 candidates = candidates,
+                circuitOpen = routing.open.map { it.id }.filterNot { it in eligible },
+                halfOpen = routing.halfOpen,
             )
         }
     }
@@ -79,6 +93,10 @@ internal data class AgentCandidateFacts(
     val fitsContext: Boolean,
     val hasRequiredCapabilities: Boolean,
     val eligible: Boolean,
+    val consecutiveFailures: Int = 0,
+    val successRate: Double? = null,
+    val circuitOpen: Boolean = false,
+    val costPerReliability: Double = 0.0,
 )
 
 /**
@@ -90,20 +108,33 @@ internal data class AgentCandidateFacts(
 @Serializable
 internal data class MemoryQueryModelInput(
     val objective: String,
+    /** Each list rarest first when [termDocumentFrequency] is known: query in this order. */
     val knownEntities: List<String>,
     val knownActions: List<String>,
     val codeSymbols: List<String>,
     val chronologicalContextRequired: Boolean,
     val alreadyRetrievedEvidenceCount: Int,
     val maxQueries: Int,
+    /** Memories per word, for the input's own words only. */
+    val termDocumentFrequency: Map<String, Int> = emptyMap(),
+    val feedbackTerms: List<String> = emptyList(),
+    /** The second-pass query's text (RESULT_FEEDBACK, Phrase), or null when there is none. */
+    val feedbackQuery: String? = null,
+    /** Each known action's synonyms: copy as that action query's expansionTerms. */
+    val actionSynonyms: Map<String, List<String>> = emptyMap(),
 ) {
     fun toInput(): MemoryQueryInput = MemoryQueryInput(
         objective, knownEntities, knownActions, codeSymbols, chronologicalContextRequired, alreadyRetrievedEvidenceCount, maxQueries,
+        termDocumentFrequency, feedbackTerms,
     )
 
     companion object {
         fun of(input: MemoryQueryInput): MemoryQueryModelInput {
-            fun clean(values: List<String>) = values.map(String::trim).filter(String::isNotEmpty).distinctBy(String::lowercase)
+            fun clean(values: List<String>) =
+                rarestFirst(values.map(String::trim).filter(String::isNotEmpty).distinctBy(String::lowercase), input.termDocumentFrequency)
+            val words = (listOf(input.objective) + input.knownEntities + input.knownActions + input.codeSymbols + input.feedbackTerms)
+                .flatMap(::queryWords)
+                .toSet()
             return MemoryQueryModelInput(
                 objective = input.objective.trim(),
                 knownEntities = clean(input.knownEntities),
@@ -112,6 +143,10 @@ internal data class MemoryQueryModelInput(
                 chronologicalContextRequired = input.chronologicalContextRequired,
                 alreadyRetrievedEvidenceCount = input.alreadyRetrievedEvidenceCount,
                 maxQueries = input.maxQueries,
+                termDocumentFrequency = input.termDocumentFrequency.filterKeys(words::contains),
+                feedbackTerms = input.feedbackTerms,
+                feedbackQuery = feedbackQueryText(input),
+                actionSynonyms = clean(input.knownActions).associateWith(::actionSynonyms).filterValues { it.isNotEmpty() },
             )
         }
     }
@@ -158,39 +193,36 @@ internal data class ToolRoutingModelInput(
 @Serializable
 internal data class ContextPackingModelInput(
     val tokenBudget: Int,
+    /** Evidence without its text; a detected near-repeat carries [ContextEvidence.repeatOf]. */
     val evidence: List<ContextEvidence>,
     /**
-     * Groups in packing order (required first, then priority, then smaller). A group is kept when
+     * Groups in rank order (required first, then priority tiers). A group is kept when
      * [ContextGroupFacts.fits]; [ContextGroupFacts.tokensUsedAfter] is the running total after it.
      */
     val groups: List<ContextGroupFacts>,
+    /** The kept evidence ids in prompt order: copy as selectedEvidenceIds. */
+    val promptOrder: List<String> = emptyList(),
 ) {
     fun toInput(): ContextPackingInput = ContextPackingInput(tokenBudget, evidence)
 
     companion object {
         fun of(input: ContextPackingInput): ContextPackingModelInput {
-            val ordered = input.evidence
-                .groupBy { it.conflictGroup ?: "__single__:${it.id}" }
-                .values
-                .sortedWith(
-                    compareByDescending<List<ContextEvidence>> { group -> group.any { it.required } }
-                        .thenByDescending { group -> group.maxOfOrNull { it.priority } ?: 0 }
-                        .thenBy { group -> group.sumOf { it.estimatedTokens } },
-                )
-            var used = 0
-            val groups = ordered.map { group ->
-                val tokens = group.sumOf { it.estimatedTokens }
-                val fits = used + tokens <= input.tokenBudget
-                if (fits) used += tokens
-                ContextGroupFacts(
-                    evidenceIds = group.map { it.id },
-                    tokens = tokens,
-                    required = group.any { it.required },
-                    fits = fits,
-                    tokensUsedAfter = used,
-                )
-            }
-            return ContextPackingModelInput(input.tokenBudget, input.evidence, groups)
+            val packing = contextPacking(input)
+            return ContextPackingModelInput(
+                tokenBudget = input.tokenBudget,
+                evidence = input.evidence.map { it.copy(text = null, repeatOf = packing.repeatOf[it.id] ?: it.repeatOf) },
+                groups = packing.groups.map { group ->
+                    ContextGroupFacts(
+                        evidenceIds = group.evidenceIds,
+                        tokens = group.tokens,
+                        required = group.required,
+                        fits = group.selected,
+                        tokensUsedAfter = group.tokensUsedAfter,
+                        repeatOf = group.repeatOf,
+                    )
+                },
+                promptOrder = packing.promptOrder,
+            )
         }
     }
 }
@@ -202,6 +234,8 @@ internal data class ContextGroupFacts(
     val required: Boolean,
     val fits: Boolean,
     val tokensUsedAfter: Int,
+    /** The id this group's single item nearly repeats; it is omitted. */
+    val repeatOf: String? = null,
 )
 
 @Serializable
@@ -223,7 +257,10 @@ internal data class CapabilityAssessmentModelInput(
     }
 }
 
-/** The handoff input already cleaned as the packet carries it: copy every field. */
+/**
+ * The handoff input already cleaned as the packet carries it: copy every field. When [fitted] is
+ * present the packet was over [maxChars]: copy [fitted]'s lists instead (sections already cut).
+ */
 @Serializable
 internal data class HandoffModelInput(
     val objective: String,
@@ -235,22 +272,31 @@ internal data class HandoffModelInput(
     val nextAction: String?,
     val acceptanceCriteria: List<String>,
     val provenance: List<String>,
+    val sources: Map<String, String> = emptyMap(),
+    val maxChars: Int? = null,
+    val fitted: HandoffPacket? = null,
 ) {
     fun toInput(): HandoffInput =
-        HandoffInput(objective, completed, artifacts, state, unresolved, failures, nextAction, acceptanceCriteria, provenance)
+        HandoffInput(objective, completed, artifacts, state, unresolved, failures, nextAction, acceptanceCriteria, provenance, sources, maxChars)
 
     companion object {
-        fun of(input: HandoffInput): HandoffModelInput = HandoffModelInput(
-            objective = input.objective.trim(),
-            completed = input.completed.distinct(),
-            artifacts = input.artifacts.distinct(),
-            state = input.state,
-            unresolved = input.unresolved.distinct(),
-            failures = input.failures.distinct(),
-            nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty),
-            acceptanceCriteria = input.acceptanceCriteria.distinct(),
-            provenance = input.provenance.distinct(),
-        )
+        fun of(input: HandoffInput): HandoffModelInput {
+            val packet = DeterministicLocalOrchestrationUtilities.composeHandoff(input)
+            return HandoffModelInput(
+                objective = input.objective.trim(),
+                completed = input.completed.distinct(),
+                artifacts = input.artifacts.distinct(),
+                state = input.state,
+                unresolved = input.unresolved.distinct(),
+                failures = input.failures.distinct(),
+                nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty),
+                acceptanceCriteria = input.acceptanceCriteria.distinct(),
+                provenance = input.provenance.distinct(),
+                sources = input.sources,
+                maxChars = input.maxChars,
+                fitted = packet.takeIf { it.cuts.isNotEmpty() },
+            )
+        }
     }
 }
 
@@ -306,9 +352,12 @@ internal data class VerificationPlanningModelInput(
     val artifactKinds: Set<ArtifactKind>,
     /** Repeats dropped. */
     val targetPlatforms: List<String>,
+    val changedFiles: List<String> = emptyList(),
+    /** Tests picked from [changedFiles] (one CHANGED_FILES test step with these targets). */
+    val testTargets: List<String> = emptyList(),
 ) {
     fun toInput(): VerificationPlanningInput =
-        VerificationPlanningInput(objective, acceptanceCriteria, artifactKinds, targetPlatforms)
+        VerificationPlanningInput(objective, acceptanceCriteria, artifactKinds, targetPlatforms, changedFiles)
 
     companion object {
         fun of(input: VerificationPlanningInput): VerificationPlanningModelInput {
@@ -319,6 +368,8 @@ internal data class VerificationPlanningModelInput(
                 criterionOperations = criteria.flatMap { c -> verificationOperationsFor(c).map { CriterionOperation(c, it) } },
                 artifactKinds = input.artifactKinds,
                 targetPlatforms = input.targetPlatforms.distinct(),
+                changedFiles = input.changedFiles,
+                testTargets = testTargetsFor(input.changedFiles),
             )
         }
     }

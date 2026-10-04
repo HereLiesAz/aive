@@ -60,7 +60,11 @@ The tag query begins from actual matching `NounTag`, `VerbTag`, and `Category` n
 
 ## Lexical seeding
 
-Free-text GRIP seeds from BM25F over active nodes (k1 1.2). Fields: node text (weight 1, b 0.75), tag aliases (0.8, b 0.3) and other content metadata (0.3, b 0.5); ids, provenance and scores are not indexed. Rare terms outweigh common ones, query stopwords are dropped, and only nodes sharing a query term (or containing the whole query) are scored. Expansion terms from `LexicalMemoryTool` arrive as `MemoryQuery.expansionTerms` at weight 0.4, so they never dilute the caller's own words. The seed score is 0.6 × normalized BM25F + 0.2 exact-phrase bonus + 0.2 from salience and confidence. Scope affinity multiplies it (×(1 + affinity)), so scope can promote a match but never create one.
+Free-text GRIP seeds from BM25F over active nodes (k1 1.2). Fields: node text (weight 1, b 0.75), tag aliases (0.8, b 0.3) and other content metadata (0.3, b 0.5); ids, provenance and scores are not indexed. Rare terms outweigh common ones, query stopwords are dropped, and only nodes sharing a query term (or containing the whole query) are scored. Expansion terms from `LexicalMemoryTool` arrive as `MemoryQuery.expansionTerms` at weight 0.4, so they never dilute the caller's own words. The seed score is relevance alone: 0.8 × normalized BM25F + 0.2 for an exact phrase, so it stays in 0..1 without clamping.
+
+## Ranking
+
+Hits are ordered by weighted reciprocal rank fusion (k = 10) over relevance (weight 2), scope affinity (0.4, scoped queries only), salience (0.15), confidence (0.1) and recency (0.15): each signal ranks the candidates and contributes w / (k + rank). Nothing is added to a score and clamped; a memory's returned score is its relevance (lexical match carried along the graph), so the attention gate's threshold means how strongly it matched. Scope, salience and recency can reorder near-equal matches but cannot outrank a clearly stronger one, and cannot create a match.
 
 ## Weighted graph traversal
 
@@ -81,6 +85,10 @@ For example, two independent `0.50` associations between the same nodes produce 
 Correlated evidence counts once: lexical features of one noun, of one verb, or one structural signature are each a family, as are the nested orchestration scopes (session ⊂ task run ⊂ workflow run …). The strongest edge of a family is its contribution, so one verb read as lemma, class and sense is 0.92, not 0.993. Families and other edges then combine as above. Lexical edges are also discounted by how many memories share the feature, and a feature shared by more than max(50, 5% of memory) is skipped.
 
 Spreading out of a node with more than eight links is damped by ln(e + 8) / ln(e + links) (ACT-R's fan effect, softened), so a hub linked to everything does not flood recall.
+
+Edges that record a shared feature (`group` metadata: a session, run or task scope, a time bucket or event, an exact cue, identifier or source section) are read as membership of that feature, not as a chain: each member reaches the others through one hub in a single step (the nearest 32 on each side, in time order), damped by the hub's size, and the hub counts as one link for the walker's fan. Correlated hubs (nested scopes; time buckets and events) count once per pair, as their edges did. Older edges without `group` stay pairwise.
+
+Sequence links between consecutive episodes fade with the time between them (halved every six hours, floor 0.25 of the base weight), and a run of episodes with no gap over thirty minutes is one event whose members link through it, however the run falls across clock buckets.
 
 The full accumulation/condensation semantics are normative in [`TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md).
 
@@ -131,6 +139,9 @@ The attention gate may deterministically vary:
 - minimum token interval between ambient cues
 - number of cues surfaced at once
 - novelty: a memory surfaced within `noveltyCueIntervals` cue intervals (2 by default, scaled by the dial like the interval itself) is not surfaced again
+- distinctness: the gate reads the strongest hit plus half its lead over the mean of the rest (`distinctnessWeight`), so one memory that stands out opens it more readily than many equally close ones
+- hysteresis: once open, the gate stays open down to the threshold less `hysteresis` (0.05) and closes only below it, so recall does not flicker around the threshold
+- bursts: the interval is a token bucket; up to `cueBurst` (2) cues may surface back to back, then one more per interval of tokens
 
 Even at high attention, semantic cues remain the default payload. Increased attention should increase the frequency or breadth of cues, not automatically dump full remembered passages.
 

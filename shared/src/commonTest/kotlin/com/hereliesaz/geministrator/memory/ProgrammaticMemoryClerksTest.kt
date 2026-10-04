@@ -251,4 +251,57 @@ class ProgrammaticMemoryClerksTest {
         assertTrue("Configuration cache is enabled." in result.text && "JDK toolchain" in result.text, result.text)
         assertEquals(1, Regex("uses Gradle").findAll(result.text).count(), "repeated sentence: ${result.text}")
     }
+
+    @Test
+    fun proseOfMostlyUnknownWordsIsNoiseButCodeAndPromptsAreNot() = runBlocking {
+        fun section(id: String, kind: MemorySourceKind, text: String) =
+            MemoryWorkItem(id, "section", text, mapOf("sourceKind" to kind.name))
+        val mash = "qwzx vbnmq plkoj hgfdr tyuxz wqazs edcrf vgbhy"
+        val packet = MemoryWorkPacket(
+            queueId = MemoryQueueId("q"),
+            episodeId = MemoryEpisodeId("e"),
+            stage = MemoryConsolidationStage.Salience,
+            packetKey = "p",
+            items = listOf(
+                section("s1", MemorySourceKind.UserPrompt, mash),
+                section("s2", MemorySourceKind.Message, mash.uppercase() + " zzqk"),
+                section("s3", MemorySourceKind.Artifact, "val qwzx = vbnmq(plkoj) { hgfdr.tyuxz() }"),
+                section("s4", MemorySourceKind.AgentNote, "The release build failed because the signing key was missing from the runner."),
+            ),
+            instruction = "",
+        )
+        val texts = ProgrammaticMemoryClerks.forRole(MemoryMicroAgentRole.SalienceFilter) { 1L }.process(packet).nodesToAdd.map { it.text }
+        assertTrue(mash in texts, "user prompts are never dropped")
+        assertFalse(texts.any { "ZZQK" in it }, "keyboard mash kept: $texts")
+        assertTrue(texts.any { "val qwzx" in it }, "code is exempt")
+        assertTrue(texts.any { "signing key" in it })
+    }
+
+    @Test
+    fun laterSectionsEarnASmallRecencyFeature() {
+        val early = MemorySalienceFeatures.score("The build passed.", "Message", emptySet(), emptyMap(), 0, position = 0f)
+        val late = MemorySalienceFeatures.score("The build passed.", "Message", emptySet(), emptyMap(), 0, position = 1f)
+        assertTrue(late.score > early.score)
+        assertTrue("recency=" in late.explain())
+    }
+
+    @Test
+    fun tagsRankByPositionSpreadAndCasing() {
+        // Early beats late; wide beats narrow; an identifier's casing counts.
+        assertTrue(keyphraseImportance("cache", listOf(0), 6) > keyphraseImportance("cache", listOf(4), 6))
+        assertTrue(keyphraseImportance("cache", listOf(1, 2, 3, 4), 6) > keyphraseImportance("cache", listOf(1), 6))
+        assertTrue(keyphraseImportance("SyncWorker", listOf(2), 6) > keyphraseImportance("worker", listOf(2), 6))
+    }
+
+    @Test
+    fun minHashPairsNearCopiesAndSkipsUnrelatedText() {
+        val texts = buildMap {
+            put("a", "the sync worker retries failed uploads with exponential backoff and jitter")
+            put("b", "the sync worker retries failed uploads with exponential backoff and random jitter")
+            (0 until 60).forEach { put("x$it", "unrelated note number $it about ${listOf("compose", "gradle", "sqlite", "oauth")[it % 4]} release $it") }
+        }
+        val candidates = MemoryMinHash.candidates(texts)
+        assertTrue("b" in candidates["a"].orEmpty())
+        assertFalse(candidates["a"].orEmpty().any { it.startsWith("x") })
+    }
 }

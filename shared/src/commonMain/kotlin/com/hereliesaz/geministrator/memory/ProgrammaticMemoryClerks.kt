@@ -131,6 +131,7 @@ private class ProgrammaticSalienceFilter(now: () -> Long) :
         val prompts = packet.items.filter { it.metadata["sourceKind"] in PROMPT_KINDS }.map { it.text }
         val idf = MemorySalienceFeatures.idf(packet.items.map { it.text })
         val promptTerms = prompts.flatMap { MemorySalienceFeatures.terms(it) }.toSet()
+        val wordNet = runCatching { MemoryLanguageResources.get().wordNet }.getOrNull()
 
         data class Kept(val index: Int, val section: MemoryWorkItem, val text: String, val collapsed: Int, val shingles: Set<String>, var duplicates: Int = 0)
         val seen = hashSetOf<String>()
@@ -140,7 +141,7 @@ private class ProgrammaticSalienceFilter(now: () -> Long) :
             val prompt = sourceKind in PROMPT_KINDS
             val (text, collapsed) = MemorySalienceFeatures.collapseRepeatedLines(section.text.trim())
             // User prompts are never dropped; everything else loses noise and repeats.
-            if (!prompt && (text.isNoise() || MemorySalienceFeatures.isToolNoise(text))) return@forEachIndexed
+            if (!prompt && (text.isNoise() || MemorySalienceFeatures.isToolNoise(text) || text.isFewWords(wordNet))) return@forEachIndexed
             if (text.isBlank()) return@forEachIndexed
             val shingles = MemorySalienceFeatures.shingles(text)
             if (!seen.add(text.memorySemanticKey())) {
@@ -161,6 +162,7 @@ private class ProgrammaticSalienceFilter(now: () -> Long) :
                 promptTerms = if (item.section.metadata["sourceKind"] in PROMPT_KINDS) emptySet() else promptTerms,
                 idf = idf,
                 duplicates = item.duplicates,
+                position = if (packet.items.size > 1) item.index.toFloat() / (packet.items.size - 1) else 0f,
             )
             MemoryNode(
                 id = MemoryNodeId("$namespace:node:${item.index}"),
@@ -189,6 +191,32 @@ private class ProgrammaticSalienceFilter(now: () -> Long) :
     }
 }
 
+/**
+ * Prose-shaped text in which under [MIN_KNOWN_WORD_SHARE] of the words are English or known
+ * technical words (WordNet, the overlay, common function words): encoded blobs, keyboard mash,
+ * hashes run together. Code, paths, logs and stack traces are exempt, as is anything under
+ * [MIN_WORDS_FOR_DICTIONARY_CHECK] words. Without WordNet the check is skipped.
+ */
+private fun String.isFewWords(wordNet: WordNetLexicon?): Boolean {
+    if (wordNet == null || looksStronglyTechnical() || LOG_OR_TRACE.containsMatchIn(this)) return false
+    val words = DICTIONARY_WORD.findAll(this).map { it.value.lowercase() }.toList()
+    if (words.size < MIN_WORDS_FOR_DICTIONARY_CHECK) return false
+    val known = words.count { word ->
+        word in COMMON_WORDS || wordNet.partsOfSpeech(word).isNotEmpty() ||
+            MemoryTechnicalLexicon.lookup(word, WordNetLexicon.Pos.Noun) != null || MemoryTechnicalLexicon.knowsVerb(word)
+    }
+    return known < words.size * MIN_KNOWN_WORD_SHARE
+}
+
+private val DICTIONARY_WORD = Regex("[A-Za-z]{2,}")
+private val LOG_OR_TRACE = Regex("^\\s*(at |Caused by:|\\[?(INFO|WARN|ERROR|DEBUG|TRACE)\\b|\\d{4}-\\d\\d-\\d\\d)", RegexOption.MULTILINE)
+private const val MIN_WORDS_FOR_DICTIONARY_CHECK = 6
+private const val MIN_KNOWN_WORD_SHARE = 0.3
+private val COMMON_WORDS = setOf(
+    "the", "a", "an", "and", "or", "but", "if", "of", "to", "in", "on", "at", "by", "for", "with", "from", "as", "is", "are",
+    "was", "were", "be", "been", "it", "its", "this", "that", "these", "those", "we", "you", "they", "he", "she", "i", "not", "no",
+)
+
 private fun String.isNoise(): Boolean {
     val text = trim()
     if (text.length < 12) return true
@@ -212,6 +240,7 @@ private class ProgrammaticTagger(
         val analyzer = runCatching { MemoryTextAnalyzer(MemoryLanguageResources.get()) }.getOrNull()
         // key -> (concept, items in which it occurs, in first-seen order)
         val occurrences = linkedMapOf<String, Pair<MemoryConcept, LinkedHashSet<MemoryWorkItem>>>()
+        val itemIndex = packet.items.withIndex().associate { (i, item) -> item.id to i }
         val verbObjects = hashMapOf<String, LinkedHashSet<MemoryVerbObject>>()
         packet.items.forEach { item ->
             val concepts = if (analyzer != null) {
@@ -235,10 +264,12 @@ private class ProgrammaticTagger(
         val namespace = packet.namespace()
         val nodes = mutableListOf<MemoryNode>()
         val edges = mutableListOf<MemoryEdge>()
-        // Explicit mentions first, most frequent first; implied concepts fill what budget remains.
+        // Explicit mentions first, ranked YAKE-style; implied concepts fill what budget remains.
         occurrences.entries
             .sortedWith(compareBy<Map.Entry<String, Pair<MemoryConcept, LinkedHashSet<MemoryWorkItem>>>> { it.value.first.impliedBy != null }
-                .thenByDescending { it.value.second.size })
+                .thenByDescending { (_, entry) ->
+                    keyphraseImportance(entry.first.text, entry.second.mapNotNull { itemIndex[it.id] }, packet.items.size)
+                })
             .forEachIndexed { index, (key, entry) ->
                 val (concept, items) = entry
                 val cost = 1 + items.size
@@ -290,6 +321,19 @@ private class ProgrammaticTagger(
         /** Implied concepts rank below what the text states outright. */
         const val IMPLIED_SALIENCE = 0.6f
     }
+}
+
+/**
+ * YAKE-style importance of a tag (Campos et al., 2020), higher first, from statistics of the packet
+ * alone: spread (share of sections it occurs in), casing (capitalised, acronym or identifier text
+ * earns 0.5), and position, damped by ln(ln(3 + first section index)) so early mentions lead.
+ */
+internal fun keyphraseImportance(text: String, sections: List<Int>, sectionCount: Int): Double {
+    if (sections.isEmpty()) return 0.0
+    val spread = sections.distinct().size.toDouble() / sectionCount.coerceAtLeast(1)
+    val casing = if (text.any(Char::isUpperCase) || text.any { it == '_' || it == '.' || it == '/' }) 0.5 else 0.0
+    val position = kotlin.math.ln(kotlin.math.ln(3.0 + sections.min()))
+    return (spread + casing) / position
 }
 
 /** Tag node metadata written by the programmatic tagger. */
@@ -625,6 +669,9 @@ private class ProgrammaticAssociationLinker(
         val visible = (packet.items + packet.neighborhood).distinctBy(MemoryWorkItem::id)
         if (visible.size < 2) return MemoryMutationBatch()
         val idf = MemorySalienceFeatures.idf(visible.map { it.text })
+        // Large text neighbourhoods compare only MinHash/LSH candidate pairs; small ones compare all.
+        val textItems = visible.filter { it.kind !in TAG_KINDS }
+        val textCandidates = if (textItems.size > MemoryMinHash.ALL_PAIRS_UP_TO) MemoryMinHash.candidates(textItems.associate { it.id to it.text }) else null
         val emitted = hashSetOf<String>()
         val createdAt = nowEpochMillis()
         val edges = mutableListOf<MemoryEdge>()
@@ -633,6 +680,7 @@ private class ProgrammaticAssociationLinker(
             val (threshold, limit) = if (tag) TAG_THRESHOLD to TAG_LINKS else TEXT_THRESHOLD to TEXT_LINKS
             visible.asSequence()
                 .filter { it.id != source.id && it.kind == source.kind }
+                .filter { tag || textCandidates == null || it.id in textCandidates[source.id].orEmpty() }
                 .map { target -> target to if (tag) MemorySimilarity.tags(source, target) else MemorySimilarity.text(source.text, target.text, idf) }
                 .filter { (_, similarity) -> similarity >= threshold }
                 .sortedByDescending { it.second }

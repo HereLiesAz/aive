@@ -354,3 +354,64 @@ internal object MemoryCondensation {
         return if (memoryClaimSignature(text) == memoryClaimSignature(base)) Result(text, medoid, appended) else Result(base, medoid, emptyList())
     }
 }
+
+/**
+ * MinHash signatures with LSH banding (Broder 1997; Leskovec et al., ch. 3) to find text pairs worth
+ * comparing without comparing every pair. Character 5-gram shingles, 60 hash functions as 20 bands
+ * of 3 rows: pairs with shingle Jaccard 0.5 become candidates ~93% of the time, 0.3 ~42%, 0.1 ~2%.
+ * Hashes are FNV-1a and SplitMix64 over Longs, so every platform picks the same pairs.
+ */
+internal object MemoryMinHash {
+    /** Neighbourhoods up to this many texts compare every pair. */
+    const val ALL_PAIRS_UP_TO = 48
+    private const val BANDS = 20
+    private const val ROWS = 3
+
+    fun candidates(texts: Map<String, String>): Map<String, Set<String>> {
+        val buckets = HashMap<Long, MutableList<String>>()
+        texts.forEach { (id, text) ->
+            val signature = signature(shingles(text))
+            for (band in 0 until BANDS) {
+                var key = band.toLong() * PRIME
+                for (row in 0 until ROWS) key = mix(key xor signature[band * ROWS + row])
+                buckets.getOrPut(key) { mutableListOf() } += id
+            }
+        }
+        val out = HashMap<String, MutableSet<String>>()
+        buckets.values.filter { it.size > 1 }.forEach { members ->
+            members.forEach { id -> out.getOrPut(id) { linkedSetOf() } += members.filter { it != id } }
+        }
+        return out
+    }
+
+    private fun shingles(text: String): Set<Long> {
+        val normalized = text.lowercase().replace(WHITESPACE, " ").trim()
+        if (normalized.length < 5) return setOf(fnv(normalized))
+        return (0..normalized.length - 5).mapTo(HashSet()) { fnv(normalized.substring(it, it + 5)) }
+    }
+
+    private fun signature(shingles: Set<Long>): LongArray = LongArray(BANDS * ROWS) { i ->
+        val seed = mix(i.toLong() + 1)
+        shingles.minOf { mix(it xor seed) }
+    }
+
+    private fun fnv(value: String): Long {
+        var hash = -0x340d631b7bdddcdbL
+        value.forEach { char ->
+            hash = hash xor char.code.toLong()
+            hash *= 0x100000001b3L
+        }
+        return hash
+    }
+
+    /** SplitMix64 finalizer. */
+    private fun mix(value: Long): Long {
+        var z = value + -0x61c8864680b583ebL
+        z = (z xor (z ushr 30)) * -0x40a7b892e31b1a47L
+        z = (z xor (z ushr 27)) * -0x6b2fb644ecceee15L
+        return z xor (z ushr 31)
+    }
+
+    private const val PRIME = 1_000_003L
+    private val WHITESPACE = Regex("\\s+")
+}

@@ -15,8 +15,26 @@ data class MemoryPromptRecall(
     }
 }
 
+/** What the Memory Query Composer is given beyond the objective: the request's terms and their rarity. */
+data class MemoryQueryHints(
+    val entities: List<String> = emptyList(),
+    val actions: List<String> = emptyList(),
+    val codeSymbols: List<String> = emptyList(),
+    /** Stored memories per lowercase word, for the words above and the objective's. */
+    val documentFrequency: Map<String, Int> = emptyMap(),
+)
+
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
+
+    /** Entities, actions and code symbols in the request, with how many memories hold each word. */
+    suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
+
+    /**
+     * A side-effect-free first pass: the uncommon words of the top results for [queryPlan], each with
+     * its memory count, for a second-pass query. Empty when there are none.
+     */
+    suspend fun feedbackTerms(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): Map<String, Int> = emptyMap()
 }
 
 private object NoOpMemoryPromptContextProvider : MemoryPromptContextProvider {
