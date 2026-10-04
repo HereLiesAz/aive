@@ -111,4 +111,26 @@ class MemoryRecallFusionTest {
         recall.consumeTokens(MemoryAttentionGate().cuePolicy(recall.currentState()).minimumIntervalTokens)
         assertTrue(recall.select(hit("four")).isNotEmpty(), "one interval of tokens refills one cue")
     }
+
+    @Test
+    fun memoriesRecalledTogetherAgainAndAgainGetLinkedAndNothingElseChanges() = runBlocking {
+        val nodes = listOf(node("a", "alpha"), node("b", "beta"), node("c", "gamma"))
+        val store = InMemoryMemoryStore(MemorySnapshot(nodes = nodes))
+        val coRecall = MemoryCoRecall({ 5L })
+        val ab = listOf(MemoryNodeId("a"), MemoryNodeId("b"))
+
+        repeat(2) { assertTrue(coRecall.recalledTogether(store, ab).isEmpty()) }
+        val first = coRecall.recalledTogether(store, ab)
+        assertEquals(1, first.size, "the third time together links them")
+        assertEquals("co-recall", first.single().metadata["basis"])
+        repeat(30) { coRecall.recalledTogether(store, ab) }
+        val snapshot = store.read()
+        assertEquals(MemoryCoRecall.MAX_LINKS, snapshot.edges.size, "links stop at the cap")
+        assertEquals(nodes, snapshot.nodes, "nodes are untouched")
+        val strength = accumulateAssociationEvidence(snapshot.edges)
+        assertTrue(strength > 0.7f && strength < 0.8f, "independent links accumulate: $strength")
+
+        repeat(3) { coRecall.recalledTogether(store, listOf(MemoryNodeId("a"), MemoryNodeId("gone"))) }
+        assertEquals(MemoryCoRecall.MAX_LINKS, store.read().edges.size, "no link to a memory that is not stored")
+    }
 }

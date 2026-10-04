@@ -88,6 +88,8 @@ Spreading out of a node with more than eight links is damped by ln(e + 8) / ln(e
 
 Edges that record a shared feature (`group` metadata: a session, run or task scope, a time bucket or event, an exact cue, identifier or source section) are read as membership of that feature, not as a chain: each member reaches the others through one hub in a single step (the nearest 32 on each side, in time order), damped by the hub's size, and the hub counts as one link for the walker's fan. Correlated hubs (nested scopes; time buckets and events) count once per pair, as their edges did. Older edges without `group` stay pairwise.
 
+Memories that keep being delivered together get linked (Hebbian): every third time the same two memories surface together, in a prompt's recall or a recall the agent asked for, one `AssociatedWith` edge of weight 0.3 (`basis: co-recall`) is added between them, up to four per pair (together about 0.76). It only adds links; nothing stored is changed, and what the two memories say is never compared. Counts are kept in memory, so they restart with the app.
+
 Sequence links between consecutive episodes fade with the time between them (halved every six hours, floor 0.25 of the base weight), and a run of episodes with no gap over thirty minutes is one event whose members link through it, however the run falls across clock buckets.
 
 The full accumulation/condensation semantics are normative in [`TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md).
