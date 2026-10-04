@@ -15,6 +15,8 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Generic transport for hosted services that expose OpenAI Chat Completions semantics.
@@ -78,6 +80,68 @@ class OpenAiCompatibleChatApi(
             outputTokens = payload.usage?.completionTokens,
         )
     }
+
+    /** Asks for a final usage chunk until an endpoint refuses `stream_options` once. */
+    private var requestUsage = true
+
+    /**
+     * Streams Chat Completions. There is no common switch for reasoning across these services, so
+     * none is sent; reasoning that arrives is read from `reasoning_content` (DeepSeek, Kimi and
+     * others), `reasoning` (OpenRouter, Groq) or inline `<think>` spans.
+     */
+    override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
+        val apiKey = apiKeyProvider.getApiKey().trim()
+        require(apiKey.isNotEmpty() || !requireApiKey) { "API key is not configured" }
+        return withReasoningFallback(requestUsage, { requestUsage = false }) { usageOption ->
+            val text = StringBuilder()
+            val reasoning = StringBuilder()
+            val splitter = ThinkTagSplitter()
+            var usage: CompatibleChatUsage? = null
+            suspend fun deliver(chunks: List<TextGenerationChunk>) = chunks.forEach { chunk ->
+                when (chunk) {
+                    is TextGenerationChunk.Thinking -> reasoning.append(chunk.text)
+                    is TextGenerationChunk.Text -> text.append(chunk.text)
+                }
+                onChunk(chunk)
+            }
+            client.postServerSentEvents(
+                url = "$baseUrl/chat/completions",
+                operation = "stream compatible chat response",
+                configure = {
+                    if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
+                    extraHeaders.forEach { (name, value) -> header(name, value) }
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        CompatibleChatRequest(
+                            model = model,
+                            messages = listOf(CompatibleChatMessage(role = "user", content = prompt)),
+                            stream = true,
+                            streamOptions = if (usageOption) CompatibleStreamOptions(includeUsage = true) else null,
+                        ),
+                    )
+                },
+            ) { _, data ->
+                if (data.trim() == "[DONE]") return@postServerSentEvents
+                val chunk = streamJson.decodeFromString<CompatibleChatStreamChunk>(data)
+                chunk.error?.let { error("Compatible chat stream error: ${it.message ?: data.take(300)}") }
+                chunk.usage?.let { usage = it }
+                chunk.choices.forEach { choice ->
+                    val delta = choice.delta ?: return@forEach
+                    val thought = delta.reasoningContent ?: (delta.reasoning as? JsonPrimitive)?.takeIf { it.isString }?.content
+                    thought?.takeIf(String::isNotEmpty)?.let { deliver(listOf(TextGenerationChunk.Thinking(it))) }
+                    delta.content?.takeIf(String::isNotEmpty)?.let { deliver(splitter.accept(it)) }
+                }
+            }
+            deliver(splitter.finish())
+            if (text.isBlank()) error("Compatible chat response did not contain assistant text")
+            TextGenerationResult(
+                text = text.toString().trim(),
+                inputTokens = usage?.promptTokens,
+                outputTokens = usage?.completionTokens,
+                thinking = reasoning.toString().trim().ifEmpty { null },
+            )
+        }
+    }
 }
 
 private fun openAiCompatibleClient(): HttpClient = HttpClient {
@@ -101,7 +165,32 @@ private fun openAiCompatibleClient(): HttpClient = HttpClient {
 private data class CompatibleChatRequest(
     val model: String,
     val messages: List<CompatibleChatMessage>,
+    val stream: Boolean? = null,
+    @SerialName("stream_options") val streamOptions: CompatibleStreamOptions? = null,
 )
+
+@Serializable
+private data class CompatibleStreamOptions(@SerialName("include_usage") val includeUsage: Boolean)
+
+@Serializable
+private data class CompatibleChatStreamChunk(
+    val choices: List<CompatibleChatStreamChoice> = emptyList(),
+    val usage: CompatibleChatUsage? = null,
+    val error: CompatibleChatError? = null,
+)
+
+@Serializable
+private data class CompatibleChatStreamChoice(val delta: CompatibleChatDelta? = null)
+
+@Serializable
+private data class CompatibleChatDelta(
+    val content: String? = null,
+    @SerialName("reasoning_content") val reasoningContent: String? = null,
+    val reasoning: JsonElement? = null,
+)
+
+@Serializable
+private data class CompatibleChatError(val message: String? = null)
 
 @Serializable
 private data class CompatibleChatMessage(

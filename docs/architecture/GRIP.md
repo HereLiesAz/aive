@@ -159,7 +159,13 @@ Memory watches an agent's own output and plans (and its reasoning, from provider
 - **Frequency filter.** A word found in more than `commonWordShare` (5%) of memories, and more than `commonWordMinimumMemories` (20) of them, cannot fire doubling or an echo, nor seed a cue cloud ("build", "test" in a codebase that says them everywhere). Explicit tags and the phrase are never filtered.
 - **Delivery.** Through the session gateway's message channel, mid-thought where the provider accepts messages; otherwise the recall waits and arrives with the agent's next turn as "Recalled on request".
 
-Today only providers that report agent messages or plans are watched; streaming reasoning (`Thinking`) is ready for providers that emit it.
+### Which providers think out loud
+
+The hosted text providers (OpenAI, xAI, Claude, Gemini, OpenAI-compatible services) and the GitLab and desktop local workspace providers stream their generations and emit the model's visible reasoning as `AgentEvent.Thinking`, in readable pieces (a paragraph or sentence end, or about 400 characters):
+
+- **Reasoning is requested** everywhere it can be: Claude adaptive thinking with summarized display (a fixed 8,000-token budget for models that predate adaptive thinking), an OpenAI or xAI reasoning summary, Gemini `includeThoughts`. A model or account that refuses the option (an older model, an OpenAI organization that is not verified) is retried once without it, and not asked again. OpenAI-compatible services have no common switch, so their reasoning is read when it arrives (`reasoning_content`, `reasoning`, or inline `<think>` spans). Requested reasoning is billed as output tokens.
+- **Memory interrupts.** A `⟦memory⟧` reply sent while a generation streams is taken by the provider (any other message is still declined). At the next streamed piece the generation stops and starts again with the original prompt, the reasoning and answer so far, and what memory brought back, and the model continues with the memory in view. At most three times per run; only the last attempt's answer is kept, and usage covers that attempt only.
+- **Not streamed:** plan drafts, on-device models (their reasoning, if any, arrives with the answer), and OpenCode on GitHub Actions, which reports only its run summary.
 
 ## Durable rule
 

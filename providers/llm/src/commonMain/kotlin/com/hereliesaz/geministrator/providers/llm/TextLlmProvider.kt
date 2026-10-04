@@ -43,6 +43,8 @@ open class TextLlmProvider(
         val phase: MutableStateFlow<TextLlmSessionPhase>,
         val planGenerated: MutableStateFlow<Boolean>,
         var planResult: TextGenerationResult? = null,
+        /** Streams the run's generation; memory can interrupt it mid-thought (see [sendMessage]). */
+        val generation: InterruptibleGeneration,
     )
 
     private val mutex = Mutex()
@@ -91,6 +93,7 @@ open class TextLlmProvider(
                         if (request.requirePlanApproval) TextLlmSessionPhase.AwaitingApproval else TextLlmSessionPhase.Ready,
                     ),
                     planGenerated = MutableStateFlow(false),
+                    generation = InterruptibleGeneration(api),
                 )
             }
         }
@@ -119,6 +122,7 @@ open class TextLlmProvider(
                         },
                     ),
                     planGenerated = MutableStateFlow(planGenerated),
+                    generation = InterruptibleGeneration(api),
                 )
             }
         }
@@ -176,7 +180,8 @@ open class TextLlmProvider(
         runId: ProviderRunId,
         session: Session,
     ): TextGenerationResult? = try {
-        api.generate(renderPrompt(session.request))
+        // Streamed: visible reasoning goes out as Thinking, where memory can answer it mid-thought.
+        session.generation.run(renderPrompt(session.request)) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Exception) {
@@ -185,10 +190,17 @@ open class TextLlmProvider(
         null
     }
 
-    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult =
-        ProviderActionResult.Rejected(
+    /**
+     * Memory's `⟦memory⟧` messages are taken while a generation streams and interrupt it (see
+     * [InterruptibleGeneration]); anything else is declined, since each run is one generation.
+     */
+    override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult {
+        val session = mutex.withLock { sessions[runId] }
+        if (session != null && session.generation.offer(message)) return ProviderActionResult.Accepted
+        return ProviderActionResult.Rejected(
             "$displayName uses one-shot task execution; start a new governed task for follow-up work.",
         )
+    }
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult {
         val session = mutex.withLock { sessions[runId] }
