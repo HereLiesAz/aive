@@ -24,18 +24,25 @@ import kotlinx.coroutines.sync.withLock
  * [PerAgentAttention].
  */
 internal class AttentionGatedRecall(
-    policy: MemoryAttentionPolicy = MemoryAttentionPolicy(),
+    private val policy: MemoryAttentionPolicy = MemoryAttentionPolicy(),
     initialState: MemoryAttentionState = MemoryAttentionState(),
 ) {
     private val gate = MemoryAttentionGate(policy)
     private val mutex = Mutex()
     private var state: MemoryAttentionState = initialState
 
+    /** Tokens consumed so far, and when (in those tokens) each recent memory was surfaced. */
+    private var tokens: Long = 0
+    private val surfacedAt = LinkedHashMap<MemoryNodeId, Long>()
+
     suspend fun currentState(): MemoryAttentionState = mutex.withLock { state }
 
     suspend fun consumeTokens(tokenCount: Int) {
         if (tokenCount <= 0) return
-        mutex.withLock { state = gate.consumeTokens(state, tokenCount) }
+        mutex.withLock {
+            state = gate.consumeTokens(state, tokenCount)
+            tokens += tokenCount
+        }
     }
 
     suspend fun suppress(level: Float) = mutex.withLock { state = gate.suppress(state, level) }
@@ -43,18 +50,36 @@ internal class AttentionGatedRecall(
     suspend fun setBaseline(level: Float) = mutex.withLock { state = gate.setBaseline(state, level) }
 
     /** [rankedHits] must already be sorted best-first and capped by the caller. */
-    suspend fun select(rankedHits: List<MemoryRecallHit>): List<MemoryRecallHit> = mutex.withLock {
-        if (rankedHits.isEmpty()) return@withLock rankedHits
-        val strongest = rankedHits.maxOf { it.score }.coerceIn(0f, 1f)
-        if (gate.shouldSurfaceTags(state, strongest)) {
+    /**
+     * [select] for cues that accompany something already surfacing at this moment (the cloud for
+     * a task's own prompt): the dial's threshold and novelty apply, the shared cue interval does not.
+     */
+    suspend fun selectAlongside(rankedHits: List<MemoryRecallHit>): List<MemoryRecallHit> = select(rankedHits, ignoreInterval = true)
+
+    suspend fun select(rankedHits: List<MemoryRecallHit>, ignoreInterval: Boolean = false): List<MemoryRecallHit> = mutex.withLock {
+        // Memories surfaced within the novelty window are not offered again; the gate decides on
+        // what is left.
+        val window = policy.noveltyCueIntervals.toLong() * gate.cuePolicy(state).minimumIntervalTokens
+        val novel = rankedHits.filter { hit ->
+            val shownAt = surfacedAt[hit.node.id] ?: return@filter true
+            tokens - shownAt >= window
+        }
+        if (novel.isEmpty()) return@withLock novel
+        val strongest = novel.maxOf { it.score }.coerceIn(0f, 1f)
+        val opens = if (ignoreInterval) strongest >= gate.cuePolicy(state).minimumSimilarity else gate.shouldSurfaceTags(state, strongest)
+        if (opens) {
             state = gate.markCueSurfaced(state)
-            rankedHits
+            novel.forEach { surfacedAt.remove(it.node.id); surfacedAt[it.node.id] = tokens }
+            while (surfacedAt.size > RECENT_LIMIT) surfacedAt.remove(surfacedAt.keys.first())
+            novel
         } else {
             emptyList()
         }
     }
 
     companion object {
+        private const val RECENT_LIMIT = 64
+
         val CUE_KINDS = setOf(MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag, MemoryNodeKind.Category)
 
         fun approximateTokens(text: String?, charsPerToken: Int = 4): Int =

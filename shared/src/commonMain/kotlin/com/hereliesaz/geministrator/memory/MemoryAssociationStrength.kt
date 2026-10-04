@@ -29,7 +29,7 @@ internal fun accumulateAssociationStrength(weights: Iterable<Float>): Float {
  * independent reinforcement.
  *
  * Most edges are independent observations and therefore participate directly in the saturating
- * accumulation curve. Edges that declare an `evidenceFamily` with `evidencePolicy=latest` are
+ * accumulation curve. Correlated families (see [correlatedFamily]) contribute their strongest edge. Edges that declare an `evidenceFamily` with `evidencePolicy=latest` are
  * alternate time-varying representations of one fact. Only the newest edge in each such family
  * contributes to recall. Legacy temporal edges are also recognized as the `temporal-co-bucket`
  * family so persisted graphs created before the metadata was introduced remain correct.
@@ -37,8 +37,16 @@ internal fun accumulateAssociationStrength(weights: Iterable<Float>): Float {
 internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
     val independent = mutableListOf<Float>()
     val latestByFamily = linkedMapOf<String, MemoryEdge>()
+    val strongestByFamily = linkedMapOf<String, Float>()
 
     edges.forEach { edge ->
+        // Correlated evidence (one word read as lemma, class and sense; nested session/run/task
+        // scopes) is one observation: the strongest edge of the family counts.
+        correlatedFamily(edge)?.let { family ->
+            require(edge.weight in 0f..1f) { "Association evidence weight must be normalized" }
+            strongestByFamily[family] = maxOf(strongestByFamily[family] ?: 0f, edge.weight)
+            return@forEach
+        }
         require(edge.weight in 0f..1f) { "Association evidence weight must be normalized" }
         val explicitFamily = edge.metadata["evidenceFamily"]?.takeIf(String::isNotBlank)
         val isLatestFamily = edge.metadata["evidencePolicy"] == "latest"
@@ -71,7 +79,25 @@ internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
         }
     }
 
-    return accumulateAssociationStrength(independent + latestByFamily.values.map(MemoryEdge::weight))
+    return accumulateAssociationStrength(independent + latestByFamily.values.map(MemoryEdge::weight) + strongestByFamily.values)
+}
+
+/**
+ * The family of correlated evidence an edge belongs to, or null when it is independent. Lexical
+ * features of nouns, of verbs, and structural (subject/verb/object) signatures are three families;
+ * the nested orchestration scopes (session ⊂ task run ⊂ workflow run ...) are one.
+ */
+private fun correlatedFamily(edge: MemoryEdge): String? {
+    val basis = edge.metadata["basis"] ?: return null
+    return when {
+        basis.startsWith("scope:") -> "scope"
+        basis.startsWith("lexical:") -> when (edge.metadata["featureKind"] ?: basis.removePrefix("lexical:")) {
+            "NounLemma", "NounSense", "CodeEntity" -> "lexical-noun"
+            "VerbLemma", "VerbSense", "VerbClass", "CodeAction" -> "lexical-verb"
+            else -> "lexical-structure"
+        }
+        else -> null
+    }
 }
 
 internal fun MemoryRelationKind.isAssociativeEvidence(): Boolean =

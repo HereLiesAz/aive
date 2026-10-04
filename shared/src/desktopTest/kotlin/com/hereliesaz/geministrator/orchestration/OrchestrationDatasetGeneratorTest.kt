@@ -114,10 +114,12 @@ class OrchestrationDatasetGeneratorTest {
                 objective = task.name,
                 roleId = null,
                 executor = TaskExecutor.TestRunner(),
+                dependsOn = task.dependsOn.map { TaskDefinitionId("t$it") }.toSet(),
             )
         }
         val definition = WorkflowDefinition(id = WorkflowDefinitionId("w"), name = "w", tasks = tasks)
-        val runs = input.tasks.mapIndexed { i, task ->
+        val runs = input.tasks.mapIndexedNotNull { i, task ->
+            if (task.status == null) return@mapIndexedNotNull null
             val runId = TaskRunId("t$i-run")
             tasks[i].id to TaskRun(
                 id = runId,

@@ -1556,3 +1556,21 @@ Use tiny models for frequent predictable control decisions.
 Use medium models for planning when they demonstrably suffice.
 
 Wake up expensive reasoning only when actual reasoning is required.
+
+---
+
+Deterministic baselines (shipped)
+
+`DeterministicLocalOrchestrationUtilities` is the code every specialist is trained against and guarded by. It never judges truth or whether evidence conflicts; it routes, counts, orders and checks structure.
+
+- Memory Query Composer: the objective always gets a query (plus the chronological one when asked); symbols, entities and actions take the remaining slots in turn, so one list cannot starve the rest.
+- Context Packer: required groups first, then by priority, smallest first within a tier (which fits the most groups), conflict groups kept or dropped whole.
+- Agent Router: hard filters, then preference rank, cost, id. The fallback is the next eligible agent with more context or a capability superset, so a failure does not retry an equivalent agent.
+- Tool Router: when the caller lists `providedInputs`, a tool whose `requiredInputs` are not all provided is skipped; if no supporting tool can run, the answer is `MissingInputs` with what is missing.
+- Escalation Gate: malformed or ambiguous input, missing tools and missing context keep their hard rules. The reasoning flags add points (multi-step 1, codebase-wide 2, architectural 3, contradiction 3, all supplied by the caller); 3 or more escalates.
+- Handoff Composer: copies the input cleaned; `warnings` flags NEXT_ACTION_MISSING (open work, no next action) and OBJECTIVE_MISSING.
+- Completion Gate: no required criteria means NeedsVerification, never Complete. Evidence marked `stale` by the caller (it predates the change it should cover) needs verification. Optional criteria are reported, not blocking. `reasonCodes` explain the decision.
+- Execution State Summarizer: every defined task in dependency order, including ones not yet run (`pendingSteps`); escalated and cancelled listed apart (and still in `failedSteps` for existing readers); `blockedBy` names the nearest stopped task each waiting task depends on.
+- Verification Planner: criteria are matched on whole words and base forms, each part of a compound criterion ("lint and test") separately; Given/When/Then and "shall" criteria are tests.
+
+Changing a baseline changes the training labels: rebuild the corpus (`tools/orchestration_training/build_kaggle_dataset.sh`) and retrain the affected adapters.

@@ -58,6 +58,10 @@ GRIP(tags, resolution = Context)
 
 The tag query begins from actual matching `NounTag`, `VerbTag`, and `Category` nodes and traverses the existing graph. It is not a second retrieval system and does not reduce category/subject cues to a prose search first.
 
+## Lexical seeding
+
+Free-text GRIP seeds from BM25F over active nodes (k1 1.2). Fields: node text (weight 1, b 0.75), tag aliases (0.8, b 0.3) and other content metadata (0.3, b 0.5); ids, provenance and scores are not indexed. Rare terms outweigh common ones, query stopwords are dropped, and only nodes sharing a query term (or containing the whole query) are scored. Expansion terms from `LexicalMemoryTool` arrive as `MemoryQuery.expansionTerms` at weight 0.4, so they never dilute the caller's own words. The seed score is 0.6 × normalized BM25F + 0.2 exact-phrase bonus + 0.2 from salience and confidence. Scope affinity multiplies it (×(1 + affinity)), so scope can promote a match but never create one.
+
 ## Weighted graph traversal
 
 GRIP treats association weights as retrieval evidence. `MemoryEdge.weight` must not be discarded when the graph is projected from a cue to another memory resolution.
@@ -73,6 +77,10 @@ combined = 1 - Π(1 - wi)
 Then path traversal multiplies the accumulated pair strengths across hops and applies the hop-distance penalty. This means repeated evidence can make a relationship easier to recall, while weak or indirect paths naturally fade.
 
 For example, two independent `0.50` associations between the same nodes produce effective pair strength `0.75`, not `1.0`. A single week-level `0.50` temporal edge remains materially weaker than a `1.0` exact-cue edge.
+
+Correlated evidence counts once: lexical features of one noun, of one verb, or one structural signature are each a family, as are the nested orchestration scopes (session ⊂ task run ⊂ workflow run …). The strongest edge of a family is its contribution, so one verb read as lemma, class and sense is 0.92, not 0.993. Families and other edges then combine as above. Lexical edges are also discounted by how many memories share the feature, and a feature shared by more than max(50, 5% of memory) is skipped.
+
+Spreading out of a node with more than eight links is damped by ln(e + 8) / ln(e + links) (ACT-R's fan effect, softened), so a hub linked to everything does not flood recall.
 
 The full accumulation/condensation semantics are normative in [`TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md`](TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md).
 
@@ -122,8 +130,25 @@ The attention gate may deterministically vary:
 - minimum association score
 - minimum token interval between ambient cues
 - number of cues surfaced at once
+- novelty: a memory surfaced within `noveltyCueIntervals` cue intervals (2 by default, scaled by the dial like the interval itself) is not surfaced again
 
 Even at high attention, semantic cues remain the default payload. Increased attention should increase the frequency or breadth of cues, not automatically dump full remembered passages.
+
+## Recall triggers in thought
+
+Memory watches an agent's own output and plans (and its reasoning, from providers that emit `AgentEvent.Thinking`) and answers inside the session. Every message memory sends starts with `⟦memory⟧`; those are never banked or re-read as the agent's own. Nothing here needs to be taught: cue clouds, echoes and doubled words fire on what an agent thinks and writes anyway, and how it works is easy to discover from the marked lines. An agent's first prompt carries one line saying what those lines are; cue clouds and recalls after that are bare (`⟦memory⟧ #a #b`).
+
+- **Cue clouds.** Each uncommon word of a thought seeds its own Tag-resolution GRIP; cues that pass the dial (threshold, interval, novelty) are sent as a line of `#tags`. User prompts draw clouds too: the task prompt's cloud joins its starting context (sharing that moment's interval with the prompt's recall), and a message typed into a running session carries its cloud appended.
+- **Following a cue.** Summary-resolution recall, scoped to the session, fires on:
+  - an explicit `#tag` (`#gradle-cache`),
+  - "Let me see what I remember about …" (for agents whose thinking is not visible),
+  - an echo: a just-offered cue's word used within `echoWindowTokens` (40),
+  - doubling: a word used twice within `doublingWindowTokens` (60).
+  Explicit tags, the phrase and echoes are deliberate and bypass the dial; doubling is gated by it.
+- **Frequency filter.** A word found in more than `commonWordShare` (5%) of memories, and more than `commonWordMinimumMemories` (20) of them, cannot fire doubling or an echo, nor seed a cue cloud ("build", "test" in a codebase that says them everywhere). Explicit tags and the phrase are never filtered.
+- **Delivery.** Through the session gateway's message channel, mid-thought where the provider accepts messages; otherwise the recall waits and arrives with the agent's next turn as "Recalled on request".
+
+Today only providers that report agent messages or plans are watched; streaming reasoning (`Thinking`) is ready for providers that emit it.
 
 ## Durable rule
 

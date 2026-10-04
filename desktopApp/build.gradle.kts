@@ -27,7 +27,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")

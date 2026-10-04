@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
 import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
@@ -12,8 +13,28 @@ import kotlin.time.ExperimentalTime
 interface MemorySessionObserver {
     suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest)
     suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent)
+
+    /**
+     * [onSessionEvent] with a way to answer the running session: [reply] sends a message into it
+     * (memory cues and recalls) and reports whether the provider accepted it.
+     */
+    suspend fun onSessionEvent(
+        handle: ManagedSessionHandle,
+        event: AgentEvent,
+        reply: suspend (String) -> ProviderActionResult,
+    ) = onSessionEvent(handle, event)
+
     suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus)
+
+    /**
+     * A user message on its way into a running session. Returns the text to send: memory appends
+     * its cue cloud for the user's words; observers without one return it unchanged.
+     */
+    suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String = text
 }
+
+/** First line of every message memory sends into a session, so it is never banked or re-read as the agent's own. */
+const val MEMORY_MESSAGE_MARKER: String = "⟦memory⟧"
 
 data object NoOpMemorySessionObserver : MemorySessionObserver {
     override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) = Unit
@@ -97,7 +118,8 @@ class QueuedMemorySessionObserver(
                 "Agent plan",
                 event.summary.take(maxCapturedEventChars),
             )
-            is AgentEvent.Message -> MemorySessionPart(
+            // Memory's own injected cues and recalls are not experience to bank again.
+            is AgentEvent.Message -> if (event.content.startsWith(MEMORY_MESSAGE_MARKER)) null else MemorySessionPart(
                 MemorySourceKind.Message,
                 "Agent message",
                 event.content.take(maxCapturedEventChars),
@@ -120,6 +142,8 @@ class QueuedMemorySessionObserver(
                 "Agent failure",
                 event.reason.take(maxCapturedEventChars),
             )
+            // Reasoning is watched for recall triggers, not banked.
+            is AgentEvent.Thinking,
             is AgentEvent.PlanApproved,
             is AgentEvent.Progress,
             is AgentEvent.Completed,

@@ -26,6 +26,12 @@ interface MemoryTool {
     /** Tag-addressed GRIP for semantic tags already present in an agent's CoTR. */
     suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle
 
+    /**
+     * How many active memories contain [term], out of how many. Recall triggers use it to keep words
+     * that appear everywhere ("build", "test") from firing on their own.
+     */
+    suspend fun termFrequency(term: String): MemoryTermFrequency = MemoryTermFrequency(0, 0)
+
     /** Explicitly descend or ascend from a known memory node when tag cues are insufficient. */
     suspend fun expand(
         nodeId: MemoryNodeId,
@@ -34,6 +40,9 @@ interface MemoryTool {
         includeConflicts: Boolean = false,
     ): List<MemoryRecallHit>
 }
+
+/** [memories] of [total] active memories contain a term. */
+data class MemoryTermFrequency(val memories: Int, val total: Int)
 
 class GraphMemoryTool(
     private val store: MemoryStore,
@@ -50,23 +59,29 @@ class GraphMemoryTool(
 
     override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
 
+    override suspend fun termFrequency(term: String): MemoryTermFrequency = index().bm25.frequency(term.lowercase())
+
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val index = index()
         val active = index.activeNodes(query)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
         val episodesById = index.episodesById
-        val queryTerms = query.text.memoryTerms()
         val queryLower = query.text.trim().lowercase()
+        val weights = queryTermWeights(query)
+        // Only nodes sharing a term (BM25F postings), plus exact-phrase matches, are scored.
+        val candidates = index.bm25.candidates(weights.keys, index.activeIds)
         val scoredSeeds = active
+            .asSequence()
+            .filter { it.id in candidates || queryLower.length > 2 && index.lowerText(it).contains(queryLower) }
             .mapNotNull { node ->
-                val lexical = lexicalScore(queryTerms, queryLower, node, index)
+                val lexical = lexicalScore(weights, queryLower, node, index)
                 if (lexical <= 0f) return@mapNotNull null
-                // Keep affinity as a ranking signal even when lexical relevance is already 1.0.
-                // Returned recall scores are normalized later; this internal score may exceed 1.
-                val score = lexical + scopeAffinity(query, node, episodesById)
+                // Scope affinity promotes a match; it cannot create one. Returned scores are clamped later.
+                val score = lexical * (1f + scopeAffinity(query, node, episodesById))
                 node to score
             }
+            .toList()
             .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
@@ -155,6 +170,7 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     val active: List<MemoryNode> = snapshot.nodes.filter { it.id !in superseded }
     val activeIds: Set<MemoryNodeId> = active.mapTo(hashSetOf(), MemoryNode::id)
     val adjacency: Map<MemoryNodeId, List<Neighbor>> by lazy { snapshot.adjacency() }
+    val bm25: MemoryBm25Index by lazy { MemoryBm25Index(active) }
     private val terms = hashMapOf<MemoryNodeId, Set<String>>()
     private val lowerTexts = hashMapOf<MemoryNodeId, String>()
     private val conflicts: Map<MemoryNodeId, List<MemoryNodeId>> by lazy {
@@ -222,8 +238,10 @@ private fun MemoryRecallIndex.recallFromSeeds(
         if (depth == MAX_RECALL_DEPTH) break
         val next = linkedMapOf<MemoryNodeId, Float>()
         frontier.forEach { (id, value) ->
-            adjacency[id].orEmpty().forEach { neighbor ->
-                val carried = value * neighbor.weight
+            val neighbors = adjacency[id].orEmpty()
+            val fan = fanDamping(neighbors.size)
+            neighbors.forEach { neighbor ->
+                val carried = value * neighbor.weight * fan
                 if (carried > 0f && carried > (next[neighbor.id] ?: 0f)) next[neighbor.id] = carried
             }
         }
@@ -232,7 +250,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
     bestPath.forEach { (nodeId, pathScore) ->
         val targetNode = nodesById[nodeId] ?: return@forEach
         val hierarchyBoost = scopeAffinity(query, targetNode, episodesById)
-        val projectedScore = (pathScore + hierarchyBoost * 0.5f).coerceIn(0f, 1f)
+        val projectedScore = (pathScore * (1f + hierarchyBoost * 0.5f)).coerceIn(0f, 1f)
         projected[nodeId] = max(projected[nodeId] ?: 0f, projectedScore)
     }
 
@@ -422,8 +440,10 @@ private fun projectToKinds(
 
         val next = linkedMapOf<MemoryNodeId, Float>()
         frontier.forEach { (id, edgeStrength) ->
-            adjacency[id].orEmpty().forEach { neighbor ->
-                val cumulative = (edgeStrength * neighbor.weight).coerceIn(0f, 1f)
+            val neighbors = adjacency[id].orEmpty()
+            val fan = fanDamping(neighbors.size)
+            neighbors.forEach { neighbor ->
+                val cumulative = (edgeStrength * neighbor.weight * fan).coerceIn(0f, 1f)
                 if (cumulative <= 0f) return@forEach
                 val existing = next[neighbor.id]
                 if (existing == null || cumulative > existing) {
@@ -453,21 +473,133 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
     MemoryRelationKind.Supersedes -> false
 }
 
+/**
+ * Lexical relevance: BM25F normalized to 0..1 (0.6), an exact-phrase bonus (0.2), and the node's
+ * own salience and confidence (0.2 together) once either matched.
+ */
 private fun lexicalScore(
-    queryTerms: List<String>,
+    weights: Map<String, Double>,
     queryLower: String,
     node: MemoryNode,
     index: MemoryRecallIndex,
 ): Float {
-    if (queryTerms.isEmpty()) return 0f
-    val nodeTerms = index.terms(node)
-    if (nodeTerms.isEmpty()) return 0f
+    val bm25 = index.bm25.score(node.id, weights)
+    val exactBonus = if (queryLower.isNotEmpty() && index.lowerText(node).contains(queryLower)) 0.2f else 0f
+    if (bm25 <= 0f && exactBonus <= 0f) return 0f
+    val semanticWeight = (node.salience * 0.12f) + (node.confidence * 0.08f)
+    return (bm25 * 0.6f + exactBonus + semanticWeight).coerceIn(0f, 1f)
+}
 
-    val overlap = queryTerms.count { it in nodeTerms }.toFloat() / queryTerms.size
-    val exactBonus = if (node.text.lowercase().contains(queryLower)) 0.25f else 0f
-    if (overlap <= 0f && exactBonus <= 0f) return 0f
-    val semanticWeight = (node.salience * 0.15f) + (node.confidence * 0.10f)
-    return (overlap * 0.5f + exactBonus + semanticWeight).coerceIn(0f, 1f)
+/** The caller's terms at weight 1 (stopwords dropped unless nothing else is left); expansions at 0.4. */
+private fun queryTermWeights(query: MemoryQuery): Map<String, Double> {
+    val own = query.text.memoryTerms()
+    val content = own.filterNot { it in RECALL_STOPWORDS }.ifEmpty { own }
+    val weights = LinkedHashMap<String, Double>()
+    content.forEach { weights[it] = 1.0 }
+    query.expansionTerms.flatMap(String::memoryTerms).forEach { if (it !in weights && it !in RECALL_STOPWORDS) weights[it] = EXPANSION_WEIGHT }
+    return weights
+}
+
+private const val EXPANSION_WEIGHT = 0.4
+
+/**
+ * ACT-R's fan effect, softened: spreading from a node with many links is damped by
+ * ln(e + 8) / ln(e + links), so hubs stop flooding recall; nodes with eight links or fewer are untouched.
+ */
+private fun fanDamping(links: Int): Float =
+    if (links <= FAN_FREE_LINKS) 1f else (kotlin.math.ln(kotlin.math.E + FAN_FREE_LINKS) / kotlin.math.ln(kotlin.math.E + links)).toFloat()
+
+private const val FAN_FREE_LINKS = 8
+
+/**
+ * BM25F over active nodes (Robertson & Zaragoza): fields text (weight 1, b 0.75), tag aliases
+ * (0.8, b 0.3) and remaining metadata (0.3, b 0.5); k1 1.2. Scores are normalized by the query's best
+ * possible score, so 1.0 means every query term saturated.
+ */
+internal class MemoryBm25Index(nodes: List<MemoryNode>) {
+    private class Fields(val text: Map<String, Int>, val aliases: Map<String, Int>, val meta: Map<String, Int>)
+
+    private val fields = HashMap<MemoryNodeId, Fields>(nodes.size * 2)
+    private val postings = HashMap<String, MutableList<MemoryNodeId>>()
+    private val documents = nodes.size.coerceAtLeast(1)
+    private val averageText: Double
+    private val averageAliases: Double
+    private val averageMeta: Double
+
+    init {
+        var textTotal = 0L
+        var aliasTotal = 0L
+        var metaTotal = 0L
+        nodes.forEach { node ->
+            val text = node.text.memoryTermCounts()
+            val aliases = node.metadata[TAG_ALIASES].orEmpty().memoryTermCounts()
+            val meta = node.metadata.filterKeys { it !in UNINDEXED_METADATA }.values.joinToString(" ").memoryTermCounts()
+            fields[node.id] = Fields(text, aliases, meta)
+            textTotal += text.values.sum()
+            aliasTotal += aliases.values.sum()
+            metaTotal += meta.values.sum()
+            (text.keys + aliases.keys + meta.keys).forEach { term -> postings.getOrPut(term) { mutableListOf() } += node.id }
+        }
+        averageText = (textTotal.toDouble() / documents).coerceAtLeast(1.0)
+        averageAliases = (aliasTotal.toDouble() / documents).coerceAtLeast(1.0)
+        averageMeta = (metaTotal.toDouble() / documents).coerceAtLeast(1.0)
+    }
+
+    fun candidates(terms: Collection<String>, allowed: Set<MemoryNodeId>): Set<MemoryNodeId> =
+        terms.flatMapTo(HashSet()) { postings[it].orEmpty() }.filterTo(HashSet()) { it in allowed }
+
+    fun frequency(term: String): MemoryTermFrequency = MemoryTermFrequency(postings[term]?.size ?: 0, fields.size)
+
+    fun idf(term: String): Double {
+        val df = postings[term]?.size ?: 0
+        return kotlin.math.ln(1.0 + (documents - df + 0.5) / (df + 0.5))
+    }
+
+    fun score(id: MemoryNodeId, weights: Map<String, Double>): Float {
+        val node = fields[id] ?: return 0f
+        var score = 0.0
+        var best = 0.0
+        val textLength = node.text.values.sum().toDouble()
+        val aliasLength = node.aliases.values.sum().toDouble()
+        val metaLength = node.meta.values.sum().toDouble()
+        weights.forEach { (term, weight) ->
+            val idf = idf(term)
+            best += weight * idf * (K1 + 1)
+            val tf = 1.0 * (node.text[term] ?: 0) / (1 - 0.75 + 0.75 * textLength / averageText) +
+                0.8 * (node.aliases[term] ?: 0) / (1 - 0.3 + 0.3 * aliasLength / averageAliases) +
+                0.3 * (node.meta[term] ?: 0) / (1 - 0.5 + 0.5 * metaLength / averageMeta)
+            if (tf > 0) score += weight * idf * tf * (K1 + 1) / (K1 + tf)
+        }
+        return if (best <= 0.0) 0f else (score / best).toFloat().coerceIn(0f, 1f)
+    }
+
+    private companion object {
+        const val K1 = 1.2
+
+        /** Bookkeeping metadata whose values are ids, provenance or scores, not content. */
+        val UNINDEXED_METADATA = setOf(
+            "microAgentRole", "semanticSource", "salienceFeatures", TAG_KEY, TAG_SENSE, TAG_IMPLIED_BY, TAG_OBJECTS,
+            TAG_ALIASES, "sourceEpisodeIds", "sourceSectionIds", "representative", "appendedFrom", "salience",
+            "confidence", "collapsedRepeatedLines", "nearDuplicatesDropped", "summaryMethod", "taxonomy",
+        )
+    }
+}
+
+private val RECALL_STOPWORDS = setOf(
+    "the", "a", "an", "to", "of", "in", "on", "at", "for", "with", "and", "or", "is", "are", "was", "were", "be", "it",
+    "its", "this", "that", "by", "as", "from", "into", "do", "does", "did", "we", "you", "i", "how", "what", "why", "when",
+)
+
+private fun String.memoryTermCounts(): Map<String, Int> {
+    val counts = HashMap<String, Int>()
+    val token = StringBuilder()
+    fun flush() {
+        if (token.length > 1) counts[token.toString()] = (counts[token.toString()] ?: 0) + 1
+        token.clear()
+    }
+    lowercase().forEach { char -> if (char.isLetterOrDigit() || char == '_' || char == '-') token.append(char) else flush() }
+    flush()
+    return counts
 }
 
 private fun String.memoryTerms(): List<String> {

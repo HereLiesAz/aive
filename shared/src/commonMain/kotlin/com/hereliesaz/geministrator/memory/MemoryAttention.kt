@@ -28,6 +28,23 @@ data class MemoryAttentionPolicy(
     val intrusiveCueIntervalTokens: Int = 128,
     val minimumCueTags: Int = 1,
     val maximumCueTags: Int = 8,
+    /**
+     * Inhibition of return: a memory surfaced within this many cue intervals (at the current dial)
+     * is not surfaced again, so the gate does not keep handing an agent what it was just shown.
+     * 0 disables it.
+     */
+    val noveltyCueIntervals: Int = 2,
+    /**
+     * Frequency filter for implicit recall and automatic cue clouds: a word found in more than this
+     * share of memories (and in more than [commonWordMinimumMemories] of them) is too common to fire
+     * on its own. Explicit #tags and "what I remember about …" are never filtered.
+     */
+    val commonWordShare: Float = 0.05f,
+    val commonWordMinimumMemories: Int = 20,
+    /** A just-offered cue's word, repeated within this many tokens, follows the cue. */
+    val echoWindowTokens: Int = 40,
+    /** A word used twice within this many tokens calls for its memory. */
+    val doublingWindowTokens: Int = 60,
 ) {
     init {
         require(recoveryWindowTokens > 0)
@@ -42,6 +59,11 @@ data class MemoryAttentionPolicy(
         require(focusedCueIntervalTokens >= intrusiveCueIntervalTokens)
         require(minimumCueTags > 0)
         require(maximumCueTags >= minimumCueTags)
+        require(noveltyCueIntervals >= 0)
+        require(commonWordShare in 0f..1f)
+        require(commonWordMinimumMemories >= 0)
+        require(echoWindowTokens > 0)
+        require(doublingWindowTokens > 0)
     }
 }
 

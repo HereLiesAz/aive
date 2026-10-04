@@ -219,7 +219,7 @@ Pushes to `main`:
 - publish exact-build assets into the patch-grouped GitHub Release through the centralized release action
 - deploy the JS production bundle to GitHub Pages after a successful build
 
-The composite build currently runs on JDK 21 because the pinned H2G2 renderer is compiled with a Java 21 toolchain. Android-facing Aive bytecode may still target JVM 17. The Aive and the pinned renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
+The composite build runs on JDK 21, and every module (Android included) targets JVM 21 bytecode. The Aive and the pinned H2G2 renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
 
 Web packaging uses isolated Maven publications because Kotlin/JS package generation cannot
 resolve the nested H2G2 composite build from within itself. CI publishes the pinned source
