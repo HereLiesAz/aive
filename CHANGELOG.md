@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- The programmatic noun and verb memory clerks now read text with WordNet 3.1 and a shipped part-of-speech tagger: noun phrases and verbs instead of keyphrases and a verb list, a curated software-term overlay for word senses, synonyms grouped under one tag, implied entities (broader terms, identifier and exception heads, file languages, GitHub references, acronym expansions), negation kept on the tag ("not remove"), and verb–object pairs, so the phrase clerk pairs a verb only with what the text says it acted on.
 - The Handoff Composer, Completion Gate and Verification Planner specialists now receive their input pre-cleaned the way the baseline cleans it (trimmed, blanks and repeats dropped), with evidence ids, unsatisfied criteria, status flags and per-criterion operations precomputed. No orchestration specialist is asked to filter or compute what the baseline already does.
 - The Memory Query Composer specialist now receives its input already cleaned (trimmed, blank and repeated entries removed), so it can no longer turn a blank entry into a query.
 - The Memory Query Composer specialist now trains on blank objectives and blank or duplicate list entries, so a trained model returns an empty plan instead of inventing a query.

@@ -85,6 +85,30 @@ Programmatic nodes record:
 
 `AgentMemoryLayer.createWithMicroAgents(..., programmaticSemanticFastPaths = false)` disables the fast path for direct A/B comparison with the trained models.
 
+## Programmatic noun and verb clerks
+
+The default (programmatic) Noun and Verb clerks read text with `MemoryTextAnalyzer`, which runs on two shipped static resources and no model:
+
+- **WordNet 3.1** (`composeResources/files/aive-wordnet-v1.txt.gz`, ~2.3 MB): noun and verb synsets with hypernyms, cross-part-of-speech derivations and topic domains, in WordNet's sense order; adjective/adverb membership; irregular forms. Built by `tools/memory_lexicon/build_wordnet_lexicon.py`.
+- **A part-of-speech tagger** (`aive-pos-tagger-v1.txt.gz`, ~1.1 MB): a greedy averaged perceptron (Penn Treebank tags) trained by `tools/memory_lexicon/train_pos_tagger.py` on Universal Dependencies English-EWT, with WordNet's allowed parts of speech for each word as features. 94.4% on the EWT test set. `pos_tagger_golden.tsv` pins the Kotlin port to the training script.
+
+Both load once, on first use, into compact hashed tables (about 19 MB of JVM heap together).
+
+Per text, the analyzer:
+
+1. takes code first: fenced blocks and stack-trace lines yield code entities only; in prose, backtick spans, identifiers, paths, URLs, `#123` references, commit hashes, versions, flags and Gradle task paths are single tokens, masked from the tagger;
+2. splits sentences without breaking `v1.2`, `foo.bar()`, paths or common abbreviations;
+3. tags parts of speech, then reads noun-phrase chunks as entities and verbs (minus auxiliaries) as actions, with phrasal particles (`roll back`) and NegEx-style negation (`didn't delete` is the tag `not remove`, never `remove`);
+4. chooses a sense: the curated software overlay (`MemoryTechnicalLexicon`) first, since WordNet's first sense of `bug` is the insect; then WordNet, preferring computing-domain senses in technical text and skipping senses that cannot be meant there; otherwise the most frequent sense. Synonyms of the chosen sense become the tag's `aliases` and share its key, so `delete` and `remove` are one tag;
+5. adds implied entities and actions, each marked `impliedBy` with lower confidence and salience: broader terms (only from a confident sense), compound heads (`gradle cache` → `cache`), identifier heads (`FooRepository` → `repository`), exception classes, file languages, URL hosts and GitHub repositories/pull requests, commits, options, Gradle tasks, acronym expansions (defined in the text by Schwartz–Hearst, or unambiguous in the overlay), and nominalizations (`deletion` → `delete`);
+6. records verb–object pairs ReVerb-style (verb, optional particle or preposition, the next noun phrase in the same clause; passive voice takes the subject). `it`/`they`/`them` resolve to the most salient agreeing phrase in the last three sentences, or stay unresolved when two candidates are close.
+
+Tag nodes carry `conceptKey`, `aliases`, `impliedBy`, `sense`, `negated`, and for verbs `objectKeys`/`objectPhrases`/`objectSpans`. The Phrase clerk pairs a verb only with the objects recorded for it; tags without that record (from a model-backed tagger) keep the earlier pairing.
+
+None of this judges truth or compares memories: it records what the text says, negations included. If the resources cannot load, the clerks fall back to the earlier keyphrase and verb-list rules.
+
+Sense choice is the most-frequent-sense baseline plus the overlay and domain preference, not full word-sense disambiguation; the claim above about richer resources stands for `RuleBasedMemoryLexicon`, which the associators still use.
+
 ## Convey-inspired structural semantics
 
 The lexical analyzer adopts the useful shape of Convey's deterministic semantic code without pretending that its lightweight built-in parser is a full dependency parser.

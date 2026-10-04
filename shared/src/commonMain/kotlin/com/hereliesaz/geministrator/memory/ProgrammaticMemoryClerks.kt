@@ -244,17 +244,27 @@ private class ProgrammaticTagger(
     now: () -> Long,
 ) : ProgrammaticClerk(role, now) {
     private val nodeKind = if (role == MemoryMicroAgentRole.NounTagger) MemoryNodeKind.NounTag else MemoryNodeKind.VerbTag
+    private val conceptKind = if (role == MemoryMicroAgentRole.NounTagger) MemoryConceptKind.Entity else MemoryConceptKind.Action
 
     override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
-        // tag -> items in which it occurs, in first-seen order
-        val occurrences = linkedMapOf<String, LinkedHashSet<MemoryWorkItem>>()
-        val display = hashMapOf<String, String>()
+        val analyzer = runCatching { MemoryTextAnalyzer(MemoryLanguageResources.get()) }.getOrNull()
+        // key -> (concept, items in which it occurs, in first-seen order)
+        val occurrences = linkedMapOf<String, Pair<MemoryConcept, LinkedHashSet<MemoryWorkItem>>>()
+        val verbObjects = hashMapOf<String, LinkedHashSet<MemoryVerbObject>>()
         packet.items.forEach { item ->
-            val tags = if (nodeKind == MemoryNodeKind.NounTag) item.text.nounTags() else item.text.verbTags()
-            tags.forEach { tag ->
-                val key = tag.memorySemanticKey()
-                display.getOrPut(key) { tag }
-                occurrences.getOrPut(key) { linkedSetOf() } += item
+            val concepts = if (analyzer != null) {
+                val analysis = analyzer.analyze(item.text)
+                analysis.verbObjects.forEach { pair -> verbObjects.getOrPut(pair.actionKey) { linkedSetOf() } += pair }
+                analysis.concepts.filter { it.kind == conceptKind }
+            } else {
+                // Language resources unavailable: the earlier keyphrase and verb-list rules.
+                val tags = if (nodeKind == MemoryNodeKind.NounTag) item.text.nounTags() else item.text.verbTags()
+                tags.map { MemoryConcept("legacy:${it.memorySemanticKey()}", it, conceptKind, confidence = 0.8f) }
+            }
+            concepts.forEach { concept ->
+                val entry = occurrences.getOrPut(concept.key) { concept to linkedSetOf() }
+                entry.second += item
+                if (entry.first.impliedBy != null && concept.impliedBy == null) occurrences[concept.key] = concept to entry.second
             }
         }
         // The Tags stage runs noun and verb clerks together; each gets half the shared budget.
@@ -263,9 +273,12 @@ private class ProgrammaticTagger(
         val namespace = packet.namespace()
         val nodes = mutableListOf<MemoryNode>()
         val edges = mutableListOf<MemoryEdge>()
+        // Explicit mentions first, most frequent first; implied concepts fill what budget remains.
         occurrences.entries
-            .sortedByDescending { it.value.size }
-            .forEachIndexed { index, (key, items) ->
+            .sortedWith(compareBy<Map.Entry<String, Pair<MemoryConcept, LinkedHashSet<MemoryWorkItem>>>> { it.value.first.impliedBy != null }
+                .thenByDescending { it.value.second.size })
+            .forEachIndexed { index, (key, entry) ->
+                val (concept, items) = entry
                 val cost = 1 + items.size
                 if (cost > budget) return@forEachIndexed
                 budget -= cost
@@ -273,13 +286,14 @@ private class ProgrammaticTagger(
                 nodes += MemoryNode(
                     id = nodeId,
                     kind = nodeKind,
-                    text = display.getValue(key),
+                    text = concept.text,
                     sourceEpisodeIds = items.flatMapTo(linkedSetOf(packet.episodeId)) { it.sourceEpisodeIds() },
                     sourceSectionIds = items.flatMapTo(linkedSetOf()) { it.sourceSectionIds() },
-                    salience = items.maxOf { it.metadata["salience"]?.toFloatOrNull() ?: 0.5f },
-                    confidence = 0.8f,
+                    salience = items.maxOf { it.metadata["salience"]?.toFloatOrNull() ?: 0.5f } *
+                        (if (concept.impliedBy != null) IMPLIED_SALIENCE else 1f),
+                    confidence = concept.confidence,
                     createdAtEpochMillis = createdAt,
-                    metadata = metadata(),
+                    metadata = metadata(conceptMetadata(concept, verbObjects[key].orEmpty())),
                 )
                 items.forEachIndexed { itemIndex, item ->
                     edges += MemoryEdge(
@@ -287,6 +301,7 @@ private class ProgrammaticTagger(
                         from = nodeId,
                         to = MemoryNodeId(item.id),
                         relation = MemoryRelationKind.Indexes,
+                        weight = if (concept.impliedBy != null) concept.confidence else 1f,
                         createdAtEpochMillis = createdAt,
                         metadata = metadata(),
                     )
@@ -294,7 +309,36 @@ private class ProgrammaticTagger(
             }
         return MemoryMutationBatch(nodesToAdd = nodes, edgesToAdd = edges)
     }
+
+    private fun conceptMetadata(concept: MemoryConcept, pairs: Set<MemoryVerbObject>): Map<String, String> = buildMap {
+        put(TAG_KEY, concept.key)
+        if (concept.aliases.isNotEmpty()) put(TAG_ALIASES, concept.aliases.joinToString(TAG_LIST_SEPARATOR))
+        concept.impliedBy?.let { put(TAG_IMPLIED_BY, it.name) }
+        concept.sense?.let { put(TAG_SENSE, it) }
+        if (concept.negated) put(TAG_NEGATED, "true")
+        if (pairs.isNotEmpty()) {
+            put(TAG_OBJECTS, pairs.joinToString(TAG_LIST_SEPARATOR) { it.entityKey })
+            put(TAG_PHRASES, pairs.joinToString(TAG_LIST_SEPARATOR) { it.text })
+            put(TAG_SPANS, pairs.joinToString(TAG_LIST_SEPARATOR) { it.span.replace(TAG_LIST_SEPARATOR, " ") })
+        }
+    }
+
+    private companion object {
+        /** Implied concepts rank below what the text states outright. */
+        const val IMPLIED_SALIENCE = 0.6f
+    }
 }
+
+/** Tag node metadata written by the programmatic tagger. */
+internal const val TAG_KEY = "conceptKey"
+internal const val TAG_ALIASES = "aliases"
+internal const val TAG_IMPLIED_BY = "impliedBy"
+internal const val TAG_SENSE = "sense"
+internal const val TAG_NEGATED = "negated"
+internal const val TAG_OBJECTS = "objectKeys"
+internal const val TAG_PHRASES = "objectPhrases"
+internal const val TAG_SPANS = "objectSpans"
+internal const val TAG_LIST_SEPARATOR = " | "
 
 internal fun String.nounTags(maxKeyphrases: Int = 6): List<String> {
     val code = extractCodeSemanticHints(this).nounCandidates.map { it.trim() }.filter { it.length in 2..80 }
@@ -385,8 +429,13 @@ private class ProgrammaticPhraseSynthesizer(now: () -> Long) :
         bySection.values.forEach { items ->
             val verbs = items.filter { it.kind == "node:${MemoryNodeKind.VerbTag.name}" }
             val nouns = items.filter { it.kind == "node:${MemoryNodeKind.NounTag.name}" }
+            val nounsByKey = nouns.filter { it.metadata[TAG_KEY] != null }.associateBy { it.metadata.getValue(TAG_KEY) }
             verbs.forEach verb@{ verb ->
-                nouns.take(MAX_NOUNS_PER_VERB).forEach noun@{ noun ->
+                // Programmatic tags carry the verb's objects as the text states them; pair only those.
+                // Tags without that record (model-made) keep the earlier co-occurrence pairing.
+                val objectKeys = verb.metadata[TAG_OBJECTS]?.split(TAG_LIST_SEPARATOR)
+                val partners = objectKeys?.mapNotNull(nounsByKey::get) ?: nouns.take(MAX_NOUNS_PER_VERB)
+                partners.forEach noun@{ noun ->
                     val text = "${verb.text.trim()} ${noun.text.trim()}"
                     if (budget < 3 || !seen.add(text.memorySemanticKey())) return@noun
                     budget -= 3
