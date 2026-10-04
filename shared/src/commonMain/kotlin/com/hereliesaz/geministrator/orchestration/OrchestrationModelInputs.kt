@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.orchestration
 
+import com.hereliesaz.geministrator.domain.ArtifactKind
 import kotlinx.serialization.Serializable
 
 /*
@@ -9,6 +10,9 @@ import kotlinx.serialization.Serializable
  * rank vs cost, running token totals). These views keep every raw field and add the comparisons as
  * booleans and running totals, in the order the rule applies them, so the model selects instead of
  * calculating. The guard sends exactly these; the training corpus is generated from them.
+ *
+ * Text is cleaned here the way the baseline cleans it (trimmed, blanks and repeats dropped), so a
+ * model is never asked to filter: trained adapters copy what they are given, blanks included.
  */
 
 @Serializable
@@ -207,3 +211,98 @@ internal data class CapabilityAssessmentModelInput(
         )
     }
 }
+
+/** The handoff input already cleaned as the packet carries it: copy every field. */
+@Serializable
+internal data class HandoffModelInput(
+    val objective: String,
+    val completed: List<String>,
+    val artifacts: List<String>,
+    val state: Map<String, String>,
+    val unresolved: List<String>,
+    val failures: List<String>,
+    val nextAction: String?,
+    val acceptanceCriteria: List<String>,
+    val provenance: List<String>,
+) {
+    fun toInput(): HandoffInput =
+        HandoffInput(objective, completed, artifacts, state, unresolved, failures, nextAction, acceptanceCriteria, provenance)
+
+    companion object {
+        fun of(input: HandoffInput): HandoffModelInput = HandoffModelInput(
+            objective = input.objective.trim(),
+            completed = input.completed.distinct(),
+            artifacts = input.artifacts.distinct(),
+            state = input.state,
+            unresolved = input.unresolved.distinct(),
+            failures = input.failures.distinct(),
+            nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty),
+            acceptanceCriteria = input.acceptanceCriteria.distinct(),
+            provenance = input.provenance.distinct(),
+        )
+    }
+}
+
+@Serializable
+internal data class CompletionModelInput(
+    val objective: String,
+    val criteria: List<CriterionEvidence>,
+    val taskTerminal: Boolean,
+    /** Every criterion's evidence ids, flattened, repeats dropped: the result's evidenceIds. */
+    val evidenceIds: List<String>,
+    /** Criteria not Passed or without evidence, in order: the result's unsatisfiedCriteria. */
+    val unsatisfiedCriteria: List<String>,
+    /** Decision order: anyFailed → Failed, anyBlocked → Blocked, !taskTerminal → Incomplete,
+     * anyNotRun → NeedsVerification, unsatisfied → Incomplete, else Complete. */
+    val anyFailed: Boolean,
+    val anyBlocked: Boolean,
+    val anyNotRun: Boolean,
+) {
+    fun toInput(): CompletionInput = CompletionInput(objective, criteria, taskTerminal)
+
+    companion object {
+        fun of(input: CompletionInput): CompletionModelInput = CompletionModelInput(
+            objective = input.objective,
+            criteria = input.criteria,
+            taskTerminal = input.taskTerminal,
+            evidenceIds = input.criteria.flatMap { it.evidenceIds }.distinct(),
+            unsatisfiedCriteria = input.criteria
+                .filter { it.status != EvidenceStatus.Passed || it.evidenceIds.isEmpty() }
+                .map { it.criterion },
+            anyFailed = input.criteria.any { it.status == EvidenceStatus.Failed },
+            anyBlocked = input.criteria.any { it.status == EvidenceStatus.Blocked },
+            anyNotRun = input.criteria.any { it.status == EvidenceStatus.NotRun },
+        )
+    }
+}
+
+@Serializable
+internal data class VerificationPlanningModelInput(
+    val objective: String,
+    /** Blank criteria and repeats dropped. */
+    val acceptanceCriteria: List<String>,
+    /** One per criterion, in order: the operation its wording calls for. */
+    val criterionOperations: List<CriterionOperation>,
+    val artifactKinds: Set<ArtifactKind>,
+    /** Repeats dropped. */
+    val targetPlatforms: List<String>,
+) {
+    fun toInput(): VerificationPlanningInput =
+        VerificationPlanningInput(objective, acceptanceCriteria, artifactKinds, targetPlatforms)
+
+    companion object {
+        fun of(input: VerificationPlanningInput): VerificationPlanningModelInput {
+            val criteria = input.acceptanceCriteria.filter(String::isNotBlank).distinct()
+            return VerificationPlanningModelInput(
+                objective = input.objective,
+                acceptanceCriteria = criteria,
+                criterionOperations = criteria.map { CriterionOperation(it, verificationOperationFor(it)) },
+                artifactKinds = input.artifactKinds,
+                targetPlatforms = input.targetPlatforms.distinct(),
+            )
+        }
+    }
+}
+
+@Serializable
+internal data class CriterionOperation(val criterion: String, val operationClass: String)

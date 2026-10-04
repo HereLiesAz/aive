@@ -172,9 +172,9 @@ class GuardedModelBackedOrchestrationUtilities(
 
     override fun composeHandoff(input: HandoffInput): HandoffPacket {
         val baseline = fallback.composeHandoff(input)
-        return infer<HandoffInput, HandoffPacket>(
+        return infer<HandoffModelInput, HandoffPacket>(
             OrchestrationUtilityRole.HandoffComposer,
-            input,
+            HandoffModelInput.of(input),
             baseline,
         ) { candidate ->
             candidate.objective == baseline.objective &&
@@ -205,9 +205,9 @@ class GuardedModelBackedOrchestrationUtilities(
     override fun evaluateCompletion(input: CompletionInput): CompletionResult {
         val baseline = fallback.evaluateCompletion(input)
         val knownEvidence = baseline.evidenceIds.toSet()
-        return infer<CompletionInput, CompletionResult>(
+        return infer<CompletionModelInput, CompletionResult>(
             OrchestrationUtilityRole.CompletionGate,
-            input,
+            CompletionModelInput.of(input),
             baseline,
         ) { candidate ->
             candidate.evidenceIds.all(knownEvidence::contains) &&
@@ -247,9 +247,9 @@ class GuardedModelBackedOrchestrationUtilities(
         val baseline = fallback.planVerification(input)
         val baselineKeys = baseline.steps.mapTo(linkedSetOf()) { stepKey(it) }
         val criteria = input.acceptanceCriteria.toSet()
-        return infer<VerificationPlanningInput, VerificationPlan>(
+        return infer<VerificationPlanningModelInput, VerificationPlan>(
             OrchestrationUtilityRole.VerificationPlanner,
-            input,
+            VerificationPlanningModelInput.of(input),
             baseline,
         ) { candidate ->
             val candidateKeys = candidate.steps.map { stepKey(it) }

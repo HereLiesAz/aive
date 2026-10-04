@@ -91,17 +91,17 @@ class OrchestrationDatasetGeneratorTest {
             OrchestrationUtilityRole.ToolRouter ->
                 assertEquals(json.decodeFromString<ToolRoute>(expected), family.routeTool(json.decodeFromString<ToolRoutingModelInput>(input).toInput()))
             OrchestrationUtilityRole.HandoffComposer ->
-                assertEquals(json.decodeFromString<HandoffPacket>(expected), family.composeHandoff(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<HandoffPacket>(expected), family.composeHandoff(json.decodeFromString<HandoffModelInput>(input).toInput()))
             OrchestrationUtilityRole.EscalationGate ->
                 assertEquals(json.decodeFromString<EscalationResult>(expected), family.evaluateEscalation(json.decodeFromString<CapabilityAssessmentModelInput>(input).assessment))
             OrchestrationUtilityRole.CompletionGate ->
-                assertEquals(json.decodeFromString<CompletionResult>(expected), family.evaluateCompletion(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<CompletionResult>(expected), family.evaluateCompletion(json.decodeFromString<CompletionModelInput>(input).toInput()))
             OrchestrationUtilityRole.ExecutionStateSummarizer -> {
                 val (definition, run) = rebuild(json.decodeFromString<ExecutionStateModelInput>(input))
                 assertEquals(json.decodeFromString<ExecutionStateSummary>(expected), family.summarizeExecution(definition, run))
             }
             OrchestrationUtilityRole.VerificationPlanner ->
-                assertEquals(json.decodeFromString<VerificationPlan>(expected), family.planVerification(json.decodeFromString(input)))
+                assertEquals(json.decodeFromString<VerificationPlan>(expected), family.planVerification(json.decodeFromString<VerificationPlanningModelInput>(input).toInput()))
         }
     }
 
