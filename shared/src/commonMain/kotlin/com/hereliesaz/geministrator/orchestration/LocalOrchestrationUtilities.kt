@@ -108,16 +108,20 @@ data class ToolCapability(
     val available: Boolean = true,
     /** Lower values preserve executor-integration priority. */
     val preferenceRank: Int = Int.MAX_VALUE,
+    /** Inputs this tool cannot run without. */
+    val requiredInputs: Set<String> = emptySet(),
 )
 
 @Serializable
-enum class ToolRouteDecision { Tool, NoTool, UnavailableCapability }
+enum class ToolRouteDecision { Tool, NoTool, UnavailableCapability, MissingInputs }
 
 @Serializable
 data class ToolRoutingInput(
     val operationClass: String? = null,
     val capabilities: List<ToolCapability>,
     val requiredInputs: List<String> = emptyList(),
+    /** Inputs the caller can supply; null when unknown, which skips the input check. */
+    val providedInputs: List<String>? = null,
 )
 
 @Serializable
@@ -153,6 +157,8 @@ data class HandoffPacket(
     val nextAction: String?,
     val acceptanceCriteria: List<String>,
     val provenance: List<String>,
+    /** Structural gaps in the handoff, e.g. NEXT_ACTION_MISSING. */
+    val warnings: List<String> = emptyList(),
 )
 
 @Serializable
@@ -188,6 +194,10 @@ data class CriterionEvidence(
     val criterion: String,
     val evidenceIds: List<String> = emptyList(),
     val status: EvidenceStatus = EvidenceStatus.NotRun,
+    /** Optional criteria never block completion; their gaps are reported only. */
+    val required: Boolean = true,
+    /** The evidence predates the latest change it should cover (a timestamp check by the caller). */
+    val stale: Boolean = false,
 )
 
 @Serializable
@@ -205,6 +215,8 @@ data class CompletionResult(
     val decision: CompletionDecision,
     val unsatisfiedCriteria: List<String>,
     val evidenceIds: List<String>,
+    /** Why the decision is what it is, e.g. NO_CRITERIA, STALE_EVIDENCE, OPTIONAL_UNSATISFIED. */
+    val reasonCodes: List<String> = emptyList(),
 )
 
 @Serializable
@@ -217,6 +229,12 @@ data class ExecutionStateSummary(
     val artifacts: List<String>,
     val knownConstraints: List<String>,
     val openQuestions: List<String>,
+    /** Defined tasks that have not started (no run, Created or Ready). */
+    val pendingSteps: List<String> = emptyList(),
+    val escalatedSteps: List<String> = emptyList(),
+    val cancelledSteps: List<String> = emptyList(),
+    /** Not-yet-finished task -> the nearest failed, blocked or approval-waiting task it depends on. */
+    val blockedBy: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -273,15 +291,25 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             }
         }
 
-        input.codeSymbols.forEach { add(it, MemoryResolution.GranularEvidence, "EXACT_SYMBOL") }
-        input.knownEntities.forEach { add(it, MemoryResolution.Entity, "KNOWN_ENTITY") }
-        input.knownActions.forEach { add(it, MemoryResolution.Action, "KNOWN_ACTION") }
-
-        if (queries.size < input.maxQueries && input.objective.isNotBlank()) {
-            add(input.objective.trim(), MemoryResolution.Summary, "OBJECTIVE_CONTEXT")
+        // The objective always gets a query (and the chronological one, when asked): one list of
+        // symbols, entities or actions can no longer use up every slot.
+        val objective = input.objective.trim()
+        val reserved = (if (objective.isNotEmpty()) 1 else 0) + (if (input.chronologicalContextRequired && objective.isNotEmpty()) 1 else 0)
+        val sources = listOf(
+            input.codeSymbols.map { Triple(it, MemoryResolution.GranularEvidence, "EXACT_SYMBOL") },
+            input.knownEntities.map { Triple(it, MemoryResolution.Entity, "KNOWN_ENTITY") },
+            input.knownActions.map { Triple(it, MemoryResolution.Action, "KNOWN_ACTION") },
+        )
+        // Round-robin across the three lists until only the reserved slots remain.
+        val longest = sources.maxOf { it.size }
+        for (i in 0 until longest) {
+            sources.forEach { list ->
+                if (queries.size < input.maxQueries - reserved) list.getOrNull(i)?.let { (text, resolution, reason) -> add(text, resolution, reason) }
+            }
         }
-        if (input.chronologicalContextRequired && queries.size < input.maxQueries) {
-            add(input.objective.trim(), MemoryResolution.GranularEvidence, "CHRONOLOGICAL_EVIDENCE")
+        if (objective.isNotEmpty()) add(objective, MemoryResolution.Summary, "OBJECTIVE_CONTEXT")
+        if (input.chronologicalContextRequired && objective.isNotEmpty()) {
+            add(objective, MemoryResolution.GranularEvidence, "CHRONOLOGICAL_EVIDENCE")
         }
 
         return MemoryQueryPlan(queries.values.toList(), enoughEvidence = false)
@@ -347,10 +375,17 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
                 requiredContextType = input.requiredContextType,
             )
         }
+        // The fallback is the next eligible agent that is genuinely stronger (more context or a
+        // capability superset), so a failure does not retry an equivalent agent; else the next one.
+        val selected = eligible.first()
+        val fallback = eligible.drop(1).firstOrNull { candidate ->
+            candidate.contextLimitTokens > selected.contextLimitTokens ||
+                (candidate.capabilities.containsAll(selected.capabilities) && candidate.capabilities.size > selected.capabilities.size)
+        } ?: eligible.getOrNull(1)
         return AgentRoute(
             decision = AgentRouteDecision.Local,
-            selectedAgent = eligible.first().id,
-            fallbackAgent = eligible.getOrNull(1)?.id,
+            selectedAgent = selected.id,
+            fallbackAgent = fallback?.id,
             reasonCode = "CAPABILITY_MATCH",
             requiredContextType = input.requiredContextType,
         )
@@ -364,9 +399,21 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
                 reasonCode = "NO_TOOL_REQUIRED",
             )
         }
-        val tool = input.capabilities
+        val supporting = input.capabilities
             .filter { it.available && operation in it.operationClasses }
-            .minWithOrNull(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
+            .sortedWith(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
+        val provided = input.providedInputs?.toSet()
+        val runnable = if (provided == null) supporting else supporting.filter { provided.containsAll(it.requiredInputs) }
+        if (supporting.isNotEmpty() && runnable.isEmpty()) {
+            return ToolRoute(
+                decision = ToolRouteDecision.MissingInputs,
+                tool = supporting.first().id,
+                operationClass = operation,
+                requiredInputs = (supporting.first().requiredInputs - provided.orEmpty()).sorted(),
+                reasonCode = "MISSING_REQUIRED_INPUTS",
+            )
+        }
+        val tool = runnable.firstOrNull()
             ?: return ToolRoute(
                 decision = ToolRouteDecision.UnavailableCapability,
                 operationClass = operation,
@@ -392,6 +439,11 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         nextAction = input.nextAction?.trim()?.takeIf(String::isNotEmpty),
         acceptanceCriteria = input.acceptanceCriteria.distinct(),
         provenance = input.provenance.distinct(),
+        warnings = buildList {
+            val nextAction = input.nextAction?.trim().orEmpty()
+            if (nextAction.isEmpty() && (input.unresolved.isNotEmpty() || input.failures.isNotEmpty())) add("NEXT_ACTION_MISSING")
+            if (input.objective.isBlank()) add("OBJECTIVE_MISSING")
+        },
     )
 
     override fun evaluateEscalation(input: CapabilityAssessment): EscalationResult {
@@ -411,10 +463,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             !input.requiredToolAvailable -> EscalationDecision.NeedTool
             !input.hasEnoughEvidence || input.requiredContextTokens > input.localContextLimitTokens ->
                 EscalationDecision.NeedMoreContext
-            input.requiresMultiStepReasoning ||
-                input.requiresCodebaseWideReasoning ||
-                input.requiresContradictionReconciliation ||
-                input.requiresArchitecturalDecision -> EscalationDecision.Escalate
+            reasoningLoad(input) >= ESCALATION_THRESHOLD -> EscalationDecision.Escalate
             else -> EscalationDecision.Local
         }
         return EscalationResult(
@@ -427,37 +476,52 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
     override fun evaluateCompletion(input: CompletionInput): CompletionResult {
         val evidenceIds = input.criteria.flatMap { it.evidenceIds }.distinct()
         val unsatisfied = input.criteria
-            .filter { it.status != EvidenceStatus.Passed || it.evidenceIds.isEmpty() }
+            .filter { it.status != EvidenceStatus.Passed || it.evidenceIds.isEmpty() || it.stale }
             .map { it.criterion }
+        val required = input.criteria.filter { it.required }
+        val reasons = mutableListOf<String>()
 
         val decision = when {
-            input.criteria.any { it.status == EvidenceStatus.Failed } -> CompletionDecision.Failed
-            input.criteria.any { it.status == EvidenceStatus.Blocked } -> CompletionDecision.Blocked
-            !input.taskTerminal -> CompletionDecision.Incomplete
-            input.criteria.any { it.status == EvidenceStatus.NotRun } -> CompletionDecision.NeedsVerification
-            unsatisfied.isNotEmpty() -> CompletionDecision.Incomplete
+            required.any { it.status == EvidenceStatus.Failed } -> CompletionDecision.Failed.also { reasons += "CRITERION_FAILED" }
+            required.any { it.status == EvidenceStatus.Blocked } -> CompletionDecision.Blocked.also { reasons += "CRITERION_BLOCKED" }
+            !input.taskTerminal -> CompletionDecision.Incomplete.also { reasons += "TASK_NOT_TERMINAL" }
+            // Nothing to check against is not completion.
+            required.isEmpty() -> CompletionDecision.NeedsVerification.also { reasons += "NO_CRITERIA" }
+            required.any { it.status == EvidenceStatus.NotRun } -> CompletionDecision.NeedsVerification.also { reasons += "CRITERION_NOT_RUN" }
+            required.any { it.status == EvidenceStatus.Passed && it.stale } -> CompletionDecision.NeedsVerification.also { reasons += "STALE_EVIDENCE" }
+            required.any { it.evidenceIds.isEmpty() } -> CompletionDecision.Incomplete.also { reasons += "MISSING_EVIDENCE" }
             else -> CompletionDecision.Complete
         }
-        return CompletionResult(decision, unsatisfied, evidenceIds)
+        if (input.criteria.any { !it.required && it.criterion in unsatisfied }) reasons += "OPTIONAL_UNSATISFIED"
+        return CompletionResult(decision, unsatisfied, evidenceIds, reasons)
     }
 
     override fun summarizeExecution(
         definition: WorkflowDefinition,
         run: WorkflowRun,
     ): ExecutionStateSummary {
-        val byId = definition.tasks.associateBy { it.id }
         val completed = mutableListOf<String>()
         val active = mutableListOf<String>()
         val blocked = mutableListOf<String>()
         val failed = mutableListOf<String>()
+        val escalated = mutableListOf<String>()
+        val cancelled = mutableListOf<String>()
+        val pending = mutableListOf<String>()
         val approvals = mutableListOf<String>()
         val artifacts = mutableListOf<String>()
         val constraints = mutableListOf<String>()
         val questions = mutableListOf<String>()
 
-        run.taskRuns.forEach { (id, taskRun) ->
-            val name = byId[id]?.name ?: id.value
-            when (taskRun.status) {
+        // Every defined task, in dependency order (definition order breaks ties); runs for tasks
+        // missing from the definition follow.
+        val ordered = executionOrder(definition) + run.taskRuns.keys.filter { id -> definition.tasks.none { it.id == id } }
+        val names = definition.tasks.associate { it.id to it.name }
+        fun nameOf(id: com.hereliesaz.geministrator.domain.TaskDefinitionId) = names[id] ?: id.value
+        ordered.forEach { id ->
+            val name = nameOf(id)
+            val taskRun = run.taskRuns[id]
+            when (taskRun?.status) {
+                null, TaskRunStatus.Created, TaskRunStatus.Ready -> pending += name
                 TaskRunStatus.Completed -> completed += name
                 TaskRunStatus.Planning,
                 TaskRunStatus.Running,
@@ -465,16 +529,33 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
                 TaskRunStatus.Retrying -> active += name
                 TaskRunStatus.AwaitingApproval -> approvals += name
                 TaskRunStatus.Blocked -> blocked += name
-                TaskRunStatus.Failed,
-                TaskRunStatus.Escalated,
-                TaskRunStatus.Cancelled -> failed += name
-                TaskRunStatus.Created,
-                TaskRunStatus.Ready -> Unit
+                TaskRunStatus.Failed -> failed += name
+                TaskRunStatus.Escalated -> escalated += name
+                TaskRunStatus.Cancelled -> cancelled += name
             }
-            taskRun.artifacts.forEach { artifacts += it.id.value }
-            taskRun.blockingReason?.let {
+            taskRun?.artifacts?.forEach { artifacts += it.id.value }
+            taskRun?.blockingReason?.let {
                 constraints += "${name}: ${it.code}"
-                questions += "${name}: ${it.message}"
+                if (it.message.isNotBlank()) questions += "${name}: ${it.message}"
+            }
+        }
+
+        // Root cause of waiting: walk dependencies back to the nearest task that stopped.
+        val stopped = setOf(TaskRunStatus.Failed, TaskRunStatus.Blocked, TaskRunStatus.AwaitingApproval, TaskRunStatus.Escalated, TaskRunStatus.Cancelled)
+        val dependencies = definition.tasks.associate { it.id to it.dependsOn }
+        val blockedBy = linkedMapOf<String, String>()
+        ordered.forEach { id ->
+            val status = run.taskRuns[id]?.status
+            if (status == TaskRunStatus.Completed || status in stopped) return@forEach
+            val seen = hashSetOf(id)
+            var frontier = dependencies[id].orEmpty().toList()
+            while (frontier.isNotEmpty()) {
+                val root = frontier.firstOrNull { run.taskRuns[it]?.status in stopped }
+                if (root != null) {
+                    blockedBy[nameOf(id)] = nameOf(root)
+                    break
+                }
+                frontier = frontier.flatMap { dependencies[it].orEmpty() }.filter(seen::add)
             }
         }
 
@@ -482,11 +563,16 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
             completedSteps = completed,
             activeSteps = active,
             blockedSteps = blocked,
-            failedSteps = failed,
+            // Kept as "did not succeed" for existing readers; escalated and cancelled are also listed apart.
+            failedSteps = failed + escalated + cancelled,
             waitingForApprovalSteps = approvals,
             artifacts = artifacts.distinct(),
             knownConstraints = constraints.distinct(),
             openQuestions = questions.distinct(),
+            pendingSteps = pending,
+            escalatedSteps = escalated,
+            cancelledSteps = cancelled,
+            blockedBy = blockedBy,
         )
     }
 
@@ -506,7 +592,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
 
         val criteria = input.acceptanceCriteria.filter(String::isNotBlank)
         criteria.forEach { criterion ->
-            add(verificationOperationFor(criterion), "ACCEPTANCE_CRITERION", criterion)
+            verificationOperationsFor(criterion).forEach { add(it, "ACCEPTANCE_CRITERION", criterion) }
         }
 
         if (ArtifactKind.CodeChange in input.artifactKinds &&
@@ -531,15 +617,67 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
     }
 }
 
-/** The verification operation an acceptance criterion's wording calls for. */
-internal fun verificationOperationFor(criterion: String): String {
-    val lower = criterion.lowercase()
-    return when {
-        "lint" in lower -> "lint"
-        "test" in lower -> "test"
-        "build" in lower || "compile" in lower -> "build"
-        "deploy" in lower || "endpoint" in lower || "health" in lower -> "health-check"
-        "source" in lower || "citation" in lower || "date" in lower -> "source-verification"
-        else -> "evidence-check"
+/** Escalation points from the caller's reasoning flags; [ESCALATION_THRESHOLD] or more escalates. */
+internal fun reasoningLoad(input: CapabilityAssessment): Int =
+    (if (input.requiresMultiStepReasoning) 1 else 0) +
+        (if (input.requiresCodebaseWideReasoning) 2 else 0) +
+        (if (input.requiresArchitecturalDecision) 3 else 0) +
+        (if (input.requiresContradictionReconciliation) 3 else 0)
+
+internal const val ESCALATION_THRESHOLD = 3
+
+/** Task ids in dependency order (Kahn's algorithm; definition order breaks ties; cycles appended). */
+internal fun executionOrder(definition: WorkflowDefinition): List<com.hereliesaz.geministrator.domain.TaskDefinitionId> {
+    val ids = definition.tasks.map { it.id }
+    val known = ids.toSet()
+    val remaining = definition.tasks.associate { it.id to it.dependsOn.filter(known::contains).toMutableSet() }.toMutableMap()
+    val out = mutableListOf<com.hereliesaz.geministrator.domain.TaskDefinitionId>()
+    while (remaining.isNotEmpty()) {
+        val ready = ids.firstOrNull { it in remaining && remaining.getValue(it).isEmpty() }
+        if (ready == null) {
+            out += ids.filter { it in remaining }
+            break
+        }
+        out += ready
+        remaining.remove(ready)
+        remaining.values.forEach { it.remove(ready) }
     }
+    return out
 }
+
+/**
+ * The verification operations an acceptance criterion's wording calls for. Matched on whole words
+ * and base forms ("latest" is not a test, "update" is not a date), across each part of a
+ * compound criterion ("lint and test" plans both). Given/When/Then and "shall" criteria are tests.
+ */
+internal fun verificationOperationsFor(criterion: String): List<String> {
+    if (BEHAVIOUR_SPEC.containsMatchIn(criterion)) return listOf("test")
+    val operations = CRITERION_PARTS.split(criterion).flatMap { part ->
+        val words = VERIFICATION_WORD.findAll(part.lowercase()).map { verificationStem(it.value) }.toSet()
+        VERIFICATION_LEXICON.filter { (_, stems) -> stems.any(words::contains) }.map { it.first }.take(1)
+    }.distinct()
+    return operations.ifEmpty { listOf("evidence-check") }
+}
+
+/** First matching operation; kept for single-operation callers. */
+internal fun verificationOperationFor(criterion: String): String = verificationOperationsFor(criterion).first()
+
+private fun verificationStem(word: String): String = when {
+    word.endsWith("ing") && word.length > 5 -> word.dropLast(3)
+    word.endsWith("ed") && word.length > 4 -> word.dropLast(2)
+    word.endsWith("es") && word.length > 4 -> word.dropLast(2)
+    word.endsWith("s") && word.length > 3 -> word.dropLast(1)
+    else -> word
+}
+
+/** Operation -> stems that call for it, in precedence order. */
+private val VERIFICATION_LEXICON: List<Pair<String, Set<String>>> = listOf(
+    "lint" to setOf("lint", "linter", "format", "formatt", "style", "detekt", "ktlint", "eslint"),
+    "test" to setOf("test", "pass", "assert", "spec", "coverage", "junit", "pytest", "regression"),
+    "build" to setOf("build", "built", "compile", "compil", "assemble", "assembl"),
+    "health-check" to setOf("deploy", "endpoint", "health", "healthy", "respond", "serv", "uptime", "reachable"),
+    "source-verification" to setOf("source", "citation", "cite", "cit", "reference", "dated", "publication"),
+)
+private val VERIFICATION_WORD = Regex("[a-z][a-z0-9]+")
+private val CRITERION_PARTS = Regex("\\s+and\\s+|[,;]\\s*|\\s+&\\s+")
+private val BEHAVIOUR_SPEC = Regex("\\b(?:given\\b.*\\bwhen\\b.*\\bthen|the system shall|shall)\\b", RegexOption.IGNORE_CASE)

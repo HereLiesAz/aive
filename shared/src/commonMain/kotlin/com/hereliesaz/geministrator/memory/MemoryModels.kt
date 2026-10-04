@@ -326,6 +326,11 @@ data class MemoryQuery(
     val taskRunId: String? = null,
     val taskDefinitionId: String? = null,
     val roleId: String? = null,
+    /**
+     * Normalized variants of the query's words (lemmas, synonyms) added by query expansion. They
+     * count at reduced weight and never dilute the caller's own terms.
+     */
+    val expansionTerms: List<String> = emptyList(),
 ) {
     init {
         require(text.isNotBlank()) { "Memory query must not be blank" }

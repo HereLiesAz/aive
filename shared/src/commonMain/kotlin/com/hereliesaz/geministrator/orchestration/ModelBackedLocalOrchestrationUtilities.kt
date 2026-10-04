@@ -25,19 +25,25 @@ fun interface LocalOrchestrationSpecialistRuntime {
  */
 @Serializable
 internal data class ExecutionStateModelInput(
+    /** Every task in dependency order; runs without a definition follow. */
     val tasks: List<ExecutionStateTask>,
 ) {
     companion object {
         fun of(definition: WorkflowDefinition, run: WorkflowRun): ExecutionStateModelInput {
             val names = definition.tasks.associate { it.id to it.name }
+            val dependencies = definition.tasks.associate { it.id to it.dependsOn }
+            val ordered = executionOrder(definition) + run.taskRuns.keys.filter { id -> definition.tasks.none { it.id == id } }
+            val position = ordered.withIndex().associate { (i, id) -> id to i }
             return ExecutionStateModelInput(
-                run.taskRuns.map { (id, taskRun) ->
+                ordered.map { id ->
+                    val taskRun = run.taskRuns[id]
                     ExecutionStateTask(
                         name = names[id] ?: id.value,
-                        status = taskRun.status,
-                        artifacts = taskRun.artifacts.map { it.id.value },
-                        blockingCode = taskRun.blockingReason?.code,
-                        blockingMessage = taskRun.blockingReason?.message,
+                        status = taskRun?.status,
+                        artifacts = taskRun?.artifacts?.map { it.id.value }.orEmpty(),
+                        blockingCode = taskRun?.blockingReason?.code,
+                        blockingMessage = taskRun?.blockingReason?.message,
+                        dependsOn = dependencies[id].orEmpty().mapNotNull(position::get).sorted(),
                     )
                 },
             )
@@ -48,10 +54,13 @@ internal data class ExecutionStateModelInput(
 @Serializable
 internal data class ExecutionStateTask(
     val name: String,
-    val status: TaskRunStatus,
+    /** Null when the task has not been run. */
+    val status: TaskRunStatus?,
     val artifacts: List<String> = emptyList(),
     val blockingCode: String? = null,
     val blockingMessage: String? = null,
+    /** Positions in [ExecutionStateModelInput.tasks] of the tasks this one depends on (names can repeat). */
+    val dependsOn: List<Int> = emptyList(),
 )
 
 /**
@@ -162,6 +171,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 baseline.decision == ToolRouteDecision.Tool &&
                     selected != null &&
                     selected.available &&
+                    (input.providedInputs == null || input.providedInputs.containsAll(selected.requiredInputs)) &&
                     operation.isNotEmpty() &&
                     operation in selected.operationClasses &&
                     candidate.operationClass == operation &&
@@ -172,6 +182,7 @@ class GuardedModelBackedOrchestrationUtilities(
 
     override fun composeHandoff(input: HandoffInput): HandoffPacket {
         val baseline = fallback.composeHandoff(input)
+        // Warnings are structural facts of the input; the baseline's always stand.
         return infer<HandoffModelInput, HandoffPacket>(
             OrchestrationUtilityRole.HandoffComposer,
             HandoffModelInput.of(input),
@@ -186,7 +197,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 candidate.nextAction == baseline.nextAction &&
                 candidate.acceptanceCriteria.toSet() == baseline.acceptanceCriteria.toSet() &&
                 candidate.provenance.toSet() == baseline.provenance.toSet()
-        }
+        }.copy(warnings = baseline.warnings)
     }
 
     override fun evaluateEscalation(input: CapabilityAssessment): EscalationResult {
@@ -219,7 +230,7 @@ class GuardedModelBackedOrchestrationUtilities(
                 (baseline.unsatisfiedCriteria.isEmpty() ||
                     candidate.unsatisfiedCriteria.containsAll(baseline.unsatisfiedCriteria)) &&
                 completionIsAtLeastAsConservative(candidate.decision, baseline.decision)
-        }
+        }.let { result -> if (result === baseline) result else result.copy(reasonCodes = (baseline.reasonCodes + result.reasonCodes).distinct()) }
     }
 
     override fun summarizeExecution(
@@ -239,7 +250,11 @@ class GuardedModelBackedOrchestrationUtilities(
                 candidate.waitingForApprovalSteps.toSet() == baseline.waitingForApprovalSteps.toSet() &&
                 candidate.artifacts.toSet() == baseline.artifacts.toSet() &&
                 candidate.knownConstraints.toSet() == baseline.knownConstraints.toSet() &&
-                candidate.openQuestions.toSet() == baseline.openQuestions.toSet()
+                candidate.openQuestions.toSet() == baseline.openQuestions.toSet() &&
+                candidate.pendingSteps.toSet() == baseline.pendingSteps.toSet() &&
+                candidate.escalatedSteps.toSet() == baseline.escalatedSteps.toSet() &&
+                candidate.cancelledSteps.toSet() == baseline.cancelledSteps.toSet() &&
+                candidate.blockedBy == baseline.blockedBy
         }
     }
 

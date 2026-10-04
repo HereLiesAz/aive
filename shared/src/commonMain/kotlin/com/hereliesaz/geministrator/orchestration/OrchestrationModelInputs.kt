@@ -129,22 +129,27 @@ internal data class ToolRoutingModelInput(
     /** In routing order: preferenceRank, then id. */
     val capabilities: List<ToolCapability>,
     val requiredInputs: List<String>,
+    /** Null when the caller did not say; then no tool is excluded for inputs. */
+    val providedInputs: List<String>? = null,
+    /** Supporting tools exist but none has its required inputs: the answer is MissingInputs. */
+    val missingInputs: Boolean = false,
 ) {
-    fun toInput(): ToolRoutingInput = ToolRoutingInput(operationClass, capabilities, requiredInputs)
+    fun toInput(): ToolRoutingInput = ToolRoutingInput(operationClass, capabilities, requiredInputs, providedInputs)
 
     companion object {
         fun of(input: ToolRoutingInput): ToolRoutingModelInput {
             val operation = input.operationClass?.trim().orEmpty()
             val ordered = input.capabilities.sortedWith(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
+            val supporting = if (operation.isEmpty()) emptyList() else ordered.filter { it.available && operation in it.operationClasses }
+            val provided = input.providedInputs?.toSet()
+            val runnable = if (provided == null) supporting else supporting.filter { provided.containsAll(it.requiredInputs) }
             return ToolRoutingModelInput(
-                eligibleInRoutingOrder = if (operation.isEmpty()) {
-                    emptyList()
-                } else {
-                    ordered.filter { it.available && operation in it.operationClasses }.map { it.id }
-                },
+                eligibleInRoutingOrder = runnable.map { it.id },
                 operationClass = input.operationClass,
                 capabilities = ordered,
                 requiredInputs = input.requiredInputs,
+                providedInputs = input.providedInputs,
+                missingInputs = supporting.isNotEmpty() && runnable.isEmpty(),
             )
         }
     }
@@ -203,11 +208,17 @@ internal data class ContextGroupFacts(
 internal data class CapabilityAssessmentModelInput(
     val assessment: CapabilityAssessment,
     val contextLimitExceeded: Boolean,
+    /** Points from the reasoning flags (multi-step 1, codebase-wide 2, architectural 3, contradiction 3). */
+    val reasoningLoad: Int = 0,
+    /** reasoningLoad reaches the escalation threshold. */
+    val reasoningEscalates: Boolean = false,
 ) {
     companion object {
         fun of(input: CapabilityAssessment): CapabilityAssessmentModelInput = CapabilityAssessmentModelInput(
             assessment = input,
             contextLimitExceeded = input.requiredContextTokens > input.localContextLimitTokens,
+            reasoningLoad = reasoningLoad(input),
+            reasoningEscalates = reasoningLoad(input) >= ESCALATION_THRESHOLD,
         )
     }
 }
@@ -252,11 +263,17 @@ internal data class CompletionModelInput(
     val evidenceIds: List<String>,
     /** Criteria not Passed or without evidence, in order: the result's unsatisfiedCriteria. */
     val unsatisfiedCriteria: List<String>,
-    /** Decision order: anyFailed → Failed, anyBlocked → Blocked, !taskTerminal → Incomplete,
-     * anyNotRun → NeedsVerification, unsatisfied → Incomplete, else Complete. */
+    /**
+     * Over required criteria, in decision order: anyFailed → Failed, anyBlocked → Blocked,
+     * !taskTerminal → Incomplete, noRequiredCriteria → NeedsVerification, anyNotRun →
+     * NeedsVerification, anyStale → NeedsVerification, anyMissingEvidence → Incomplete, else Complete.
+     */
     val anyFailed: Boolean,
     val anyBlocked: Boolean,
     val anyNotRun: Boolean,
+    val noRequiredCriteria: Boolean = false,
+    val anyStale: Boolean = false,
+    val anyMissingEvidence: Boolean = false,
 ) {
     fun toInput(): CompletionInput = CompletionInput(objective, criteria, taskTerminal)
 
@@ -267,11 +284,14 @@ internal data class CompletionModelInput(
             taskTerminal = input.taskTerminal,
             evidenceIds = input.criteria.flatMap { it.evidenceIds }.distinct(),
             unsatisfiedCriteria = input.criteria
-                .filter { it.status != EvidenceStatus.Passed || it.evidenceIds.isEmpty() }
+                .filter { it.status != EvidenceStatus.Passed || it.evidenceIds.isEmpty() || it.stale }
                 .map { it.criterion },
-            anyFailed = input.criteria.any { it.status == EvidenceStatus.Failed },
-            anyBlocked = input.criteria.any { it.status == EvidenceStatus.Blocked },
-            anyNotRun = input.criteria.any { it.status == EvidenceStatus.NotRun },
+            anyFailed = input.criteria.any { it.required && it.status == EvidenceStatus.Failed },
+            anyBlocked = input.criteria.any { it.required && it.status == EvidenceStatus.Blocked },
+            anyNotRun = input.criteria.any { it.required && it.status == EvidenceStatus.NotRun },
+            noRequiredCriteria = input.criteria.none { it.required },
+            anyStale = input.criteria.any { it.required && it.status == EvidenceStatus.Passed && it.stale },
+            anyMissingEvidence = input.criteria.any { it.required && it.evidenceIds.isEmpty() },
         )
     }
 }
@@ -281,7 +301,7 @@ internal data class VerificationPlanningModelInput(
     val objective: String,
     /** Blank criteria and repeats dropped. */
     val acceptanceCriteria: List<String>,
-    /** One per criterion, in order: the operation its wording calls for. */
+    /** Per criterion, in order: each operation its wording calls for. */
     val criterionOperations: List<CriterionOperation>,
     val artifactKinds: Set<ArtifactKind>,
     /** Repeats dropped. */
@@ -296,7 +316,7 @@ internal data class VerificationPlanningModelInput(
             return VerificationPlanningModelInput(
                 objective = input.objective,
                 acceptanceCriteria = criteria,
-                criterionOperations = criteria.map { CriterionOperation(it, verificationOperationFor(it)) },
+                criterionOperations = criteria.flatMap { c -> verificationOperationsFor(c).map { CriterionOperation(c, it) } },
                 artifactKinds = input.artifactKinds,
                 targetPlatforms = input.targetPlatforms.distinct(),
             )

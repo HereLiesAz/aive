@@ -94,9 +94,15 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
         }
     }
 
+    // A feature shared by most of memory says little: skip stop-features, and discount the rest by
+    // how common they are (rarer shared features make stronger edges).
+    val stopFeatureCount = maxOf(STOP_FEATURE_MIN, (active.size * STOP_FEATURE_SHARE).toInt())
+    val logNodes = kotlin.math.ln(active.size.toDouble().coerceAtLeast(2.0))
+    fun rarity(sharing: Int): Float = (1.0 - 0.5 * kotlin.math.ln(sharing.toDouble()) / logNodes).toFloat().coerceIn(0.5f, 1f)
+
     groups.entries
         .asSequence()
-        .filter { it.value.size > 1 }
+        .filter { it.value.size > 1 && it.value.distinctBy { pair -> pair.first.id }.size <= stopFeatureCount }
         .sortedWith(
             compareByDescending<Map.Entry<String, MutableList<Pair<MemoryNode, Signal>>>> { entry ->
                 entry.value.maxOf { it.second.weight }
@@ -126,7 +132,7 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
                     from = first.id,
                     to = second.id,
                     relation = MemoryRelationKind.AssociatedWith,
-                    weight = minOf(leftSignal.weight, rightSignal.weight).coerceIn(0f, 1f),
+                    weight = (minOf(leftSignal.weight, rightSignal.weight) * rarity(ordered.size)).coerceIn(0f, 1f),
                     createdAtEpochMillis = nowEpochMillis,
                     metadata = mapOf(
                         "deterministic" to "true",
@@ -154,3 +160,5 @@ private fun String.memoryLexicalIdPart(): String = buildString {
 }.trim('-').take(96).ifBlank { "feature" }
 
 private const val MIN_LEXICAL_EDGE_WEIGHT = 0.50f
+private const val STOP_FEATURE_MIN = 50
+private const val STOP_FEATURE_SHARE = 0.05

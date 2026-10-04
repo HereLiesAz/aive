@@ -222,7 +222,7 @@ private fun buildUtilityPromptBlocks(
     val handoffBlock = PromptContextBlock(
         "Handoff",
         buildString {
-            appendLine("Dependency gate: ${dependencyCompletion.decision.name}")
+            appendLine("Dependency gate: ${if (dependencies.isEmpty()) "no dependencies" else dependencyCompletion.decision.name}")
             appendLine("Completed: ${handoff.completed.joinToString().ifBlank { "none" }}")
             appendLine("Unresolved: ${handoff.unresolved.joinToString().ifBlank { "none" }}")
             appendLine("Failures: ${handoff.failures.joinToString().ifBlank { "none" }}")

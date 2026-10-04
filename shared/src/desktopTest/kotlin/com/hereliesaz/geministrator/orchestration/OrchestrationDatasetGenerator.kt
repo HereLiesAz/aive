@@ -206,9 +206,11 @@ object OrchestrationDatasetGenerator {
                         operationClasses = r.some(OPERATIONS, 3).toSet(),
                         available = r.nextInt(5) != 0,
                         preferenceRank = r.nextInt(0, 5),
+                        requiredInputs = if (r.nextInt(3) == 0) r.some(INPUTS, 2).toSet() else emptySet(),
                     )
                 },
                 requiredInputs = r.some(INPUTS, 2),
+                providedInputs = if (r.nextInt(3) == 0) null else r.some(INPUTS, 4),
             ),
         )
         OrchestrationUtilityRole.HandoffComposer -> handoff(
@@ -242,12 +244,14 @@ object OrchestrationDatasetGenerator {
         OrchestrationUtilityRole.CompletionGate -> completion(
             CompletionInput(
                 objective = "${r.pick(VERBS)} the ${r.pick(NOUNS)}",
-                criteria = r.some(CRITERIA, 4).ifEmpty { listOf(r.pick(CRITERIA)) }.map { criterion ->
+                criteria = (if (r.nextInt(12) == 0) emptyList() else r.some(CRITERIA, 4).ifEmpty { listOf(r.pick(CRITERIA)) }).map { criterion ->
                     val status = r.pick(EvidenceStatus.entries)
                     CriterionEvidence(
                         criterion = criterion,
                         evidenceIds = if (status == EvidenceStatus.NotRun && r.nextBoolean()) emptyList() else r.some(EVIDENCE, 2),
                         status = status,
+                        required = r.nextInt(5) != 0,
+                        stale = status == EvidenceStatus.Passed && r.nextInt(6) == 0,
                     )
                 },
                 taskTerminal = r.nextBoolean(),
@@ -392,6 +396,7 @@ object OrchestrationDatasetGenerator {
                 objective = r.pick(VERBS),
                 roleId = null,
                 executor = TaskExecutor.TestRunner(r.pick(listOf("gradle test", "npm test", null))),
+                dependsOn = if (i > 0 && r.nextBoolean()) setOf(TaskDefinitionId("task-${r.nextInt(i)}")) else emptySet(),
             )
         }
         val definition = WorkflowDefinition(id = WorkflowDefinitionId("workflow"), name = "Workflow", tasks = tasks)
@@ -455,7 +460,10 @@ object OrchestrationDatasetGenerator {
     private val STATE_VALUES = listOf("main", "abc123", "staging", "2")
     private val QUESTIONS = listOf("Which API version?", "Is the flaky test real?", "Who owns the key?")
     private val FAILURES = listOf("compile error in Sync.kt", "timeout after 20 minutes", "HTTP 429 from provider")
-    private val CRITERIA = listOf("All unit tests pass", "Android build succeeds", "Docs updated", "No lint errors", "Wasm build succeeds", "Changelog entry added")
+    private val CRITERIA = listOf(
+        "All unit tests pass", "Android build succeeds", "Docs updated", "No lint errors", "Wasm build succeeds", "Changelog entry added",
+        "Lint and unit tests pass", "Uses the latest API", "Resources are updated", "Given a signed-in user, when they export, then a file is saved",
+    )
     private val EVIDENCE = listOf("ci-1", "ci-2", "review-1", "log-3")
     private val BLOCKERS = listOf(
         BlockingReason("MISSING_CREDENTIAL", "GitHub token not configured"),

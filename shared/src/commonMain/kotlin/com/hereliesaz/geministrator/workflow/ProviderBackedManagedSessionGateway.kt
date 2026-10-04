@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
 import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
+import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.orchestration.ContextEvidence
 import com.hereliesaz.geministrator.orchestration.ContextPackingInput
@@ -236,7 +237,13 @@ class ProviderBackedManagedSessionGateway(
         handle: ManagedSessionHandle,
         message: String,
     ): ProviderActionResult = providerOperation("Unable to message provider session ${handle.providerRunId.value}") {
-        providerFor(handle).sendMessage(handle.providerRunId, message)
+        // A user's message carries memory's cue cloud for its words; memory's own messages go as they are.
+        val outgoing = if (message.startsWith(MEMORY_MESSAGE_MARKER)) {
+            message
+        } else {
+            runCatching { memoryObserver.annotateUserMessage(handle, message) }.getOrDefault(message)
+        }
+        providerFor(handle).sendMessage(handle.providerRunId, outgoing)
     }
 
     override suspend fun approvePlan(handle: ManagedSessionHandle): ProviderActionResult =
@@ -469,7 +476,7 @@ class ProviderBackedManagedSessionGateway(
                         message = effectiveEvent.message.takeIf { it.isNotBlank() },
                     ),
                 )
-                is AgentEvent.Message -> current
+                is AgentEvent.Message, is AgentEvent.Thinking -> current
                 is AgentEvent.ArtifactProduced -> current.copy(
                     artifacts = current.artifacts.upsertArtifact(effectiveEvent.artifact),
                 )
@@ -519,7 +526,7 @@ class ProviderBackedManagedSessionGateway(
             )
             else -> Unit
         }
-        recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) }
+        recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         terminalStatus?.let { status ->
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
@@ -540,6 +547,7 @@ class ProviderBackedManagedSessionGateway(
         is AgentEvent.PlanApproved -> "approved:${runId.value}"
         is AgentEvent.Progress -> "progress:${runId.value}:${fraction}:${message}"
         is AgentEvent.Message -> "message:${runId.value}:${content}"
+        is AgentEvent.Thinking -> "thinking:${runId.value}:${content}"
         is AgentEvent.ArtifactProduced -> "artifact:${runId.value}:${artifact.identityKey()}"
         is AgentEvent.Completed -> "completed:${runId.value}"
         is AgentEvent.Failed -> "failed:${runId.value}:${reason}"

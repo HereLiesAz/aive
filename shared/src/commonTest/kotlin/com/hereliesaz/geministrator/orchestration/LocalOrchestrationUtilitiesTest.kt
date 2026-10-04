@@ -216,4 +216,119 @@ class LocalOrchestrationUtilitiesTest {
         assertTrue(plan.steps.any { it.operationClass == "test" })
         assertTrue(plan.steps.any { it.operationClass == "platform-check:Android" })
     }
+
+    @Test
+    fun objectiveIsQueriedEvenWhenSymbolsFillTheBudget() {
+        val plan = utilities.composeMemoryQueries(
+            MemoryQueryInput(objective = "Fix sync", codeSymbols = List(8) { "sym$it" }, knownEntities = listOf("Cache"), maxQueries = 4),
+        )
+        assertEquals(4, plan.queries.size)
+        assertTrue(plan.queries.any { it.reasonCode == "OBJECTIVE_CONTEXT" })
+        assertTrue(plan.queries.any { it.reasonCode == "KNOWN_ENTITY" }, "round-robin starved entities: ${plan.queries}")
+    }
+
+    @Test
+    fun fallbackAgentIsStrongerThanTheSelectedOne() {
+        val route = utilities.routeAgent(
+            AgentRoutingInput(
+                candidates = listOf(
+                    AgentRouteCandidate("a", setOf("code"), contextLimitTokens = 8_000, preferenceRank = 0),
+                    AgentRouteCandidate("b", setOf("code"), contextLimitTokens = 8_000, preferenceRank = 1),
+                    AgentRouteCandidate("c", setOf("code"), contextLimitTokens = 128_000, preferenceRank = 2),
+                ),
+            ),
+        )
+        assertEquals("a", route.selectedAgent)
+        assertEquals("c", route.fallbackAgent)
+    }
+
+    @Test
+    fun toolsMissingRequiredInputsAreNotRouted() {
+        val capabilities = listOf(
+            ToolCapability("deployer", setOf("deploy"), preferenceRank = 0, requiredInputs = setOf("credential")),
+            ToolCapability("dry-run", setOf("deploy"), preferenceRank = 1),
+        )
+        assertEquals("dry-run", utilities.routeTool(ToolRoutingInput("deploy", capabilities, providedInputs = emptyList())).tool)
+        val missing = utilities.routeTool(ToolRoutingInput("deploy", capabilities.take(1), providedInputs = listOf("branch")))
+        assertEquals(ToolRouteDecision.MissingInputs, missing.decision)
+        assertEquals(listOf("credential"), missing.requiredInputs)
+        // Unknown provided inputs skip the check, as before.
+        assertEquals("deployer", utilities.routeTool(ToolRoutingInput("deploy", capabilities)).tool)
+    }
+
+    @Test
+    fun oneSoftReasoningFlagNoLongerEscalatesButHeavyLoadDoes() {
+        assertEquals(EscalationDecision.Local, utilities.evaluateEscalation(CapabilityAssessment(requiresMultiStepReasoning = true)).decision)
+        assertEquals(
+            EscalationDecision.Escalate,
+            utilities.evaluateEscalation(CapabilityAssessment(requiresMultiStepReasoning = true, requiresCodebaseWideReasoning = true)).decision,
+        )
+        assertEquals(EscalationDecision.Escalate, utilities.evaluateEscalation(CapabilityAssessment(requiresArchitecturalDecision = true)).decision)
+    }
+
+    @Test
+    fun completionNeedsCriteriaFreshEvidenceAndIgnoresOptionalGaps() {
+        val none = utilities.evaluateCompletion(CompletionInput("Ship", emptyList(), taskTerminal = true))
+        assertEquals(CompletionDecision.NeedsVerification, none.decision)
+        assertEquals(listOf("NO_CRITERIA"), none.reasonCodes)
+        val stale = utilities.evaluateCompletion(
+            CompletionInput("Ship", listOf(CriterionEvidence("tests pass", listOf("ci-1"), EvidenceStatus.Passed, stale = true)), taskTerminal = true),
+        )
+        assertEquals(CompletionDecision.NeedsVerification, stale.decision)
+        assertTrue("STALE_EVIDENCE" in stale.reasonCodes)
+        val optional = utilities.evaluateCompletion(
+            CompletionInput(
+                "Ship",
+                listOf(
+                    CriterionEvidence("tests pass", listOf("ci-1"), EvidenceStatus.Passed),
+                    CriterionEvidence("docs updated", emptyList(), EvidenceStatus.Failed, required = false),
+                ),
+                taskTerminal = true,
+            ),
+        )
+        assertEquals(CompletionDecision.Complete, optional.decision)
+        assertTrue("OPTIONAL_UNSATISFIED" in optional.reasonCodes)
+    }
+
+    @Test
+    fun handoffWarnsWhenWorkIsOpenButNoNextActionIsGiven() {
+        val packet = utilities.composeHandoff(HandoffInput(objective = "Ship", failures = listOf("build failed")))
+        assertEquals(listOf("NEXT_ACTION_MISSING"), packet.warnings)
+    }
+
+    @Test
+    fun summaryListsEveryTaskAndWhatEachWaitingTaskIsBlockedBy() {
+        val build = TaskDefinition(TaskDefinitionId("build"), "Build", "build", null)
+        val test = TaskDefinition(TaskDefinitionId("test"), "Test", "test", null, dependsOn = setOf(build.id))
+        val deploy = TaskDefinition(TaskDefinitionId("deploy"), "Deploy", "deploy", null, dependsOn = setOf(test.id))
+        val review = TaskDefinition(TaskDefinitionId("review"), "Review", "review", null)
+        val definition = WorkflowDefinition(WorkflowDefinitionId("w"), "w", tasks = listOf(deploy, test, build, review))
+        val run = WorkflowRun(
+            id = WorkflowRunId("r"),
+            projectId = ProjectId("p"),
+            workflowDefinitionId = definition.id,
+            objective = "o",
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(
+                build.id to TaskRun(TaskRunId("b"), build.id, TaskRunStatus.Failed, assignedRoleId = null),
+                review.id to TaskRun(TaskRunId("v"), review.id, TaskRunStatus.Cancelled, assignedRoleId = null),
+            ),
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 2L,
+        )
+        val summary = utilities.summarizeExecution(definition, run)
+        assertEquals(listOf("Test", "Deploy"), summary.pendingSteps)
+        assertEquals(listOf("Review"), summary.cancelledSteps)
+        assertEquals(mapOf("Test" to "Build", "Deploy" to "Build"), summary.blockedBy)
+        assertTrue("Review" in summary.failedSteps, "failedSteps keeps cancelled for existing readers")
+    }
+
+    @Test
+    fun verificationMatchesWholeWordsAndEveryPartOfACriterion() {
+        assertEquals(listOf("lint", "test"), verificationOperationsFor("Lint and unit tests pass"))
+        assertEquals(listOf("evidence-check"), verificationOperationsFor("Uses the latest API"))
+        assertEquals(listOf("evidence-check"), verificationOperationsFor("Resources are updated"))
+        assertEquals(listOf("test"), verificationOperationsFor("Given a user, when they export, then a file is saved"))
+        assertEquals(listOf("build"), verificationOperationsFor("Android build succeeds"))
+    }
 }

@@ -131,6 +131,15 @@ sealed interface AgentEvent {
     ) : AgentEvent
 
     /**
+     * Reasoning the provider streams while it thinks, for providers that expose it (local models,
+     * APIs with visible thinking). Memory watches it for recall triggers; it is not shown as output.
+     */
+    data class Thinking(
+        override val runId: ProviderRunId,
+        val content: String,
+    ) : AgentEvent
+
+    /**
      * Provider-reported execution progress. [fraction] is normalized 0f..1f when the provider
      * exposes a real numeric value. Providers that only expose qualitative progress should leave
      * it null and still report [message].
