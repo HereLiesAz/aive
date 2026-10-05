@@ -248,7 +248,7 @@ class MemoryConsolidator(
                 continue
             }
 
-            val batch = try {
+            val validated = try {
                 manager.process(plan.packet)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -257,17 +257,26 @@ class MemoryConsolidator(
                 return failed(processing, plan, reason)
             }
 
-            if (entry.stage == MemoryConsolidationStage.Condensation && batch.size == 0) {
+            if (entry.stage == MemoryConsolidationStage.Condensation && validated.size == 0) {
                 val reason = "Condensation declined"
                 decline(processing, requireNotNull(plan.clusterKey), reason)
                 return MemoryConsolidationResult.Declined(entry.id, reason)
             }
 
             try {
-                validateBatch(entry.stage, plan, batch)
+                validateBatch(entry.stage, plan, validated)
             } catch (failure: Throwable) {
                 val reason = failure.message ?: "Invalid memory mutation batch"
                 return failed(processing, plan, reason)
+            }
+
+            // Tag clouds are the engine's, not the clerk's: every new noun/verb tag gets its WordNet
+            // related-word cloud once, here, whichever clerk engine named it.
+            val batch = if (entry.stage == MemoryConsolidationStage.Tags) {
+                val wordNet = runCatching { MemoryLanguageResources.get().wordNet }.getOrNull()
+                validated.copy(nodesToAdd = MemoryTagCloud.withClouds(validated.nodesToAdd, wordNet))
+            } else {
+                validated
             }
 
             while (true) {
@@ -949,7 +958,8 @@ private fun MemoryNode.asWorkItem() = MemoryWorkItem(
     id = id.value,
     kind = "node:${kind.name}",
     text = text,
-    metadata = metadata + mapOf(
+    // Tag clouds serve recall only; they would crowd a clerk's packet budget.
+    metadata = (metadata - TAG_CLOUD) + mapOf(
         "salience" to salience.toString(),
         "confidence" to confidence.toString(),
         "sourceEpisodeIds" to sourceEpisodeIds.joinToString(",") { it.value },
