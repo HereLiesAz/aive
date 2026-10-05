@@ -904,6 +904,29 @@ def role_release(slug):
 code(r'''
 started = time.time()
 scores, merged, merged_roles, base, adapters, new_roles = {}, None, [], None, {}, []
+if UPLOAD == "auto":
+    # Publish when the GITHUB_TOKEN secret is there, so a run needs no edit beyond its secrets.
+    try:
+        UPLOAD = bool(github_token())
+    except Exception as missing:
+        UPLOAD = False
+        print(f"UPLOAD = \"auto\": no GITHUB_TOKEN ({missing}); keeping the release in the output folder")
+PUBLISHED = set()  # role releases already uploaded (and mirrored) during this run
+
+def role_release_files(slug):
+    """Write [slug]'s one-role release, exactly as its role notebook would publish it; (tag, paths)."""
+    role_dir = ASSETS / role_tag(slug)
+    write_catalog(base=base, adapters={slug: adapters[slug]}, scores={slug: scores[slug]}, into=role_dir, tag=role_tag(slug))
+    return role_tag(slug), sorted(role_dir.glob("*.safetensors")) + [role_dir / "catalog.json"]
+
+def publish_role(slug):
+    """Publish one passing role as soon as it passes, so a later failure or timeout never loses it:
+    a rerun finds the release and reuses it instead of retraining."""
+    if not UPLOAD:
+        return
+    tag, paths = role_release_files(slug)
+    upload_and_mirror(paths, tag, slug)
+    PUBLISHED.add(slug)
 
 if MODE in ("multitask", "both"):
     mt = state.setdefault("multitask", {})
@@ -955,16 +978,18 @@ if MODE in ("adapters", "both"):
         )
         scores.setdefault(slug, {})["adapters"] = {"adapter": role["adapterGate"], "onnxInt8": role["onnxGate"]}
         new_roles.append(slug)
+        publish_role(slug)
     print("adapter roles:", sorted(adapters) or "none", "| newly released:", new_roles or "none")
 
 # catalog.json lists every passing role in every shape: register it. Each new adapter is also its own
-# release with a one-role catalog, exactly as its role notebook would publish it.
+# release with a one-role catalog, exactly as its role notebook would publish it; with UPLOAD, each
+# was already published the moment it passed, so only the rest are left for the upload cell.
 catalog = write_catalog(merged, merged_roles, base, adapters, scores)
 RELEASES = [(RELEASE_TAG, [ASSETS / ASSET_NAME, ASSETS / "catalog.json"], None)] if merged else []
 for slug in new_roles:
-    role_dir = ASSETS / role_tag(slug)
-    write_catalog(base=base, adapters={slug: adapters[slug]}, scores={slug: scores[slug]}, into=role_dir, tag=role_tag(slug))
-    RELEASES.append((role_tag(slug), sorted(role_dir.glob("*.safetensors")) + [role_dir / "catalog.json"], slug))
+    tag, paths = role_release_files(slug)
+    if slug not in PUBLISHED:
+        RELEASES.append((tag, paths, slug))
 print(f"catalog: {len(catalog['specialists'])} roles; assets in {ASSETS}; done in {(time.time() - started) / 60:.1f} min")
 ''')
 
@@ -982,7 +1007,8 @@ if UPLOAD:
     for tag, paths, variation in RELEASES:
         upload_and_mirror(paths, tag, variation)
     if not RELEASES:
-        print("nothing new passed: nothing to upload")
+        published = globals().get("PUBLISHED")  # the base notebook publishes nothing early
+        print("nothing left to upload" + (f" ({len(published)} published as they passed)" if published else ""))
 else:
     export_root = Path("/kaggle/working/orchestration-v3-output")
     if export_root.exists():

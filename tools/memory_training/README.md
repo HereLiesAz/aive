@@ -90,8 +90,10 @@ and a failing one costs only its own rerun.
 `notebooks/all.ipynb` trains every clerk in one session and `notebooks/<clerk>.ipynb` one clerk; both
 are the same code (`tools/orchestration_training/make_notebook.py`) and publish each clerk the same
 way. They share one work folder (`/kaggle/working/aive-memory`), so in one session each resumes from
-what the others left. A clerk whose `memory-<clerk>-v1` release already exists is reused, not
-retrained (`REUSE_RELEASED`).
+what the others left. Each clerk is published (GitHub release, then Kaggle mirror) the moment it
+passes, not at the end of the run, so a timeout or a later failure never loses it. A clerk whose
+`memory-<clerk>-v1` release already exists is reused, not retrained (`REUSE_RELEASED`), so a rerun
+picks up where the last one stopped.
 
 `UPLOAD = "auto"` (the default in these notebooks) publishes when a `GITHUB_TOKEN` secret is set
 and `KAGGLE_MIRROR = "auto"` mirrors when a `KAGGLE_KEY` secret is set, so a run needs no edit
