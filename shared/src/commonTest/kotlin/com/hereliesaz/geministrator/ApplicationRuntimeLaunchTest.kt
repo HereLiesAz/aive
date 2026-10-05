@@ -14,8 +14,36 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import kotlinx.coroutines.delay
 
 class ApplicationRuntimeLaunchTest {
+    @Test
+    fun launchesRecordContinuationAndMergeParentsAndStartRootsWithout() = runBlocking<Unit> {
+        val persistence = InMemoryWorkflowPersistence()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val runtime = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            suspend fun launch(objective: String, parents: List<WorkflowRunId> = emptyList()): WorkflowRunId {
+                delay(3) // run ids are millisecond-stamped
+                runtime.launchStarterWorkflow("Lineage", objective, continuesWorkflowRunIds = parents)
+                return assertIs<ApplicationRuntimeState.Live>(runtime.state.value).presentation.run.id
+            }
+            val a = launch("Root A")
+            val b = launch("Root B")
+            assertTrue(persistence.runs.get(a)!!.parentWorkflowRunIds.isEmpty(), "a plain launch is a root")
+            val continuation = launch("Continue A", listOf(a, a))
+            assertEquals(listOf(a), persistence.runs.get(continuation)!!.parentWorkflowRunIds)
+            val merge = launch("Merge A and B", listOf(b, a))
+            assertEquals(listOf(b, a), persistence.runs.get(merge)!!.parentWorkflowRunIds)
+            assertFailsWith<IllegalArgumentException> { runtime.launchStarterWorkflow("Lineage", "Ghost", continuesWorkflowRunIds = listOf(WorkflowRunId("missing"))) }
+        } finally {
+            scope.cancel()
+        }
+    }
+
     @Test
     fun starterLaunchPersistsRepositoryObjectiveAndImplementationPlanGate() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()

@@ -35,6 +35,7 @@ import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -72,7 +73,8 @@ fun ControlRoom(
     onDestinationSelected: (ControlRoomDestination) -> Unit,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
@@ -143,6 +145,7 @@ fun ControlRoom(
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
+                onLoadLaunchableRuns = onLoadLaunchableRuns,
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
@@ -206,6 +209,7 @@ fun ControlRoom(
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
+                onLoadLaunchableRuns = onLoadLaunchableRuns,
                     onApproveTask = onApproveTask,
                     onRejectPlan = onRejectPlan,
                     onResolveEscalation = onResolveEscalation,
@@ -361,7 +365,8 @@ private fun MainDestination(
     destination: ControlRoomDestination,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
@@ -418,6 +423,7 @@ private fun MainDestination(
                 selectedTaskId = selectedTaskId,
                 onTaskSelected = onTaskSelected,
                 onLaunchWorkflow = onLaunchWorkflow,
+                onLoadLaunchableRuns = onLoadLaunchableRuns,
                 projectFileService = projectFileService,
                 onImportProjectFile = onImportProjectFile,
                 onRecoverFromCorruption = onRecoverFromCorruption,

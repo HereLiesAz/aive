@@ -144,6 +144,16 @@ the same for every clerk engine, and none of it judges which memory is right.
   workflow's bank) and a `Deliberation` node citing the memories (and naming the evidence) it
   considered (`Deliberates`). It may name the cited memory it judged correct (`chosen`), or conclude
   "unresolved" (`chosen = null`). It is never sectioned or condensed itself.
+- **Agents record deliberations from their session** with the `/deliberate` session command, one per
+  line of their thinking or output:
+  `/deliberate memory-node:<a> memory-node:<b> chosen=memory-node:<a> | <conclusion> | evidence=<what was considered>`
+  (`MemoryDeliberationCommand`). The ids before the first `|` are the memories cited; `chosen=` names
+  the one judged correct (it is cited too), `chosen=none` or no `chosen=` records "unresolved". The
+  controller calls `MemoryTool.deliberate` in the session's workflow bank, scoped to its project,
+  workflow and task run, and answers on the memory channel with the deliberation's id or why it was not
+  recorded (an unknown id, no conclusion). Agents are told the command in the one-time memory protocol,
+  and every divergent recall hit carries a ready template citing it and its partners
+  (`⚖ to deliberate: …`); a resolved memory no longer shows one.
 
 ### Resolved contrasts: deliberation, then absorption
 
@@ -232,6 +242,30 @@ Memory is organised like version-control history.
   absorption all operate within the workflow's lineage bank and write only its own records.
 - **Add-only.** Workflows, parent links and project expansions are appended (`MemoryLineage`) and
   never removed; a parent link that would make the graph cyclic is refused.
+
+**Which actions set parents.** `WorkflowRun.parentWorkflowRunIds` is set when the run is created
+(`WorkflowRunFactory.create`, `WorkflowLaunchService.launch`) and never changed afterwards:
+
+| Action | Parents | Kind |
+|---|---|---|
+| A plain launch (starter, orchestrated, saved workflow) | none | new root |
+| A launch given `continuesWorkflowRunIds = [r]` (`launchStarterWorkflow`, `launchOrchestratedWorkflow`, `launchSavedWorkflow`) | `[r]` | continuation |
+| A launch given two or more runs in `continuesWorkflowRunIds` | those runs, first = primary, duplicates collapsed | merge |
+| A nested workflow node starting its child run (`WorkflowRunNestedWorkflowClient`) | the dispatching run | continuation |
+| A Hall Monitor solution trial (counterfactual of a paused run) | the paused source run | continuation |
+| A plan repair after a failure escalation | the run's own parents, unchanged (the same run, rebuilt) | — |
+| Resume after restart, task retry, approve/reject, pause/resume | unchanged (the same run) | — |
+| An inlined sub-workflow (`WorkflowComposer.inline`) | none: it becomes part of the parent's definition and runs in the parent run | — |
+
+A launch naming a run that is not stored is refused. `ProviderTaskRequestFactory` and
+`HallMonitorGovernanceService` copy the run's parents into
+`AgentOrchestrationContext.parentWorkflowRunIds`, and memory registers them in `MemoryLineage` when the
+run's first session starts; a second parent makes the run a merge and its contrasts are marked then.
+In the app, the launch form's **Lineage** choice sets them: **New** (none), **Continue a run** (pick
+one earlier run) or **Combine runs** (pick two or more, in the order picked; the first is primary).
+The run list shows each run's workflow, date, status and project (`loadLaunchableRuns`,
+`LaunchLineageState`). A finished run's view also offers **Continue this run**, which asks for the
+next objective and launches a continuation in the same project.
 
 ```mermaid
 flowchart LR
@@ -477,6 +511,16 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
   episode is refused. Memory can be switched off or its consolidation paused.
 - **Raw history:** how much raw session context is held, and the retention setting (keep all, cap by
   size, cap by age).
+- **Summaries:** the summarizer's cost for the selected bank (`MemorySummaryMetrics`: summaries, tree
+  nodes, pair summaries, model and embedding calls with failures, time, use by engine, and pair-summary
+  violations, a link recalled before its summary existed), counted since the bank's layer was last
+  built. Choose a memory to see its summary-tree levels (root first), every link with its pair
+  summary (or that it is still pending), and its explicit history (`MemoryLayerController.history`:
+  what it replaced and was condensed from). Each stored episode can open its whole summary tree,
+  indented by level.
+- **Projects:** every project with workflow banks, its expansions, a control to expand it to include
+  another project (`MemoryLayerController.expandProject`, a reason is required; add-only), and its own
+  raw retention (`rawRetentionByProject`: global, keep all, cap by size, cap by age).
 
 Every platform stores each workflow's bank in its own SQLite database through `SqlMemoryStore`. On
 the web each bank is its own database in the Origin Private File System, opened in its own worker

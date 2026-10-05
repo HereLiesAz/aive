@@ -23,7 +23,10 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     objective: String = definition.description ?: definition.name,
     repository: RepositoryRef? = existingProject?.repository,
     supplementalRoles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
+    /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
+    continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
 ) {
+    val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
     val cleanObjective = objective.trim()
     require(cleanProjectName.isNotEmpty()) { "Project name is required" }
@@ -60,6 +63,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         objective = cleanObjective,
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+        parentWorkflowRunIds = parents,
     )
     loadLatest()
 }

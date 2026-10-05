@@ -60,6 +60,7 @@ class ProviderTaskRequestFactoryTest {
             taskRuns = mapOf(taskId to taskRun),
             createdAtEpochMillis = 1L,
             updatedAtEpochMillis = 1L,
+            parentWorkflowRunIds = listOf(WorkflowRunId("earlier-a"), WorkflowRunId("earlier-b")),
         )
         val surfaces = listOf(
             AiveRoleSurfaceEnvelope(
@@ -91,6 +92,8 @@ class ProviderTaskRequestFactoryTest {
         val block = request.promptContext.dynamicContext.single { it.label == "Attached role surfaces" }
         assertTrue(block.content.contains("\"customers\""))
         assertTrue(block.content.contains("\"Ada\""))
+        // A merged run's parents reach memory through the orchestration context.
+        assertEquals(listOf(WorkflowRunId("earlier-a"), WorkflowRunId("earlier-b")), request.orchestrationContext.parentWorkflowRunIds)
     }
 
     @Test
