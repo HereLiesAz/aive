@@ -147,6 +147,25 @@ class EmbeddingAssociationLinkerMicroAgent(
         return MemoryMutationBatch(edgesToAdd = edges)
     }
 
+    /** Embeddings of [texts] with this linker's model (cached like association inputs). */
+    suspend fun embedTexts(texts: List<String>): List<List<Float>> {
+        if (texts.isEmpty()) return emptyList()
+        val artifact = selectArtifact()
+        val keys = texts.map { EmbeddingCacheKey(model.modelId, artifact.artifactId, it) }
+        val missing = keys.indices.filter { keys[it] !in embeddingCache }.distinctBy { texts[it] }
+        val fresh = HashMap<String, List<Float>>()
+        if (missing.isNotEmpty()) {
+            val result = runtime.embed(MemoryEmbeddingInferenceRequest(model = model, artifact = artifact, texts = missing.map { texts[it] }))
+            require(result.vectors.size == missing.size) { "${model.modelId} returned ${result.vectors.size} embeddings for ${missing.size} inputs" }
+            result.vectors.forEachIndexed { i, vector ->
+                require(vector.isNotEmpty()) { "${model.modelId} returned an empty embedding" }
+                putCached(keys[missing[i]], vector)
+                fresh[texts[missing[i]]] = vector
+            }
+        }
+        return keys.map { key -> fresh[key.text] ?: embeddingCache.getValue(key) }
+    }
+
     private fun putCached(key: EmbeddingCacheKey, vector: List<Float>) {
         embeddingCache.remove(key)
         embeddingCache[key] = vector.toList()

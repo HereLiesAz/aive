@@ -125,6 +125,16 @@ internal fun MemoryNode.sizeState(weight: Double = 1.0): MemorySizeState = Memor
     weight,
 )
 
+/**
+ * Existing measures joined by the complementary rule: salience with associative strength, scaled by
+ * confidence (see [MEMORY_LIFESPAN_PASSES]). Floored so no contributor vanishes from an average.
+ */
+internal fun memoryContributorWeight(salience: Double, confidence: Double, strength: Double): Double =
+    (confidence * memoryJoin(salience, strength)).coerceAtLeast(MIN_CONTRIBUTOR_WEIGHT)
+
+/** The complementary rule used to join two 0..1 measures: 1 − (1 − a)(1 − b). */
+internal fun memoryJoin(a: Double, b: Double): Double = 1 - (1 - a.coerceIn(0.0, 1.0)) * (1 - b.coerceIn(0.0, 1.0))
+
 /** The contributors' curve states in order of arrival, each with its memory-level weight. */
 internal fun MemorySnapshot.contributorStates(ids: Collection<MemoryNodeId>): List<MemorySizeState> {
     val nodesById = nodes.associateBy(MemoryNode::id)
@@ -136,8 +146,7 @@ internal fun MemorySnapshot.contributorStates(ids: Collection<MemoryNodeId>): Li
         // includes Hebbian co-recall links), combined with the stored salience by the same
         // complementary rule, scaled by confidence (derivation fidelity).
         val strength = accumulateAssociationEvidence(evidence.filter { it.from == node.id || it.to == node.id }).toDouble()
-        val weight = node.confidence * (1 - (1 - node.salience) * (1 - strength))
-        node.sizeState(weight.coerceAtLeast(MIN_CONTRIBUTOR_WEIGHT))
+        node.sizeState(memoryContributorWeight(node.salience.toDouble(), node.confidence.toDouble(), strength))
     }
 }
 

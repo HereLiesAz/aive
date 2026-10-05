@@ -120,6 +120,19 @@ enum class MemoryNodeKind {
      * never condensed, never supersedes anything.
      */
     Deliberation,
+
+    /**
+     * One node of a banked episode's top-down summary tree ([MemorySummaryTree]): the root summarizes
+     * the whole episode, an interior node one segment, a leaf one paragraph verbatim. Engine-owned;
+     * never a ranked recall result, never condensed; recall shows a hit's tree levels with it.
+     */
+    Outline,
+
+    /**
+     * The summary of two linked memories together, attached to the link (`pairOf` = the edge id).
+     * Engine-owned, written when the link is consolidated; recall shows it with the link.
+     */
+    PairSummary,
     ;
 
     /** The six kinds the clerk pipeline produces; the others are engine-owned records. */
@@ -203,6 +216,9 @@ enum class MemoryRelationKind {
      * memory, written to the reading workflow's bank; counting them gives the memory's access count.
      */
     Recalled,
+
+    /** Summary tree: parent -> child ([MemoryNodeKind.Outline]). Engine-owned; not ranking evidence. */
+    Outlines,
 }
 
 /**
@@ -475,6 +491,25 @@ data class MemoryRecallHit(
      * such a memory as a single memory; this history fades from rendering as access grows.
      */
     val resolution: MemoryResolvedHistory? = null,
+    /**
+     * The summary of each link between this hit and a memory delivered with it (another hit or a
+     * divergent partner), written when the link was consolidated ([MemoryPairSummaries]).
+     */
+    val pairSummaries: List<MemoryPairSummary> = emptyList(),
+    /**
+     * The hit's place in its episode's summary tree, root first, down to the deepest summary above
+     * the paragraph it came from ([MemorySummaryTree]); empty when its episode has no tree.
+     */
+    val outline: List<MemoryNode> = emptyList(),
+)
+
+/** A link delivered with a recall hit and the summary of its two memories together. */
+@Serializable
+data class MemoryPairSummary(
+    val edgeId: MemoryEdgeId,
+    val relation: MemoryRelationKind,
+    val partner: MemoryNodeId,
+    val summary: MemoryNode,
 )
 
 @Serializable

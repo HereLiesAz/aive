@@ -19,7 +19,11 @@ class AgentMemoryLayer private constructor(
     private val consolidator: MemoryConsolidator?,
     private val programmaticAssociator: MemoryProgrammaticAssociator,
     private val lexicalAssociator: MemoryLexicalAssociator,
+    private val summarizer: MemorySummarizerChain,
 ) {
+    /** Summarizer cost: model and embedding calls, time, per-engine counts, pair-summary violations. */
+    val summaryMetrics: MemorySummaryMetrics get() = summarizer.metrics
+
     suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
         absorbDeliberations(nowEpochMillis)
         val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
@@ -27,7 +31,10 @@ class AgentMemoryLayer private constructor(
             while (programmaticAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
             while (lexicalAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
         }
-        return result
+        // Pair summaries for links made so far, bounded per pass; the remainder carries over.
+        if (consolidator == null) return result
+        val pairs = MemoryPairSummaries.step(store, nowEpochMillis, summarizer)
+        return if (result == MemoryConsolidationResult.Idle && pairs > 0) MemoryConsolidationResult.PairSummaries(pairs) else result
     }
 
     /**
@@ -84,20 +91,22 @@ class AgentMemoryLayer private constructor(
             policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
             maxChunkChars: Int = 6_000,
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
+            summarizer: MemorySummarizerChain = MemorySummarizerChain(),
         ): AgentMemoryLayer {
             val queue = MemoryConsolidationQueue(
                 store,
                 minOf(maxChunkChars, policy.maxPacketChars),
             )
-            val graphTool = GraphMemoryTool(store, queue)
+            val graphTool = GraphMemoryTool(store, queue, summarizer)
             return AgentMemoryLayer(
                 store = store,
                 tool = LexicalMemoryTool(graphTool, lexicon),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
-                consolidator = manager?.let { MemoryConsolidator(store, it, policy) },
+                consolidator = manager?.let { MemoryConsolidator(store, it, policy, summarizer) },
                 programmaticAssociator = MemoryProgrammaticAssociator(store),
                 lexicalAssociator = MemoryLexicalAssociator(store, lexicon),
+                summarizer = summarizer,
             )
         }
 
@@ -128,8 +137,22 @@ class AgentMemoryLayer private constructor(
                 policy = constrainedPolicy,
                 maxChunkChars = minOf(maxChunkChars, constrainedPolicy.maxPacketChars),
                 lexicon = lexicon,
+                summarizer = summarizerChainFor(agents),
             )
         }
+
+        /**
+         * The summarizer chain the [agents] support: the SummarySynthesizer clerk when it is a local
+         * model (never a programmatic or hosted one), and the AssociationLinker's embedder.
+         */
+        fun summarizerChainFor(agents: Collection<MemoryMicroAgent>): MemorySummarizerChain = MemorySummarizerChain(
+            model = agents.firstOrNull {
+                it.role == MemoryMicroAgentRole.SummarySynthesizer && it !is ProgrammaticMemoryMicroAgent && it.model.localOnly
+            }?.let(::ClerkAbstractiveSummarizer),
+            embedder = agents.filterIsInstance<EmbeddingAssociationLinkerMicroAgent>().firstOrNull()?.let { linker ->
+                MemoryTextEmbedder { texts -> linker.embedTexts(texts) }
+            },
+        )
 
         fun createDefault(
             manager: MemoryManagerAgent? = null,

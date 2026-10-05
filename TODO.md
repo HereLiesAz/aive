@@ -121,6 +121,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 ## P1 — Persistence and recovery
 
 - [ ] Memory lineage: set `WorkflowRun.parentWorkflowRunIds` when the app creates a run that continues or merges earlier runs (run creation in `ApplicationRuntime`/`ApplicationRuntimeOrchestration`; nothing sets it yet, so every run is a root). Memory reads it from `AgentOrchestrationContext.parentWorkflowRunIds` (`ProviderTaskRequestFactory`, `HallMonitorGovernanceService`).
+- [x] Memory: top-down summary tree per banked episode and a pair summary for every link (on-device summarizer chain: local model clerk, MiniLM centroid, LexRank with cue/position/heading signals, Luhn), bounded per consolidation pass with a recall-time safety net counted as a violation.
+- [ ] Memory: show the summary tree and pair summaries on the Memory screen, and surface `MemorySummaryMetrics` (model calls, time, pair-summary violations) there.
 - [ ] Memory: UI for project expansion (`MemoryLayerController.expandProject`), per-project raw retention (`rawRetentionByProject`), the explicit history query (`MemoryLayerController.history`) and agent access to `MemoryTool.deliberate(chosen = …)`.
 - [ ] Memory: verify the per-bank web worker (`shared/memory-worker/memory.worker.js` named `bank-*`, one OPFS pool per bank) in a browser, and the one-time split of the old shared store on Android, desktop and web.
 
