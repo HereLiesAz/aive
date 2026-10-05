@@ -14,3 +14,14 @@ class DeferredMemoryStore(private val store: Deferred<MemoryStore>) : MemoryStor
 
     override suspend fun replace(snapshot: MemorySnapshot) = store.await().replace(snapshot)
 }
+
+/** Project memory banks that are still opening; every call waits for them. */
+fun deferredMemoryBanks(banks: Deferred<MemoryBanks>): MemoryBanks = MemoryBanks(
+    openBank = { projectId -> banks.await().store(projectId) },
+    registry = object : MemoryBankRegistry {
+        override suspend fun known(): Set<String> = banks.await().known().toSet()
+        override suspend fun add(projectId: String) { banks.await().store(projectId) }
+        override suspend fun migrationReport(): MemoryBankMigrationReport? = banks.await().migrationState.migrationReport()
+        override suspend fun recordMigration(report: MemoryBankMigrationReport) = banks.await().migrationState.recordMigration(report)
+    },
+)

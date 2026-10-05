@@ -109,6 +109,7 @@ internal fun buildProviderTaskRequest(
             workflowDefinitionId = definition.id,
             taskDefinitionId = task.id,
             roleId = role.id,
+            parentWorkflowRunIds = run.parentWorkflowRunIds,
         ),
     )
 }

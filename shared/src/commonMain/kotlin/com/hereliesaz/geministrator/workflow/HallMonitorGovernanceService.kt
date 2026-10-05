@@ -294,6 +294,7 @@ class HallMonitorGovernanceService(
                 workflowRunId = run.id,
                 workflowDefinitionId = run.workflowDefinitionId,
                 roleId = role.id,
+                parentWorkflowRunIds = run.parentWorkflowRunIds,
             ),
         )
 

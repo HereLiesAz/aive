@@ -170,7 +170,8 @@ class QueuedMemorySessionObserver(
             MemorySessionEnvelope(
                 sourceSessionId = handle.providerRunId.value,
                 projectId = context.projectId?.value,
-                workflowRunId = context.workflowRunId?.value ?: fallbackWorkflowRunId,
+                // The workflow whose bank this session's memory goes to (a session outside any workflow is its own).
+                workflowRunId = memoryWorkflowOf(request, handle.providerRunId.value),
                 workflowDefinitionId = context.workflowDefinitionId?.value,
                 taskRunId = request.taskRunId.value,
                 taskDefinitionId = context.taskDefinitionId?.value,
@@ -193,6 +194,17 @@ class QueuedMemorySessionObserver(
         }
     }
 }
+
+/**
+ * The workflow a session's memory belongs to: its workflow run (from the orchestration context, else
+ * the prompt cache namespace), or, outside any workflow, the session itself as a root workflow.
+ */
+fun memoryWorkflowOf(request: AgentTaskRequest, sessionId: String? = null): String = memoryWorkflowOf(
+    request.orchestrationContext.workflowRunId?.value
+        ?: request.promptContext.cacheNamespace?.substringBefore(':')?.takeIf(String::isNotBlank),
+    request.taskRunId.value,
+    sessionId,
+)
 
 internal const val MEMORY_RECALL_PROMPT_LABEL: String = "Relevant memory"
 

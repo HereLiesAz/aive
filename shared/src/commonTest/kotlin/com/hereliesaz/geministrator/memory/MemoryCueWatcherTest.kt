@@ -12,6 +12,8 @@ import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -55,6 +57,8 @@ class MemoryCueWatcherTest {
         MemoryConsolidationQueue(store).enqueueSession(
             MemorySessionEnvelope(
                 "s1",
+                // agent-1 runs outside any workflow, so its session is its own workflow.
+                workflowRunId = "session:agent-1",
                 userPrompt = "Move the memory store off JSON settings.",
                 parts = listOf(
                     MemorySessionPart(
@@ -67,7 +71,7 @@ class MemoryCueWatcherTest {
             ),
         )
         val controller = MemoryLayerController(
-            store = store,
+            banks = MemoryBanks.inMemory(mapOf("session:agent-1" to store)),
             settingsStore = MemoryLayerSettingsStore(MapSettings()),
             engineProvider = object : MemoryEngineProvider {},
             scope = CoroutineScope(Dispatchers.Unconfined),
@@ -100,13 +104,14 @@ class MemoryCueWatcherTest {
         MemoryConsolidationQueue(store).enqueueSession(
             MemorySessionEnvelope(
                 "s1",
+                workflowRunId = "wf-keys",
                 userPrompt = "Fix the keystore signing for the release build.",
                 parts = listOf(MemorySessionPart(MemorySourceKind.AgentNote, "Agent", "The keystore password moved to the CI secrets; signing reads KEYSTORE_PASSWORD.")),
                 closedAtEpochMillis = 1L,
             ),
         )
         val controller = MemoryLayerController(
-            store = store,
+            banks = MemoryBanks.inMemory(mapOf("wf-keys" to store)),
             settingsStore = MemoryLayerSettingsStore(MapSettings()),
             engineProvider = object : MemoryEngineProvider {},
             scope = CoroutineScope(Dispatchers.Unconfined),
@@ -116,10 +121,17 @@ class MemoryCueWatcherTest {
         controller.setDefaultAttentionLevel(1f)
         // A message typed into a running session carries its cloud.
         val handle = ManagedSessionHandle(TaskRunId("agent-2"), AgentProviderId("p"), ProviderRunId("r"))
+        controller.observer.onSessionStarted(
+            handle,
+            AgentTaskRequest(TaskRunId("agent-2"), "Release", "", emptyList(), orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-keys"))),
+        )
         val annotated = controller.observer.annotateUserMessage(handle, "What happened with the keystore?")
         assertTrue(annotated.startsWith("What happened with the keystore?") && "$MEMORY_MESSAGE_MARKER #" in annotated, annotated)
         // The task prompt carries one in its starting context.
-        val request = AgentTaskRequest(TaskRunId("agent-3"), "Check the keystore signing", "", emptyList())
+        val request = AgentTaskRequest(
+            TaskRunId("agent-3"), "Check the keystore signing", "", emptyList(),
+            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-keys")),
+        )
         val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
         assertTrue(blocks.any { it.label == "Memory" && it.content.startsWith("$MEMORY_MESSAGE_MARKER #") }, "$blocks")
     }

@@ -77,6 +77,24 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         style = AzphaltType.body,
         color = Azphalt.currentGround.onPage,
     )
+    // Every workflow run has its own memory bank (reading through its ancestors'); this screen shows one at a time.
+    val knownBanks by controller.knownBanks.collectAsState()
+    val selectedBank by controller.selectedBank.collectAsState()
+    if (knownBanks.isEmpty()) {
+        Text("No workflow has a memory bank yet.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+    } else {
+        Text("Workflow memory bank", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            knownBanks.forEach { bank ->
+                AzphaltPill(
+                    bank,
+                    "memory-bank-$bank",
+                    selected = bank == (selectedBank ?: knownBanks.first()),
+                    onClick = { scope.launch { controller.selectBank(bank) } },
+                )
+            }
+        }
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
             if (settings.enabled) "Memory: on" else "Memory: off",

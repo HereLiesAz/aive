@@ -60,7 +60,7 @@ import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
-import com.hereliesaz.geministrator.memory.desktopSqlMemoryStore
+import com.hereliesaz.geministrator.memory.desktopSqlMemoryBanks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -100,9 +100,12 @@ fun main() {
     val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val memoryModelInstaller = DesktopMemoryModelInstaller(httpClient)
     val memorySessions = DesktopOrtMemorySessionManager()
+    val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage(com.russhwolf.settings.Settings())
     val memoryLayer = MemoryLayerController(
-        store = desktopSqlMemoryStore(),
+        // One SQLite database per workflow run's memory bank; lineage and projects in Settings.
+        banks = kotlinx.coroutines.runBlocking { desktopSqlMemoryBanks(memoryLineage) },
         settingsStore = MemoryLayerSettingsStore.createDefault(),
+        lineage = memoryLineage,
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
         localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),

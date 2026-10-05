@@ -99,7 +99,8 @@ class GraphMemoryTool(
                 text = text,
                 sourceEpisodeIds = setOf(episodeId),
                 createdAtEpochMillis = request.deliberatedAtEpochMillis,
-                metadata = mapOf("cites" to request.citedNodeIds.joinToString(",") { it.value }),
+                metadata = mapOf("cites" to request.citedNodeIds.joinToString(",") { it.value }) +
+                    listOfNotNull(request.chosen?.let { DELIBERATION_CHOSEN to it.value }),
             )
             val edges = request.citedNodeIds.distinct().map { cited ->
                 MemoryEdge(
@@ -264,6 +265,14 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
             .distinctBy(MemoryNode::id)
             .toList()
 
+    /** The resolved-contrast history of a current version ([MemoryDeliberationAbsorber]), with its access count. */
+    fun resolutionFor(node: MemoryNode): MemoryResolvedHistory? {
+        val deliberation = node.metadata[RESOLVES_DELIBERATION]?.let { nodesById[MemoryNodeId(it)] } ?: return null
+        val notChosen = node.metadata[NOT_CHOSEN].orEmpty().split(',').filter(String::isNotBlank).mapNotNull { nodesById[MemoryNodeId(it)] }
+        val accessCount = snapshot.edges.count { it.relation == MemoryRelationKind.Recalled && it.to == node.id }
+        return MemoryResolvedHistory(deliberation, notChosen, accessCount)
+    }
+
     /** Deliberations citing [nodeId] or any of its divergent partners ("has deliberations"). */
     fun deliberationsFor(nodeId: MemoryNodeId): List<MemoryNode> =
         (listOf(nodeId) + conflicts[nodeId].orEmpty())
@@ -326,6 +335,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
                 score = score,
                 conflicts = if (query.includeConflicts) conflictsFor(node.id) else emptyList(),
                 deliberations = if (query.includeConflicts) deliberationsFor(node.id) else emptyList(),
+                resolution = resolutionFor(node),
             )
         }
 
@@ -654,6 +664,7 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
     MemoryRelationKind.Attests,
     MemoryRelationKind.VariantOf,
     MemoryRelationKind.Deliberates,
+    MemoryRelationKind.Recalled,
     -> false
 }
 
