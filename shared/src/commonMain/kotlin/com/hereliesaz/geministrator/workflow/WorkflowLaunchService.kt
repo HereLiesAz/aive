@@ -24,6 +24,8 @@ class WorkflowLaunchService(
         objective: String,
         nowEpochMillis: Long,
         taskRunIdFactory: (TaskDefinitionId) -> TaskRunId,
+        /** Runs the new run continues (one) or merges (several); empty for a root run. */
+        parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     ): Pair<WorkflowDefinition, WorkflowRuntimeState> {
         val prepared = preparer.prepare(definition, project.repository)
         val run = WorkflowRunFactory.create(
@@ -35,6 +37,7 @@ class WorkflowLaunchService(
             taskRunIdFactory = taskRunIdFactory,
             repository = project.repository,
             roles = roles,
+            parentWorkflowRunIds = parentWorkflowRunIds,
         )
 
         persistence.projects.put(project)

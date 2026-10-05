@@ -99,6 +99,14 @@ class MemoryLayerController(
     /** Every workflow with a memory bank. */
     val knownBanks: StateFlow<List<String>> = mutableKnownBanks.asStateFlow()
 
+    private val mutableSummaryMetrics = MutableStateFlow(MemorySummaryMetricsView())
+    /** Summarizer cost (model calls, time, pair-summary violations) of the selected workflow's layer. */
+    val summaryMetrics: StateFlow<MemorySummaryMetricsView> = mutableSummaryMetrics.asStateFlow()
+
+    private val mutableLineageLog = MutableStateFlow(MemoryLineageLog())
+    /** Workflows, their parents, project membership and expansions, as last published. */
+    val lineageLog: StateFlow<MemoryLineageLog> = mutableLineageLog.asStateFlow()
+
     private val mutableActivity = MutableStateFlow(MemoryActivity())
     val activity: StateFlow<MemoryActivity> = mutableActivity.asStateFlow()
 
@@ -234,7 +242,15 @@ class MemoryLayerController(
 
     /** Appends: [projectId] now also includes every workflow of [incorporatesProjectId]. */
     suspend fun expandProject(projectId: String, incorporatesProjectId: String, by: String, reason: String): MemoryProjectExpansion =
-        lineage.expandProject(projectId, incorporatesProjectId, by, reason, nowEpochMillis())
+        lineage.expandProject(projectId, incorporatesProjectId, by, reason, nowEpochMillis()).also { publish() }
+
+    /** Sets [projectId]'s own raw-history retention, or (null) returns it to the global setting. */
+    suspend fun setProjectRawRetention(projectId: String, retention: MemoryRawRetention?) = updateSettings { current ->
+        current.copy(
+            rawRetentionByProject = if (retention == null) current.rawRetentionByProject - projectId
+            else current.rawRetentionByProject + (projectId to retention),
+        )
+    }
 
     private suspend fun markMergeContrasts(workflowId: String) {
         val store = layerFor(workflowId).store
@@ -733,6 +749,31 @@ class MemoryLayerController(
             }
         }
 
+        // Deliberations the agent records with the /deliberate session command.
+        MemoryDeliberationCommand.parse(text).forEach { parsed ->
+            val outcome = parsed.mapCatching { command ->
+                val request = session.request
+                tool.deliberate(
+                    command.toRequest(
+                        sourceSessionId = agentId,
+                        scope = MemoryBankScope(
+                            projectId = request?.orchestrationContext?.projectId?.value,
+                            workflowRunId = workflow,
+                            taskRunId = agentId,
+                        ),
+                        atEpochMillis = nowEpochMillis(),
+                    ),
+                )
+            }
+            deliver(
+                outcome.fold(
+                    onSuccess = { node -> "$MEMORY_MESSAGE_MARKER deliberation recorded (memory-node:${node.id.value})" },
+                    onFailure = { error -> "$MEMORY_MESSAGE_MARKER deliberation not recorded: ${error.message}" },
+                ),
+            )
+            if (outcome.isSuccess) publish()
+        }
+
         if (triggers.isNotEmpty()) {
             triggers.take(MAX_TRIGGERS_PER_THOUGHT).forEach { trigger ->
                 val hits = recallSummaries(workflow, trigger, session.request)
@@ -837,6 +878,8 @@ class MemoryLayerController(
         mutableKnownBanks.value = banks.known()
         mutableRawUsage.value = banks.known().map { banks.store(it).read() }.rawUsage()
         mutableSnapshot.value = selectedWorkflow()?.let { lineageStore(it).read() } ?: MemorySnapshot()
+        mutableSummaryMetrics.value = selectedWorkflow()?.let { MemorySummaryMetricsView.of(layerFor(it).summaryMetrics) } ?: MemorySummaryMetricsView()
+        mutableLineageLog.value = lineage.log()
     }
 
     private companion object {
@@ -858,7 +901,10 @@ class MemoryLayerController(
          * clouds, echoes, doubled words). This only tells it what the marked lines are, once.
          */
         val MEMORY_PROTOCOL = "Lines starting $MEMORY_MESSAGE_MARKER are your memory. #tags are things you remember; " +
-            "dwell on one (or write \"Let me see what I remember about …\") and more of it comes back."
+            "dwell on one (or write \"Let me see what I remember about …\") and more of it comes back. " +
+            "When memories diverge, record your conclusion on its own line: " +
+            "${MemoryDeliberationCommand.COMMAND} memory-node:<a> memory-node:<b> chosen=memory-node:<a> | <why> " +
+            "(chosen=none if it stays unresolved). Both memories are kept either way."
 
         const val MAX_RECALL_RESULTS = 6
         const val MAX_HINTS = 4
@@ -955,6 +1001,9 @@ internal fun MemoryRecallHit.divergenceLines(): String = buildString {
         append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
     }
     deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
+    if (conflicts.isNotEmpty() && resolution == null) {
+        append("\n  ⚖ to deliberate: ").append(MemoryDeliberationCommand.template(node.id, conflicts.map { it.id }))
+    }
     // The summary of each link delivered with the hit, and the hit's summary-tree levels.
     pairSummaries.forEach { pair ->
         append("\n  ⇄ ").append(pair.relation.name).append(" link, together: ").append(pair.summary.text.replace('\n', ' '))

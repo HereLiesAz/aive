@@ -24,6 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.memory.MemoryEngineKind
+import com.hereliesaz.geministrator.memory.MemoryInspection
+import com.hereliesaz.geministrator.memory.MemoryNode
+import com.hereliesaz.geministrator.memory.MemoryNodeId
+import com.hereliesaz.geministrator.memory.MemoryRawRetention
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
@@ -170,6 +174,8 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
     }
 
     QueueSection(controller, settings)
+    SummariesSection(controller)
+    ProjectsSection(controller, settings)
     TuningSection(settings, onApply = { policy -> update { it.copy(policy = policy) } })
     ModelsSection(controller)
     DataSection(controller)
@@ -396,6 +402,7 @@ private fun DataSection(controller: MemoryLayerController) {
     var importDraft by remember { mutableStateOf<String?>(null) }
     var clearConfirm by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    var openTree by remember { mutableStateOf<com.hereliesaz.geministrator.memory.MemoryEpisodeId?>(null) }
 
     MemorySectionLabel("Stored memory")
     AzphaltRecord(
@@ -411,9 +418,30 @@ private fun DataSection(controller: MemoryLayerController) {
             title = episode.userPrompt.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { episode.id.value },
             body = "${episode.chunks.size} chunks",
             well = {
-                AzphaltPill("Forget", "memory-forget-${episode.id.value}", onClick = {
-                    scope.launch { controller.forgetEpisode(episode.id) }
-                })
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AzphaltPill(
+                            if (episode.id == openTree) "Hide summary tree" else "Summary tree",
+                            "memory-tree-${episode.id.value}",
+                            selected = episode.id == openTree,
+                            onClick = { openTree = if (episode.id == openTree) null else episode.id },
+                        )
+                        AzphaltPill("Forget", "memory-forget-${episode.id.value}", onClick = {
+                            scope.launch { controller.forgetEpisode(episode.id) }
+                        })
+                    }
+                    if (episode.id == openTree) {
+                        val rows = MemoryInspection.outline(snapshot, episode.id)
+                        if (rows.isEmpty()) {
+                            MemoryBody("No summary tree yet: it is built when this session reaches Condensation.")
+                        }
+                        rows.forEach { row ->
+                            MemoryBody(
+                                "  ".repeat(row.level) + (if (row.leaf) "· " else "▸ ") + row.node.text.replace('\n', ' ').take(OUTLINE_ROW_CHARS),
+                            )
+                        }
+                    }
+                }
             },
         )
     }
@@ -478,9 +506,179 @@ private fun DataSection(controller: MemoryLayerController) {
     message?.let { Text(it, style = AzphaltType.body, color = Azphalt.currentGround.onPage) }
 }
 
+/** Summarizer cost, and one memory's summary-tree levels, pair summaries and explicit history. */
+@Composable
+private fun SummariesSection(controller: MemoryLayerController) {
+    val scope = rememberCoroutineScope()
+    val snapshot by controller.snapshot.collectAsState()
+    val metrics by controller.summaryMetrics.collectAsState()
+    val selectedBank by controller.selectedBank.collectAsState()
+    var selected by remember { mutableStateOf<MemoryNodeId?>(null) }
+    var history by remember { mutableStateOf<List<MemoryNode>?>(null) }
+
+    MemorySectionLabel("Summaries")
+    AzphaltRecord(
+        seed = "memory-summary-metrics",
+        eyebrow = "Summarizer",
+        title = "${metrics.summaries} summaries · ${metrics.treeNodes} tree nodes · ${metrics.pairSummaries} pair summaries",
+        body = buildString {
+            append("Model calls: ${metrics.modelCalls}")
+            if (metrics.modelFailures > 0) append(" (${metrics.modelFailures} failed)")
+            append(" · embedding calls: ${metrics.embeddingCalls}")
+            if (metrics.embeddingFailures > 0) append(" (${metrics.embeddingFailures} failed)")
+            append(" · time: ${metrics.millis} ms")
+            append("\nPair-summary violations (a link recalled before its summary existed): ${metrics.pairSummaryViolations}")
+            if (metrics.byEngine.isNotEmpty()) {
+                append("\nBy engine: ").append(metrics.byEngine.entries.joinToString(" · ") { "${it.key} ${it.value}" })
+            }
+            append("\nCounted since this bank's layer was last built (a settings change rebuilds it).")
+        },
+        endCap = if (metrics.pairSummaryViolations > 0) "${metrics.pairSummaryViolations} late" else null,
+    )
+
+    val memories = remember(snapshot) { MemoryInspection.inspectable(snapshot) }
+    if (memories.isEmpty()) {
+        MemoryBody("No memories to inspect yet.")
+        return
+    }
+    MemoryBody("Choose a memory to see its summary-tree levels and the pair summary of each of its links.")
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        memories.forEach { node ->
+            AzphaltPill(
+                node.text.lineSequence().firstOrNull().orEmpty().take(40).ifBlank { node.id.value },
+                "memory-inspect-${node.id.value}",
+                selected = node.id == selected,
+                onClick = {
+                    selected = if (node.id == selected) null else node.id
+                    history = null
+                },
+            )
+        }
+    }
+    val node = memories.firstOrNull { it.id == selected } ?: return
+    val outline = remember(snapshot, node) { MemoryInspection.outlineAbove(snapshot, node) }
+    val pairs = remember(snapshot, node) { MemoryInspection.pairs(snapshot, node.id) }
+    AzphaltRecord(
+        seed = "memory-inspected-${node.id.value}",
+        eyebrow = "${node.kind.name} · memory-node:${node.id.value}",
+        title = node.text.take(INSPECTED_CHARS),
+        body = if (outline.isEmpty()) "No summary-tree levels above this memory." else
+            "Summary tree, root first:\n" + outline.mapIndexed { level, it -> "  ".repeat(level) + "▸ " + it.text.replace('\n', ' ').take(OUTLINE_ROW_CHARS) }.joinToString("\n"),
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill("History", "memory-history-${node.id.value}", onClick = {
+                    val bank = selectedBank ?: return@AzphaltPill
+                    scope.launch { history = controller.history(bank, node.id) }
+                })
+                history?.let { past ->
+                    MemoryBody(
+                        if (past.isEmpty()) "No history: this memory replaced and was condensed from nothing." else
+                            "What it replaced and was condensed from:\n" + past.joinToString("\n") { "- ${it.kind.name}: ${it.text.replace('\n', ' ').take(OUTLINE_ROW_CHARS)}" },
+                    )
+                }
+            }
+        },
+    )
+    pairs.forEach { pair ->
+        AzphaltRecord(
+            seed = "memory-pair-${pair.edge.id.value}",
+            eyebrow = "${pair.edge.relation.name} link",
+            title = pair.partner?.text?.replace('\n', ' ')?.take(OUTLINE_ROW_CHARS) ?: pair.edge.id.value,
+            body = pair.summary?.text ?: "No pair summary yet; the next consolidation pass writes it.",
+        )
+    }
+}
+
+/** Per-project raw retention and project expansion (add-only). */
+@Composable
+private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryLayerSettings) {
+    val scope = rememberCoroutineScope()
+    val log by controller.lineageLog.collectAsState()
+    val projects = remember(log) { log.workflows.mapNotNull { it.projectId }.distinct().sorted() }
+    MemorySectionLabel("Projects")
+    if (projects.isEmpty()) {
+        MemoryBody("No project has a workflow with memory yet.")
+        return
+    }
+    MemoryBody(
+        "A project's workflows read each other's memory, read-only. Expanding a project adds another project's " +
+            "workflows to it; expansions are permanent. Raw history can be kept per project; otherwise the global setting applies.",
+    )
+    projects.forEach { project ->
+        var reason by remember(project) { mutableStateOf("") }
+        var message by remember(project) { mutableStateOf<String?>(null) }
+        val includes = log.expansions.filter { it.projectId == project }
+        AzphaltRecord(
+            seed = "memory-project-$project",
+            eyebrow = "Project",
+            title = project,
+            body = buildString {
+                append("${log.workflows.count { it.projectId == project }} workflows")
+                if (includes.isNotEmpty()) {
+                    append("\nIncludes: ").append(includes.joinToString(" · ") { "${it.incorporatesProjectId} (${it.reason})" })
+                }
+            },
+            well = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val current = settings.rawRetentionByProject[project]
+                        AzphaltPill("Raw: global", "memory-project-retention-$project-global", selected = current == null, onClick = {
+                            scope.launch { controller.setProjectRawRetention(project, null) }
+                        })
+                        RETENTION_CHOICES.forEach { (label, retention) ->
+                            AzphaltPill("Raw: $label", "memory-project-retention-$project-${retention.mode.name}", selected = current == retention, onClick = {
+                                scope.launch { controller.setProjectRawRetention(project, retention) }
+                            })
+                        }
+                    }
+                    val others = projects.filter { other -> other != project && includes.none { it.incorporatesProjectId == other } }
+                    if (others.isNotEmpty()) {
+                        OutlinedTextField(
+                            value = reason,
+                            onValueChange = { reason = it },
+                            label = { Text("Why include another project (required)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            others.forEach { other ->
+                                AzphaltPill("Include $other", "memory-project-expand-$project-$other", onClick = {
+                                    if (reason.isBlank()) {
+                                        message = "Give a reason first."
+                                    } else {
+                                        scope.launch {
+                                            message = runCatching { controller.expandProject(project, other, by = "user", reason = reason.trim()) }
+                                                .fold({ "Now includes $other." }, { "Not expanded: ${it.message}" })
+                                            reason = ""
+                                        }
+                                    }
+                                })
+                            }
+                        }
+                    }
+                    message?.let { MemoryBody(it) }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun MemoryBody(text: String) {
+    Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+}
+
 @Composable
 private fun MemorySectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
 }
 
 private const val RECENT_EPISODES = 8
+private const val OUTLINE_ROW_CHARS = 160
+private const val INSPECTED_CHARS = 240
+
+private val RETENTION_CHOICES = listOf(
+    "keep all" to MemoryRawRetention.KeepAll,
+    "50 M characters" to MemoryRawRetention(MemoryRawRetention.Mode.CapBySize, maxCharacters = 50_000_000L),
+    "90 days" to MemoryRawRetention(MemoryRawRetention.Mode.CapByAge, maxAgeMillis = 90L * 86_400_000L),
+)

@@ -221,6 +221,8 @@ class HallMonitorSolutionTrialService(
             objective = experimentObjective,
             nowEpochMillis = launchAt,
             taskRunIdFactory = { id -> TaskRunId("${trialRunId.value}-${id.value}") },
+            // The counterfactual branches from the paused source run: a continuation of its lineage.
+            parentWorkflowRunIds = listOf(sourceRun.id),
         )
 
         val trial = HallMonitorSolutionTrial(

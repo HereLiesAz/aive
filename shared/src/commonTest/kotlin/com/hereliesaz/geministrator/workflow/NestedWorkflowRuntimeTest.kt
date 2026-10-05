@@ -47,6 +47,8 @@ class NestedWorkflowRuntimeTest {
         val childRun = assertNotNull(fixture.persistence.runs.get(WorkflowRunId(childRunId)))
         assertEquals(WorkflowDefinitionId("child"), childRun.workflowDefinitionId)
         assertEquals(project.id, childRun.projectId)
+        // A nested workflow continues the run that dispatched it (memory lineage).
+        assertEquals(listOf(WorkflowRunId("run-parent")), childRun.parentWorkflowRunIds)
 
         state = fixture.cycle(parent, state)
         assertEquals(TaskRunStatus.Running, state.run.taskRuns.getValue(parentTask).status)

@@ -50,7 +50,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 - [x] Document the compound-inference architecture and preserve the existing human-like memory/reconsolidation authority boundary.
 - [x] Keep memory contrasts apart: deterministic frame/filler contrast detection (with an entity alias table) bars contrasting memories from condensation for every engine; divergence markers, an add-only variant register and deliberation records are stored; recall returns divergent partners as one unit by default; only the engine writes `Supersedes`, and only on exact sentence coverage.
-- [ ] Let a running agent record a deliberation (`MemoryTool.deliberate`) from its session; today it is an API with tests, not yet a session command or tool the agent is told about.
+- [x] Let a running agent record a deliberation (`MemoryTool.deliberate`) from its session; the `/deliberate` session command (`MemoryDeliberationCommand`), taught in the memory protocol and templated under every divergent hit.
 - [x] Add provider-neutral compound-inference strategy and direct genealogy contracts.
 - [x] Attach baseline single-model compound-inference metadata to every `AgentTaskRequest`, including direct dependency artifact ancestry.
 - [x] Populate complete workflow/project/task/role coordinates before provider dispatch so genealogy is fully namespaced without fallback inference.
@@ -120,10 +120,11 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## P1 — Persistence and recovery
 
-- [ ] Memory lineage: set `WorkflowRun.parentWorkflowRunIds` when the app creates a run that continues or merges earlier runs (run creation in `ApplicationRuntime`/`ApplicationRuntimeOrchestration`; nothing sets it yet, so every run is a root). Memory reads it from `AgentOrchestrationContext.parentWorkflowRunIds` (`ProviderTaskRequestFactory`, `HallMonitorGovernanceService`).
+- [x] Memory lineage: set `WorkflowRun.parentWorkflowRunIds` when the app creates a run that continues or merges earlier runs (run creation in `ApplicationRuntime`/`ApplicationRuntimeOrchestration`; launches take `continuesWorkflowRunIds`; nested workflows and Hall Monitor trials continue their source run; repairs keep the run's parents; see Memory-layer.md). Memory reads it from `AgentOrchestrationContext.parentWorkflowRunIds` (`ProviderTaskRequestFactory`, `HallMonitorGovernanceService`).
+- [ ] Launch UI to continue or merge earlier runs (pass `continuesWorkflowRunIds` to the launch functions); today only nested workflows and Hall Monitor trials set parents from the app.
 - [x] Memory: top-down summary tree per banked episode and a pair summary for every link (on-device summarizer chain: local model clerk, MiniLM centroid, LexRank with cue/position/heading signals, Luhn), bounded per consolidation pass with a recall-time safety net counted as a violation.
-- [ ] Memory: show the summary tree and pair summaries on the Memory screen, and surface `MemorySummaryMetrics` (model calls, time, pair-summary violations) there.
-- [ ] Memory: UI for project expansion (`MemoryLayerController.expandProject`), per-project raw retention (`rawRetentionByProject`), the explicit history query (`MemoryLayerController.history`) and agent access to `MemoryTool.deliberate(chosen = …)`.
+- [x] Memory: show the summary tree and pair summaries on the Memory screen, and surface `MemorySummaryMetrics` (model calls, time, pair-summary violations) there.
+- [x] Memory: UI for project expansion (`MemoryLayerController.expandProject`), per-project raw retention (`rawRetentionByProject`), the explicit history query (`MemoryLayerController.history`) and agent access to `MemoryTool.deliberate(chosen = …)`.
 - [ ] Memory: verify the per-bank web worker (`shared/memory-worker/memory.worker.js` named `bank-*`, one OPFS pool per bank) in a browser, and the one-time split of the old shared store on Android, desktop and web.
 
 - [x] Add schema migrations; never silently reinterpret incompatible persisted workflow state.

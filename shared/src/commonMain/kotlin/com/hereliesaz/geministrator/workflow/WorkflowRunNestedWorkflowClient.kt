@@ -84,6 +84,8 @@ class WorkflowRunNestedWorkflowClient(
             taskRunIdFactory = { id -> TaskRunId("${childRunId.value}-${id.value}") },
             repository = childProject.repository,
             roles = context.run.roleSnapshot,
+            // A nested workflow continues the run that dispatched it: it reads that run's memory lineage.
+            parentWorkflowRunIds = listOf(context.run.id),
         )
         persistence.runs.put(run)
         persistence.events.append(

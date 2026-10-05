@@ -222,8 +222,11 @@ class ApplicationRuntime private constructor(
         objective: String,
         repository: RepositoryRef? = null,
         existingProject: Project? = null,
+        /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
+        continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     ) {
         runtimeMutex.withLock {
+            val parents = requireKnownParentRuns(continuesWorkflowRunIds)
             val cleanProjectName = projectName.trim()
             val cleanObjective = objective.trim()
             require(cleanProjectName.isNotEmpty()) { "Project name is required" }
@@ -261,6 +264,7 @@ class ApplicationRuntime private constructor(
                 objective = cleanObjective,
                 nowEpochMillis = now,
                 taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+                parentWorkflowRunIds = parents,
             )
 
             replaceCurrent(Current(project, prepared, runtimeState))
@@ -826,3 +830,12 @@ class ApplicationRuntime private constructor(
 
 @OptIn(ExperimentalTime::class)
 private fun nowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
+
+/**
+ * The parents of a run the user launches as a continuation (one earlier run) or a merge (several):
+ * each must be a stored run. Duplicates collapse; order is kept (the first is the primary parent).
+ */
+internal suspend fun ApplicationRuntime.requireKnownParentRuns(parents: List<WorkflowRunId>): List<WorkflowRunId> =
+    parents.distinct().onEach { parent ->
+        requireNotNull(persistence.runs.get(parent)) { "Workflow run ${parent.value} to continue was not found" }
+    }

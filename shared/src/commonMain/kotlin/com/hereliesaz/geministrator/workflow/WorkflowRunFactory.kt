@@ -29,6 +29,8 @@ object WorkflowRunFactory {
         taskRunIdFactory: (TaskDefinitionId) -> TaskRunId,
         repository: RepositoryRef? = null,
         roles: Collection<RoleDefinition> = emptyList(),
+        /** Runs this run continues (one) or merges (several); empty for a root run. */
+        parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     ): WorkflowRun {
         WorkflowGraphValidator.requireValid(definition)
         val rolesById = roles.associateBy(RoleDefinition::id)
@@ -72,6 +74,7 @@ object WorkflowRunFactory {
             roleSnapshot = roles
                 .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
                 .distinctBy(RoleDefinition::id),
+            parentWorkflowRunIds = parentWorkflowRunIds.distinct(),
         )
     }
 
