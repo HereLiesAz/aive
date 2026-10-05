@@ -11,9 +11,13 @@ package com.hereliesaz.geministrator.memory
  * contrast when the shared part carries content and an aligned slot holds different content words on
  * both sides, at least one of which looks like a filler (an entity, value, identifier or choice).
  *
- * It is surface alignment only: no parser, no lexicon, no roles beyond "the shared part" and "the
- * slot". Spelling variants of one name are folded first through [MemoryAliases] (an entity alias
- * table), so "Postgres" and "PostgreSQL" are the same filler.
+ * It is surface alignment only: no parser, no roles beyond "the shared part" and "the slot".
+ * Spelling variants of one name are folded first through [MemoryAliases] (an entity alias table), so
+ * "Postgres" and "PostgreSQL" are the same filler. When WordNet is loaded ([MemoryLanguageResources]),
+ * it refines a slot in two ways (see [MemoryContrastLexicon]): words that share a synset are one
+ * filler said two ways ("begin" / "start"), not a contrast; and two different words under one parent
+ * concept ("Monday" / "Tuesday", "red" / "blue") are fillers of one slot, so the slot contrasts even
+ * when neither word otherwise looks like a filler. Without WordNet the detector behaves as before.
  */
 internal object MemoryContrast {
     /** A filler slot: the aligned gap where the two texts say different things. */
@@ -36,7 +40,12 @@ internal object MemoryContrast {
     )
 
     /** The contrast between [left] and [right], or null when they share no frame or differ in no filler. */
-    fun between(left: String, right: String): Contrast? {
+    fun between(
+        left: String,
+        right: String,
+        wordNet: WordNetLexicon? = MemoryLanguageResources.loadedOrNull()?.wordNet,
+    ): Contrast? {
+        val lexicon = wordNet?.let(::MemoryContrastLexicon)
         val a = tokens(left)
         val b = tokens(right)
         if (a.isEmpty() || b.isEmpty()) return null
@@ -78,7 +87,8 @@ internal object MemoryContrast {
             val cb = gb.filter { it.content }
             val substitution = ca.isNotEmpty() && cb.isNotEmpty() &&
                 ca.map { it.norm }.toSet() != cb.map { it.norm }.toSet() &&
-                (ca.any { it.filler } || cb.any { it.filler })
+                lexicon?.sameWords(ca.map { it.norm }, cb.map { it.norm }) != true &&
+                (ca.any { it.filler } || cb.any { it.filler } || lexicon?.siblings(ca.map { it.norm }, cb.map { it.norm }) == true)
             val polarity = ga.any { it.negation } != gb.any { it.negation }
             substitution || polarity
         }
@@ -100,11 +110,15 @@ internal object MemoryContrast {
         )
     }
 
-    fun contrasts(left: String, right: String): Boolean = between(left, right) != null
+    fun contrasts(
+        left: String,
+        right: String,
+        wordNet: WordNetLexicon? = MemoryLanguageResources.loadedOrNull()?.wordNet,
+    ): Boolean = between(left, right, wordNet) != null
 
     /** True when any two of [texts] contrast. */
-    fun anyContrast(texts: List<String>): Boolean {
-        for (i in texts.indices) for (j in i + 1 until texts.size) if (contrasts(texts[i], texts[j])) return true
+    fun anyContrast(texts: List<String>, wordNet: WordNetLexicon? = MemoryLanguageResources.loadedOrNull()?.wordNet): Boolean {
+        for (i in texts.indices) for (j in i + 1 until texts.size) if (contrasts(texts[i], texts[j], wordNet)) return true
         return false
     }
 
@@ -192,6 +206,69 @@ internal object MemoryContrast {
         "dark", "light", "left", "right", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
         "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
     )
+}
+
+/**
+ * WordNet as contrast detection uses it: synonymy and sibling concepts, over the most frequent senses
+ * only, so a rare sense neither folds nor splits a pair. Words are looked up by their base forms
+ * (morphy) as nouns and verbs; adjectives and adverbs carry no synsets in the packed resource.
+ */
+internal class MemoryContrastLexicon(private val wordNet: WordNetLexicon) {
+    private fun senses(word: String, limit: Int): List<Int> =
+        listOf(WordNetLexicon.Pos.Noun, WordNetLexicon.Pos.Verb).flatMap { pos ->
+            wordNet.baseForms(word, pos).flatMap { wordNet.senses(it, pos).take(limit).asIterable() }
+        }.distinct()
+
+    /** True when [a] and [b] share a synset among their [SYNONYM_SENSES] most frequent senses. */
+    fun synonyms(a: String, b: String): Boolean =
+        a == b || senses(a, SYNONYM_SENSES).toSet().let { left -> left.isNotEmpty() && senses(b, SYNONYM_SENSES).any { it in left } }
+
+    /**
+     * True when each side's content words pair one to one with the other side's, identical or
+     * synonymous: the slot says the same thing in other words.
+     */
+    fun sameWords(left: List<String>, right: List<String>): Boolean {
+        if (left.size != right.size) return false
+        val remaining = right.toMutableList()
+        return left.all { word -> remaining.firstOrNull { synonyms(word, it) }?.also { remaining.remove(it) } != null }
+    }
+
+    /**
+     * True when some word of [left] and some word of [right] are different concepts under one parent:
+     * their most frequent senses are not synonyms, sit in the same lexicographer file, and reach a
+     * common hypernym within [SIBLING_DEPTH] levels.
+     */
+    fun siblings(left: List<String>, right: List<String>): Boolean =
+        left.any { a -> right.any { b -> a != b && !synonyms(a, b) && siblingSenses(a, b) } }
+
+    private fun siblingSenses(a: String, b: String): Boolean {
+        val first = senses(a, 1)
+        val second = senses(b, 1)
+        return first.any { x ->
+            second.any { y ->
+                if (x == y || wordNet.posOf(x) != wordNet.posOf(y) || wordNet.lexname(x) != wordNet.lexname(y)) return@any false
+                val above = ancestors(x)
+                val other = ancestors(y)
+                // One under the other ("dog" / "canine") is a generalization, not two alternatives.
+                y !in above && x !in other && above.any { it in other }
+            }
+        }
+    }
+
+    private fun ancestors(synset: Int): Set<Int> {
+        val found = HashSet<Int>()
+        var frontier = wordNet.hypernyms(synset).toList()
+        repeat(SIBLING_DEPTH) {
+            found += frontier
+            frontier = frontier.flatMap { wordNet.hypernyms(it).asIterable() }.filter { it !in found }
+        }
+        return found
+    }
+
+    private companion object {
+        const val SYNONYM_SENSES = 3
+        const val SIBLING_DEPTH = 2
+    }
 }
 
 /**
