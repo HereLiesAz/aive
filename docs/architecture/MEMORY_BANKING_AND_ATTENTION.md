@@ -304,7 +304,7 @@ They do not decide what is true, false, correct, incorrect, morally right, strat
 
 They do not infer contradiction merely because related memories disagree.
 
-The engine, not a clerk, marks a deterministic **contrast** (two memories with one frame and different fillers) with a `Diverges` marker and records each filler in the variant register. That is a structural fact about the text, like a genealogy finding, not a verdict: it never says which memory is right, and it makes recall bring both to the agent together (`docs/Memory-layer.md`).
+The engine, not a clerk, marks a deterministic **contrast** (two memories with one frame and different fillers) with a `Diverges` marker and records each filler in the variant register. That is a structural fact about the text, not a verdict: it never says which memory is right, and it makes recall bring both to the agent together. Only an agent's deliberation that names the memory it judged correct lets consolidation absorb the contrast into one current memory; the other side becomes history (`docs/Memory-layer.md`).
 
 The Association Linker supplies neutral semantic proximity. Related memories can be brought near one another without the memory layer deciding what the relationship means epistemically.
 
@@ -362,3 +362,7 @@ GRIP
 The durable rule is:
 
 > **Bank experience. Organize it clerically. Surface associations as semantic cues first. Let the active agent decide whether it needs to remember more.**
+
+## Which bank a session banks into
+
+A session banks into its workflow run's memory bank, and only there. A session outside any workflow run is its own root workflow. When a session starts, memory records its workflow, project and parent runs (`AgentOrchestrationContext.parentWorkflowRunIds`) in the add-only lineage; consolidation, attention and recall for that session then run over the workflow's lineage bank. See [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage).

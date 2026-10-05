@@ -59,6 +59,23 @@ data class MemoryEpisode(
     val userPrompt: String,
     val chunks: List<MemorySourceChunk>,
     val createdAtEpochMillis: Long,
+    /**
+     * Tombstone: set when the user's raw-retention setting purged this episode's raw context (its
+     * chunks and prompt). The episode record stays so provenance resolves; memories made from it are
+     * untouched.
+     */
+    val purged: MemoryRawPurge? = null,
+)
+
+/** The audit record of one raw purge: what, when, why, and by whose setting. */
+@Serializable
+data class MemoryRawPurge(
+    val purgedAtEpochMillis: Long,
+    val chunks: Int,
+    val characters: Long,
+    val reason: String,
+    /** `global` or `project:<id>`: whose retention setting purged it. */
+    val setting: String,
 )
 
 @Serializable
@@ -167,7 +184,7 @@ enum class MemoryRelationKind {
 
     /**
      * Divergence marker: two memories share a frame and differ in filler (a contrast). Structural and
-     * advisory, like a genealogy finding: it says the memories differ, never which is right. Recall
+     * advisory: it says the memories differ, never which is right. Recall
      * returns marked partners together. Written only by the deterministic contrast step.
      */
     Diverges,

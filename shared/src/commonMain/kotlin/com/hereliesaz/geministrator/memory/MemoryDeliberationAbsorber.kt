@@ -20,9 +20,6 @@ const val NOT_CHOSEN: String = "notChosen"
  * recall, reachable through [historyOf]. A deliberation with no choice ("unresolved") absorbs
  * nothing. A later deliberation over the same memories reopens it: its absorption supersedes the
  * earlier current version in turn.
- *
- * Borrowed, not ours: the shape follows reconsolidation (a retrieved trace becomes labile and is
- * re-stored with the update) and the trace-transformation view of systems consolidation.
  */
 internal object MemoryDeliberationAbsorber {
     /** The absorption of the oldest deliberation not yet absorbed, or an empty mutation. */

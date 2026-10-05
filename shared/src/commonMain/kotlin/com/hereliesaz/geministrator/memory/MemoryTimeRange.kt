@@ -6,6 +6,9 @@ const val MEMORY_TIME_FROM: String = "timeFrom"
 /** Version metadata: latest time (epoch millis) over every contributing source. */
 const val MEMORY_TIME_TO: String = "timeTo"
 
+/** Version metadata: how many times it happened in its range — the distinct source episodes it was made from. */
+const val MEMORY_OCCURRENCES: String = "occurrences"
+
 /**
  * Time on a memory. A raw memory keeps its exact time: the date its text states (ISO yyyy-mm-dd),
  * else its earliest source episode's time, else its record time. A consolidated current version
@@ -39,13 +42,22 @@ internal object MemoryTimeRange {
         return mapOf(MEMORY_TIME_FROM to ranges.minOf { it.first }.toString(), MEMORY_TIME_TO to ranges.maxOf { it.last }.toString())
     }
 
-    /** `yyyy-mm-dd – yyyy-mm-dd` (or one date) for a version's range; null for a raw memory. */
+    /** Distinct source episodes (deliberations excluded) over [contributors]: occurrences. */
+    fun occurrences(snapshot: MemorySnapshot, contributors: Collection<MemoryNodeId>): Int {
+        val ids = contributors.toSet()
+        val deliberationEpisodes = snapshot.episodes.filter { episode -> episode.chunks.any { it.kind == MemorySourceKind.Deliberation } }.mapTo(hashSetOf()) { it.id }
+        return snapshot.nodes.filter { it.id in ids }.flatMap { it.sourceEpisodeIds }.filter { it !in deliberationEpisodes }.toSet().size
+    }
+
+    /** `~N times, yyyy-mm-dd – yyyy-mm-dd` (or one date) for a version; null for a raw memory. */
     fun label(node: MemoryNode): String? {
         val from = node.metadata[MEMORY_TIME_FROM]?.toLongOrNull() ?: return null
         val to = node.metadata[MEMORY_TIME_TO]?.toLongOrNull() ?: return null
         val a = isoDate(from)
         val b = isoDate(to)
-        return if (a == b) a else "$a – $b"
+        val range = if (a == b) a else "$a – $b"
+        val times = node.metadata[MEMORY_OCCURRENCES]?.toIntOrNull()
+        return if (times != null) "~$times ${if (times == 1) "time" else "times"}, $range" else range
     }
 
     fun isoDate(epochMillis: Long): String {

@@ -388,6 +388,55 @@ class MemoryLineageBanksTest {
         assertEquals(100L, MemoryTimeRange.exactTime(snapshot, snapshot.nodes.first()))
     }
 
+    // ---- raw retention ----------------------------------------------------------------------------
+
+    private suspend fun rawWorld(): World {
+        val w = World()
+        w.memory.registerWorkflow("wf", "P")
+        val view = w.view("wf")
+        val raw = { id: String, at: Long ->
+            episode(id, "wf", at).copy(
+                userPrompt = "prompt $id",
+                chunks = listOf(MemorySourceChunk(MemoryChunkId("c-$id"), MemoryEpisodeId("e-$id"), 0, MemorySourceKind.Message, "m", "raw chat of $id")),
+            )
+        }
+        val snapshot = view.read()
+        view.commit(
+            snapshot.revision,
+            MemoryStoreMutation(
+                episodesToAdd = listOf(raw("old", 0L), raw("new", 900L)),
+                nodesToAdd = listOf(node("old", "Old memory.", 0L).copy(metadata = mapOf(MEMORY_TIME_FROM to "0", MEMORY_TIME_TO to "0", MEMORY_OCCURRENCES to "3"))),
+            ),
+        )
+        return w
+    }
+
+    @Test
+    fun rawHistoryIsKeptByDefault() = runBlocking<Unit> {
+        val w = rawWorld()
+        assertTrue(w.memory.applyRawRetention().isEmpty())
+        assertTrue(w.banks.store("wf").read().episodes.all { it.purged == null && it.chunks.isNotEmpty() })
+    }
+
+    @Test
+    fun aRetentionCapPurgesRawHistoryWithATombstoneAndLeavesMemoryIntact() = runBlocking<Unit> {
+        val w = rawWorld()
+        val before = w.banks.store("wf").read().nodes
+        w.memory.updateSettings { it.copy(rawRetention = MemoryRawRetention(MemoryRawRetention.Mode.CapByAge, maxAgeMillis = 500L)) }
+        w.memory.applyRawRetention()
+        val episodes = w.banks.store("wf").read().episodes.associateBy { it.id.value }
+        val old = episodes.getValue("e-old")
+        assertTrue(old.chunks.isEmpty() && old.userPrompt.isEmpty())
+        val tombstone = assertNotNull(old.purged)
+        assertEquals("global", tombstone.setting)
+        assertEquals(1, tombstone.chunks)
+        assertTrue("days" in tombstone.reason)
+        assertNull(episodes.getValue("e-new").purged)
+        // Consolidated memory, its range and count are untouched.
+        assertEquals(before, w.banks.store("wf").read().nodes)
+        assertEquals("~3 times, 1970-01-01", MemoryTimeRange.label(before.single()))
+    }
+
     private fun condenser() = object : MemoryManagerAgent {
         override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
             val generalized = MemoryNode(

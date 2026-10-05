@@ -20,11 +20,8 @@ package com.hereliesaz.geministrator.memory
  * the merging workflow's bank: noticing, not judging.
  *
  * Nothing here ranks a filler as correct, removes, edits or hides a memory. Writing the register
- * twice is a no-op (all ids are derived from content). The keeping of every contrasting trace side by
- * side follows the spirit of an assumption-based truth maintenance system (de Kleer's ATMS keeps
- * contradictory environments rather than retracting one); unlike an ATMS, nothing here labels a set
- * as inconsistent. Recording both record and event time is the bitemporal pattern (transaction vs
- * valid time) applied to attestations only.
+ * twice is a no-op (all ids are derived from content). Every contrasting memory is kept side by side,
+ * and each attestation records both when it was recorded and the date its text states.
  */
 internal object MemoryVariantRegister {
     /** Kinds that carry statements; tags and categories are single cues and are not compared. */

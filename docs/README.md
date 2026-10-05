@@ -51,6 +51,8 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 ### Memory banking and attention
 
+Memory is organised per workflow run: every run has its own memory bank, continuations and merges read their ancestors' banks through a lineage, and the other runs of the same project are readable at recall, read-only. [`Memory-layer.md`](Memory-layer.md#workflow-banks-and-lineage) states the model (lineage, merge, project membership and expansion, provenance, deliberation-resolved consolidation, the size curve, time ranges, raw-history retention); [`architecture/GRIP.md`](architecture/GRIP.md) states where recall reads.
+
 [`architecture/MEMORY_BANKING_AND_ATTENTION.md`](architecture/MEMORY_BANKING_AND_ATTENTION.md) defines the canonical memory-banking, deliberate note-to-self deposit, tag-first associative surfacing, Attention Deficit Dial, token-driven attention recovery, non-destructive memory, and no-programmatic-reminder invariants. Future memory and orchestration work should treat this document as normative.
 
 ### Local memory inference

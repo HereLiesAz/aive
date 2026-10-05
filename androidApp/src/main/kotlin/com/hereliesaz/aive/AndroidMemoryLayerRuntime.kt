@@ -644,7 +644,7 @@ internal class AndroidMemoryLayerRuntime(
     }
 
     /** The workflow lineage DAG and project membership (add-only). */
-    private val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage(com.russhwolf.settings.Settings())
+    private val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
 
     /**
      * One SQLite database per workflow run's memory bank. Built on the IO dispatcher (see

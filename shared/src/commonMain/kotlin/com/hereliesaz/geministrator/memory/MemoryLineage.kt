@@ -186,6 +186,11 @@ class MemoryLineage(
 
     suspend fun isMerge(workflowId: String): Boolean = parentsOf(workflowId).size > 1
 
+    companion object {
+        /** The lineage persisted in the platform's default settings. */
+        fun createDefault(): MemoryLineage = MemoryLineage(Settings())
+    }
+
     private fun parentsIn(log: MemoryLineageLog, workflowId: String) =
         log.parents.filter { it.workflowId == workflowId }.map { it.parentWorkflowId }
 

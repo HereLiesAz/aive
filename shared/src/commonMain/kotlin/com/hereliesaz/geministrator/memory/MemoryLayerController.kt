@@ -91,6 +91,10 @@ class MemoryLayerController(
     /** The workflow whose bank the Memory screen shows and acts on; null until one exists. */
     val selectedBank: StateFlow<String?> = mutableSelectedBank.asStateFlow()
 
+    private val mutableRawUsage = MutableStateFlow(MemoryRawUsage())
+    /** Raw history (full session context) held across every workflow bank. */
+    val rawUsage: StateFlow<MemoryRawUsage> = mutableRawUsage.asStateFlow()
+
     private val mutableKnownBanks = MutableStateFlow<List<String>>(emptyList())
     /** Every workflow with a memory bank. */
     val knownBanks: StateFlow<List<String>> = mutableKnownBanks.asStateFlow()
@@ -263,7 +267,11 @@ class MemoryLayerController(
     // ---- consolidation --------------------------------------------------------------------------
 
     fun drainSoon() {
-        scope.launch { drain() }
+        scope.launch {
+            drain()
+            // The user's raw-retention setting, if any (the default keeps everything).
+            runCatching { applyRawRetention() }
+        }
     }
 
     /** Consolidates until idle, paused or disabled. */
@@ -319,6 +327,44 @@ class MemoryLayerController(
         publish()
         drainSoon()
     }
+
+    // ---- raw retention ----------------------------------------------------------------------------
+
+    /**
+     * Applies the user's raw-retention settings: per project ([MemoryLayerSettings.rawRetentionByProject])
+     * or global. With the default (keep all) nothing happens. Otherwise the selected episodes' raw text
+     * is purged with a tombstone — the one audited exception to add-only. Returns the purged episodes.
+     */
+    suspend fun applyRawRetention(): List<MemoryEpisodeId> = drainMutex.withLock {
+        val current = settings.value
+        val byScope = banks.known().groupBy { workflow ->
+            val project = lineage.projectOf(workflow)
+            if (project != null && project in current.rawRetentionByProject) "project:$project" else "global"
+        }
+        val purged = mutableListOf<MemoryEpisodeId>()
+        byScope.forEach { (scope, workflows) ->
+            val retention = if (scope == "global") current.rawRetention else current.rawRetentionByProject.getValue(scope.removePrefix("project:"))
+            val stores = workflows.associateWith { banks.store(it) }
+            // Raw history still waiting for consolidation is never purged.
+            val episodes = stores.values.flatMap { store ->
+                val snapshot = store.read()
+                val pending = snapshot.queue.filter { it.status != MemoryQueueStatus.Complete }.mapTo(hashSetOf()) { it.episodeId }
+                snapshot.episodes.filter { it.id !in pending }
+            }
+            val selected = rawPurgeSelection(episodes, retention, nowEpochMillis())
+            if (selected.isEmpty()) return@forEach
+            stores.values.forEach { store ->
+                val snapshot = store.read()
+                val mine = snapshot.episodes.map { it.id }.filter { it in selected }.toSet()
+                if (mine.isNotEmpty()) {
+                    store.replace(snapshot.purgeRaw(mine, retention, scope, nowEpochMillis()))
+                    purged += mine
+                }
+            }
+        }
+        if (purged.isNotEmpty()) resetLayers()
+        purged
+    }.also { publish() }
 
     // ---- data -----------------------------------------------------------------------------------
 
@@ -789,6 +835,7 @@ class MemoryLayerController(
 
     private suspend fun publish() {
         mutableKnownBanks.value = banks.known()
+        mutableRawUsage.value = banks.known().map { banks.store(it).read() }.rawUsage()
         mutableSnapshot.value = selectedWorkflow()?.let { lineageStore(it).read() } ?: MemorySnapshot()
     }
 

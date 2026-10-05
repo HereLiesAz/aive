@@ -221,7 +221,7 @@ fun MemorySnapshot.splitIntoBanks(): MemoryBankSplit {
     val excluded = mutableListOf<MemoryBankMigrationExclusion>()
     val episodeBank = episodes.associate { it.id to memoryWorkflowOf(it.workflowRunId, it.taskRunId, it.sourceSessionId) }
     val projects = linkedMapOf<String, String>()
-    episodes.forEach { episode -> memoryBankKey(episode.projectId)?.let { projects.putIfAbsent(episodeBank.getValue(episode.id), it) } }
+    episodes.forEach { episode -> memoryBankKey(episode.projectId)?.let { projects.getOrPut(episodeBank.getValue(episode.id)) { it } } }
     val nodeBank = HashMap<MemoryNodeId, String>()
     val unplaced = mutableListOf<MemoryNode>()
     nodes.forEach { node ->

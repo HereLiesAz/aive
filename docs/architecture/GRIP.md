@@ -68,7 +68,7 @@ Hits are ordered by weighted reciprocal rank fusion (k = 10) over relevance (wei
 
 ## Divergent partners travel together
 
-Every hit carries its divergent partners (`MemoryRecallHit.conflicts`: memories linked to it by a `Diverges` marker, or legacy `ConflictsWith`) and the deliberations citing either side (`MemoryRecallHit.deliberations`). Partners are returned even when they are superseded, outside the query's project scope, or did not match the query. A hit and its partners are one unit: ranking, `maxResults`, the attention dial and prompt rendering keep or drop the whole unit, and rendering adds only whole units to a budget. The markers are not traversal edges, so they neither raise nor lower any score. This is on by default (`MemoryQuery.includeConflicts`, `MemoryTagQuery.includeConflicts` and `expand(includeConflicts)` default to `true`). Prompts show a partner as "diverges (same subject, different content; both remembered)", never as right or wrong.
+Every hit with an unresolved divergence carries its divergent partners (`MemoryRecallHit.conflicts`: memories linked to it by a `Diverges` marker, or legacy `ConflictsWith`) and the deliberations citing either side (`MemoryRecallHit.deliberations`). Partners come from the bank the hit was read from; they are returned even when they are superseded or did not match the query. A hit and its partners are one unit: ranking, `maxResults`, the attention dial and prompt rendering keep or drop the whole unit, and rendering adds only whole units to a budget. The markers are not traversal edges, so they neither raise nor lower any score. This is on by default (`MemoryQuery.includeConflicts`, `MemoryTagQuery.includeConflicts` and `expand(includeConflicts)` default to `true`). Prompts show a partner as "diverges (same subject, different content; both remembered)", never as right or wrong.
 
 ## Weighted graph traversal
 
@@ -176,3 +176,14 @@ The hosted text providers (OpenAI, xAI, Claude, Gemini, OpenAI-compatible servic
 ## Durable rule
 
 > **BANK deposits experience. GRIP cues recollection. Entity, action, and category/subject tags are normal memory addresses and normal first results. GRIP preserves associative weight, repeated evidence accumulates with diminishing returns, and deliberate banks jump next in line before becoming ordinary associative memory.**
+
+## Where GRIP reads: lineage first, then the project, read-only
+
+GRIP reads a workflow's memory, never one global store. Every workflow run has its own bank; a session recalls from its workflow's **lineage bank** first (its own records plus every ancestor's, read through; a merge reads through both ancestries), then, read-only, from the banks of the other workflows of its project (including projects it has incorporated), ranked after the lineage. Nothing outside the project is accessible. The rule is precise:
+
+- Read-only hits are labelled with the workflow they came from (`MemoryRecallHit.provenance.readOnlyFromWorkflow`) and are never written to: no co-recall link, no access event, no register entry, no condensation touches another workflow's bank.
+- Every hit carries its provenance: the producing workflow and session, the project, and the lineage path from the producing workflow to the reader, derived from the lineage DAG at read time (`MemoryRecallHit.provenance`).
+- A consolidated memory is rendered with its time range and occurrence count.
+- A resolved contrast is recalled as one memory; its contradiction history is attached and fades with access (`MemoryRecallHit.resolution`). Hebbian co-recall links only memories of the reader's own lineage, written to its own bank.
+
+See [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage).

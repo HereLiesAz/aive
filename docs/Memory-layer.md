@@ -78,7 +78,7 @@ graphs still load; nothing writes them.
 The engine enforces the boundary; it does not trust a clerk to keep it. Whatever runs a stage
 (programmatic, local model, hosted provider), `MemoryConsolidator` validates the answer in code:
 
-- Clerks only add. No answer edits or deletes a stored memory.
+- Clerks only add. No answer edits or deletes a stored record.
 - Every derived node and section must point at sources inside its packet, and keep its source episode.
 - A condensation cluster is never offered to any clerk if two of its members assert different values
   (a number, a quoted string, or negation in some but not all; `memoryClaimSignature`) or **contrast**
@@ -88,13 +88,13 @@ The engine enforces the boundary; it does not trust a clerk to keep it. Whatever
   memory, and link every source through `CondensedFrom`. A clerk that also emits `Supersedes` (or any
   relation other than `CondensedFrom`/`AssociatedWith`) is rejected, and the cluster is declined once
   it keeps failing.
-- **Supersession is coverage only.** After accepting a condensation, the engine itself adds
-  `Supersedes` from the generalized memory to each source whose every sentence the generalized text
-  contains (case and spacing folded), which includes an identical repeat (`memoryCovers`). Every other
-  source stays active: the generalized memory is an extra index entry beside it, linked by
-  `CondensedFrom`. A superseded memory leaves ranking but stays in the store with its provenance, and
-  is still returned as a divergent partner (below). A memory already folded into a condensation is not
-  offered for condensation again.
+- **Consolidation rewrites the current memory; storage stays add-only.** After accepting a
+  condensation, the engine adds `Supersedes` from the generalized memory to every source: the members
+  are the same memory (similar, never contrasting), so the generalized memory is the new current
+  version and the sources become history. History is never deleted: it stays in the store with its
+  provenance, reachable through `CondensedFrom` and `MemorySnapshot.historyOf`, and fades from default
+  recall. A memory already folded into a condensation is not offered for condensation again. Every
+  rewrite is fitted to its size budget (below).
 - Forgetting an episode removes what was derived only from it; memories with other sources stay, and
   a register variant no remaining memory attests is removed with it.
 
@@ -102,9 +102,8 @@ Condensation exists to fold repeated and similar memories, as people do. The def
 treating a **frame** match as similarity. Every statement has a frame (what it is about: its subject
 and the question or predicate it answers) and a filler (what it says in that slot). "I chose Postgres
 for the database" and "I chose MySQL for the database" share a frame and differ in filler: they are
-not similar, they are a contrast, and memory keeps both. The terms are borrowed loosely from frame
-semantics (Fillmore; FrameNet's frames and frame elements); the implementation is a surface diff, not
-a frame lexicon.
+not similar, they are a contrast, and memory keeps both until an agent has deliberated over them. The
+implementation is a surface diff, not a lexicon.
 
 ### Contrast, variant register, divergence marker, deliberation
 
@@ -122,35 +121,65 @@ the same for every clerk engine, and none of it judges which memory is right.
   phrased with different structure, and it can flag two lowercase names it reads as values.
 - **Divergence marker** (`Diverges`): when an episode reaches the condensation stage, before any
   condensation, the engine compares each of its Context, Phrase and Summary memories with up to 48
-  same-kind memories sharing a content word (any project) and links every contrasting pair. The marker
-  is structural and advisory, like a genealogy finding: it says the two differ, nothing more. A
-  generalized memory inherits its sources' markers.
+  same-kind memories sharing a content word in the workflow's lineage bank (its own records and its
+  ancestors'; never another workflow's read-only bank) and links every contrasting pair, writing the
+  marker into the workflow's own bank. When a merge marries lineages, the engine compares the
+  memories of the married sides and marks their contrasts in the merging workflow's bank
+  (`MemoryVariantRegister.mergeMutationFor`). The marker is structural and advisory: it says the two
+  differ, nothing more. A generalized memory inherits its sources' markers.
 - **Variant register**: for each frame, a `Frame` node and one `Variant` node per filler
   (`VariantOf`), and an `Attests` edge from every memory that states that filler. Each attestation
   records age (the memory's record time, its episode times and, when the text states an ISO date, that
   event date), context (sessions, project, workflow run, task run, role), subject (the frame's words
   before the first slot) and source episodes; a variant's occurrence count is its distinct source
   episodes. It is add-only and keyed by content, so writing it twice is a no-op. Read it with
-  `MemorySnapshot.variantRegister()`. Nothing in it is ranked as correct. Keeping both record and
-  event time is the bitemporal pattern (transaction vs valid time) applied to attestations only; it is
-  not a bitemporal store.
-- **Recall unit**: every recall result carries its divergent partners (`MemoryRecallHit.conflicts`,
-  from `Diverges` and legacy `ConflictsWith`) and any deliberations about them, including partners
-  that are superseded, out of the query's scope or did not match. Ranking, the result budget, the
+  `MemorySnapshot.variantRegister()`. Nothing in it is ranked as correct.
+- **Recall unit**: every recall result with an unresolved divergence carries its divergent partners
+  (`MemoryRecallHit.conflicts`, from `Diverges` and legacy `ConflictsWith`) and any deliberations about
+  them, including partners that are superseded, out of the query's scope or did not match. Ranking, the result budget, the
   attention dial and prompt rendering all handle a hit and its partners as one item; rendering adds
   whole units only and never cuts one in two. Surfacing is on by default (`includeConflicts = true`).
 - **Deliberation record**: an agent's conscious conclusion about a divergence,
-  `MemoryTool.deliberate(MemoryDeliberationRequest)`. It is stored as its own episode and a
-  `Deliberation` node citing the memories (and naming the evidence) it considered (`Deliberates`). It
-  is not queued for consolidation, so it is never sectioned or condensed, and it never supersedes: the
-  marker and both sides stay, and recall returns the deliberation with the unit ("has deliberations").
+  `MemoryTool.deliberate(MemoryDeliberationRequest)`. It is stored as its own episode (in the current
+  workflow's bank) and a `Deliberation` node citing the memories (and naming the evidence) it
+  considered (`Deliberates`). It may name the cited memory it judged correct (`chosen`), or conclude
+  "unresolved" (`chosen = null`). It is never sectioned or condensed itself.
 
-Keeping every contrasting trace and handing the set to a reasoner follows the spirit of an
-assumption-based truth maintenance system (de Kleer's ATMS keeps contradictory environments rather
-than retracting one). Unlike an ATMS, memory never labels anything inconsistent.
+### Resolved contrasts: deliberation, then absorption
 
-Differing memories therefore stay separate and marked, so recall brings them to an ordinary agent
-together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and record its
+Clerks never pick a side, and contrasting memories are never condensed on similarity. A contrast is
+consolidated only after conscious judgment:
+
+1. An agent investigates the divergence (the memories and any other evidence) and records a
+   deliberation that names the memory it judged correct.
+2. The next consolidation pass absorbs it (`MemoryDeliberationAbsorber`, deterministic): it writes a
+   new current version with the chosen memory's text (fitted to its size budget), tagged with the
+   consolidating workflow, `CondensedFrom` the chosen memory and the deliberation. Every cited memory
+   and its current versions become history (`Supersedes`, basis `deliberation`); the not-chosen side is
+   linked from the version (`notChosen`) and explained by the deliberation.
+3. A deliberation with no choice absorbs nothing: no deliberation, no consolidation of a contrast.
+4. A later deliberation over the same memories reopens it: its absorption writes a newer current
+   version that supersedes the earlier one. Everything stays reachable.
+
+Recall then returns the resolved memory as a single memory, not a divergence unit, so a model does not
+re-adjudicate it on every recall. Its contradiction history (`MemoryRecallHit.resolution`: the
+deliberation and the not-chosen side) is attached, and how much of it is rendered decays with access.
+Each recall that delivers it appends one access event (`Recalled`, from the resolving deliberation to
+the memory, in the reading workflow's bank; add-only, counted rather than kept as a mutable counter):
+
+| Recalls so far | Rendered under the memory |
+|---|---|
+| fewer than `RESOLVED_NOTE_RECALLS` (2) | "resolved, previously contested; not chosen: …" and a history link |
+| fewer than `RESOLVED_LINK_RECALLS` (5) | the history link only |
+| more | nothing |
+
+The history is always retrievable explicitly (`MemoryLayerController.history`,
+`MemorySnapshot.historyOf`). It surfaces as a live divergence again only when new contrasting evidence
+arrives: a new memory that contrasts with the resolved one is marked `Diverges` by the contrast step,
+and the pair is a divergence unit again.
+
+Unresolved differing memories therefore stay separate and marked, so recall brings them to an
+ordinary agent together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and record its
 conclusion as a deliberation or bank it as new experience through the same pipeline
 (`docs/architecture/MEMORY_BANKING_AND_ATTENTION.md`).
 
@@ -174,6 +203,149 @@ curator and keeps the thinker away from memory: the inverse of this layer.
   destroyed because a curator judged it obsolete, wrong or contradictory.
 - **Prose over schema.** Free-form pages cannot be validated; every clerk answer here is a typed,
   add-only mutation checked before it is stored, and clerks see bounded packets, never the whole store.
+
+## Workflow banks and lineage
+
+Memory is organised like version-control history.
+
+- **Workflow bank.** Every workflow run has its own memory bank: the records it appended, in its own
+  store (`MemoryBanks`, `WorkflowBankStore`). A session outside any workflow run is its own root
+  workflow (`session:<task run id>`, `memoryWorkflowOf`).
+- **Continuation.** A run that continues another names it as its parent
+  (`WorkflowRun.parentWorkflowRunIds`, carried to sessions as
+  `AgentOrchestrationContext.parentWorkflowRunIds`). It inherits the parent's bank by reference and
+  contributes to its own. A workflow's **lineage bank** (`LineageMemoryStore`) is its own records plus,
+  read through, every ancestor's: nothing is copied, and nothing is ever written into an ancestor's
+  bank. Workflows in one direct line therefore write to one ongoing history.
+- **Merge.** A run that combines the work of two or more lineages has several parents; it marries
+  their banks. Its lineage bank reads through every ancestry, and its writes continue the married
+  lineage. On the merge the engine compares the married sides and marks their contrasts in the
+  merging workflow's bank (noticing, not judging; resolution is a deliberation, above).
+- **Project.** A project is the set of workflow runs regarding it. A project can expand at any time to
+  incorporate another project and all its workflows (`MemoryLineage.expandProject`: an append-only
+  record of who, why and when; never removed silently).
+- **Access.** A session recalls from its workflow's lineage bank first. Then, read-only, from the
+  banks of the other workflows of its project (with expansions) that are not in its lineage, ranked
+  after the lineage and labelled with the workflow they came from. Nothing outside the project is
+  accessible. Nothing is ever written to, linked into, condensed with or registered in another
+  workflow's bank: contrast detection, condensation, associations, Hebbian co-recall, the register and
+  absorption all operate within the workflow's lineage bank and write only its own records.
+- **Add-only.** Workflows, parent links and project expansions are appended (`MemoryLineage`) and
+  never removed; a parent link that would make the graph cyclic is refused.
+
+```mermaid
+flowchart LR
+  subgraph P["Project P (expanded to incorporate Q)"]
+    A["run A (root)"] --> B["run B (continues A)"]
+    A --> C["run C (continues A)"]
+    B --> M["run M (merge of B and C)"]
+    C --> M
+    S["run S (root)"]
+    subgraph Q["Project Q"]
+      X["run X"]
+    end
+  end
+  Z["run Z (project R)"]
+  M -. "lineage bank: M + B + C + A" .-> M
+  S -. "read-only, labelled" .-> M
+  X -. "read-only, labelled" .-> M
+  Z -. "never accessible" .-x M
+```
+
+### Provenance
+
+Every memory is tagged with the workflow that produced it (`producedByWorkflow`; for a consolidated
+memory, the workflow that did the consolidation) and, when it came from one episode, the session
+(`producedBySession`). `LineageMemoryStore` stamps the tag on every memory it writes and refuses a
+memory tagged with another workflow. The lineage is not stored on memories: it is derived at read time
+from the DAG. Recall shows each hit's producing workflow, session, project and the lineage path from
+the producing workflow to the reading one, merge points included (`MemoryRecallHit.provenance`,
+`MemoryLineage.lineagePath`). A derived memory links to all its sources (`CondensedFrom`), and the
+sources keep their own tags, so the full provenance stays reachable. A merge workflow is part of both
+lineages, so a condensation it writes reaches both parent lineages through the DAG.
+
+### Size: a memory never grows
+
+A memory's text has a size budget that follows an S-curve over its life, measured in characters. Each
+current version records its memory's original size (`originalSize`) and its life position
+(`rewritePass`: how many rewrites it has gone through, fractional after a combination). With σ the
+logistic function, L = `MEMORY_LIFESPAN_PASSES` (10), m = `MEMORY_MIDPOINT_FRACTION` × L (0.6 × 10),
+s = `MEMORY_STEEPNESS_PASSES` (1) and φ = `MEMORY_FLOOR_FRACTION` (0.2):
+
+    f(n)      = (σ((n − m)/s) − σ(−m/s)) / (1 − σ(−m/s))        f(0) = 0
+    floor     = φ × original
+    budget(n) = floor + (original − floor) × (1 − f(n))
+
+Budget for a 1,000-character memory with the defaults:
+
+| pass | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| budget | 1000 | 996 | 987 | 963 | 906 | 786 | 600 | 415 | 295 | 238 | 214 | 201 |
+
+Little is lost early and near the floor; the steepest loss is just past the middle of the life.
+
+- **One memory rewritten** continues down its curve: the new version is at most budget(n + 1), strictly
+  smaller than the previous version (at least one character) until the floor, and never larger.
+- **Memories combined** (a condensation, a deliberation absorbed, new information folded in) re-base
+  the curve. Contributors are folded pairwise in order of arrival; each next one is the new memory
+  meeting the current summary:
+
+      original' = (w_s × size_s + w_n × size_n) / (w_s + w_n)
+      n'        = (w_s × n_s + w_n × n_n) / (w_s + w_n)
+      floor'    = φ × original'
+      limit     = max(floor', min(budget'(n' + 1), size_previous − 1))
+
+  where size_previous is the largest contributor's size, so a rewrite is never as big as what it
+  replaces. Folding exact repeats (every contributor states the version's text) rewrites nothing.
+  The weight w of a contributor uses existing measures only: its associative strength (the
+  saturating accumulation over its `SimilarTo`/`AssociatedWith` edges, Hebbian co-recall links
+  included; [Associative strength](architecture/TEMPORAL_MEMORY_AND_PROGRAMMATIC_ASSOCIATIONS.md#associative-strength-accumulates-on-a-saturating-exponential-curve)),
+  joined with its stored SalienceFilter salience by the same complementary rule, scaled by its
+  confidence (derivation fidelity, [Confidence semantics](#confidence-semantics)):
+  `w = confidence × (1 − (1 − salience)(1 − strength))`.
+  Worked example: an old summary of 600 characters (w = 0.75, life position 4) meets a new memory of
+  200 (w = 0.25, position 0): original' = 500, floor' = 100, n' = 3, and the rewrite may be at most
+  min(budget'(4), 599) = 453 characters.
+
+Fitting a rewrite into its limit keeps sentences by retention weight: the SalienceFilter score
+([Programmatic sectioning and salience](architecture/MEMORY_DETERMINISTIC_SEMANTICS.md#programmatic-sectioning-and-salience))
+of each sentence, with the deliberations citing the predecessors as the prompt terms, IDF over the
+predecessors' sentences, repeats across predecessors, and the sentence's position. If no sentence fits,
+the best sentence's clauses are kept, then function words are dropped, then it is cut at a word.
+Sentences that do not fit become a separate new memory linked to the version (`detail:<id>`), not
+growth; every prior version stays in history. `MemorySnapshot.applyMutation` refuses any rewrite over
+its limit, on every store, whichever clerk wrote it.
+
+### Time ranges and occurrences
+
+A raw memory keeps its exact time: the date its text states (ISO yyyy-mm-dd), else its earliest
+source episode's time. A consolidated current version carries a time range instead (`timeFrom`,
+`timeTo`: the earliest and latest over all contributors), and every further consolidation takes the
+union, so ranges only widen. It also carries how many times it happened in that range
+(`occurrences`: the distinct source episodes it was made from, deliberations excluded). Recall shows
+both ("~40 times, 2026-03-02 – 2026-09-28"); exact times come only from the history.
+
+### Raw history retention is the user's decision
+
+Raw history (the full context and chat of every agent session: episode chunks and prompts) is kept
+by default, with no automatic pruning. The user may set a retention (`MemoryLayerSettings.rawRetention`,
+or per project `rawRetentionByProject`): keep all, cap by size (newest characters kept), or cap by age.
+The Memory screen shows how much raw history is held. When a cap applies, raw history beyond it is
+purged as the single audited exception to add-only: the episode's chunks and prompt are removed, and
+the episode keeps a tombstone (`MemoryEpisode.purged`: what, when, why, and whose setting). Episodes
+still waiting for consolidation are never purged. Consolidated and current memories, their time
+ranges and occurrence counts never depend on raw history surviving and are never touched.
+
+### The one-time split of the old shared store
+
+Earlier versions kept one shared store. On first start the platform splits it into workflow banks
+(`migrateSharedMemoryToBanks`): each episode goes to its workflow run's bank (a session outside any
+run becomes its own root workflow), each memory with its source episodes and tagged with that
+workflow, each edge only where both ends are. The old store records no continuation or merge, so every
+migrated workflow starts as a root; project membership comes from the episodes' project ids. Anything
+drawn from several workflows is placed in no bank and listed in the migration report. The split is
+deterministic, idempotent and crash-safe (each bank is written whole, then verified, and only then is
+the report recorded), and the old store is left untouched as the backup.
 
 ## Memory flow
 
@@ -207,16 +379,20 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
 - **Queue:** waiting and parked counts; retry or discard parked entries.
 - **Tuning:** attempts before parking, packet size, similarity needed to condense, batch size.
 - **On-device models:** install or remove each clerk's model where the platform has them (Android).
-- **Stored memory:** counts, forget one episode (and what came only from it), export/import JSON,
-  forget everything. Memory can be switched off or its consolidation paused.
+- **Workflow memory bank:** pick the workflow whose bank the screen shows. Counts, forget one episode
+  (and what came only from it), export/import JSON and clear act on that workflow's own records only;
+  its ancestors' and other workflows' banks are untouched, and an import holding another workflow's
+  episode is refused. Memory can be switched off or its consolidation paused.
+- **Raw history:** how much raw session context is held, and the retention setting (keep all, cap by
+  size, cap by age).
 
-Every platform stores memory in SQLite through one `SqlMemoryStore`. On the web the database
-lives in the Origin Private File System, opened in a worker (`shared/memory-worker/`, the official
-SQLite WebAssembly build with its `opfs-sahpool` VFS, which needs no COOP/COEP headers).
-`openWebMemoryStore` creates or migrates the schema through `PRAGMA user_version` and imports the
-older browser-storage log once. A browser without OPFS keeps that browser-storage store. A second
-tab cannot open the database while the first holds it; it gets memory that lasts only for the
-session rather than a second copy that would diverge.
+Every platform stores each workflow's bank in its own SQLite database through `SqlMemoryStore`. On
+the web each bank is its own database in the Origin Private File System, opened in its own worker
+(`shared/memory-worker/`, named `bank-<stem>`, with its own `opfs-sahpool` pool so banks never share a
+lock; the official SQLite WebAssembly build needs no COOP/COEP headers). `openWebMemoryBanks` creates
+or migrates each schema through `PRAGMA user_version`. A browser without OPFS keeps each bank under its
+own browser-storage keys. A second tab cannot open a database while the first holds it; it gets
+memory that lasts only for the session rather than a second copy that would diverge.
 
 ### Engines
 
@@ -236,13 +412,17 @@ consolidation `policy`. Changes apply between packets.
 
 ### Storage
 
-The graph lives in SQLite through SQLDelight (`SqlMemoryStore`; schema in
-`shared/src/commonMain/sqldelight/.../Memory.sq`). One row per episode, section, node, edge, queue
+Each workflow's bank is its own SQLite database through SQLDelight (`SqlMemoryStore`; schema in
+`shared/src/commonMain/sqldelight/.../Memory.sq`): `~/.aive/memory/banks/w-<hash>-<id>.db` on desktop,
+`aive-memory-w-<hash>-<id>.db` on Android, an OPFS database per bank on the web. A bank's records may
+cite its ancestors' records (it is opened with external references allowed); the lineage view
+validates every reference. The lineage DAG, project membership and the bank list live in Settings
+(`MemoryLineage`, `SettingsMemoryBankRegistry`). One row per episode, section, node, edge, queue
 entry and declined cluster; each row holds the full record as JSON plus indexed columns (node kind,
 edge endpoints and relation, episode) for querying. A commit is one transaction containing only its
 own rows. Queries are generated as suspend functions so the same store runs on the browser's
-asynchronous worker driver. `SettingsMemoryStore` remains for platforms not yet on SQLite and as the
-source of the one-time import.
+asynchronous worker driver. `SettingsMemoryStore` remains for browsers without OPFS and as the source
+of the one-time import.
 
 ### Failure and output contract
 

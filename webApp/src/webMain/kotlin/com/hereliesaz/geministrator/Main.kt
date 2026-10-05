@@ -62,7 +62,7 @@ fun main() {
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
     val memoryScope = MainScope()
     // One database per workflow run's memory bank; lineage and projects in Settings.
-    val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage(com.russhwolf.settings.Settings())
+    val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
     val memoryBanks = memoryScope.async {
         openWebMemoryBanks(memoryLineage) { reason -> println("Aive memory: SQLite unavailable ($reason)") }
     }

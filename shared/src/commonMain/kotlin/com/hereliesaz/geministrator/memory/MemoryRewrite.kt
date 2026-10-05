@@ -3,7 +3,6 @@ package com.hereliesaz.geministrator.memory
 import kotlin.math.ceil
 import kotlin.math.exp
 import kotlin.math.floor
-import kotlin.math.ln
 
 /**
  * A memory never grows, and it fades along an S-curve.
@@ -40,14 +39,15 @@ import kotlin.math.ln
  * exception: folding exact repeats (every contributor has the version's text) rewrites nothing and
  * keeps the text.
  *
- * A memory's weight is the retention weight at memory level (see [MemoryRewrite.weigher]):
- * `w = 1 + 2·cited + 1·detail + 0.5·ln(1 + accesses) + 0.5·recent`, with `cited` 1 when a
- * deliberation cites it, `detail` 1 when its text carries a number, identifier, quoted string or
- * negation, `accesses` its recorded recalls, and `recent` 1 for the newest contributor.
+ * A contributor's weight w combines existing measures only: `w = confidence × (1 − (1 − salience) ×
+ * (1 − strength))`, where `strength` is its associative strength (accumulateAssociationEvidence over
+ * its SimilarTo/AssociatedWith edges, Hebbian co-recall links included; TEMPORAL_MEMORY_AND_
+ * PROGRAMMATIC_ASSOCIATIONS.md), `salience` its stored SalienceFilter score and `confidence` its
+ * derivation fidelity (Memory-layer.md); salience joins strength by the same complementary rule.
  *
- * Worked example: an old summary of 600 characters (weight 3, life position 4) meets a new memory of
- * 200 (weight 1, position 0): original' = (3·600 + 1·200)/4 = 500, floor' = 100, n' = 3, and the
- * rewrite may be at most min(budget'(4), 599) = 459 characters.
+ * Worked example: an old summary of 600 characters (w = 0.75, life position 4) meets a new memory of
+ * 200 (w = 0.25, position 0): original' = (0.75·600 + 0.25·200)/1 = 500, floor' = 100, n' = 3, and
+ * the rewrite may be at most min(budget'(4), 599) characters.
  *
  * [MemorySnapshot.applyMutation] refuses any rewrite over its limit, on every store, whichever clerk
  * wrote it. Fitting drops detail by weight ([MemoryRewrite.compress]); the predecessors stay as
@@ -115,6 +115,9 @@ fun memoryRewriteLimit(contributors: List<MemorySizeState>): Int {
     return maxOf(floorSize, minOf(memorySizeBudget(original, pass), previous - 1))
 }
 
+/** Keeps a contributor with zero salience, strength or confidence from vanishing from the average. */
+private const val MIN_CONTRIBUTOR_WEIGHT = 1e-3
+
 internal fun MemoryNode.sizeState(weight: Double = 1.0): MemorySizeState = MemorySizeState(
     text.length,
     metadata[MEMORY_ORIGINAL_SIZE]?.toIntOrNull() ?: text.length,
@@ -127,16 +130,14 @@ internal fun MemorySnapshot.contributorStates(ids: Collection<MemoryNodeId>): Li
     val nodesById = nodes.associateBy(MemoryNode::id)
     val contributors = ids.distinct().mapNotNull(nodesById::get).sortedWith(compareBy<MemoryNode> { it.createdAtEpochMillis }.thenBy { it.id.value })
     if (contributors.isEmpty()) return emptyList()
-    val cited = edges.filter { it.relation == MemoryRelationKind.Deliberates }.mapTo(hashSetOf()) { it.to }
-    val accesses = edges.filter { it.relation == MemoryRelationKind.Recalled }.groupingBy { it.to }.eachCount()
-    val newest = contributors.last().id
+    val evidence = edges.filter { it.relation.isAssociativeEvidence() }
     return contributors.map { node ->
-        val weight = 1.0 +
-            2 * (if (node.id in cited) 1 else 0) +
-            (if (MemoryRewrite.hasDetail(node.text)) 1 else 0) +
-            0.5 * ln(1.0 + (accesses[node.id] ?: 0)) +
-            0.5 * (if (node.id == newest && contributors.size > 1) 1 else 0)
-        node.sizeState(weight)
+        // Existing measures only: associative strength (accumulateAssociationEvidence, which
+        // includes Hebbian co-recall links), combined with the stored salience by the same
+        // complementary rule, scaled by confidence (derivation fidelity).
+        val strength = accumulateAssociationEvidence(evidence.filter { it.from == node.id || it.to == node.id }).toDouble()
+        val weight = node.confidence * (1 - (1 - node.salience) * (1 - strength))
+        node.sizeState(weight.coerceAtLeast(MIN_CONTRIBUTOR_WEIGHT))
     }
 }
 
@@ -145,31 +146,27 @@ data class MemoryCompression(val text: String, val dropped: List<String>)
 
 internal object MemoryRewrite {
     /**
-     * Weight of each sentence of a rewrite of [predecessors] in [snapshot]:
-     *
-     * `1 + 2·cited + 1·detail + 0.5·ln(1 + accesses) + 0.5·recent`, where `cited` is 1 when the
-     * sentence shares a content word with a deliberation citing a predecessor, `detail` is 1 when it
-     * carries a number, identifier, quoted string or negation, `accesses` counts the recorded recalls
-     * (`Recalled` events) of the predecessors whose text holds the sentence, and `recent` is 1 when
-     * the newest predecessor holds it.
+     * Retention weight of each sentence of a rewrite of [predecessors]: the existing SalienceFilter
+     * score ([MemorySalienceFeatures.score]; MEMORY_DETERMINISTIC_SEMANTICS.md, "Programmatic
+     * sectioning and salience") applied to the sentence, with the deliberations citing the
+     * predecessors as the prompt terms, IDF over the predecessors' sentences, repeats counted across
+     * the predecessors, and the sentence's position in the predecessor that holds it. Nothing new is
+     * defined here.
      */
     fun weigher(snapshot: MemorySnapshot, predecessors: Collection<MemoryNodeId>): (String) -> Double {
         val nodesById = snapshot.nodes.associateBy(MemoryNode::id)
         val preds = predecessors.mapNotNull(nodesById::get)
-        val deliberationWords = snapshot.edges
+        val promptTerms = snapshot.edges
             .filter { it.relation == MemoryRelationKind.Deliberates && it.to in predecessors }
             .mapNotNull { nodesById[it.from] }
-            .flatMapTo(hashSetOf()) { contentWords(it.text) }
-        val accesses = preds.associate { node -> node.id to snapshot.edges.count { it.relation == MemoryRelationKind.Recalled && it.to == node.id } }
-        val newest = preds.maxByOrNull(MemoryNode::createdAtEpochMillis)
+            .flatMapTo(hashSetOf()) { MemorySalienceFeatures.terms(it.text) }
+        val predSentences = preds.map { node -> memorySentences(node.text).map(::normalize) }
+        val idf = MemorySalienceFeatures.idf(predSentences.flatten())
         return { sentence ->
-            val words = contentWords(sentence)
             val norm = normalize(sentence)
-            val cited = if (words.any { it in deliberationWords }) 1.0 else 0.0
-            val detail = if (DETAIL.containsMatchIn(sentence)) 1.0 else 0.0
-            val accessed = preds.filter { normalize(it.text).contains(norm) }.sumOf { accesses[it.id] ?: 0 }
-            val recent = if (newest != null && normalize(newest.text).contains(norm)) 1.0 else 0.0
-            1.0 + 2 * cited + detail + 0.5 * ln(1.0 + accessed) + 0.5 * recent
+            val holders = predSentences.filter { norm in it }
+            val position = holders.firstOrNull()?.let { list -> if (list.size > 1) list.indexOf(norm).toFloat() / (list.size - 1) else 0f } ?: 1f
+            MemorySalienceFeatures.score(sentence, null, promptTerms, idf, duplicates = (holders.size - 1).coerceAtLeast(0), position = position).score.toDouble()
         }
     }
 
@@ -204,7 +201,7 @@ internal object MemoryRewrite {
 
     private fun select(parts: List<String>, limit: Int, separator: String, weight: (String) -> Double): Set<Int> {
         val order = parts.indices.sortedWith(compareByDescending<Int> { weight(parts[it]) }.thenBy { it })
-        val chosen = sortedSetOf<Int>()
+        val chosen = hashSetOf<Int>()
         var length = 0
         order.forEach { i ->
             val extra = parts[i].length + if (chosen.isEmpty()) 0 else separator.length
@@ -213,7 +210,7 @@ internal object MemoryRewrite {
                 length += extra
             }
         }
-        return chosen
+        return chosen.sorted().toCollection(linkedSetOf())
     }
 
     /** A rewrite of [predecessors] fitted to its limit, with the detail it drops. */
@@ -230,7 +227,8 @@ internal object MemoryRewrite {
         val (original, pass) = memoryRewriteState(states)
         // A consolidated version carries the time range of everything it was made from.
         return mapOf(MEMORY_ORIGINAL_SIZE to original.toString(), MEMORY_REWRITE_PASS to pass.toString()) +
-            MemoryTimeRange.metadataFor(snapshot, predecessors)
+            MemoryTimeRange.metadataFor(snapshot, predecessors) +
+            (MEMORY_OCCURRENCES to MemoryTimeRange.occurrences(snapshot, predecessors).toString())
     }
 
     /**
