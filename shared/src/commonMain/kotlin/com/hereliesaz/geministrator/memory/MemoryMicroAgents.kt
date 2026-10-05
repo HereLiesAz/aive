@@ -180,6 +180,16 @@ class MemoryMicroAgentRouter(
         return merged
     }
 
+    override fun fitsInput(packet: MemoryWorkPacket): Boolean {
+        if (packet.stage == MemoryConsolidationStage.Complete) return true
+        val primary = packet.copy(neighborhood = emptyList())
+        return rolesFor(packet.stage).all { role ->
+            val model = requireNotNull(agentsByRole[role]).model
+            val routed = primary.withCodeSemanticHints(role).withRoleInstruction(role)
+            routed.items.size <= model.maxInputItems && routed.estimatedInputChars() <= model.maxContentChars
+        }
+    }
+
     fun constrainPolicy(base: MemoryConsolidationPolicy = MemoryConsolidationPolicy()): MemoryConsolidationPolicy {
         val active = REQUIRED_ROLES.mapNotNull(agentsByRole::get)
         return base.copy(

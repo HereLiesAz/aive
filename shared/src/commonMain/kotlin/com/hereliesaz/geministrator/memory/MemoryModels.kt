@@ -290,6 +290,12 @@ data class MemoryQueueEntry(
     val episodeId: MemoryEpisodeId,
     val stage: MemoryConsolidationStage = MemoryConsolidationStage.Sectioning,
     val cursor: Int = 0,
+    /**
+     * Which part of the item at [cursor] comes next, when that one item alone exceeds its stage's
+     * input budget and is sent in paragraph parts. 0 otherwise. Advances atomically with the part's
+     * mutations, so a crash mid-split resumes at the same part with the same packet key.
+     */
+    val part: Int = 0,
     val status: MemoryQueueStatus = MemoryQueueStatus.Pending,
     val priority: MemoryQueuePriority = MemoryQueuePriority.Normal,
     val attempt: Int = 0,

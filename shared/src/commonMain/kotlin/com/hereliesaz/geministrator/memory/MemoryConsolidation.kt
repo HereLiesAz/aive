@@ -8,6 +8,14 @@ import kotlinx.coroutines.CancellationException
  */
 interface MemoryManagerAgent {
     suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch
+
+    /**
+     * Whether [packet]'s primary items fit the input budget of every clerk that will receive it,
+     * measured the way the manager measures it (ids, kinds, metadata, routed instruction). The
+     * consolidator sizes each packet with this before sending it, so a packet is never built that
+     * its stage must reject. The neighborhood is excluded: the manager trims it to the remainder.
+     */
+    fun fitsInput(packet: MemoryWorkPacket): Boolean = true
 }
 
 class MemoryConsolidationQueue(
@@ -222,6 +230,7 @@ class MemoryConsolidator(
                     entry.copy(
                         stage = entry.stage.next(),
                         cursor = 0,
+                        part = 0,
                         status = MemoryQueueStatus.Pending,
                         lastError = null,
                     )
@@ -276,6 +285,7 @@ class MemoryConsolidator(
                     )
                     plan.hasMore -> current.copy(
                         cursor = current.cursor + plan.consumed,
+                        part = plan.nextPart,
                         status = MemoryQueueStatus.Pending,
                         attempt = 0,
                         lastError = null,
@@ -283,6 +293,7 @@ class MemoryConsolidator(
                     else -> current.copy(
                         stage = current.stage.next(),
                         cursor = 0,
+                        part = 0,
                         status = MemoryQueueStatus.Pending,
                         attempt = 0,
                         lastError = null,
@@ -384,9 +395,10 @@ class MemoryConsolidator(
                 projectId = episode.projectId,
             )
                 .map { cluster ->
-                    cluster to cluster
-                        .map(MemoryNode::asWorkItem)
-                        .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
+                    cluster to fitPrefix(
+                        entry,
+                        cluster.map(MemoryNode::asWorkItem).boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars),
+                    )
                 }
                 // A cluster whose members assert different values or contrast (same frame, different
                 // filler) is never offered: merging it would pick a claim, whichever engine runs the
@@ -440,8 +452,25 @@ class MemoryConsolidator(
         }
 
         if (entry.cursor >= allItems.size) return null
-        val selected = allItems.boundedSlice(entry.cursor, policy.maxPacketItems, policy.maxPacketChars)
-        if (selected.isEmpty()) return null
+        val candidate = allItems.boundedSlice(entry.cursor, policy.maxPacketItems, policy.maxPacketChars)
+        if (candidate.isEmpty()) return null
+        // Sized to what the stage's clerks will actually accept, not only by item count and text
+        // length: the longest fitting prefix goes now, the rest starts the next packet.
+        var selected = fitPrefix(entry, candidate)
+        var packetKey = "${entry.stage.name.lowercase()}-${entry.cursor}"
+        var partCount = 1
+        if (selected.isEmpty()) {
+            // One item alone is over budget: send it in paragraph parts, one part per packet.
+            val item = allItems[entry.cursor]
+            val parts = splitToFit(entry, item)
+            partCount = parts.size
+            require(entry.part < partCount) {
+                "Memory work item ${item.id} has ${parts.size} parts; queue cursor points at part ${entry.part}"
+            }
+            selected = listOf(parts[entry.part])
+            packetKey += "-part${entry.part}"
+        }
+        val lastPart = entry.part >= partCount - 1
         val remainingChars = (policy.maxPacketChars - selected.sumOf { it.text.length }).coerceAtLeast(0)
         val remainingItems = (policy.maxPacketItems - selected.size).coerceAtLeast(0)
         val neighborhood = if (
@@ -466,13 +495,14 @@ class MemoryConsolidator(
                 queueId = entry.id,
                 episodeId = entry.episodeId,
                 stage = entry.stage,
-                packetKey = "${entry.stage.name.lowercase()}-${entry.cursor}",
+                packetKey = packetKey,
                 items = selected,
                 neighborhood = neighborhood,
                 instruction = instructionFor(entry.stage),
             ),
-            consumed = selected.size,
-            hasMore = entry.cursor + selected.size < allItems.size,
+            consumed = if (partCount > 1) (if (lastPart) 1 else 0) else selected.size,
+            hasMore = !lastPart || entry.cursor + selected.size < allItems.size,
+            nextPart = if (lastPart) 0 else entry.part + 1,
         )
     }
 
@@ -684,10 +714,56 @@ class MemoryConsolidator(
         require(batch.edgesToAdd.all { it.relation in allowedRelations })
     }
 
+    private fun probe(entry: MemoryQueueEntry, items: List<MemoryWorkItem>) = MemoryWorkPacket(
+        queueId = entry.id,
+        episodeId = entry.episodeId,
+        stage = entry.stage,
+        packetKey = "${entry.stage.name.lowercase()}-${entry.cursor}-part${entry.part}",
+        items = items,
+        instruction = instructionFor(entry.stage),
+    )
+
+    private fun fits(entry: MemoryQueueEntry, items: List<MemoryWorkItem>): Boolean =
+        items.size <= policy.maxPacketItems &&
+            items.sumOf { it.text.length } <= policy.maxPacketChars &&
+            manager.fitsInput(probe(entry, items))
+
+    /** The longest prefix of [items] the stage accepts; empty when even the first item alone does not fit. */
+    private fun fitPrefix(entry: MemoryQueueEntry, items: List<MemoryWorkItem>): List<MemoryWorkItem> {
+        var end = items.size
+        while (end > 0 && !fits(entry, items.subList(0, end))) end -= 1
+        return items.subList(0, end).toList()
+    }
+
+    /**
+     * Splits one item that alone exceeds its stage's budget into ordered parts that each fit. Parts
+     * keep the item's id and kind (so provenance and edges still name the real source) and carry
+     * [MEMORY_PART] = "i/n". Paragraphs are kept whole while they fit; a paragraph that alone is too
+     * long is cut at whitespace. Deterministic for a given item and budget, so a resumed entry sees
+     * the same parts.
+     */
+    private fun splitToFit(entry: MemoryQueueEntry, item: MemoryWorkItem): List<MemoryWorkItem> {
+        val paragraphs = item.text.split(PARAGRAPH_BREAK).map(String::trim).filter(String::isNotEmpty)
+        var limit = item.text.length
+        while (limit >= MIN_PART_CHARS) {
+            val texts = packParagraphs(paragraphs, limit)
+            val parts = texts.mapIndexed { index, text ->
+                item.copy(text = text, metadata = item.metadata + (MEMORY_PART to "${index + 1}/${texts.size}"))
+            }
+            if (parts.size > 1 && parts.all { fits(entry, listOf(it)) }) return parts
+            limit = limit * 3 / 4
+        }
+        throw IllegalArgumentException(
+            "Memory work item ${item.id} cannot fit the ${entry.stage} input budget even split into parts; " +
+                "its id, kind and metadata alone exceed it",
+        )
+    }
+
     private data class PacketPlan(
         val packet: MemoryWorkPacket,
         val consumed: Int,
         val hasMore: Boolean,
+        val nextPart: Int = 0,
         val condensationKind: MemoryNodeKind? = null,
         val clusterKey: String? = null,
     )
@@ -801,6 +877,41 @@ private fun String.chunkedText(maxChars: Int): List<String> {
     return result.filter(String::isNotEmpty)
 }
 
+/** Metadata key on a work item that is one part ("i/n") of a source item too large for one packet. */
+const val MEMORY_PART = "memory.part"
+
+private val PARAGRAPH_BREAK = Regex("\\n\\s*\\n")
+private const val MIN_PART_CHARS = 16
+
+/** Greedily packs whole paragraphs into texts of at most [limit] chars; an overlong paragraph is cut at whitespace. */
+private fun packParagraphs(paragraphs: List<String>, limit: Int): List<String> {
+    val pieces = paragraphs.flatMap { paragraph -> cutAtWhitespace(paragraph, limit) }
+    val out = mutableListOf<String>()
+    val current = StringBuilder()
+    for (piece in pieces) {
+        if (current.isNotEmpty() && current.length + 2 + piece.length > limit) {
+            out += current.toString()
+            current.clear()
+        }
+        if (current.isNotEmpty()) current.append("\n\n")
+        current.append(piece)
+    }
+    if (current.isNotEmpty()) out += current.toString()
+    return out
+}
+
+private fun cutAtWhitespace(text: String, limit: Int): List<String> {
+    val out = mutableListOf<String>()
+    var rest = text
+    while (rest.length > limit) {
+        val space = rest.lastIndexOf(' ', limit).takeIf { it > 0 } ?: limit
+        out += rest.substring(0, space).trim()
+        rest = rest.substring(space).trim()
+    }
+    if (rest.isNotEmpty()) out += rest
+    return out
+}
+
 private fun List<MemoryWorkItem>.boundedSlice(
     start: Int,
     maxItems: Int,
@@ -811,10 +922,8 @@ private fun List<MemoryWorkItem>.boundedSlice(
     var index = start
     while (index < size && result.size < maxItems) {
         val item = this[index]
+        // An item over the limit on its own is still returned (alone); the caller splits it into parts.
         if (result.isNotEmpty() && chars + item.text.length > maxChars) break
-        require(item.text.length <= maxChars) {
-            "Memory work item ${item.id} has ${item.text.length} chars; packet limit is $maxChars"
-        }
         result += item
         chars += item.text.length
         index += 1
