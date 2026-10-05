@@ -223,8 +223,14 @@ data class WorkflowRun(
     /** Exact role definitions used by this run, including package-local roles. */
     val roleSnapshot: List<RoleDefinition> = emptyList(),
     val globalPause: WorkflowGlobalPause? = null,
+    /**
+     * Workflow runs this run continues: one parent for a continuation, several for a merge that
+     * combines lineages. Empty for a root run. Memory derives its lineage banks from these.
+     */
+    val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
 ) {
     init {
+        require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }
         taskRuns.forEach { (key, taskRun) ->
             require(key == taskRun.taskDefinitionId) {
                 "taskRuns map key ${key.value} does not match TaskRun.taskDefinitionId ${taskRun.taskDefinitionId.value}"

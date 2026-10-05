@@ -273,13 +273,16 @@ class MemoryConsolidator(
                     )
                 }
 
+                // A memory never grows: the condensed version is fitted to its sources by weight, whatever
+                // clerk wrote it, and the detail it drops becomes a separate linked memory.
+                val fitted = if (entry.stage == MemoryConsolidationStage.Condensation) fitCondensation(latest, plan, batch) else batch
                 if (
                     store.commit(
                         expectedRevision = latest.revision,
                         mutation = MemoryStoreMutation(
-                            sectionsToAdd = batch.sectionsToAdd,
-                            nodesToAdd = batch.nodesToAdd,
-                            edgesToAdd = batch.edgesToAdd + condensationEngineEdges(latest, entry.stage, plan, batch),
+                            sectionsToAdd = fitted.sectionsToAdd,
+                            nodesToAdd = fitted.nodesToAdd,
+                            edgesToAdd = fitted.edgesToAdd + condensationEngineEdges(latest, entry.stage, plan, batch),
                             queueUpserts = listOf(nextEntry),
                         ),
                     )
@@ -576,12 +579,25 @@ class MemoryConsolidator(
         }
     }
 
+    private fun fitCondensation(snapshot: MemorySnapshot, plan: PacketPlan, batch: MemoryMutationBatch): MemoryMutationBatch {
+        val generalized = batch.nodesToAdd.singleOrNull() ?: return batch
+        val sources = plan.packet.items.map { MemoryNodeId(it.id) }
+        val fitted = MemoryRewrite.fit(snapshot, generalized.text, sources)
+        val version = generalized.copy(text = fitted.text, metadata = generalized.metadata + MemoryRewrite.versionMetadata(snapshot, sources))
+        val spill = MemoryRewrite.spillFor(version, fitted.dropped)
+        return batch.copy(
+            nodesToAdd = listOfNotNull(version, spill?.first),
+            edgesToAdd = batch.edgesToAdd + listOfNotNull(spill?.second),
+        )
+    }
+
     /**
      * Edges only the engine writes for a condensation:
      *
-     * - `Supersedes` from the generalized memory to each source it genuinely covers (contains every
-     *   source sentence; an identical repeat). Other sources stay active beside it: the generalized
-     *   memory is then an extra index entry, linked by `CondensedFrom`.
+     * - `Supersedes` from the generalized memory to every source: consolidation rewrites. The members
+     *   are the same memory (similar, never contrasting: a contrasting cluster is never offered), so the
+     *   generalized memory is the new current version and the sources become history, kept and
+     *   reachable through `CondensedFrom`, faded from default recall.
      * - The sources' divergence markers and variant attestations, carried over to the generalized
      *   memory (its sources agree, so it states what they state), so recalling it still brings the
      *   contrasting partners.
@@ -630,7 +646,6 @@ class MemoryConsolidator(
             }
         }
         return inherited.values.toList() + plan.packet.items
-            .filter { memoryCovers(generalized.text, it.text) }
             .map { item ->
                 MemoryEdge(
                     id = MemoryEdgeId("${generalized.id.value}:supersedes:${item.id}"),
@@ -638,7 +653,7 @@ class MemoryConsolidator(
                     to = MemoryNodeId(item.id),
                     relation = MemoryRelationKind.Supersedes,
                     createdAtEpochMillis = generalized.createdAtEpochMillis,
-                    metadata = mapOf("basis" to "coverage"),
+                    metadata = mapOf("basis" to "condensation"),
                 )
             }
     }

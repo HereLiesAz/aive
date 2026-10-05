@@ -163,28 +163,28 @@ class MemoryContrastRegisterTest {
         }
     }
 
-    // ---- supersession is coverage only -----------------------------------------------------------
+    // ---- consolidation rewrites: sources become history ------------------------------------------
 
     @Test
-    fun condensationSupersedesOnlyCoveredSources() = runBlocking<Unit> {
+    fun condensationWritesTheCurrentVersionAndKeepsSourcesAsHistory() = runBlocking<Unit> {
         val store = store(
             "c-1" to "The connection pool is shared.",
             "c-2" to "The connection pool is shared.",
             "c-3" to "The connection pool is shared. It is sized by the gateway.",
         )
-        // Generalized memory: covers c-1 and c-2 (identical) but drops c-3's second sentence.
         val manager = condenser(text = "The connection pool is shared.")
 
         drain(MemoryConsolidator(store, manager, policy))
 
         val snapshot = store.read()
+        // The members are the same memory (similar, not contrasting): all become history.
         val superseded = snapshot.edges.filter { it.relation == MemoryRelationKind.Supersedes }.map { it.to.value }.toSet()
-        assertEquals(setOf("c-1", "c-2"), superseded)
-        val condensedFrom = snapshot.edges.filter { it.relation == MemoryRelationKind.CondensedFrom }.map { it.to.value }.toSet()
-        assertEquals(setOf("c-1", "c-2", "c-3"), condensedFrom)
-        // c-3 stays recallable beside the generalized entry.
-        val hits = GraphMemoryTool(store).grip(MemoryQuery("gateway", resolution = MemoryResolution.Context)).hits
-        assertTrue(hits.any { it.node.id.value == "c-3" })
+        assertEquals(setOf("c-1", "c-2", "c-3"), superseded)
+        val generalized = snapshot.nodes.single { it.id.value.startsWith("g-") }
+        assertEquals(setOf("c-1", "c-2", "c-3"), snapshot.historyOf(generalized.id).map { it.id.value }.toSet())
+        // Default recall returns the current version only.
+        val hits = GraphMemoryTool(store).grip(MemoryQuery("connection pool", resolution = MemoryResolution.Context)).hits
+        assertEquals(listOf(generalized.id), hits.map { it.node.id })
     }
 
     @Test

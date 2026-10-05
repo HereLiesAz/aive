@@ -15,8 +15,7 @@ import com.hereliesaz.geministrator.memory.MemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
 import com.hereliesaz.geministrator.memory.MemoryStageEngine
-import com.hereliesaz.geministrator.memory.SettingsMemoryStore
-import com.hereliesaz.geministrator.memory.androidSqlMemoryStore
+import com.hereliesaz.geministrator.memory.androidSqlMemoryBanks
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingInferenceRuntime
 import com.hereliesaz.geministrator.memory.AndroidOrtEmbeddingModelAdapter
 import com.hereliesaz.geministrator.memory.AndroidOrtGenerativeInferenceRuntime
@@ -644,18 +643,20 @@ internal class AndroidMemoryLayerRuntime(
             }
     }
 
+    /** The workflow lineage DAG and project membership (add-only). */
+    private val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
+
     /**
-     * SQLite store. Built on the IO dispatcher (see MainActivity), so the one-time import of the
-     * older Settings-backed graph runs before anything can bank into the new database.
+     * One SQLite database per workflow run's memory bank. Built on the IO dispatcher (see
+     * MainActivity), so the one-time split of the older shared store runs before anything can bank.
      */
-    private val store = androidSqlMemoryStore(context).also { store ->
-        runBlocking { store.importLegacy(SettingsMemoryStore.createDefault()) }
-    }
+    private val banks = runBlocking { androidSqlMemoryBanks(context, memoryLineage) }
 
     /** The memory layer the Memory screen controls. */
     val controller = MemoryLayerController(
-        store = store,
+        banks = banks,
         settingsStore = MemoryLayerSettingsStore.createDefault(),
+        lineage = memoryLineage,
         engineProvider = engineProvider,
         scope = scope,
         localModels = AndroidMemoryLocalModels(installer, scope),

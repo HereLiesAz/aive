@@ -21,6 +21,8 @@ import kotlinx.serialization.json.Json
 class SqlMemoryStore(
     driver: SqlDriver,
     private val json: Json = SettingsMemoryStore.defaultJson,
+    /** A workflow's own records in a lineage bank: may reference its ancestors' records (see [LineageMemoryStore]). */
+    private val allowExternalReferences: Boolean = false,
 ) : MemoryStore {
     private val database = MemoryDatabase(driver)
     private val queries = database.memoryQueries
@@ -68,7 +70,7 @@ class SqlMemoryStore(
                 queries.setRevision(snapshot.revision.toString())
             }
             cached = snapshot
-            ids = MemoryIdIndex(snapshot)
+            ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
     }
 
@@ -104,7 +106,7 @@ class SqlMemoryStore(
             throw MemoryStoreCorruptionException("Memory database is unreadable and must be repaired or cleared.", failure)
         }
         cached = snapshot
-        ids = MemoryIdIndex(snapshot)
+        ids = MemoryIdIndex(snapshot, allowExternalReferences)
         return snapshot
     }
 

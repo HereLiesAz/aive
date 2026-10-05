@@ -59,6 +59,23 @@ data class MemoryEpisode(
     val userPrompt: String,
     val chunks: List<MemorySourceChunk>,
     val createdAtEpochMillis: Long,
+    /**
+     * Tombstone: set when the user's raw-retention setting purged this episode's raw context (its
+     * chunks and prompt). The episode record stays so provenance resolves; memories made from it are
+     * untouched.
+     */
+    val purged: MemoryRawPurge? = null,
+)
+
+/** The audit record of one raw purge: what, when, why, and by whose setting. */
+@Serializable
+data class MemoryRawPurge(
+    val purgedAtEpochMillis: Long,
+    val chunks: Int,
+    val characters: Long,
+    val reason: String,
+    /** `global` or `project:<id>`: whose retention setting purged it. */
+    val setting: String,
 )
 
 @Serializable
@@ -167,7 +184,7 @@ enum class MemoryRelationKind {
 
     /**
      * Divergence marker: two memories share a frame and differ in filler (a contrast). Structural and
-     * advisory, like a genealogy finding: it says the memories differ, never which is right. Recall
+     * advisory: it says the memories differ, never which is right. Recall
      * returns marked partners together. Written only by the deterministic contrast step.
      */
     Diverges,
@@ -180,6 +197,12 @@ enum class MemoryRelationKind {
 
     /** Deliberation -> each memory (or other deliberation) it cites. */
     Deliberates,
+
+    /**
+     * Access event, add-only: a recall delivered this (resolved) memory once. Resolving deliberation ->
+     * memory, written to the reading workflow's bank; counting them gives the memory's access count.
+     */
+    Recalled,
 }
 
 /**
@@ -436,6 +459,7 @@ data class MemoryTagQuery(
  * different filler, via `Diverges` or legacy `ConflictsWith`), returned whether or not they matched,
  * ranked, or are otherwise hidden; [deliberations] are agents' recorded conclusions about them. The
  * unit is ranked, budgeted and gated as one item, so nothing downstream can show one side alone.
+ * Partners and deliberations always come from the bank the hit was read from.
  */
 @Serializable
 data class MemoryRecallHit(
@@ -443,6 +467,41 @@ data class MemoryRecallHit(
     val score: Float,
     val conflicts: List<MemoryNode> = emptyList(),
     val deliberations: List<MemoryNode> = emptyList(),
+    /** Where the memory came from and how it reaches the reading workflow. Set by workflow-bank recall. */
+    val provenance: MemoryHitProvenance? = null,
+    /**
+     * Set when the hit is the current version of a resolved contrast: the deliberation that resolved
+     * it, the side not chosen (now history) and how often it has been recalled since. Recall returns
+     * such a memory as a single memory; this history fades from rendering as access grows.
+     */
+    val resolution: MemoryResolvedHistory? = null,
+)
+
+@Serializable
+data class MemoryResolvedHistory(
+    val deliberation: MemoryNode,
+    val notChosen: List<MemoryNode>,
+    /** Recalls of this memory recorded so far (add-only access events). */
+    val accessCount: Int,
+)
+
+/**
+ * A recall hit's provenance. [producedByWorkflow] is the workflow whose bank the memory was written
+ * to (for a derived memory, the workflow that derived it; its sources keep their own tags, reachable
+ * through `CondensedFrom`). The lineage is derived from the workflow DAG at read time, never stored.
+ */
+@Serializable
+data class MemoryHitProvenance(
+    val producedByWorkflow: String?,
+    val producedBySession: String?,
+    val projectId: String?,
+    /**
+     * Producing workflow to reading workflow through parent links (merge points included), when the
+     * memory is in the reader's own lineage; null for a read-only memory of another workflow.
+     */
+    val lineagePath: List<String>?,
+    /** Set when the hit was read, read-only, from another workflow's bank in the same project. */
+    val readOnlyFromWorkflow: String? = null,
 )
 
 @Serializable
@@ -494,10 +553,16 @@ data class MemoryDeliberationRequest(
     val evidence: List<String> = emptyList(),
     val scope: MemoryBankScope = MemoryBankScope(),
     val deliberatedAtEpochMillis: Long,
+    /**
+     * The cited memory the deliberation judged correct, or null for "unresolved". Only a deliberation
+     * that names one lets consolidation absorb the contrast ([MemoryDeliberationAbsorber]).
+     */
+    val chosen: MemoryNodeId? = null,
 ) {
     init {
         require(sourceSessionId.isNotBlank()) { "Deliberation source session must not be blank" }
         require(conclusion.isNotBlank()) { "Deliberation conclusion must not be blank" }
         require(citedNodeIds.isNotEmpty()) { "A deliberation must cite at least one memory" }
+        require(chosen == null || chosen in citedNodeIds) { "A deliberation can choose only a memory it cites" }
     }
 }

@@ -26,10 +26,12 @@ interface MemoryStore {
 
 class InMemoryMemoryStore(
     initial: MemorySnapshot = MemorySnapshot(),
+    /** A workflow's own records in a lineage bank: may reference its ancestors' records (see [LineageMemoryStore]). */
+    private val allowExternalReferences: Boolean = false,
 ) : MemoryStore {
     private val mutex = Mutex()
     private var snapshot = initial
-    private var ids = MemoryIdIndex(initial)
+    private var ids = MemoryIdIndex(initial, allowExternalReferences)
 
     override suspend fun read(): MemorySnapshot = mutex.withLock { snapshot }
 
@@ -43,7 +45,7 @@ class InMemoryMemoryStore(
     override suspend fun replace(snapshot: MemorySnapshot) {
         mutex.withLock {
             this.snapshot = snapshot
-            ids = MemoryIdIndex(snapshot)
+            ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
     }
 }
@@ -65,6 +67,8 @@ class SettingsMemoryStore(
     private val storageKey: String = DEFAULT_STORAGE_KEY,
     private val json: Json = defaultJson,
     private val compactEvery: Int = DEFAULT_COMPACT_EVERY,
+    /** A workflow's own records in a lineage bank: may reference its ancestors' records (see [LineageMemoryStore]). */
+    private val allowExternalReferences: Boolean = false,
 ) : MemoryStore {
     private val mutex = Mutex()
     private var cached: MemorySnapshot? = null
@@ -101,7 +105,7 @@ class SettingsMemoryStore(
             loadUnlocked()
             writeCompacted(snapshot)
             cached = snapshot
-            ids = MemoryIdIndex(snapshot)
+            ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
     }
 
@@ -110,7 +114,7 @@ class SettingsMemoryStore(
             clearLog()
             settings.remove(storageKey)
             cached = MemorySnapshot()
-            ids = MemoryIdIndex(MemorySnapshot())
+            ids = MemoryIdIndex(MemorySnapshot(), allowExternalReferences)
         }
     }
 
@@ -127,7 +131,7 @@ class SettingsMemoryStore(
         }
         logSize = settings.getInt(logCountKey, 0)
         var snapshot = base
-        val replayIds = MemoryIdIndex(base)
+        val replayIds = MemoryIdIndex(base, allowExternalReferences)
         for (index in 0 until logSize) {
             val encoded = settings.getStringOrNull(logKey(index)) ?: throw MemoryStoreCorruptionException(
                 "Memory log entry $index of $logSize is missing.",
@@ -192,7 +196,7 @@ private data class MemoryLogEntry(
  * its own size rather than rebuilding every set. Only [applyMutation] updates it, and only after the
  * whole mutation has validated.
  */
-internal class MemoryIdIndex(snapshot: MemorySnapshot) {
+internal class MemoryIdIndex(snapshot: MemorySnapshot, val allowExternalReferences: Boolean = false) {
     val episodes: MutableSet<MemoryEpisodeId> = snapshot.episodes.mapTo(hashSetOf()) { it.id }
     val sections: MutableSet<MemorySectionId> = snapshot.sections.mapTo(hashSetOf()) { it.id }
     val nodes: MutableSet<MemoryNodeId> = snapshot.nodes.mapTo(hashSetOf()) { it.id }
@@ -210,13 +214,15 @@ internal fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation, ids: Me
         }
     }
     fun episodeKnown(id: MemoryEpisodeId) = id in ids.episodes || id in newEpisodes
+    // A lineage bank's own store may point at its ancestors' records; the lineage view checks those.
+    val external = ids.allowExternalReferences
 
     val newSections = hashSetOf<MemorySectionId>()
     mutation.sectionsToAdd.forEach { section ->
         require(section.id !in ids.sections && newSections.add(section.id)) {
             "Memory section ${section.id.value} already exists"
         }
-        require(episodeKnown(section.episodeId)) {
+        require(external || episodeKnown(section.episodeId)) {
             "Memory section ${section.id.value} references missing episode ${section.episodeId.value}"
         }
     }
@@ -224,18 +230,21 @@ internal fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation, ids: Me
     val newNodes = hashSetOf<MemoryNodeId>()
     mutation.nodesToAdd.forEach { node ->
         require(node.id !in ids.nodes && newNodes.add(node.id)) { "Memory node ${node.id.value} already exists" }
-        require(node.sourceEpisodeIds.all(::episodeKnown)) {
+        require(external || node.sourceEpisodeIds.all(::episodeKnown)) {
             "Memory node ${node.id.value} references a missing episode"
         }
-        require(node.sourceSectionIds.all { it in ids.sections || it in newSections }) {
+        require(external || node.sourceSectionIds.all { it in ids.sections || it in newSections }) {
             "Memory node ${node.id.value} references a missing section"
         }
     }
 
+    // A memory never grows: a rewrite must be smaller than the predecessor it supersedes.
+    requireRewritesShrink(mutation)
+
     val newEdges = hashSetOf<MemoryEdgeId>()
     mutation.edgesToAdd.forEach { edge ->
         require(edge.id !in ids.edges && newEdges.add(edge.id)) { "Memory edge ${edge.id.value} already exists" }
-        require((edge.from in ids.nodes || edge.from in newNodes) && (edge.to in ids.nodes || edge.to in newNodes)) {
+        require(external || (edge.from in ids.nodes || edge.from in newNodes) && (edge.to in ids.nodes || edge.to in newNodes)) {
             "Memory edge ${edge.id.value} references a missing node"
         }
     }

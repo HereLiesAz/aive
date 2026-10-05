@@ -11,9 +11,8 @@ package com.hereliesaz.geministrator.memory
  * contrast when the shared part carries content and an aligned slot holds different content words on
  * both sides, at least one of which looks like a filler (an entity, value, identifier or choice).
  *
- * The idea is borrowed from frame semantics (Fillmore; FrameNet's frames and frame elements), reduced
- * to surface alignment: no parser, no frame lexicon, no semantic roles beyond "the shared part" and
- * "the slot". Spelling variants of one name are folded first through [MemoryAliases] (an entity alias
+ * It is surface alignment only: no parser, no lexicon, no roles beyond "the shared part" and "the
+ * slot". Spelling variants of one name are folded first through [MemoryAliases] (an entity alias
  * table), so "Postgres" and "PostgreSQL" are the same filler.
  */
 internal object MemoryContrast {

@@ -21,12 +21,27 @@ class AgentMemoryLayer private constructor(
     private val lexicalAssociator: MemoryLexicalAssociator,
 ) {
     suspend fun consolidateOne(nowEpochMillis: Long): MemoryConsolidationResult {
+        absorbDeliberations(nowEpochMillis)
         val result = consolidator?.processNext(nowEpochMillis) ?: MemoryConsolidationResult.Idle
         if (result is MemoryConsolidationResult.Completed) {
             while (programmaticAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
             while (lexicalAssociator.refresh(nowEpochMillis) > 0) { /* drain */ }
         }
         return result
+    }
+
+    /**
+     * Absorbs every deliberation that chose a memory and has not been absorbed yet, oldest first
+     * ([MemoryDeliberationAbsorber]). Returns how many were absorbed. Deterministic; no model call.
+     */
+    suspend fun absorbDeliberations(nowEpochMillis: Long): Int {
+        var absorbed = 0
+        while (true) {
+            val snapshot = store.read()
+            val mutation = MemoryDeliberationAbsorber.mutationFor(snapshot, nowEpochMillis)
+            if (mutation.nodesToAdd.isEmpty()) return absorbed
+            if (store.commit(snapshot.revision, mutation)) absorbed += 1
+        }
     }
 
     /** Refresh exact/bookkeeping associations without invoking a model. */

@@ -44,8 +44,8 @@ import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
-import com.hereliesaz.geministrator.memory.DeferredMemoryStore
-import com.hereliesaz.geministrator.memory.openWebMemoryStore
+import com.hereliesaz.geministrator.memory.deferredMemoryBanks
+import com.hereliesaz.geministrator.memory.openWebMemoryBanks
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
 private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
@@ -61,12 +61,15 @@ fun main() {
     // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
     val memoryScope = MainScope()
-    val memoryStore = memoryScope.async {
-        openWebMemoryStore { reason -> println("Aive memory: SQLite unavailable ($reason)") }
+    // One database per workflow run's memory bank; lineage and projects in Settings.
+    val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
+    val memoryBanks = memoryScope.async {
+        openWebMemoryBanks(memoryLineage) { reason -> println("Aive memory: SQLite unavailable ($reason)") }
     }
     val memoryLayer = MemoryLayerController(
-        store = DeferredMemoryStore(memoryStore),
+        banks = deferredMemoryBanks(memoryBanks),
         settingsStore = MemoryLayerSettingsStore.createDefault(),
+        lineage = memoryLineage,
         engineProvider = memoryEngines,
         scope = memoryScope,
     ).also { it.attach() }

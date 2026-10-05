@@ -77,7 +77,7 @@ Genealogy governance must never:
 - rewrite recalled content,
 - convert structural independence into an epistemic verdict.
 
-Conflicting memories continue to be handled by The Aive's existing human-like architecture: preserve traces, associate them, surface them to conscious reasoning, reason about the discrepancy, and bank the resulting experience. Memory's own `Diverges` marker is the same kind of finding as a genealogy report: a deterministic structural fact (two memories share a frame and differ in filler), advisory only, never a selection of a winner.
+Conflicting memories continue to be handled by The Aive's existing human-like architecture: preserve traces, associate them, surface them to conscious reasoning, reason about the discrepancy, and bank the resulting experience. Memory's own `Diverges` marker is a deterministic structural fact (two memories share a frame and differ in filler), advisory only, never a selection of a winner. A contrast is consolidated only after an agent's deliberation names the memory it judged correct; the other side stays as history.
 
 ## Centralized MoA integration
 

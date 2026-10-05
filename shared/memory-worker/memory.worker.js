@@ -12,7 +12,12 @@
 // holding the database) leaves the app with session-only memory.
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 
-const DATABASE_PATH = "/aive-memory.db";
+// Each project's memory bank is its own worker, named "bank-<stem>", with its own OPFS pool and
+// database (separate pools also mean separate locks). An unnamed worker opens the old shared
+// database, which is read once to split it into banks and otherwise left untouched as the backup.
+const BANK = self.name && self.name.startsWith("bank-") ? self.name.slice("bank-".length) : null;
+const DATABASE_PATH = BANK ? `/aive-memory-${BANK}.db` : "/aive-memory.db";
+const POOL_NAME = BANK ? `aive-memory-${BANK}` : "aive-memory";
 
 const OPFS_UNAVAILABLE = "OPFS_UNAVAILABLE";
 
@@ -21,7 +26,7 @@ const ready = (async () => {
     throw new Error(`${OPFS_UNAVAILABLE}: this browser has no Origin Private File System`);
   }
   const sqlite3 = await sqlite3InitModule();
-  const pool = await sqlite3.installOpfsSAHPoolVfs({ name: "aive-memory" });
+  const pool = await sqlite3.installOpfsSAHPoolVfs({ name: POOL_NAME });
   return new pool.OpfsSAHPoolDb(DATABASE_PATH);
 })();
 

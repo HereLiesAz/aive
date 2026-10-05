@@ -77,6 +77,51 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         style = AzphaltType.body,
         color = Azphalt.currentGround.onPage,
     )
+    // Raw history (full session context) is kept until the user says otherwise.
+    val rawUsage by controller.rawUsage.collectAsState()
+    Text(
+        "Raw history: ${rawUsage.characters} characters in ${rawUsage.episodes} sessions" +
+            (if (rawUsage.purgedEpisodes > 0) " (${rawUsage.purgedEpisodes} purged by your retention setting)" else "") +
+            ". Consolidated memory never depends on it.",
+        style = AzphaltType.body,
+        color = Azphalt.currentGround.onPage,
+    )
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            "Keep all raw history" to com.hereliesaz.geministrator.memory.MemoryRawRetention.KeepAll,
+            "Keep 50 M characters" to com.hereliesaz.geministrator.memory.MemoryRawRetention(
+                com.hereliesaz.geministrator.memory.MemoryRawRetention.Mode.CapBySize, maxCharacters = 50_000_000L,
+            ),
+            "Keep 90 days" to com.hereliesaz.geministrator.memory.MemoryRawRetention(
+                com.hereliesaz.geministrator.memory.MemoryRawRetention.Mode.CapByAge, maxAgeMillis = 90L * 86_400_000L,
+            ),
+        ).forEach { (label, retention) ->
+            AzphaltPill(
+                label,
+                "memory-retention-${retention.mode.name}",
+                selected = settings.rawRetention == retention,
+                onClick = { update { it.copy(rawRetention = retention) } },
+            )
+        }
+    }
+    // Every workflow run has its own memory bank (reading through its ancestors'); this screen shows one at a time.
+    val knownBanks by controller.knownBanks.collectAsState()
+    val selectedBank by controller.selectedBank.collectAsState()
+    if (knownBanks.isEmpty()) {
+        Text("No workflow has a memory bank yet.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+    } else {
+        Text("Workflow memory bank", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            knownBanks.forEach { bank ->
+                AzphaltPill(
+                    bank,
+                    "memory-bank-$bank",
+                    selected = bank == (selectedBank ?: knownBanks.first()),
+                    onClick = { scope.launch { controller.selectBank(bank) } },
+                )
+            }
+        }
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
             if (settings.enabled) "Memory: on" else "Memory: off",

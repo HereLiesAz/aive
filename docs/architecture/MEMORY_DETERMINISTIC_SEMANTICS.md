@@ -109,7 +109,7 @@ The Salience clerk (`MemorySalienceFeatures.kt`) drops acknowledgements, symbol-
 - Contrast: the shared part holds at least half the content words of the shorter text, and some slot has different content words on both sides with at least one filler-like word (number or identifier, a capitalized name that is not an ordinary sentence opener, a quoted string, an alias-folded name, or a value word such as `enabled`, `tabs`, a weekday), or has negation on one side only.
 - Not a contrast: a repeat, an aliased spelling, a slot filled on one side only ("…today"), or two texts sharing too little.
 
-It is a heuristic over surface text, borrowed loosely from frame semantics (Fillmore; FrameNet), not a parser or frame lexicon: it can miss a contrast phrased with different structure, and it can read two lowercase words it takes for values as a contrast. Erring toward a contrast only keeps two memories apart and marked; it never hides or ranks one. What the engine does with a contrast (divergence markers, the variant register, deliberations) is in [`docs/Memory-layer.md`](../Memory-layer.md#contrast-variant-register-divergence-marker-deliberation).
+It is a heuristic over surface text, not a parser or lexicon: it can miss a contrast phrased with different structure, and it can read two lowercase words it takes for values as a contrast. Erring toward a contrast only keeps two memories apart and marked; it never hides or ranks one. What the engine does with a contrast (divergence markers, the variant register, deliberations) is in [`docs/Memory-layer.md`](../Memory-layer.md#contrast-variant-register-divergence-marker-deliberation).
 
 ## Programmatic noun and verb clerks
 

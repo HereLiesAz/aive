@@ -41,6 +41,10 @@ data class MemoryLayerSettings(
     val consolidationPaused: Boolean = false,
     val engines: Map<MemoryMicroAgentRole, MemoryStageEngine> = emptyMap(),
     val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+    /** Raw history retention for every project without its own setting. Default: keep everything. */
+    val rawRetention: MemoryRawRetention = MemoryRawRetention.KeepAll,
+    /** Per-project raw history retention, overriding [rawRetention]. */
+    val rawRetentionByProject: Map<String, MemoryRawRetention> = emptyMap(),
 ) {
     fun engineFor(role: MemoryMicroAgentRole): MemoryStageEngine = engines[role] ?: MemoryStageEngine()
 

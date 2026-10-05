@@ -14,12 +14,14 @@ package com.hereliesaz.geministrator.memory
  *   (session, project, run, task, role), subject and source episodes. A variant's occurrence count is
  *   the number of distinct source episodes over its attestations.
  *
+ * It runs on a workflow's lineage bank ([LineageMemoryStore]: the workflow's own records plus its
+ * ancestors'), and everything it adds is written to that workflow's own bank. When a merge marries
+ * lineages, [mergeMutationFor] compares the memories of the married sides and marks their contrasts in
+ * the merging workflow's bank: noticing, not judging.
+ *
  * Nothing here ranks a filler as correct, removes, edits or hides a memory. Writing the register
- * twice is a no-op (all ids are derived from content). The keeping of every contrasting trace side by
- * side follows the spirit of an assumption-based truth maintenance system (de Kleer's ATMS keeps
- * contradictory environments rather than retracting one); unlike an ATMS, nothing here labels a set
- * as inconsistent. Recording both record and event time is the bitemporal pattern (transaction vs
- * valid time) applied to attestations only.
+ * twice is a no-op (all ids are derived from content). Every contrasting memory is kept side by side,
+ * and each attestation records both when it was recorded and the date its text states.
  */
 internal object MemoryVariantRegister {
     /** Kinds that carry statements; tags and categories are single cues and are not compared. */
@@ -28,9 +30,36 @@ internal object MemoryVariantRegister {
     private const val MAX_CANDIDATES_PER_NODE = 48
 
     fun mutationFor(snapshot: MemorySnapshot, episodeId: MemoryEpisodeId, nowEpochMillis: Long): MemoryStoreMutation {
+        val claims = claimsOf(snapshot)
+        return contrastMutation(snapshot, claims, claims.filter { episodeId in it.sourceEpisodeIds }, nowEpochMillis) { _, _ -> true }
+    }
+
+    /**
+     * The contrast step for a merge: [sides] are the memory ids each married lineage holds (a memory
+     * of a common ancestor is on every side). Every claim is compared with claims of the other sides
+     * only, and each contrast is marked and registered, like any other.
+     */
+    fun mergeMutationFor(snapshot: MemorySnapshot, sides: List<Set<MemoryNodeId>>, nowEpochMillis: Long): MemoryStoreMutation {
+        if (sides.size < 2) return MemoryStoreMutation()
+        val claims = claimsOf(snapshot)
+        fun apart(a: MemoryNodeId, b: MemoryNodeId) =
+            sides.any { a in it && b !in it } && sides.any { b in it && a !in it }
+        val sideMembers = sides.flatten().toSet()
+        return contrastMutation(snapshot, claims, claims.filter { it.id in sideMembers }, nowEpochMillis) { a, b -> apart(a.id, b.id) }
+    }
+
+    private fun claimsOf(snapshot: MemorySnapshot): List<MemoryNode> {
         val superseded = snapshot.edges.filter { it.relation == MemoryRelationKind.Supersedes }.mapTo(hashSetOf()) { it.to }
-        val claims = snapshot.nodes.filter { it.kind in CLAIM_KINDS && it.id !in superseded }
-        val own = claims.filter { episodeId in it.sourceEpisodeIds }
+        return snapshot.nodes.filter { it.kind in CLAIM_KINDS && it.id !in superseded }
+    }
+
+    private fun contrastMutation(
+        snapshot: MemorySnapshot,
+        claims: List<MemoryNode>,
+        own: List<MemoryNode>,
+        nowEpochMillis: Long,
+        comparable: (MemoryNode, MemoryNode) -> Boolean,
+    ): MemoryStoreMutation {
         if (own.isEmpty()) return MemoryStoreMutation()
 
         val episodesById = snapshot.episodes.associateBy(MemoryEpisode::id)
@@ -56,7 +85,7 @@ internal object MemoryVariantRegister {
             val byId = HashMap<MemoryNodeId, MemoryNode>()
             terms(node).forEach { term ->
                 postings[term].orEmpty().forEach { other ->
-                    if (other.id != node.id && other.kind == node.kind) {
+                    if (other.id != node.id && other.kind == node.kind && comparable(node, other)) {
                         overlap[other.id] = (overlap[other.id] ?: 0) + 1
                         byId[other.id] = other
                     }

@@ -41,17 +41,13 @@ A coarse bucket preserves the episode IDs represented by its finer source bucket
 
 Temporal compaction is therefore retrieval/index compaction, not memory deletion.
 
-## The MemoryStore is the association boundary
+Consolidated memories follow the same idea for time. A raw memory keeps its exact time (the date its text states, else its episode's time). A consolidated current version carries a time range, `[earliest, latest]` over all its contributors, and an occurrence count (distinct source episodes); further consolidation takes the union, so ranges only widen. Recall shows the range and count; exact times stay with the history. See [`docs/Memory-layer.md`](../Memory-layer.md#time-ranges-and-occurrences).
 
-Project IDs are memory metadata, not memory-isolation boundaries.
+## The workflow's lineage bank is the association boundary
 
-Different saved/cloned projects use different memory-store locations. If two project IDs occur inside the same `MemoryStore`, The Aive should assume that they are intentionally part of the same remembered working universe and permit associations between them.
+Every workflow run has its own memory bank, and a workflow reads its ancestors' banks through its lineage bank (`LineageMemoryStore`; [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage)). Deterministic association runs on that lineage bank and writes only the workflow's own records: it may link the workflow's memories with each other and with its ancestors' (including memories of different projects married by a merge, or of a project incorporated by an expansion), but it never writes into an ancestor's bank and never links, condenses or registers anything with a workflow outside the lineage. Other workflows of the same project are readable at recall only, read-only.
 
-This matters when one orchestration works on two projects at once. The context switch itself, shared time window, shared task/workflow run, shared identifier, or shared semantic cue may be exactly what lets a later agent remember that the two pieces of work were connected.
-
-Therefore deterministic association must **not** reject a relationship merely because the two source episodes have different `projectId` values.
-
-`projectId` can still be used as a useful positive association signal, but never as an association firewall inside one store.
+Within a lineage bank, `projectId` is a positive association signal, never a firewall: a merge or project expansion is a deliberate decision that the two pieces of work belong to one remembered history.
 
 ## Programmatic associations
 
@@ -75,7 +71,7 @@ Examples:
 - `test` ↔ `test`
 - `build verification` ↔ `build verification`
 
-This identity matching applies across project IDs when those memories live in the same store.
+This identity matching applies across project IDs when those memories are in the same lineage bank.
 
 ### Exact identifiers and artifacts
 
@@ -112,7 +108,7 @@ Task-definition identity is qualified by both project and workflow definition be
 
 ### Sequential work history
 
-Chronologically adjacent episodes in the same memory store can be linked as neighboring work-history events. This preserves project-to-project context switches as real remembered sequence.
+Chronologically adjacent episodes in the same lineage bank can be linked as neighboring work-history events. This preserves project-to-project context switches as real remembered sequence.
 
 Same-project adjacency can also be recorded as a slightly stronger bookkeeping signal.
 
@@ -205,7 +201,7 @@ New replaceable evidence families should explicitly store `evidenceFamily` and `
 
 When several highly similar memories are mechanically condensed into a more general representation, their shared associations become more important, not less.
 
-The generalized memory is an extra index entry. A source is superseded (hidden from ranking, kept in the store) only when the generalized text contains every one of its sentences, such as an identical repeat; any other source stays active beside it, linked by `CondensedFrom`. Members that contrast (same frame, different filler) are never condensed together, and the generalized memory inherits its sources' divergence markers and variant attestations (`docs/Memory-layer.md`).
+The generalized memory is the new current version: every source is superseded (faded from default recall, kept in the store as history, reachable through `CondensedFrom`). Members that contrast (same frame, different filler) are never condensed together on similarity; a contrast is consolidated only by absorbing a deliberation that chose a side. The generalized memory inherits its sources' divergence markers and variant attestations, carries their time range and occurrence count, and is fitted to its size budget (`docs/Memory-layer.md`).
 
 The generalized memory therefore receives direct `AssociatedWith` support for external targets that were associated with **two or more** of the condensed source memories. Source-specific parallel evidence is first accumulated per source, then independent source contributions are accumulated again with the same saturating exponential rule.
 

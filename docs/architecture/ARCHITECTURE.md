@@ -92,7 +92,9 @@ Roles are data. They carry responsibility, instructions, capabilities, and autho
 
 `WorkflowDefinition` is immutable execution structure: tasks, dependencies, acceptance requirements, policies, gates, responsibility, and executor declarations.
 
-`WorkflowRun` and `TaskRun` are durable state. They carry status, attempts, resolved executor, responsibility assignment, provider/external run identifiers, artifacts, blocking reasons, and progress.
+`WorkflowRun` and `TaskRun` are durable state. A run may continue other runs (`WorkflowRun.parentWorkflowRunIds`: one parent for a continuation, several for a merge); memory derives its workflow lineage from these. Each run has its own memory bank and reads its ancestors' banks through, and the other runs of its project read-only ([`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage)).
+
+`WorkflowRun` and `TaskRun` carry status, attempts, resolved executor, responsibility assignment, provider/external run identifiers, artifacts, blocking reasons, and progress.
 
 The engine owns:
 

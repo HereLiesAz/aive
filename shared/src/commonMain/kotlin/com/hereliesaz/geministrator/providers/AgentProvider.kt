@@ -60,6 +60,8 @@ data class AgentOrchestrationContext(
     val workflowDefinitionId: WorkflowDefinitionId? = null,
     val taskDefinitionId: TaskDefinitionId? = null,
     val roleId: RoleDefinitionId? = null,
+    /** The run's parent runs ([com.hereliesaz.geministrator.domain.WorkflowRun.parentWorkflowRunIds]). */
+    val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
 )
 
 data class AgentTaskRequest(

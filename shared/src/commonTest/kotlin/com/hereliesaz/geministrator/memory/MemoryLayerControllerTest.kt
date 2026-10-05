@@ -8,10 +8,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+private const val WORKFLOW = "wf"
+
 class MemoryLayerControllerTest {
     private fun controller(store: MemoryStore = InMemoryMemoryStore(), provider: MemoryEngineProvider = object : MemoryEngineProvider {}) =
         MemoryLayerController(
-            store = store,
+            banks = MemoryBanks.inMemory(mapOf(WORKFLOW to store)),
             settingsStore = MemoryLayerSettingsStore(MapSettings()),
             engineProvider = provider,
             scope = CoroutineScope(Dispatchers.Unconfined),
@@ -20,7 +22,7 @@ class MemoryLayerControllerTest {
 
     private suspend fun MemoryStore.bank(id: String, text: String) {
         MemoryConsolidationQueue(this).enqueueSession(
-            MemorySessionEnvelope(id, userPrompt = text, parts = emptyList(), closedAtEpochMillis = id.hashCode().toLong() and 0xffff),
+            MemorySessionEnvelope(id, workflowRunId = WORKFLOW, userPrompt = text, parts = emptyList(), closedAtEpochMillis = id.hashCode().toLong() and 0xffff),
         )
     }
 
