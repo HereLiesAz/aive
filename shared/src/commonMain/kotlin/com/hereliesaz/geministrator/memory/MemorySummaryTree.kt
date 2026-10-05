@@ -279,7 +279,9 @@ internal object MemoryPairSummaries {
         val text = if (tiny) {
             // Two very short memories (tags, names) are their own gist: both kept whole, no labels.
             engines += ENGINE_VERBATIM_PAIR
-            "${a.text.trim()}$UNLABELLED_SEPARATOR${b.text.trim()}"
+            // On one line: the separator must be on the last line, and a chatter memory ("ok\n\nthanks!")
+            // would otherwise put a line break after it.
+            "${a.text.oneLine()}$UNLABELLED_SEPARATOR${b.text.oneLine()}"
         } else if (contrastText != null) {
             // The frame and each side's filler, as the contrast step reads them: exact, no engine needed.
             engines += ENGINE_CONTRAST
@@ -360,6 +362,8 @@ internal object MemoryPairSummaries {
         }
         return 0
     }
+
+    private fun String.oneLine(): String = trim().replace(Regex("\\s*\n\\s*"), " ")
 
     private const val COMMIT_ATTEMPTS = 3
     private const val MIN_SIDE = 16
