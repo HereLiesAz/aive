@@ -284,8 +284,15 @@ fun App(
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
                         },
-                        onLaunchWorkflow = onLaunch@{ projectName, objective, repository ->
-                            val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
+                        onLoadLaunchableRuns = { runtime?.loadLaunchableRuns() ?: emptyList() },
+                        onLaunchWorkflow = onLaunch@{ projectName, objective, repository, continuesWorkflowRunIds ->
+                            val existingProject = when (val state = runtimeState) {
+                                is ApplicationRuntimeState.NoRun -> state.project
+                                // "Continue" from a finished run's view stays in that run's project.
+                                is ApplicationRuntimeState.Live ->
+                                    state.presentation.project.takeIf { continuesWorkflowRunIds.isNotEmpty() }
+                                else -> null
+                            }
                             if (launching) {
                                 platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
                                 return@onLaunch
@@ -306,6 +313,7 @@ fun App(
                                             orchestrationRuntime = orchestrationRuntime,
                                             repository = repository,
                                             existingProject = existingProject,
+                                            continuesWorkflowRunIds = continuesWorkflowRunIds,
                                         )
                                     } else {
                                         launchSteps.push("Starting the starter workflow…")
@@ -314,6 +322,7 @@ fun App(
                                             objective = objective,
                                             repository = repository,
                                             existingProject = existingProject,
+                                            continuesWorkflowRunIds = continuesWorkflowRunIds,
                                         )
                                     }
                                 } catch (failure: CancellationException) {

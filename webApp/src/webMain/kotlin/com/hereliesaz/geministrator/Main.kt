@@ -46,6 +46,7 @@ import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentPlatform
 import com.hereliesaz.geministrator.memory.deferredMemoryBanks
 import com.hereliesaz.geministrator.memory.openWebMemoryBanks
+import com.hereliesaz.geministrator.memory.WebMemoryDebugHook
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
 private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
@@ -63,8 +64,12 @@ fun main() {
     val memoryScope = MainScope()
     // One database per workflow run's memory bank; lineage and projects in Settings.
     val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
+    // Dev-only: null unless on localhost with ?aiveMemoryDebug=… (see WebMemoryDebugHook).
+    val memoryDebug = WebMemoryDebugHook.fromLocation(window.location.hostname, window.location.search)
     val memoryBanks = memoryScope.async {
+        memoryDebug?.beforeBanksOpen()
         openWebMemoryBanks(memoryLineage) { reason -> println("Aive memory: SQLite unavailable ($reason)") }
+            .also { banks -> memoryDebug?.afterBanksOpen(banks) }
     }
     val memoryLayer = MemoryLayerController(
         banks = deferredMemoryBanks(memoryBanks),

@@ -154,6 +154,40 @@ under "Runtime integrity audit" and the "Make one complete workflow actually wor
 Other checked P0 items record implementation with automated test coverage, not live verification.
 
 
+## Browser memory banks
+
+`tools/web_memory_banks/verify.mjs` checks, in headless Chromium and with no provider or key, that
+each workflow's memory bank in the browser is its own worker (`shared/memory-worker/memory.worker.js`
+named `bank-<stem>`) with its own OPFS pool, that banks do not see each other's data, and that the old
+shared store is split into banks once and not again. It drives the app through a dev-only hook
+(`WebMemoryDebugHook`): active only on `localhost`/`127.0.0.1` with `?aiveMemoryDebug=<commands>`
+(`seed-legacy:<tag>` writes two episodes for workflows `wf-a` and `wf-b` into the old Settings memory
+log before startup, which startup imports into the old shared database and then splits;
+`write:<workflow>:<episode>` commits to one bank; `dump` logs every bank's episodes and the split
+report). The script wraps `Worker` to record worker names and lists the OPFS root. Steps: (1) first
+start with a seeded old store; (2) reload with more old-store data and a write to `wf-a`; (3) reload.
+
+Build a development bundle (web builds resolve h2g2 from Maven Local, published as above), serve the
+distribution together with the webpack output, and run:
+
+~~~
+./gradlew :webApp:jsBrowserDevelopmentWebpack      # or :webApp:wasmJsBrowserDevelopmentWebpack
+mkdir site && cp -r webApp/build/processedResources/js/main/. site/ \
+  && cp -r webApp/build/kotlin-webpack/js/developmentExecutable/. site/
+NODE_PATH=$(npm root -g) node tools/web_memory_banks/verify.mjs site
+~~~
+
+### Recorded runs
+
+- 2026-10-05, JS and Wasm development bundles of `claude/continue-merge-launch` (on `7b84444`), headless
+  Chromium 141 (Playwright): all 16 checks passed on both. First start: the unnamed worker opened
+  the old shared store, two workers `bank-w-23a67ef60b528ef2-wf-a` and `bank-w-23a67df60b528d3f-wf-b`
+  were created, the OPFS root held `.aive-memory`, `.aive-memory-w-…-wf-a` and `.aive-memory-w-…-wf-b`,
+  each bank held only its own split episode, and the split report recorded one episode per workflow.
+  Reload: no unnamed worker was created (no second split), the report was unchanged, old-store data
+  seeded after the split stayed out of the banks, and a write to `wf-a` was visible in `wf-a` only and
+  survived a further reload. No SQLite fallback was logged. Android and desktop are not covered.
+
 ## Manual acceptance runs
 
 Two roadmap items need a person, a device or a real repository, and cannot be proved by the central

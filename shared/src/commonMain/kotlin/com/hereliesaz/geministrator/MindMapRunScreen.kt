@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
@@ -42,7 +43,8 @@ internal fun MindMapRunScreen(
     modifier: Modifier,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     projectFileService: ProjectFileService? = null,
     onImportProjectFile: suspend (String) -> String? = { null },
     onRecoverFromCorruption: () -> Unit = {},
@@ -101,6 +103,14 @@ internal fun MindMapRunScreen(
         key = "overview.$draftScope.objective",
         initialValue = "",
     )
+    var lineage by remember(draftScope) { mutableStateOf(LaunchLineageState()) }
+    var launchableRuns by remember(runtimeState) { mutableStateOf<List<LaunchableRun>?>(null) }
+    LaunchedEffect(runtimeState, lineage.mode) {
+        if (lineage.mode == LaunchLineageMode.New || launchableRuns != null) return@LaunchedEffect
+        val loaded = runCatching { onLoadLaunchableRuns() }.getOrDefault(emptyList())
+        launchableRuns = loaded
+        lineage = lineage.retainOnly(loaded.map(LaunchableRun::id))
+    }
 
     val repositorySearchConnected = when (repositorySource) {
         RepositorySource.GitHub -> RepositoryServiceCatalog.GITHUB_ID in connectedRepositoryServiceIds
@@ -368,6 +378,14 @@ internal fun MindMapRunScreen(
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
+                LaunchLineagePicker(
+                    state = lineage,
+                    runs = launchableRuns,
+                    onStateChange = {
+                        lineage = it
+                        launchFieldsError = null
+                    },
+                )
                 OutlinedTextField(
                     value = objective,
                     onValueChange = { objective = it },
@@ -398,10 +416,16 @@ internal fun MindMapRunScreen(
                             platformDebugLog("AiveLaunch", "Launch blocked: $launchFieldsError")
                             return@AzphaltPill
                         }
+                        lineage.validationError?.let { message ->
+                            launchFieldsError = message
+                            platformDebugLog("AiveLaunch", "Launch blocked: $message")
+                            return@AzphaltPill
+                        }
+                        val parents = lineage.continuesWorkflowRunIds
                         launchFieldsError = null
                         if (locator.isEmpty()) {
                             repositoryError = null
-                            onLaunchWorkflow(projectName.trim(), objective.trim(), null)
+                            onLaunchWorkflow(projectName.trim(), objective.trim(), null, parents)
                         } else {
                             runCatching {
                                 parseRepositoryRef(
@@ -412,7 +436,7 @@ internal fun MindMapRunScreen(
                             }.fold(
                                 onSuccess = { repository ->
                                     repositoryError = null
-                                    onLaunchWorkflow(projectName.trim(), objective.trim(), repository)
+                                    onLaunchWorkflow(projectName.trim(), objective.trim(), repository, parents)
                                 },
                                 onFailure = { failure ->
                                     repositoryError = failure.message ?: "Invalid repository location"
@@ -451,6 +475,15 @@ internal fun MindMapRunScreen(
                 "run-status",
                 endCap = "$completed/$total",
                 onClick = {},
+            )
+        }
+
+        if (run.status.isFinished()) {
+            ContinueRunPanel(
+                runId = run.id,
+                onContinue = { continuation ->
+                    onLaunchWorkflow(liveWorkflow.project.name, continuation, liveWorkflow.project.repository, listOf(run.id))
+                },
             )
         }
 

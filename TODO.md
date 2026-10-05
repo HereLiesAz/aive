@@ -121,11 +121,12 @@ A checked box means implemented and covered by automated tests. It does not mean
 ## P1 — Persistence and recovery
 
 - [x] Memory lineage: set `WorkflowRun.parentWorkflowRunIds` when the app creates a run that continues or merges earlier runs (run creation in `ApplicationRuntime`/`ApplicationRuntimeOrchestration`; launches take `continuesWorkflowRunIds`; nested workflows and Hall Monitor trials continue their source run; repairs keep the run's parents; see Memory-layer.md). Memory reads it from `AgentOrchestrationContext.parentWorkflowRunIds` (`ProviderTaskRequestFactory`, `HallMonitorGovernanceService`).
-- [ ] Launch UI to continue or merge earlier runs (pass `continuesWorkflowRunIds` to the launch functions); today only nested workflows and Hall Monitor trials set parents from the app.
+- [x] Launch UI to continue or merge earlier runs: the launch form's Lineage choice (New / Continue a run / Combine runs, with a run list of workflow, date, status and project) and "Continue this run" on a finished run's view pass `continuesWorkflowRunIds` to the launch functions (`RunLineageLaunch.kt`, `LaunchLineageStateTest`).
 - [x] Memory: top-down summary tree per banked episode and a pair summary for every link (on-device summarizer chain: local model clerk, MiniLM centroid, LexRank with cue/position/heading signals, Luhn), bounded per consolidation pass with a recall-time safety net counted as a violation.
 - [x] Memory: show the summary tree and pair summaries on the Memory screen, and surface `MemorySummaryMetrics` (model calls, time, pair-summary violations) there.
 - [x] Memory: UI for project expansion (`MemoryLayerController.expandProject`), per-project raw retention (`rawRetentionByProject`), the explicit history query (`MemoryLayerController.history`) and agent access to `MemoryTool.deliberate(chosen = …)`.
-- [ ] Memory: verify the per-bank web worker (`shared/memory-worker/memory.worker.js` named `bank-*`, one OPFS pool per bank) in a browser, and the one-time split of the old shared store on Android, desktop and web.
+- [x] Memory: verify the per-bank web worker (`shared/memory-worker/memory.worker.js` named `bank-*`, one OPFS pool per bank) in a browser, and the one-time split of the old shared store on web. Verified 2026-10-05 in headless Chromium 141, JS and Wasm (`tools/web_memory_banks/verify.mjs`; record in `docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md`, "Browser memory banks").
+- [ ] Memory: verify the one-time split of the old shared store on Android and desktop (not yet run on a device or a desktop install).
 
 - [x] Add schema migrations; never silently reinterpret incompatible persisted workflow state.
 - [x] Add corruption/recovery handling and a user-visible recovery path.

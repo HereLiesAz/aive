@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Starting a run now lets you choose its lineage: **New**, **Continue a run** (pick one earlier run) or **Combine runs** (pick two or more). The run list shows each run's workflow, date, status and project. A finished run's view also has **Continue this run**, which asks for the next objective and starts the continuation in the same project.
 - Runs now record what they continue: a nested workflow's run and a Hall Monitor solution trial continue the run they came from, a launch can name one earlier run to continue or several to merge, and a plan repair keeps the run's lineage. Memory reads these to give each run its ancestors' memory. A plain launch still starts a new line.
 - Agents can now settle a disagreement in memory from their session: writing `/deliberate memory-node:a memory-node:b chosen=memory-node:a | why` records a deliberation (or `chosen=none` for unresolved), and memory confirms it or says why not. Agents are told the command when memory starts, and every pair of diverging memories comes with the command ready to fill in.
 - The Memory screen now shows the summarizer's cost (model and embedding calls, time, and links recalled before their pair summary existed), each session's summary tree, and for a chosen memory its summary levels, the pair summary of each of its links and its history. It also lists projects, lets you expand one to include another (with a reason), and set raw-history retention per project.
