@@ -98,7 +98,18 @@ The Salience clerk (`MemorySalienceFeatures.kt`) drops acknowledgements, symbol-
 - **Summaries:** the tagger records each verb–object pair's source sentence, and the Phrase clerk carries it forward. The Summary clerk picks whole source sentences up to 280 characters using SumBasic (mean content-word probability, squared after each pick). It favours the first and last sentence, sentences behind several phrases, and outcome or error sentences, and rejects candidates that overlap a chosen one by Jaccard > 0.5. A sentence over the limit is shortened by deletion only, and a deletion that would change its numbers, quoted values or negation is refused. Phrases without a source sentence (from a model-backed tagger) are listed as before. `summaryMethod` records which path ran.
 - **Categories:** each category has a weighted lexicon of strong, medium and weak terms, plus redirects such as "test data" counting as data. Terms match whole words and identifier parts, never substrings. A label is assigned when its score is at least 3 and at least half the top score, with at most three per summary. WordNet synonyms of strong terms count at half weight, using computing senses only. Each `Categorizes` edge records its score and evidence. The regex taxonomy remains as the model clerk's guide.
 - **Similarity (SimilarTo):** tags link when they share a concept key (1.0), share a synonym (0.9), or differ only in spelling (Jaro–Winkler ≥ 0.92), with at most four links each. A broader term alone never links two tags. Longer text links at 0.6 tf-idf cosine plus 0.4 character-trigram cosine ≥ 0.8, with at most six links each. In a neighbourhood of more than 48 texts, only pairs that MinHash/LSH marks as candidates are compared (character 5-gram shingles, 20 bands of 3 rows; FNV-1a and SplitMix64, so every platform picks the same pairs): pairs with shingle Jaccard 0.5 are candidates about 93% of the time, 0.1 about 2%.
-- **Condensation:** keeps the most representative member, then appends any member's sentences that are not already covered, in member order, up to a section's limit. `appendedFrom` records where they came from. Fusing sentences across members was rejected because it can produce a claim that no member made. Clusters whose values differ are still never condensed.
+- **Condensation:** keeps the most representative member, then appends any member's sentences that are not already covered, in member order, up to a section's limit. `appendedFrom` records where they came from. Fusing sentences across members was rejected because it can produce a claim that no member made. Clusters whose values differ, or whose members contrast, are never condensed. The clerk emits `CondensedFrom` only; the engine adds `Supersedes` for a source only when the result contains every one of that source's sentences (exact, case and spacing folded), so a source whose sentence was judged "covered" by similarity but not copied stays active beside the result.
+
+## Contrast: frame and filler
+
+`MemoryContrast.kt` is the deterministic test that keeps similarity from swallowing a difference. A statement's **frame** is what it is about (its subject and the question or predicate it answers); its **filler** is what it says in that slot. Two statements with one frame and different fillers are a **contrast** ("I chose Postgres for the database" / "I chose MySQL for the database"), not a near-duplicate.
+
+- Tokens: words, identifiers (`config_a.yaml`, `node.js`), numbers, quoted strings. Spellings of one name fold through `MemoryAliases`, a small explicit entity alias table (`postgres`/`postgresql`/`psql`, `js`/`javascript`, `k8s`/`kubernetes`, …); folding is exact, so it never merges two different names.
+- Alignment: longest common subsequence over the folded tokens. Shared tokens form the frame (`frameKey`, with `_` per slot); each gap is a slot.
+- Contrast: the shared part holds at least half the content words of the shorter text, and some slot has different content words on both sides with at least one filler-like word (number or identifier, a capitalized name that is not an ordinary sentence opener, a quoted string, an alias-folded name, or a value word such as `enabled`, `tabs`, a weekday), or has negation on one side only.
+- Not a contrast: a repeat, an aliased spelling, a slot filled on one side only ("…today"), or two texts sharing too little.
+
+It is a heuristic over surface text, borrowed loosely from frame semantics (Fillmore; FrameNet), not a parser or frame lexicon: it can miss a contrast phrased with different structure, and it can read two lowercase words it takes for values as a contrast. Erring toward a contrast only keeps two memories apart and marked; it never hides or ranks one. What the engine does with a contrast (divergence markers, the variant register, deliberations) is in [`docs/Memory-layer.md`](../Memory-layer.md#contrast-variant-register-divergence-marker-deliberation).
 
 ## Programmatic noun and verb clerks
 
@@ -136,7 +147,7 @@ For a sentence with a confidently known verb, The Aive may derive weak structura
 - `(verb, object)`
 - `(subject, verb, object)`
 
-These are association cues only. They do not assert that the sentence has been parsed perfectly, that one memory is true, or that one memory supersedes another.
+These are association cues only. They do not assert that the sentence has been parsed perfectly, that one memory is true, or that one memory supersedes another (only exact sentence coverage after a condensation does that; see above).
 
 A future WordNet/VerbNet-backed `MemoryLexicon` may provide stable synset/sense IDs and richer verb classes. Those features can strengthen lexical association without changing the graph contract.
 

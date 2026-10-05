@@ -304,9 +304,11 @@ They do not decide what is true, false, correct, incorrect, morally right, strat
 
 They do not infer contradiction merely because related memories disagree.
 
+The engine, not a clerk, marks a deterministic **contrast** (two memories with one frame and different fillers) with a `Diverges` marker and records each filler in the variant register. That is a structural fact about the text, like a genealogy finding, not a verdict: it never says which memory is right, and it makes recall bring both to the agent together (`docs/Memory-layer.md`).
+
 The Association Linker supplies neutral semantic proximity. Related memories can be brought near one another without the memory layer deciding what the relationship means epistemically.
 
-Any conscious recognition of conflict, interpretation, reconciliation, strategy, or judgment belongs to an ordinary orchestrated agent. If that reasoning occurs, it becomes ordinary session context and can later be banked through the same memory process.
+Any conscious recognition of conflict, interpretation, reconciliation, strategy, or judgment belongs to an ordinary orchestrated agent. If that reasoning occurs, it becomes ordinary session context and can later be banked through the same memory process; an agent may also record its conclusion about a divergence directly as a deliberation (`MemoryTool.deliberate`), which cites what it considered, is never condensed and never supersedes anything.
 
 ---
 
@@ -320,7 +322,7 @@ Memory representations may be:
 - grouped
 - condensed
 - given lower retrieval prominence through ordinary bookkeeping
-- replaced by a more compact representation for retrieval
+- replaced for retrieval by a more compact representation that contains every one of its sentences (`Supersedes`; written only by the engine's coverage check)
 
 but provenance to the underlying experience must remain available.
 

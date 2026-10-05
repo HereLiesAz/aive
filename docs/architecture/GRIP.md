@@ -66,6 +66,10 @@ Free-text GRIP seeds from BM25F over active nodes (k1 1.2). Fields: node text (w
 
 Hits are ordered by weighted reciprocal rank fusion (k = 10) over relevance (weight 2), scope affinity (0.4, scoped queries only), salience (0.15), confidence (0.1) and recency (0.15): each signal ranks the candidates and contributes w / (k + rank). Nothing is added to a score and clamped; a memory's returned score is its relevance (lexical match carried along the graph), so the attention gate's threshold means how strongly it matched. Scope, salience and recency can reorder near-equal matches but cannot outrank a clearly stronger one, and cannot create a match.
 
+## Divergent partners travel together
+
+Every hit carries its divergent partners (`MemoryRecallHit.conflicts`: memories linked to it by a `Diverges` marker, or legacy `ConflictsWith`) and the deliberations citing either side (`MemoryRecallHit.deliberations`). Partners are returned even when they are superseded, outside the query's project scope, or did not match the query. A hit and its partners are one unit: ranking, `maxResults`, the attention dial and prompt rendering keep or drop the whole unit, and rendering adds only whole units to a budget. The markers are not traversal edges, so they neither raise nor lower any score. This is on by default (`MemoryQuery.includeConflicts`, `MemoryTagQuery.includeConflicts` and `expand(includeConflicts)` default to `true`). Prompts show a partner as "diverges (same subject, different content; both remembered)", never as right or wrong.
+
 ## Weighted graph traversal
 
 GRIP treats association weights as retrieval evidence. `MemoryEdge.weight` must not be discarded when the graph is projected from a cue to another memory resolution.
