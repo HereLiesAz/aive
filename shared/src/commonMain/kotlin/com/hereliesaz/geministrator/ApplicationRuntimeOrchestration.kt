@@ -27,7 +27,10 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     orchestrationRuntime: OrchestrationAgentRuntime,
     repository: RepositoryRef? = null,
     existingProject: Project? = null,
+    /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
+    continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
 ) {
+    val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
     val cleanObjective = objective.trim()
     require(cleanProjectName.isNotEmpty()) { "Project name is required" }
@@ -101,6 +104,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         objective = cleanObjective,
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+        parentWorkflowRunIds = parents,
     )
     reportLaunchProgress("Loading the new run…")
     loadLatest()

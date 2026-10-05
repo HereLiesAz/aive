@@ -1,5 +1,15 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -230,6 +240,57 @@ class MemoryLineageBanksTest {
         val revisions = banks.known().associateWith { banks.store(it).read().revision }
         assertEquals(report, migrateSharedMemoryToBanks(legacyStore, banks, lineage))
         assertEquals(revisions, banks.known().associateWith { banks.store(it).read().revision })
+    }
+
+    // ---- the /deliberate session command -------------------------------------------------------
+
+    @Test
+    fun deliberateCommandParsesCitationsChoiceConclusionAndEvidence() {
+        val command = MemoryDeliberationCommand.parse(
+            "Thinking.\n/deliberate memory-node:c1, c2 chosen=memory-node:c1 | Postgres won. | evidence=migration notes\nmore",
+        ).single().getOrThrow()
+        assertEquals(listOf("c1", "c2"), command.cited.map { it.value })
+        assertEquals("c1", command.chosen?.value)
+        assertEquals("Postgres won.", command.conclusion)
+        assertEquals(listOf("migration notes"), command.evidence)
+        // chosen=none is unresolved; a chosen id that was not listed is cited too.
+        assertNull(MemoryDeliberationCommand.parse("/deliberate c1 c2 chosen=none | Unclear.").single().getOrThrow().chosen)
+        assertEquals(listOf("c1", "c2"), MemoryDeliberationCommand.parse("/deliberate c1 chosen=c2 | B.").single().getOrThrow().cited.map { it.value })
+        assertTrue(MemoryDeliberationCommand.parse("/deliberate c1 c2").single().isFailure, "a conclusion is required")
+        assertTrue(MemoryDeliberationCommand.parse("no command here").isEmpty())
+    }
+
+    @Test
+    fun anAgentRecordsADeliberationFromItsSessionAndIsToldHow() = runBlocking<Unit> {
+        val w = World()
+        contrastingPair(w)
+        // A divergent hit tells the agent the exact command, citing both sides.
+        val hit = w.memory.recallFor("wf", "Postgres").single { it.node.id.value == "c1" }
+        assertTrue("/deliberate memory-node:c1 memory-node:c2 chosen=" in hit.divergenceLines(), hit.divergenceLines())
+
+        val handle = ManagedSessionHandle(TaskRunId("agent-d"), AgentProviderId("p"), ProviderRunId("r"))
+        w.memory.observer.onSessionStarted(
+            handle,
+            AgentTaskRequest(
+                TaskRunId("agent-d"), "Pick the database", "", emptyList(),
+                orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf"), projectId = ProjectId("P")),
+            ),
+        )
+        val sent = mutableListOf<String>()
+        w.memory.observer.onSessionEvent(
+            handle,
+            AgentEvent.Thinking(ProviderRunId("r"), "/deliberate memory-node:c1 memory-node:c2 chosen=memory-node:c1 | Postgres; MySQL was dropped."),
+        ) { sent += it; ProviderActionResult.Accepted }
+        assertTrue(sent.any { "deliberation recorded" in it }, "$sent")
+        val deliberation = w.view("wf").read().nodes.single { it.kind == MemoryNodeKind.Deliberation }
+        assertEquals("c1", deliberation.metadata[DELIBERATION_CHOSEN])
+        assertEquals("Postgres; MySQL was dropped.", deliberation.text)
+        assertEquals(1, AgentMemoryLayer.create(w.view("wf")).absorbDeliberations(4L), "a chosen deliberation lets consolidation absorb the contrast")
+
+        // A command citing an unknown memory is refused, and the agent is told why.
+        sent.clear()
+        w.memory.observer.onSessionEvent(handle, AgentEvent.Thinking(ProviderRunId("r"), "/deliberate memory-node:ghost | x")) { sent += it; ProviderActionResult.Accepted }
+        assertTrue(sent.any { "not recorded" in it && "ghost" in it }, "$sent")
     }
 
     // ---- contrasts resolved by deliberation, then absorbed --------------------------------------

@@ -903,3 +903,6 @@ private fun String.memoryTerms(): List<String> {
     if (token.length > 1) terms += token.toString()
     return terms.distinct()
 }
+
+/** The summary-tree levels above [node] (root first), as recall shows them under a hit. */
+internal fun MemorySnapshot.outlineAbove(node: MemoryNode): List<MemoryNode> = MemoryRecallIndex(this).outlineFor(node)
