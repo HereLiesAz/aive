@@ -59,7 +59,11 @@ Two kinds of rows do not come from the packets the clerks receive in the synthet
   state another value (a number or quoted string) or to contrast (same frame, different filler;
   `MemoryContrast`). The engine never offers such a cluster, but a clerk shown one must decline
   (`{"sections":[],"nodes":[],"links":[]}`, or `DO_NOT_CONDENSE`). They sit in the source packet's
-  split, so condense and keep-apart rows are balanced in training and in every gated split.
+  split, so condense and keep-apart rows are balanced in training and in every gated split. Most
+  condensation clusters in the synthetic sessions are short tags with nothing to contrast, so the
+  1500-session corpus has `keep-apart:values` rows only (157 beside 157 `condense`). Identical
+  members make the copy shortcut right on many `condense` rows; those rows are left out of the
+  shortcut gate, and `keep-apart` is what tells a copying clerk apart.
 - **Summary-chain requests.** The summary tree and pair summaries (`MemorySummaryChain.kt`) call the
   Summary Synthesizer clerk when it is installed, through one-off Summaries packets
   (`memorySummaryChainPacket`) that now state the character limit. The generator records every
