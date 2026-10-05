@@ -205,6 +205,8 @@ New replaceable evidence families should explicitly store `evidenceFamily` and `
 
 When several highly similar memories are mechanically condensed into a more general representation, their shared associations become more important, not less.
 
+The generalized memory is an extra index entry. A source is superseded (hidden from ranking, kept in the store) only when the generalized text contains every one of its sentences, such as an identical repeat; any other source stays active beside it, linked by `CondensedFrom`. Members that contrast (same frame, different filler) are never condensed together, and the generalized memory inherits its sources' divergence markers and variant attestations (`docs/Memory-layer.md`).
+
 The generalized memory therefore receives direct `AssociatedWith` support for external targets that were associated with **two or more** of the condensed source memories. Source-specific parallel evidence is first accumulated per source, then independent source contributions are accumulated again with the same saturating exponential rule.
 
 Conceptually:

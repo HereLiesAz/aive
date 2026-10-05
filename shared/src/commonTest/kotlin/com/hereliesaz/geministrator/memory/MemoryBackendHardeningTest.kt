@@ -192,23 +192,14 @@ class MemoryBackendHardeningTest {
                 )
                 return MemoryMutationBatch(
                     nodesToAdd = listOf(generalized),
-                    edgesToAdd = packet.items.flatMapIndexed { index, item ->
-                        val source = MemoryNodeId(item.id)
-                        listOf(
-                            MemoryEdge(
-                                id = MemoryEdgeId("condensed-$index"),
-                                from = generalized.id,
-                                to = source,
-                                relation = MemoryRelationKind.CondensedFrom,
-                                createdAtEpochMillis = 50L,
-                            ),
-                            MemoryEdge(
-                                id = MemoryEdgeId("supersedes-$index"),
-                                from = generalized.id,
-                                to = source,
-                                relation = MemoryRelationKind.Supersedes,
-                                createdAtEpochMillis = 50L,
-                            ),
+                    // CondensedFrom only: Supersedes is written by the engine, never a clerk.
+                    edgesToAdd = packet.items.mapIndexed { index, item ->
+                        MemoryEdge(
+                            id = MemoryEdgeId("condensed-$index"),
+                            from = generalized.id,
+                            to = MemoryNodeId(item.id),
+                            relation = MemoryRelationKind.CondensedFrom,
+                            createdAtEpochMillis = 50L,
                         )
                     },
                 )
@@ -225,11 +216,11 @@ class MemoryBackendHardeningTest {
         assertIs<MemoryConsolidationResult.Applied>(result)
         assertEquals(priorityEntry.id, result.queueId)
 
-        val superseded = store.read().edges
-            .filter { it.relation == MemoryRelationKind.Supersedes }
+        val condensed = store.read().edges
+            .filter { it.relation == MemoryRelationKind.CondensedFrom || it.relation == MemoryRelationKind.Supersedes }
             .mapTo(hashSetOf()) { it.to }
-        assertTrue(priorityNodes.any { it.id in superseded })
-        assertFalse(pausedNodes.any { it.id in superseded })
+        assertTrue(priorityNodes.any { it.id in condensed })
+        assertFalse(pausedNodes.any { it.id in condensed })
     }
 
     @Test

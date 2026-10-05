@@ -24,6 +24,8 @@ data class MemoryQueueId(val value: String)
 enum class MemorySourceKind {
     UserPrompt,
     Objective,
+    /** An agent's deliberation about a divergence ([MemoryTool.deliberate]). */
+    Deliberation,
     Role,
     PromptContext,
     Plan,
@@ -82,6 +84,33 @@ enum class MemoryNodeKind {
     Phrase,
     Summary,
     Category,
+
+    /**
+     * Variant register: one frame (what a set of contrasting memories is about). Written only by the
+     * engine's deterministic contrast step; never a recall result, never condensed.
+     */
+    Frame,
+
+    /**
+     * Variant register: one filler encountered for a frame. Add-only; its occurrences are the
+     * [MemoryRelationKind.Attests] edges into it. No variant is ranked as correct.
+     */
+    Variant,
+
+    /**
+     * An agent's conscious conclusion about a divergence, citing the memories and evidence it
+     * considered ([MemoryRelationKind.Deliberates]). Written only through [MemoryTool.deliberate];
+     * never condensed, never supersedes anything.
+     */
+    Deliberation,
+    ;
+
+    /** The six kinds the clerk pipeline produces; the others are engine-owned records. */
+    val isClerkMemory: Boolean get() = this in CLERK_MEMORY_KINDS
+
+    companion object {
+        val CLERK_MEMORY_KINDS: Set<MemoryNodeKind> = setOf(Context, NounTag, VerbTag, Phrase, Summary, Category)
+    }
 }
 
 @Serializable
@@ -119,11 +148,54 @@ enum class MemoryRelationKind {
 
     SimilarTo,
     AssociatedWith,
+
+    /** Legacy: kept readable for stored graphs and surfaced like [Diverges]. No clerk may write it. */
     ConflictsWith,
+
+    /** Legacy: kept readable for stored graphs. No clerk may write it; nothing writes it. */
     ResolvesConflict,
+
+    /**
+     * Derived -> source: the derived memory contains every sentence of the source (genuine coverage,
+     * including identical repeats), so the source is hidden from ranking and stays in the store.
+     * Written only by the consolidator's deterministic coverage check, never by a clerk.
+     */
     Supersedes,
+
+    /** Generalized memory -> each memory it was condensed from (provenance; sources stay active unless covered). */
     CondensedFrom,
+
+    /**
+     * Divergence marker: two memories share a frame and differ in filler (a contrast). Structural and
+     * advisory, like a genealogy finding: it says the memories differ, never which is right. Recall
+     * returns marked partners together. Written only by the deterministic contrast step.
+     */
+    Diverges,
+
+    /** Variant register: a memory node -> the variant (filler) it attests. Metadata carries age and context. */
+    Attests,
+
+    /** Variant register: variant -> its frame. */
+    VariantOf,
+
+    /** Deliberation -> each memory (or other deliberation) it cites. */
+    Deliberates,
 }
+
+/**
+ * Relations a model-backed clerk may propose. `Supersedes`, `ResolvesConflict` and `ConflictsWith`
+ * are not offered to models and are rejected if a model emits them; nor are the engine-owned
+ * register, divergence and deliberation relations.
+ */
+val MODEL_WRITABLE_RELATIONS: Set<MemoryRelationKind> = setOf(
+    MemoryRelationKind.Indexes,
+    MemoryRelationKind.Composes,
+    MemoryRelationKind.Summarizes,
+    MemoryRelationKind.Categorizes,
+    MemoryRelationKind.SimilarTo,
+    MemoryRelationKind.AssociatedWith,
+    MemoryRelationKind.CondensedFrom,
+)
 
 @Serializable
 data class MemoryEdge(
@@ -319,7 +391,8 @@ data class MemoryQuery(
     val text: String,
     val resolution: MemoryResolution = MemoryResolution.Tag,
     val maxResults: Int = 12,
-    val includeConflicts: Boolean = false,
+    /** Divergent partners (and their deliberations) come back with each hit. On by default. */
+    val includeConflicts: Boolean = true,
     val projectId: String? = null,
     val workflowRunId: String? = null,
     val workflowDefinitionId: String? = null,
@@ -348,7 +421,7 @@ data class MemoryTagQuery(
     val tags: List<String>,
     val resolution: MemoryResolution = MemoryResolution.Tag,
     val maxResults: Int = 12,
-    val includeConflicts: Boolean = false,
+    val includeConflicts: Boolean = true,
     val scope: MemoryBankScope = MemoryBankScope(),
 ) {
     init {
@@ -358,11 +431,18 @@ data class MemoryTagQuery(
     }
 }
 
+/**
+ * One recall unit. [conflicts] are the hit's divergent partners (memories sharing its frame with a
+ * different filler, via `Diverges` or legacy `ConflictsWith`), returned whether or not they matched,
+ * ranked, or are otherwise hidden; [deliberations] are agents' recorded conclusions about them. The
+ * unit is ranked, budgeted and gated as one item, so nothing downstream can show one side alone.
+ */
 @Serializable
 data class MemoryRecallHit(
     val node: MemoryNode,
     val score: Float,
     val conflicts: List<MemoryNode> = emptyList(),
+    val deliberations: List<MemoryNode> = emptyList(),
 )
 
 @Serializable
@@ -398,4 +478,26 @@ data class MemoryMutationBatch(
     val edgesToAdd: List<MemoryEdge> = emptyList(),
 ) {
     val size: Int get() = sectionsToAdd.size + nodesToAdd.size + edgesToAdd.size
+}
+
+/**
+ * An agent's conscious conclusion about a divergence. [citedNodeIds] are the memories it considered
+ * (at least one); [evidence] is free text naming anything else it weighed. Stored as its own episode
+ * and a [MemoryNodeKind.Deliberation] node; it is not queued for consolidation, so it is never
+ * condensed, and it never supersedes: the divergence marker and both sides stay.
+ */
+@Serializable
+data class MemoryDeliberationRequest(
+    val sourceSessionId: String,
+    val conclusion: String,
+    val citedNodeIds: List<MemoryNodeId>,
+    val evidence: List<String> = emptyList(),
+    val scope: MemoryBankScope = MemoryBankScope(),
+    val deliberatedAtEpochMillis: Long,
+) {
+    init {
+        require(sourceSessionId.isNotBlank()) { "Deliberation source session must not be blank" }
+        require(conclusion.isNotBlank()) { "Deliberation conclusion must not be blank" }
+        require(citedNodeIds.isNotEmpty()) { "A deliberation must cite at least one memory" }
+    }
 }

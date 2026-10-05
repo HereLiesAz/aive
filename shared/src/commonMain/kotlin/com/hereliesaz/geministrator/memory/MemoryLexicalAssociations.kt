@@ -59,7 +59,7 @@ internal fun MemorySnapshot.lexicalAssociationCandidates(
         .asSequence()
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val active = nodes.filter { it.id !in superseded }
+    val active = nodes.filter { it.kind.isClerkMemory && it.id !in superseded }
     if (active.size < 2) return emptyList()
 
     val existingIds = edges.mapTo(hashSetOf(), MemoryEdge::id)

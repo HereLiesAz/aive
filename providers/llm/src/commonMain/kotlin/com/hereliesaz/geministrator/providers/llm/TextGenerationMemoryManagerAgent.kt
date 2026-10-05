@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.memory.MemoryConsolidationStage
 import com.hereliesaz.geministrator.memory.MemoryEdge
 import com.hereliesaz.geministrator.memory.MemoryEdgeId
 import com.hereliesaz.geministrator.memory.MemoryEpisodeId
+import com.hereliesaz.geministrator.memory.MODEL_WRITABLE_RELATIONS
 import com.hereliesaz.geministrator.memory.MemoryManagerAgent
 import com.hereliesaz.geministrator.memory.MemoryMutationBatch
 import com.hereliesaz.geministrator.memory.MemoryNode
@@ -117,6 +118,7 @@ private fun MemoryManagerProposal.toMutationBatch(
         }
         val kind = runCatching { MemoryNodeKind.valueOf(draft.kind) }
             .getOrElse { error("Unknown memory node kind ${draft.kind}") }
+        require(kind.isClerkMemory) { "The memory manager may not write ${kind.name} nodes" }
 
         val inheritedEpisodes = draft.sourceIds
             .flatMap { sourceId -> workItems[sourceId]?.sourceEpisodeIds().orEmpty() }
@@ -156,6 +158,8 @@ private fun MemoryManagerProposal.toMutationBatch(
         }
         val relation = runCatching { MemoryRelationKind.valueOf(link.relation) }
             .getOrElse { error("Unknown memory relation ${link.relation}") }
+        // Supersedes, ResolvesConflict, ConflictsWith and the engine-owned relations are not the model's to write.
+        require(relation in MODEL_WRITABLE_RELATIONS) { "The memory manager may not write ${relation.name}" }
         MemoryEdge(
             id = MemoryEdgeId("${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:edge:$index"),
             from = from,
@@ -199,15 +203,15 @@ private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
     appendLine("Schema:")
     appendLine("{\"sections\":[{\"text\":\"...\",\"sourceIds\":[\"input-id\"],\"metadata\":{}}],")
     appendLine(" \"nodes\":[{\"key\":\"local-key\",\"kind\":\"Context|NounTag|VerbTag|Phrase|Summary|Category\",\"text\":\"...\",\"sourceIds\":[\"input-id\"],\"salience\":0.0,\"confidence\":1.0,\"metadata\":{}}],")
-    appendLine(" \"links\":[{\"from\":\"local-key-or-node-id\",\"to\":\"local-key-or-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|ConflictsWith|ResolvesConflict|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
+    appendLine(" \"links\":[{\"from\":\"local-key-or-node-id\",\"to\":\"local-key-or-node-id\",\"relation\":\"${MODEL_WRITABLE_RELATIONS.joinToString("|") { it.name }}\",\"weight\":1.0,\"metadata\":{}}]}")
     appendLine("Use empty arrays for mutation types that are irrelevant to this stage.")
     appendLine("Node sourceIds must be IDs already present in this packet; local keys are only for links.")
     appendLine("Never reference an ID that is not in this packet unless it is a local node key you create in the same response.")
     if (stage == MemoryConsolidationStage.Condensation) {
         appendLine("Create exactly one node derived from ALL input node IDs.")
-        appendLine("For every input node, emit both CondensedFrom and Supersedes links from the new node to that source.")
+        appendLine("For every input node, emit a CondensedFrom link from the new node to that source. Keep every source's values.")
     }
-    appendLine("Preserve disagreements with ConflictsWith; do not erase one memory merely because another conflicts with it.")
+    appendLine("Never judge which memory is true, correct, newer or preferred, and never mark memories as conflicting; only organize the supplied material.")
 }
 
 private fun MemoryWorkItem.sourceEpisodeIds(): List<MemoryEpisodeId> = metadata["sourceEpisodeIds"]

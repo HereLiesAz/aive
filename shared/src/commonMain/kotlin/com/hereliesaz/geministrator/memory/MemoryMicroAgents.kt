@@ -331,9 +331,8 @@ class MemoryMicroAgentRouter(
                 require(batch.nodesToAdd.all { it.kind in inputKinds })
                 require(batch.edgesToAdd.all {
                     it.relation == MemoryRelationKind.CondensedFrom ||
-                        it.relation == MemoryRelationKind.Supersedes ||
                         it.relation == MemoryRelationKind.AssociatedWith
-                })
+                }) { "Condensation clerks may emit only CondensedFrom and AssociatedWith; Supersedes is the engine's" }
             }
         }
     }

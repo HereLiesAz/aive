@@ -430,8 +430,8 @@ class MemoryLayerController(
                 add(
                     PromptContextBlock(
                         "Relevant memory",
-                        relevant.joinToString("\n\n") { "[${it.score.twoDecimals()}] ${it.node.kind.name}: ${it.node.text}" }
-                            .take(MAX_RECALL_CHARS),
+                        relevant.map { "[${it.score.twoDecimals()}] ${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                            .joinWholeUnits(MAX_RECALL_CHARS),
                     ),
                 )
             }
@@ -440,8 +440,8 @@ class MemoryLayerController(
                     PromptContextBlock(
                         "Memory timeline",
                         timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value })
-                            .joinToString("\n\n") { "${it.node.kind.name}: ${it.node.text}" }
-                            .take(MAX_RECALL_CHARS),
+                            .map { "${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                            .joinWholeUnits(MAX_RECALL_CHARS),
                     ),
                 )
             }
@@ -489,7 +489,7 @@ class MemoryLayerController(
                     deliver(
                         buildString {
                             append(MEMORY_MESSAGE_MARKER).append(' ').append(MemoryCueWatcher.hashtag(trigger.subject)).append('\n')
-                            shown.forEach { append("- ").append(it.node.text.take(MAX_SUMMARY_CHARS)).append('\n') }
+                            shown.forEach { append("- ").append(it.node.text.take(MAX_SUMMARY_CHARS)).append(it.divergenceLines()).append('\n') }
                         }.trimEnd(),
                     )
                 }
@@ -638,15 +638,54 @@ internal fun MemorySnapshot.without(episodeId: MemoryEpisodeId): MemorySnapshot 
             sourceSectionIds = node.sourceSectionIds.filterTo(linkedSetOf()) { it in sectionIds },
         )
     }
-    val nodeIds = nodes.mapTo(hashSetOf()) { it.id }
+    val survivingIds = nodes.mapTo(hashSetOf()) { it.id }
+    val survivingEdges = edges.filter { it.from in survivingIds && it.to in survivingIds }
+    // A register entry no remaining memory attests is forgotten with it: a filler is not kept once
+    // every memory that stated it is gone. A frame with no variants left goes too.
+    val attested = survivingEdges.filter { it.relation == MemoryRelationKind.Attests }.mapTo(hashSetOf()) { it.to }
+    val withVariants = survivingEdges
+        .filter { it.relation == MemoryRelationKind.VariantOf && it.from in attested }
+        .mapTo(hashSetOf()) { it.to }
+    val pruned = nodes.filter { node ->
+        when (node.kind) {
+            MemoryNodeKind.Variant -> node.id in attested
+            MemoryNodeKind.Frame -> node.id in withVariants
+            else -> true
+        }
+    }
+    val nodeIds = pruned.mapTo(hashSetOf()) { it.id }
     return copy(
         revision = revision + 1,
         episodes = episodes.filter { it.id != episodeId },
         sections = sections,
-        nodes = nodes,
-        edges = edges.filter { it.from in nodeIds && it.to in nodeIds },
+        nodes = pruned,
+        edges = survivingEdges.filter { it.from in nodeIds && it.to in nodeIds },
         queue = queue.filter { it.episodeId != episodeId },
     )
+}
+
+/**
+ * A hit's divergent partners and deliberations, as indented lines under it. Partners are stated side
+ * by side; nothing says which is right.
+ */
+internal fun MemoryRecallHit.divergenceLines(): String = buildString {
+    conflicts.forEach { partner ->
+        append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
+    }
+    deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
+}
+
+/**
+ * Joins recall units whole, in order, while they fit [maxChars]: a unit (a hit with its divergent
+ * partners) is never cut in two. The first unit is always kept whole.
+ */
+internal fun List<String>.joinWholeUnits(maxChars: Int, separator: String = "\n\n"): String = buildString {
+    this@joinWholeUnits.forEach { unit ->
+        val extra = if (isEmpty()) unit.length else separator.length + unit.length
+        if (isNotEmpty() && length + extra > maxChars) return@forEach
+        if (isNotEmpty()) append(separator)
+        append(unit)
+    }
 }
 
 private fun Float.twoDecimals(): String {

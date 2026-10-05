@@ -765,17 +765,16 @@ private class ProgrammaticCondensationRewriter(now: () -> Long) :
                 },
             ),
         )
-        val edges = items.flatMapIndexed { index, item ->
-            listOf(MemoryRelationKind.CondensedFrom, MemoryRelationKind.Supersedes).map { relation ->
-                MemoryEdge(
-                    id = MemoryEdgeId("$namespace:edge:$index:${relation.name}"),
-                    from = id,
-                    to = MemoryNodeId(item.id),
-                    relation = relation,
-                    createdAtEpochMillis = createdAt,
-                    metadata = metadata(),
-                )
-            }
+        // CondensedFrom only: whether a source is covered (and so superseded) is the engine's call.
+        val edges = items.mapIndexed { index, item ->
+            MemoryEdge(
+                id = MemoryEdgeId("$namespace:edge:$index:${MemoryRelationKind.CondensedFrom.name}"),
+                from = id,
+                to = MemoryNodeId(item.id),
+                relation = MemoryRelationKind.CondensedFrom,
+                createdAtEpochMillis = createdAt,
+                metadata = metadata(),
+            )
         }
         return MemoryMutationBatch(nodesToAdd = listOf(node), edgesToAdd = edges)
     }
@@ -783,11 +782,12 @@ private class ProgrammaticCondensationRewriter(now: () -> Long) :
 
 
 /**
- * True when the members disagree on a value: a number, a quoted string, or negation present in some
- * but not all. Choosing a representative would then choose a claim, which clerks never do.
+ * True when the members disagree on a value (a number, a quoted string, or negation present in some
+ * but not all) or any two contrast: same frame, different filler ([MemoryContrast]). Choosing a
+ * representative would then choose a claim, which clerks never do.
  */
 internal fun condensationWouldAdjudicate(texts: List<String>): Boolean =
-    texts.map(::memoryClaimSignature).distinct().size > 1
+    texts.map(::memoryClaimSignature).distinct().size > 1 || MemoryContrast.anyContrast(texts)
 
 /**
  * The values a memory's text asserts: its numbers and quoted strings, and whether it negates. Two

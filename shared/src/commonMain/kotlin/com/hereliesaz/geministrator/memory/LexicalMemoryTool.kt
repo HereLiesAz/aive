@@ -16,6 +16,8 @@ class LexicalMemoryTool(
 
     override suspend fun termFrequency(term: String): MemoryTermFrequency = delegate.termFrequency(term)
 
+    override suspend fun deliberate(request: MemoryDeliberationRequest): MemoryNode = delegate.deliberate(request)
+
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val expanded = query.copy(expansionTerms = (query.expansionTerms + query.text.lexicalCues()).distinct())
         val result = delegate.grip(expanded)

@@ -69,24 +69,89 @@ There is no memory-layer `ConflictResolver` role.
 
 `AssociationLinker` may emit only semantic relatedness such as `SimilarTo` and `AssociatedWith`. It must never infer or emit `ConflictsWith`.
 
+No model-backed clerk may write `Supersedes`, `ResolvesConflict` or `ConflictsWith`: they are not in
+the relation list any model prompt offers (`MODEL_WRITABLE_RELATIONS`), and both model decoders
+(`StructuredMemoryMicroAgent`, `TextGenerationMemoryManagerAgent`) reject an answer that uses them, or
+the engine-owned kinds below. `ConflictsWith` and `ResolvesConflict` remain only so older stored
+graphs still load; nothing writes them.
+
 The engine enforces the boundary; it does not trust a clerk to keep it. Whatever runs a stage
 (programmatic, local model, hosted provider), `MemoryConsolidator` validates the answer in code:
 
-- Clerks only add. No answer edits or deletes a stored memory; `Supersedes` hides a representation
-  from recall and leaves it, and its provenance, in the store.
+- Clerks only add. No answer edits or deletes a stored memory.
 - Every derived node and section must point at sources inside its packet, and keep its source episode.
-- A condensation cluster whose members assert different values (a number, a quoted string, or
-  negation in some but not all; `memoryClaimSignature`) is never offered to any clerk. Merging it would
-  pick a claim, and superseding the rest would hide the differing traces from recall, which is where
-  an agent is meant to meet them.
+- A condensation cluster is never offered to any clerk if two of its members assert different values
+  (a number, a quoted string, or negation in some but not all; `memoryClaimSignature`) or **contrast**
+  (same frame, different filler; below). Members are dropped from a cluster greedily until none
+  contrast or carry a divergence marker to each other, so agreeing members can still fold.
 - A condensation must restate its sources' values unchanged (same claim signature), create exactly one
-  memory, and link every source through both `CondensedFrom` and `Supersedes`. Anything else is
-  rejected, and the cluster is declined once it keeps failing.
-- Forgetting an episode removes what was derived only from it; memories with other sources stay.
+  memory, and link every source through `CondensedFrom`. A clerk that also emits `Supersedes` (or any
+  relation other than `CondensedFrom`/`AssociatedWith`) is rejected, and the cluster is declined once
+  it keeps failing.
+- **Supersession is coverage only.** After accepting a condensation, the engine itself adds
+  `Supersedes` from the generalized memory to each source whose every sentence the generalized text
+  contains (case and spacing folded), which includes an identical repeat (`memoryCovers`). Every other
+  source stays active: the generalized memory is an extra index entry beside it, linked by
+  `CondensedFrom`. A superseded memory leaves ranking but stays in the store with its provenance, and
+  is still returned as a divergent partner (below). A memory already folded into a condensation is not
+  offered for condensation again.
+- Forgetting an episode removes what was derived only from it; memories with other sources stay, and
+  a register variant no remaining memory attests is removed with it.
 
-Differing memories therefore stay separate, associated by similarity, so recall brings them to an
-ordinary agent together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and
-its reasoning is banked as new experience through the same pipeline
+Condensation exists to fold repeated and similar memories, as people do. The defect it must avoid is
+treating a **frame** match as similarity. Every statement has a frame (what it is about: its subject
+and the question or predicate it answers) and a filler (what it says in that slot). "I chose Postgres
+for the database" and "I chose MySQL for the database" share a frame and differ in filler: they are
+not similar, they are a contrast, and memory keeps both. The terms are borrowed loosely from frame
+semantics (Fillmore; FrameNet's frames and frame elements); the implementation is a surface diff, not
+a frame lexicon.
+
+### Contrast, variant register, divergence marker, deliberation
+
+All of this is deterministic code in the engine (`MemoryContrast.kt`, `MemoryVariantRegister.kt`),
+the same for every clerk engine, and none of it judges which memory is right.
+
+- **Contrast** (`MemoryContrast.between`): tokenize both texts, fold entity aliases
+  (`MemoryAliases`, a small explicit alias table: "Postgres", "PostgreSQL", "psql" are one name), and
+  align them by longest common subsequence. The shared tokens are the frame; each gap is a slot. A pair
+  contrasts when the shared part holds at least half the content words of the shorter text and some
+  slot either holds different content words on both sides, at least one of which looks like a filler
+  (a number or identifier, a capitalized name, a quoted string, or a value word such as
+  `enabled`/`disabled`, `tabs`/`spaces`), or carries negation on one side only. A repeat, an aliased
+  spelling or an added word ("…today") is not a contrast. This is a heuristic: it can miss a contrast
+  phrased with different structure, and it can flag two lowercase names it reads as values.
+- **Divergence marker** (`Diverges`): when an episode reaches the condensation stage, before any
+  condensation, the engine compares each of its Context, Phrase and Summary memories with up to 48
+  same-kind memories sharing a content word (any project) and links every contrasting pair. The marker
+  is structural and advisory, like a genealogy finding: it says the two differ, nothing more. A
+  generalized memory inherits its sources' markers.
+- **Variant register**: for each frame, a `Frame` node and one `Variant` node per filler
+  (`VariantOf`), and an `Attests` edge from every memory that states that filler. Each attestation
+  records age (the memory's record time, its episode times and, when the text states an ISO date, that
+  event date), context (sessions, project, workflow run, task run, role), subject (the frame's words
+  before the first slot) and source episodes; a variant's occurrence count is its distinct source
+  episodes. It is add-only and keyed by content, so writing it twice is a no-op. Read it with
+  `MemorySnapshot.variantRegister()`. Nothing in it is ranked as correct. Keeping both record and
+  event time is the bitemporal pattern (transaction vs valid time) applied to attestations only; it is
+  not a bitemporal store.
+- **Recall unit**: every recall result carries its divergent partners (`MemoryRecallHit.conflicts`,
+  from `Diverges` and legacy `ConflictsWith`) and any deliberations about them, including partners
+  that are superseded, out of the query's scope or did not match. Ranking, the result budget, the
+  attention dial and prompt rendering all handle a hit and its partners as one item; rendering adds
+  whole units only and never cuts one in two. Surfacing is on by default (`includeConflicts = true`).
+- **Deliberation record**: an agent's conscious conclusion about a divergence,
+  `MemoryTool.deliberate(MemoryDeliberationRequest)`. It is stored as its own episode and a
+  `Deliberation` node citing the memories (and naming the evidence) it considered (`Deliberates`). It
+  is not queued for consolidation, so it is never sectioned or condensed, and it never supersedes: the
+  marker and both sides stay, and recall returns the deliberation with the unit ("has deliberations").
+
+Keeping every contrasting trace and handing the set to a reasoner follows the spirit of an
+assumption-based truth maintenance system (de Kleer's ATMS keeps contradictory environments rather
+than retracting one). Unlike an ATMS, memory never labels anything inconsistent.
+
+Differing memories therefore stay separate and marked, so recall brings them to an ordinary agent
+together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and record its
+conclusion as a deliberation or bank it as new experience through the same pipeline
 (`docs/architecture/MEMORY_BANKING_AND_ATTENTION.md`).
 
 ### Why not a self-edited knowledge wiki
@@ -320,7 +385,7 @@ Example:
 - A: `API timeout is configured for 30 seconds.`
 - B: `API timeout is configured for 60 seconds.`
 
-Correct behavior: high semantic association because both concern the API timeout.
+Correct behavior: high semantic association because both concern the API timeout. (The engine's deterministic contrast step separately marks them as a divergence, which is a structural fact, not a verdict.)
 
 Forbidden behavior: declaring that they contradict, deciding which is correct, or deciding which supersedes the other.
 
@@ -340,7 +405,7 @@ Clusters that disagree on a value never reach the clerk (see **Governing boundar
 remaining judgment is whether agreeing members are truly redundant. Its output must keep their values
 exactly: no number, quoted string or negation added or dropped.
 
-`Supersedes` in this stage means a retrieval representation has been replaced by a compressed equivalent. It does not mean the source belief was declared false or obsolete. Original provenance must remain reachable.
+The clerk links the generalized representation to every source with `CondensedFrom` only. It never writes `Supersedes`: the engine adds it, and only for a source whose every sentence the generalized text contains. `Supersedes` therefore means a retrieval representation is fully covered by another; it never means the source belief was declared false or obsolete. Original provenance remains reachable.
 
 ## Adversarial release gate
 
@@ -429,11 +494,11 @@ Verify that useful memories survive, chatter disappears, code is indexed correct
 To validate conscious conflict reasoning:
 
 1. Store two semantically related memories containing differing information.
-2. `AssociationLinker` links them only by similarity/relatedness.
-3. A normal orchestrated Aive agent recalls both.
+2. `AssociationLinker` links them only by similarity/relatedness; when they share a frame and differ in filler, the engine's contrast step marks them `Diverges` and records both fillers in the variant register.
+3. A normal orchestrated Aive agent recalls both, as one unit.
 4. That agent may consciously notice and reason about the discrepancy.
 5. Its reasoning becomes ordinary session context.
-6. The resulting episode later passes through the same clerical pipeline.
+6. The resulting episode later passes through the same clerical pipeline, or the agent records its conclusion as a deliberation that cites both memories and leaves them and the marker in place.
 
 Contradiction awareness belongs to the ordinary agent, not to the memory clerks.
 
