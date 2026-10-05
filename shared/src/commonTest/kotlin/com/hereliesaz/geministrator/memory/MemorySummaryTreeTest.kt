@@ -201,6 +201,29 @@ class MemorySummaryTreeTest {
     }
 
     @Test
+    fun shortPairSummariesAlwaysShowBothSides() = runBlocking {
+        listOf(
+            "Heap set to 4 GB." to "CI runs nightly.",
+            "Use Gradle." to "Pizza.",
+            paragraphs[0] to paragraphs[3],
+            paragraphs.take(3).joinToString("\n\n") to "Cache on.",
+        ).forEachIndexed { i, (left, right) ->
+            val a = MemoryNode(MemoryNodeId("a$i"), MemoryNodeKind.Context, left, createdAtEpochMillis = 1L)
+            val b = MemoryNode(MemoryNodeId("b$i"), MemoryNodeKind.Context, right, createdAtEpochMillis = 2L)
+            val edge = MemoryEdge(MemoryEdgeId("e$i"), a.id, b.id, MemoryRelationKind.AssociatedWith, createdAtEpochMillis = 3L)
+            val pair = MemoryPairSummaries.summaryFor(MemorySnapshot(nodes = listOf(a, b), edges = listOf(edge)), edge, 4L, MemorySummarizerChain())
+            assertTrue(MemoryPairSummaries.validatePair(pair.text, maxOf(pair.text.length, left.length + right.length - 1)), pair.text)
+            val body = pair.text.lines().let { ls -> if (ls.any { it.startsWith("A: ") }) ls.filter { it.startsWith("A: ") || it.startsWith("B: ") }.map { it.drop(3) } else ls.last().split(" / ", limit = 2) }
+            assertEquals(2, body.size, pair.text)
+            val words = { t: String -> Regex("[A-Za-z0-9]+").findAll(t.lowercase()).map { it.value }.toSet() }
+            assertTrue(words(body[0]).isNotEmpty() && words(left).containsAll(words(body[0])), "side A from A: ${pair.text}")
+            assertTrue(words(body[1]).isNotEmpty() && words(right).containsAll(words(body[1])), "side B from B: ${pair.text}")
+        }
+        assertFalse(MemoryPairSummaries.validatePair("A: only one side", 100))
+        assertFalse(MemoryPairSummaries.validatePair("A: x\nB: ", 100))
+    }
+
+    @Test
     fun divergencePairSummaryDescribesBothSidesWithoutJudging() = runBlocking {
         val a = MemoryNode(MemoryNodeId("a"), MemoryNodeKind.Context, "For the memory store we chose Postgres as the database engine because it supports JSON columns well.", createdAtEpochMillis = 1L)
         val b = MemoryNode(MemoryNodeId("b"), MemoryNodeKind.Context, "For the memory store we chose MySQL as the database engine because the hosting plan includes it.", createdAtEpochMillis = 2L)

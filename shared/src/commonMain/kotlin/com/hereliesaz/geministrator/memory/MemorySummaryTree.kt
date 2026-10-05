@@ -211,8 +211,9 @@ internal object MemorySummaryTree {
  * Hierarchy and bookkeeping edges (tree, ladder, supersession, register, deliberation, access) are
  * not links between two memories' content and get none.
  *
- * The summary is the chain's output over both memories' paragraphs, each labelled with its side
- * (`A:` the edge's `from`, `B:` its `to`). Its size budget is the existing one-memory rewrite rule
+ * The summary always represents both memories: each side is summarized by the chain in half the
+ * room and the two are joined as `A: …\nB: …` (`A` the edge's `from`, `B` its `to`), or `… / …`
+ * when labels cost too much; [validatePair] rejects a summary missing either side. Its size budget is the existing one-memory rewrite rule
  * (MemoryRewrite.kt) applied to the pair's joint text: size and original size are the two memories'
  * sums, the life position their weighted mean (contributor weights), so the limit is
  * `memoryRewriteLimit([joint])`. A divergence summary reads "same question, different answers": the
@@ -272,34 +273,43 @@ internal object MemoryPairSummaries {
         val contrast = if (divergence) MemoryContrast.between(a.text, b.text) else null
         val contrastText = contrast?.let { c ->
             val sides = "${c.frameText}\n$SIDE_A${c.leftFillerText}\n$SIDE_B${c.rightFillerText}"
-            listOf("$DIVERGENCE_HEADER $sides", sides).firstOrNull { it.length <= limit }
+            listOf("$DIVERGENCE_HEADER $sides", sides).firstOrNull { validatePair(it, limit) }
         }
-        val text = if (contrastText != null) {
+        val tiny = a.text.length + b.text.length <= 2 * MIN_SIDE
+        val text = if (tiny) {
+            // Two very short memories (tags, names) are their own gist: both kept whole, no labels.
+            engines += ENGINE_VERBATIM_PAIR
+            "${a.text.trim()}$UNLABELLED_SEPARATOR${b.text.trim()}"
+        } else if (contrastText != null) {
             // The frame and each side's filler, as the contrast step reads them: exact, no engine needed.
             engines += ENGINE_CONTRAST
             contrastText
-        } else if (divergence) {
-            val header = DIVERGENCE_HEADER.takeIf { limit - it.length - 1 >= 2 * MIN_SIDE + SIDE_A.length + SIDE_B.length + 1 }
-            val room = limit - (header?.length?.plus(1) ?: 0) - SIDE_A.length - SIDE_B.length - 1
-            val side = (room / 2).coerceAtLeast(1)
+        } else {
+            // Two-part form: each side summarized by the chain in half the room, never one side alone.
+            val header = if (divergence) DIVERGENCE_HEADER.takeIf { limit - it.length - 1 >= 2 * MIN_SIDE + SIDE_A.length + SIDE_B.length + 1 } else null
+            val headerCost = header?.length?.plus(1) ?: 0
+            val labelled = (limit - headerCost - SIDE_A.length - SIDE_B.length - 1) / 2 >= MIN_SIDE
+            val joinCost = if (labelled) SIDE_A.length + SIDE_B.length + 1 else UNLABELLED_SEPARATOR.length
+            val side = ((limit - headerCost - joinCost) / 2).coerceAtLeast(1)
             val sides = listOf(a, b).map { node ->
                 val ps = paragraphs(node)
                 chain.summarize(
-                    MemorySummaryRequest(ps, side, ps.map { node.salience.toDouble() }, separator = " ", forbidden = JUDGING, instruction = DIVERGENCE_INSTRUCTION),
-                ).also { engines += it.engine; millis += it.millis }.text.replace('\n', ' ')
+                    MemorySummaryRequest(
+                        ps, side, ps.map { node.salience.toDouble() }, separator = " ",
+                        forbidden = if (divergence) JUDGING else null,
+                        instruction = if (divergence) DIVERGENCE_INSTRUCTION else PAIR_SIDE_INSTRUCTION,
+                    ),
+                ).also { engines += it.engine; millis += it.millis }.text.replace('\n', ' ').trim()
             }
-            listOfNotNull(header, SIDE_A + sides[0], SIDE_B + sides[1]).joinToString("\n")
-        } else {
-            val labelled = paragraphs(a).map { SIDE_A + it } + paragraphs(b).map { SIDE_B + it }
-            val salience = paragraphs(a).map { a.salience.toDouble() } + paragraphs(b).map { b.salience.toDouble() }
-            chain.summarize(MemorySummaryRequest(labelled, limit, salience, separator = "\n", instruction = PAIR_INSTRUCTION))
-                .also { engines += it.engine; millis += it.millis }.text
+            val body = if (labelled) "$SIDE_A${sides[0]}\n$SIDE_B${sides[1]}" else sides.joinToString(UNLABELLED_SEPARATOR)
+            listOfNotNull(header, body).joinToString("\n")
         }
+        require(validatePair(text, if (tiny) text.length else limit)) { "Pair summary of ${edge.id.value} does not represent both memories within $limit characters" }
         chain.metrics.pairSummaries += 1
         return MemoryNode(
             id = idFor(edge.id),
             kind = MemoryNodeKind.PairSummary,
-            text = text.take(limit).ifBlank { "$SIDE_A… $SIDE_B…" },
+            text = text,
             sourceEpisodeIds = a.sourceEpisodeIds + b.sourceEpisodeIds,
             sourceSectionIds = a.sourceSectionIds + b.sourceSectionIds,
             salience = memoryJoin(a.salience.toDouble(), b.salience.toDouble()).toFloat(),
@@ -354,11 +364,24 @@ internal object MemoryPairSummaries {
     private const val COMMIT_ATTEMPTS = 3
     private const val MIN_SIDE = 16
     const val ENGINE_CONTRAST = "contrast"
+    const val ENGINE_VERBATIM_PAIR = "verbatim-pair"
     const val SIDE_A = "A: "
     const val SIDE_B = "B: "
     const val DIVERGENCE_HEADER = "Same question, different answers:"
-    private const val PAIR_INSTRUCTION =
-        "Summarize memories A and B together within the character limit, keeping which side said what. Add no facts."
+    private const val PAIR_SIDE_INSTRUCTION =
+        "Summarize this memory, one side of a linked pair, within the character limit. Add no facts."
+    private const val UNLABELLED_SEPARATOR = " / "
+
+    /** A pair summary is within its limit and has a non-blank part for each side (labelled or separated). */
+    fun validatePair(text: String, limit: Int): Boolean {
+        if (text.length > limit) return false
+        val lines = text.lines()
+        val a = lines.firstOrNull { it.startsWith(SIDE_A) }?.removePrefix(SIDE_A)
+        val b = lines.firstOrNull { it.startsWith(SIDE_B) }?.removePrefix(SIDE_B)
+        if (a != null || b != null) return !a.isNullOrBlank() && !b.isNullOrBlank()
+        val last = lines.last()
+        return last.contains(UNLABELLED_SEPARATOR) && last.split(UNLABELLED_SEPARATOR, limit = 2).all(String::isNotBlank)
+    }
     private const val DIVERGENCE_INSTRUCTION =
         "Summarize this side of a divergence within the character limit. State what it says; do not judge whether it is right."
 

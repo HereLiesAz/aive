@@ -414,8 +414,10 @@ edges get none.
 - Written by the engine in the sequential consolidation queue (`AgentMemoryLayer.consolidateOne`),
   at most `PAIR_SUMMARIES_PER_PASS` (32) per pass, oldest link first; the rest carry over, and the
   drain keeps going (`MemoryConsolidationResult.PairSummaries`) until none is pending.
-- Input: both memories' paragraphs, labelled `A:` (the edge's `from`) and `B:` (its `to`), through
-  the summarizer chain below.
+- Always both sides: each memory is summarized by the chain below in half the room, then joined in a
+  fixed two-part form, `A: …` / `B: …` (A the edge's `from`, B its `to`); when the labels would cost
+  too much, `… / …` without labels. The engine rejects a pair summary missing either side. Two very
+  short memories (joint text ≤ 32 characters, e.g. tags) are kept whole as `a / b`.
 - Size: the one-memory rewrite rule applied to the pair's joint text (sizes and original sizes
   summed, life position the weighted mean of the two).
 - A divergence pair summary describes "same question, different answers": the shared frame and each
