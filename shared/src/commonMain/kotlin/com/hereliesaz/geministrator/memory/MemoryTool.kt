@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.memory
 
 import kotlin.math.max
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Agent-facing memory surface. Agents bank experience and query this service; they do not read
@@ -52,9 +54,13 @@ interface MemoryTool {
 /** [memories] of [total] active memories contain a term. */
 data class MemoryTermFrequency(val memories: Int, val total: Int)
 
+@OptIn(ExperimentalTime::class)
 class GraphMemoryTool(
     private val store: MemoryStore,
     private val queue: MemoryConsolidationQueue = MemoryConsolidationQueue(store),
+    /** Writes a link's pair summary at recall if consolidation has not yet (a counted violation). */
+    private val summarizer: MemorySummarizerChain = MemorySummarizerChain(),
+    private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : MemoryTool {
     /** Rebuilt only when the store hands out a different snapshot; recall between commits reuses it. */
     private var cachedIndex: MemoryRecallIndex? = null
@@ -140,7 +146,40 @@ class GraphMemoryTool(
             .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
-        return index.recallFromSeeds(query, scoredSeeds, active)
+        return index.recallFromSeeds(query, scoredSeeds, active).let { it.copy(hits = withLinks(index, it.hits)) }
+    }
+
+    /**
+     * Attaches to each hit the pair summary of every link between it and another delivered memory
+     * (another hit or a divergent partner), and its place in its episode's summary tree. A link
+     * whose summary consolidation has not written yet gets one now: the safety net, counted in
+     * [MemorySummaryMetrics.pairSummaryViolations].
+     */
+    private suspend fun withLinks(index: MemoryRecallIndex, hits: List<MemoryRecallHit>): List<MemoryRecallHit> {
+        if (hits.isEmpty()) return hits
+        val delivered = hits.flatMapTo(hashSetOf()) { hit -> listOf(hit.node.id) + hit.conflicts.map(MemoryNode::id) }
+        val links = hits.associate { hit ->
+            hit.node.id to index.linksOf(hit.node.id).filter { edge -> edge.other(hit.node.id) in delivered }
+        }
+        val missing = links.values.flatten().distinctBy { it.id }.filter { index.pairSummaryOf(it.id) == null }
+        val generated = HashMap<MemoryEdgeId, MemoryNode>()
+        if (missing.isNotEmpty()) {
+            summarizer.metrics.pairSummaryViolations += missing.size
+            val now = nowEpochMillis()
+            runCatching { generated += MemoryPairSummaries.ensure(store, missing, now, summarizer) }
+            missing.filter { it.id !in generated }.forEach { edge ->
+                // Not writable here (e.g. a read-only bank): still shown, computed for this recall.
+                runCatching { generated[edge.id] = MemoryPairSummaries.summaryFor(index.snapshot, edge, now, summarizer) }
+            }
+        }
+        return hits.map { hit ->
+            hit.copy(
+                pairSummaries = links[hit.node.id].orEmpty().mapNotNull { edge ->
+                    (index.pairSummaryOf(edge.id) ?: generated[edge.id])?.let { MemoryPairSummary(edge.id, edge.relation, edge.other(hit.node.id), it) }
+                },
+                outline = index.outlineFor(hit.node),
+            )
+        }
     }
 
     override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle {
@@ -162,7 +201,7 @@ class GraphMemoryTool(
             .take(max(query.maxResults * 4, 24))
             .toList()
 
-        return index.recallFromSeeds(normalizedQuery, scoredSeeds, active)
+        return index.recallFromSeeds(normalizedQuery, scoredSeeds, active).let { it.copy(hits = withLinks(index, it.hits)) }
     }
 
     override suspend fun expand(
@@ -183,7 +222,7 @@ class GraphMemoryTool(
             activeIds = index.activeIds,
             maxDepth = 6,
         )
-        return paths.entries
+        val hits = paths.entries
             .sortedWith(
                 compareByDescending<Map.Entry<MemoryNodeId, TraversalPath>> { it.value.score }
                     .thenBy { it.value.depth }
@@ -200,8 +239,13 @@ class GraphMemoryTool(
                     )
                 }
             }
+        return withLinks(index, hits)
     }
 }
+
+private fun MemoryEdge.other(id: MemoryNodeId): MemoryNodeId = if (from == id) to else from
+
+private const val MAX_OUTLINE_DEPTH = 64
 
 private val semanticCueKinds = setOf(
     MemoryNodeKind.NounTag,
@@ -238,6 +282,49 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     }
     private val deliberationsCiting: Map<MemoryNodeId, List<MemoryNodeId>> by lazy {
         snapshot.edges.filter { it.relation == MemoryRelationKind.Deliberates }.groupBy({ it.to }, { it.from })
+    }
+
+    private val links: Map<MemoryNodeId, List<MemoryEdge>> by lazy {
+        snapshot.edges.filter { MemoryPairSummaries.covers(it, nodesById) }
+            .flatMap { listOf(it.from to it, it.to to it) }
+            .groupBy({ it.first }, { it.second })
+    }
+    private val pairSummaries: Map<String, MemoryNode> by lazy {
+        snapshot.nodes.filter { it.kind == MemoryNodeKind.PairSummary }.mapNotNull { node -> node.metadata[PAIR_OF]?.let { it to node } }.toMap()
+    }
+    private val outlineParent: Map<MemoryNodeId, MemoryNodeId> by lazy {
+        snapshot.edges.filter { it.relation == MemoryRelationKind.Outlines }.associate { it.to to it.from }
+    }
+    private val outlineLeafBySection: Map<MemorySectionId, MemoryNode> by lazy {
+        snapshot.nodes.filter { it.kind == MemoryNodeKind.Outline && it.metadata[OUTLINE_LEAF] == "true" }
+            .sortedBy { it.id.value }
+            .flatMap { leaf -> leaf.sourceSectionIds.map { it to leaf } }
+            .distinctBy { it.first }
+            .toMap()
+    }
+
+    /** Links between two memories that carry a pair summary, by endpoint. */
+    fun linksOf(nodeId: MemoryNodeId): List<MemoryEdge> = links[nodeId].orEmpty()
+
+    fun pairSummaryOf(edgeId: MemoryEdgeId): MemoryNode? = pairSummaries[edgeId.value]
+
+    /**
+     * The summary-tree levels above [node], root first: from the leaf paragraph of its first source
+     * section up to the root, the leaf itself excluded; or just its episode's root.
+     */
+    fun outlineFor(node: MemoryNode): List<MemoryNode> {
+        val leaf = node.sourceSectionIds.firstNotNullOfOrNull(outlineLeafBySection::get)
+        if (leaf != null) {
+            val path = mutableListOf<MemoryNode>()
+            var at = outlineParent[leaf.id]
+            while (at != null && path.size < MAX_OUTLINE_DEPTH) {
+                nodesById[at]?.let(path::add)
+                at = outlineParent[at]
+            }
+            return path.reversed()
+        }
+        val root = node.sourceEpisodeIds.singleOrNull()?.let { nodesById[MemorySummaryTree.rootId(it)] } ?: return emptyList()
+        return if (root.metadata[OUTLINE_LEAF] == "true") emptyList() else listOf(root)
     }
 
     fun terms(node: MemoryNode): Set<String> = terms.getOrPut(node.id) {
@@ -495,8 +582,11 @@ private fun MemorySnapshot.recallGraph(): MemoryRecallGraph {
         byTarget.getOrPut(to) { mutableListOf() } += edge
     }
 
+    // Summary-tree and pair-summary nodes are views, not memories to walk through.
+    val views = nodes.filter { it.kind == MemoryNodeKind.Outline || it.kind == MemoryNodeKind.PairSummary }.mapTo(hashSetOf()) { it.id }
     edges.forEach { edge ->
         if (!edge.relation.isRecallTraversable()) return@forEach
+        if (edge.from in views || edge.to in views) return@forEach
         val group = edge.metadata[EDGE_GROUP]?.takeIf(String::isNotBlank)
         if (group != null) {
             groups.getOrPut("${edge.metadata["basis"].orEmpty()}|$group") { mutableListOf() } += edge
@@ -665,6 +755,8 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
     MemoryRelationKind.VariantOf,
     MemoryRelationKind.Deliberates,
     MemoryRelationKind.Recalled,
+    // The summary tree is a view of an episode, not evidence that two memories are related.
+    MemoryRelationKind.Outlines,
     -> false
 }
 

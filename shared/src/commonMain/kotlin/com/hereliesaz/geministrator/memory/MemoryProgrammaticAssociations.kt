@@ -524,7 +524,7 @@ private fun List<MemoryNode>.anchorForEpisode(episodeId: MemoryEpisodeId): Memor
                     MemoryNodeKind.Phrase -> 2
                     MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag -> 3
                     MemoryNodeKind.Context -> 4
-                    MemoryNodeKind.Frame, MemoryNodeKind.Variant, MemoryNodeKind.Deliberation -> 5
+                    MemoryNodeKind.Frame, MemoryNodeKind.Variant, MemoryNodeKind.Deliberation, MemoryNodeKind.Outline, MemoryNodeKind.PairSummary -> 5
                 }
             }.thenByDescending(MemoryNode::salience)
                 .thenByDescending(MemoryNode::createdAtEpochMillis)

@@ -130,6 +130,9 @@ sealed interface MemoryConsolidationResult {
         val reason: String,
     ) : MemoryConsolidationResult
 
+    /** No queue work was due, but [count] pending pair summaries were written ([MemoryPairSummaries]). */
+    data class PairSummaries(val count: Int) : MemoryConsolidationResult
+
     /** A condensation cluster was declined (or kept failing) and will not be offered again. */
     data class Declined(
         val queueId: MemoryQueueId,
@@ -141,12 +144,17 @@ class MemoryConsolidator(
     private val store: MemoryStore,
     private val manager: MemoryManagerAgent,
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
+    /** The on-device summarizer chain for the episode summary tree ([MemorySummaryTree]). */
+    private val summarizer: MemorySummarizerChain = MemorySummarizerChain(),
 ) {
     /** Node text is immutable, so each node is tokenized once for neighborhood search. */
     private val neighborhoodTerms = hashMapOf<MemoryNodeId, Set<String>>()
 
     /** Episodes whose contrast step has been committed by this instance (the step is idempotent anyway). */
     private val registeredEpisodes = hashSetOf<MemoryEpisodeId>()
+
+    /** Episodes whose summary tree has been committed (or found) by this instance. */
+    private val outlinedEpisodes = hashSetOf<MemoryEpisodeId>()
 
     /**
      * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
@@ -176,6 +184,14 @@ class MemoryConsolidator(
                 } else if (store.commit(snapshot.revision, register)) {
                     registeredEpisodes += entry.episodeId
                 }
+                continue
+            }
+
+            // The episode's top-down summary tree, once, after the contrast step and before any
+            // condensation rewrites its memories. Deterministic apart from an optional model clerk.
+            if (entry.stage == MemoryConsolidationStage.Condensation && entry.episodeId !in outlinedEpisodes) {
+                val tree = MemorySummaryTree.mutationFor(snapshot, entry.episodeId, nowEpochMillis, summarizer)
+                if (tree.nodesToAdd.isEmpty() || store.commit(snapshot.revision, tree)) outlinedEpisodes += entry.episodeId
                 continue
             }
 

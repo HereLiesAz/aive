@@ -349,22 +349,103 @@ the report recorded), and the old store is left untouched as the backup.
 
 ## Memory flow
 
-The intended pipeline is:
+The pipeline parses a banked episode in this order:
 
 session context
-→ sections
-→ retained context
+→ sections (Sectioner)
+→ retained context (SalienceFilter)
 → noun/entity indexes
 → verb/action indexes
 → phrases
 → summaries
 → categories
 → semantic associations
+→ contrast step (divergence markers, variant register)
+→ **summary tree** of the episode
 → similarity-based condensation
+
+and, after every consolidation pass, **pair summaries** for the links made so far.
 
 Every abstraction must preserve provenance so a later agent can descend back to its source episode.
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
+
+### Summary tree (top-down, per banked episode)
+
+Once per episode, when its queue entry reaches Condensation (after the contrast step, before any
+condensation rewrites its memories), the engine builds a top-down summary tree
+(`MemorySummaryTree`, `MemorySummaryTree.kt`):
+
+- **Units** are the episode's paragraphs: the Sectioner's sections in order, each split into its
+  paragraph-level typed blocks (headings attached to the block they introduce).
+- **Root**: a summary of the whole raw episode.
+- **Splitting**: a range of units is cut at its largest natural boundaries — task phases (a change of
+  session part), then section groups (section boundaries where the topic shifts: adjacent-section
+  similarity below mean − sd/2 of the range's boundary similarities; every section boundary when none
+  stands out), then paragraphs within one section by the same rule. Similarity is cosine over the
+  on-device MiniLM embeddings, or over TF-IDF vectors without an embedder. Each part is summarized and
+  split again.
+- **Leaves** are one paragraph (≈ one claim or action) kept verbatim.
+- **Every node** is a memory node (`MemoryNodeKind.Outline`) with `Outlines` edges parent → child,
+  `outlineLevel` (root 0), `outlinePath`, `cues` (top TF-IDF terms of its span) and `Indexes` edges
+  from the episode's noun/verb tags it mentions; the lineage store stamps the producing workflow
+  (`producedByWorkflow`) as on every memory.
+- **Size**: an interior node is a combined rewrite of its children under the existing S-curve rules
+  ([Size](#size-a-memory-never-grows)): its limit is `memoryRewriteLimit(children)` with each child's
+  weight from its salience (`w = confidence × (1 − (1 − salience)(1 − strength))`, strength 0 for a
+  new node), and it records the folded `originalSize` and `rewritePass`. No separate, tighter budget
+  is set toward the root: folding children already makes each level shorter and further along the curve.
+- **Cost**: the root records `treeNodes`, `treeModelCalls`, `treeEmbeddingCalls` and `treeMillis`;
+  every interior node records its `summarizer` and `summaryMillis`.
+
+Tree nodes are views of an episode, not ranked recall results: recall walks no edge into them, and a
+hit shows its tree levels ([GRIP](architecture/GRIP.md#summary-tree-levels-and-pair-summaries)).
+
+### Pair summaries (one per link)
+
+Every link created between two memories — semantic and mechanical associations (`SimilarTo`,
+`AssociatedWith`, co-recall links included), divergence (`Diverges`, legacy `ConflictsWith`) and
+`CondensedFrom` — gets a summary of the two memories together (`MemoryPairSummaries`): a
+`MemoryNodeKind.PairSummary` node with id `pair:<edge id>` and `pairOf` = the edge id (edges are
+immutable, so the summary is attached by id rather than written into the edge). Tree, ladder
+(`Indexes`, `Composes`, `Summarizes`, `Categorizes`), `Supersedes`, register, deliberation and access
+edges get none.
+
+- Written by the engine in the sequential consolidation queue (`AgentMemoryLayer.consolidateOne`),
+  at most `PAIR_SUMMARIES_PER_PASS` (32) per pass, oldest link first; the rest carry over, and the
+  drain keeps going (`MemoryConsolidationResult.PairSummaries`) until none is pending.
+- Always both sides: each memory is summarized by the chain below in half the room, then joined in a
+  fixed two-part form, `A: …` / `B: …` (A the edge's `from`, B its `to`); when the labels would cost
+  too much, `… / …` without labels. The engine rejects a pair summary missing either side. Two very
+  short memories (joint text ≤ 32 characters, e.g. tags) are kept whole as `a / b`.
+- Size: the one-memory rewrite rule applied to the pair's joint text (sizes and original sizes
+  summed, life position the weighted mean of the two).
+- A divergence pair summary describes "same question, different answers": the shared frame and each
+  side's filler as the contrast step reads them, else each side summarized in half the room. It names
+  no chosen side, and a model's wording that adds a judging word (correct, wrong, better, outdated…)
+  is rejected.
+- Safety net: a link recalled before its summary exists gets one synchronously at recall, and the
+  event is counted (`MemorySummaryMetrics.pairSummaryViolations`).
+
+### Summarizer chain (on-device, paragraph level)
+
+`MemorySummarizerChain` (`MemorySummaryChain.kt`) serves both. The first available engine wins:
+
+1. **model** — the local SummarySynthesizer clerk (abstractive), when installed, on-device and it loads;
+2. **centroid** — paragraphs ranked by cosine to the segment centroid of their MiniLM embeddings;
+3. **lexrank** — TF-IDF cosine graph and power iteration, with cue, location and heading signals
+   taken from the salience features (pure Kotlin, deterministic);
+4. **luhn** — significant-word clusters, for very short or noisy segments.
+
+Extractive output is a selection of whole paragraphs in their original order; only when not one
+paragraph fits does the existing last-resort rule of the rewrite apply (best sentences, then clauses,
+then a cut at a word). Every output is validated against the limit and the retention rule (the
+highest-salience paragraph that fits is kept; an abstractive output must restate its values and
+negation and state no value the source does not); one that fails is discarded and the next engine
+runs. Weights use only existing measures: salience, confidence and associative strength, joined by
+the complementary rule. Model calls, embedding calls, per-engine counts and time are recorded in
+`MemorySummaryMetrics` (`AgentMemoryLayer.summaryMetrics`). The algorithms are specified in
+[Deterministic-first memory semantics](architecture/MEMORY_DETERMINISTIC_SEMANTICS.md#summary-tree-pair-summaries-and-the-summarizer-chain).
 
 ### Memory screen
 

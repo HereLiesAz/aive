@@ -47,7 +47,7 @@ class ProgrammaticMemoryClerksTest {
             MemoryNodeKind.Context, MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag,
             MemoryNodeKind.Phrase, MemoryNodeKind.Summary, MemoryNodeKind.Category,
         ).forEach { assertTrue((kinds[it] ?: 0) > 0, "no $it nodes: $kinds") }
-        assertFalse(snapshot.nodes.any { it.text.trim() == "ok" }, "acknowledgement kept as memory")
+        assertFalse(snapshot.nodes.any { it.kind.isClerkMemory && it.text.trim() == "ok" }, "acknowledgement kept as memory")
         assertTrue(snapshot.nodes.any { it.kind == MemoryNodeKind.Category && it.text == "data" })
 
         val recall = layer.tool.grip(MemoryQuery("SettingsMemoryStore commit", resolution = MemoryResolution.Context))

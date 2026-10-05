@@ -925,8 +925,11 @@ internal fun MemorySnapshot.without(episodeId: MemoryEpisodeId): MemorySnapshot 
     val withVariants = survivingEdges
         .filter { it.relation == MemoryRelationKind.VariantOf && it.from in attested }
         .mapTo(hashSetOf()) { it.to }
+    val survivingEdgeIds = survivingEdges.mapTo(hashSetOf()) { it.id.value }
     val pruned = nodes.filter { node ->
         when (node.kind) {
+            // A pair summary goes with its link.
+            MemoryNodeKind.PairSummary -> node.metadata[PAIR_OF] in survivingEdgeIds
             MemoryNodeKind.Variant -> node.id in attested
             MemoryNodeKind.Frame -> node.id in withVariants
             else -> true
@@ -952,6 +955,13 @@ internal fun MemoryRecallHit.divergenceLines(): String = buildString {
         append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
     }
     deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
+    // The summary of each link delivered with the hit, and the hit's summary-tree levels.
+    pairSummaries.forEach { pair ->
+        append("\n  ⇄ ").append(pair.relation.name).append(" link, together: ").append(pair.summary.text.replace('\n', ' '))
+    }
+    if (outline.isNotEmpty()) {
+        append("\n  ⌂ outline: ").append(outline.joinToString(" › ") { it.text.replace('\n', ' ').take(OUTLINE_LEVEL_CHARS) })
+    }
     // A resolved contrast is one memory; its history fades with each recall (always reachable via history()).
     resolution?.let { history ->
         when {
@@ -965,6 +975,9 @@ internal fun MemoryRecallHit.divergenceLines(): String = buildString {
         }
     }
 }
+
+/** Characters of each summary-tree level shown under a hit (the full node is reachable by id). */
+internal const val OUTLINE_LEVEL_CHARS = 160
 
 /** Recalls of a resolved memory that still show the brief "previously contested" note. */
 internal const val RESOLVED_NOTE_RECALLS = 2
