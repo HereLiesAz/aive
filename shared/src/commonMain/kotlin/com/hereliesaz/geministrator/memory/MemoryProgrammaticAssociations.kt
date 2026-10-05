@@ -104,7 +104,7 @@ internal fun MemorySnapshot.programmaticAssociationCandidates(
         .asSequence()
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val activeNodes = nodes.filter { it.id !in superseded }
+    val activeNodes = nodes.filter { it.kind.isClerkMemory && it.id !in superseded }
     if (activeNodes.size < 2) return emptyList()
 
     val nodesById = nodes.associateBy(MemoryNode::id)
@@ -524,6 +524,7 @@ private fun List<MemoryNode>.anchorForEpisode(episodeId: MemoryEpisodeId): Memor
                     MemoryNodeKind.Phrase -> 2
                     MemoryNodeKind.NounTag, MemoryNodeKind.VerbTag -> 3
                     MemoryNodeKind.Context -> 4
+                    MemoryNodeKind.Frame, MemoryNodeKind.Variant, MemoryNodeKind.Deliberation -> 5
                 }
             }.thenByDescending(MemoryNode::salience)
                 .thenByDescending(MemoryNode::createdAtEpochMillis)

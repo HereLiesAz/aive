@@ -137,6 +137,7 @@ private fun MicroAgentProposal.toMutationBatch(
         require(draft.sourceIds.all { it in packetIds })
         val kind = runCatching { MemoryNodeKind.valueOf(draft.kind) }
             .getOrElse { error("Unknown memory node kind ${draft.kind}") }
+        require(kind.isClerkMemory) { "A memory clerk may not write ${kind.name} nodes" }
         val inheritedEpisodes = draft.sourceIds
             .flatMap { workItems[it]?.microSourceEpisodeIds().orEmpty() }
             .toMutableSet()
@@ -170,6 +171,7 @@ private fun MicroAgentProposal.toMutationBatch(
         require(to.value in knownNodeIds || to in nodeIdsByKey.values)
         val relation = runCatching { MemoryRelationKind.valueOf(link.relation) }
             .getOrElse { error("Unknown memory relation ${link.relation}") }
+        require(relation in MODEL_WRITABLE_RELATIONS) { "A memory clerk may not write ${relation.name}" }
         MemoryEdge(
             id = MemoryEdgeId("$namespace:edge:$index"),
             from = from,
@@ -285,7 +287,7 @@ private fun MemoryWorkPacket.renderMicroAgentPrompt(role: MemoryMicroAgentRole):
     appendLine("Return exactly one JSON object and nothing else.")
     appendLine("{\"sections\":[{\"text\":\"...\",\"sourceIds\":[\"id\"],\"metadata\":{}}],")
     appendLine(" \"nodes\":[{\"key\":\"local-key\",\"kind\":\"Context|NounTag|VerbTag|Phrase|Summary|Category\",\"text\":\"...\",\"sourceIds\":[\"id\"],\"salience\":0.5,\"confidence\":1.0,\"metadata\":{}}],")
-    appendLine(" \"links\":[{\"from\":\"local-key-or-visible-node-id\",\"to\":\"local-key-or-visible-node-id\",\"relation\":\"Indexes|Composes|Summarizes|Categorizes|SimilarTo|AssociatedWith|Supersedes|CondensedFrom\",\"weight\":1.0,\"metadata\":{}}]}")
+    appendLine(" \"links\":[{\"from\":\"local-key-or-visible-node-id\",\"to\":\"local-key-or-visible-node-id\",\"relation\":\"${MODEL_WRITABLE_RELATIONS.joinToString("|") { it.name }}\",\"weight\":1.0,\"metadata\":{}}]}")
     appendLine("Use only IDs visible in this packet as sourceIds or link endpoints, except local keys created in this same response.")
     appendLine("Never infer contradiction, truth, falsity, or conflict resolution. Memory clerks only organize supplied material.")
 }

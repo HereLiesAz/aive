@@ -145,6 +145,9 @@ class MemoryConsolidator(
     /** Node text is immutable, so each node is tokenized once for neighborhood search. */
     private val neighborhoodTerms = hashMapOf<MemoryNodeId, Set<String>>()
 
+    /** Episodes whose contrast step has been committed by this instance (the step is idempotent anyway). */
+    private val registeredEpisodes = hashSetOf<MemoryEpisodeId>()
+
     /**
      * Processes at most one manager packet. Priority-next entries preempt ordinary backlog between
      * packets; entries at the same priority remain FIFO by sequence. An entry that has failed
@@ -163,6 +166,18 @@ class MemoryConsolidator(
                 )
                 .firstOrNull()
                 ?: return MemoryConsolidationResult.Idle
+
+            // Deterministic contrast step, once the episode's memories are associated and before any
+            // condensation: divergence markers and the variant register, written by code for every engine.
+            if (entry.stage == MemoryConsolidationStage.Condensation && entry.episodeId !in registeredEpisodes) {
+                val register = MemoryVariantRegister.mutationFor(snapshot, entry.episodeId, nowEpochMillis)
+                if (register.nodesToAdd.isEmpty() && register.edgesToAdd.isEmpty()) {
+                    registeredEpisodes += entry.episodeId
+                } else if (store.commit(snapshot.revision, register)) {
+                    registeredEpisodes += entry.episodeId
+                }
+                continue
+            }
 
             if (entry.stage == MemoryConsolidationStage.Complete) {
                 val completed = entry.copy(status = MemoryQueueStatus.Complete, lastError = null)
@@ -264,7 +279,7 @@ class MemoryConsolidator(
                         mutation = MemoryStoreMutation(
                             sectionsToAdd = batch.sectionsToAdd,
                             nodesToAdd = batch.nodesToAdd,
-                            edgesToAdd = batch.edgesToAdd,
+                            edgesToAdd = batch.edgesToAdd + condensationEngineEdges(latest, entry.stage, plan, batch),
                             queueUpserts = listOf(nextEntry),
                         ),
                     )
@@ -354,8 +369,9 @@ class MemoryConsolidator(
                         .map(MemoryNode::asWorkItem)
                         .boundedSlice(0, policy.maxPacketItems, policy.maxPacketChars)
                 }
-                // A cluster whose members assert different values is never offered: merging it would
-                // pick a claim, whichever engine runs the clerk. Its members stay side by side.
+                // A cluster whose members assert different values or contrast (same frame, different
+                // filler) is never offered: merging it would pick a claim, whichever engine runs the
+                // clerk. Its members stay side by side.
                 .firstOrNull { (_, items) ->
                     items.size >= 2 && items.clusterKey() !in declined &&
                         !condensationWouldAdjudicate(items.map(MemoryWorkItem::text))
@@ -397,7 +413,7 @@ class MemoryConsolidator(
                 .map(MemoryNode::asWorkItem)
             MemoryConsolidationStage.Associations -> snapshot.episodeNodes(
                 entry.episodeId,
-                MemoryNodeKind.entries.toSet(),
+                MemoryNodeKind.CLERK_MEMORY_KINDS,
             ).map(MemoryNode::asWorkItem)
             MemoryConsolidationStage.Condensation,
             MemoryConsolidationStage.Complete,
@@ -548,21 +564,83 @@ class MemoryConsolidator(
                         it.from == generalized.id &&
                             it.to == sourceId &&
                             it.relation == MemoryRelationKind.CondensedFrom
-                    } &&
-                        batch.edgesToAdd.any {
-                            it.from == generalized.id &&
-                                it.to == sourceId &&
-                                it.relation == MemoryRelationKind.Supersedes
-                        }
-                }) { "Condensation must preserve and supersede every source memory explicitly" }
+                    }
+                }) { "Condensation must link every source memory through CondensedFrom" }
+                // Supersedes is the engine's to write (coverageSupersessions), never a clerk's.
                 require(batch.edgesToAdd.all {
                     it.relation == MemoryRelationKind.CondensedFrom ||
-                        it.relation == MemoryRelationKind.Supersedes ||
                         it.relation == MemoryRelationKind.AssociatedWith
-                })
+                }) { "A condensation clerk may emit only CondensedFrom and AssociatedWith links" }
             }
             MemoryConsolidationStage.Complete -> error("Complete memory jobs cannot be processed")
         }
+    }
+
+    /**
+     * Edges only the engine writes for a condensation:
+     *
+     * - `Supersedes` from the generalized memory to each source it genuinely covers (contains every
+     *   source sentence; an identical repeat). Other sources stay active beside it: the generalized
+     *   memory is then an extra index entry, linked by `CondensedFrom`.
+     * - The sources' divergence markers and variant attestations, carried over to the generalized
+     *   memory (its sources agree, so it states what they state), so recalling it still brings the
+     *   contrasting partners.
+     */
+    private fun condensationEngineEdges(
+        snapshot: MemorySnapshot,
+        stage: MemoryConsolidationStage,
+        plan: PacketPlan,
+        batch: MemoryMutationBatch,
+    ): List<MemoryEdge> {
+        if (stage != MemoryConsolidationStage.Condensation) return emptyList()
+        val generalized = batch.nodesToAdd.singleOrNull() ?: return emptyList()
+        val sourceIds = plan.packet.items.mapTo(hashSetOf()) { MemoryNodeId(it.id) }
+        val existing = snapshot.edges.mapTo(hashSetOf()) { it.id }
+        val inherited = linkedMapOf<MemoryEdgeId, MemoryEdge>()
+        snapshot.edges.forEach { edge ->
+            when (edge.relation) {
+                MemoryRelationKind.Diverges -> {
+                    val partner = when {
+                        edge.from in sourceIds && edge.to !in sourceIds -> edge.to
+                        edge.to in sourceIds && edge.from !in sourceIds -> edge.from
+                        else -> return@forEach
+                    }
+                    val (from, to) = if (generalized.id.value <= partner.value) generalized.id to partner else partner to generalized.id
+                    val id = MemoryEdgeId("diverges:${from.value}|${to.value}")
+                    if (id !in existing) {
+                        inherited[id] = edge.copy(id = id, from = from, to = to, createdAtEpochMillis = generalized.createdAtEpochMillis, metadata = edge.metadata + ("inheritedFrom" to edge.id.value))
+                    }
+                }
+                MemoryRelationKind.Attests -> if (edge.from in sourceIds) {
+                    val id = MemoryEdgeId("attests:${generalized.id.value}|${edge.to.value}")
+                    if (id !in existing) {
+                        inherited[id] = edge.copy(
+                            id = id,
+                            from = generalized.id,
+                            createdAtEpochMillis = generalized.createdAtEpochMillis,
+                            metadata = edge.metadata + mapOf(
+                                MemoryVariantRegister.RECORDED_AT to generalized.createdAtEpochMillis.toString(),
+                                "sourceEpisodeIds" to generalized.sourceEpisodeIds.joinToString(",") { it.value },
+                                "inheritedFrom" to edge.from.value,
+                            ),
+                        )
+                    }
+                }
+                else -> Unit
+            }
+        }
+        return inherited.values.toList() + plan.packet.items
+            .filter { memoryCovers(generalized.text, it.text) }
+            .map { item ->
+                MemoryEdge(
+                    id = MemoryEdgeId("${generalized.id.value}:supersedes:${item.id}"),
+                    from = generalized.id,
+                    to = MemoryNodeId(item.id),
+                    relation = MemoryRelationKind.Supersedes,
+                    createdAtEpochMillis = generalized.createdAtEpochMillis,
+                    metadata = mapOf("basis" to "coverage"),
+                )
+            }
     }
 
     private fun validateSemanticStage(
@@ -772,7 +850,7 @@ private fun MemorySnapshot.relatedNeighborhood(
     var chars = 0
     val candidates = nodes
         .asSequence()
-        .filter { episodeId !in it.sourceEpisodeIds && it.id !in superseded }
+        .filter { it.kind.isClerkMemory && episodeId !in it.sourceEpisodeIds && it.id !in superseded }
         .map { node ->
             val candidateTerms = termsOf(node)
             val overlap = terms.count { it in candidateTerms }
@@ -807,10 +885,21 @@ private fun MemorySnapshot.condensationClusters(
     val superseded = edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
+    // A memory already folded into a generalized one is not offered again (it may stay active).
+    val folded = edges
+        .filter { it.relation == MemoryRelationKind.CondensedFrom }
+        .mapTo(hashSetOf()) { it.to }
+    val divergent = edges
+        .filter { it.relation == MemoryRelationKind.Diverges || it.relation == MemoryRelationKind.ConflictsWith }
+        .flatMap { listOf(it.from to it.to, it.to to it.from) }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, partners) -> partners.toHashSet() }
     val episodesById = episodes.associateBy(MemoryEpisode::id)
     val activeById = nodes
         .filter { node ->
-            node.id !in superseded &&
+            node.kind.isClerkMemory &&
+                node.id !in superseded &&
+                node.id !in folded &&
                 node.sourceEpisodeIds.none { it in protectedEpisodeIds } &&
                 node.sourceEpisodeIds.isNotEmpty() &&
                 node.sourceEpisodeIds.all { sourceEpisodeId ->
@@ -866,7 +955,19 @@ private fun MemorySnapshot.condensationClusters(
                 .values
                 .maxWith(compareBy<List<MemoryNode>> { it.size }.thenBy { group -> group.sumOf { (weights[it.id] ?: 0f).toDouble() } })
                 .sortedByDescending { weights[it.id] ?: 0f }
-                .take(policy.condensationBatchSize)
+                // Greedy: keep a member only if it neither carries a divergence marker to nor
+                // contrasts with (same frame, different filler) any member already kept.
+                .fold(mutableListOf<MemoryNode>()) { kept, node ->
+                    if (
+                        kept.size < policy.condensationBatchSize &&
+                        kept.none { other ->
+                            divergent[node.id]?.contains(other.id) == true || MemoryContrast.contrasts(node.text, other.text)
+                        }
+                    ) {
+                        kept += node
+                    }
+                    kept
+                }
         }
 }
 
@@ -886,7 +987,7 @@ private fun instructionFor(stage: MemoryConsolidationStage): String = when (stag
     MemoryConsolidationStage.Associations ->
         "Link only neutral semantic similarity or association supported by shared topics, concepts, entities, actions, or proximity. Do not infer contradiction, truth, falsity, or reconciliation."
     MemoryConsolidationStage.Condensation ->
-        "Mechanically restate these highly similar same-level representations as exactly one compact representation. Preserve provenance to every supplied source; representational supersession is not a judgment that any source is wrong."
+        "Mechanically restate these highly similar same-level representations as exactly one compact representation that keeps every source's values. Link it to every supplied source with CondensedFrom. Do not judge which source is right; the sources stay in memory."
     MemoryConsolidationStage.Complete -> "No work."
 }
 

@@ -37,8 +37,16 @@ interface MemoryTool {
         nodeId: MemoryNodeId,
         resolution: MemoryResolution,
         maxResults: Int = 12,
-        includeConflicts: Boolean = false,
+        includeConflicts: Boolean = true,
     ): List<MemoryRecallHit>
+
+    /**
+     * Records the agent's conscious conclusion about a divergence: a [MemoryNodeKind.Deliberation]
+     * citing the memories it considered. It never condenses or supersedes anything; the divergence
+     * marker and both sides stay, and recall returns the deliberation with them.
+     */
+    suspend fun deliberate(request: MemoryDeliberationRequest): MemoryNode =
+        throw UnsupportedOperationException("This memory tool does not record deliberations")
 }
 
 /** [memories] of [total] active memories contain a term. */
@@ -58,6 +66,55 @@ class GraphMemoryTool(
     }
 
     override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
+
+    override suspend fun deliberate(request: MemoryDeliberationRequest): MemoryNode {
+        while (true) {
+            val snapshot = store.read()
+            val known = snapshot.nodes.mapTo(hashSetOf(), MemoryNode::id)
+            val missing = request.citedNodeIds.filter { it !in known }
+            require(missing.isEmpty()) { "Deliberation cites unknown memories: ${missing.joinToString { it.value }}" }
+            val episodeId = MemoryEpisodeId("episode-deliberation-${request.deliberatedAtEpochMillis}-${snapshot.revision}")
+            val text = buildString {
+                append(request.conclusion.trim())
+                if (request.evidence.isNotEmpty()) append("\nEvidence considered: ").append(request.evidence.joinToString("; "))
+            }
+            val episode = MemoryEpisode(
+                id = episodeId,
+                sourceSessionId = request.sourceSessionId,
+                projectId = request.scope.projectId,
+                workflowRunId = request.scope.workflowRunId,
+                workflowDefinitionId = request.scope.workflowDefinitionId,
+                taskRunId = request.scope.taskRunId,
+                taskDefinitionId = request.scope.taskDefinitionId,
+                roleId = request.scope.roleId,
+                userPrompt = request.conclusion,
+                chunks = listOf(
+                    MemorySourceChunk(MemoryChunkId("${episodeId.value}:chunk:0:0"), episodeId, 0, MemorySourceKind.Deliberation, "Deliberation", text),
+                ),
+                createdAtEpochMillis = request.deliberatedAtEpochMillis,
+            )
+            val node = MemoryNode(
+                id = MemoryNodeId("deliberation:${episodeId.value}"),
+                kind = MemoryNodeKind.Deliberation,
+                text = text,
+                sourceEpisodeIds = setOf(episodeId),
+                createdAtEpochMillis = request.deliberatedAtEpochMillis,
+                metadata = mapOf("cites" to request.citedNodeIds.joinToString(",") { it.value }),
+            )
+            val edges = request.citedNodeIds.distinct().map { cited ->
+                MemoryEdge(
+                    id = MemoryEdgeId("${node.id.value}:deliberates:${cited.value}"),
+                    from = node.id,
+                    to = cited,
+                    relation = MemoryRelationKind.Deliberates,
+                    createdAtEpochMillis = request.deliberatedAtEpochMillis,
+                )
+            }
+            // No queue entry: a deliberation is never sectioned, condensed or superseded.
+            val mutation = MemoryStoreMutation(episodesToAdd = listOf(episode), nodesToAdd = listOf(node), edgesToAdd = edges)
+            if (store.commit(snapshot.revision, mutation)) return node
+        }
+    }
 
     override suspend fun termFrequency(term: String): MemoryTermFrequency = index().bm25.frequency(term.lowercase())
 
@@ -138,6 +195,7 @@ class GraphMemoryTool(
                         node = node,
                         score = path.score,
                         conflicts = if (includeConflicts) index.conflictsFor(id) else emptyList(),
+                        deliberations = if (includeConflicts) index.deliberationsFor(id) else emptyList(),
                     )
                 }
             }
@@ -160,7 +218,8 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     private val superseded: Set<MemoryNodeId> = snapshot.edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    val active: List<MemoryNode> = snapshot.nodes.filter { it.id !in superseded }
+    /** Recallable memories: clerk-made and not superseded. Register and deliberation records surface only with a divergence unit. */
+    val active: List<MemoryNode> = snapshot.nodes.filter { it.kind.isClerkMemory && it.id !in superseded }
     val activeIds: Set<MemoryNodeId> = active.mapTo(hashSetOf(), MemoryNode::id)
     val graph: MemoryRecallGraph by lazy { snapshot.recallGraph() }
     val bm25: MemoryBm25Index by lazy { MemoryBm25Index(active) }
@@ -168,11 +227,16 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     private val lowerTexts = hashMapOf<MemoryNodeId, String>()
     private val conflicts: Map<MemoryNodeId, List<MemoryNodeId>> by lazy {
         buildMap<MemoryNodeId, MutableList<MemoryNodeId>> {
-            snapshot.edges.filter { it.relation == MemoryRelationKind.ConflictsWith }.forEach { edge ->
-                getOrPut(edge.from) { mutableListOf() } += edge.to
-                getOrPut(edge.to) { mutableListOf() } += edge.from
-            }
+            snapshot.edges
+                .filter { it.relation == MemoryRelationKind.Diverges || it.relation == MemoryRelationKind.ConflictsWith }
+                .forEach { edge ->
+                    getOrPut(edge.from) { mutableListOf() } += edge.to
+                    getOrPut(edge.to) { mutableListOf() } += edge.from
+                }
         }
+    }
+    private val deliberationsCiting: Map<MemoryNodeId, List<MemoryNodeId>> by lazy {
+        snapshot.edges.filter { it.relation == MemoryRelationKind.Deliberates }.groupBy({ it.to }, { it.from })
     }
 
     fun terms(node: MemoryNode): Set<String> = terms.getOrPut(node.id) {
@@ -189,13 +253,24 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
         }
     }
 
-    fun conflictsFor(nodeId: MemoryNodeId, allowedNodeIds: Set<MemoryNodeId>? = null): List<MemoryNode> =
+    /**
+     * Every divergent partner of [nodeId], including partners that are superseded, out of scope or
+     * did not match: a marked pair is one unit, so recall never shows one side alone.
+     */
+    fun conflictsFor(nodeId: MemoryNodeId): List<MemoryNode> =
         conflicts[nodeId].orEmpty()
             .asSequence()
-            .filter { allowedNodeIds == null || it in allowedNodeIds }
             .mapNotNull(nodesById::get)
             .distinctBy(MemoryNode::id)
             .toList()
+
+    /** Deliberations citing [nodeId] or any of its divergent partners ("has deliberations"). */
+    fun deliberationsFor(nodeId: MemoryNodeId): List<MemoryNode> =
+        (listOf(nodeId) + conflicts[nodeId].orEmpty())
+            .flatMap { deliberationsCiting[it].orEmpty() }
+            .distinct()
+            .mapNotNull(nodesById::get)
+            .sortedBy(MemoryNode::createdAtEpochMillis)
 }
 
 private fun MemoryRecallIndex.recallFromSeeds(
@@ -249,11 +324,8 @@ private fun MemoryRecallIndex.recallFromSeeds(
             MemoryRecallHit(
                 node = node,
                 score = score,
-                conflicts = if (query.includeConflicts) {
-                    conflictsFor(node.id, activeIds)
-                } else {
-                    emptyList()
-                },
+                conflicts = if (query.includeConflicts) conflictsFor(node.id) else emptyList(),
+                deliberations = if (query.includeConflicts) deliberationsFor(node.id) else emptyList(),
             )
         }
 
@@ -575,7 +647,14 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
     MemoryRelationKind.CondensedFrom,
     -> true
 
-    MemoryRelationKind.Supersedes -> false
+    // Divergence partners and deliberations travel with their hit as a unit, not as ranking
+    // evidence; register edges are bookkeeping.
+    MemoryRelationKind.Supersedes,
+    MemoryRelationKind.Diverges,
+    MemoryRelationKind.Attests,
+    MemoryRelationKind.VariantOf,
+    MemoryRelationKind.Deliberates,
+    -> false
 }
 
 /**
