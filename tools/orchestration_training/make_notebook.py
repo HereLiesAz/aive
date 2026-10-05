@@ -726,12 +726,12 @@ def github_token():
     """GITHUB_TOKEN from Kaggle secrets, Colab secrets, or the environment, whichever this runs on."""
     try:
         from kaggle_secrets import UserSecretsClient
-        return UserSecretsClient().get_secret("GITHUB_TOKEN")
+        return UserSecretsClient().get_secret("GITHUB_TOKEN").strip()
     except ImportError:
         pass
     try:
         from google.colab import userdata
-        return userdata.get("GITHUB_TOKEN")
+        return (userdata.get("GITHUB_TOKEN") or "").strip()
     except ImportError:
         pass
     token = os.environ.get("GITHUB_TOKEN")
@@ -739,7 +739,20 @@ def github_token():
         raise RuntimeError("No GITHUB_TOKEN: add it as a Kaggle or Colab secret, or set the environment variable")
     return token
 
+def already_published(paths, tag):
+    """True when the public release [tag] already holds every file with the same digest: nothing to
+    upload, and no token needed to know it."""
+    r = requests.get(f"https://api.github.com/repos/{RELEASE_REPOSITORY}/releases/tags/{tag}",
+                     headers={"Accept": "application/vnd.github+json"}, timeout=60)
+    if r.status_code != 200:
+        return False
+    existing = {a["name"]: a.get("digest") for a in r.json().get("assets", [])}
+    return all(existing.get(p.name) == "sha256:" + sha256(p) for p in paths)
+
 def upload(paths, tag):
+    if already_published(paths, tag):
+        print(f"{tag}: already published with identical files; nothing to upload")
+        return
     token = github_token()
     api = f"https://api.github.com/repos/{RELEASE_REPOSITORY}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
