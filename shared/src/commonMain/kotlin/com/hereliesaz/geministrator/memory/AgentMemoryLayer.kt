@@ -123,6 +123,7 @@ class AgentMemoryLayer private constructor(
             maxChunkChars: Int = 6_000,
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
             programmaticSemanticFastPaths: Boolean = true,
+            summarizer: MemorySummarizerChain = summarizerChainFor(agents),
         ): AgentMemoryLayer {
             val routedAgents = if (programmaticSemanticFastPaths) {
                 agents.withProgrammaticSemanticFastPaths()
@@ -137,7 +138,7 @@ class AgentMemoryLayer private constructor(
                 policy = constrainedPolicy,
                 maxChunkChars = minOf(maxChunkChars, constrainedPolicy.maxPacketChars),
                 lexicon = lexicon,
-                summarizer = summarizerChainFor(agents),
+                summarizer = summarizer,
             )
         }
 

@@ -45,21 +45,28 @@ class ClerkAbstractiveSummarizer(private val agent: MemoryMicroAgent) : MemoryAb
         require(agent.role == MemoryMicroAgentRole.SummarySynthesizer) { "Only a SummarySynthesizer clerk summarizes" }
     }
 
-    override suspend fun summarize(paragraphs: List<String>, limit: Int, instruction: String): String {
-        val episode = MemoryEpisodeId("summary-chain")
-        val packet = MemoryWorkPacket(
-            queueId = MemoryQueueId("summary-chain"),
-            episodeId = episode,
-            stage = MemoryConsolidationStage.Summaries,
-            packetKey = "summary-${paragraphs.hashCode().toUInt().toString(16)}",
-            items = paragraphs.mapIndexed { i, text ->
-                MemoryWorkItem("p$i", "node:${MemoryNodeKind.Phrase.name}", text, mapOf("sourceEpisodeIds" to episode.value))
-            },
-            instruction = instruction,
-        )
-        return agent.process(packet).nodesToAdd.firstOrNull { it.kind == MemoryNodeKind.Summary }?.text
+    override suspend fun summarize(paragraphs: List<String>, limit: Int, instruction: String): String =
+        agent.process(memorySummaryChainPacket(paragraphs, limit, instruction)).nodesToAdd.firstOrNull { it.kind == MemoryNodeKind.Summary }?.text
             ?: error("${agent.model.modelId} proposed no summary")
-    }
+}
+
+/**
+ * The one-off Summaries packet the chain sends a SummarySynthesizer clerk: the paragraphs as items
+ * `p0`, `p1`, … and the instruction with the character limit, which the clerk must see to meet it.
+ * `MemoryDatasetGenerator` builds the clerk's summary-chain rows from the same function.
+ */
+internal fun memorySummaryChainPacket(paragraphs: List<String>, limit: Int, instruction: String): MemoryWorkPacket {
+    val episode = MemoryEpisodeId("summary-chain")
+    return MemoryWorkPacket(
+        queueId = MemoryQueueId("summary-chain"),
+        episodeId = episode,
+        stage = MemoryConsolidationStage.Summaries,
+        packetKey = "summary-${paragraphs.hashCode().toUInt().toString(16)}",
+        items = paragraphs.mapIndexed { i, text ->
+            MemoryWorkItem("p$i", "node:${MemoryNodeKind.Phrase.name}", text, mapOf("sourceEpisodeIds" to episode.value))
+        },
+        instruction = "$instruction Character limit: $limit.",
+    )
 }
 
 /** Summarizer cost, counted per engine over the layer's life (model calls and time included). */
@@ -128,6 +135,9 @@ class MemorySummarizerChain(
     private val embedder: MemoryTextEmbedder? = null,
     val metrics: MemorySummaryMetrics = MemorySummaryMetrics(),
 ) {
+    /** Sees every summary an engine other than the model produced (the corpus generator records them). */
+    internal var observer: ((MemorySummaryRequest, MemorySummary) -> Unit)? = null
+
     private val embeddingCache = linkedMapOf<String, List<Float>>()
     private var embedderDown = false
 
@@ -166,6 +176,7 @@ class MemorySummarizerChain(
             metrics.millis += millis
             metrics.used(engine)
             return MemorySummary(text, engine, selected, lastResort, modelCalls, embeddingCalls, millis)
+                .also { summary -> if (engine != ENGINE_MODEL) observer?.invoke(request, summary) }
         }
         val whole = request.paragraphs.joinToString(request.separator)
         if (whole.length <= request.limit) return done(whole, ENGINE_VERBATIM, request.paragraphs.indices.toList())
