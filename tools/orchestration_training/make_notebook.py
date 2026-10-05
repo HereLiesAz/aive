@@ -84,7 +84,7 @@ code("""
 """)
 
 code(r'''
-import gc, hashlib, json, os, shutil, tarfile, time
+import collections, gc, hashlib, json, os, shutil, tarfile, time
 from pathlib import Path
 
 os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")  # before torch is imported
@@ -218,11 +218,24 @@ def load_role(slug):
 def prompt_messages(config, row):
     return [{"role": "system", "content": config["system_prompt"]}, {"role": "user", "content": row["input"]}]
 
+EMPTY_PROPOSAL = {"sections": [], "nodes": [], "links": []}
+
 def json_exact(text, expected):
-    """Same rule as tools/specialist_optimization: parsed JSON must be equal."""
+    """Same rule as tools/specialist_optimization: parsed JSON must be equal.
+
+    A memory clerk may also decline with DO_NOT_CONDENSE (before any JSON), which the runtime reads
+    exactly as the empty proposal, so it matches an empty-proposal label.
+    """
+    try:
+        wanted = json.loads(expected)
+    except ValueError:
+        return False
+    marker = text.find("DO_NOT_CONDENSE")
+    if wanted == EMPTY_PROPOSAL and marker >= 0 and ("{" not in text or text.index("{") > marker):
+        return True
     try:
         start, end = text.index("{"), text.rindex("}") + 1
-        return json.loads(text[start:end]) == json.loads(expected)
+        return json.loads(text[start:end]) == wanted
     except ValueError:
         return False
 
@@ -321,18 +334,89 @@ def train(slugs, out, min_steps=0):
 
 code(r'''
 def score(generate_fn, tokenizer, config, rows):
-    hits = 0
-    failures = []
+    """(score, first failures, every answer): the answers feed the class and shortcut gates."""
+    hits, failures, answers = 0, [], []
     for row in rows:
         text = generate_fn(tokenizer.apply_chat_template(prompt_messages(config, row), tokenize=False, add_generation_prompt=True), row)
+        answers.append(text)
         if json_exact(text, row["expected"]):
             hits += 1
         elif len(failures) < 3:
             failures.append({"id": row["id"], "got": text[:300]})
-    return (hits / len(rows) if rows else 0.0), failures
+    return (hits / len(rows) if rows else 0.0), failures, answers
 
 def max_new_tokens(tokenizer, row):
     return len(tokenizer(row["expected"], add_special_tokens=False)["input_ids"]) + 32
+
+def row_class(row):
+    return next((t[len("class:"):] for t in row.get("tags", []) if t.startswith("class:")), None)
+
+def shortcut_answer(name, row, constant):
+    """What a collapsed model would answer: copy its input, answer nothing, or one fixed answer."""
+    if name == "copy":
+        return row.get("copy")
+    if name == "empty":
+        return json.dumps(EMPTY_PROPOSAL)
+    if name == "constant":
+        return constant
+    raise ValueError(f"unknown shortcut {name}")
+
+def shortcut_gates(slug, label, rows, answers, gates, train_rows):
+    """Per-class scores and shortcut baselines over the gated rows ([answers] in row order).
+
+    Sources of the failure modes these catch: a small model fine-tuned on a skewed corpus learns to
+    copy its input, ignore it, or always give one answer, and still scores well on the majority.
+    - Each class (tag class:<name>) with at least min_class_rows rows must score min_class_score.
+    - For each shortcut, on the rows where the shortcut is wrong, the clerk must score
+      min_nontrivial_score and give the shortcut's answer at most max_shortcut_rate of the time.
+    Returns (passed, report). A config without these gates (orchestration roles) passes.
+    """
+    report, passed = {"classes": {}, "shortcuts": {}}, True
+    if "min_class_score" in gates:
+        by_class = {}
+        for row, answer in zip(rows, answers):
+            by_class.setdefault(row_class(row) or "unclassified", []).append(json_exact(answer, row["expected"]))
+        for name, hits in sorted(by_class.items()):
+            value = sum(hits) / len(hits)
+            judged = len(hits) >= gates.get("min_class_rows", 1)
+            ok = value >= gates["min_class_score"] or not judged
+            report["classes"][name] = {"score": value, "rows": len(hits), "judged": judged, "passed": ok}
+            passed &= ok
+            print(f"[{slug}] {label}: class {name}: {value:.3f} on {len(hits)} rows" + ("" if judged else " (too few to judge)") + ("" if ok else " -> FAIL"))
+    if gates.get("shortcuts"):
+        labels = collections.Counter(r["expected"] for r in train_rows)
+        constant = labels.most_common(1)[0][0] if labels else None
+        for name in gates["shortcuts"]:
+            judged = []
+            for row, answer in zip(rows, answers):
+                shortcut = shortcut_answer(name, row, constant)
+                if shortcut is None or json_exact(shortcut, row["expected"]):
+                    continue  # the shortcut is right here (or does not apply): nothing to learn from this row
+                judged.append((json_exact(answer, row["expected"]), json_exact(answer, shortcut)))
+            baseline = sum(
+                1 for r in rows
+                if shortcut_answer(name, r, constant) is not None and json_exact(shortcut_answer(name, r, constant), r["expected"])
+            ) / max(1, len(rows))
+            if len(judged) < gates.get("min_class_rows", 1):
+                report["shortcuts"][name] = {"baseline": baseline, "rows": len(judged), "judged": False, "passed": True}
+                print(f"[{slug}] {label}: shortcut {name}: baseline {baseline:.3f}; {len(judged)} rows where it is wrong (too few to judge)")
+                continue
+            nontrivial = sum(hit for hit, _ in judged) / len(judged)
+            rate = sum(same for _, same in judged) / len(judged)
+            ok = nontrivial >= gates["min_nontrivial_score"] and rate <= gates["max_shortcut_rate"]
+            report["shortcuts"][name] = {"baseline": baseline, "rows": len(judged), "nontrivial": nontrivial, "shortcutRate": rate, "judged": True, "passed": ok}
+            passed &= ok
+            print(f"[{slug}] {label}: shortcut {name}: baseline {baseline:.3f}; where it is wrong ({len(judged)} rows) the clerk scores {nontrivial:.3f} (>= {gates['min_nontrivial_score']}) and answers it {rate:.3f} (<= {gates['max_shortcut_rate']})" + ("" if ok else " -> FAIL"))
+    # A clerk that gives one answer to everything collapsed, whatever its score.
+    if gates.get("shortcuts") and answers:
+        top = collections.Counter(answers).most_common(1)[0][1] / len(answers)
+        top_label = collections.Counter(r["expected"] for r in rows).most_common(1)[0][1] / len(rows)
+        ok = top <= top_label + gates["max_shortcut_rate"]
+        report["collapse"] = {"topAnswerShare": top, "topLabelShare": top_label, "passed": ok}
+        passed &= ok
+        if not ok:
+            print(f"[{slug}] {label}: one answer is {top:.3f} of all answers but only {top_label:.3f} of labels -> FAIL (collapsed)")
+    return passed, report
 
 def gate(slug, generate_fn, tokenizer, label, test_rows=None):
     """Score a role's test and adversarial splits. test_rows samples that many test rows (fixed seed)."""
@@ -345,14 +429,16 @@ def gate(slug, generate_fn, tokenizer, label, test_rows=None):
     tests = splits["test"]
     if test_rows is not None and len(tests) > test_rows:
         tests = random.Random(f"{slug}:onnx-gate").sample(tests, test_rows)
-    test, test_fail = score(generate_fn, tokenizer, config, tests)
-    adversarial, adv_fail = score(generate_fn, tokenizer, config, splits["adversarial"])
+    test, test_fail, test_answers = score(generate_fn, tokenizer, config, tests)
+    adversarial, adv_fail, adv_answers = score(generate_fn, tokenizer, config, splits["adversarial"])
     gates = config["gates"]
     passed = test >= gates["min_test_score"] and adversarial >= gates["min_adversarial_score"]
     print(f"[{slug}] {label}: test {test:.3f} on {len(tests)}/{len(splits['test'])} rows (>= {gates['min_test_score']}), adversarial {adversarial:.3f} on {len(splits['adversarial'])} (>= {gates['min_adversarial_score']}) -> {'PASS' if passed else 'FAIL'}")
     for f in test_fail + adv_fail:
         print("   miss", f["id"], f["got"])
-    return {"test": test, "adversarial": adversarial, "testRows": len(tests), "adversarialRows": len(splits["adversarial"]), "passed": passed}
+    shortcuts_ok, report = shortcut_gates(slug, label, tests + splits["adversarial"], test_answers + adv_answers, gates, splits["train"])
+    return {"test": test, "adversarial": adversarial, "testRows": len(tests), "adversarialRows": len(splits["adversarial"]),
+            **report, "passed": passed and shortcuts_ok}
 
 def torch_gates(adapter, slugs):
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
@@ -724,6 +810,9 @@ def upload_and_mirror(paths, tag, variation=None):
     upload(paths, tag)
     if not (KAGGLE_MIRROR and variation):
         return
+    if KAGGLE_MIRROR == "auto" and not (secret("KAGGLE_KEY") or secret("KAGGLE_API_TOKEN")):
+        print(f"no KAGGLE_KEY secret: {tag} is not mirrored to Kaggle")
+        return
     import kagglehub
     kaggle_credentials()
     mirror = WORK / "kaggle-mirror"
@@ -882,6 +971,13 @@ print(f"catalog: {len(catalog['specialists'])} roles; assets in {ASSETS}; done i
 code(r'''
 # Upload directly only for an explicitly credentialed manual run. Centralized Kaggle execution leaves
 # UPLOAD false and publishes the compact output from HereLiesAz/workflows after the kernel completes.
+if UPLOAD == "auto":
+    # Publish when the GITHUB_TOKEN secret is there, so a run needs no edit beyond its secrets.
+    try:
+        UPLOAD = bool(github_token())
+    except Exception as missing:
+        UPLOAD = False
+        print(f"UPLOAD = \"auto\": no GITHUB_TOKEN ({missing}); keeping the release in the output folder")
 if UPLOAD:
     for tag, paths, variation in RELEASES:
         upload_and_mirror(paths, tag, variation)
@@ -974,6 +1070,13 @@ FAMILIES = {
             ("ADAPTER_MIN_STEPS = 450\n", "ADAPTER_MIN_STEPS = 400\n"),
             ("tools/orchestration_training/aive-orchestration-corpus.zip", "tools/memory_training/aive-memory-corpus.zip"),
             ("attach aive-orchestration-corpus", "attach aive-memory-corpus"),
+            # Without a dataset attached, the corpus comes from main, or this branch before it merges.
+            ('for ref in ("main", "claude/amazing-fermi-3o92qn")', 'for ref in ("main", "claude/memory-clerk-corpus")'),
+            # No edit beyond secrets: publish when GITHUB_TOKEN is set, mirror when KAGGLE_KEY is.
+            ("UPLOAD = False                       # True: publish to the GitHub releases (needs GITHUB_TOKEN secret)",
+             'UPLOAD = "auto"                      # "auto": publish when a GITHUB_TOKEN secret is set; True or False to force'),
+            ("KAGGLE_MIRROR = True                 # with UPLOAD: also publish adapters to Kaggle (KAGGLE_KEY secret)",
+             'KAGGLE_MIRROR = "auto"               # with UPLOAD, "auto": mirror to Kaggle when a KAGGLE_KEY secret is set'),
         ],
     },
 }

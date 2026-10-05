@@ -205,6 +205,8 @@ class MemorySummaryTreeTest {
         listOf(
             "Heap set to 4 GB." to "CI runs nightly.",
             "Use Gradle." to "Pizza.",
+            // Two short memories, one of them several lines of chatter: both kept, on one line.
+            "sound thanks" to "ok\n\nthanks!",
             paragraphs[0] to paragraphs[3],
             paragraphs.take(3).joinToString("\n\n") to "Cache on.",
         ).forEachIndexed { i, (left, right) ->

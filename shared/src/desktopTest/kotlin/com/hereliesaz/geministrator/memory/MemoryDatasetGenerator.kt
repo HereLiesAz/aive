@@ -4,8 +4,12 @@ import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.random.Random
 
 /** One corpus row, in the same shape as the orchestration corpus. */
@@ -15,7 +19,15 @@ data class MemoryDatasetRow(
     val input: String,
     val expected: String,
     val split: String,
+    /** `[stage, regular|adversarial, class:<class>]`; the notebook gates every class on its own. */
     val tags: List<String>,
+    /**
+     * The copy shortcut for this row: the label's shape with every text copied verbatim from its
+     * first source (for a summary-chain row, every paragraph joined; for a keep-apart condensation,
+     * the condensation the shortcut would write). Null when the label writes nothing. The notebook
+     * rejects a clerk that answers it on rows whose label differs.
+     */
+    val copy: String? = null,
 )
 
 /**
@@ -38,7 +50,14 @@ object MemoryDatasetGenerator {
     fun slug(role: MemoryMicroAgentRole): String =
         role.name.replace(Regex("([a-z])([A-Z])"), "$1-$2").lowercase()
 
-    /** Rows per role; regular sessions split 70/15/15 by session, hand-written ones are adversarial. */
+    /**
+     * Rows per role; regular sessions split 70/15/15 by session, hand-written ones are adversarial.
+     *
+     * Besides the packets the clerks receive, each split gets contrast material the engine never
+     * offers (every condensation packet again with one member changed to state another value or
+     * contrast, labelled as a decline) and the Summary Synthesizer gets the summary tree's and pair
+     * summaries' requests (the chain's packets, labelled with the extractive engine's summary).
+     */
     fun generate(sessions: Int = 120, seed: Int = 8): Map<MemoryMicroAgentRole, List<MemoryDatasetRow>> {
         val random = Random(seed)
         val regular = (0 until sessions).map { index -> SyntheticSession(session(index, random), split(index, sessions)) }
@@ -47,22 +66,178 @@ object MemoryDatasetGenerator {
         } + adversarialRestatements(sessions + ADVERSARIAL.size)
         dropped.clear()
         // Adversarial sessions share one store, so their restatements meet and condense.
-        val recorded = record(regular.chunked(SESSIONS_PER_STORE) + listOf(adversarial))
+        val (recorded, summaries) = record(regular.chunked(SESSIONS_PER_STORE) + listOf(adversarial))
         ROLES.forEach { role -> dropped[role to "recorded"] = recorded.count { it.role == role } }
+        val candidates = recorded.mapNotNull { record ->
+            labelled(record)?.let { (input, expected) -> Candidate(record.role, input, expected, record.split, record.packet.stage.name, classOf(record), copyOf(expected, record.packet)) }
+        } + keepApart(recorded)
+        val stageSummaries = candidates.filter { it.role == MemoryMicroAgentRole.SummarySynthesizer }.groupingBy { it.split }.eachCount()
+        val chain = balancedChain(summaries.mapNotNull(::chainRow), stageSummaries)
         val seen = HashSet<Pair<MemoryMicroAgentRole, String>>()
         return ROLES.associateWith { role ->
-            recorded.filter { it.role == role }
-                .mapNotNull { record -> labelled(record)?.takeIf { seen.add(role to it.first) }?.let { record to it } }
-                .mapIndexed { index, (record, pair) ->
+            (candidates + chain).filter { it.role == role && seen.add(role to it.input) }
+                .mapIndexed { index, candidate ->
                     MemoryDatasetRow(
                         id = "${slug(role)}-${index.toString().padStart(4, '0')}",
-                        input = pair.first,
-                        expected = pair.second,
-                        split = record.split,
-                        tags = listOf(record.packet.stage.name, if (record.split == "adversarial") "adversarial" else "regular"),
+                        input = candidate.input,
+                        expected = candidate.expected,
+                        split = candidate.split,
+                        tags = listOf(candidate.stage, if (candidate.split == "adversarial") "adversarial" else "regular", "class:${candidate.rowClass}"),
+                        copy = candidate.copy,
                     )
                 }
         }
+    }
+
+    /**
+     * The tree and pair summaries ask far more often than the Summaries stage does; unbounded, chain
+     * rows would swamp the stage's own rows. Per split, at most [CHAIN_ROWS_PER_STAGE_ROW] per stage
+     * row (at least [MIN_CHAIN_ROWS]), taken round-robin over the chain's classes (unique inputs).
+     */
+    private fun balancedChain(rows: List<Candidate>, stageRows: Map<String, Int>): List<Candidate> =
+        rows.distinctBy { it.input }.groupBy { it.split }.flatMap { (split, inSplit) ->
+            val cap = maxOf(MIN_CHAIN_ROWS, CHAIN_ROWS_PER_STAGE_ROW * (stageRows[split] ?: 0))
+            val queues = inSplit.groupBy { it.rowClass }.values.map { ArrayDeque(it) }
+            buildList {
+                while (size < cap && queues.any { it.isNotEmpty() }) queues.forEach { q -> if (size < cap) q.removeFirstOrNull()?.let(::add) }
+            }.also { kept -> dropped.merge(MemoryMicroAgentRole.SummarySynthesizer to "summary chain: over the $split cap", inSplit.size - kept.size, Int::plus) }
+        }
+
+    private const val CHAIN_ROWS_PER_STAGE_ROW = 2
+    private const val MIN_CHAIN_ROWS = 20
+
+    private data class Candidate(
+        val role: MemoryMicroAgentRole,
+        val input: String,
+        val expected: String,
+        val split: String,
+        val stage: String,
+        val rowClass: String,
+        val copy: String?,
+    )
+
+    private fun classOf(record: Recorded): String = when {
+        record.role == MemoryMicroAgentRole.CondensationRewriter -> if (record.batch.size == 0) "keep-apart" else "condense"
+        record.batch.size == 0 -> "empty"
+        else -> "writes"
+    }
+
+    /**
+     * The copy shortcut for [expected]: each section's and node's text replaced by its first source
+     * item's text. Null when the label writes nothing (the empty shortcut covers those rows).
+     */
+    private fun copyOf(expected: String, packet: MemoryWorkPacket): String? {
+        val items = (packet.items + packet.neighborhood).associate { it.id to it.text }
+        val label = json.parseToJsonElement(expected).jsonObject
+        fun copied(key: String) = JsonArray(
+            label[key]?.jsonArray.orEmpty().map { entry ->
+                val draft = entry.jsonObject
+                val source = draft["sourceIds"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
+                val text = items[source] ?: return@map draft
+                JsonObject(draft + ("text" to JsonPrimitive(text)))
+            },
+        )
+        if (label["sections"]?.jsonArray.isNullOrEmpty() && label["nodes"]?.jsonArray.isNullOrEmpty()) return null
+        return JsonObject(label + ("sections" to copied("sections")) + ("nodes" to copied("nodes"))).toString()
+    }
+
+    /**
+     * For every condensation packet, the same packet with its last member changed to state another
+     * value (or, without a value to change, to contrast: same frame, different filler). The engine
+     * never offers such a cluster; a clerk that is shown one must decline it. Labelled by the
+     * programmatic clerk (which declines), in the source packet's split, so the classes stay balanced.
+     */
+    private fun keepApart(recorded: List<Recorded>): List<Candidate> {
+        val clerk = ProgrammaticMemoryClerks.all { 1L }.first { it.role == MemoryMicroAgentRole.CondensationRewriter }
+        return recorded.filter { it.role == MemoryMicroAgentRole.CondensationRewriter && it.batch.size > 0 }
+            .mapIndexedNotNull { index, source ->
+                val items = source.packet.items
+                val last = items.last()
+                // Alternate the two kinds; a member with nothing to contrast (a one-word tag) changes a value.
+                val values = { changedValue(last.text, index)?.let { "values" to it } }
+                val contrast = { contrasted(last.text)?.let { "contrast" to it } }
+                val (kind, text) = (if (index % 2 == 0) values() ?: contrast() else contrast() ?: values())
+                    ?: return@mapIndexedNotNull null.also { dropped.merge(source.role to "no keep-apart variant", 1, Int::plus) }
+                val changed = items.dropLast(1) + last.copy(text = text)
+                if (!condensationWouldAdjudicate(changed.map(MemoryWorkItem::text))) return@mapIndexedNotNull null
+                val packet = source.packet.copy(
+                    items = changed,
+                    packetKey = "condense-${changed.joinToString("|") { it.id + it.text }.hashCode().toString(16)}",
+                )
+                val batch = runBlocking { clerk.process(packet) }
+                val record = Recorded(source.role, packet, batch, source.split)
+                val (input, expected) = labelled(record) ?: return@mapIndexedNotNull null
+                val shortcut = labelled(source)?.second?.let { copyOf(it, packet) }
+                Candidate(source.role, input, expected, source.split, packet.stage.name, "keep-apart:$kind", shortcut)
+            }
+    }
+
+    private fun changedValue(text: String, index: Int): String? {
+        val number = Regex("\\b\\d+\\b").find(text)
+        if (number != null) return text.replaceRange(number.range, (number.value.toInt() + 1 + index % 7).toString())
+        val quoted = Regex("\"([^\"]+)\"").find(text)
+        if (quoted != null) {
+            return text.replaceRange(quoted.groups[1]!!.range, quoted.groupValues[1].uppercase().takeIf { it != quoted.groupValues[1] } ?: (quoted.groupValues[1] + " v2"))
+        }
+        // No value to change: flip the polarity, which is part of the claim too.
+        val negation = Regex("\\b(not|never) ").find(text)
+        if (negation != null) return text.removeRange(negation.range)
+        val copula = Regex("\\b(is|are|must|does|will) ").find(text)
+        return if (copula != null) text.replaceRange(copula.range, "${copula.groupValues[1]} not ") else "not $text"
+    }
+
+    private fun contrasted(text: String): String? = CONTRAST_SWAPS.firstNotNullOfOrNull { (from, to) ->
+        Regex("\\b$from\\b").find(text)?.let { text.replaceRange(it.range, to) }?.takeIf { MemoryContrast.contrasts(text, it) }
+    }
+
+    private val CONTRAST_SWAPS = listOf(
+        "dark" to "light", "warm" to "cool", "Maya" to "Jordan", "Jordan" to "Maya", "self-hosted" to "hosted",
+        "before" to "after", "nightly" to "weekly", "every" to "no", "under" to "over", "owns" to "reviews",
+        "reviews" to "owns", "does not" to "does", "never" to "always", "does" to "does not",
+    )
+
+    /** A summary-chain request as a Summary Synthesizer row, or null (counted) when it cannot be one. */
+    private fun chainRow(record: ChainRecord): Candidate? {
+        val role = MemoryMicroAgentRole.SummarySynthesizer
+        fun drop(reason: String): Candidate? {
+            dropped.merge(role to "summary chain: $reason", 1, Int::plus)
+            return null
+        }
+        val request = record.request
+        val model = MemoryEpoch8ModelCatalog.modelSpec(role)
+        val packet = memorySummaryChainPacket(request.paragraphs, request.limit, request.instruction)
+        val input = MemoryMicroAgentPrompts.render(packet, role)
+        if (input.length > model.maxInputChars) return drop("over input budget")
+        val text = record.summary.text.trim()
+        // The chain validates a model's summary as abstractive; the label must pass that check too.
+        if (text.isBlank() || !MemorySummarizerChain().validate(text, request, abstractive = true)) return drop("label fails the chain's check")
+        fun proposal(summary: String) = MemoryMutationBatch(
+            nodesToAdd = listOf(
+                MemoryNode(
+                    id = MemoryNodeId("summary"),
+                    kind = MemoryNodeKind.Summary,
+                    text = summary,
+                    sourceSectionIds = packet.items.mapTo(linkedSetOf()) { MemorySectionId(it.id) },
+                    createdAtEpochMillis = 1L,
+                ),
+            ),
+        ).toMicroAgentProposalJson(packet)
+        val expected = proposal(text) ?: return drop("not expressible")
+        if (expected.length > model.maxOutputChars) return drop("over output budget")
+        val decoded = runCatching {
+            runBlocking {
+                StructuredMemoryMicroAgent(role, model, ReplayRuntime(input, expected), nowEpochMillis = { 1L }).process(packet)
+            }
+        }.getOrElse { return drop("decode failed: ${it.message?.take(80)}") }
+        if (decoded.nodesToAdd.singleOrNull()?.text != text) return drop("round trip differs")
+        val rowClass = when {
+            request.forbidden != null -> "chain:divergence"
+            request.separator != PARAGRAPH_SEPARATOR -> "chain:pair"
+            else -> "chain:tree"
+        }
+        // The copy shortcut keeps every paragraph, which never fits: the chain only asks when it does not.
+        val copy = proposal(request.paragraphs.joinToString(request.separator))
+        return Candidate(role, input, expected, record.split, "SummaryChain", rowClass, copy)
     }
 
     /** Pipeline config for [role]; answers are scored with `json_exact`. */
@@ -76,6 +251,16 @@ object MemoryDatasetGenerator {
                 mapOf(
                     "min_test_score" to JsonPrimitive(0.9),
                     "min_adversarial_score" to JsonPrimitive(0.9),
+                    // Every class (tag `class:<name>`) of the gated rows, scored on its own, so a
+                    // clerk cannot pass on the majority class (e.g. always writing, or never).
+                    "min_class_score" to JsonPrimitive(0.8),
+                    "min_class_rows" to JsonPrimitive(5),
+                    // Shortcut baselines: copy the input (the row's `copy`), answer nothing, or always
+                    // give the most common training answer. On the rows where a shortcut is wrong the
+                    // clerk must still score this, and may give the shortcut's answer at most this often.
+                    "shortcuts" to JsonArray(listOf("copy", "empty", "constant").map(::JsonPrimitive)),
+                    "min_nontrivial_score" to JsonPrimitive(0.8),
+                    "max_shortcut_rate" to JsonPrimitive(0.1),
                 ),
             ),
         ),
@@ -94,8 +279,11 @@ object MemoryDatasetGenerator {
      * Consolidates each block of sessions in order, in a fresh store, recording every packet a
      * generative clerk receives.
      */
-    private fun record(blocks: List<List<SyntheticSession>>): List<Recorded> = runBlocking {
+    private data class ChainRecord(val request: MemorySummaryRequest, val summary: MemorySummary, val split: String)
+
+    private fun record(blocks: List<List<SyntheticSession>>): Pair<List<Recorded>, List<ChainRecord>> = runBlocking {
         val recorded = mutableListOf<Recorded>()
+        val summaries = mutableListOf<ChainRecord>()
         var split = "train"
         val agents = ProgrammaticMemoryClerks.all { 1L }.map { clerk ->
             if (clerk.role == MemoryMicroAgentRole.AssociationLinker) {
@@ -119,7 +307,14 @@ object MemoryDatasetGenerator {
         // A fresh SQLite store per block keeps the graph, and each commit, bounded.
         blocks.forEachIndexed { block, chunk ->
             val file = File.createTempFile("aive-memory-dataset", ".db").apply { deleteOnExit() }
-            val layer = AgentMemoryLayer.createWithMicroAgents(desktopSqlMemoryStore(file), agents, POLICY)
+            // The summary tree and pair summaries send the Summary Synthesizer clerk every request
+            // the extractive engines answer here (verbatim ones never reach a model).
+            val chain = MemorySummarizerChain().apply {
+                observer = { request, summary ->
+                    if (summary.engine != MemorySummarizerChain.ENGINE_VERBATIM) summaries += ChainRecord(request, summary, split)
+                }
+            }
+            val layer = AgentMemoryLayer.createWithMicroAgents(desktopSqlMemoryStore(file), agents, POLICY, summarizer = chain)
             chunk.forEachIndexed { offset, session ->
                 split = session.split
                 layer.queue.enqueueSession(session.envelope)
@@ -128,7 +323,7 @@ object MemoryDatasetGenerator {
             }
             file.delete()
         }
-        recorded
+        recorded to summaries
     }
 
     /** Why recorded packets were not used, per role and reason, from the last [generate]. */
