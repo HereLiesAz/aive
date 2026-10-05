@@ -91,7 +91,7 @@ class MemorySummaryTreeTest {
     @Test
     fun episodeTreeHasLevelsLeavesBudgetsCuesAndWorkflowTag() = runBlocking {
         val store = InMemoryMemoryStore()
-        val layer = AgentMemoryLayer.createWithMicroAgents(store, ProgrammaticMemoryClerks.all { 1_000L }, MemoryConsolidationPolicy(maxPacketItems = 8))
+        val layer = AgentMemoryLayer.createWithMicroAgents(store, ProgrammaticMemoryClerks.all { 1_000L })
         layer.queue.enqueueSession(
             MemorySessionEnvelope(
                 sourceSessionId = "s1",

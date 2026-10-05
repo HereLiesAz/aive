@@ -370,6 +370,17 @@ Every abstraction must preserve provenance so a later agent can descend back to 
 
 No clerk should require the whole memory graph. Use deliberately bounded packets.
 
+**Packet budgeting.** A packet is sized to what its stage's clerks accept, measured the way the
+router enforces it (`MemoryManagerAgent.fitsInput`): item ids, kinds and metadata and the routed role
+instruction count, not only item text. The consolidator takes the longest prefix of the stage's
+remaining items (within `maxPacketItems` / `maxPacketChars`) that fits; the rest start the next
+packet, in order, and the cursor advances by what was sent. An item too large to fit on its own is
+sent in parts, one per packet: its text split at paragraph breaks (an overlong paragraph is cut at
+whitespace), each part keeping the item's id and kind and carrying `memory.part = "i/n"`. The queue
+entry's `part` field records the next part and advances atomically with that part's mutations, so a
+crash mid-split resumes at the same part with the same packet key. Nothing is dropped; an item is
+parked only when its id, kind and metadata alone exceed the budget.
+
 ### Summary tree (top-down, per banked episode)
 
 Once per episode, when its queue entry reaches Condensation (after the contrast step, before any
