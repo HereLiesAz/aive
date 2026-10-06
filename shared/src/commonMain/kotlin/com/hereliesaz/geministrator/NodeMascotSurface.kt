@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -32,6 +33,20 @@ internal fun NodeMascotSurface(
     motionPhase: Float,
     modifier: Modifier = Modifier,
 ) {
+    // Puppet rigs (files/rigs) take precedence when one is mapped for the role and has loaded.
+    // While loading, or if the rig is missing/invalid, fall through to the pre-rig rendering.
+    if (CreatureRigSettings.enabled) {
+        val rig = rememberCreatureRig(remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) })
+        if (rig != null) {
+            RiggedCreatureSurface(
+                loaded = rig,
+                state = state,
+                phase = creatureRigPhase(motionPhase, hueSeed),
+                modifier = modifier,
+            )
+            return
+        }
+    }
     if (roleLabel.trim().equals("Orchestrator", ignoreCase = true)) {
         OrchestratorSpritePuppetSurface(
             state = state,
