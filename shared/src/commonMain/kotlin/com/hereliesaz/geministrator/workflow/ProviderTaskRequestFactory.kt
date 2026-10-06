@@ -248,7 +248,6 @@ private fun buildUtilityPromptBlocks(
             localFailureRate = run.failureRate(),
             // On-device only: the decision model reads the real objective even when the provider prompt is redacted.
             objective = task.objective,
-            acceptanceCriteria = task.acceptanceCriteria.map { it.description },
         ),
     )
     val escalationBlock = PromptContextBlock(

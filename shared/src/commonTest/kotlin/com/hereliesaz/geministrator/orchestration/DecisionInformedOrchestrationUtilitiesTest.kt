@@ -56,18 +56,6 @@ class DecisionInformedOrchestrationUtilitiesTest {
     }
 
     @Test
-    fun contradictionIsAskedOfTheJoinedCriteria() {
-        val criteria = listOf("Data never leaves the device", "Data is synced to the cloud")
-        val joined = criteria.joinToString(CRITERIA_SEPARATOR)
-        val utilities = DecisionInformedOrchestrationUtilities(
-            FakeModel(mapOf((joined to OrchestrationQuestion.ContradictoryCriteria) to "yes")),
-        )
-        val result = utilities.evaluateEscalation(CapabilityAssessment(acceptanceCriteria = criteria))
-        assertTrue("CONTRADICTION_RECONCILIATION" in result.reasonCodes)
-        assertEquals(EscalationDecision.Escalate, result.decision)
-    }
-
-    @Test
     fun verificationUsesTheModelPerPartAndTheLexiconWhenUnsure() {
         val criterion = "the checker is quiet and unit tests pass"
         val model = FakeModel(mapOf(("the checker is quiet" to OrchestrationQuestion.VerificationOperation) to "lint"))
@@ -104,5 +92,17 @@ class DecisionInformedOrchestrationUtilitiesTest {
         val utilities = DecisionInformedOrchestrationUtilities(OrchestrationDecisionModel { _, _ -> error("model crashed") })
         val input = CapabilityAssessment(objective = "Decide whether to use Room or SQLDelight")
         assertEquals(base.evaluateEscalation(input), utilities.evaluateEscalation(input))
+    }
+
+    @Test
+    fun aQuestionsReleasedThresholdOverridesTheDefault() {
+        val objective = "Decide whether to use Room or SQLDelight"
+        val answers = mapOf((objective to OrchestrationQuestion.ArchitecturalDecision) to "yes")
+        val strict = object : OrchestrationDecisionModel by FakeModel(answers, confidence = 0.9) {
+            override fun minConfidence(question: OrchestrationQuestion): Double = 0.95
+        }
+        val input = CapabilityAssessment(objective = objective)
+        assertEquals(base.evaluateEscalation(input), DecisionInformedOrchestrationUtilities(strict).evaluateEscalation(input))
+        assertEquals(EscalationDecision.Escalate, DecisionInformedOrchestrationUtilities(FakeModel(answers, confidence = 0.9)).evaluateEscalation(input).decision)
     }
 }

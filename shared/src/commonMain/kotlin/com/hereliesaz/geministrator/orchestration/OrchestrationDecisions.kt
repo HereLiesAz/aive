@@ -19,8 +19,6 @@ enum class OrchestrationQuestion(val id: String, val options: List<String>, val 
     MultiStepReasoning("multi-step-reasoning", listOf("no", "yes"), DecisionText.Objective),
     /** The objective is about order, history or change over time: memory needs dated evidence. */
     ChronologicalContext("chronological-context", listOf("no", "yes"), DecisionText.Objective),
-    /** Two acceptance criteria cannot both hold. */
-    ContradictoryCriteria("contradictory-criteria", listOf("no", "yes"), DecisionText.Criteria),
     /** The check one part of an acceptance criterion calls for. */
     VerificationOperation(
         "verification-operation",
@@ -34,10 +32,8 @@ enum class OrchestrationQuestion(val id: String, val options: List<String>, val 
     }
 }
 
-/** What text a question reads. Criteria are joined with [CRITERIA_SEPARATOR], as in training. */
-enum class DecisionText { Objective, Criteria, CriterionPart }
-
-const val CRITERIA_SEPARATOR: String = " ; "
+/** What text a question reads. */
+enum class DecisionText { Objective, CriterionPart }
 
 /**
  * A decision model: calibrated probabilities over [OrchestrationQuestion.options] for each question
@@ -46,13 +42,20 @@ const val CRITERIA_SEPARATOR: String = " ; "
  */
 fun interface OrchestrationDecisionModel {
     fun answer(text: String, questions: List<OrchestrationQuestion>): Map<OrchestrationQuestion, List<Double>>?
+
+    /**
+     * The confidence this model's answers to [question] need, set per question when the model was
+     * gated (`config.json`), or null for the caller's default. A question the model was not released
+     * for is simply not answered.
+     */
+    fun minConfidence(question: OrchestrationQuestion): Double? = null
 }
 
 /**
  * The deterministic utilities with their judgement inputs filled by an [OrchestrationDecisionModel].
  *
- * A model answer is used only when its top option reaches [minConfidence]; otherwise the caller's
- * heuristic stands. Escalation flags only ever turn on (a model can make the gate more conservative,
+ * A model answer is used only when its top option reaches [minConfidence], or the higher threshold
+ * the model was released with for that question; otherwise the caller's heuristic stands. Escalation flags only ever turn on (a model can make the gate more conservative,
  * never less), and memory queries only ever gain the chronological pass.
  */
 class DecisionInformedOrchestrationUtilities(
@@ -71,18 +74,12 @@ class DecisionInformedOrchestrationUtilities(
                 OrchestrationQuestion.MultiStepReasoning,
             ),
         )
-        val criteria = input.acceptanceCriteria.map(String::trim).filter(String::isNotEmpty)
-        val contradiction = if (criteria.size < 2) null else confident(
-            criteria.joinToString(CRITERIA_SEPARATOR),
-            listOf(OrchestrationQuestion.ContradictoryCriteria),
-        )[OrchestrationQuestion.ContradictoryCriteria]
         fun yes(question: OrchestrationQuestion) = fromObjective[question] == "yes"
         return base.evaluateEscalation(
             input.copy(
                 ambiguousObjective = input.ambiguousObjective || yes(OrchestrationQuestion.AmbiguousObjective),
                 requiresArchitecturalDecision = input.requiresArchitecturalDecision || yes(OrchestrationQuestion.ArchitecturalDecision),
                 requiresMultiStepReasoning = input.requiresMultiStepReasoning || yes(OrchestrationQuestion.MultiStepReasoning),
-                requiresContradictionReconciliation = input.requiresContradictionReconciliation || contradiction == "yes",
             ),
         )
     }
@@ -117,7 +114,8 @@ class DecisionInformedOrchestrationUtilities(
         return questions.mapNotNull { question ->
             val probabilities = answers[question]?.takeIf { it.size == question.options.size } ?: return@mapNotNull null
             val best = probabilities.indices.maxByOrNull { probabilities[it] } ?: return@mapNotNull null
-            if (probabilities[best] >= minConfidence) question to question.options[best] else null
+            val threshold = maxOf(minConfidence, runCatching { model.minConfidence(question) }.getOrNull() ?: minConfidence)
+            if (probabilities[best] >= threshold) question to question.options[best] else null
         }.toMap()
     }
 
