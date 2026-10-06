@@ -1,10 +1,8 @@
 package com.hereliesaz.aive
 
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import com.hereliesaz.geministrator.AzphaltAlertDialog
 
 internal sealed interface AndroidUpdateState {
     data object Idle : AndroidUpdateState
@@ -23,34 +21,22 @@ internal fun AndroidUpdatePrompt(
     onDismiss: () -> Unit,
 ) {
     when (state) {
-        is AndroidUpdateState.ReadyToInstall -> AlertDialog(
+        is AndroidUpdateState.ReadyToInstall -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_ready_title, state.version),
+            text = stringResource(R.string.update_ready_body),
+            confirmLabel = stringResource(R.string.update_install),
+            onConfirm = onInstallGithubUpdate,
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.update_ready_title, state.version)) },
-            text = {
-                Text(
-                    stringResource(R.string.update_ready_body),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onInstallGithubUpdate) { Text(stringResource(R.string.update_install)) }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
-            },
+            dismissLabel = stringResource(R.string.update_later),
         )
 
-        AndroidUpdateState.PlayUpdateAvailable -> AlertDialog(
+        AndroidUpdateState.PlayUpdateAvailable -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_play_title),
+            text = stringResource(R.string.update_play_body),
+            confirmLabel = stringResource(R.string.update_open_play_store),
+            onConfirm = onOpenPlayStore,
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.update_play_title)) },
-            text = {
-                Text(stringResource(R.string.update_play_body))
-            },
-            confirmButton = {
-                TextButton(onClick = onOpenPlayStore) { Text(stringResource(R.string.update_open_play_store)) }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
-            },
+            dismissLabel = stringResource(R.string.update_later),
         )
 
         else -> Unit
