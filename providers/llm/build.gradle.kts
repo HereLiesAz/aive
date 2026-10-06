@@ -15,6 +15,9 @@ kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)
         }
+        // Host (JVM) unit tests run the common test tree on the Android target too, so CI
+        // checks the providers against the Android build, not just desktop/web.
+        withHostTest {}
         // On-device (instrumented) tests share the common test tree, so the opt-in live
         // acceptance test can run on an Android device or emulator.
         withDeviceTestBuilder {
