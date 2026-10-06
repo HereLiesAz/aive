@@ -1,5 +1,11 @@
 name: Build and Deploy
 
+# Target-local CI under HereLiesAz/workflows policy: the build and installer jobs end with
+# the central ci-report action, which registers this workflow `local`, `ci: true`.
+# Version, tag/grouping and Play publication policy come from the central actions
+# (four-part-version, patch-grouped-release, google-play-publish); this file keeps only
+# aive-specific build, verification and packaging steps.
+
 on:
   push:
     branches:
@@ -26,6 +32,25 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  version:
+    name: Resolve four-part version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Resolve four-part build version
+        id: version
+        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        uses: HereLiesAz/workflows/.github/actions/four-part-version@main
+        with:
+          source-version-file: gradle.properties
+          source-version-key: app.versionName
+          build-number: ${{ github.run_number }}
+          prerelease-major-max: "0"
+
   build:
     runs-on: ubuntu-latest
 
@@ -143,6 +168,9 @@ jobs:
 
       - name: Test Android provider bootstrap
         run: ./gradlew :androidApp:testPlayDebugUnitTest :androidApp:testGithubDebugUnitTest
+
+      - name: Test LLM providers on the Android host
+        run: ./gradlew :providers:llm:testAndroidHostTest
 
       - name: Build Android distributions
         env:
@@ -364,12 +392,18 @@ jobs:
         with:
           path: webApp/build/pages
 
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
+
   desktop-packages:
     name: Desktop installer (${{ matrix.platform }})
     # Dependabot PRs skip the three-OS installer matrix: a batch of dependency bumps
     # otherwise holds every concurrent runner (2026-10-03). They still get `build`,
     # and main builds the installers once the bump merges.
     if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: version
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -394,20 +428,15 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-      - name: Resolve four-part build version
+      - name: Use central four-part build version
         shell: bash
+        env:
+          AIVE_VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          SOURCE_VERSION=$(grep '^app.versionName=' gradle.properties | cut -d'=' -f2- | tr -d '\r ')
-          if ! printf '%s' "$SOURCE_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::app.versionName must be MAJOR.MINOR.PATCH.BUILD"
-            exit 1
-          fi
-          BASE_VERSION=$(printf '%s' "$SOURCE_VERSION" | cut -d. -f1-3)
-          AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"
+          test -n "$AIVE_VERSION"
           echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
           echo "Aive build version: $AIVE_VERSION"
-
 
       - name: Check out pinned h2g2
         uses: actions/checkout@v7
@@ -495,6 +524,11 @@ jobs:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.path }}
           if-no-files-found: error
+
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
 
   release:
     name: Publish patch-grouped release

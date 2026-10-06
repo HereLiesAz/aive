@@ -27,8 +27,8 @@ elif match.group(4) != "0":
     violations.append("checked-in app.versionName BUILD must be 0; CI supplies the release build number")
 
 required_fragments = {
-    'AIVE_VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}"':
-        "desktop-packages job does not derive MAJOR.MINOR.PATCH.BUILD from github.run_number",
+    'AIVE_VERSION: ${{ needs.version.outputs.version }}':
+        "desktop-packages job does not use the central four-part version from the version job",
     'build-number: ${{ github.run_number }}':
         "build job does not pass github.run_number to four-part-version action",
     'build-version: ${{ steps.version.outputs.version }}':

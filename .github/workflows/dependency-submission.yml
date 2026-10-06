@@ -19,8 +19,11 @@ concurrency:
   group: ${{ github.repository }}-dependency-submission
   cancel-in-progress: true
 
+# Dependency submission always runs in the target repository (HereLiesAz/workflows
+# policy); the ci-report step registers it as target-local CI (`local`, `ci: true`).
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   dependency-submission:
@@ -44,3 +47,8 @@ jobs:
           dependency-graph-continue-on-failure: false
           additional-arguments: '-Phaive.useLocalH2g2=false'
           cache-disabled: true
+
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
