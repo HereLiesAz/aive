@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0b">
+  <title>aive puppet rig</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <strong class="brand">puppet rig</strong>
+    <nav class="tabs" role="tablist">
+      <button data-mode="cut" class="on">Cut</button>
+      <button data-mode="rig">Rig</button>
+      <button data-mode="animate">Animate</button>
+    </nav>
+    <span class="grow"></span>
+    <label class="btn">Import<input id="import" type="file" accept="image/png,application/json,.json" multiple hidden></label>
+    <button id="export" class="btn">Export</button>
+    <button id="new" class="btn ghost" title="Start a new rig">New</button>
+  </header>
+
+  <main class="layout">
+    <section class="stage-wrap">
+      <div class="stage-tools" id="stage-tools"></div>
+      <canvas id="stage"></canvas>
+      <div class="transport" id="transport" hidden>
+        <select id="state" aria-label="Workflow state"></select>
+        <button id="play" class="btn">Pause</button>
+        <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Phase">
+        <output id="phase-out">0.000</output>
+        <label class="small">loop s <input id="loop-seconds" type="number" min="0.2" step="0.1" value="2.4"></label>
+      </div>
+    </section>
+    <aside class="panel" id="panel"></aside>
+  </main>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
