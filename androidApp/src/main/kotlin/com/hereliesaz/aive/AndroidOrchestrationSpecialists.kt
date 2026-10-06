@@ -95,6 +95,17 @@ internal class AndroidOrchestrationSpecialistInstaller(
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
     }
 
+    /** The installed decision model's directory, or null when it is not released or not installed. */
+    fun decisionModelRoot(): File? {
+        val plan = runCatching {
+            OrchestrationSpecialistCatalog.released().plan(
+                OrchestrationSpecialistCatalog.DECISIONS_SPECIALIST_ID,
+                AndroidOrchestrationSpecialists.runtimeCapabilities,
+            )
+        }.getOrNull() as? LocalModelLoadPlan.MergedModel ?: return null
+        return installed(plan.model)
+    }
+
     fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
 
     fun allReleasedInstalled(): Boolean {

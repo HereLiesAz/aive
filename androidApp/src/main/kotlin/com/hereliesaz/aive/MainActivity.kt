@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
     }
     private val orchestrationSpecialistExecutor by orchestrationSpecialistExecutorDelegate
     private val orchestrationDecisionModelDelegate = lazy {
-        AndroidOrchestrationDecisionModel(orchestrationSpecialistInstaller)
+        AndroidOrchestrationDecisionModel(orchestrationSpecialistInstaller::decisionModelRoot)
     }
     private val orchestrationDecisionModel by orchestrationDecisionModelDelegate
 
