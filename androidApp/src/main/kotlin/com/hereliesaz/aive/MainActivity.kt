@@ -25,8 +25,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
 import com.hereliesaz.geministrator.CrashReportingSetting
@@ -464,14 +462,6 @@ class MainActivity : ComponentActivity() {
                     onDismissRequest = {
                         CrashReporting.markFirstReportNoticeShown(this)
                         crashReportNoticeVisible = false
-                    },
-                )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            CrashReporting.markFirstReportNoticeShown(this)
-                            crashReportNoticeVisible = false
-                        }) { Text("OK") }
                     },
                 )
             }
