@@ -270,11 +270,11 @@ class MemoryConsolidator(
                 return failed(processing, plan, reason)
             }
 
-            // Tag clouds are the engine's, not the clerk's: every new noun/verb tag gets its WordNet
-            // related-word cloud once, here, whichever clerk engine named it.
+            // Tag keywords are the engine's, not the clerk's: every new noun/verb tag gets its WordNet
+            // trigger keywords once, here, whichever clerk engine named it.
             val batch = if (entry.stage == MemoryConsolidationStage.Tags) {
                 val wordNet = runCatching { MemoryLanguageResources.get().wordNet }.getOrNull()
-                validated.copy(nodesToAdd = MemoryTagCloud.withClouds(validated.nodesToAdd, wordNet))
+                validated.copy(nodesToAdd = MemoryTagKeywords.withKeywords(validated.nodesToAdd, wordNet))
             } else {
                 validated
             }
@@ -958,8 +958,8 @@ private fun MemoryNode.asWorkItem() = MemoryWorkItem(
     id = id.value,
     kind = "node:${kind.name}",
     text = text,
-    // Tag clouds serve recall only; they would crowd a clerk's packet budget.
-    metadata = (metadata - TAG_CLOUD) + mapOf(
+    // Tag keywords serve recall only; they would crowd a clerk's packet budget.
+    metadata = (metadata - TAG_KEYWORDS) + mapOf(
         "salience" to salience.toString(),
         "confidence" to confidence.toString(),
         "sourceEpisodeIds" to sourceEpisodeIds.joinToString(",") { it.value },

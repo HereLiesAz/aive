@@ -119,10 +119,29 @@ class MemoryLayerController(
 
     private suspend fun layerFor(workflowId: String): AgentMemoryLayer {
         val store = lineageStore(workflowId)
-        return layersMutex.withLock { layers.getOrPut(workflowId) { build(store, settings.value) } }
+        return layersMutex.withLock {
+            layers.getOrPut(workflowId) {
+                // Every commit through the layer reaches its keyword trigger table at once.
+                val triggers = keywordTriggers.getOrPut(workflowId) { MemoryKeywordTriggers() }
+                build(KeywordTriggeringStore(store, triggers), settings.value)
+            }
+        }
     }
 
-    private suspend fun resetLayers() = layersMutex.withLock { layers.clear() }
+    /** Each workflow layer's cue trigger table (keyword -> tags), held ready for [cueCloud]. */
+    private val keywordTriggers = HashMap<String, MemoryKeywordTriggers>()
+
+    private suspend fun triggersFor(workflowId: String): MemoryKeywordTriggers {
+        val layer = layerFor(workflowId)
+        val triggers = layersMutex.withLock { keywordTriggers.getValue(workflowId) }
+        triggers.ensureCurrent(layer.store.read())
+        return triggers
+    }
+
+    private suspend fun resetLayers() = layersMutex.withLock {
+        layers.clear()
+        keywordTriggers.clear()
+    }
 
     /** Workflow of each running agent (task run), fixed when its session starts. */
     private val agentWorkflows = HashMap<String, String>()
@@ -804,14 +823,18 @@ class MemoryLayerController(
     private suspend fun cueCloud(agentId: String, text: String, request: AgentTaskRequest? = null, alongside: Boolean = false): String? {
         val session = cueSession(agentId, request)
         val gate = attention.forAgent(agentId)
-        val tool = layerFor(request?.let { memoryWorkflowOf(it) } ?: workflowOfAgent(agentId)).tool
+        val workflow = request?.let { memoryWorkflowOf(it) } ?: workflowOfAgent(agentId)
+        val tool = layerFor(workflow).tool
         val words = CONTENT_WORD.findAll(text.lowercase()).map { it.value }.filter { it !in CLOUD_STOPWORDS }.distinct().toList()
         val cueWords = words.filterNot { isCommonWord(tool, it) }.take(MAX_CLOUD_QUERY_WORDS)
-        if (cueWords.isEmpty()) return null
-        val scope = request ?: session.request
+        // Keyword triggers: the text's words and 2–3 word phrases looked up in the table held ready
+        // (no search), each firing its tag at the relevance its keyword weight earns.
+        val keywordHits = keywordCueHits(workflow, text, tool)
+        if (cueWords.isEmpty() && keywordHits.isEmpty()) return null
         // Each uncommon word seeds its own cues (a word should not be diluted by its neighbours);
-        // a tag reached by several words keeps its best score.
+        // a tag reached by several words, or by a keyword too, keeps its best score.
         val best = LinkedHashMap<MemoryNodeId, MemoryRecallHit>()
+        keywordHits.forEach { hit -> best[hit.node.id] = hit }
         cueWords.forEach { word ->
             tool.grip(
                 MemoryQuery(
@@ -829,6 +852,22 @@ class MemoryLayerController(
         if (cues.isEmpty()) return null
         cueMutex.withLock { session.watcher.offered(cues.map { it.node.text }) }
         return "$MEMORY_MESSAGE_MARKER " + cues.joinToString(" ") { MemoryCueWatcher.hashtag(it.node.text) }
+    }
+
+    /**
+     * Tags the keyword trigger table fires for [text]: single words pass the same stopword and
+     * common-word filter as the searched cue words; 2–3 word phrases are matched as-is. Scored
+     * `0.9 * sqrt(weight)` ([MemoryTagKeywords.relevance]), so even a tag's own text (1.0) scores
+     * 0.9, under an exact tag-search hit.
+     */
+    private suspend fun keywordCueHits(workflow: String, text: String, tool: MemoryTool): List<MemoryRecallHit> {
+        val triggers = triggersFor(workflow)
+        val keys = MemoryKeywordTriggers.keys(text) { word ->
+            word.length < 3 || word in CLOUD_STOPWORDS || word in SHORT_STOPWORDS || isCommonWord(tool, word)
+        }
+        return triggers.match(keys).values
+            .filter { it.tag.kind in AttentionGatedRecall.CUE_KINDS }
+            .map { MemoryRecallHit(it.tag, MemoryTagKeywords.relevance(it.weight)) }
     }
 
     private suspend fun recallSummaries(workflow: String, trigger: MemoryRecallTrigger, request: AgentTaskRequest?): List<MemoryRecallHit> {
@@ -888,6 +927,11 @@ class MemoryLayerController(
         const val MAX_SUMMARY_CHARS = 400
         const val MAX_PENDING_RECALLS = 8
         const val MAX_CLOUD_QUERY_WORDS = 12
+        /** Three-letter function words, which keyword lookup (unlike the searched cue words) would otherwise keep. */
+        val SHORT_STOPWORDS = setOf(
+            "the", "and", "for", "but", "not", "you", "are", "was", "can", "has", "had", "its", "our", "out", "all",
+            "any", "how", "who", "why", "may", "use", "get", "set", "new", "one", "two", "now", "see", "did", "let",
+        )
         val CONTENT_WORD = Regex("[a-z][a-z0-9_-]{3,}")
         val CLOUD_STOPWORDS = setOf(
             "that", "this", "with", "from", "have", "will", "would", "should", "could", "there", "their", "they", "them",

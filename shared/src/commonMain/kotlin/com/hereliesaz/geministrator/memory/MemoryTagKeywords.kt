@@ -1,13 +1,15 @@
 package com.hereliesaz.geministrator.memory
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * WordNet related-word clouds for noun and verb tags.
+ * WordNet trigger keywords for noun and verb tags.
  *
  * When the engine stores a NounTag or VerbTag it attaches, once, the related words of every keyword
- * in the tag ([TAG_CLOUD], a compact `term:weight` list). Recall then maps an agent's words to tags
+ * in the tag ([TAG_KEYWORDS], a compact `term:weight` list). Recall then maps an agent's words to tags
  * (and through their Indexes edges to memories) by an inverted-index lookup instead of reasoning
  * about meaning at query time. Noise is deliberate: weak relations carry low weights, and the
  * attention dial's similarity threshold decides how far down the weights a cue may reach.
@@ -15,7 +17,7 @@ import kotlin.math.sqrt
  * The relations are ordinary WordNet ones (synonymy, derivation, hypernymy, hyponymy, co-hyponymy)
  * read from the most frequent senses; nothing here is new, only the weighting table is ours.
  */
-internal object MemoryTagCloud {
+internal object MemoryTagKeywords {
     /** Relation weights; one table so they can be tuned together. */
     data class Weights(
         val synonym: Float = 1.0f,
@@ -35,25 +37,25 @@ internal object MemoryTagCloud {
     /** Narrower synsets read per synset (index order), and siblings per parent. */
     const val MAX_CHILDREN = 24
 
-    /** Terms kept per tag cloud, highest weight first. */
+    /** Terms kept per tag keyword list, highest weight first. */
     const val MAX_TERMS = 64
 
     /**
-     * Relevance a cloud match contributes to recall for a cloud weight: `0.9 * sqrt(weight)`. A
+     * Relevance a keyword match contributes to recall for a keyword weight: `0.9 * sqrt(weight)`. A
      * synonym (1.0) scores 0.9, a little under an exact match; a sibling (0.3) scores about 0.49 and
      * so clears only a near-intrusive dial (the threshold runs from 0.92 focused to 0.45 intrusive).
      */
-    fun relevance(weight: Float): Float = (CLOUD_RELEVANCE * sqrt(weight.coerceIn(0f, 1f).toDouble())).toFloat()
+    fun relevance(weight: Float): Float = (KEYWORD_RELEVANCE * sqrt(weight.coerceIn(0f, 1f).toDouble())).toFloat()
 
-    private const val CLOUD_RELEVANCE = 0.9
+    private const val KEYWORD_RELEVANCE = 0.9
 
     /**
-     * The cloud of a tag's [text]: every keyword (and the whole phrase, when WordNet knows it) with
+     * The keywords of a tag's [text]: every keyword (and the whole phrase, when WordNet knows it) with
      * its related words, max weight per term, capped at [MAX_TERMS]. Without [wordNet], or for words
      * WordNet does not know, just the word and its [MemoryAliases] group. Deterministic: ties keep
      * discovery order (keyword order, then sense order).
      */
-    fun cloudFor(text: String, kind: MemoryNodeKind, wordNet: WordNetLexicon?, weights: Weights = WEIGHTS): List<Pair<String, Float>> {
+    fun keywordsFor(text: String, kind: MemoryNodeKind, wordNet: WordNetLexicon?, weights: Weights = WEIGHTS): List<Pair<String, Float>> {
         val words = text.lowercase().split(WORD_SPLIT).filter { it.length > 1 }
         val phrase = words.joinToString(" ")
         val keywords = (listOf(phrase) + words).filter(String::isNotEmpty).distinct()
@@ -129,8 +131,8 @@ internal object MemoryTagCloud {
     }
 
     /** `term:weight|term:weight`, weights to two decimals. */
-    fun encode(cloud: List<Pair<String, Float>>): String =
-        cloud.joinToString(SEPARATOR) { (term, weight) -> "$term:${formatWeight(weight)}" }
+    fun encode(keywords: List<Pair<String, Float>>): String =
+        keywords.joinToString(SEPARATOR) { (term, weight) -> "$term:${formatWeight(weight)}" }
 
     fun decode(value: String?): List<Pair<String, Float>> =
         value.orEmpty().split(SEPARATOR).mapNotNull { entry ->
@@ -144,15 +146,15 @@ internal object MemoryTagCloud {
     }
 
     /**
-     * Adds a cloud to every NounTag/VerbTag in [nodes] that has none yet. Engine-side, so tags from
-     * any clerk engine get one; a tag carrying a cloud already is left as written.
+     * Adds keywords to every NounTag/VerbTag in [nodes] that has none yet. Engine-side, so tags from
+     * any clerk engine get one; a tag carrying keywords already is left as written.
      */
-    fun withClouds(nodes: List<MemoryNode>, wordNet: WordNetLexicon?): List<MemoryNode> = nodes.map { node ->
-        if ((node.kind != MemoryNodeKind.NounTag && node.kind != MemoryNodeKind.VerbTag) || TAG_CLOUD in node.metadata) {
+    fun withKeywords(nodes: List<MemoryNode>, wordNet: WordNetLexicon?): List<MemoryNode> = nodes.map { node ->
+        if ((node.kind != MemoryNodeKind.NounTag && node.kind != MemoryNodeKind.VerbTag) || TAG_KEYWORDS in node.metadata) {
             node
         } else {
-            val cloud = cloudFor(node.text, node.kind, wordNet)
-            if (cloud.isEmpty()) node else node.copy(metadata = node.metadata + (TAG_CLOUD to encode(cloud)))
+            val keywords = keywordsFor(node.text, node.kind, wordNet)
+            if (keywords.isEmpty()) node else node.copy(metadata = node.metadata + (TAG_KEYWORDS to encode(keywords)))
         }
     }
 
@@ -160,14 +162,14 @@ internal object MemoryTagCloud {
     private val WORD_SPLIT = Regex("[^\\p{L}\\p{N}_.+#-]+")
 }
 
-/** Tag node metadata: the tag's related-word cloud, `term:weight|…` ([MemoryTagCloud]). */
-internal const val TAG_CLOUD = "cloud"
+/** Tag node metadata: the tag's trigger keywords, `term:weight|…` ([MemoryTagKeywords]). */
+internal const val TAG_KEYWORDS = "keywords"
 
 /**
- * Inverted index over stored tag clouds: term -> tags (with cloud weight), plus each tag's indexed
- * memories. A memory's cloud is the union of its tags' clouds, max weight per term.
+ * Inverted index over stored tag keywords: term -> tags (with keyword weight), plus each tag's indexed
+ * memories. A memory's keywords are the union of its tags' keywords, max weight per term.
  */
-internal class MemoryTagCloudIndex(snapshot: MemorySnapshot, activeIds: Set<MemoryNodeId>) {
+internal class MemoryKeywordIndex(snapshot: MemorySnapshot, activeIds: Set<MemoryNodeId>) {
     private val postings = HashMap<String, MutableMap<MemoryNodeId, Float>>()
     private val indexed = HashMap<MemoryNodeId, MutableList<MemoryNodeId>>()
 
@@ -175,7 +177,7 @@ internal class MemoryTagCloudIndex(snapshot: MemorySnapshot, activeIds: Set<Memo
         snapshot.nodes.forEach { node ->
             if (node.id !in activeIds) return@forEach
             if (node.kind != MemoryNodeKind.NounTag && node.kind != MemoryNodeKind.VerbTag) return@forEach
-            MemoryTagCloud.decode(node.metadata[TAG_CLOUD]).forEach { (term, weight) ->
+            MemoryTagKeywords.decode(node.metadata[TAG_KEYWORDS]).forEach { (term, weight) ->
                 val tags = postings.getOrPut(term) { HashMap() }
                 if (weight > (tags[node.id] ?: 0f)) tags[node.id] = weight
             }
@@ -189,14 +191,14 @@ internal class MemoryTagCloudIndex(snapshot: MemorySnapshot, activeIds: Set<Memo
 
     val isEmpty: Boolean get() = postings.isEmpty()
 
-    /** Memories (tags and what they index) whose cloud holds [term]; the frequency filter reads it. */
+    /** Memories (tags and what they index) whose keywords hold [term]; the frequency filter reads it. */
     fun memoryCount(term: String): Int {
         val tags = postings[term] ?: return 0
         return tags.keys.flatMapTo(HashSet()) { listOf(it) + indexed[it].orEmpty() }.size
     }
 
     /**
-     * Best cloud weight per tag and per indexed memory for [terms] (each also tried in its WordNet
+     * Best keyword weight per tag and per indexed memory for [terms] (each also tried in its WordNet
      * base forms when WordNet is loaded).
      */
     fun match(terms: Collection<String>, wordNet: WordNetLexicon?): Map<MemoryNodeId, Float> {
@@ -214,4 +216,88 @@ internal class MemoryTagCloudIndex(snapshot: MemorySnapshot, activeIds: Set<Memo
     private fun forms(term: String, wordNet: WordNetLexicon?): List<String> =
         if (wordNet == null || ' ' in term) emptyList()
         else wordNet.baseForms(term, WordNetLexicon.Pos.Noun) + wordNet.baseForms(term, WordNetLexicon.Pos.Verb)
+}
+
+/**
+ * The cue trigger table of one memory layer, held ready: keyword (a word or a 2–3 word phrase,
+ * lowercased) -> the tags it fires, with the keyword's weight. Each tag's own text is a keyword at
+ * weight 1.0. Built from the stored keyword lists on first use, then updated the instant a tag is
+ * committed through [KeywordTriggeringStore]; a store revision it did not see (a write that bypassed
+ * the layer, a replace) rebuilds it. Keywords are never memories: the table only maps chat words to
+ * the real tag, and what is delivered is always the tag.
+ */
+internal class MemoryKeywordTriggers {
+    data class Trigger(val tag: MemoryNode, val weight: Float)
+
+    private val mutex = Mutex()
+    private val table = HashMap<String, MutableMap<MemoryNodeId, Trigger>>()
+    /** Store revision the table reflects; null until built or after a replace. */
+    private var revision: Long? = null
+
+    /** Builds the table from [snapshot] unless it already reflects that revision. */
+    suspend fun ensureCurrent(snapshot: MemorySnapshot) = mutex.withLock {
+        if (revision == snapshot.revision) return@withLock
+        table.clear()
+        val superseded = snapshot.edges.filter { it.relation == MemoryRelationKind.Supersedes }.mapTo(HashSet()) { it.to }
+        snapshot.nodes.forEach { if (it.id !in superseded) addLocked(it) }
+        revision = snapshot.revision
+    }
+
+    /** A successful commit at [expectedRevision]: its new tags join the table at once. */
+    suspend fun committed(expectedRevision: Long, nodes: List<MemoryNode>) = mutex.withLock {
+        if (revision != expectedRevision) {
+            revision = null
+            return@withLock
+        }
+        nodes.forEach(::addLocked)
+        revision = expectedRevision + 1
+    }
+
+    suspend fun invalidate() = mutex.withLock { revision = null }
+
+    /** Best trigger per tag over [keys]; O(1) per key. */
+    suspend fun match(keys: Collection<String>): Map<MemoryNodeId, Trigger> = mutex.withLock {
+        val out = LinkedHashMap<MemoryNodeId, Trigger>()
+        keys.forEach { key ->
+            table[key]?.forEach { (id, trigger) -> if (trigger.weight > (out[id]?.weight ?: 0f)) out[id] = trigger }
+        }
+        out
+    }
+
+    suspend fun keywords(): Set<String> = mutex.withLock { table.keys.toSet() }
+
+    private fun addLocked(node: MemoryNode) {
+        if (node.kind != MemoryNodeKind.NounTag && node.kind != MemoryNodeKind.VerbTag) return
+        val own = node.text.trim().lowercase()
+        (listOf(own to 1.0f) + MemoryTagKeywords.decode(node.metadata[TAG_KEYWORDS])).forEach { (keyword, weight) ->
+            if (keyword.isEmpty()) return@forEach
+            val tags = table.getOrPut(keyword) { HashMap() }
+            if (weight > (tags[node.id]?.weight ?: 0f)) tags[node.id] = Trigger(node, weight)
+        }
+    }
+
+    companion object {
+        /**
+         * Lookup keys for [text]: its words (minus [dropWord], the stopword/common-word filter) and
+         * every adjacent 2- and 3-word phrase, as-is.
+         */
+        inline fun keys(text: String, dropWord: (String) -> Boolean): List<String> {
+            val tokens = text.lowercase().split(Regex("[^\\p{L}\\p{N}_-]+")).filter(String::isNotEmpty)
+            val phrases = (2..3).flatMap { n -> tokens.windowed(n).map { it.joinToString(" ") } }
+            return (tokens.filterNot(dropWord) + phrases).distinct()
+        }
+    }
+}
+
+/** The layer's store, telling [triggers] of every tag it commits. */
+internal class KeywordTriggeringStore(private val inner: MemoryStore, private val triggers: MemoryKeywordTriggers) : MemoryStore {
+    override suspend fun read(): MemorySnapshot = inner.read()
+
+    override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation): Boolean =
+        inner.commit(expectedRevision, mutation).also { ok -> if (ok) triggers.committed(expectedRevision, mutation.nodesToAdd) }
+
+    override suspend fun replace(snapshot: MemorySnapshot) {
+        inner.replace(snapshot)
+        triggers.invalidate()
+    }
 }
