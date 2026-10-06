@@ -47,6 +47,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import java.util.UUID
 import javax.swing.JFileChooser
+import javax.swing.UIManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
@@ -68,6 +69,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
 
 fun main() {
+    // File choosers are Swing; without this they draw in Swing's own Metal theme instead of the
+    // operating system's, which clashes with both the app and the desktop.
+    runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
     val providerCredentialStore = DesktopProviderCredentialStore()
     val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
