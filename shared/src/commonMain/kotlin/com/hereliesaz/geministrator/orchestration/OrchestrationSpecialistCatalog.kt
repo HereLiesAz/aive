@@ -16,10 +16,15 @@ import kotlinx.serialization.json.Json
  * runtime advertises adapter support). Register a new release with
  * `python3 tools/orchestration_training/register_catalog.py <catalog.json>`, which rewrites the constant.
  * An empty catalog is valid: every utility then uses its deterministic baseline.
+ *
+ * The generative role models (Qwen2.5-0.5B writing each role's JSON) are retired: their labels were the
+ * deterministic baseline itself and the runtime guards only accepted answers equal to or stricter than
+ * it, so they cost a download and added nothing. What needs judgement is now asked of the small
+ * decision model ([DECISIONS_SPECIALIST_ID], [DecisionInformedOrchestrationUtilities]).
  */
 object OrchestrationSpecialistCatalog {
     // register_catalog.py:begin
-    const val RELEASED: String = """{"specialists":[{"specialistId":"orchestration:agent-router","mergedVariants":[{"logicalArtifactId":"orchestration:utilities:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-utilities-v1","assetName":"aive-orchestration-utilities-int8.tar.gz","sha256":"b8b47322f685f777f36b514591b985a2d3820644174f7ad09d993f66645c2437","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["agent-router","handoff-composer","orchestration-utility"]}]},{"specialistId":"orchestration:handoff-composer","mergedVariants":[{"logicalArtifactId":"orchestration:utilities:int8","foundationModelId":"Qwen/Qwen2.5-0.5B-Instruct","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-utilities-v1","assetName":"aive-orchestration-utilities-int8.tar.gz","sha256":"b8b47322f685f777f36b514591b985a2d3820644174f7ad09d993f66645c2437","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["agent-router","handoff-composer","orchestration-utility"]}]}]}"""
+    const val RELEASED: String = """{"specialists":[]}"""
     // register_catalog.py:end
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -43,7 +48,14 @@ object OrchestrationSpecialistCatalog {
         )
     }
 
-    private val RELEASABLE_IDS = OrchestrationUtilityRole.entries.map(OrchestrationSpecialistIds::specialistId).toSet()
+    private val RELEASABLE_IDS =
+        OrchestrationUtilityRole.entries.map(OrchestrationSpecialistIds::specialistId).toSet() + DECISIONS_SPECIALIST_ID
+
+    /** The orchestration decision model (`tools/decision_training`), answering every [OrchestrationQuestion]. */
+    const val DECISIONS_SPECIALIST_ID: String = "orchestration:decisions"
+
+    /** Whether the released catalog carries the decision model. */
+    fun hasDecisionModel(): Boolean = released().hasSpecialist(DECISIONS_SPECIALIST_ID)
 
     @Serializable
     private data class CatalogFile(val specialists: List<CatalogSpecialist> = emptyList())

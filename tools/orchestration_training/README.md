@@ -1,5 +1,12 @@
 # Orchestration specialist training
 
+> **Retired.** These generative role models are no longer released or installed. Their labels were the
+> deterministic baseline itself, and the runtime accepted an answer only when it matched or was
+> stricter than the baseline, so a 0.5B model could add nothing but a download. The orchestration
+> utilities run as exact code; the judgement calls inside them are answered by the tiny decision model
+> in `tools/decision_training`. `register_catalog.py` is still how a release (now the decision model)
+> is registered. The rest is kept for reference.
+
 Trains, gates and releases the nine local orchestration specialists (Memory Query Composer, Context
 Packer, Agent Router, Tool Router, Handoff Composer, Escalation Gate, Completion Gate, Execution State
 Summarizer, Verification Planner). The app runs without them: `GuardedModelBackedOrchestrationUtilities`

@@ -501,7 +501,7 @@
 
     <string name="settings_chars">%1$s chars</string>
     <string name="settings_download_and_a_capable_machine">%1$s download and a capable machine. The linked LLM still plans </string>
-    <string name="settings_of_roles_currently_have">%1$s of %2$s roles currently have released models; </string>
+    <string name="settings_of_roles_currently_have">%1$s of %2$s judgement calls have a released model; </string>
     <string name="settings_ai_providers">AI Providers</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
@@ -536,7 +536,7 @@
     <string name="settings_import_data_from_json">Import data from JSON</string>
     <string name="settings_install_failed">Install failed</string>
     <string name="settings_install_local_planner">Install local planner (%1$s)</string>
-    <string name="settings_install_released_specialists">Install released specialists</string>
+    <string name="settings_install_released_specialists">Install the decision model</string>
     <string name="settings_installing">Installing</string>
     <string name="settings_irreversible">Irreversible</string>
     <string name="settings_load">Load</string>
@@ -548,7 +548,7 @@
     <string name="settings_local_planner">Local Planner</string>
     <string name="settings_local_planner_2">Local planner</string>
     <string name="settings_local_planner_installed_remove">Local planner installed: remove</string>
-    <string name="settings_local_specialists_installed_remove">Local specialists installed: remove</string>
+    <string name="settings_local_specialists_installed_remove">Decision model installed: remove</string>
     <string name="settings_logical_cpus"> logical CPUs · </string>
     <string name="settings_maximum_simultaneous_remote_jobs">Maximum simultaneous remote jobs</string>
     <string name="settings_metered_allowed">Metered: allowed</string>
@@ -589,7 +589,7 @@
     <string name="settings_retry_install">Retry install (%1$s)</string>
     <string name="settings_retry_specialist_install">Retry specialist install</string>
     <string name="settings_run_diagnostic_bundle">Run diagnostic bundle</string>
-    <string name="settings_runs_released_orchestration_utility_specialists_on">Runs released orchestration utility specialists on this device. </string>
+    <string name="settings_runs_released_orchestration_utility_specialists_on">Runs a small decision model on this device for the judgement calls in orchestration; everything else is exact code. </string>
     <string name="settings_save_connect">Save &amp; connect</string>
     <string name="settings_save_current_project">Save current project</string>
     <string name="settings_save_project_as">Save project as…</string>
@@ -600,7 +600,7 @@
     <string name="settings_sharing_compute_on">Sharing compute: ON</string>
     <string name="settings_stable_device_id">Stable device ID</string>
     <string name="settings_this_device_name">This device name</string>
-    <string name="settings_unreleased_roles_keep_the_deterministic_implementation">unreleased roles keep the deterministic implementation.</string>
+    <string name="settings_unreleased_roles_keep_the_deterministic_implementation">without it, or when it is unsure, the built-in rules decide.</string>
     <string name="settings_whenever_the_local_planner_is_not">whenever the local planner is not installed or fails, and always handles plan repair.</string>
 
     <string name="steps_starting_run">STARTING RUN</string>
