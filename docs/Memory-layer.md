@@ -117,8 +117,16 @@ the same for every clerk engine, and none of it judges which memory is right.
   slot either holds different content words on both sides, at least one of which looks like a filler
   (a number or identifier, a capitalized name, a quoted string, or a value word such as
   `enabled`/`disabled`, `tabs`/`spaces`), or carries negation on one side only. A repeat, an aliased
-  spelling or an added word ("…today") is not a contrast. This is a heuristic: it can miss a contrast
-  phrased with different structure, and it can flag two lowercase names it reads as values.
+  spelling or an added word ("…today") is not a contrast. When WordNet is loaded
+  (`MemoryContrastLexicon`, most frequent senses only, nouns and verbs): a slot whose words pair up
+  as synonyms (a shared synset among each word's three most frequent senses: "begin"/"start",
+  "car"/"automobile") is the same filler said two ways, not a contrast; and a slot holding two
+  different concepts under one parent (most frequent senses in the same lexicographer file sharing a
+  hypernym within two levels: "Monday"/"Tuesday", "red"/"blue", "increase"/"decrease") is a filler
+  slot even when neither word otherwise looks like a filler. One concept under the other
+  ("dog"/"canine") is a generalization, not a sibling. Until WordNet has loaded, detection runs
+  without it. This is a heuristic: it can miss a contrast phrased with different structure, and it
+  can flag two lowercase names it reads as values.
 - **Divergence marker** (`Diverges`): when an episode reaches the condensation stage, before any
   condensation, the engine compares each of its Context, Phrase and Summary memories with up to 48
   same-kind memories sharing a content word in the workflow's lineage bank (its own records and its
