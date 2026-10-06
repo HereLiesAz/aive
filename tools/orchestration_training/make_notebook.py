@@ -47,7 +47,7 @@ shape to use.
 ### 1. Credentials Handshake
 Configure secrets once:
 - **Local**: `~/.kaggle/kaggle.json` (Kaggle Settings → *Create New Token*)
-- **Colab**: Secrets (key icon) → `KAGGLE_USERNAME`, `KAGGLE_KEY`, `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`)
+- **Colab**: Secrets (key icon) → `KAGGLE_USERNAME`, `KAGGLE_KEY`, `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`), each with notebook access on. Work is kept in Google Drive (`MyDrive/aive-<family>`), so a run cut off by a disconnect resumes where it stopped
 - **Kaggle**: Add-ons → Secrets → `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`)
 
 ### 2. Operational Loop
@@ -152,7 +152,18 @@ LORA_R, LORA_ALPHA, LORA_DROPOUT = 16, 32, 0.05
 # sample of test rows plus every adversarial row. None scores every test row.
 ONNX_GATE_TEST_ROWS = 100
 
-WORK = Path(f"/kaggle/working/aive-{FAMILY}")  # shared by every notebook of the family
+def work_root():
+    """Where the session's work lives. Colab loses /content when a runtime disconnects, so on Colab the
+    work goes to Google Drive: a rerun after a disconnect or the time guard resumes from state.json
+    instead of training again. Kaggle keeps /kaggle/working for the session."""
+    try:
+        from google.colab import drive
+    except ImportError:
+        return Path("/kaggle/working")
+    drive.mount("/content/drive")
+    return Path("/content/drive/MyDrive")
+
+WORK = work_root() / f"aive-{FAMILY}"  # shared by every notebook of the family
 STATE_FILE = WORK / "state.json"
 WORK.mkdir(parents=True, exist_ok=True)
 
