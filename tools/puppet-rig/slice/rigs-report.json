@@ -1,0 +1,1128 @@
+[
+ {
+  "slug": "generic-01",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_36 AM-1.png",
+  "ref": "node_01.png",
+  "newest": false,
+  "sheets_in_role": 6,
+  "canvas": [
+   304.81,
+   451.25
+  ],
+  "atlas": [
+   361,
+   404
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 5
+ },
+ {
+  "slug": "generic-02",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_37 AM-2.png",
+  "ref": "node_11.png",
+  "newest": false,
+  "sheets_in_role": 6,
+  "canvas": [
+   262.35,
+   463.99
+  ],
+  "atlas": [
+   317,
+   379
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 3
+ },
+ {
+  "slug": "generic-03",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-3.png",
+  "ref": "node_21.png",
+  "newest": false,
+  "sheets_in_role": 6,
+  "canvas": [
+   389.9,
+   483.5
+  ],
+  "atlas": [
+   412,
+   511
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "generic-04",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-4.png",
+  "ref": "node_31.png",
+  "newest": false,
+  "sheets_in_role": 6,
+  "canvas": [
+   274.76,
+   462.9
+  ],
+  "atlas": [
+   328,
+   356
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "generic-05",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_39 AM-5.png",
+  "ref": "node_41.png",
+  "newest": false,
+  "sheets_in_role": 6,
+  "canvas": [
+   306.46,
+   408.48
+  ],
+  "atlas": [
+   333,
+   408
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 5
+ },
+ {
+  "slug": "generic-06",
+  "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_40 AM-6.png",
+  "ref": "node_43.png",
+  "newest": true,
+  "sheets_in_role": 6,
+  "canvas": [
+   344.35,
+   400.62
+  ],
+  "atlas": [
+   349,
+   360
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 5
+ },
+ {
+  "slug": "orchestrator",
+  "key": "001_orchestrator/ChatGPT Image Sep 21, 2026, 08_00_02 PM (1).png",
+  "skipped": "segmented kit (stalks, bulbs and pupils are separate pieces, music-note props); needs hand assembly in the editor"
+ },
+ {
+  "slug": "architect",
+  "key": "005_architect/ChatGPT Image Oct 5, 2026, 10_41_02 PM.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_41 AM-5.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   520.0,
+   506.25
+  ],
+  "atlas": [
+   471,
+   464
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "data-miner-sheet-1-variant-1",
+  "key": "016_data_miner_sheet_1_variant/Crystal Mining Creature Sprite Sheet.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_17 AM-6.png",
+  "newest": false,
+  "sheets_in_role": 2,
+  "canvas": [
+   415.63,
+   520.0
+  ],
+  "atlas": [
+   410,
+   448
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "data-miner-sheet-1-variant-2",
+  "key": "016_data_miner_sheet_1_variant/Crystalline Creature Parts Atlas.png",
+  "ref": null,
+  "newest": true,
+  "sheets_in_role": 2,
+  "canvas": [
+   368.87,
+   520.0
+  ],
+  "atlas": [
+   359,
+   338
+  ],
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
+  "tendrils": 3
+ },
+ {
+  "slug": "knowledge-keeper-sheet-1-variant",
+  "key": "017_knowledge_keeper_sheet_1_variant/Glossy Alien Creature Sprite Sheet.png",
+  "ref": "node_38.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   362.24,
+   428.28
+  ],
+  "atlas": [
+   344,
+   342
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "pattern-seeker-sheet-1-variant",
+  "key": "018_pattern_seeker_sheet_1_variant/ChatGPT Image Oct 6, 2026, 12_16_27 AM-1.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_20 AM-8.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   500.6,
+   520.0
+  ],
+  "atlas": [
+   493,
+   534
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "translator-sheet-1-variant",
+  "key": "019_translator_sheet_1_variant/ChatGPT Image Oct 6, 2026, 12_16_28 AM-2.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_22 AM-9.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   418.56,
+   520.0
+  ],
+  "atlas": [
+   535,
+   656
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "connector-sheet-1-variant",
+  "key": "020_connector_sheet_1_variant/ChatGPT Image Oct 6, 2026, 12_16_29 AM-3.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_26 AM-10.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   421.26,
+   520.0
+  ],
+  "atlas": [
+   415,
+   468
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "knowledge-keeper-sheet-2-variant",
+  "key": "022_knowledge_keeper_sheet_2_variant/ChatGPT Image Oct 6, 2026, 12_16_29 AM-4.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_19 AM-7.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   520.0,
+   514.05
+  ],
+  "atlas": [
+   615,
+   622
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 1,
+  "tendrils": 1
+ },
+ {
+  "slug": "scheduler-sheet-2-variant",
+  "key": "026_scheduler_sheet_2_variant/ChatGPT Image Oct 6, 2026, 12_16_30 AM-5.png",
+  "ref": "node_04.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   312.91,
+   438.93
+  ],
+  "atlas": [
+   390,
+   461
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 0,
+  "tendrils": 0
+ },
+ {
+  "slug": "optimizer-sheet-2-variant",
+  "key": "027_optimizer_sheet_2_variant/ChatGPT Image Oct 6, 2026, 12_16_30 AM-6.png",
+  "ref": "node_46.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   384.52,
+   431.41
+  ],
+  "atlas": [
+   456,
+   510
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 7
+ },
+ {
+  "slug": "simulator",
+  "key": "028_simulator/ChatGPT Image Oct 6, 2026, 12_16_31 AM-7.png",
+  "ref": "node_27.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   374.88,
+   510.79
+  ],
+  "atlas": [
+   503,
+   557
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 5
+ },
+ {
+  "slug": "documenter",
+  "key": "029_documenter/ChatGPT Image Oct 6, 2026, 12_16_32 AM-8.png",
+  "ref": "node_40.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   354.64,
+   480.0
+  ],
+  "atlas": [
+   370,
+   452
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 3
+ },
+ {
+  "slug": "guardian",
+  "key": "030_guardian/ChatGPT Image Oct 6, 2026, 12_16_32 AM-9.png",
+  "ref": "node_29.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   441.91,
+   357.13
+  ],
+  "atlas": [
+   462,
+   512
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 1,
+  "tendrils": 4
+ },
+ {
+  "slug": "creative-synthesizer",
+  "key": "031_creative_synthesizer/ChatGPT Image Oct 6, 2026, 12_16_33 AM-10.png",
+  "ref": "node_26.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   516.31,
+   380.11
+  ],
+  "atlas": [
+   490,
+   563
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 9
+ },
+ {
+  "slug": "feedback-listener",
+  "key": "033_feedback_listener/ChatGPT Image Oct 6, 2026, 12_27_21 AM-1.png",
+  "ref": "node_33.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   293.63,
+   444.09
+  ],
+  "atlas": [
+   366,
+   395
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "decision-helper",
+  "key": "034_decision_helper/ChatGPT Image Oct 6, 2026, 12_27_22 AM-2.png",
+  "ref": "node_34.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   308.37,
+   391.16
+  ],
+  "atlas": [
+   347,
+   382
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "flow-director",
+  "key": "035_flow_director/ChatGPT Image Oct 6, 2026, 12_27_23 AM-3.png",
+  "ref": "node_35.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   351.96,
+   402.24
+  ],
+  "atlas": [
+   349,
+   490
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "data-miner-sheet-3-variant",
+  "key": "036_data_miner_sheet_3_variant/ChatGPT Image Oct 6, 2026, 12_27_23 AM-4.png",
+  "ref": "node_49.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   323.4,
+   415.14
+  ],
+  "atlas": [
+   366,
+   404
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 9
+ },
+ {
+  "slug": "pattern-seer",
+  "key": "037_pattern_seer/ChatGPT Image Oct 6, 2026, 12_27_24 AM-5.png",
+  "ref": "node_18.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   334.48,
+   479.56
+  ],
+  "atlas": [
+   368,
+   383
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 5
+ },
+ {
+  "slug": "optimizer-sheet-3-variant",
+  "key": "039_optimizer_sheet_3_variant/ChatGPT Image Oct 6, 2026, 12_27_25 AM-6.png",
+  "ref": "node_23.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   345.03,
+   515.25
+  ],
+  "atlas": [
+   419,
+   456
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 5
+ },
+ {
+  "slug": "scheduler-sheet-3-variant",
+  "key": "040_scheduler_sheet_3_variant/ChatGPT Image Oct 6, 2026, 12_27_26 AM-7.png",
+  "ref": "node_20.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   337.21,
+   473.98
+  ],
+  "atlas": [
+   395,
+   478
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 6,
+  "tendrils": 6
+ },
+ {
+  "slug": "resource-manager-sheet-3-variant",
+  "key": "041_resource_manager_sheet_3_variant/ChatGPT Image Oct 6, 2026, 12_27_26 AM-8.png",
+  "ref": "node_19.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   332.75,
+   448.85
+  ],
+  "atlas": [
+   324,
+   354
+  ],
+  "used_ref": true,
+  "eyes_matched": false,
+  "tendrils_matched": 6,
+  "tendrils": 8
+ },
+ {
+  "slug": "communicator",
+  "key": "042_communicator/ChatGPT Image Oct 5, 2026, 10_38_31 PM-2.png",
+  "ref": "Matplotlib Chart (3).png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   277.12,
+   520.0
+  ],
+  "atlas": [
+   291,
+   288
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 6,
+  "tendrils": 6
+ },
+ {
+  "slug": "integrator",
+  "key": "043_integrator/ChatGPT Image Oct 5, 2026, 10_38_33 PM-4.png",
+  "ref": "node_10.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   316.19,
+   451.98
+  ],
+  "atlas": [
+   420,
+   530
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 0,
+  "tendrils": 0
+ },
+ {
+  "slug": "security-analyst",
+  "key": "044_security_analyst/ChatGPT Image Oct 6, 2026, 12_27_27 AM-9.png",
+  "ref": "node_50.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   320.34,
+   413.15
+  ],
+  "atlas": [
+   357,
+   370
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 9,
+  "tendrils": 9
+ },
+ {
+  "slug": "quality-guardian",
+  "key": "045_quality_guardian/ChatGPT Image Oct 6, 2026, 12_27_28 AM-10.png",
+  "ref": "node_32.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   296.77,
+   459.05
+  ],
+  "atlas": [
+   338,
+   333
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "documentation-specialist",
+  "key": "046_documentation_specialist/ChatGPT Image Oct 5, 2026, 10_38_32 PM-3.png",
+  "ref": "node_09.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   293.77,
+   520.0
+  ],
+  "atlas": [
+   365,
+   369
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 5
+ },
+ {
+  "slug": "test-explorer",
+  "key": "047_test_explorer/ChatGPT Image Oct 6, 2026, 12_39_17 AM-1.png",
+  "ref": "node_13.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   336.9,
+   385.87
+  ],
+  "atlas": [
+   307,
+   337
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "deployment-pilot",
+  "key": "048_deployment_pilot/ChatGPT Image Oct 6, 2026, 12_39_17 AM-2.png",
+  "ref": "node_37.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   368.22,
+   428.24
+  ],
+  "atlas": [
+   386,
+   505
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "monitoring-sentinel",
+  "key": "049_monitoring_sentinel/ChatGPT Image Oct 6, 2026, 12_39_20 AM-5.png",
+  "ref": "node_47.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   346.44,
+   420.68
+  ],
+  "atlas": [
+   341,
+   333
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 5
+ },
+ {
+  "slug": "feedback-collector",
+  "key": "050_feedback_collector/ChatGPT Image Oct 6, 2026, 12_39_19 AM-4.png",
+  "ref": "node_08.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   418.34,
+   482.18
+  ],
+  "atlas": [
+   314,
+   362
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 1,
+  "tendrils": 1
+ },
+ {
+  "slug": "idea-catalyst-1",
+  "key": "051_idea_catalyst/ChatGPT Image Oct 6, 2026, 12_39_18 AM-3.png",
+  "ref": null,
+  "newest": false,
+  "sheets_in_role": 2,
+  "canvas": [
+   440.44,
+   467.66
+  ],
+  "atlas": [
+   503,
+   596
+  ],
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
+  "tendrils": 6
+ },
+ {
+  "slug": "idea-catalyst-2",
+  "key": "051_idea_catalyst/ChatGPT Image Oct 6, 2026, 01_00_55 AM-8.png",
+  "ref": "node_28.png",
+  "newest": true,
+  "sheets_in_role": 2,
+  "canvas": [
+   389.59,
+   486.74
+  ],
+  "atlas": [
+   455,
+   513
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 9
+ },
+ {
+  "slug": "process-mapper",
+  "key": "052_process_mapper/ChatGPT Image Oct 6, 2026, 01_00_56 AM-9.png",
+  "ref": "node_30.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   326.12,
+   473.46
+  ],
+  "atlas": [
+   413,
+   456
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 8
+ },
+ {
+  "slug": "strategy-scout",
+  "key": "053_strategy_scout/ChatGPT Image Oct 6, 2026, 12_39_21 AM-6.png",
+  "ref": "node_45.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   274.85,
+   400.32
+  ],
+  "atlas": [
+   330,
+   393
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "system-maintainer",
+  "key": "054_system_maintainer/Colorful Low-Poly Creature Sprite Sheet.png",
+  "ref": "ChatGPT Image Sep 25, 2026, 11_24_40 AM-4.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   353.73,
+   520.0
+  ],
+  "atlas": [
+   321,
+   376
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "sustainability-advocate",
+  "key": "055_sustainability_advocate/Glossy Slime Creature Sprite Parts (2).png",
+  "ref": "node_06.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   350.09,
+   520.0
+  ],
+  "atlas": [
+   380,
+   412
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 7
+ },
+ {
+  "slug": "systems-analyst",
+  "key": "056_systems_analyst/ChatGPT Image Oct 6, 2026, 12_39_21 AM-7.png",
+  "ref": "node_22.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   319.97,
+   415.65
+  ],
+  "atlas": [
+   416,
+   541
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 5
+ },
+ {
+  "slug": "database-administrator",
+  "key": "057_database_administrator/ChatGPT Image Oct 6, 2026, 12_39_22 AM-8.png",
+  "ref": "node_48.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   367.08,
+   464.27
+  ],
+  "atlas": [
+   377,
+   389
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 4
+ },
+ {
+  "slug": "network-engineer",
+  "key": "058_network_engineer/ChatGPT Image Oct 5, 2026, 10_38_30 PM-1.png",
+  "ref": "node_07.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   398.84,
+   503.98
+  ],
+  "atlas": [
+   400,
+   482
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 6,
+  "tendrils": 7
+ },
+ {
+  "slug": "site-reliability-engineer",
+  "key": "059_site_reliability_engineer/ChatGPT Image Oct 6, 2026, 12_39_23 AM-9.png",
+  "ref": "node_17.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   316.29,
+   444.21
+  ],
+  "atlas": [
+   330,
+   327
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "build-engineer",
+  "key": "060_build_engineer/Glossy Alien Sprite Sheet Pieces.png",
+  "ref": "node_03.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   339.89,
+   457.27
+  ],
+  "atlas": [
+   390,
+   390
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 6,
+  "tendrils": 8
+ },
+ {
+  "slug": "test-automation-engineer",
+  "key": "061_test_automation_engineer/Glossy Slime Creature Sprite Parts (1).png",
+  "ref": "sheet_variant_node_012_transparent.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   341.4,
+   416.15
+  ],
+  "atlas": [
+   379,
+   393
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "threat-modeler",
+  "key": "062_threat_modeler/Glossy Slime Creature Parts Sheet.png",
+  "ref": "node_05.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   356.57,
+   445.08
+  ],
+  "atlas": [
+   373,
+   402
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 7,
+  "tendrils": 7
+ },
+ {
+  "slug": "compliance-officer",
+  "key": "063_compliance_officer/ChatGPT Image Oct 6, 2026, 12_39_23 AM-10.png",
+  "ref": "node_39.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   362.36,
+   478.32
+  ],
+  "atlas": [
+   352,
+   459
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 2
+ },
+ {
+  "slug": "migration-engineer",
+  "key": "064_migration_engineer/ChatGPT Image Oct 6, 2026, 01_00_57 AM-10.png",
+  "ref": "node_44.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   369.95,
+   433.46
+  ],
+  "atlas": [
+   392,
+   418
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 6
+ },
+ {
+  "slug": "observability-engineer",
+  "key": "065_observability_engineer/ChatGPT Image Oct 6, 2026, 01_00_55 AM-7.png",
+  "ref": "node_24.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   404.07,
+   478.47
+  ],
+  "atlas": [
+   482,
+   555
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 5,
+  "tendrils": 7
+ },
+ {
+  "slug": "business-analyst",
+  "key": "066_business_analyst/ChatGPT Image Oct 6, 2026, 01_00_54 AM-6.png",
+  "ref": "node_15.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   323.4,
+   399.14
+  ],
+  "atlas": [
+   349,
+   393
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 4,
+  "tendrils": 4
+ },
+ {
+  "slug": "content-strategist",
+  "key": "067_content_strategist/ChatGPT Image Oct 6, 2026, 01_00_53 AM-5.png",
+  "ref": "node_42.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   312.36,
+   400.68
+  ],
+  "atlas": [
+   342,
+   477
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 2,
+  "tendrils": 3
+ },
+ {
+  "slug": "support-agent",
+  "key": "068_support_agent/ChatGPT Image Oct 6, 2026, 01_00_53 AM-4.png",
+  "ref": "node_25.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   345.02,
+   498.98
+  ],
+  "atlas": [
+   409,
+   487
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "data-scientist",
+  "key": "069_data_scientist/ChatGPT Image Oct 6, 2026, 01_00_52 AM-3.png",
+  "ref": "node_36.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   322.97,
+   463.81
+  ],
+  "atlas": [
+   416,
+   441
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 7,
+  "tendrils": 8
+ },
+ {
+  "slug": "ml-engineer",
+  "key": "070_ml_engineer/ChatGPT Image Oct 6, 2026, 01_00_52 AM-2.png",
+  "ref": "node_16.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   340.63,
+   429.63
+  ],
+  "atlas": [
+   412,
+   497
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 3,
+  "tendrils": 4
+ },
+ {
+  "slug": "legal-counsel",
+  "key": "071_legal_counsel/ChatGPT Image Oct 6, 2026, 01_00_51 AM-1.png",
+  "ref": "node_14.png",
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   346.01,
+   465.1
+  ],
+  "atlas": [
+   407,
+   489
+  ],
+  "used_ref": true,
+  "eyes_matched": true,
+  "tendrils_matched": 6,
+  "tendrils": 6
+ }
+]

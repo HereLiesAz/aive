@@ -188,3 +188,9 @@ The motion is an approximation (see the script).
 `tools/puppet-rig/validate-rig.mjs <file.rig.json>` checks a rig against this spec and compares the atlas PNG's real size with the declared size.
 It shares its validator with the editor (`tools/puppet-rig/rig-core.js`). The JS validator is stricter
 than the Kotlin parser: it also rejects unknown state names, unknown channels and eases, and out-of-atlas rects.
+
+## Generated creature rigs
+
+`tools/puppet-rig/slice/` slices the node-creature parts sheets in `docs/swarm-terrarium/characters/` into parts.
+It then assembles them into starter rigs in `files/rigs/` (one per sheet, for example `simulator.rig.json` and `generic-01.rig.json`), checked against each role's `node_XX.png`.
+Treat them as starting points for the editor. See `tools/puppet-rig/slice/README.md`.
