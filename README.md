@@ -49,3 +49,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
+
+## License
+
+Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE); not open source. Path-by-path layout: [LICENSING](LICENSING). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
