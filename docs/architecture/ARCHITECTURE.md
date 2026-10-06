@@ -241,3 +241,22 @@ artifacts, for example, live under `0.9.6`. Asset filenames retain the exact bui
 multiple builds coexist safely. The version calculation, patch grouping, legacy-release migration,
 and collision policy live in `HereLiesAz/workflows`; Aive's workflow only produces Aive-specific
 artifacts and delegates those semantics.
+
+### Workflow centralization
+
+Every workflow in `.github/workflows/` follows the `HereLiesAz/workflows` policy:
+
+- **Target-local CI** (`local`, `ci: true` in the central registry): `multiplatform.yml`
+  (Build and Deploy), `android-ci.yml`, `bitcos-engine.yml` and `dependency-submission.yml` run
+  in this repository and declare themselves with the central `ci-report` action. Release
+  semantics inside `multiplatform.yml` come only from the central `four-part-version`,
+  `patch-grouped-release` and `google-play-publish` actions; the desktop installers take their
+  version from the same central action through the `version` job.
+- **Centrally executed** (trackers carrying `# centralized-by: HereLiesAz/workflows`):
+  `live-runtime-verification.yml`, `security-review.yml` and
+  `orchestration-specialist-training.yml`. Do not edit trackers; the sync rewrites them.
+  Orchestration training is fire-and-forget: the central run submits the Kaggle kernel and exits,
+  and Kaggle reports its result back through the central Worker.
+
+A new non-CI workflow must be submitted to `HereLiesAz/workflows` first; the sync rejects an
+unregistered one.

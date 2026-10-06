@@ -2,6 +2,8 @@ name: Android CI
 
 # Runs unit tests on every push/PR and builds the Android debug app.
 # Release publication belongs exclusively to Build and Deploy.
+# Target-local CI under HereLiesAz/workflows policy: each job ends with the central
+# ci-report action, which registers this workflow `local`, `ci: true`.
 
 on:
   push:
@@ -23,6 +25,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -54,6 +57,11 @@ jobs:
           name: unit-test-reports
           path: '**/build/reports/tests/'
 
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
+
   dependency-submission:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -61,6 +69,7 @@ jobs:
     needs: unit-tests
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -87,6 +96,11 @@ jobs:
           additional-arguments: '-Phaive.useLocalH2g2=false'
           cache-disabled: true
 
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
+
   build-and-release:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -94,6 +108,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -157,3 +172,8 @@ jobs:
               body: `The main-branch build failed.\n\n**Log (last 4000 characters):**\n\`\`\`\n${logTail}\n\`\`\``,
               labels: ['bug']
             });
+
+      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
+      - name: Report CI
+        if: always()
+        uses: HereLiesAz/workflows/.github/actions/ci-report@main
