@@ -26,10 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import com.hereliesaz.geministrator.App
+import com.hereliesaz.geministrator.AzphaltAlertDialog
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
@@ -451,8 +449,14 @@ class MainActivity : ComponentActivity() {
             }
 
             if (crashReportNoticeVisible) {
-                AlertDialog(
-                    onDismissRequest = {
+                AzphaltAlertDialog(
+                    title = "Crash report sent",
+                    text = "Aive crashed or stopped responding earlier, and a report (stack trace, app version, " +
+                        "Android version, device model) was sent automatically to the HereLiesAz/aive " +
+                        "GitHub issue tracker. You can turn automatic crash reports off any time in " +
+                        "Settings → Crash Reports.",
+                    confirmLabel = "OK",
+                    onConfirm = {
                         CrashReporting.markFirstReportNoticeShown(this)
                         crashReportNoticeVisible = false
                     },

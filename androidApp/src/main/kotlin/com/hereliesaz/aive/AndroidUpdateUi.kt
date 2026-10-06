@@ -1,10 +1,8 @@
 package com.hereliesaz.aive
 
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import com.hereliesaz.geministrator.AzphaltAlertDialog
 
 internal sealed interface AndroidUpdateState {
     data object Idle : AndroidUpdateState
@@ -23,7 +21,11 @@ internal fun AndroidUpdatePrompt(
     onDismiss: () -> Unit,
 ) {
     when (state) {
-        is AndroidUpdateState.ReadyToInstall -> AlertDialog(
+        is AndroidUpdateState.ReadyToInstall -> AzphaltAlertDialog(
+            title = "The Aive ${state.version} is ready",
+            text = "The GitHub build downloaded the update. Android will ask you to confirm installation; your projects, settings, credentials, roles, and workflows remain in place.",
+            confirmLabel = "Install update",
+            onConfirm = onInstallGithubUpdate,
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.update_ready_title, state.version)) },
             text = {
@@ -39,7 +41,11 @@ internal fun AndroidUpdatePrompt(
             },
         )
 
-        AndroidUpdateState.PlayUpdateAvailable -> AlertDialog(
+        AndroidUpdateState.PlayUpdateAvailable -> AzphaltAlertDialog(
+            title = "A The Aive update is available",
+            text = "An update is available through Google Play.",
+            confirmLabel = "Open Play Store",
+            onConfirm = onOpenPlayStore,
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.update_play_title)) },
             text = {
