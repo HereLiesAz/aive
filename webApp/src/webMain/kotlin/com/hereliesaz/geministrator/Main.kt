@@ -83,6 +83,10 @@ fun main() {
             TerrariumVisualProofScreen()
             return@ComposeViewport
         }
+        if (window.location.search.contains("creatureRigs=1")) {
+            CreatureRigGalleryScreen()
+            return@ComposeViewport
+        }
 
         var credentials by remember { mutableStateOf(emptyMap<String, String>()) }
         var repositoryCredentials by remember { mutableStateOf(emptyMap<String, String>()) }
