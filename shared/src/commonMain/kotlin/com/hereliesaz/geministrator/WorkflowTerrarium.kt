@@ -24,6 +24,10 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
+import com.hereliesaz.geministrator.resources.terrarium_draft_wiring_staged_now_depends
+import org.jetbrains.compose.resources.getString
 
 /**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
@@ -133,10 +137,10 @@ internal fun GeministratorWorkflowTerrarium(
                                 runCatching { stageDefinition(edit.definition) }
                                     .onSuccess { persisted ->
                                         stagedDefinition = persisted
-                                        authoringMessage = "Draft wiring staged: $downstreamRaw now depends on $upstreamRaw."
+                                        authoringMessage = getString(Res.string.terrarium_draft_wiring_staged_now_depends, downstreamRaw, upstreamRaw)
                                     }
                                     .onFailure { failure ->
-                                        authoringMessage = failure.message ?: "Could not stage workflow edit."
+                                        authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
                                     }
                             }
                         }

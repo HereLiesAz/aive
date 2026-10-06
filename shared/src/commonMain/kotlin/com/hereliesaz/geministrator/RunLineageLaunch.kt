@@ -18,6 +18,19 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.memory.MemoryTimeRange
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.lineage_a_new_run_that_reads_this
+import com.hereliesaz.geministrator.resources.lineage_cancel_continue
+import com.hereliesaz.geministrator.resources.lineage_continue_this_run
+import com.hereliesaz.geministrator.resources.lineage_lineage
+import com.hereliesaz.geministrator.resources.lineage_loading_runs
+import com.hereliesaz.geministrator.resources.lineage_next_objective
+import com.hereliesaz.geministrator.resources.lineage_no_earlier_runs_yet
+import com.hereliesaz.geministrator.resources.lineage_start_continuation
+import com.hereliesaz.geministrator.resources.lineage_starts_a_new_line_of_work
+import com.hereliesaz.geministrator.resources.lineage_the_new_run_reads_every_chosen
+import com.hereliesaz.geministrator.resources.lineage_the_new_run_reads_the_chosen
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * How a launch relates to earlier runs. Maps onto `continuesWorkflowRunIds` of the launch
@@ -119,7 +132,7 @@ internal fun LaunchLineagePicker(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("LINEAGE", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.lineage_lineage), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LaunchLineageMode.entries.forEach { mode ->
                 AzphaltPill(
@@ -133,7 +146,7 @@ internal fun LaunchLineagePicker(
         }
         if (state.mode == LaunchLineageMode.New) {
             Text(
-                "Starts a new line of work with its own memory.",
+                stringResource(Res.string.lineage_starts_a_new_line_of_work),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
@@ -141,16 +154,16 @@ internal fun LaunchLineagePicker(
         }
         Text(
             if (state.mode == LaunchLineageMode.Continue) {
-                "The new run reads the chosen run's memory and adds to its own."
+                stringResource(Res.string.lineage_the_new_run_reads_the_chosen)
             } else {
-                "The new run reads every chosen run's memory; where they disagree, both answers are kept."
+                stringResource(Res.string.lineage_the_new_run_reads_every_chosen)
             },
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
         when {
-            runs == null -> Text("Loading runs…", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
-            runs.isEmpty() -> Text("No earlier runs yet.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            runs == null -> Text(stringResource(Res.string.lineage_loading_runs), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            runs.isEmpty() -> Text(stringResource(Res.string.lineage_no_earlier_runs_yet), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
             else -> runs.forEach { run ->
                 val order = state.selected.indexOf(run.id)
                 AzphaltRecord(
@@ -179,7 +192,7 @@ internal fun ContinueRunPanel(
     var error by remember(runId) { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
-            label = if (open) "Cancel continue" else "Continue this run",
+            label = if (open) stringResource(Res.string.lineage_cancel_continue) else stringResource(Res.string.lineage_continue_this_run),
             seed = "continue-run",
             selected = open,
             onClick = { open = !open; error = null },
@@ -187,19 +200,19 @@ internal fun ContinueRunPanel(
         )
         if (!open) return@Column
         Text(
-            "A new run that reads this run's memory and adds to its own.",
+            stringResource(Res.string.lineage_a_new_run_that_reads_this),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
         OutlinedTextField(
             value = objective,
             onValueChange = { objective = it; error = null },
-            label = { Text("Next objective") },
+            label = { Text(stringResource(Res.string.lineage_next_objective)) },
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
         AzphaltPill(
-            label = "Start continuation",
+            label = stringResource(Res.string.lineage_start_continuation),
             seed = "continue-run-start",
             selected = objective.isNotBlank(),
             onClick = {

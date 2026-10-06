@@ -37,6 +37,61 @@ import com.hereliesaz.geministrator.domain.locatorInput
 import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_dismiss
+import com.hereliesaz.geministrator.resources.overview_has_no_persisted_workflow_run
+import com.hereliesaz.geministrator.resources.overview_a_workflow_gate_is_waiting_for
+import com.hereliesaz.geministrator.resources.overview_aive_automatically_reopens_the_last_saved
+import com.hereliesaz.geministrator.resources.overview_blocked
+import com.hereliesaz.geministrator.resources.overview_branch
+import com.hereliesaz.geministrator.resources.overview_branch_1
+import com.hereliesaz.geministrator.resources.overview_choose_git_folder
+import com.hereliesaz.geministrator.resources.overview_clear
+import com.hereliesaz.geministrator.resources.overview_could_not_open_saved_project
+import com.hereliesaz.geministrator.resources.overview_create_a_project_and_define_its
+import com.hereliesaz.geministrator.resources.overview_create_project_start_run
+import com.hereliesaz.geministrator.resources.overview_decision_required
+import com.hereliesaz.geministrator.resources.overview_default_branch_optional
+import com.hereliesaz.geministrator.resources.overview_github_url_or_owner_repository
+import com.hereliesaz.geministrator.resources.overview_gitlab_url_or_group_repository
+import com.hereliesaz.geministrator.resources.overview_invalid
+import com.hereliesaz.geministrator.resources.overview_jump_to_active
+import com.hereliesaz.geministrator.resources.overview_link_repository
+import com.hereliesaz.geministrator.resources.overview_loading_runtime
+import com.hereliesaz.geministrator.resources.overview_local_git_folder_path
+import com.hereliesaz.geministrator.resources.overview_no_active_run
+import com.hereliesaz.geministrator.resources.overview_no_decision_required
+import com.hereliesaz.geministrator.resources.overview_no_project
+import com.hereliesaz.geministrator.resources.overview_objective
+import com.hereliesaz.geministrator.resources.overview_open_a_different_saved_project
+import com.hereliesaz.geministrator.resources.overview_or_create_a_new_project
+import com.hereliesaz.geministrator.resources.overview_owner_attention
+import com.hereliesaz.geministrator.resources.overview_paste_the_repository_url_or_shorthand
+import com.hereliesaz.geministrator.resources.overview_project
+import com.hereliesaz.geministrator.resources.overview_project_load_failed
+import com.hereliesaz.geministrator.resources.overview_project_name
+import com.hereliesaz.geministrator.resources.overview_provider_settings
+import com.hereliesaz.geministrator.resources.overview_reading_persisted_workflow_state
+import com.hereliesaz.geministrator.resources.overview_recover_clear_corrupted_data
+import com.hereliesaz.geministrator.resources.overview_repository_search_unavailable
+import com.hereliesaz.geministrator.resources.overview_required
+import com.hereliesaz.geministrator.resources.overview_resume_failed
+import com.hereliesaz.geministrator.resources.overview_retry_runtime
+import com.hereliesaz.geministrator.resources.overview_runtime
+import com.hereliesaz.geministrator.resources.overview_runtime_disconnected
+import com.hereliesaz.geministrator.resources.overview_runtime_is_advancing_without_human_intervention
+import com.hereliesaz.geministrator.resources.overview_search_github_repositories_or_paste_url
+import com.hereliesaz.geministrator.resources.overview_search_gitlab_repositories_or_paste_url
+import com.hereliesaz.geministrator.resources.overview_start_run
+import com.hereliesaz.geministrator.resources.overview_start_typing_to_search_your_own
+import com.hereliesaz.geministrator.resources.overview_swarm_activity
+import com.hereliesaz.geministrator.resources.overview_swarm_execution
+import com.hereliesaz.geministrator.resources.overview_this_runtime_can_link_the_selected
+import com.hereliesaz.geministrator.resources.overview_workflow_definition_error
+import com.hereliesaz.geministrator.resources.overview_workflow_errors
+import com.hereliesaz.geministrator.resources.overview_yours
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun MindMapRunScreen(
@@ -130,7 +185,7 @@ internal fun MindMapRunScreen(
                 repositorySuggestions = suggestions
             },
             onFailure = { failure ->
-                repositorySearchError = failure.message?.take(120) ?: "Repository search unavailable"
+                repositorySearchError = failure.message?.take(120) ?: getString(Res.string.overview_repository_search_unavailable)
             },
         )
     }
@@ -147,7 +202,7 @@ internal fun MindMapRunScreen(
             val corrupted = (runtimeState as? ApplicationRuntimeState.ResumeFailed)?.isCorrupted == true
             if (corrupted) {
                 AzphaltPill(
-                    "Recover — clear corrupted data",
+                    stringResource(Res.string.overview_recover_clear_corrupted_data),
                     "recover-corruption",
                     onClick = onRecoverFromCorruption,
                     modifier = Modifier.fillMaxWidth(),
@@ -162,13 +217,13 @@ internal fun MindMapRunScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     AzphaltPill(
-                        "Retry runtime",
+                        stringResource(Res.string.overview_retry_runtime),
                         "retry-runtime",
                         onClick = onRetryRuntime,
                         modifier = Modifier.weight(1f),
                     )
                     AzphaltPill(
-                        "Provider settings",
+                        stringResource(Res.string.overview_provider_settings),
                         "provider-settings",
                         onClick = onOpenSettings,
                         modifier = Modifier.weight(1f),
@@ -178,17 +233,17 @@ internal fun MindMapRunScreen(
             if (runtimeState is ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
                 if (projectFileService != null) {
                     Text(
-                        "PROJECT",
+                        stringResource(Res.string.overview_project),
                         style = AzphaltType.eyebrow,
                         color = Azphalt.currentGround.onPage,
                     )
                     Text(
-                        "Aive automatically reopens the last saved project it knows about.",
+                        stringResource(Res.string.overview_aive_automatically_reopens_the_last_saved),
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,
                     )
                     AzphaltPill(
-                        label = "Open a different saved project…",
+                        label = stringResource(Res.string.overview_open_a_different_saved_project),
                         seed = "overview-open-different-project",
                         onClick = {
                             scope.launch {
@@ -199,7 +254,7 @@ internal fun MindMapRunScreen(
                                 }.onSuccess {
                                     projectLoadError = null
                                 }.onFailure { failure ->
-                                    projectLoadError = failure.message ?: "Project load failed"
+                                    projectLoadError = failure.message ?: getString(Res.string.overview_project_load_failed)
                                 }
                             }
                         },
@@ -208,15 +263,15 @@ internal fun MindMapRunScreen(
                     projectLoadError?.let { message ->
                         AzphaltRecord(
                             seed = "overview-project-load-error",
-                            eyebrow = "Project load failed",
-                            title = "Could not open saved project",
+                            eyebrow = stringResource(Res.string.overview_project_load_failed),
+                            title = stringResource(Res.string.overview_could_not_open_saved_project),
                             body = message,
-                            endCap = "Dismiss",
+                            endCap = stringResource(Res.string.common_dismiss),
                             onClick = { projectLoadError = null },
                         )
                     }
                     Text(
-                        "OR CREATE A NEW PROJECT",
+                        stringResource(Res.string.overview_or_create_a_new_project),
                         style = AzphaltType.eyebrow,
                         color = Azphalt.currentGround.onPage,
                     )
@@ -225,13 +280,13 @@ internal fun MindMapRunScreen(
                 OutlinedTextField(
                     value = projectName,
                     onValueChange = { projectName = it },
-                    label = { Text("Project name") },
+                    label = { Text(stringResource(Res.string.overview_project_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
                 Text(
-                    "LINK REPOSITORY",
+                    stringResource(Res.string.overview_link_repository),
                     style = AzphaltType.eyebrow,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -259,7 +314,7 @@ internal fun MindMapRunScreen(
                 }
                 if (repositorySource == RepositorySource.Local && onPickLocalRepository != null) {
                     AzphaltPill(
-                        label = "Choose Git folder",
+                        label = stringResource(Res.string.overview_choose_git_folder),
                         seed = "choose-local-git-folder",
                         onClick = {
                             onPickLocalRepository()?.let { path ->
@@ -283,9 +338,9 @@ internal fun MindMapRunScreen(
                             label = {
                                 Text(
                                     when (repositorySource) {
-                                        RepositorySource.GitHub -> "Search GitHub repositories or paste URL"
-                                        RepositorySource.GitLab -> "Search GitLab repositories or paste URL"
-                                        RepositorySource.Local -> "Local Git folder path"
+                                        RepositorySource.GitHub -> stringResource(Res.string.overview_search_github_repositories_or_paste_url)
+                                        RepositorySource.GitLab -> stringResource(Res.string.overview_search_gitlab_repositories_or_paste_url)
+                                        RepositorySource.Local -> stringResource(Res.string.overview_local_git_folder_path)
                                     },
                                 )
                             },
@@ -311,12 +366,12 @@ internal fun MindMapRunScreen(
                                         Column {
                                             Text(
                                                 buildString {
-                                                    if (suggestion.ownedByCurrentUser) append("YOURS · ")
+                                                    if (suggestion.ownedByCurrentUser) append(stringResource(Res.string.overview_yours))
                                                     append(suggestion.fullName)
                                                 },
                                             )
                                             val detail = listOfNotNull(
-                                                suggestion.defaultBranch?.let { "Branch: $it" },
+                                                suggestion.defaultBranch?.let { stringResource(Res.string.overview_branch_1, it) },
                                                 suggestion.description?.takeIf(String::isNotBlank),
                                             ).joinToString(" · ")
                                             if (detail.isNotBlank()) {
@@ -345,9 +400,9 @@ internal fun MindMapRunScreen(
                         label = {
                             Text(
                                 when (repositorySource) {
-                                    RepositorySource.GitHub -> "GitHub URL or owner/repository"
-                                    RepositorySource.GitLab -> "GitLab URL or group/repository"
-                                    RepositorySource.Local -> "Local Git folder path"
+                                    RepositorySource.GitHub -> stringResource(Res.string.overview_github_url_or_owner_repository)
+                                    RepositorySource.GitLab -> stringResource(Res.string.overview_gitlab_url_or_group_repository)
+                                    RepositorySource.Local -> stringResource(Res.string.overview_local_git_folder_path)
                                 },
                             )
                         },
@@ -362,18 +417,18 @@ internal fun MindMapRunScreen(
                 OutlinedTextField(
                     value = defaultBranch,
                     onValueChange = { defaultBranch = it },
-                    label = { Text("Default branch (optional)") },
+                    label = { Text(stringResource(Res.string.overview_default_branch_optional)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
                     when {
                         repositorySource == RepositorySource.Local ->
-                            "This runtime can link the selected Git checkout. The path stays project-local and is never rewritten as a remote repository."
+                            stringResource(Res.string.overview_this_runtime_can_link_the_selected)
                         repositorySearchConnected ->
-                            "Start typing to search. Your own repositories are ranked first; other accessible/public repositories appear as autocomplete suggestions. You can still paste any repository URL or shorthand manually."
+                            stringResource(Res.string.overview_start_typing_to_search_your_own)
                         else ->
-                            "Paste the repository URL or shorthand. Connect this repository service from Repositories to enable search and autocomplete. Leave this blank only for a repoless orchestration."
+                            stringResource(Res.string.overview_paste_the_repository_url_or_shorthand)
                     },
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
@@ -389,12 +444,12 @@ internal fun MindMapRunScreen(
                 OutlinedTextField(
                     value = objective,
                     onValueChange = { objective = it },
-                    label = { Text("Objective") },
+                    label = { Text(stringResource(Res.string.overview_objective)) },
                     minLines = if (compact) 2 else 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 AzphaltPill(
-                    label = if (runtimeState is ApplicationRuntimeState.NoRun) "Start run" else "Create project + start run",
+                    label = if (runtimeState is ApplicationRuntimeState.NoRun) stringResource(Res.string.overview_start_run) else stringResource(Res.string.overview_create_project_start_run),
                     seed = "project-start-run",
                     selected = projectName.isNotBlank() && objective.isNotBlank(),
                     onClick = {
@@ -497,26 +552,26 @@ internal fun MindMapRunScreen(
         val awaitingHuman = run.status == WorkflowRunStatus.AwaitingHuman
         AzphaltRecord(
             seed = "owner-attention",
-            eyebrow = "Owner attention",
-            title = if (awaitingHuman) "Decision required" else "No decision required",
+            eyebrow = stringResource(Res.string.overview_owner_attention),
+            title = if (awaitingHuman) stringResource(Res.string.overview_decision_required) else stringResource(Res.string.overview_no_decision_required),
             body = if (awaitingHuman) {
-                "A workflow gate is waiting for human input."
+                stringResource(Res.string.overview_a_workflow_gate_is_waiting_for)
             } else {
-                "Runtime is advancing without human intervention."
+                stringResource(Res.string.overview_runtime_is_advancing_without_human_intervention)
             },
-            endCap = if (awaitingHuman) "Required" else "Clear",
+            endCap = if (awaitingHuman) stringResource(Res.string.overview_required) else stringResource(Res.string.overview_clear),
         )
 
         val validationErrors = remember(liveWorkflow.definition) { onValidateWorkflow() }
         if (validationErrors.isNotEmpty()) {
-            Text("WORKFLOW ERRORS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.overview_workflow_errors), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             validationErrors.forEachIndexed { index, error ->
                 AzphaltRecord(
                     seed = "validation-error-$index",
-                    eyebrow = "Invalid",
-                    title = "Workflow definition error",
+                    eyebrow = stringResource(Res.string.overview_invalid),
+                    title = stringResource(Res.string.overview_workflow_definition_error),
                     body = error,
-                    endCap = "Blocked",
+                    endCap = stringResource(Res.string.overview_blocked),
                 )
             }
         }
@@ -531,16 +586,16 @@ internal fun MindMapRunScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("SWARM EXECUTION", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage, modifier = Modifier.weight(1f))
+            Text(stringResource(Res.string.overview_swarm_execution), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage, modifier = Modifier.weight(1f))
             if (activeTaskId != null) {
                 AzphaltPill(
-                    label = "Jump to active",
+                    label = stringResource(Res.string.overview_jump_to_active),
                     seed = "jump-active",
                     onClick = { onTaskSelected(activeTaskId) },
                 )
             }
             AzphaltPill(
-                label = "Branch",
+                label = stringResource(Res.string.overview_branch),
                 seed = "branch-isolation",
                 selected = branchIsolation,
                 onClick = { branchIsolation = !branchIsolation },
@@ -556,7 +611,7 @@ internal fun MindMapRunScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text("SWARM ACTIVITY", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.overview_swarm_activity), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         val recentTasks = liveWorkflow.definition.tasks
             .mapNotNull { task -> run.taskRuns[task.id]?.let { taskRun -> task to taskRun } }
             .sortedByDescending { (_, taskRun) -> taskRun.status.activityRank() }
@@ -587,11 +642,11 @@ internal fun MindMapRunScreen(
 @Composable
 private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean) {
     val (title, body) = when (state) {
-        ApplicationRuntimeState.Loading -> "LOADING RUNTIME" to "Reading persisted workflow state."
-        is ApplicationRuntimeState.NoProject -> "NO PROJECT" to "Create a project and define its first objective below."
-        is ApplicationRuntimeState.NoRun -> "NO ACTIVE RUN" to "${state.project.name} has no persisted workflow run. Define an objective below to start one."
-        is ApplicationRuntimeState.Disconnected -> "RUNTIME DISCONNECTED" to state.message
-        is ApplicationRuntimeState.ResumeFailed -> "RESUME FAILED" to state.message
+        ApplicationRuntimeState.Loading -> stringResource(Res.string.overview_loading_runtime) to stringResource(Res.string.overview_reading_persisted_workflow_state)
+        is ApplicationRuntimeState.NoProject -> stringResource(Res.string.overview_no_project) to stringResource(Res.string.overview_create_a_project_and_define_its)
+        is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_no_active_run) to stringResource(Res.string.overview_has_no_persisted_workflow_run, state.project.name)
+        is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.overview_runtime_disconnected) to state.message
+        is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.overview_resume_failed) to state.message
         is ApplicationRuntimeState.Live -> return
     }
     Text(
@@ -601,7 +656,7 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
     )
     AzphaltRecord(
         seed = "runtime-state-$title",
-        eyebrow = "Runtime",
+        eyebrow = stringResource(Res.string.overview_runtime),
         title = title.lowercase().replaceFirstChar(Char::uppercase),
         body = body,
         endCap = null,

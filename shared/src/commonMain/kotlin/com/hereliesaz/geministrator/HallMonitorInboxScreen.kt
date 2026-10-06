@@ -14,6 +14,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_approve
+import com.hereliesaz.geministrator.resources.common_inbox
+import com.hereliesaz.geministrator.resources.common_reject
+import com.hereliesaz.geministrator.resources.common_retry
+import com.hereliesaz.geministrator.resources.hall_monitor_tasks_complete_artifacts
+import com.hereliesaz.geministrator.resources.hall_monitor_global_pause
+import com.hereliesaz.geministrator.resources.hall_monitor_hall_monitor_review
+import com.hereliesaz.geministrator.resources.hall_monitor_isolated
+import com.hereliesaz.geministrator.resources.hall_monitor_isolated_counterfactual
+import com.hereliesaz.geministrator.resources.hall_monitor_paused
+import com.hereliesaz.geministrator.resources.hall_monitor_progress
+import com.hereliesaz.geministrator.resources.hall_monitor_stop
+import com.hereliesaz.geministrator.resources.hall_monitor_test_solution
+import com.hereliesaz.geministrator.resources.hall_monitor_the_hall_monitor_report_cannot_be
+import com.hereliesaz.geministrator.resources.hall_monitor_the_original_run_remains_frozen_while
+import com.hereliesaz.geministrator.resources.hall_monitor_the_paused_source_run_is_unchanged
+import com.hereliesaz.geministrator.resources.hall_monitor_trial_history
+import com.hereliesaz.geministrator.resources.hall_monitor_validation
+import org.jetbrains.compose.resources.stringResource
 
 private const val HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX = "Isolated Hall Monitor counterfactual"
 
@@ -41,22 +61,22 @@ internal fun HallMonitorPauseInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("INBOX", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         AzphaltRecord(
             seed = "hall-monitor-global-pause",
-            eyebrow = "GLOBAL PAUSE",
-            title = report?.title ?: "Hall Monitor review",
+            eyebrow = stringResource(Res.string.hall_monitor_global_pause),
+            title = report?.title ?: stringResource(Res.string.hall_monitor_hall_monitor_review),
             body = buildString {
                 append(pause.reason)
-                append("\n\nThe original run remains frozen while you review or test recommendations. Testing does not approve or apply anything.")
+                append(stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while))
             },
-            endCap = "PAUSED",
+            endCap = stringResource(Res.string.hall_monitor_paused),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (report == null) {
                         Text(
                             reportResult.exceptionOrNull()?.message
-                                ?: "The Hall Monitor report cannot be parsed into testable solutions.",
+                                ?: stringResource(Res.string.hall_monitor_the_hall_monitor_report_cannot_be),
                             style = AzphaltType.body,
                             color = Azphalt.currentGround.onPage,
                         )
@@ -91,14 +111,14 @@ internal fun HallMonitorPauseInboxScreen(
                                     )
                                     AzphaltNote(
                                         seed = "hall-monitor-tests-${finding.id}-$solutionIndex",
-                                        label = "VALIDATION",
+                                        label = stringResource(Res.string.hall_monitor_validation),
                                         value = solution.validationTests.joinToString(" · "),
                                     )
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         AzphaltPill(
-                                            label = "TEST SOLUTION",
+                                            label = stringResource(Res.string.hall_monitor_test_solution),
                                             seed = "hall-monitor-test-${finding.id}-$solutionIndex",
-                                            endCap = "Isolated",
+                                            endCap = stringResource(Res.string.hall_monitor_isolated),
                                             onClick = { onTestSolution(finding.id, solutionIndex) },
                                         )
                                     }
@@ -108,7 +128,7 @@ internal fun HallMonitorPauseInboxScreen(
                     }
 
                     if (pause.solutionTrials.isNotEmpty()) {
-                        Text("TRIAL HISTORY", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                        Text(stringResource(Res.string.hall_monitor_trial_history), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                         pause.solutionTrials.forEach { trial ->
                             AzphaltNote(
                                 seed = "hall-monitor-trial-${trial.id}",
@@ -142,22 +162,22 @@ internal fun HallMonitorTrialInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("TEST SOLUTION", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.hall_monitor_test_solution), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         AzphaltRecord(
             seed = presentation.run.id.value,
-            eyebrow = "ISOLATED COUNTERFACTUAL",
+            eyebrow = stringResource(Res.string.hall_monitor_isolated_counterfactual),
             title = presentation.definition.name,
             body = buildString {
                 append(presentation.run.objective)
-                append("\n\nThe paused source run is unchanged. This trial uses Manual integration and exists only to produce evidence.")
+                append(stringResource(Res.string.hall_monitor_the_paused_source_run_is_unchanged))
             },
             endCap = presentation.run.status.name,
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AzphaltNote(
                         seed = "trial-progress-${presentation.run.id.value}",
-                        label = "PROGRESS",
-                        value = "$completed / ${taskRuns.size} tasks complete · ${artifacts.size} artifacts",
+                        label = stringResource(Res.string.hall_monitor_progress),
+                        value = stringResource(Res.string.hall_monitor_tasks_complete_artifacts, completed, taskRuns.size, artifacts.size),
                     )
                     taskRuns.forEach { taskRun ->
                         val task = presentation.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }
@@ -185,11 +205,11 @@ internal fun HallMonitorTrialInboxScreen(
                                         }
                                         if (taskRun.status == TaskRunStatus.AwaitingApproval) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill("Approve", "trial-approve-${taskRun.id.value}", onClick = {
+                                                AzphaltPill(stringResource(Res.string.common_approve), "trial-approve-${taskRun.id.value}", onClick = {
                                                     onApproveTask(taskRun.taskDefinitionId.value)
                                                 })
                                                 if (taskRun.assignedProviderId != null) {
-                                                    AzphaltPill("Reject", "trial-reject-${taskRun.id.value}", onClick = {
+                                                    AzphaltPill(stringResource(Res.string.common_reject), "trial-reject-${taskRun.id.value}", onClick = {
                                                         onRejectPlan(taskRun.taskDefinitionId.value)
                                                     })
                                                 }
@@ -197,10 +217,10 @@ internal fun HallMonitorTrialInboxScreen(
                                         }
                                         if (taskRun.status == TaskRunStatus.Escalated) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill("Retry", "trial-retry-${taskRun.id.value}", onClick = {
+                                                AzphaltPill(stringResource(Res.string.common_retry), "trial-retry-${taskRun.id.value}", onClick = {
                                                     onResolveEscalation(taskRun.taskDefinitionId.value, true)
                                                 })
-                                                AzphaltPill("Stop", "trial-stop-${taskRun.id.value}", onClick = {
+                                                AzphaltPill(stringResource(Res.string.hall_monitor_stop), "trial-stop-${taskRun.id.value}", onClick = {
                                                     onResolveEscalation(taskRun.taskDefinitionId.value, false)
                                                 })
                                             }

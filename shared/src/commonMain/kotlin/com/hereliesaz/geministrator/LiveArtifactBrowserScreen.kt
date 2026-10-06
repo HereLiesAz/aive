@@ -18,6 +18,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.artifacts_artifact_id
+import com.hereliesaz.geministrator.resources.artifacts_artifacts
+import com.hereliesaz.geministrator.resources.artifacts_loading_runtime
+import com.hereliesaz.geministrator.resources.artifacts_no_artifacts_have_been_produced_by
+import com.hereliesaz.geministrator.resources.artifacts_no_artifacts_match
+import com.hereliesaz.geministrator.resources.artifacts_no_live_run
+import com.hereliesaz.geministrator.resources.artifacts_no_project_yet
+import com.hereliesaz.geministrator.resources.artifacts_no_workflow_run_yet
+import com.hereliesaz.geministrator.resources.artifacts_open
+import com.hereliesaz.geministrator.resources.artifacts_persisted_workflow_artifact
+import com.hereliesaz.geministrator.resources.artifacts_run_unavailable
+import com.hereliesaz.geministrator.resources.artifacts_runtime_disconnected
+import com.hereliesaz.geministrator.resources.artifacts_search_artifacts
+import org.jetbrains.compose.resources.stringResource
+import com.hereliesaz.geministrator.resources.artifacts_count_from_run
+import org.jetbrains.compose.resources.pluralStringResource
 
 private data class LiveArtifactRow(
     val task: TaskDefinition,
@@ -65,18 +82,18 @@ internal fun LiveArtifactBrowserScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("ARTIFACTS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.artifacts_artifacts), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
 
         when {
             live == null -> {
                 Text(
                     when (runtimeState) {
-                        ApplicationRuntimeState.Loading -> "Loading runtime…"
-                        is ApplicationRuntimeState.NoProject -> "No project yet."
-                        is ApplicationRuntimeState.NoRun -> "No workflow run yet."
-                        is ApplicationRuntimeState.Disconnected -> "Runtime disconnected: ${runtimeState.message}"
-                        is ApplicationRuntimeState.ResumeFailed -> "Run unavailable: ${runtimeState.message}"
-                        is ApplicationRuntimeState.Live -> "No live run."
+                        ApplicationRuntimeState.Loading -> stringResource(Res.string.artifacts_loading_runtime)
+                        is ApplicationRuntimeState.NoProject -> stringResource(Res.string.artifacts_no_project_yet)
+                        is ApplicationRuntimeState.NoRun -> stringResource(Res.string.artifacts_no_workflow_run_yet)
+                        is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.artifacts_runtime_disconnected, runtimeState.message)
+                        is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.artifacts_run_unavailable, runtimeState.message)
+                        is ApplicationRuntimeState.Live -> stringResource(Res.string.artifacts_no_live_run)
                     },
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
@@ -85,7 +102,7 @@ internal fun LiveArtifactBrowserScreen(
 
             rows.isEmpty() -> {
                 Text(
-                    "No artifacts have been produced by this run.",
+                    stringResource(Res.string.artifacts_no_artifacts_have_been_produced_by),
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -93,21 +110,21 @@ internal fun LiveArtifactBrowserScreen(
 
             else -> {
                 Text(
-                    "${rows.size} artifact${if (rows.size == 1) "" else "s"} from run ${live.run.id.value.takeLast(8)}.",
+                    pluralStringResource(Res.plurals.artifacts_count_from_run, rows.size, rows.size, live.run.id.value.takeLast(8)),
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search artifacts") },
+                    label = { Text(stringResource(Res.string.artifacts_search_artifacts)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
 
                 if (filtered.isEmpty()) {
                     Text(
-                        "No artifacts match \"${query.trim()}\".",
+                        stringResource(Res.string.artifacts_no_artifacts_match, query.trim()),
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,
                     )
@@ -120,8 +137,8 @@ internal fun LiveArtifactBrowserScreen(
                             title = row.artifact.label,
                             body = row.artifact.uri
                                 ?: row.artifact.mediaType
-                                ?: "Persisted workflow artifact",
-                            endCap = if (selected) "Open" else row.artifact.kind.name,
+                                ?: stringResource(Res.string.artifacts_persisted_workflow_artifact),
+                            endCap = if (selected) stringResource(Res.string.artifacts_open) else row.artifact.kind.name,
                             selected = selected,
                             onClick = {
                                 selectedArtifactIdValue = if (selected) "" else row.artifact.id.value
@@ -130,7 +147,7 @@ internal fun LiveArtifactBrowserScreen(
                                 {
                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                         Text(
-                                            "Artifact ID · ${row.artifact.id.value}",
+                                            stringResource(Res.string.artifacts_artifact_id, row.artifact.id.value),
                                             style = AzphaltType.eyebrow,
                                             color = Azphalt.currentGround.onPage,
                                         )

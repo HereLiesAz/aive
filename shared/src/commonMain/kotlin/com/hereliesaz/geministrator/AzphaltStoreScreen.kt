@@ -40,6 +40,96 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_connect
+import com.hereliesaz.geministrator.resources.common_connected
+import com.hereliesaz.geministrator.resources.common_remove
+import com.hereliesaz.geministrator.resources.store_files
+import com.hereliesaz.geministrator.resources.store_installed
+import com.hereliesaz.geministrator.resources.store_unsupported_denied
+import com.hereliesaz.geministrator.resources.store_workflow_definition
+import com.hereliesaz.geministrator.resources.store_workflows_roles_models_and_llms
+import com.hereliesaz.geministrator.resources.store_a_key_you_add_is_kept
+import com.hereliesaz.geministrator.resources.store_a_repository_revocation_applies_to_this
+import com.hereliesaz.geministrator.resources.store_a_repository_revocation_applies_to_this_2
+import com.hereliesaz.geministrator.resources.store_a_repository_revocation_applies_to_this_3
+import com.hereliesaz.geministrator.resources.store_aive_calls_this_model_directly_the
+import com.hereliesaz.geministrator.resources.store_approve_publisher_key_change_for_this
+import com.hereliesaz.geministrator.resources.store_azphalt
+import com.hereliesaz.geministrator.resources.store_azphalt_package_import_is_unavailable_on
+import com.hereliesaz.geministrator.resources.store_azphalt_store
+import com.hereliesaz.geministrator.resources.store_azphalt_store_could_not_be_loaded
+import com.hereliesaz.geministrator.resources.store_azphalt_store_search_failed
+import com.hereliesaz.geministrator.resources.store_change_key
+import com.hereliesaz.geministrator.resources.store_dependencies
+import com.hereliesaz.geministrator.resources.store_dependency_preparation_failed
+import com.hereliesaz.geministrator.resources.store_host_permission_requests
+import com.hereliesaz.geministrator.resources.store_imported_azphalt_package_could_not_be
+import com.hereliesaz.geministrator.resources.store_inspect_install
+import com.hereliesaz.geministrator.resources.store_inspect_model_install
+import com.hereliesaz.geministrator.resources.store_inspect_model_update
+import com.hereliesaz.geministrator.resources.store_inspect_update
+import com.hereliesaz.geministrator.resources.store_install_and_connect
+import com.hereliesaz.geministrator.resources.store_install_despite_an_unrecognized_signing_key
+import com.hereliesaz.geministrator.resources.store_install_required_dependencies_before_this_package
+import com.hereliesaz.geministrator.resources.store_install_verified_model
+import com.hereliesaz.geministrator.resources.store_install_verified_package
+import com.hereliesaz.geministrator.resources.store_installed_1
+import com.hereliesaz.geministrator.resources.store_installed_its_model_assets
+import com.hereliesaz.geministrator.resources.store_installed_its_workflows_and
+import com.hereliesaz.geministrator.resources.store_installed_connect_it_to_use
+import com.hereliesaz.geministrator.resources.store_key
+import com.hereliesaz.geministrator.resources.store_language_model_installation_failed
+import com.hereliesaz.geministrator.resources.store_language_model_package_preparation_failed
+import com.hereliesaz.geministrator.resources.store_llm
+import com.hereliesaz.geministrator.resources.store_loading
+import com.hereliesaz.geministrator.resources.store_model
+import com.hereliesaz.geministrator.resources.store_model_1
+import com.hereliesaz.geministrator.resources.store_model_installation_failed
+import com.hereliesaz.geministrator.resources.store_model_license
+import com.hereliesaz.geministrator.resources.store_model_package_preparation_failed
+import com.hereliesaz.geministrator.resources.store_model_removal_failed
+import com.hereliesaz.geministrator.resources.store_needs_a_key
+import com.hereliesaz.geministrator.resources.store_no_azphalt_packages_match_this_search
+import com.hereliesaz.geministrator.resources.store_no_key_is_needed
+import com.hereliesaz.geministrator.resources.store_no_key_needed
+import com.hereliesaz.geministrator.resources.store_no_key_needed_2
+import com.hereliesaz.geministrator.resources.store_package_installation_failed
+import com.hereliesaz.geministrator.resources.store_package_preparation_failed
+import com.hereliesaz.geministrator.resources.store_prepare_dependency
+import com.hereliesaz.geministrator.resources.store_prompts
+import com.hereliesaz.geministrator.resources.store_publisher_key_change_requires_explicit_approval
+import com.hereliesaz.geministrator.resources.store_refresh
+import com.hereliesaz.geministrator.resources.store_remove_model
+import com.hereliesaz.geministrator.resources.store_removed
+import com.hereliesaz.geministrator.resources.store_revoked
+import com.hereliesaz.geministrator.resources.store_search_workflows_roles_models_and_llms
+import com.hereliesaz.geministrator.resources.store_size_not_published
+import com.hereliesaz.geministrator.resources.store_store
+import com.hereliesaz.geministrator.resources.store_store_error
+import com.hereliesaz.geministrator.resources.store_store_networking_is_unavailable_on_this
+import com.hereliesaz.geministrator.resources.store_terms
+import com.hereliesaz.geministrator.resources.store_the_package_signature_is_valid_but
+import com.hereliesaz.geministrator.resources.store_trusted
+import com.hereliesaz.geministrator.resources.store_unknown_signer
+import com.hereliesaz.geministrator.resources.store_unsigned
+import com.hereliesaz.geministrator.resources.store_update
+import com.hereliesaz.geministrator.resources.store_verified_review_model_trust_and
+import com.hereliesaz.geministrator.resources.store_verified_review_trust_permissions_and
+import com.hereliesaz.geministrator.resources.store_verified_imported_model_package_review_trust
+import com.hereliesaz.geministrator.resources.store_verified_imported_package_review_trust_permissions
+import com.hereliesaz.geministrator.resources.store_verified_install_plan
+import com.hereliesaz.geministrator.resources.store_verified_language_model
+import com.hereliesaz.geministrator.resources.store_verified_model_install
+import com.hereliesaz.geministrator.resources.store_verified_workflows_roles_models_and_llms
+import com.hereliesaz.geministrator.resources.store_where_prompts_go
+import com.hereliesaz.geministrator.resources.store_with_your_key
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+import com.hereliesaz.geministrator.resources.store_update_count
+import com.hereliesaz.geministrator.resources.store_plan_reusable_role_count
+import com.hereliesaz.geministrator.resources.store_plan_fragment_count
+import org.jetbrains.compose.resources.pluralStringResource
 
 private enum class AzphaltStoreCategory(val label: String) {
     All("All"),
@@ -89,7 +179,7 @@ internal fun AzphaltStoreScreen(
                 packages = loaded.packages
                 error = null
             }
-            .onFailure { failure -> error = failure.message ?: "Azphalt Store could not be loaded." }
+            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_azphalt_store_could_not_be_loaded) }
         loading = false
     }
 
@@ -98,13 +188,13 @@ internal fun AzphaltStoreScreen(
         delay(250)
         runCatching { service.search(query).packages }
             .onSuccess { packages = it }
-            .onFailure { failure -> error = failure.message ?: "Azphalt Store search failed." }
+            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_azphalt_store_search_failed) }
     }
 
     LaunchedEffect(service, importRequest?.requestId) {
         val request = importRequest ?: return@LaunchedEffect
         if (service == null) {
-            error = "Azphalt package import is unavailable on this host."
+            error = getString(Res.string.store_azphalt_package_import_is_unavailable_on)
             onImportHandled(request.requestId)
             return@LaunchedEffect
         }
@@ -127,8 +217,8 @@ internal fun AzphaltStoreScreen(
                 allowPublisherChange = false
                 status = request.sourceLabel
                     ?.takeIf(String::isNotBlank)
-                    ?.let { "Verified $it. Review trust, permissions, and dependencies before installing." }
-                    ?: "Verified imported package. Review trust, permissions, and dependencies before installing."
+                    ?.let { getString(Res.string.store_verified_review_trust_permissions_and, it) }
+                    ?: getString(Res.string.store_verified_imported_package_review_trust_permissions)
             } else {
                 val workflowFailure = workflowAttempt.exceptionOrNull()
                 val modelAttempt = runCatching { service.prepareLocalModelInstall(request.bytes) }
@@ -141,8 +231,8 @@ internal fun AzphaltStoreScreen(
                     allowPublisherChange = false
                     status = request.sourceLabel
                         ?.takeIf(String::isNotBlank)
-                        ?.let { "Verified $it. Review model trust and license metadata before installing." }
-                        ?: "Verified imported model package. Review trust and license metadata before installing."
+                        ?.let { getString(Res.string.store_verified_review_model_trust_and, it) }
+                        ?: getString(Res.string.store_verified_imported_model_package_review_trust)
                 } else {
                     val modelFailure = modelAttempt.exceptionOrNull()
                     throw if (workflowFailure?.message.orEmpty().contains("is kind asset")) {
@@ -153,7 +243,7 @@ internal fun AzphaltStoreScreen(
                 }
             }
         } catch (failure: Exception) {
-            error = failure.message ?: "Imported Azphalt package could not be verified."
+            error = failure.message ?: getString(Res.string.store_imported_azphalt_package_could_not_be)
         } finally {
             loading = false
             onImportHandled(request.requestId)
@@ -177,17 +267,17 @@ internal fun AzphaltStoreScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("AZPHALT STORE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            snapshot?.repository?.name?.let { "$it · workflows, roles, models, and LLMs for The Aive" }
-                ?: "Verified workflows, roles, models, and LLMs for The Aive",
+            snapshot?.repository?.name?.let { stringResource(Res.string.store_workflows_roles_models_and_llms, it) }
+                ?: stringResource(Res.string.store_verified_workflows_roles_models_and_llms),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
 
         if (service == null) {
             Text(
-                "Store networking is unavailable on this host.",
+                stringResource(Res.string.store_store_networking_is_unavailable_on_this),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
@@ -196,30 +286,30 @@ internal fun AzphaltStoreScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             AzphaltPill(
-                label = if (loading) "Loading" else "Refresh",
+                label = if (loading) stringResource(Res.string.store_loading) else stringResource(Res.string.store_refresh),
                 seed = "azphalt-refresh",
                 onClick = { if (!loading) refreshGeneration += 1 },
             )
             snapshot?.let { loaded ->
                 val count = loaded.installed.size + loaded.installedModels.size + loaded.installedLlms.size
-                Text("$count installed", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.store_installed, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
-                Text("$count update${if (count == 1) "" else "s"}", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(pluralStringResource(Res.plurals.store_update_count, count, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             }
         }
 
         error?.let { message ->
-            AzphaltNote(seed = "azphalt-error", label = "STORE ERROR", value = message)
+            AzphaltNote(seed = "azphalt-error", label = stringResource(Res.string.store_store_error), value = message)
         }
         status?.let { message ->
-            AzphaltNote(seed = "azphalt-status", label = "STORE", value = message)
+            AzphaltNote(seed = "azphalt-status", label = stringResource(Res.string.store_store), value = message)
         }
 
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Search workflows, roles, models, and LLMs") },
+            label = { Text(stringResource(Res.string.store_search_workflows_roles_models_and_llms)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -247,7 +337,7 @@ internal fun AzphaltStoreScreen(
         }
 
         if (!loading && visiblePackages.isEmpty()) {
-            Text("No Azphalt packages match this search and filter.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
@@ -288,7 +378,7 @@ internal fun AzphaltStoreScreen(
                                         allowUntrustedSigner = false
                                         allowPublisherChange = false
                                     }
-                                    .onFailure { failure -> error = failure.message ?: "Language model package preparation failed." }
+                                    .onFailure { failure -> error = failure.message ?: getString(Res.string.store_language_model_package_preparation_failed) }
                                 loading = false
                             }
                         }
@@ -319,22 +409,22 @@ internal fun AzphaltStoreScreen(
                 seed = "azphalt-package-${item.id}",
                 eyebrow = if (modelAsset) {
                     listOfNotNull(
-                        "Model",
+                        stringResource(Res.string.store_model),
                         item.types.firstOrNull()?.uppercase(),
                         item.author?.takeIf(String::isNotBlank),
                     ).joinToString(" · ")
                 } else {
-                    item.author?.takeIf(String::isNotBlank) ?: "Azphalt ${item.kind}"
+                    item.author?.takeIf(String::isNotBlank) ?: stringResource(Res.string.store_azphalt, item.kind)
                 },
                 title = item.name,
                 body = item.description ?: item.id,
                 endCap = when {
-                    isRevoked -> "Revoked"
-                    update?.updateAvailable == true -> "Update ${update.latest ?: item.latest}"
-                    installed != null -> "Installed ${installed.version}"
-                    installedModel != null -> "Installed ${installedModel.version}"
+                    isRevoked -> stringResource(Res.string.store_revoked)
+                    update?.updateAvailable == true -> stringResource(Res.string.store_update, update.latest ?: item.latest)
+                    installed != null -> stringResource(Res.string.store_installed_1, installed.version)
+                    installedModel != null -> stringResource(Res.string.store_installed_1, installedModel.version)
                     item.priceStatus != "free" -> item.priceStatus
-                    modelAsset -> "Model · ${item.latest}"
+                    modelAsset -> stringResource(Res.string.store_model_1, item.latest)
                     else -> item.latest
                 },
                 selected = selected,
@@ -359,7 +449,7 @@ internal fun AzphaltStoreScreen(
                                     append(" · ")
                                     append(item.priceStatus)
                                     append(" · ")
-                                    append(item.byteSize?.let(::formatByteSize) ?: "size not published")
+                                    append(item.byteSize?.let(::formatByteSize) ?: stringResource(Res.string.store_size_not_published))
                                 },
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
@@ -367,13 +457,13 @@ internal fun AzphaltStoreScreen(
                             if (modelAsset) {
                                 if (isRevoked) {
                                     Text(
-                                        "A repository revocation applies to this model package/version. Installation is blocked.",
+                                        stringResource(Res.string.store_a_repository_revocation_applies_to_this),
                                         style = AzphaltType.body,
                                         color = Azphalt.currentGround.onPage,
                                     )
                                 } else {
                                     AzphaltPill(
-                                        label = if (installedModel == null) "Inspect model install" else "Inspect model update",
+                                        label = if (installedModel == null) stringResource(Res.string.store_inspect_model_install) else stringResource(Res.string.store_inspect_model_update),
                                         seed = "azphalt-model-prepare-${item.id}",
                                         endCap = item.latest,
                                         onClick = {
@@ -390,7 +480,7 @@ internal fun AzphaltStoreScreen(
                                                             allowPublisherChange = false
                                                         }
                                                         .onFailure { failure ->
-                                                            error = failure.message ?: "Model package preparation failed."
+                                                            error = failure.message ?: getString(Res.string.store_model_package_preparation_failed)
                                                         }
                                                     loading = false
                                                 }
@@ -399,7 +489,7 @@ internal fun AzphaltStoreScreen(
                                     )
                                     if (installedModel != null) {
                                         AzphaltPill(
-                                            label = "Remove model",
+                                            label = stringResource(Res.string.store_remove_model),
                                             seed = "azphalt-model-remove-${item.id}",
                                             endCap = installedModel.version,
                                             onClick = {
@@ -409,12 +499,12 @@ internal fun AzphaltStoreScreen(
                                                         error = null
                                                         runCatching { service.removeModel(item.id) }
                                                             .onSuccess {
-                                                                status = "Removed ${item.name}."
+                                                                status = getString(Res.string.store_removed, item.name)
                                                                 preparedModel = null
                                                                 refreshGeneration += 1
                                                             }
                                                             .onFailure { failure ->
-                                                                error = failure.message ?: "Model removal failed."
+                                                                error = failure.message ?: getString(Res.string.store_model_removal_failed)
                                                             }
                                                         loading = false
                                                     }
@@ -425,13 +515,13 @@ internal fun AzphaltStoreScreen(
                                 }
                             } else if (isRevoked) {
                                 Text(
-                                    "A repository revocation applies to this package/version. Installation is blocked until a non-revoked version is selected.",
+                                    stringResource(Res.string.store_a_repository_revocation_applies_to_this_2),
                                     style = AzphaltType.body,
                                     color = Azphalt.currentGround.onPage,
                                 )
                             } else {
                                 AzphaltPill(
-                                    label = if (installed == null) "Inspect install" else "Inspect update",
+                                    label = if (installed == null) stringResource(Res.string.store_inspect_install) else stringResource(Res.string.store_inspect_update),
                                     seed = "azphalt-prepare-${item.id}",
                                     endCap = item.latest,
                                     onClick = {
@@ -448,7 +538,7 @@ internal fun AzphaltStoreScreen(
                                                         allowPublisherChange = false
                                                     }
                                                     .onFailure { failure ->
-                                                        error = failure.message ?: "Package preparation failed."
+                                                        error = failure.message ?: getString(Res.string.store_package_preparation_failed)
                                                     }
                                                 loading = false
                                             }
@@ -482,11 +572,11 @@ internal fun AzphaltStoreScreen(
                                 allowPublisherChange = allowPublisherChange,
                             )
                         }.onSuccess { installed ->
-                            status = "Installed ${installed.packageId} ${installed.version}. Its model assets are registered for local inference."
+                            status = getString(Res.string.store_installed_its_model_assets, installed.packageId, installed.version)
                             preparedModel = null
                             refreshGeneration += 1
                         }.onFailure { failure ->
-                            error = failure.message ?: "Model installation failed."
+                            error = failure.message ?: getString(Res.string.store_model_installation_failed)
                         }
                         loading = false
                     }
@@ -514,13 +604,13 @@ internal fun AzphaltStoreScreen(
                                 allowPublisherChange = allowPublisherChange,
                             )
                         }.onSuccess { installed ->
-                            status = "Installed ${installed.name}. Connect it to use it" +
-                                if (installed.keyOptional) "; no key is needed." else " with your key."
+                            status = getString(Res.string.store_installed_connect_it_to_use, installed.name) +
+                                if (installed.keyOptional) getString(Res.string.store_no_key_is_needed) else getString(Res.string.store_with_your_key)
                             preparedLlm = null
                             refreshGeneration += 1
                             onConnectProvider(installed.providerId)
                         }.onFailure { failure ->
-                            error = failure.message ?: "Language model installation failed."
+                            error = failure.message ?: getString(Res.string.store_language_model_installation_failed)
                         }
                         loading = false
                     }
@@ -556,7 +646,7 @@ internal fun AzphaltStoreScreen(
                                 allowUntrustedSigner = false
                                 allowPublisherChange = false
                             }
-                            .onFailure { failure -> error = failure.message ?: "Dependency preparation failed." }
+                            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_dependency_preparation_failed) }
                         loading = false
                     }
                 },
@@ -574,12 +664,12 @@ internal fun AzphaltStoreScreen(
                                 allowPublisherChange = allowPublisherChange,
                             )
                         }.onSuccess { installed ->
-                            status = "Installed ${installed.packageId} ${installed.version}. Its workflows and roles are available immediately."
+                            status = getString(Res.string.store_installed_its_workflows_and, installed.packageId, installed.version)
                             prepared = null
                             refreshGeneration += 1
                             workflowLibraryHost?.packagesChanged()
                         }.onFailure { failure ->
-                            error = failure.message ?: "Package installation failed."
+                            error = failure.message ?: getString(Res.string.store_package_installation_failed)
                         }
                         loading = false
                     }
@@ -607,16 +697,16 @@ private fun StoreLlmRecord(
     AzphaltRecord(
         seed = "azphalt-llm-${item.id}",
         eyebrow = listOfNotNull(
-            "LLM",
-            if (keyless) "No key needed" else "Needs a key",
+            stringResource(Res.string.store_llm),
+            if (keyless) stringResource(Res.string.store_no_key_needed) else stringResource(Res.string.store_needs_a_key),
             llm?.dataHandling?.operator?.takeIf(String::isNotBlank),
         ).joinToString(" · "),
         title = item.name,
         body = item.description ?: item.id,
         endCap = when {
-            revoked -> "Revoked"
-            connected -> "Connected"
-            installed != null -> "Installed ${installed.version}"
+            revoked -> stringResource(Res.string.store_revoked)
+            connected -> stringResource(Res.string.common_connected)
+            installed != null -> stringResource(Res.string.store_installed_1, installed.version)
             else -> item.latest
         },
         selected = selected,
@@ -633,28 +723,28 @@ private fun StoreLlmRecord(
                         )
                     }
                     llm?.dataHandling?.let { handling ->
-                        AzphaltNote(seed = "azphalt-llm-data-${item.id}", label = "PROMPTS", value = describePromptHandling(handling.operator, handling.prompts, handling.modelPinned))
+                        AzphaltNote(seed = "azphalt-llm-data-${item.id}", label = stringResource(Res.string.store_prompts), value = describePromptHandling(handling.operator, handling.prompts, handling.modelPinned))
                     }
                     when {
                         revoked -> Text(
-                            "A repository revocation applies to this package/version. Installation is blocked.",
+                            stringResource(Res.string.store_a_repository_revocation_applies_to_this_3),
                             style = AzphaltType.body,
                             color = Azphalt.currentGround.onPage,
                         )
                         installed == null -> AzphaltPill(
-                            label = "Inspect install",
+                            label = stringResource(Res.string.store_inspect_install),
                             seed = "azphalt-llm-prepare-${item.id}",
                             endCap = item.latest,
                             onClick = onPrepare,
                         )
                         else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AzphaltPill(
-                                label = if (connected) "Change key" else "Connect",
+                                label = if (connected) stringResource(Res.string.store_change_key) else stringResource(Res.string.common_connect),
                                 seed = "azphalt-llm-connect-${item.id}",
                                 onClick = onConnect,
                             )
                             AzphaltPill(
-                                label = "Remove",
+                                label = stringResource(Res.string.common_remove),
                                 seed = "azphalt-llm-remove-${item.id}",
                                 endCap = installed.version,
                                 onClick = onRemove,
@@ -681,15 +771,15 @@ private fun PreparedStoreLlmPanel(
     val handling = prepared.llm.dataHandling
     AzphaltRecord(
         seed = "azphalt-llm-prepared-${prepared.detail.id}",
-        eyebrow = "Verified language model",
+        eyebrow = stringResource(Res.string.store_verified_language_model),
         title = "${prepared.detail.name} ${prepared.version}",
         body = "${endpoint.defaultModel} at ${endpoint.baseUrl}",
         endCap = if (verification.trusted) {
-            "Trusted"
+            stringResource(Res.string.store_trusted)
         } else if (verification.packageContents.signed) {
-            "Unknown signer"
+            stringResource(Res.string.store_unknown_signer)
         } else {
-            "Unsigned"
+            stringResource(Res.string.store_unsigned)
         },
         selected = true,
         well = {
@@ -698,22 +788,22 @@ private fun PreparedStoreLlmPanel(
                 handling?.let {
                     AzphaltNote(
                         seed = "azphalt-llm-prepared-data",
-                        label = "WHERE PROMPTS GO",
+                        label = stringResource(Res.string.store_where_prompts_go),
                         value = describePromptHandling(it.operator, it.prompts, it.modelPinned) +
-                            (it.terms?.takeIf(String::isNotBlank)?.let { terms -> " Terms: $terms" } ?: ""),
+                            (it.terms?.takeIf(String::isNotBlank)?.let { terms -> stringResource(Res.string.store_terms, terms) } ?: ""),
                     )
                 }
                 AzphaltNote(
                     seed = "azphalt-llm-prepared-key",
-                    label = "KEY",
+                    label = stringResource(Res.string.store_key),
                     value = when (endpoint.auth) {
-                        "required-bearer" -> "Needs a key" + (prepared.keyInput?.description?.let { ": $it" } ?: ".")
-                        "optional-bearer" -> "No key needed" + (prepared.keyInput?.description?.let { "; $it" } ?: ".")
-                        else -> "No key needed."
-                    } + " A key you add is kept in this device's credential store and sent only to this endpoint.",
+                        "required-bearer" -> stringResource(Res.string.store_needs_a_key) + (prepared.keyInput?.description?.let { ": $it" } ?: ".")
+                        "optional-bearer" -> stringResource(Res.string.store_no_key_needed) + (prepared.keyInput?.description?.let { "; $it" } ?: ".")
+                        else -> stringResource(Res.string.store_no_key_needed_2)
+                    } + stringResource(Res.string.store_a_key_you_add_is_kept),
                 )
                 Text(
-                    "Aive calls this model directly. The package's GitHub setup script is not run, and no GitHub access is needed.",
+                    stringResource(Res.string.store_aive_calls_this_model_directly_the),
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -721,21 +811,21 @@ private fun PreparedStoreLlmPanel(
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = "Install despite an unrecognized signing key",
+                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
                     )
                 }
                 if (verification.publisherChanged) {
                     ConfirmationRow(
                         checked = allowPublisherChange,
                         onCheckedChange = onAllowPublisherChangeChanged,
-                        text = "Approve publisher-key change for this package id",
+                        text = stringResource(Res.string.store_approve_publisher_key_change_for_this),
                     )
                 }
                 val trustReady = !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
                 if (trustReady && publisherReady) {
                     AzphaltPill(
-                        label = "Install and connect",
+                        label = stringResource(Res.string.store_install_and_connect),
                         seed = "azphalt-llm-install-${prepared.detail.id}",
                         endCap = prepared.version,
                         onClick = onInstall,
@@ -743,9 +833,9 @@ private fun PreparedStoreLlmPanel(
                 } else {
                     Text(
                         if (!publisherReady) {
-                            "Publisher-key change requires explicit approval."
+                            stringResource(Res.string.store_publisher_key_change_requires_explicit_approval)
                         } else {
-                            "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                            stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,
@@ -768,7 +858,7 @@ private fun PreparedAzphaltModelInstallPanel(
     val verification = prepared.verification
     AzphaltRecord(
         seed = "azphalt-model-prepared-${prepared.detail.id}",
-        eyebrow = "Verified model install",
+        eyebrow = stringResource(Res.string.store_verified_model_install),
         title = "${prepared.detail.name} ${prepared.version}",
         body = prepared.assets.joinToString(" · ") { asset ->
             buildString {
@@ -778,11 +868,11 @@ private fun PreparedAzphaltModelInstallPanel(
             }
         },
         endCap = if (verification.trusted) {
-            "Trusted"
+            stringResource(Res.string.store_trusted)
         } else if (verification.packageContents.signed) {
-            "Unknown signer"
+            stringResource(Res.string.store_unknown_signer)
         } else {
-            "Unsigned"
+            stringResource(Res.string.store_unsigned)
         },
         selected = true,
         well = {
@@ -794,9 +884,9 @@ private fun PreparedAzphaltModelInstallPanel(
                         label = asset.role ?: asset.type,
                         value = buildString {
                             append(asset.type)
-                            if (asset.files.isNotEmpty()) append(" · ${asset.files.size} files")
+                            if (asset.files.isNotEmpty()) append(stringResource(Res.string.store_files, asset.files.size))
                             asset.modelLicense?.let {
-                                append(" · model license: ")
+                                append(stringResource(Res.string.store_model_license))
                                 append(it.toString())
                             }
                         },
@@ -807,14 +897,14 @@ private fun PreparedAzphaltModelInstallPanel(
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = "Install despite an unrecognized signing key",
+                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
                     )
                 }
                 if (verification.publisherChanged) {
                     ConfirmationRow(
                         checked = allowPublisherChange,
                         onCheckedChange = onAllowPublisherChangeChanged,
-                        text = "Approve publisher-key change for this package id",
+                        text = stringResource(Res.string.store_approve_publisher_key_change_for_this),
                     )
                 }
 
@@ -823,7 +913,7 @@ private fun PreparedAzphaltModelInstallPanel(
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
                 if (trustReady && publisherReady) {
                     AzphaltPill(
-                        label = "Install verified model",
+                        label = stringResource(Res.string.store_install_verified_model),
                         seed = "azphalt-model-install-${prepared.detail.id}",
                         endCap = prepared.version,
                         onClick = onInstall,
@@ -831,9 +921,9 @@ private fun PreparedAzphaltModelInstallPanel(
                 } else {
                     Text(
                         if (!publisherReady) {
-                            "Publisher-key change requires explicit approval."
+                            stringResource(Res.string.store_publisher_key_change_requires_explicit_approval)
                         } else {
-                            "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                            stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,
@@ -859,22 +949,22 @@ private fun PreparedAzphaltInstall(
     val plan = prepared.plan
     AzphaltRecord(
         seed = "azphalt-prepared-${plan.packageId}",
-        eyebrow = "Verified install plan",
+        eyebrow = stringResource(Res.string.store_verified_install_plan),
         title = "${plan.name} ${plan.version}",
         body = buildString {
-            append("${plan.definitions.size} workflow definition")
+            append(stringResource(Res.string.store_workflow_definition, plan.definitions.size))
             if (plan.definitions.size != 1) append('s')
-            if (plan.roles.isNotEmpty()) append(" · ${plan.roles.size} reusable role${if (plan.roles.size == 1) "" else "s"}")
-            if (plan.fragments.isNotEmpty()) append(" · ${plan.fragments.size} fragment${if (plan.fragments.size == 1) "" else "s"}")
+            if (plan.roles.isNotEmpty()) append(pluralStringResource(Res.plurals.store_plan_reusable_role_count, plan.roles.size, plan.roles.size))
+            if (plan.fragments.isNotEmpty()) append(pluralStringResource(Res.plurals.store_plan_fragment_count, plan.fragments.size, plan.fragments.size))
         },
-        endCap = if (plan.trusted) "Trusted" else if (plan.signed) "Unknown signer" else "Unsigned",
+        endCap = if (plan.trusted) stringResource(Res.string.store_trusted) else if (plan.signed) stringResource(Res.string.store_unknown_signer) else stringResource(Res.string.store_unsigned),
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(plan.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
 
                 if (plan.requestedHostPermissions.isNotEmpty()) {
-                    Text("HOST PERMISSION REQUESTS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_host_permission_requests), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                     plan.requestedHostPermissions.sorted().forEach { permission ->
                         val supported = permission !in plan.unsupportedHostPermissions
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -886,7 +976,7 @@ private fun PreparedAzphaltInstall(
                                 enabled = supported,
                             )
                             Text(
-                                if (supported) permission else "$permission · unsupported / denied",
+                                if (supported) permission else stringResource(Res.string.store_unsupported_denied, permission),
                                 style = AzphaltType.body,
                                 color = Azphalt.currentGround.onPage,
                             )
@@ -898,19 +988,19 @@ private fun PreparedAzphaltInstall(
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = "Install despite an unrecognized signing key",
+                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
                     )
                 }
                 if (plan.publisherChanged) {
                     ConfirmationRow(
                         checked = allowPublisherChange,
                         onCheckedChange = onAllowPublisherChangeChanged,
-                        text = "Approve publisher-key change for this package id",
+                        text = stringResource(Res.string.store_approve_publisher_key_change_for_this),
                     )
                 }
 
                 if (prepared.dependencies.isNotEmpty()) {
-                    Text("DEPENDENCIES", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_dependencies), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                     prepared.dependencies.forEach { dependency ->
                         AzphaltNote(
                             seed = "azphalt-dependency-${dependency.dependency.id}",
@@ -924,7 +1014,7 @@ private fun PreparedAzphaltInstall(
                         )
                         if (dependency.status == AzphaltDependencyStatus.InstallRequired) {
                             AzphaltPill(
-                                label = "Prepare dependency",
+                                label = stringResource(Res.string.store_prepare_dependency),
                                 seed = "azphalt-dependency-install-${dependency.dependency.id}",
                                 endCap = dependency.selectedVersion,
                                 onClick = { onPrepareDependency(dependency.dependency.id, dependency.selectedVersion) },
@@ -938,7 +1028,7 @@ private fun PreparedAzphaltInstall(
                 val dependenciesReady = prepared.blockingDependencies.isEmpty()
                 if (trustReady && publisherReady && dependenciesReady) {
                     AzphaltPill(
-                        label = "Install verified package",
+                        label = stringResource(Res.string.store_install_verified_package),
                         seed = "azphalt-install-${plan.packageId}",
                         endCap = plan.version,
                         onClick = onInstall,
@@ -946,9 +1036,9 @@ private fun PreparedAzphaltInstall(
                 } else {
                     Text(
                         when {
-                            !dependenciesReady -> "Install required dependencies before this package."
-                            !publisherReady -> "Publisher-key change requires explicit approval."
-                            else -> "The package signature is valid, but this signer is not trusted. Explicit approval is required."
+                            !dependenciesReady -> stringResource(Res.string.store_install_required_dependencies_before_this_package)
+                            !publisherReady -> stringResource(Res.string.store_publisher_key_change_requires_explicit_approval)
+                            else -> stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,

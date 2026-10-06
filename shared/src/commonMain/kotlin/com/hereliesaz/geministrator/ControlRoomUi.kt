@@ -47,6 +47,18 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.nav_ground
+import com.hereliesaz.geministrator.resources.nav_reroll
+import com.hereliesaz.geministrator.resources.nav_runtime
+import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
+import com.hereliesaz.geministrator.resources.nav_runtime_loading
+import com.hereliesaz.geministrator.resources.nav_runtime_no_project
+import com.hereliesaz.geministrator.resources.nav_runtime_no_run
+import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
+import com.hereliesaz.geministrator.resources.nav_swarm_os
+import com.hereliesaz.geministrator.resources.nav_the_aive
+import org.jetbrains.compose.resources.stringResource
 
 internal object ControlRoomBreakpoints {
     val Wide: Dp = 820.dp
@@ -296,8 +308,8 @@ private fun PillNavigation(
         modifier = modifier.padding(start = 14.dp, top = 22.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("THE AIVE", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
-        Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         Spacer(Modifier.height(12.dp))
         ControlRoomDestination.entries.forEachIndexed { index, item ->
             AzphaltPill(
@@ -315,7 +327,7 @@ private fun PillNavigation(
         AzphaltPill(
             label = Azphalt.currentGround.name,
             seed = "ground",
-            endCap = "Reroll",
+            endCap = stringResource(Res.string.nav_reroll),
             onClick = { Azphalt.rerollGround() },
             modifier = Modifier.fillMaxWidth(0.9f),
         )
@@ -331,10 +343,10 @@ private fun CompactHeader() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text("THE AIVE", style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
-            Text("SWARM OS", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         }
-        AzphaltPill("Ground", "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
+        AzphaltPill(stringResource(Res.string.nav_ground), "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
     }
 }
 
@@ -514,11 +526,12 @@ private fun MainDestination(
     }
 }
 
+@Composable
 private fun runtimeStatusLabel(state: ApplicationRuntimeState): String = when (state) {
-    ApplicationRuntimeState.Loading -> "RUNTIME · LOADING"
-    is ApplicationRuntimeState.NoProject -> "RUNTIME · NO PROJECT"
-    is ApplicationRuntimeState.NoRun -> "RUNTIME · NO RUN"
-    is ApplicationRuntimeState.Live -> "RUNTIME · ${state.presentation.run.status.name.uppercase()}"
-    is ApplicationRuntimeState.Disconnected -> "RUNTIME · DISCONNECTED"
-    is ApplicationRuntimeState.ResumeFailed -> "RUNTIME · RESUME FAILED"
+    ApplicationRuntimeState.Loading -> stringResource(Res.string.nav_runtime_loading)
+    is ApplicationRuntimeState.NoProject -> stringResource(Res.string.nav_runtime_no_project)
+    is ApplicationRuntimeState.NoRun -> stringResource(Res.string.nav_runtime_no_run)
+    is ApplicationRuntimeState.Live -> stringResource(Res.string.nav_runtime, state.presentation.run.status.name.uppercase())
+    is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.nav_runtime_disconnected)
+    is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.nav_runtime_resume_failed)
 }
