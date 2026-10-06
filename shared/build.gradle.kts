@@ -98,6 +98,11 @@ kotlin {
             implementation(npm("aive-memory-worker", memoryWorkerPackage))
         }
 
+        getByName("desktopTest").dependencies {
+            // Native Skia for headless ImageComposeScene renders (CreatureRigRenderTest).
+            implementation(compose.desktop.currentOs)
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
