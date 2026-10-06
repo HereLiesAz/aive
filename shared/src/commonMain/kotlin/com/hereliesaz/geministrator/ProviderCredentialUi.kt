@@ -21,6 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.provider_credential_ai_provider
+import com.hereliesaz.geministrator.resources.provider_credential_connect
+import com.hereliesaz.geministrator.resources.provider_credential_credential
+import com.hereliesaz.geministrator.resources.provider_credential_credential_required
+import com.hereliesaz.geministrator.resources.provider_credential_get
+import com.hereliesaz.geministrator.resources.provider_credential_key_optional
+import com.hereliesaz.geministrator.resources.provider_credential_leave_blank_to_use_the_free
+import com.hereliesaz.geministrator.resources.provider_credential_save
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProviderCredentialSetup(
@@ -47,7 +58,7 @@ fun ProviderCredentialSetup(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "CONNECT",
+                    stringResource(Res.string.provider_credential_connect),
                     style = AzphaltType.hero,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -59,13 +70,13 @@ fun ProviderCredentialSetup(
 
                 AzphaltRecord(
                     seed = "credential-provider-${entry.id}",
-                    eyebrow = "AI provider",
+                    eyebrow = stringResource(Res.string.provider_credential_ai_provider),
                     title = entry.displayName,
                     body = entry.description,
-                    endCap = if (entry.keyOptional) "Key optional" else "Credential required",
+                    endCap = if (entry.keyOptional) stringResource(Res.string.provider_credential_key_optional) else stringResource(Res.string.provider_credential_credential_required),
                     well = {
                         AzphaltPill(
-                            label = "Get ${entry.credentialLabel}",
+                            label = stringResource(Res.string.provider_credential_get, entry.credentialLabel),
                             seed = "credential-link-${entry.id}",
                             onClick = { uriHandler.openUri(entry.apiKeyUrl) },
                         )
@@ -73,7 +84,7 @@ fun ProviderCredentialSetup(
                 )
 
                 Text(
-                    "CREDENTIAL",
+                    stringResource(Res.string.provider_credential_credential),
                     style = AzphaltType.eyebrow,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -85,7 +96,7 @@ fun ProviderCredentialSetup(
                     },
                     label = { Text(entry.credentialLabel) },
                     placeholder = if (entry.keyOptional) {
-                        { Text("Leave blank to use the free tier") }
+                        { Text(stringResource(Res.string.provider_credential_leave_blank_to_use_the_free)) }
                     } else {
                         null
                     },
@@ -100,7 +111,7 @@ fun ProviderCredentialSetup(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AzphaltPill(
-                        label = "Save",
+                        label = stringResource(Res.string.provider_credential_save),
                         seed = "credential-save-${entry.id}",
                         selected = apiKey.isNotBlank() || entry.keyOptional,
                         onClick = {
@@ -115,7 +126,7 @@ fun ProviderCredentialSetup(
                         },
                     )
                     AzphaltPill(
-                        label = "Cancel",
+                        label = stringResource(Res.string.common_cancel),
                         seed = "credential-cancel-${entry.id}",
                         onClick = onCancel,
                     )

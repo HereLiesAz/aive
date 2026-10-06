@@ -34,6 +34,117 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.common_connect
+import com.hereliesaz.geministrator.resources.common_connected
+import com.hereliesaz.geministrator.resources.common_dismiss
+import com.hereliesaz.geministrator.resources.common_retry
+import com.hereliesaz.geministrator.resources.settings_chars
+import com.hereliesaz.geministrator.resources.settings_download_and_a_capable_machine
+import com.hereliesaz.geministrator.resources.settings_of_roles_currently_have
+import com.hereliesaz.geministrator.resources.settings_ai_providers
+import com.hereliesaz.geministrator.resources.settings_automatic_crash_reports_off
+import com.hereliesaz.geministrator.resources.settings_automatic_crash_reports_on
+import com.hereliesaz.geministrator.resources.settings_available
+import com.hereliesaz.geministrator.resources.settings_battery_use_allowed
+import com.hereliesaz.geministrator.resources.settings_check_provider_health
+import com.hereliesaz.geministrator.resources.settings_choose_ive_file_from_another_location
+import com.hereliesaz.geministrator.resources.settings_compute_pool
+import com.hereliesaz.geministrator.resources.settings_compute_pool_id
+import com.hereliesaz.geministrator.resources.settings_connect_as_many_providers_as_you
+import com.hereliesaz.geministrator.resources.settings_connect_this_device_to_the_same
+import com.hereliesaz.geministrator.resources.settings_crash_reports
+import com.hereliesaz.geministrator.resources.settings_credential_configured
+import com.hereliesaz.geministrator.resources.settings_data
+import com.hereliesaz.geministrator.resources.settings_delete_all_workflow_data
+import com.hereliesaz.geministrator.resources.settings_delete_all_workflow_data_2
+import com.hereliesaz.geministrator.resources.settings_delete_everything
+import com.hereliesaz.geministrator.resources.settings_destructive
+import com.hereliesaz.geministrator.resources.settings_device_model_no_workflow_content_or
+import com.hereliesaz.geministrator.resources.settings_diagnostic
+import com.hereliesaz.geministrator.resources.settings_diagnostics
+import com.hereliesaz.geministrator.resources.settings_disconnect
+import com.hereliesaz.geministrator.resources.settings_distributed_compute
+import com.hereliesaz.geministrator.resources.settings_every_device_connects_outbound_to_the
+import com.hereliesaz.geministrator.resources.settings_export_diagnostic_bundle
+import com.hereliesaz.geministrator.resources.settings_export_workflow_data_to_json
+import com.hereliesaz.geministrator.resources.settings_exported_json_chars
+import com.hereliesaz.geministrator.resources.settings_external_power_required
+import com.hereliesaz.geministrator.resources.settings_get_api_key
+import com.hereliesaz.geministrator.resources.settings_hereliesaz_aive_github_issue_tracker_exception
+import com.hereliesaz.geministrator.resources.settings_import
+import com.hereliesaz.geministrator.resources.settings_import_data_from_json
+import com.hereliesaz.geministrator.resources.settings_install_failed
+import com.hereliesaz.geministrator.resources.settings_install_local_planner
+import com.hereliesaz.geministrator.resources.settings_install_released_specialists
+import com.hereliesaz.geministrator.resources.settings_installing
+import com.hereliesaz.geministrator.resources.settings_irreversible
+import com.hereliesaz.geministrator.resources.settings_load
+import com.hereliesaz.geministrator.resources.settings_load_project
+import com.hereliesaz.geministrator.resources.settings_loaded
+import com.hereliesaz.geministrator.resources.settings_local_model_s
+import com.hereliesaz.geministrator.resources.settings_local_orchestration
+import com.hereliesaz.geministrator.resources.settings_local_orchestration_2
+import com.hereliesaz.geministrator.resources.settings_local_planner
+import com.hereliesaz.geministrator.resources.settings_local_planner_2
+import com.hereliesaz.geministrator.resources.settings_local_planner_installed_remove
+import com.hereliesaz.geministrator.resources.settings_local_specialists_installed_remove
+import com.hereliesaz.geministrator.resources.settings_logical_cpus
+import com.hereliesaz.geministrator.resources.settings_maximum_simultaneous_remote_jobs
+import com.hereliesaz.geministrator.resources.settings_metered_allowed
+import com.hereliesaz.geministrator.resources.settings_metered_blocked
+import com.hereliesaz.geministrator.resources.settings_mib
+import com.hereliesaz.geministrator.resources.settings_no_credential_configured
+import com.hereliesaz.geministrator.resources.settings_no_ive_project_files_detected_yet
+import com.hereliesaz.geministrator.resources.settings_node
+import com.hereliesaz.geministrator.resources.settings_not_configured
+import com.hereliesaz.geministrator.resources.settings_not_connected
+import com.hereliesaz.geministrator.resources.settings_observe_only
+import com.hereliesaz.geministrator.resources.settings_ok
+import com.hereliesaz.geministrator.resources.settings_on_by_default_while_the_aive
+import com.hereliesaz.geministrator.resources.settings_online
+import com.hereliesaz.geministrator.resources.settings_online_2
+import com.hereliesaz.geministrator.resources.settings_online_compute_nodes
+import com.hereliesaz.geministrator.resources.settings_paste_exported_json
+import com.hereliesaz.geministrator.resources.settings_permanently_removes_all_projects_runs_events
+import com.hereliesaz.geministrator.resources.settings_plans_workflows_on_this_computer_instead
+import com.hereliesaz.geministrator.resources.settings_pool_configured
+import com.hereliesaz.geministrator.resources.settings_portable_project_state_remains_separate_from
+import com.hereliesaz.geministrator.resources.settings_privacy
+import com.hereliesaz.geministrator.resources.settings_project_file
+import com.hereliesaz.geministrator.resources.settings_project_files
+import com.hereliesaz.geministrator.resources.settings_project_files_use_the_ive_extension
+import com.hereliesaz.geministrator.resources.settings_project_load_failed
+import com.hereliesaz.geministrator.resources.settings_project_save_failed
+import com.hereliesaz.geministrator.resources.settings_projects
+import com.hereliesaz.geministrator.resources.settings_provider
+import com.hereliesaz.geministrator.resources.settings_ready
+import com.hereliesaz.geministrator.resources.settings_reconfigure
+import com.hereliesaz.geministrator.resources.settings_refresh_detected_project_files
+import com.hereliesaz.geministrator.resources.settings_refresh_health
+import com.hereliesaz.geministrator.resources.settings_relay_pool_device_identity_and_token
+import com.hereliesaz.geministrator.resources.settings_relay_token
+import com.hereliesaz.geministrator.resources.settings_relay_token_leave_blank_to_keep
+import com.hereliesaz.geministrator.resources.settings_relay_url_wss
+import com.hereliesaz.geministrator.resources.settings_retry_install
+import com.hereliesaz.geministrator.resources.settings_retry_specialist_install
+import com.hereliesaz.geministrator.resources.settings_run_diagnostic_bundle
+import com.hereliesaz.geministrator.resources.settings_runs_released_orchestration_utility_specialists_on
+import com.hereliesaz.geministrator.resources.settings_save_connect
+import com.hereliesaz.geministrator.resources.settings_save_current_project
+import com.hereliesaz.geministrator.resources.settings_save_project_as
+import com.hereliesaz.geministrator.resources.settings_saved
+import com.hereliesaz.geministrator.resources.settings_settings
+import com.hereliesaz.geministrator.resources.settings_setup
+import com.hereliesaz.geministrator.resources.settings_sharing_compute_off
+import com.hereliesaz.geministrator.resources.settings_sharing_compute_on
+import com.hereliesaz.geministrator.resources.settings_stable_device_id
+import com.hereliesaz.geministrator.resources.settings_this_device_name
+import com.hereliesaz.geministrator.resources.settings_unreleased_roles_keep_the_deterministic_implementation
+import com.hereliesaz.geministrator.resources.settings_whenever_the_local_planner_is_not
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun CompanyProviderScreen(
@@ -354,10 +465,10 @@ internal fun ProviderSettingsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("SETTINGS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
-        ProviderSectionLabel("AI Providers")
+        Text(stringResource(Res.string.settings_settings), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
         Text(
-            "Connect as many providers as you have access to. Every swarm role can be routed independently from the Swarm screen.",
+            stringResource(Res.string.settings_connect_as_many_providers_as_you),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -367,34 +478,34 @@ internal fun ProviderSettingsScreen(
             val health = healthResults?.get(entry.id)
             AzphaltRecord(
                 seed = "provider-catalog-${entry.id}",
-                eyebrow = "Provider",
+                eyebrow = stringResource(Res.string.settings_provider),
                 title = entry.displayName,
                 body = buildString {
                     append(entry.description)
                     append("\n")
-                    append(if (connected) health ?: "Credential configured" else "No credential configured")
+                    append(if (connected) health ?: stringResource(Res.string.settings_credential_configured) else stringResource(Res.string.settings_no_credential_configured))
                 },
                 endCap = when {
-                    !connected -> "Not configured"
+                    !connected -> stringResource(Res.string.settings_not_configured)
                     health != null -> health.substringBefore(" ·")
-                    else -> "Connected"
+                    else -> stringResource(Res.string.common_connected)
                 },
                 well = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AzphaltPill(
-                            if (connected) "Reconfigure" else "Connect",
+                            if (connected) stringResource(Res.string.settings_reconfigure) else stringResource(Res.string.common_connect),
                             "configure-provider-${entry.id}",
                             onClick = { onConfigureProvider(entry.id) },
                         )
                         if (connected) {
                             AzphaltPill(
-                                "Disconnect",
+                                stringResource(Res.string.settings_disconnect),
                                 "disconnect-provider-${entry.id}",
                                 onClick = { onDisconnectProvider(entry.id) },
                             )
                         }
                         AzphaltPill(
-                            "Get API key",
+                            stringResource(Res.string.settings_get_api_key),
                             "get-key-${entry.id}",
                             onClick = { uriHandler.openUri(entry.apiKeyUrl) },
                         )
@@ -410,7 +521,7 @@ internal fun ProviderSettingsScreen(
             }
         }
         AzphaltPill(
-            if (healthResults == null) "Check provider health" else "Refresh health",
+            if (healthResults == null) stringResource(Res.string.settings_check_provider_health) else stringResource(Res.string.settings_refresh_health),
             "health-check",
             onClick = {
                 healthChecking = true
@@ -420,16 +531,16 @@ internal fun ProviderSettingsScreen(
         )
 
         crashReportingSetting?.let { setting ->
-            ProviderSectionLabel("Crash Reports")
+            ProviderSectionLabel(stringResource(Res.string.settings_crash_reports))
             Text(
-                "On by default while The Aive is pre-release. When enabled, crashes and app-not-responding events are sent automatically to the " +
-                    "HereLiesAz/aive GitHub issue tracker (exception, stack trace, app version, Android version, " +
-                    "device model). No workflow content or credentials are included.",
+                stringResource(Res.string.settings_on_by_default_while_the_aive) +
+                    stringResource(Res.string.settings_hereliesaz_aive_github_issue_tracker_exception) +
+                    stringResource(Res.string.settings_device_model_no_workflow_content_or),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
             AzphaltPill(
-                if (setting.enabled) "Automatic crash reports: ON" else "Automatic crash reports: OFF",
+                if (setting.enabled) stringResource(Res.string.settings_automatic_crash_reports_on) else stringResource(Res.string.settings_automatic_crash_reports_off),
                 "crash-reporting-toggle",
                 selected = setting.enabled,
                 onClick = { setting.onEnabledChange(!setting.enabled) },
@@ -438,30 +549,30 @@ internal fun ProviderSettingsScreen(
         }
 
         localPlannerSetting?.let { setting ->
-            ProviderSectionLabel("Local Planner")
+            ProviderSectionLabel(stringResource(Res.string.settings_local_planner))
             Text(
-                "Plans workflows on this computer instead of the linked LLM. Needs a " +
-                    "${setting.downloadSize} download and a capable machine. The linked LLM still plans " +
-                    "whenever the local planner is not installed or fails, and always handles plan repair.",
+                stringResource(Res.string.settings_plans_workflows_on_this_computer_instead) +
+                    stringResource(Res.string.settings_download_and_a_capable_machine, setting.downloadSize) +
+                    stringResource(Res.string.settings_whenever_the_local_planner_is_not),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
             when (val status = setting.status) {
                 LocalPlannerStatus.NotInstalled -> AzphaltPill(
-                    "Install local planner (${setting.downloadSize})",
+                    stringResource(Res.string.settings_install_local_planner, setting.downloadSize),
                     "local-planner-install",
                     onClick = setting.onInstall,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 is LocalPlannerStatus.Installing -> AzphaltRecord(
                     seed = "local-planner-installing",
-                    eyebrow = "Local planner",
-                    title = "Installing",
+                    eyebrow = stringResource(Res.string.settings_local_planner_2),
+                    title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
                 )
                 LocalPlannerStatus.Installed -> AzphaltPill(
-                    "Local planner installed: remove",
+                    stringResource(Res.string.settings_local_planner_installed_remove),
                     "local-planner-remove",
                     selected = true,
                     onClick = setting.onRemove,
@@ -470,13 +581,13 @@ internal fun ProviderSettingsScreen(
                 is LocalPlannerStatus.Failed -> {
                     AzphaltRecord(
                         seed = "local-planner-failed",
-                        eyebrow = "Local planner",
-                        title = "Install failed",
+                        eyebrow = stringResource(Res.string.settings_local_planner_2),
+                        title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
-                        endCap = "Retry",
+                        endCap = stringResource(Res.string.common_retry),
                     )
                     AzphaltPill(
-                        "Retry install (${setting.downloadSize})",
+                        stringResource(Res.string.settings_retry_install, setting.downloadSize),
                         "local-planner-retry",
                         onClick = setting.onInstall,
                         modifier = Modifier.fillMaxWidth(),
@@ -486,30 +597,30 @@ internal fun ProviderSettingsScreen(
         }
 
         localOrchestrationSpecialistSetting?.let { setting ->
-            ProviderSectionLabel("Local Orchestration")
+            ProviderSectionLabel(stringResource(Res.string.settings_local_orchestration))
             Text(
-                "Runs released orchestration utility specialists on this device. " +
-                    "${setting.releasedRoles} of ${setting.totalRoles} roles currently have released models; " +
-                    "unreleased roles keep the deterministic implementation.",
+                stringResource(Res.string.settings_runs_released_orchestration_utility_specialists_on) +
+                    stringResource(Res.string.settings_of_roles_currently_have, setting.releasedRoles, setting.totalRoles) +
+                    stringResource(Res.string.settings_unreleased_roles_keep_the_deterministic_implementation),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
             when (val status = setting.status) {
                 LocalOrchestrationSpecialistStatus.NotInstalled -> AzphaltPill(
-                    "Install released specialists",
+                    stringResource(Res.string.settings_install_released_specialists),
                     "local-orchestration-install",
                     onClick = setting.onInstall,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 is LocalOrchestrationSpecialistStatus.Installing -> AzphaltRecord(
                     seed = "local-orchestration-installing",
-                    eyebrow = "Local orchestration",
-                    title = "Installing",
+                    eyebrow = stringResource(Res.string.settings_local_orchestration_2),
+                    title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
                 )
                 LocalOrchestrationSpecialistStatus.Installed -> AzphaltPill(
-                    "Local specialists installed: remove",
+                    stringResource(Res.string.settings_local_specialists_installed_remove),
                     "local-orchestration-remove",
                     selected = true,
                     onClick = setting.onRemove,
@@ -518,13 +629,13 @@ internal fun ProviderSettingsScreen(
                 is LocalOrchestrationSpecialistStatus.Failed -> {
                     AzphaltRecord(
                         seed = "local-orchestration-failed",
-                        eyebrow = "Local orchestration",
-                        title = "Install failed",
+                        eyebrow = stringResource(Res.string.settings_local_orchestration_2),
+                        title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
-                        endCap = "Retry",
+                        endCap = stringResource(Res.string.common_retry),
                     )
                     AzphaltPill(
-                        "Retry specialist install",
+                        stringResource(Res.string.settings_retry_specialist_install),
                         "local-orchestration-retry",
                         onClick = setting.onInstall,
                         modifier = Modifier.fillMaxWidth(),
@@ -533,25 +644,25 @@ internal fun ProviderSettingsScreen(
             }
         }
 
-        ProviderSectionLabel("Compute Pool")
+        ProviderSectionLabel(stringResource(Res.string.settings_compute_pool))
         Text(
-            "Connect this device to the same Aive compute pool as your other phones and desktops. " +
-                "Every device connects outbound to the relay, so no inbound port or shared local network is required.",
+            stringResource(Res.string.settings_connect_this_device_to_the_same) +
+                stringResource(Res.string.settings_every_device_connects_outbound_to_the),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
         AzphaltRecord(
             seed = "distributed-compute-status",
-            eyebrow = "Distributed compute",
-            title = if (distributedComputeState.connected) "Connected" else "Not connected",
+            eyebrow = stringResource(Res.string.settings_distributed_compute),
+            title = if (distributedComputeState.connected) stringResource(Res.string.common_connected) else stringResource(Res.string.settings_not_connected),
             body = buildString {
-                append(if (distributedComputeState.ready) "Pool configured" else "Relay, pool, device identity, and token are required")
+                append(if (distributedComputeState.ready) stringResource(Res.string.settings_pool_configured) else stringResource(Res.string.settings_relay_pool_device_identity_and_token))
                 if (distributedComputeState.onlineNodes.isNotEmpty()) {
                     append("\n")
                     append(distributedComputeState.onlineNodes.size)
-                    append(" node")
+                    append(stringResource(Res.string.settings_node))
                     if (distributedComputeState.onlineNodes.size != 1) append("s")
-                    append(" online")
+                    append(stringResource(Res.string.settings_online))
                 }
                 distributedComputeState.lastError?.let {
                     append("\n")
@@ -559,36 +670,36 @@ internal fun ProviderSettingsScreen(
                 }
             },
             endCap = when {
-                distributedComputeState.connected -> "Online"
-                distributedComputeState.ready -> "Ready"
-                else -> "Setup"
+                distributedComputeState.connected -> stringResource(Res.string.settings_online_2)
+                distributedComputeState.ready -> stringResource(Res.string.settings_ready)
+                else -> stringResource(Res.string.settings_setup)
             },
         )
         OutlinedTextField(
             value = relayUrlDraft,
             onValueChange = { relayUrlDraft = it },
-            label = { Text("Relay URL (wss://...)") },
+            label = { Text(stringResource(Res.string.settings_relay_url_wss)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = poolIdDraft,
             onValueChange = { poolIdDraft = it },
-            label = { Text("Compute pool ID") },
+            label = { Text(stringResource(Res.string.settings_compute_pool_id)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = nodeNameDraft,
             onValueChange = { nodeNameDraft = it },
-            label = { Text("This device name") },
+            label = { Text(stringResource(Res.string.settings_this_device_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = nodeIdDraft,
             onValueChange = { nodeIdDraft = it },
-            label = { Text("Stable device ID") },
+            label = { Text(stringResource(Res.string.settings_stable_device_id)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -598,9 +709,9 @@ internal fun ProviderSettingsScreen(
             label = {
                 Text(
                     if (distributedComputeState.tokenConfigured) {
-                        "Relay token (leave blank to keep existing)"
+                        stringResource(Res.string.settings_relay_token_leave_blank_to_keep)
                     } else {
-                        "Relay token"
+                        stringResource(Res.string.settings_relay_token)
                     },
                 )
             },
@@ -610,33 +721,33 @@ internal fun ProviderSettingsScreen(
         OutlinedTextField(
             value = maxParallelDraft,
             onValueChange = { value -> maxParallelDraft = value.filter(Char::isDigit).take(2) },
-            label = { Text("Maximum simultaneous remote jobs") },
+            label = { Text(stringResource(Res.string.settings_maximum_simultaneous_remote_jobs)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(
-                if (sharingEnabledDraft) "Sharing compute: ON" else "Sharing compute: OFF",
+                if (sharingEnabledDraft) stringResource(Res.string.settings_sharing_compute_on) else stringResource(Res.string.settings_sharing_compute_off),
                 "distributed-sharing-toggle",
                 selected = sharingEnabledDraft,
                 onClick = { sharingEnabledDraft = !sharingEnabledDraft },
             )
             AzphaltPill(
-                if (allowMeteredDraft) "Metered: allowed" else "Metered: blocked",
+                if (allowMeteredDraft) stringResource(Res.string.settings_metered_allowed) else stringResource(Res.string.settings_metered_blocked),
                 "distributed-metered-toggle",
                 selected = allowMeteredDraft,
                 onClick = { allowMeteredDraft = !allowMeteredDraft },
             )
         }
         AzphaltPill(
-            if (requirePowerDraft) "External power required" else "Battery use allowed",
+            if (requirePowerDraft) stringResource(Res.string.settings_external_power_required) else stringResource(Res.string.settings_battery_use_allowed),
             "distributed-power-toggle",
             selected = requirePowerDraft,
             onClick = { requirePowerDraft = !requirePowerDraft },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(
-                "Save & connect",
+                stringResource(Res.string.settings_save_connect),
                 "distributed-save",
                 onClick = {
                     val maxParallel = maxParallelDraft.toIntOrNull()?.coerceAtLeast(1) ?: 1
@@ -658,14 +769,14 @@ internal fun ProviderSettingsScreen(
             )
             if (distributedComputeState.ready) {
                 AzphaltPill(
-                    "Disconnect",
+                    stringResource(Res.string.settings_disconnect),
                     "distributed-disconnect",
                     onClick = onDisconnectDistributedCompute,
                 )
             }
         }
         if (distributedComputeState.onlineNodes.isNotEmpty()) {
-            Text("ONLINE COMPUTE NODES", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.settings_online_compute_nodes), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
             distributedComputeState.onlineNodes.sortedBy { it.displayName }.forEach { node ->
                 AzphaltRecord(
                     seed = "compute-node-" + node.nodeId,
@@ -675,9 +786,9 @@ internal fun ProviderSettingsScreen(
                         append(node.architecture)
                         append(" · ")
                         append(node.logicalProcessors)
-                        append(" logical CPUs · ")
+                        append(stringResource(Res.string.settings_logical_cpus))
                         append(node.memoryMiB)
-                        append(" MiB")
+                        append(stringResource(Res.string.settings_mib))
                         if (node.accelerators.isNotEmpty()) {
                             append("\n")
                             append(node.accelerators.joinToString { it.name })
@@ -685,24 +796,24 @@ internal fun ProviderSettingsScreen(
                         if (node.installedModelIds.isNotEmpty()) {
                             append(" · ")
                             append(node.installedModelIds.size)
-                            append(" local model(s)")
+                            append(stringResource(Res.string.settings_local_model_s))
                         }
                     },
-                    endCap = if (node.acceptsWork) "Available" else "Observe only",
+                    endCap = if (node.acceptsWork) stringResource(Res.string.settings_available) else stringResource(Res.string.settings_observe_only),
                 )
             }
         }
 
-        ProviderSectionLabel("Projects")
+        ProviderSectionLabel(stringResource(Res.string.settings_projects))
         if (projectFileService != null) {
             Text(
-                "Project files use the .ive extension. The detected list includes Aive's project folder and files you previously selected elsewhere.",
+                stringResource(Res.string.settings_project_files_use_the_ive_extension),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(
-                    "Save current project",
+                    stringResource(Res.string.settings_save_current_project),
                     "ive-save-default",
                     onClick = {
                         scope.launch {
@@ -711,16 +822,16 @@ internal fun ProviderSettingsScreen(
                                     ?: error("No project is currently loaded")
                                 projectFileService.saveDefault(export.fileName, export.content)
                             }.onSuccess { descriptor ->
-                                projectFileMessage = "Saved ${descriptor.displayName}"
+                                projectFileMessage = getString(Res.string.settings_saved, descriptor.displayName)
                                 projectFileRefresh += 1
                             }.onFailure { failure ->
-                                projectFileMessage = failure.message ?: "Project save failed"
+                                projectFileMessage = failure.message ?: getString(Res.string.settings_project_save_failed)
                             }
                         }
                     },
                 )
                 AzphaltPill(
-                    "Save project as…",
+                    stringResource(Res.string.settings_save_project_as),
                     "ive-save-as",
                     onClick = {
                         scope.launch {
@@ -730,11 +841,11 @@ internal fun ProviderSettingsScreen(
                                 projectFileService.saveAs(export.fileName, export.content)
                             }.onSuccess { descriptor ->
                                 if (descriptor != null) {
-                                    projectFileMessage = "Saved ${descriptor.displayName}"
+                                    projectFileMessage = getString(Res.string.settings_saved, descriptor.displayName)
                                     projectFileRefresh += 1
                                 }
                             }.onFailure { failure ->
-                                projectFileMessage = failure.message ?: "Project save failed"
+                                projectFileMessage = failure.message ?: getString(Res.string.settings_project_save_failed)
                             }
                         }
                     },
@@ -742,7 +853,7 @@ internal fun ProviderSettingsScreen(
             }
             if (detectedProjectFiles.isEmpty()) {
                 Text(
-                    "No .ive project files detected yet.",
+                    stringResource(Res.string.settings_no_ive_project_files_detected_yet),
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
@@ -750,13 +861,13 @@ internal fun ProviderSettingsScreen(
                 detectedProjectFiles.forEach { descriptor ->
                     AzphaltRecord(
                         seed = "ive-project-${descriptor.id}",
-                        eyebrow = "Project file",
+                        eyebrow = stringResource(Res.string.settings_project_file),
                         title = descriptor.displayName,
                         body = descriptor.locationLabel,
-                        endCap = "Load",
+                        endCap = stringResource(Res.string.settings_load),
                         well = {
                             AzphaltPill(
-                                "Load project",
+                                stringResource(Res.string.settings_load_project),
                                 "ive-load-${descriptor.id}",
                                 onClick = {
                                     scope.launch {
@@ -766,10 +877,10 @@ internal fun ProviderSettingsScreen(
                                             onImportProjectFile(opened.content)
                                                 ?: error("Project could not be loaded")
                                         }.onSuccess { projectName ->
-                                            projectFileMessage = "Loaded $projectName"
+                                            projectFileMessage = getString(Res.string.settings_loaded, projectName)
                                             projectFileRefresh += 1
                                         }.onFailure { failure ->
-                                            projectFileMessage = failure.message ?: "Project load failed"
+                                            projectFileMessage = failure.message ?: getString(Res.string.settings_project_load_failed)
                                         }
                                     }
                                 },
@@ -779,7 +890,7 @@ internal fun ProviderSettingsScreen(
                 }
             }
             AzphaltPill(
-                "Choose .ive file from another location…",
+                stringResource(Res.string.settings_choose_ive_file_from_another_location),
                 "ive-open-picker",
                 onClick = {
                     scope.launch {
@@ -788,17 +899,17 @@ internal fun ProviderSettingsScreen(
                             onImportProjectFile(opened.content)
                                 ?: error("Project could not be loaded")
                         }.onSuccess { projectName ->
-                            projectFileMessage = "Loaded $projectName"
+                            projectFileMessage = getString(Res.string.settings_loaded, projectName)
                             projectFileRefresh += 1
                         }.onFailure { failure ->
-                            projectFileMessage = failure.message ?: "Project load failed"
+                            projectFileMessage = failure.message ?: getString(Res.string.settings_project_load_failed)
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
             AzphaltPill(
-                "Refresh detected project files",
+                stringResource(Res.string.settings_refresh_detected_project_files),
                 "ive-refresh",
                 onClick = { projectFileRefresh += 1 },
                 modifier = Modifier.fillMaxWidth(),
@@ -806,16 +917,16 @@ internal fun ProviderSettingsScreen(
             projectFileMessage?.let { message ->
                 AzphaltRecord(
                     seed = "ive-project-message",
-                    eyebrow = "Project files",
+                    eyebrow = stringResource(Res.string.settings_project_files),
                     title = message,
-                    body = "Portable project state remains separate from provider API keys and repository tokens.",
-                    endCap = "OK",
+                    body = stringResource(Res.string.settings_portable_project_state_remains_separate_from),
+                    endCap = stringResource(Res.string.settings_ok),
                     onClick = { projectFileMessage = null },
                 )
             }
         }
 
-        ProviderSectionLabel("Data")
+        ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
                 exportedJson = onExportJson()
@@ -824,7 +935,7 @@ internal fun ProviderSettingsScreen(
         }
         if (exportedJson == null) {
             AzphaltPill(
-                "Export workflow data to JSON",
+                stringResource(Res.string.settings_export_workflow_data_to_json),
                 "export-trigger",
                 onClick = { exportTriggered = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -834,15 +945,15 @@ internal fun ProviderSettingsScreen(
                 value = exportedJson!!,
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("Exported JSON (${exportedJson!!.length} chars)") },
+                label = { Text(stringResource(Res.string.settings_exported_json_chars, exportedJson!!.length)) },
                 modifier = Modifier.fillMaxWidth().height(160.dp),
             )
-            AzphaltPill("Dismiss", "export-dismiss", onClick = { exportedJson = null })
+            AzphaltPill(stringResource(Res.string.common_dismiss), "export-dismiss", onClick = { exportedJson = null })
         }
 
         if (!importMode) {
             AzphaltPill(
-                "Import data from JSON",
+                stringResource(Res.string.settings_import_data_from_json),
                 "import-mode-enter",
                 onClick = { importMode = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -851,25 +962,25 @@ internal fun ProviderSettingsScreen(
             OutlinedTextField(
                 value = importDraft,
                 onValueChange = { importDraft = it },
-                label = { Text("Paste exported JSON") },
+                label = { Text(stringResource(Res.string.settings_paste_exported_json)) },
                 modifier = Modifier.fillMaxWidth().height(120.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill("Import", "import-confirm", onClick = {
+                AzphaltPill(stringResource(Res.string.settings_import), "import-confirm", onClick = {
                     if (importDraft.isNotBlank()) {
                         onImportJson(importDraft)
                         importDraft = ""
                         importMode = false
                     }
                 })
-                AzphaltPill("Cancel", "import-cancel", onClick = {
+                AzphaltPill(stringResource(Res.string.common_cancel), "import-cancel", onClick = {
                     importDraft = ""
                     importMode = false
                 })
             }
         }
 
-        ProviderSectionLabel("Diagnostics")
+        ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
                 diagnosticBundle = onExportDiagnosticBundle()
@@ -878,7 +989,7 @@ internal fun ProviderSettingsScreen(
         }
         if (diagnosticBundle == null) {
             AzphaltPill(
-                "Export diagnostic bundle",
+                stringResource(Res.string.settings_export_diagnostic_bundle),
                 "diagnostic-trigger",
                 onClick = { diagnosticTriggered = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -886,18 +997,18 @@ internal fun ProviderSettingsScreen(
         } else {
             AzphaltRecord(
                 seed = "diagnostic-result",
-                eyebrow = "Diagnostic",
-                title = "Run diagnostic bundle",
+                eyebrow = stringResource(Res.string.settings_diagnostic),
+                title = stringResource(Res.string.settings_run_diagnostic_bundle),
                 body = diagnosticBundle!!.take(300).let { if (diagnosticBundle!!.length > 300) "$it…" else it },
-                endCap = "${diagnosticBundle!!.length} chars",
+                endCap = stringResource(Res.string.settings_chars, diagnosticBundle!!.length),
                 onClick = { diagnosticBundle = null },
             )
         }
 
-        ProviderSectionLabel("Privacy")
+        ProviderSectionLabel(stringResource(Res.string.settings_privacy))
         if (!clearConfirm) {
             AzphaltPill(
-                "Delete all workflow data",
+                stringResource(Res.string.settings_delete_all_workflow_data),
                 "clear-data-enter",
                 onClick = { clearConfirm = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -905,17 +1016,17 @@ internal fun ProviderSettingsScreen(
         } else {
             AzphaltRecord(
                 seed = "clear-confirm",
-                eyebrow = "Destructive",
-                title = "Delete all workflow data?",
-                body = "Permanently removes all projects, runs, events, and artifacts from this device. Provider credentials are managed separately.",
-                endCap = "Irreversible",
+                eyebrow = stringResource(Res.string.settings_destructive),
+                title = stringResource(Res.string.settings_delete_all_workflow_data_2),
+                body = stringResource(Res.string.settings_permanently_removes_all_projects_runs_events),
+                endCap = stringResource(Res.string.settings_irreversible),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill("Delete everything", "clear-data-confirm", onClick = {
+                AzphaltPill(stringResource(Res.string.settings_delete_everything), "clear-data-confirm", onClick = {
                     onClearWorkflowData()
                     clearConfirm = false
                 })
-                AzphaltPill("Cancel", "clear-data-cancel", onClick = { clearConfirm = false })
+                AzphaltPill(stringResource(Res.string.common_cancel), "clear-data-cancel", onClick = { clearConfirm = false })
             }
         }
     }

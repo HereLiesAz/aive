@@ -33,6 +33,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.steps_starting_run
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * One row of the live-steps feed.
@@ -197,7 +200,7 @@ internal fun LaunchStepsOverlay(
     ) {
         Column(modifier = Modifier.widthIn(max = 520.dp)) {
             Text(
-                "STARTING RUN",
+                stringResource(Res.string.steps_starting_run),
                 style = AzphaltType.eyebrow,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp),

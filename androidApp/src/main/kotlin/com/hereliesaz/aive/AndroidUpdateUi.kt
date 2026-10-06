@@ -1,6 +1,7 @@
 package com.hereliesaz.aive
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import com.hereliesaz.geministrator.AzphaltAlertDialog
 
 internal sealed interface AndroidUpdateState {
@@ -26,7 +27,18 @@ internal fun AndroidUpdatePrompt(
             confirmLabel = "Install update",
             onConfirm = onInstallGithubUpdate,
             onDismissRequest = onDismiss,
-            dismissLabel = "Later",
+            title = { Text(stringResource(R.string.update_ready_title, state.version)) },
+            text = {
+                Text(
+                    stringResource(R.string.update_ready_body),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = onInstallGithubUpdate) { Text(stringResource(R.string.update_install)) }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
+            },
         )
 
         AndroidUpdateState.PlayUpdateAvailable -> AzphaltAlertDialog(
@@ -35,7 +47,16 @@ internal fun AndroidUpdatePrompt(
             confirmLabel = "Open Play Store",
             onConfirm = onOpenPlayStore,
             onDismissRequest = onDismiss,
-            dismissLabel = "Later",
+            title = { Text(stringResource(R.string.update_play_title)) },
+            text = {
+                Text(stringResource(R.string.update_play_body))
+            },
+            confirmButton = {
+                TextButton(onClick = onOpenPlayStore) { Text(stringResource(R.string.update_open_play_store)) }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
+            },
         )
 
         else -> Unit

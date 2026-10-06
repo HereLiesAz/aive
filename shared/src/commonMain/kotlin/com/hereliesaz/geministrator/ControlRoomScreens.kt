@@ -65,6 +65,67 @@ import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.events.WorkflowCreated
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.events.WorkflowFailed
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_approve
+import com.hereliesaz.geministrator.resources.common_inbox
+import com.hereliesaz.geministrator.resources.common_reject
+import com.hereliesaz.geministrator.resources.common_retry
+import com.hereliesaz.geministrator.resources.runs_active
+import com.hereliesaz.geministrator.resources.runs_agent_assigned
+import com.hereliesaz.geministrator.resources.runs_approval_required
+import com.hereliesaz.geministrator.resources.runs_approve_to_begin_execution
+import com.hereliesaz.geministrator.resources.runs_approved
+import com.hereliesaz.geministrator.resources.runs_artifact_created
+import com.hereliesaz.geministrator.resources.runs_attempt_of
+import com.hereliesaz.geministrator.resources.runs_authority
+import com.hereliesaz.geministrator.resources.runs_cancelled
+import com.hereliesaz.geministrator.resources.runs_created
+import com.hereliesaz.geministrator.resources.runs_done
+import com.hereliesaz.geministrator.resources.runs_evidence
+import com.hereliesaz.geministrator.resources.runs_executor_assigned
+import com.hereliesaz.geministrator.resources.runs_expanded_oauth_scope_challenged
+import com.hereliesaz.geministrator.resources.runs_failed
+import com.hereliesaz.geministrator.resources.runs_failure_escalation
+import com.hereliesaz.geministrator.resources.runs_failure_escalation_2
+import com.hereliesaz.geministrator.resources.runs_foo_authentication
+import com.hereliesaz.geministrator.resources.runs_human_decision_required
+import com.hereliesaz.geministrator.resources.runs_human_decision_required_2
+import com.hereliesaz.geministrator.resources.runs_infra_release
+import com.hereliesaz.geministrator.resources.runs_inspector
+import com.hereliesaz.geministrator.resources.runs_integration_approval_after_independent_review
+import com.hereliesaz.geministrator.resources.runs_loading
+import com.hereliesaz.geministrator.resources.runs_marketplace_security
+import com.hereliesaz.geministrator.resources.runs_needs_you
+import com.hereliesaz.geministrator.resources.runs_no_pending_decisions
+import com.hereliesaz.geministrator.resources.runs_no_projects_yet
+import com.hereliesaz.geministrator.resources.runs_no_runs
+import com.hereliesaz.geministrator.resources.runs_plan_approval
+import com.hereliesaz.geministrator.resources.runs_reject_reassigns_to
+import com.hereliesaz.geministrator.resources.runs_reject_stops_the_workflow
+import com.hereliesaz.geministrator.resources.runs_rejected
+import com.hereliesaz.geministrator.resources.runs_release_failed_after_3_attempts
+import com.hereliesaz.geministrator.resources.runs_retry_scheduled_attempt
+import com.hereliesaz.geministrator.resources.runs_run
+import com.hereliesaz.geministrator.resources.runs_running
+import com.hereliesaz.geministrator.resources.runs_runs
+import com.hereliesaz.geministrator.resources.runs_security_risk
+import com.hereliesaz.geministrator.resources.runs_stop
+import com.hereliesaz.geministrator.resources.runs_task_cancelled
+import com.hereliesaz.geministrator.resources.runs_task_completed
+import com.hereliesaz.geministrator.resources.runs_task_escalated
+import com.hereliesaz.geministrator.resources.runs_task_failed
+import com.hereliesaz.geministrator.resources.runs_task_ready
+import com.hereliesaz.geministrator.resources.runs_task_started_attempt
+import com.hereliesaz.geministrator.resources.runs_timeline
+import com.hereliesaz.geministrator.resources.runs_upcoming
+import com.hereliesaz.geministrator.resources.runs_usage_recorded
+import com.hereliesaz.geministrator.resources.runs_verification_failed
+import com.hereliesaz.geministrator.resources.runs_waiting
+import com.hereliesaz.geministrator.resources.runs_workflow_cancelled
+import com.hereliesaz.geministrator.resources.runs_workflow_completed
+import com.hereliesaz.geministrator.resources.runs_workflow_created
+import com.hereliesaz.geministrator.resources.runs_workflow_failed
+import org.jetbrains.compose.resources.stringResource
 
 /** The inspector with nothing live to show: says so instead of showing sample data. */
 @Composable
@@ -73,7 +134,7 @@ internal fun EmptyTechnicalInspector(message: String, modifier: Modifier = Modif
         modifier = modifier.background(Azphalt.Ink).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("INSPECTOR", style = AzphaltType.eyebrow, color = Azphalt.Yellow)
+        Text(stringResource(Res.string.runs_inspector), style = AzphaltType.eyebrow, color = Azphalt.Yellow)
         Text(message, style = AzphaltType.body, color = Azphalt.White)
     }
 }
@@ -269,13 +330,13 @@ internal fun InboxScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("INBOX", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         if (liveWorkflow != null) {
             val pending = liveWorkflow.run.taskRuns.values.filter {
                 it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated
             }
             if (pending.isEmpty()) {
-                Text("No pending decisions.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.runs_no_pending_decisions), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
             } else {
                 pending.forEach { taskRun ->
                     val task = liveWorkflow.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }
@@ -283,31 +344,31 @@ internal fun InboxScreen(
                     val isPlanApproval = taskRun.status == TaskRunStatus.AwaitingApproval
                     val scope = buildString {
                         if (isPlanApproval) {
-                            append("Approve to begin execution")
+                            append(stringResource(Res.string.runs_approve_to_begin_execution))
                             task?.approvalPolicy?.let {
-                                if (it is ApprovalPolicy.RoleApproval) append(" · authority: ${it.authority.name}")
+                                if (it is ApprovalPolicy.RoleApproval) append(stringResource(Res.string.runs_authority, it.authority.name))
                             }
                         } else {
                             val maxAttempts = task?.retryPolicy?.maxAttempts ?: 2
-                            append("Attempt ${taskRun.attempt} of $maxAttempts")
+                            append(stringResource(Res.string.runs_attempt_of, taskRun.attempt, maxAttempts))
                             task?.escalationPolicy?.let { ep ->
                                 when (ep) {
-                                    is EscalationPolicy.FailWorkflow -> append(" · Reject stops the workflow")
-                                    is EscalationPolicy.RequireHumanDecision -> append(" · Human decision required")
-                                    is EscalationPolicy.Reassign -> append(" · Reject reassigns to ${ep.roleId.value}")
+                                    is EscalationPolicy.FailWorkflow -> append(stringResource(Res.string.runs_reject_stops_the_workflow))
+                                    is EscalationPolicy.RequireHumanDecision -> append(stringResource(Res.string.runs_human_decision_required))
+                                    is EscalationPolicy.Reassign -> append(stringResource(Res.string.runs_reject_reassigns_to, ep.roleId.value))
                                 }
                             }
                         }
                     }
                     AzphaltRecord(
                         seed = taskId,
-                        eyebrow = if (isPlanApproval) "Plan Approval" else "Failure Escalation",
+                        eyebrow = if (isPlanApproval) stringResource(Res.string.runs_plan_approval) else stringResource(Res.string.runs_failure_escalation),
                         title = task?.name ?: taskId,
                         body = buildString {
                             val primary = if (isPlanApproval) {
                                 taskRun.progressMessage?.takeIf(String::isNotBlank) ?: task?.objective ?: ""
                             } else {
-                                taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: "Task failed"
+                                taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: stringResource(Res.string.runs_task_failed)
                             }
                             append(primary)
                             if (scope.isNotBlank()) {
@@ -315,11 +376,11 @@ internal fun InboxScreen(
                                 append(scope)
                             }
                         },
-                        endCap = "Needs you",
+                        endCap = stringResource(Res.string.runs_needs_you),
                         well = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (taskRun.artifacts.isNotEmpty()) {
-                                    Text("EVIDENCE", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                                    Text(stringResource(Res.string.runs_evidence), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                                     taskRun.artifacts.forEach { artifact ->
                                         val ref = artifact.uri
                                             ?: artifact.textContent?.take(80)?.let { if (artifact.textContent.length > 80) "$it…" else it }
@@ -333,13 +394,13 @@ internal fun InboxScreen(
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (isPlanApproval) {
-                                        AzphaltPill("Approve", "$taskId-approve", onClick = { onApproveTask(taskId) })
+                                        AzphaltPill(stringResource(Res.string.common_approve), "$taskId-approve", onClick = { onApproveTask(taskId) })
                                         if (taskRun.assignedProviderId != null) {
-                                            AzphaltPill("Reject", "$taskId-reject", onClick = { onRejectPlan(taskId) })
+                                            AzphaltPill(stringResource(Res.string.common_reject), "$taskId-reject", onClick = { onRejectPlan(taskId) })
                                         }
                                     } else {
-                                        AzphaltPill("Retry", "$taskId-retry", onClick = { onResolveEscalation(taskId, true) })
-                                        AzphaltPill("Stop", "$taskId-stop", onClick = { onResolveEscalation(taskId, false) })
+                                        AzphaltPill(stringResource(Res.string.common_retry), "$taskId-retry", onClick = { onResolveEscalation(taskId, true) })
+                                        AzphaltPill(stringResource(Res.string.runs_stop), "$taskId-stop", onClick = { onResolveEscalation(taskId, false) })
                                     }
                                 }
                             }
@@ -348,9 +409,9 @@ internal fun InboxScreen(
                 }
             }
         } else {
-            DecisionRecord("infra-release", "Failure escalation", "Infra · Release", "Release failed after 3 attempts", true)
-            DecisionRecord("market-security", "Security risk", "Marketplace · Security", "Expanded OAuth scope challenged", true)
-            DecisionRecord("foo-integration", "Upcoming", "Foo · Authentication", "Integration approval after independent review", false)
+            DecisionRecord("infra-release", stringResource(Res.string.runs_failure_escalation_2), stringResource(Res.string.runs_infra_release), stringResource(Res.string.runs_release_failed_after_3_attempts), true)
+            DecisionRecord("market-security", stringResource(Res.string.runs_security_risk), stringResource(Res.string.runs_marketplace_security), stringResource(Res.string.runs_expanded_oauth_scope_challenged), true)
+            DecisionRecord("foo-integration", stringResource(Res.string.runs_upcoming), stringResource(Res.string.runs_foo_authentication), stringResource(Res.string.runs_integration_approval_after_independent_review), false)
         }
     }
 }
@@ -386,17 +447,17 @@ internal fun RunsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("RUNS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.runs_runs), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         val entries = history
         if (entries == null) {
-            Text("Loading…", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.runs_loading), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         } else if (entries.isEmpty()) {
-            Text("No projects yet.", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.runs_no_projects_yet), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         } else {
             entries.forEach { (project, runs) ->
                 SectionLabel(project.name)
                 if (runs.isEmpty()) {
-                    Text("No runs.", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.runs_no_runs), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                 } else {
                     runs.forEach { run ->
                         val isActive = run.id.value == liveRunId
@@ -404,8 +465,8 @@ internal fun RunsScreen(
                             seed = run.id.value,
                             eyebrow = run.status.name,
                             title = run.objective.take(60).let { if (run.objective.length > 60) "$it…" else it },
-                            body = "Run · ${run.id.value.takeLast(8)}",
-                            endCap = if (isActive) "Active" else runStatusEndCap(run.status),
+                            body = stringResource(Res.string.runs_run, run.id.value.takeLast(8)),
+                            endCap = if (isActive) stringResource(Res.string.runs_active) else runStatusEndCap(run.status),
                             selected = isActive,
                             onClick = { if (!isActive) onSwitchRun(run.id.value) },
                         )
@@ -415,7 +476,7 @@ internal fun RunsScreen(
         }
         val events = timeline
         if (events != null && events.isNotEmpty()) {
-            SectionLabel("Timeline")
+            SectionLabel(stringResource(Res.string.runs_timeline))
             events.sortedByDescending { it.occurredAtEpochMillis }.forEach { event ->
                 AzphaltRecord(
                     seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
@@ -448,26 +509,27 @@ private fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when 
     is ProviderUsageRecorded -> null
 }
 
+@Composable
 private fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
-    is WorkflowCreated -> "Workflow created"
-    is TaskBecameReady -> "Task ready"
-    is ExecutorAssigned -> "Executor assigned"
-    is AgentAssigned -> "Agent assigned"
-    is TaskStarted -> "Task started · attempt ${event.attempt}"
-    is ApprovalRequired -> "Approval required"
-    is ApprovalDecisionReceived -> if (event.approved) "Approved" else "Rejected"
-    is ArtifactCreated -> "Artifact created · ${event.artifact.kind.name}"
-    is VerificationFailed -> "Verification failed"
-    is RetryScheduled -> "Retry scheduled · attempt ${event.nextAttempt}"
-    is TaskEscalated -> "Task escalated"
-    is TaskCompleted -> "Task completed"
-    is TaskFailed -> "Task failed"
-    is HumanDecisionRequired -> "Human decision required"
-    is WorkflowCompleted -> "Workflow completed"
-    is WorkflowFailed -> "Workflow failed"
-    is WorkflowCancelled -> "Workflow cancelled"
-    is TaskCancelled -> "Task cancelled"
-    is ProviderUsageRecorded -> "Usage recorded"
+    is WorkflowCreated -> stringResource(Res.string.runs_workflow_created)
+    is TaskBecameReady -> stringResource(Res.string.runs_task_ready)
+    is ExecutorAssigned -> stringResource(Res.string.runs_executor_assigned)
+    is AgentAssigned -> stringResource(Res.string.runs_agent_assigned)
+    is TaskStarted -> stringResource(Res.string.runs_task_started_attempt, event.attempt)
+    is ApprovalRequired -> stringResource(Res.string.runs_approval_required)
+    is ApprovalDecisionReceived -> if (event.approved) stringResource(Res.string.runs_approved) else stringResource(Res.string.runs_rejected)
+    is ArtifactCreated -> stringResource(Res.string.runs_artifact_created, event.artifact.kind.name)
+    is VerificationFailed -> stringResource(Res.string.runs_verification_failed)
+    is RetryScheduled -> stringResource(Res.string.runs_retry_scheduled_attempt, event.nextAttempt)
+    is TaskEscalated -> stringResource(Res.string.runs_task_escalated)
+    is TaskCompleted -> stringResource(Res.string.runs_task_completed)
+    is TaskFailed -> stringResource(Res.string.runs_task_failed)
+    is HumanDecisionRequired -> stringResource(Res.string.runs_human_decision_required_2)
+    is WorkflowCompleted -> stringResource(Res.string.runs_workflow_completed)
+    is WorkflowFailed -> stringResource(Res.string.runs_workflow_failed)
+    is WorkflowCancelled -> stringResource(Res.string.runs_workflow_cancelled)
+    is TaskCancelled -> stringResource(Res.string.runs_task_cancelled)
+    is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
 }
 
 private fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
@@ -486,13 +548,14 @@ private fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     else -> event.workflowRunId.value.takeLast(8)
 }
 
+@Composable
 private fun runStatusEndCap(status: WorkflowRunStatus): String = when (status) {
-    WorkflowRunStatus.Completed -> "Done"
-    WorkflowRunStatus.Failed -> "Failed"
-    WorkflowRunStatus.Cancelled -> "Cancelled"
-    WorkflowRunStatus.Running -> "Running"
-    WorkflowRunStatus.AwaitingHuman -> "Waiting"
-    WorkflowRunStatus.Created -> "Created"
+    WorkflowRunStatus.Completed -> stringResource(Res.string.runs_done)
+    WorkflowRunStatus.Failed -> stringResource(Res.string.runs_failed)
+    WorkflowRunStatus.Cancelled -> stringResource(Res.string.runs_cancelled)
+    WorkflowRunStatus.Running -> stringResource(Res.string.runs_running)
+    WorkflowRunStatus.AwaitingHuman -> stringResource(Res.string.runs_waiting)
+    WorkflowRunStatus.Created -> stringResource(Res.string.runs_created)
 }
 
 @Composable

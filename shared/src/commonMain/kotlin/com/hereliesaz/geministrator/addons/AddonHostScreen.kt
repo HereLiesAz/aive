@@ -22,6 +22,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.addons_add_agents_to_swarm
+import com.hereliesaz.geministrator.resources.addons_add_on_could_not_be_removed
+import com.hereliesaz.geministrator.resources.addons_add_on_state_could_not_be
+import com.hereliesaz.geministrator.resources.addons_add_on_storage_could_not_be
+import com.hereliesaz.geministrator.resources.addons_add_ons
+import com.hereliesaz.geministrator.resources.addons_azphalt_workflow_packages_installed_in_haive
+import com.hereliesaz.geministrator.resources.addons_disable
+import com.hereliesaz.geministrator.resources.addons_disabled
+import com.hereliesaz.geministrator.resources.addons_enable
+import com.hereliesaz.geministrator.resources.addons_enabled
+import com.hereliesaz.geministrator.resources.addons_no_verified_package_source_is_connected
+import com.hereliesaz.geministrator.resources.addons_no_workflow_add_ons_are_installed
+import com.hereliesaz.geministrator.resources.addons_storage_error
+import com.hereliesaz.geministrator.resources.common_remove
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AddonHostScreen(
@@ -47,7 +64,7 @@ fun AddonHostScreen(
                     storageFailure = null
                 }
                 .onFailure { failure ->
-                    storageFailure = failure.message ?: "Add-on storage could not be read."
+                    storageFailure = failure.message ?: getString(Res.string.addons_add_on_storage_could_not_be)
                 }
         }
     }
@@ -58,18 +75,18 @@ fun AddonHostScreen(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("ADD-ONS")
-        Text("Azphalt workflow packages installed in Haive.")
+        Text(stringResource(Res.string.addons_add_ons))
+        Text(stringResource(Res.string.addons_azphalt_workflow_packages_installed_in_haive))
 
-        storageFailure?.let { Text("Storage error: $it") }
+        storageFailure?.let { Text(stringResource(Res.string.addons_storage_error, it)) }
 
         if (visibleInstallations.isEmpty()) {
-            Text("No workflow add-ons are installed.")
+            Text(stringResource(Res.string.addons_no_workflow_add_ons_are_installed))
         } else {
             visibleInstallations.sortedBy(AddonInstallation::id).forEach { installation ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${installation.id} · ${installation.version}")
-                    Text(if (installation.enabled) "Enabled" else "Disabled")
+                    Text(if (installation.enabled) stringResource(Res.string.addons_enabled) else stringResource(Res.string.addons_disabled))
                     Button(onClick = {
                         val enabled = !installation.enabled
                         scope.launch {
@@ -79,11 +96,11 @@ fun AddonHostScreen(
                                 reloadStoredInstallations()
                                 onEnableDisable(installation.id, enabled)
                             }.onFailure { failure ->
-                                storageFailure = failure.message ?: "Add-on state could not be saved."
+                                storageFailure = failure.message ?: getString(Res.string.addons_add_on_state_could_not_be)
                             }
                         }
                     }) {
-                        Text(if (installation.enabled) "Disable" else "Enable")
+                        Text(if (installation.enabled) stringResource(Res.string.addons_disable) else stringResource(Res.string.addons_enable))
                     }
                     Button(onClick = {
                         scope.launch {
@@ -93,15 +110,15 @@ fun AddonHostScreen(
                                     onRemove(installation.id)
                                 }
                                 .onFailure { failure ->
-                                    storageFailure = failure.message ?: "Add-on could not be removed."
+                                    storageFailure = failure.message ?: getString(Res.string.addons_add_on_could_not_be_removed)
                                 }
                         }
                     }) {
-                        Text("Remove")
+                        Text(stringResource(Res.string.common_remove))
                     }
                     if (enableCompanyContribution) {
                         Button(onClick = { onAddAgentsToCompany(installation.id) }) {
-                            Text("Add agents to swarm")
+                            Text(stringResource(Res.string.addons_add_agents_to_swarm))
                         }
                     }
                 }
@@ -111,7 +128,7 @@ fun AddonHostScreen(
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             packageSourceStatus
-                ?: "No verified package source is connected. Haive will not install unverified manifest text as a package.",
+                ?: stringResource(Res.string.addons_no_verified_package_source_is_connected),
         )
     }
 }

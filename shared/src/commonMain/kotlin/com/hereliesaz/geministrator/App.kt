@@ -43,6 +43,26 @@ import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestratio
 import com.hereliesaz.geministrator.orchestration.LaunchProgress
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.app_approval_failed
+import com.hereliesaz.geministrator.resources.app_clear_failed
+import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
+import com.hereliesaz.geministrator.resources.app_import_failed
+import com.hereliesaz.geministrator.resources.app_plan_rejection_failed
+import com.hereliesaz.geministrator.resources.app_provider_message_failed
+import com.hereliesaz.geministrator.resources.app_reachable_capabilities
+import com.hereliesaz.geministrator.resources.app_recovery_failed
+import com.hereliesaz.geministrator.resources.app_reset_swarm_failed
+import com.hereliesaz.geministrator.resources.app_retry_failed
+import com.hereliesaz.geministrator.resources.app_role_delegation_failed
+import com.hereliesaz.geministrator.resources.app_runtime_bootstrap_failed
+import com.hereliesaz.geministrator.resources.app_runtime_is_unavailable
+import com.hereliesaz.geministrator.resources.app_save_swarm_failed
+import com.hereliesaz.geministrator.resources.app_switch_run_failed
+import com.hereliesaz.geministrator.resources.app_task_delegation_failed
+import com.hereliesaz.geministrator.resources.app_workflow_delegation_failed
+import com.hereliesaz.geministrator.resources.app_workflow_launch_failed
+import org.jetbrains.compose.resources.getString
 
 @Composable
 fun App(
@@ -105,7 +125,7 @@ fun App(
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Exception) {
-            runtimeState = failure.toRuntimeFailureState("Runtime bootstrap failed")
+            runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_runtime_bootstrap_failed))
         }
     }
 
@@ -305,7 +325,7 @@ fun App(
                                         "AiveLaunch",
                                         "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
                                     )
-                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    val activeRuntime = runtime ?: error(getString(Res.string.app_runtime_is_unavailable))
                                     if (orchestrationRuntime != null) {
                                         activeRuntime.launchOrchestratedWorkflow(
                                             projectName = projectName,
@@ -332,7 +352,7 @@ fun App(
                                     // OutOfMemoryError are Errors and previously escaped this handler,
                                     // leaving the launch button silently doing nothing.
                                     platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
-                                    runtimeState = failure.toRuntimeFailureState("Workflow launch failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_launch_failed))
                                 } finally {
                                     launching = false
                                 }
@@ -345,7 +365,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Approval failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_approval_failed))
                                 }
                             }
                         },
@@ -356,7 +376,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Plan rejection failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_plan_rejection_failed))
                                 }
                             }
                         },
@@ -383,21 +403,21 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Escalation decision failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_escalation_decision_failed))
                                 }
                             }
                         },
                         onMessageAgent = { taskId, message ->
                             try {
                                 when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
-                                    null -> "Runtime is unavailable"
+                                    null -> getString(Res.string.app_runtime_is_unavailable)
                                     ProviderActionResult.Accepted -> null
                                     is ProviderActionResult.Rejected -> result.reason
                                 }
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: Exception) {
-                                failure.message?.takeIf(String::isNotBlank) ?: "Provider message failed"
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_provider_message_failed)
                             }
                         },
                         onRecoverFromCorruption = {
@@ -407,7 +427,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Recovery failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_recovery_failed))
                                 }
                             }
                         },
@@ -421,7 +441,7 @@ fun App(
                                     } catch (failure: CancellationException) {
                                         throw failure
                                     } catch (failure: Exception) {
-                                        runtimeState = failure.toRuntimeFailureState("Retry failed")
+                                        runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_retry_failed))
                                     }
                                 }
                             }
@@ -429,7 +449,7 @@ fun App(
                         onCheckProviderHealth = {
                             runtime?.checkProviderHealth()?.mapValues { (_, result) ->
                                 result.fold(
-                                    onSuccess = { caps -> "Reachable · ${caps.supported.size} capabilities" },
+                                    onSuccess = { caps -> getString(Res.string.app_reachable_capabilities, caps.supported.size) },
                                     onFailure = { failure ->
                                         "Unreachable · ${failure.message?.take(60) ?: "unknown error"}"
                                     },
@@ -444,7 +464,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Clear failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_clear_failed))
                                 }
                             }
                         },
@@ -456,7 +476,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Import failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_import_failed))
                                 }
                             }
                         },
@@ -479,7 +499,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Switch run failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_switch_run_failed))
                                 }
                             }
                         },
@@ -495,7 +515,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Save swarm failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_save_swarm_failed))
                                 }
                             }
                         },
@@ -507,7 +527,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Reset swarm failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_reset_swarm_failed))
                                 }
                             }
                         },
@@ -518,7 +538,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Workflow delegation failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_delegation_failed))
                                 }
                             }
                         },
@@ -529,7 +549,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Role delegation failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_role_delegation_failed))
                                 }
                             }
                         },
@@ -540,7 +560,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState("Task delegation failed")
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_task_delegation_failed))
                                 }
                             }
                         },

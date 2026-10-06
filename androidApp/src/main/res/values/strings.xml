@@ -1,4 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">The Aive</string>
+
+    <!-- Shared button labels -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
+
+    <!-- Crash report notice (MainActivity) -->
+    <string name="crash_report_sent_title">Crash report sent</string>
+    <string name="crash_report_sent_body">Aive crashed or stopped responding earlier, and a report (stack trace, app version, Android version, device model) was sent automatically to the HereLiesAz/aive GitHub issue tracker. You can turn automatic crash reports off any time in Settings → Crash Reports.</string>
+
+    <!-- In-app update prompt (AndroidUpdateUi) -->
+    <string name="update_ready_title">The Aive %1$s is ready</string>
+    <string name="update_ready_body">The GitHub build downloaded the update. Android will ask you to confirm installation; your projects, settings, credentials, roles, and workflows remain in place.</string>
+    <string name="update_install">Install update</string>
+    <string name="update_later">Later</string>
+    <string name="update_play_title">A The Aive update is available</string>
+    <string name="update_play_body">An update is available through Google Play.</string>
+    <string name="update_open_play_store">Open Play Store</string>
+
+    <!-- Gemini provider setup (AndroidGeminiProviderSetup) -->
+    <string name="gemini_setup_title">Connect Gemini</string>
+    <string name="gemini_setup_bridge_unsupported">Google Play builds connect to Gemini through the official API. The installed-app bridge is available in GitHub releases.</string>
+    <string name="gemini_setup_app_not_detected">The Gemini app was not detected. You can still connect Gemini with an API key.</string>
+    <string name="gemini_setup_bridge_ready">The installed Gemini app is ready. Aive can open it in a bounded window and use it as the Gemini transport.</string>
+    <string name="gemini_setup_enable_bridge_hint">The Gemini app is installed. Enable The Aive · Gemini bridge in Android Accessibility settings to use the signed-in app without an API key.</string>
+    <string name="gemini_setup_use_installed">Use installed Gemini</string>
+    <string name="gemini_setup_enable_bridge">Enable installed Gemini bridge</string>
+    <string name="gemini_setup_use_api_key">Use Gemini API key</string>
 </resources>

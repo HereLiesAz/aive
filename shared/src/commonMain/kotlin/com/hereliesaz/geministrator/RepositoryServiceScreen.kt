@@ -13,6 +13,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_connect
+import com.hereliesaz.geministrator.resources.common_connected
+import com.hereliesaz.geministrator.resources.repositories_connect_the_repository_hosts_aive_may
+import com.hereliesaz.geministrator.resources.repositories_credential_configured
+import com.hereliesaz.geministrator.resources.repositories_desktop_repository_service
+import com.hereliesaz.geministrator.resources.repositories_disconnect
+import com.hereliesaz.geministrator.resources.repositories_get_access_token
+import com.hereliesaz.geministrator.resources.repositories_local_git
+import com.hereliesaz.geministrator.resources.repositories_local_working_trees_are_linked_per
+import com.hereliesaz.geministrator.resources.repositories_no_credential_configured
+import com.hereliesaz.geministrator.resources.repositories_no_token
+import com.hereliesaz.geministrator.resources.repositories_not_configured
+import com.hereliesaz.geministrator.resources.repositories_reconfigure
+import com.hereliesaz.geministrator.resources.repositories_repository_service
+import com.hereliesaz.geministrator.resources.repositories_repository_services
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun RepositoryServiceScreen(
@@ -29,9 +46,9 @@ internal fun RepositoryServiceScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("REPOSITORY SERVICES", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.repositories_repository_services), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Connect the repository hosts Aive may operate while workflows run. Project repository links stay separate from AI-provider credentials and role routing.",
+            stringResource(Res.string.repositories_connect_the_repository_hosts_aive_may),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -40,14 +57,14 @@ internal fun RepositoryServiceScreen(
             val connected = entry.id in connectedServiceIds
             AzphaltRecord(
                 seed = "repository-service-${entry.id}",
-                eyebrow = "Repository service",
+                eyebrow = stringResource(Res.string.repositories_repository_service),
                 title = entry.displayName,
                 body = buildString {
                     append(entry.description)
                     append("\n")
-                    append(if (connected) "Credential configured" else "No credential configured")
+                    append(if (connected) stringResource(Res.string.repositories_credential_configured) else stringResource(Res.string.repositories_no_credential_configured))
                 },
-                endCap = if (connected) "Connected" else "Not configured",
+                endCap = if (connected) stringResource(Res.string.common_connected) else stringResource(Res.string.repositories_not_configured),
                 selected = connected,
                 well = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -56,20 +73,20 @@ internal fun RepositoryServiceScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             AzphaltPill(
-                                label = if (connected) "Reconfigure" else "Connect",
+                                label = if (connected) stringResource(Res.string.repositories_reconfigure) else stringResource(Res.string.common_connect),
                                 seed = "repository-service-configure-${entry.id}",
                                 onClick = { onConfigureService(entry.id) },
                             )
                             if (connected) {
                                 AzphaltPill(
-                                    label = "Disconnect",
+                                    label = stringResource(Res.string.repositories_disconnect),
                                     seed = "repository-service-disconnect-${entry.id}",
                                     onClick = { onDisconnectService(entry.id) },
                                 )
                             }
                         }
                         AzphaltPill(
-                            label = "Get access token",
+                            label = stringResource(Res.string.repositories_get_access_token),
                             seed = "repository-service-token-${entry.id}",
                             onClick = { uriHandler.openUri(entry.credentialUrl) },
                             modifier = Modifier.fillMaxWidth(),
@@ -81,10 +98,10 @@ internal fun RepositoryServiceScreen(
 
         AzphaltRecord(
             seed = "repository-service-local-git",
-            eyebrow = "Desktop repository service",
-            title = "Local Git",
-            body = "Local working trees are linked per project from the Overview screen. Desktop validates the selected folder as a Git repository and executes bounded Git operations directly against that working tree.",
-            endCap = "No token",
+            eyebrow = stringResource(Res.string.repositories_desktop_repository_service),
+            title = stringResource(Res.string.repositories_local_git),
+            body = stringResource(Res.string.repositories_local_working_trees_are_linked_per),
+            endCap = stringResource(Res.string.repositories_no_token),
         )
     }
 }

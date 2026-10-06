@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
@@ -459,9 +460,17 @@ class MainActivity : ComponentActivity() {
                         CrashReporting.markFirstReportNoticeShown(this)
                         crashReportNoticeVisible = false
                     },
-                    onDismissRequest = {
-                        CrashReporting.markFirstReportNoticeShown(this)
-                        crashReportNoticeVisible = false
+                    title = { Text(stringResource(R.string.crash_report_sent_title)) },
+                    text = {
+                        Text(
+                            stringResource(R.string.crash_report_sent_body),
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            CrashReporting.markFirstReportNoticeShown(this)
+                            crashReportNoticeVisible = false
+                        }) { Text(stringResource(R.string.common_ok)) }
                     },
                 )
             }

@@ -24,6 +24,50 @@ import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.compute_any_device
+import com.hereliesaz.geministrator.resources.compute_any_eligible_connected_device
+import com.hereliesaz.geministrator.resources.compute_assignments
+import com.hereliesaz.geministrator.resources.compute_assignments_are_enforced_by_the_relay
+import com.hereliesaz.geministrator.resources.compute_compute
+import com.hereliesaz.geministrator.resources.compute_compute_pool
+import com.hereliesaz.geministrator.resources.compute_compute_pool_not_configured
+import com.hereliesaz.geministrator.resources.compute_configure_the_relay_and_this_device
+import com.hereliesaz.geministrator.resources.compute_configured_offline
+import com.hereliesaz.geministrator.resources.compute_connected_device
+import com.hereliesaz.geministrator.resources.compute_connected_hardware_advertises_capacity_accelerators_models
+import com.hereliesaz.geministrator.resources.compute_coordinate_where_work_runs_assign_the
+import com.hereliesaz.geministrator.resources.compute_currently_offline
+import com.hereliesaz.geministrator.resources.compute_delegatable_task
+import com.hereliesaz.geministrator.resources.compute_entire_graph
+import com.hereliesaz.geministrator.resources.compute_fleet
+import com.hereliesaz.geministrator.resources.compute_idle
+import com.hereliesaz.geministrator.resources.compute_launch_or_select_a_workflow_run
+import com.hereliesaz.geministrator.resources.compute_local
+import com.hereliesaz.geministrator.resources.compute_logical_cpus
+import com.hereliesaz.geministrator.resources.compute_mixed_assignment
+import com.hereliesaz.geministrator.resources.compute_model
+import com.hereliesaz.geministrator.resources.compute_no_delegatable_work
+import com.hereliesaz.geministrator.resources.compute_no_live_workflow
+import com.hereliesaz.geministrator.resources.compute_nothing_to_delegate_yet
+import com.hereliesaz.geministrator.resources.compute_observe_only
+import com.hereliesaz.geministrator.resources.compute_online
+import com.hereliesaz.geministrator.resources.compute_origin
+import com.hereliesaz.geministrator.resources.compute_override
+import com.hereliesaz.geministrator.resources.compute_pinned_to
+import com.hereliesaz.geministrator.resources.compute_role
+import com.hereliesaz.geministrator.resources.compute_role_2
+import com.hereliesaz.geministrator.resources.compute_roles
+import com.hereliesaz.geministrator.resources.compute_runs_on_the_originating_device
+import com.hereliesaz.geministrator.resources.compute_setup
+import com.hereliesaz.geministrator.resources.compute_slot
+import com.hereliesaz.geministrator.resources.compute_task
+import com.hereliesaz.geministrator.resources.compute_task_2
+import com.hereliesaz.geministrator.resources.compute_task_overrides
+import com.hereliesaz.geministrator.resources.compute_this_device
+import com.hereliesaz.geministrator.resources.compute_this_workflow_has_no_role_backed
+import com.hereliesaz.geministrator.resources.compute_workflow
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun ComputeDelegationScreen(
@@ -50,31 +94,31 @@ internal fun ComputeDelegationScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("COMPUTE", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.compute_compute), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Coordinate where work runs. Assign the whole workflow, route a role, or override a single task. " +
-                "Assignments are enforced by the relay rather than treated as scheduling suggestions.",
+            stringResource(Res.string.compute_coordinate_where_work_runs_assign_the) +
+                stringResource(Res.string.compute_assignments_are_enforced_by_the_relay),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
 
-        ComputeSectionLabel("Fleet")
+        ComputeSectionLabel(stringResource(Res.string.compute_fleet))
         AzphaltRecord(
             seed = "compute-fleet-status",
-            eyebrow = "Compute pool",
+            eyebrow = stringResource(Res.string.compute_compute_pool),
             title = when {
                 distributedComputeState.connected ->
-                    nodes.size.toString() + " connected device" + if (nodes.size == 1) "" else "s"
-                distributedComputeState.ready -> "Configured · offline"
-                else -> "Compute pool not configured"
+                    nodes.size.toString() + stringResource(Res.string.compute_connected_device) + if (nodes.size == 1) "" else "s"
+                distributedComputeState.ready -> stringResource(Res.string.compute_configured_offline)
+                else -> stringResource(Res.string.compute_compute_pool_not_configured)
             },
             body = distributedComputeState.lastError
                 ?: if (distributedComputeState.connected) {
-                    "Connected hardware advertises capacity, accelerators, models, and supported executor kinds."
+                    stringResource(Res.string.compute_connected_hardware_advertises_capacity_accelerators_models)
                 } else {
-                    "Configure the relay and this device in Settings before delegating remote work."
+                    stringResource(Res.string.compute_configure_the_relay_and_this_device)
                 },
-            endCap = if (distributedComputeState.connected) "Online" else "Setup",
+            endCap = if (distributedComputeState.connected) stringResource(Res.string.compute_online) else stringResource(Res.string.compute_setup),
         )
 
         nodes.forEach { node ->
@@ -82,13 +126,13 @@ internal fun ComputeDelegationScreen(
         }
 
         if (live == null) {
-            ComputeSectionLabel("Assignments")
+            ComputeSectionLabel(stringResource(Res.string.compute_assignments))
             AzphaltRecord(
                 seed = "compute-no-workflow",
-                eyebrow = "No live workflow",
-                title = "Nothing to delegate yet",
-                body = "Launch or select a workflow run, then return here to assign its work to connected hardware.",
-                endCap = "Idle",
+                eyebrow = stringResource(Res.string.compute_no_live_workflow),
+                title = stringResource(Res.string.compute_nothing_to_delegate_yet),
+                body = stringResource(Res.string.compute_launch_or_select_a_workflow_run),
+                endCap = stringResource(Res.string.compute_idle),
             )
             return@Column
         }
@@ -99,19 +143,19 @@ internal fun ComputeDelegationScreen(
             node.nodeId != localNodeId && node.acceptsWork
         }
 
-        ComputeSectionLabel("Workflow")
+        ComputeSectionLabel(stringResource(Res.string.compute_workflow))
         AzphaltRecord(
             seed = "compute-workflow-" + definition.id.value,
-            eyebrow = "Workflow",
+            eyebrow = stringResource(Res.string.compute_workflow),
             title = definition.name,
             body = buildString {
                 append(delegatableTasks.size)
-                append(" delegatable task")
+                append(stringResource(Res.string.compute_delegatable_task))
                 if (delegatableTasks.size != 1) append("s")
                 append(" · ")
                 append(assignmentLabel(delegatableTasks, nodes))
             },
-            endCap = "Entire graph",
+            endCap = stringResource(Res.string.compute_entire_graph),
             well = {
                 DelegationTargets(
                     tasks = delegatableTasks,
@@ -121,7 +165,7 @@ internal fun ComputeDelegationScreen(
             },
         )
 
-        ComputeSectionLabel("Roles")
+        ComputeSectionLabel(stringResource(Res.string.compute_roles))
         val rolesById = live.roles.associateBy(RoleDefinition::id)
         val roleIds = definition.tasks
             .mapNotNull { task -> task.roleId }
@@ -129,7 +173,7 @@ internal fun ComputeDelegationScreen(
 
         if (roleIds.isEmpty()) {
             Text(
-                "This workflow has no role-backed tasks.",
+                stringResource(Res.string.compute_this_workflow_has_no_role_backed),
                 style = AzphaltType.body,
                 color = Azphalt.currentGround.onPage,
             )
@@ -142,10 +186,10 @@ internal fun ComputeDelegationScreen(
                 val role = rolesById[roleId]
                 AzphaltRecord(
                     seed = "compute-role-" + roleId.value,
-                    eyebrow = "Role · " + roleTasks.size + " task" + if (roleTasks.size == 1) "" else "s",
+                    eyebrow = stringResource(Res.string.compute_role) + roleTasks.size + stringResource(Res.string.compute_task) + if (roleTasks.size == 1) "" else "s",
                     title = role?.name ?: roleId.value,
                     body = assignmentLabel(roleTasks, nodes),
-                    endCap = "Role",
+                    endCap = stringResource(Res.string.compute_role_2),
                     well = {
                         DelegationTargets(
                             tasks = roleTasks,
@@ -157,14 +201,14 @@ internal fun ComputeDelegationScreen(
             }
         }
 
-        ComputeSectionLabel("Task overrides")
+        ComputeSectionLabel(stringResource(Res.string.compute_task_overrides))
         definition.tasks.filter(TaskDefinition::isComputeDelegatable).forEach { task ->
             AzphaltRecord(
                 seed = "compute-task-" + task.id.value,
-                eyebrow = task.roleId?.let { rolesById[it]?.name } ?: "Task",
+                eyebrow = task.roleId?.let { rolesById[it]?.name } ?: stringResource(Res.string.compute_task_2),
                 title = task.name,
                 body = assignmentLabel(listOf(task), nodes),
-                endCap = "Override",
+                endCap = stringResource(Res.string.compute_override),
                 well = {
                     DelegationTargets(
                         tasks = listOf(task),
@@ -184,13 +228,13 @@ private fun ComputeNodeRecord(
 ) {
     AzphaltRecord(
         seed = "compute-fleet-" + node.nodeId,
-        eyebrow = node.platform.name + if (isLocal) " · THIS DEVICE" else "",
+        eyebrow = node.platform.name + if (isLocal) stringResource(Res.string.compute_this_device) else "",
         title = node.displayName,
         body = buildString {
             append(node.architecture)
             append(" · ")
             append(node.logicalProcessors)
-            append(" logical CPUs · ")
+            append(stringResource(Res.string.compute_logical_cpus))
             append(formatMemory(node.memoryMiB))
             if (node.accelerators.isNotEmpty()) {
                 append("\n")
@@ -199,7 +243,7 @@ private fun ComputeNodeRecord(
             if (node.installedModelIds.isNotEmpty()) {
                 append(" · ")
                 append(node.installedModelIds.size)
-                append(" model")
+                append(stringResource(Res.string.compute_model))
                 if (node.installedModelIds.size != 1) append("s")
             }
             if (node.supportedExecutorKinds.isNotEmpty()) {
@@ -208,10 +252,10 @@ private fun ComputeNodeRecord(
             }
         },
         endCap = when {
-            isLocal -> "Origin"
+            isLocal -> stringResource(Res.string.compute_origin)
             node.acceptsWork ->
-                node.maxParallelLeases.toString() + " slot" + if (node.maxParallelLeases == 1) "" else "s"
-            else -> "Observe only"
+                node.maxParallelLeases.toString() + stringResource(Res.string.compute_slot) + if (node.maxParallelLeases == 1) "" else "s"
+            else -> stringResource(Res.string.compute_observe_only)
         },
     )
 }
@@ -230,13 +274,13 @@ private fun DelegationTargets(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AzphaltPill(
-            label = "Local",
+            label = stringResource(Res.string.compute_local),
             seed = "compute-target-local",
             selected = selected == ComputeDelegationTarget.Local.key(),
             onClick = { onAssign(ComputeDelegationTarget.Local) },
         )
         AzphaltPill(
-            label = "Any device",
+            label = stringResource(Res.string.compute_any_device),
             seed = "compute-target-any",
             selected = selected == ComputeDelegationTarget.AnyRemote.key(),
             onClick = { onAssign(ComputeDelegationTarget.AnyRemote) },
@@ -254,22 +298,23 @@ private fun DelegationTargets(
     }
 }
 
+@Composable
 private fun assignmentLabel(
     tasks: List<TaskDefinition>,
     nodes: List<ComputeNodeDescriptor>,
 ): String {
-    if (tasks.isEmpty()) return "No delegatable work"
+    if (tasks.isEmpty()) return stringResource(Res.string.compute_no_delegatable_work)
     val targets = tasks.map(TaskDefinition::computeDelegationTarget).distinctBy { it.key() }
-    if (targets.size != 1) return "Mixed assignment"
+    if (targets.size != 1) return stringResource(Res.string.compute_mixed_assignment)
     return when (val target = targets.single()) {
-        ComputeDelegationTarget.Local -> "Runs on the originating device"
-        ComputeDelegationTarget.AnyRemote -> "Any eligible connected device"
+        ComputeDelegationTarget.Local -> stringResource(Res.string.compute_runs_on_the_originating_device)
+        ComputeDelegationTarget.AnyRemote -> stringResource(Res.string.compute_any_eligible_connected_device)
         is ComputeDelegationTarget.Node -> {
             val node = nodes.firstOrNull { it.nodeId == target.nodeId }
             if (node == null) {
-                "Pinned to " + target.nodeId + " · currently offline"
+                stringResource(Res.string.compute_pinned_to) + target.nodeId + stringResource(Res.string.compute_currently_offline)
             } else {
-                "Pinned to " + node.displayName
+                stringResource(Res.string.compute_pinned_to) + node.displayName
             }
         }
     }

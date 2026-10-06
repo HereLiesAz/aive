@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -41,17 +42,17 @@ internal fun AndroidGeminiProviderSetup(
         modifier = Modifier.fillMaxSize().padding(28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Connect Gemini")
+        Text(stringResource(R.string.gemini_setup_title))
         Text(
             when {
                 !installedBridgeSupported ->
-                    "Google Play builds connect to Gemini through the official API. The installed-app bridge is available in GitHub releases."
+                    stringResource(R.string.gemini_setup_bridge_unsupported)
                 !installedAppDetected ->
-                    "The Gemini app was not detected. You can still connect Gemini with an API key."
+                    stringResource(R.string.gemini_setup_app_not_detected)
                 accessibilityEnabled ->
-                    "The installed Gemini app is ready. Aive can open it in a bounded window and use it as the Gemini transport."
+                    stringResource(R.string.gemini_setup_bridge_ready)
                 else ->
-                    "The Gemini app is installed. Enable The Aive · Gemini bridge in Android Accessibility settings to use the signed-in app without an API key."
+                    stringResource(R.string.gemini_setup_enable_bridge_hint)
             },
         )
         if (installedBridgeSupported && installedAppDetected) {
@@ -59,20 +60,20 @@ internal fun AndroidGeminiProviderSetup(
                 onClick = { disclosing = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (accessibilityEnabled) "Use installed Gemini" else "Enable installed Gemini bridge")
+                Text(if (accessibilityEnabled) stringResource(R.string.gemini_setup_use_installed) else stringResource(R.string.gemini_setup_enable_bridge))
             }
         }
         Button(
             onClick = onUseApiKey,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Use Gemini API key")
+            Text(stringResource(R.string.gemini_setup_use_api_key))
         }
         OutlinedButton(
             onClick = onCancel,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Cancel")
+            Text(stringResource(R.string.common_cancel))
         }
     }
 }

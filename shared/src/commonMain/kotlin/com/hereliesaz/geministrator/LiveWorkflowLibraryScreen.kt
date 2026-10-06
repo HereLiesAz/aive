@@ -31,6 +31,53 @@ import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.nullable
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.library_tasks
+import com.hereliesaz.geministrator.resources.library_active
+import com.hereliesaz.geministrator.resources.library_add_after_end
+import com.hereliesaz.geministrator.resources.library_after
+import com.hereliesaz.geministrator.resources.library_combine_workflows
+import com.hereliesaz.geministrator.resources.library_depends_on
+import com.hereliesaz.geministrator.resources.library_draft
+import com.hereliesaz.geministrator.resources.library_entry
+import com.hereliesaz.geministrator.resources.library_expand
+import com.hereliesaz.geministrator.resources.library_expand_role_into_workflow
+import com.hereliesaz.geministrator.resources.library_filter_installed_workflows_and_roles
+import com.hereliesaz.geministrator.resources.library_filter_roles
+import com.hereliesaz.geministrator.resources.library_find_workflow_or_role_to_add
+import com.hereliesaz.geministrator.resources.library_installed
+import com.hereliesaz.geministrator.resources.library_installed_workflow
+import com.hereliesaz.geministrator.resources.library_installed_workflows_saved_compositions_and_reusable
+import com.hereliesaz.geministrator.resources.library_integration_concurrency
+import com.hereliesaz.geministrator.resources.library_library_error
+import com.hereliesaz.geministrator.resources.library_load
+import com.hereliesaz.geministrator.resources.library_loaded_workflow
+import com.hereliesaz.geministrator.resources.library_loading_workflow_library
+import com.hereliesaz.geministrator.resources.library_no_dependencies
+import com.hereliesaz.geministrator.resources.library_no_library_entries_match_this_filter
+import com.hereliesaz.geministrator.resources.library_optional_workflows_may_use_this_as
+import com.hereliesaz.geministrator.resources.library_reassign_role
+import com.hereliesaz.geministrator.resources.library_reset_edits
+import com.hereliesaz.geministrator.resources.library_reusable_role
+import com.hereliesaz.geministrator.resources.library_reusable_role_1
+import com.hereliesaz.geministrator.resources.library_run_loaded
+import com.hereliesaz.geministrator.resources.library_run_objective_inputs
+import com.hereliesaz.geministrator.resources.library_save_composition
+import com.hereliesaz.geministrator.resources.library_save_reusable_workflow
+import com.hereliesaz.geministrator.resources.library_saved
+import com.hereliesaz.geministrator.resources.library_saved_composition
+import com.hereliesaz.geministrator.resources.library_started
+import com.hereliesaz.geministrator.resources.library_unassigned
+import com.hereliesaz.geministrator.resources.library_workflow_could_not_be_saved
+import com.hereliesaz.geministrator.resources.library_workflow_id
+import com.hereliesaz.geministrator.resources.library_workflow_launch_failed
+import com.hereliesaz.geministrator.resources.library_workflow_library_could_not_be_loaded
+import com.hereliesaz.geministrator.resources.library_workflow_name
+import com.hereliesaz.geministrator.resources.library_workflows
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+import com.hereliesaz.geministrator.resources.library_task_count
+import org.jetbrains.compose.resources.pluralStringResource
 
 private enum class WorkflowLibrarySurface(val label: String) {
     Library("MY LIBRARY"),
@@ -126,7 +173,7 @@ internal fun LiveWorkflowLibraryScreen(
         }.onFailure { failure ->
             entries = emptyList()
             roles = emptyList()
-            loadError = failure.message ?: "Workflow library could not be loaded."
+            loadError = failure.message ?: getString(Res.string.library_workflow_library_could_not_be_loaded)
         }
     }
 
@@ -161,9 +208,9 @@ internal fun LiveWorkflowLibraryScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("WORKFLOWS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.library_workflows), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
-            "Installed workflows, saved compositions, and reusable roles share one graph library.",
+            stringResource(Res.string.library_installed_workflows_saved_compositions_and_reusable),
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
         )
@@ -172,16 +219,16 @@ internal fun LiveWorkflowLibraryScreen(
             onSelected = { surfaceName = it.name },
         )
 
-        loadError?.let { AzphaltNote("workflow-library-error", "LIBRARY ERROR", it) }
-        status?.let { AzphaltNote("workflow-library-status", "WORKFLOWS", it) }
+        loadError?.let { AzphaltNote("workflow-library-error", stringResource(Res.string.library_library_error), it) }
+        status?.let { AzphaltNote("workflow-library-status", stringResource(Res.string.library_workflows), it) }
 
         when (val loaded = entries) {
-            null -> Text("Loading workflow library…", style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            null -> Text(stringResource(Res.string.library_loading_workflow_library), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
             else -> {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Filter installed workflows and roles") },
+                    label = { Text(stringResource(Res.string.library_filter_installed_workflows_and_roles)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -204,7 +251,7 @@ internal fun LiveWorkflowLibraryScreen(
 
                 if (visibleEntries.isEmpty()) {
                     Text(
-                        "No library entries match this filter.",
+                        stringResource(Res.string.library_no_library_entries_match_this_filter),
                         style = AzphaltType.body,
                         color = Azphalt.currentGround.onPage,
                     )
@@ -216,14 +263,14 @@ internal fun LiveWorkflowLibraryScreen(
                     AzphaltRecord(
                         seed = "workflow-library-${entry.key}",
                         eyebrow = when (entry.origin) {
-                            WorkflowLibraryOrigin.Installed -> entry.packageId?.let { "Installed · $it" } ?: "Installed workflow"
-                            WorkflowLibraryOrigin.Authored -> "Saved composition"
-                            WorkflowLibraryOrigin.Role -> entry.packageId?.let { "Reusable role · $it" } ?: "Reusable role"
+                            WorkflowLibraryOrigin.Installed -> entry.packageId?.let { stringResource(Res.string.library_installed, it) } ?: stringResource(Res.string.library_installed_workflow)
+                            WorkflowLibraryOrigin.Authored -> stringResource(Res.string.library_saved_composition)
+                            WorkflowLibraryOrigin.Role -> entry.packageId?.let { stringResource(Res.string.library_reusable_role_1, it) } ?: stringResource(Res.string.library_reusable_role)
                         },
                         title = entry.definition.name,
                         body = entry.definition.description
-                            ?: "${entry.definition.tasks.size} task${if (entry.definition.tasks.size == 1) "" else "s"}",
-                        endCap = if (isActive) "Active" else "${entry.definition.tasks.size} task${if (entry.definition.tasks.size == 1) "" else "s"}",
+                            ?: pluralStringResource(Res.plurals.library_task_count, entry.definition.tasks.size, entry.definition.tasks.size),
+                        endCap = if (isActive) stringResource(Res.string.library_active) else pluralStringResource(Res.plurals.library_task_count, entry.definition.tasks.size, entry.definition.tasks.size),
                         selected = selected,
                         onClick = { selectedKeyValue = if (selected) "" else entry.key },
                         well = if (selected) {
@@ -233,7 +280,7 @@ internal fun LiveWorkflowLibraryScreen(
                                         Text(it, style = AzphaltType.eyebrow, color = Azphalt.White)
                                     }
                                     AzphaltPill(
-                                        label = "Load",
+                                        label = stringResource(Res.string.library_load),
                                         seed = "workflow-load-${entry.key}",
                                         endCap = entry.origin.name,
                                         onClick = {
@@ -262,44 +309,44 @@ internal fun LiveWorkflowLibraryScreen(
         }
 
         draft?.let { currentDraft ->
-            Text("LOADED WORKFLOW", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.library_loaded_workflow), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
             AzphaltRecord(
                 seed = "workflow-loaded-${currentDraft.id.value}",
-                eyebrow = draftOrigin?.name ?: "Draft",
+                eyebrow = draftOrigin?.name ?: stringResource(Res.string.library_draft),
                 title = currentDraft.name,
                 body = currentDraft.description,
-                endCap = "${currentDraft.tasks.size} tasks",
+                endCap = stringResource(Res.string.library_tasks, currentDraft.tasks.size),
                 selected = true,
                 well = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "Integration · ${currentDraft.integrationPolicy.name} · Concurrency ${currentDraft.concurrencyPolicy.maxConcurrentTasks}",
+                            stringResource(Res.string.library_integration_concurrency, currentDraft.integrationPolicy.name, currentDraft.concurrencyPolicy.maxConcurrentTasks),
                             style = AzphaltType.body,
                             color = Azphalt.White,
                         )
                         OutlinedTextField(
                             value = runObjective,
                             onValueChange = { runObjective = it },
-                            label = { Text("Run objective / inputs") },
-                            placeholder = { Text("Optional. Workflows may use this as their runtime input.") },
+                            label = { Text(stringResource(Res.string.library_run_objective_inputs)) },
+                            placeholder = { Text(stringResource(Res.string.library_optional_workflows_may_use_this_as)) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (host != null) {
                                 AzphaltPill(
-                                    label = "Run loaded",
+                                    label = stringResource(Res.string.library_run_loaded),
                                     seed = "workflow-run-loaded",
                                     onClick = {
                                         scope.launch {
                                             runCatching { host.run(currentDraft, runObjective) }
-                                                .onSuccess { status = "Started ${currentDraft.name}." }
-                                                .onFailure { loadError = it.message ?: "Workflow launch failed." }
+                                                .onSuccess { status = getString(Res.string.library_started, currentDraft.name) }
+                                                .onFailure { loadError = it.message ?: getString(Res.string.library_workflow_launch_failed) }
                                         }
                                     },
                                 )
                             }
                             AzphaltPill(
-                                label = "Reset edits",
+                                label = stringResource(Res.string.library_reset_edits),
                                 seed = "workflow-reset-draft",
                                 onClick = {
                                     val source = entries.orEmpty().firstOrNull { it.key == selectedKey }
@@ -321,10 +368,10 @@ internal fun LiveWorkflowLibraryScreen(
                 val roleName = task.roleId?.let { roleId -> roles.firstOrNull { it.id == roleId }?.name }
                 AzphaltRecord(
                     seed = "loaded-task-${task.id.value}",
-                    eyebrow = roleName ?: executor?.displayName() ?: "Unassigned",
+                    eyebrow = roleName ?: executor?.displayName() ?: stringResource(Res.string.library_unassigned),
                     title = task.name,
                     body = task.objective,
-                    endCap = if (task.dependsOn.isEmpty()) "Entry" else "After ${task.dependsOn.size}",
+                    endCap = if (task.dependsOn.isEmpty()) stringResource(Res.string.library_entry) else stringResource(Res.string.library_after, task.dependsOn.size),
                     selected = selected,
                     onClick = { selectedTaskIdValue = if (selected) "" else task.id.value },
                     well = if (selected) {
@@ -332,17 +379,17 @@ internal fun LiveWorkflowLibraryScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Text(
                                     task.dependsOn.takeIf { it.isNotEmpty() }
-                                        ?.joinToString(prefix = "Depends on · ") { it.value }
-                                        ?: "No dependencies",
+                                        ?.joinToString(prefix = stringResource(Res.string.library_depends_on)) { it.value }
+                                        ?: stringResource(Res.string.library_no_dependencies),
                                     style = AzphaltType.body,
                                     color = Azphalt.White,
                                 )
                                 if (roles.isNotEmpty()) {
-                                    Text("REASSIGN ROLE", style = AzphaltType.eyebrow, color = Azphalt.White)
+                                    Text(stringResource(Res.string.library_reassign_role), style = AzphaltType.eyebrow, color = Azphalt.White)
                                     OutlinedTextField(
                                         value = roleQuery,
                                         onValueChange = { roleQuery = it },
-                                        label = { Text("Filter roles") },
+                                        label = { Text(stringResource(Res.string.library_filter_roles)) },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
@@ -379,12 +426,12 @@ internal fun LiveWorkflowLibraryScreen(
                                 }
 
                                 if (executor is TaskExecutor.RoleAgent || task.roleId != null) {
-                                    Text("EXPAND ROLE INTO WORKFLOW", style = AzphaltType.eyebrow, color = Azphalt.White)
+                                    Text(stringResource(Res.string.library_expand_role_into_workflow), style = AzphaltType.eyebrow, color = Azphalt.White)
                                     composableWorkflows(entries.orEmpty(), currentDraft, composeQuery).take(10).forEach { candidate ->
                                         AzphaltPill(
                                             label = candidate.definition.name,
                                             seed = "expand-${task.id.value}-${candidate.key}",
-                                            endCap = "Expand",
+                                            endCap = stringResource(Res.string.library_expand),
                                             onClick = {
                                                 mutateDraft(
                                                     currentDraft = currentDraft,
@@ -412,11 +459,11 @@ internal fun LiveWorkflowLibraryScreen(
                 )
             }
 
-            Text("COMBINE WORKFLOWS", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.library_combine_workflows), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
             OutlinedTextField(
                 value = composeQuery,
                 onValueChange = { composeQuery = it },
-                label = { Text("Find workflow or role to add") },
+                label = { Text(stringResource(Res.string.library_find_workflow_or_role_to_add)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -426,10 +473,10 @@ internal fun LiveWorkflowLibraryScreen(
                     eyebrow = candidate.origin.name,
                     title = candidate.definition.name,
                     body = candidate.definition.description,
-                    endCap = "${candidate.definition.tasks.size} task${if (candidate.definition.tasks.size == 1) "" else "s"}",
+                    endCap = pluralStringResource(Res.plurals.library_task_count, candidate.definition.tasks.size, candidate.definition.tasks.size),
                     well = {
                         AzphaltPill(
-                            label = "Add after end",
+                            label = stringResource(Res.string.library_add_after_end),
                             seed = "inline-${candidate.key}",
                             onClick = {
                                 mutateDraft(
@@ -454,25 +501,25 @@ internal fun LiveWorkflowLibraryScreen(
             }
 
             if (host != null) {
-                Text("SAVE COMPOSITION", style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.library_save_composition), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
                 OutlinedTextField(
                     value = saveName,
                     onValueChange = { saveName = it },
-                    label = { Text("Workflow name") },
+                    label = { Text(stringResource(Res.string.library_workflow_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = saveId,
                     onValueChange = { saveId = it },
-                    label = { Text("Workflow id") },
+                    label = { Text(stringResource(Res.string.library_workflow_id)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 AzphaltPill(
-                    label = "Save reusable workflow",
+                    label = stringResource(Res.string.library_save_reusable_workflow),
                     seed = "workflow-save-composition",
-                    endCap = "${currentDraft.tasks.size} tasks",
+                    endCap = stringResource(Res.string.library_tasks, currentDraft.tasks.size),
                     onClick = {
                         scope.launch {
                             runCatching {
@@ -486,10 +533,10 @@ internal fun LiveWorkflowLibraryScreen(
                                 draftOriginName = WorkflowLibraryOrigin.Authored.name
                                 saveId = saved.id.value
                                 saveName = saved.name
-                                status = "Saved ${saved.name}."
+                                status = getString(Res.string.library_saved, saved.name)
                                 refreshGeneration += 1
                             }.onFailure { failure ->
-                                loadError = failure.message ?: "Workflow could not be saved."
+                                loadError = failure.message ?: getString(Res.string.library_workflow_could_not_be_saved)
                             }
                         }
                     },

@@ -21,6 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.repository_credential_connect
+import com.hereliesaz.geministrator.resources.repository_credential_credential
+import com.hereliesaz.geministrator.resources.repository_credential_credential_required
+import com.hereliesaz.geministrator.resources.repository_credential_get
+import com.hereliesaz.geministrator.resources.repository_credential_repository_service
+import com.hereliesaz.geministrator.resources.repository_credential_save
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun RepositoryCredentialSetup(
@@ -46,25 +55,25 @@ fun RepositoryCredentialSetup(
                     .padding(26.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("CONNECT", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.repository_credential_connect), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
                 Text(entry.displayName.uppercase(), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
 
                 AzphaltRecord(
                     seed = "repository-credential-${entry.id}",
-                    eyebrow = "Repository service",
+                    eyebrow = stringResource(Res.string.repository_credential_repository_service),
                     title = entry.displayName,
                     body = entry.description,
-                    endCap = "Credential required",
+                    endCap = stringResource(Res.string.repository_credential_credential_required),
                     well = {
                         AzphaltPill(
-                            label = "Get ${entry.credentialLabel}",
+                            label = stringResource(Res.string.repository_credential_get, entry.credentialLabel),
                             seed = "repository-credential-link-${entry.id}",
                             onClick = { uriHandler.openUri(entry.credentialUrl) },
                         )
                     },
                 )
 
-                Text("CREDENTIAL", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.repository_credential_credential), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                 OutlinedTextField(
                     value = credential,
                     onValueChange = {
@@ -81,7 +90,7 @@ fun RepositoryCredentialSetup(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AzphaltPill(
-                        label = "Save",
+                        label = stringResource(Res.string.repository_credential_save),
                         seed = "repository-credential-save-${entry.id}",
                         selected = credential.isNotBlank(),
                         onClick = {
@@ -94,7 +103,7 @@ fun RepositoryCredentialSetup(
                         },
                     )
                     AzphaltPill(
-                        label = "Cancel",
+                        label = stringResource(Res.string.common_cancel),
                         seed = "repository-credential-cancel-${entry.id}",
                         onClick = onCancel,
                     )

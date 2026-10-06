@@ -10,6 +10,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.common_inbox
+import com.hereliesaz.geministrator.resources.inbox_loading_runtime
+import com.hereliesaz.geministrator.resources.inbox_no_active_run_there_are_no
+import com.hereliesaz.geministrator.resources.inbox_no_pending_decisions
+import com.hereliesaz.geministrator.resources.inbox_no_project_yet_there_are_no
+import com.hereliesaz.geministrator.resources.inbox_run_unavailable
+import com.hereliesaz.geministrator.resources.inbox_runtime_disconnected
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun LiveInboxScreen(
@@ -56,15 +65,15 @@ internal fun LiveInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("INBOX", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         Text(
             when (runtimeState) {
-                ApplicationRuntimeState.Loading -> "Loading runtime…"
-                is ApplicationRuntimeState.NoProject -> "No project yet. There are no workflow decisions to review."
-                is ApplicationRuntimeState.NoRun -> "No active run. There are no workflow decisions to review."
-                is ApplicationRuntimeState.Disconnected -> "Runtime disconnected: ${runtimeState.message}"
-                is ApplicationRuntimeState.ResumeFailed -> "Run unavailable: ${runtimeState.message}"
-                is ApplicationRuntimeState.Live -> "No pending decisions."
+                ApplicationRuntimeState.Loading -> stringResource(Res.string.inbox_loading_runtime)
+                is ApplicationRuntimeState.NoProject -> stringResource(Res.string.inbox_no_project_yet_there_are_no)
+                is ApplicationRuntimeState.NoRun -> stringResource(Res.string.inbox_no_active_run_there_are_no)
+                is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.inbox_runtime_disconnected, runtimeState.message)
+                is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.inbox_run_unavailable, runtimeState.message)
+                is ApplicationRuntimeState.Live -> stringResource(Res.string.inbox_no_pending_decisions)
             },
             style = AzphaltType.body,
             color = Azphalt.currentGround.onPage,
