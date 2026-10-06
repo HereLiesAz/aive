@@ -51,7 +51,7 @@ import javax.swing.UIManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
-import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
+import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
@@ -97,6 +97,7 @@ fun main() {
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
     val orchestrationSpecialistExecutor = DesktopLocalOrchestrationModelExecutor(orchestrationSpecialistInstaller)
+    val orchestrationDecisionModel = DesktopOrchestrationDecisionModel(orchestrationSpecialistInstaller::decisionModelRoot)
     // Memory: SQLite under ~/.aive/memory, programmatic stages by default; local (installed epoch-8
     // clerks) or hosted stages on request. Attached before App builds the runtime, whose session
     // gateway captures the observer.
@@ -250,12 +251,16 @@ fun main() {
                     )
                 }
                 val orchestrationUtilities = remember(localOrchestrationStatus) {
-                    DesktopOrchestrationSpecialists.utilities(orchestrationSpecialistInstaller, orchestrationSpecialistExecutor)
+                    DesktopOrchestrationSpecialists.utilities(
+                        orchestrationSpecialistInstaller,
+                        orchestrationSpecialistExecutor,
+                        orchestrationDecisionModel,
+                    )
                 }
                 val localOrchestrationSetting = LocalOrchestrationSpecialistSetting(
                     status = localOrchestrationStatus,
                     releasedRoles = DesktopOrchestrationSpecialists.releasedRoleCount(),
-                    totalRoles = OrchestrationUtilityRole.entries.size,
+                    totalRoles = OrchestrationQuestion.entries.size,
                     onInstall = install@{
                         if (localOrchestrationStatus is LocalOrchestrationSpecialistStatus.Installing) return@install
                         localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing("Starting…")
@@ -277,7 +282,10 @@ fun main() {
                         uiScope.launch {
                             localOrchestrationStatus = try {
                                 // reset() waits for a running generation; keep it off the UI thread.
-                                withContext(Dispatchers.IO) { orchestrationSpecialistExecutor.reset() }
+                                withContext(Dispatchers.IO) {
+                                    orchestrationSpecialistExecutor.reset()
+                                    orchestrationDecisionModel.close()
+                                }
                                 orchestrationSpecialistInstaller.removeReleased()
                                 LocalOrchestrationSpecialistStatus.NotInstalled
                             } catch (cancelled: CancellationException) {
@@ -372,6 +380,7 @@ fun main() {
         memoryScope.cancel()
         memorySessions.close()
         orchestrationSpecialistExecutor.reset()
+        orchestrationDecisionModel.close()
         localPlanner.close()
         httpClient.close()
     }

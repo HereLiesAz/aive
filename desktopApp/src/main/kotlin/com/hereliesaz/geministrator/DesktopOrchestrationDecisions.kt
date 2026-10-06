@@ -1,4 +1,4 @@
-package com.hereliesaz.aive
+package com.hereliesaz.geministrator
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import ai.onnxruntime.OnnxTensor
@@ -19,7 +19,7 @@ import kotlinx.serialization.json.Json
  * One forward pass per text answers every question asked of it. Returns null (the caller's heuristic
  * stands) when the model is not installed or fails.
  */
-internal class AndroidOrchestrationDecisionModel(
+internal class DesktopOrchestrationDecisionModel(
     /** The installed model directory, or null when it is not released or not installed. */
     private val installedRoot: () -> File?,
 ) : OrchestrationDecisionModel, AutoCloseable {

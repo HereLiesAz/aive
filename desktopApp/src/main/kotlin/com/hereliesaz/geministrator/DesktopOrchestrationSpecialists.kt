@@ -3,16 +3,19 @@ package com.hereliesaz.geministrator
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
 import com.hereliesaz.geministrator.inference.LocalModelArtifactDescriptor
 import com.hereliesaz.geministrator.inference.LocalModelArtifactKind
+import com.hereliesaz.geministrator.inference.LocalModelLibrary
 import com.hereliesaz.geministrator.inference.LocalModelLoadPlan
 import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
 import com.hereliesaz.geministrator.orchestration.CatalogBackedLocalOrchestrationSpecialistRuntime
+import com.hereliesaz.geministrator.orchestration.DecisionInformedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.GuardedModelBackedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationModelExecutor
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistCatalog
+import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistPrompts
 import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
 import io.ktor.client.HttpClient
@@ -40,18 +43,23 @@ internal object DesktopOrchestrationSpecialists {
         supportsSharedBaseAdapters = true,
     )
 
-    fun releasedRoleCount(): Int = OrchestrationSpecialistCatalog.released().allSpecialists().size
+    /** Judgement calls the released decision model answers (the settings screen's "x of y"). */
+    fun releasedRoleCount(): Int =
+        if (OrchestrationSpecialistCatalog.hasDecisionModel()) OrchestrationQuestion.entries.size else 0
 
     fun utilities(
         installer: DesktopOrchestrationSpecialistInstaller,
         executor: DesktopLocalOrchestrationModelExecutor,
+        decisions: DesktopOrchestrationDecisionModel,
     ): LocalOrchestrationUtilityFamily =
-        if (!installer.hasAnyInstalledReleasedArtifact()) {
+        if (decisions.isInstalled()) {
+            DecisionInformedOrchestrationUtilities(decisions)
+        } else if (!installer.hasAnyInstalledReleasedArtifact()) {
             DeterministicLocalOrchestrationUtilities
         } else {
             GuardedModelBackedOrchestrationUtilities(
                 runtime = CatalogBackedLocalOrchestrationSpecialistRuntime(
-                    library = OrchestrationSpecialistCatalog.released(),
+                    library = installer.library(),
                     runtimeCapabilities = runtimeCapabilities,
                     executor = executor,
                 ),
@@ -67,13 +75,15 @@ internal object DesktopOrchestrationSpecialists {
 internal class DesktopOrchestrationSpecialistInstaller(
     httpClient: HttpClient,
     private val installRoot: File = File(System.getProperty("user.home"), ".aive/models/orchestration-utilities"),
+    /** The released catalog; tests pass a fixture. */
+    val library: () -> LocalModelLibrary = OrchestrationSpecialistCatalog::released,
 ) {
     private val mutex = Mutex()
     private val downloader = DesktopResumableFileDownloader(httpClient)
 
     /** The artifacts the released catalog's preferred load plans need on desktop. */
     fun releasedArtifacts(): List<LocalModelArtifactDescriptor> {
-        val library = OrchestrationSpecialistCatalog.released()
+        val library = library()
         return library.allSpecialists().flatMap { specialist ->
             runCatching {
                 when (val plan = library.plan(specialist.specialistId, DesktopOrchestrationSpecialists.runtimeCapabilities)) {
@@ -83,6 +93,14 @@ internal class DesktopOrchestrationSpecialistInstaller(
                 }
             }.getOrDefault(emptyList())
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
+    }
+
+    /** The installed decision model's directory, or null when it is not released or not installed. */
+    fun decisionModelRoot(): File? {
+        val plan = runCatching {
+            library().plan(OrchestrationSpecialistCatalog.DECISIONS_SPECIALIST_ID, DesktopOrchestrationSpecialists.runtimeCapabilities)
+        }.getOrNull() as? LocalModelLoadPlan.MergedModel ?: return null
+        return installed(plan.model)
     }
 
     fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
@@ -116,7 +134,7 @@ internal class DesktopOrchestrationSpecialistInstaller(
     }
 
     private fun removeAll() {
-        OrchestrationSpecialistCatalog.released().allArtifacts().forEach { artifact ->
+        library().allArtifacts().forEach { artifact ->
             if (artifact.kind == LocalModelArtifactKind.Adapter) {
                 val file = adapterFile(artifact)
                 file.delete()
