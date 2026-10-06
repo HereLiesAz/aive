@@ -1,0 +1,30 @@
+# The Aive — Licensing
+
+Authoritative, path-by-path license layout.
+
+> **Not legal advice.** If a licensing or acquisition conversation ever turns on this, have an IP lawyer
+> read `LICENSE`, this file and `THIRD_PARTY_NOTICES.md`.
+
+---
+
+## Summary
+
+| Layer | License |
+|---|---|
+| The app and everything in this repository not listed below: `shared`, `providers/*`, `androidApp`, `desktopApp`, `webApp`, the memory and orchestration layers, `tools/*`, docs | **PolyForm Noncommercial 1.0.0** (`/LICENSE`) |
+| `vendor/conveyance-h2g2` | Its own license, as stated in that tree |
+| Bundled third-party data: WordNet (`shared/src/commonMain/composeResources/files/aive-wordnet-v1.txt.gz`) | WordNet license (Princeton University); notice in `THIRD_PARTY_NOTICES.md` |
+| Downloaded model weights (Qwen2.5-0.5B-Instruct base and the released LoRA adapters, the Association Linker embedder) | Their upstream licenses, listed in `THIRD_PARTY_NOTICES.md`; fetched at run time, not stored in this repository |
+| Library dependencies (Gradle) | Their own upstream licenses; not relicensed |
+
+## Precedence (most specific wins)
+
+per-file SPDX header  →  module `LICENSE`  →  this `LICENSING`  →  root `/LICENSE`
+
+## Notes
+
+- **Source license ≠ app-usage grant.** PolyForm on the *source* stops others from lifting the code. Using
+  the compiled app, including for paid work, is not restricted by the source's noncommercial clause.
+- **The author is never restricted.** PolyForm binds others; HereLiesAz keeps all rights, including
+  commercial tiers, dual licensing and acquisition.
+- **Not "open source."** PolyForm is source-available, not OSI-approved. Describe The Aive accordingly.
