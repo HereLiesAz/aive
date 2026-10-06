@@ -121,10 +121,27 @@ EPOCHS = 2                           # nine roles' worth of rows per epoch
 # many optimizer steps. 700 overshot: validation loss stopped improving near step 500, and the
 # remaining steps only fit the training rows harder. 450 stops near that plateau.
 ADAPTER_MIN_STEPS = 450
-# Every run also stops at the first epoch whose validation loss fails to improve on the best by this
-# fraction, and keeps the best epoch's weights. The step budget above is then a ceiling, not a target.
-PLATEAU_MIN_IMPROVEMENT = 0.05
+# Each epoch is judged by the gate's own measure on a validation sample: the worst class's exact-match
+# score (overall score for a role without classes). Validation loss picked collapsed clerks: on a
+# corpus that is mostly empty proposals, answering empty to everything has the lowest loss, so the
+# Category Classifier and Condensation Rewriter stopped at epoch 3 answering one thing. Training stops
+# after SELECT_PATIENCE epochs without a better score and keeps the best epoch's weights.
+SELECT_ROWS_PER_CLASS = 12
+SELECT_PATIENCE = 2
+# Training rows are oversampled per class (tag class:<name>) up to the largest class, so a minority
+# class (writes, condense) weighs as much in the loss as the majority.
+BALANCE_CLASSES = True
+# Bumped whenever training changes: a role trained by an older recipe that failed its gate is trained
+# again instead of being skipped as done.
+TRAIN_RECIPE = 2
 LEARNING_RATE = 2e-4
+# Kaggle ends a session at 12 hours and loses whatever was mid-flight. A role is started only when
+# the time left covers the longest role so far (ROLE_HOURS_ESTIMATE before the first), and training
+# itself stops at the deadline. A run that stops early still publishes what passed; run it again.
+SESSION_STARTED = time.time()
+TIME_BUDGET_HOURS = 11.0
+ROLE_HOURS_ESTIMATE = 2.5
+GATE_BATCH = 8                       # rows generated together in the GPU gates (length-sorted, left-padded)
 # Per-device batch 4 x 4 accumulation keeps 16 rows per optimizer step on one GPU. Batch 8 ran a
 # 15 GB T4 out of memory: the logits alone are 8 x 1024 x 151936 floats (~5 GB).
 BATCH_SIZE = 4
@@ -259,19 +276,85 @@ from datasets import Dataset
 from peft import LoraConfig, PeftModel, TaskType, get_peft_model
 from transformers import TrainerCallback
 
-class StopOnPlateau(TrainerCallback):
-    """Stop once an epoch's validation loss improves on the best by less than PLATEAU_MIN_IMPROVEMENT."""
-    def __init__(self):
-        self.best, self.stopped_epoch = None, None
-    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
-        loss = (metrics or {}).get("eval_loss")
-        if loss is None:
-            return
-        if self.best is None or loss < self.best * (1 - PLATEAU_MIN_IMPROVEMENT):
-            self.best = loss
-        elif state.epoch < args.num_train_epochs:
-            self.stopped_epoch = round(state.epoch)
+def deadline_left():
+    """Seconds left of the session's TIME_BUDGET_HOURS."""
+    return SESSION_STARTED + TIME_BUDGET_HOURS * 3600 - time.time()
+
+def generate_batch(model, tokenizer, prompts, max_new):
+    """Greedy answers for [prompts], GATE_BATCH at a time, longest first, left-padded."""
+    tokenizer.padding_side = "left"
+    order = sorted(range(len(prompts)), key=lambda i: -len(prompts[i]))
+    answers = [None] * len(prompts)
+    for start in range(0, len(order), GATE_BATCH):
+        chunk = order[start:start + GATE_BATCH]
+        ids = tokenizer([prompts[i] for i in chunk], return_tensors="pt", padding=True).to(model.device)
+        with torch.no_grad():
+            out = model.generate(**ids, max_new_tokens=max(max_new[i] for i in chunk), do_sample=False,
+                                 pad_token_id=tokenizer.pad_token_id)
+        for k, i in enumerate(chunk):
+            answers[i] = tokenizer.decode(out[k][ids["input_ids"].shape[1]:], skip_special_tokens=True)
+    return answers
+
+def class_floor(rows, answers):
+    """The gate's measure: the worst class's exact-match score (all rows as one class when untagged)."""
+    by_class = {}
+    for row, answer in zip(rows, answers):
+        by_class.setdefault(row_class(row) or "all", []).append(json_exact(answer, row["expected"]))
+    return min(sum(h) / len(h) for h in by_class.values()) if by_class else 0.0
+
+def selection_rows(slugs):
+    """A fixed validation sample per role and class: what each epoch is judged on."""
+    picked = []
+    for slug in slugs:
+        config, splits = load_role(slug)
+        by_class = {}
+        for row in splits["validation"]:
+            by_class.setdefault(row_class(row) or "all", []).append(row)
+        for name, rows in sorted(by_class.items()):
+            rng = random.Random(f"{slug}:{name}:select")
+            picked += [(slug, config, r) for r in rng.sample(rows, min(SELECT_ROWS_PER_CLASS, len(rows)))]
+    return picked
+
+class SelectByGate(TrainerCallback):
+    """After each epoch, score the validation sample with the gate's measure; keep the best weights.
+
+    Stops after SELECT_PATIENCE epochs without a better score, and at the session deadline.
+    """
+    def __init__(self, model, tokenizer, picked):
+        self.model, self.tokenizer, self.picked = model, tokenizer, picked
+        self.best, self.best_epoch, self.best_weights, self.stale, self.stopped_epoch, self.out_of_time = None, None, None, 0, None, False
+        self.history = []
+    def on_step_end(self, args, state, control, **kwargs):
+        if deadline_left() <= 0:
+            self.out_of_time = True
             control.should_training_stop = True
+    def on_epoch_end(self, args, state, control, **kwargs):
+        if not self.picked:
+            return
+        from peft import get_peft_model_state_dict
+        was_training = self.model.training
+        self.model.eval()
+        prompts = [self.tokenizer.apply_chat_template(prompt_messages(c, r), tokenize=False, add_generation_prompt=True) for _, c, r in self.picked]
+        max_new = [max_new_tokens(self.tokenizer, r) for _, _, r in self.picked]
+        answers = generate_batch(self.model, self.tokenizer, prompts, max_new)
+        if was_training:
+            self.model.train()
+        by_role = {}
+        for (slug, _, row), answer in zip(self.picked, answers):
+            by_role.setdefault(slug, ([], []))
+            by_role[slug][0].append(row); by_role[slug][1].append(answer)
+        value = min(class_floor(rows, ans) for rows, ans in by_role.values())
+        epoch = round(state.epoch)
+        self.history.append({"epoch": epoch, "classFloor": value})
+        print(f"epoch {epoch}: worst-class validation score {value:.3f}")
+        if self.best is None or value > self.best:
+            self.best, self.best_epoch, self.stale = value, epoch, 0
+            self.best_weights = {k: v.detach().cpu().clone() for k, v in get_peft_model_state_dict(self.model).items()}
+        else:
+            self.stale += 1
+            if self.stale >= SELECT_PATIENCE and state.epoch < args.num_train_epochs:
+                self.stopped_epoch = epoch
+                control.should_training_stop = True
 
 def lora_config():
     """Every adapter and the shared base use this shape: an adapter only runs on a base exported with it."""
@@ -280,21 +363,35 @@ def lora_config():
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
 
+def balance(pairs):
+    """Oversample one role's (row, encoded) pairs per class (tag class:<name>) up to its largest class."""
+    by_class = {}
+    for row, enc in pairs:
+        by_class.setdefault(row_class(row) or "all", []).append(enc)
+    if len(by_class) < 2:
+        return [enc for _, enc in pairs]
+    target = max(len(v) for v in by_class.values())
+    rng, out = random.Random(8), []
+    for name, rows in sorted(by_class.items()):
+        out += rows + [rng.choice(rows) for _ in range(target - len(rows))]
+        print(f"  class {name}: {len(rows)} rows, oversampled to {target}")
+    return out
+
 def train(slugs, out, min_steps=0):
     """Train one LoRA on the rows of [slugs] into [out]. Multi-task: every role; adapters: one role.
 
-    [min_steps] raises the epoch budget until it allows that many optimizer steps; StopOnPlateau ends
-    training sooner once validation loss levels off, and the best epoch's weights are kept.
+    [min_steps] raises the epoch budget until it allows that many optimizer steps; SelectByGate ends
+    training sooner once the worst class's validation score stops improving (or the session deadline
+    comes), and the best epoch's weights are kept. Returns None when the deadline stopped it before
+    any epoch finished: nothing is saved and the role is trained again next session.
     """
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
-    encoded, skipped = {"train": [], "validation": []}, {}
+    encoded, skipped = {"train": []}, {}
     for slug in slugs:
         config, splits = load_role(slug)
-        for name in encoded:
-            rows = [e for e in (encode_row(tokenizer, config, r) for r in splits[name]) if e]
-            if name == "train":
-                skipped[slug] = len(splits[name]) - len(rows)
-            encoded[name] += rows
+        pairs = [(r, e) for r, e in ((r, encode_row(tokenizer, config, r)) for r in splits["train"]) if e]
+        skipped[slug] = len(splits["train"]) - len(pairs)
+        encoded["train"] += balance(pairs) if BALANCE_CLASSES else [e for _, e in pairs]
     random.Random(8).shuffle(encoded["train"])
     # Trainer spreads each batch over every visible GPU (Kaggle's T4 x2), so count them.
     devices = max(1, torch.cuda.device_count())
@@ -305,40 +402,55 @@ def train(slugs, out, min_steps=0):
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
     model = get_peft_model(model, lora_config())
-    plateau = StopOnPlateau()
+    select = SelectByGate(model, tokenizer, selection_rows(slugs))
     trainer = Trainer(
         model=model,
         args=TrainingArguments(
             output_dir=str(out / "checkpoints"), per_device_train_batch_size=BATCH_SIZE,
-            per_device_eval_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
+            gradient_accumulation_steps=GRAD_ACCUM,
             num_train_epochs=epochs, learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
-            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="epoch", save_strategy="epoch", save_total_limit=2,
-            load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False, report_to=[], seed=8,
+            fp16=DEVICE == "cuda", logging_steps=50, eval_strategy="no", save_strategy="no", report_to=[], seed=8,
         ),
         train_dataset=Dataset.from_list(encoded["train"]),
-        eval_dataset=Dataset.from_list(encoded["validation"]),
         data_collator=DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100),
-        callbacks=[plateau],
+        callbacks=[select],
     )
     trainer.train()
-    if plateau.stopped_epoch:
-        print(f"Validation loss levelled off: stopped after epoch {plateau.stopped_epoch} of {epochs}, kept the best epoch")
+    if select.best_weights is None:
+        print("Session deadline reached before the first epoch finished: nothing saved")
+        del trainer, model; gc.collect()
+        if DEVICE == "cuda": torch.cuda.empty_cache()
+        return None
+    from peft import set_peft_model_state_dict
+    set_peft_model_state_dict(model, select.best_weights)
+    if select.stopped_epoch:
+        print(f"Worst-class score levelled off: stopped after epoch {select.stopped_epoch} of {epochs}")
+    if select.out_of_time:
+        print("Session deadline reached: stopped training early")
+    print(f"kept epoch {select.best_epoch} (worst-class validation score {select.best:.3f})")
     model.save_pretrained(out)
     tokenizer.save_pretrained(out)
     shutil.rmtree(out / "checkpoints", ignore_errors=True)
     del trainer, model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
-    return {"trainRows": len(encoded["train"]), "epochs": epochs, "stoppedAfterEpoch": plateau.stopped_epoch,
-            "bestEvalLoss": plateau.best, "skippedTooLong": skipped}
+    return {"trainRows": len(encoded["train"]), "epochs": epochs, "stoppedAfterEpoch": select.stopped_epoch,
+            "bestEpoch": select.best_epoch, "bestClassFloor": select.best, "selection": select.history,
+            "outOfTime": select.out_of_time, "recipe": TRAIN_RECIPE, "skippedTooLong": skipped}
 ''')
 
 code(r'''
 def score(generate_fn, tokenizer, config, rows):
-    """(score, first failures, every answer): the answers feed the class and shortcut gates."""
-    hits, failures, answers = 0, [], []
-    for row in rows:
-        text = generate_fn(tokenizer.apply_chat_template(prompt_messages(config, row), tokenize=False, add_generation_prompt=True), row)
-        answers.append(text)
+    """(score, first failures, every answer): the answers feed the class and shortcut gates.
+
+    [generate_fn] answers one (prompt, row), or, with a `many` attribute, all of them in one call.
+    """
+    hits, failures = 0, []
+    prompts = [tokenizer.apply_chat_template(prompt_messages(config, row), tokenize=False, add_generation_prompt=True) for row in rows]
+    if hasattr(generate_fn, "many"):
+        answers = generate_fn.many(prompts, rows)
+    else:
+        answers = [generate_fn(p, row) for p, row in zip(prompts, rows)]
+    for row, text in zip(rows, answers):
         if json_exact(text, row["expected"]):
             hits += 1
         elif len(failures) < 3:
@@ -449,6 +561,7 @@ def torch_gates(adapter, slugs):
         with torch.no_grad():
             out = model.generate(**ids, max_new_tokens=max_new_tokens(tokenizer, row), do_sample=False)
         return tokenizer.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True)
+    generate.many = lambda prompts, rows: generate_batch(model, tokenizer, prompts, [max_new_tokens(tokenizer, r) for r in rows])
     results = {slug: gate(slug, generate, tokenizer, "adapter") for slug in slugs}
     del model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
@@ -944,7 +1057,10 @@ def publish_role(slug):
 if MODE in ("multitask", "both"):
     mt = state.setdefault("multitask", {})
     if not mt.get("trained"):
-        mt["train"] = train(SLUGS, WORK / "multitask" / "adapter"); mt["trained"] = True; save_state()
+        mt["train"] = train(SLUGS, WORK / "multitask" / "adapter")
+        if mt["train"] is None:
+            raise RuntimeError("Session deadline reached while training the multitask model; run again")
+        mt["trained"] = True; save_state()
     if "adapterGates" not in mt:
         mt["adapterGates"] = torch_gates(WORK / "multitask" / "adapter", SLUGS); save_state()
     candidates = [s for s in SLUGS if mt["adapterGates"][s]["passed"]]
@@ -963,6 +1079,7 @@ if MODE in ("adapters", "both"):
     # adapters from any notebook mix in one catalog.
     base, base_int8, mapping = fetch_base()
     ad = state.setdefault("adapters", {})
+    role_hours = []
     for slug in SLUGS:
         released = role_release(slug) if REUSE_RELEASED else None
         if released:
@@ -971,8 +1088,21 @@ if MODE in ("adapters", "both"):
             print(f"{slug}: already released as {role_tag(slug)}; reusing it")
             continue
         role = ad.setdefault(slug, {})
+        # A role an older recipe trained into a failing gate is trained again, not skipped as done.
+        if role.get("trained") and role.get("train", {}).get("recipe") != TRAIN_RECIPE and not role.get("adapterGate", {}).get("passed", True):
+            print(f"{slug}: failed its gate under an older training recipe; training again")
+            role.clear(); save_state()
         if not role.get("trained"):
-            role["train"] = train([slug], WORK / "adapters" / slug, min_steps=ADAPTER_MIN_STEPS); role["trained"] = True; save_state()
+            needed = max(role_hours, default=ROLE_HOURS_ESTIMATE) * 3600
+            if deadline_left() < needed:
+                print(f"{slug}: {deadline_left() / 3600:.1f} h left of the {TIME_BUDGET_HOURS} h budget, a role takes up to {needed / 3600:.1f} h; stopping here. Run again to continue.")
+                break
+            role_started = time.time()
+            result = train([slug], WORK / "adapters" / slug, min_steps=ADAPTER_MIN_STEPS)
+            if result is None:
+                break
+            role["train"] = result; role["trained"] = True; save_state()
+            role_hours.append((time.time() - role_started) / 3600 * 1.5)  # training plus both gates
         if "adapterGate" not in role:
             role["adapterGate"] = torch_gates(WORK / "adapters" / slug, [slug])[slug]; save_state()
         if not role["adapterGate"]["passed"]:

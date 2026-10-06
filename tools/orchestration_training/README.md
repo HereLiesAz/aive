@@ -68,8 +68,11 @@ others left, and every adapter, whichever notebook trained it, runs on the one p
 
 1. trains one LoRA adapter on Qwen2.5-0.5B-Instruct over every role's rows (loss on the answer only;
    every row carries its role's system prompt, which is how one model knows which contract it is
-   answering). Every run, multitask or adapter, stops at the first epoch whose validation loss improves
-   on the best by less than `PLATEAU_MIN_IMPROVEMENT` (5%) and keeps the best epoch's weights;
+   answering). Training rows are oversampled per class (`class:<name>` tags) up to the largest class
+   (`BALANCE_CLASSES`). After each epoch the gate's own measure, the worst class's exact-match score
+   on a fixed validation sample (`SELECT_ROWS_PER_CLASS`), judges the weights; training stops after
+   `SELECT_PATIENCE` epochs without a better score and keeps the best epoch. Validation loss is not
+   used: on a corpus that is mostly empty proposals it rewards answering empty to everything;
 2. gates the adapter **per role** on that role's test and adversarial splits (`json_exact`, thresholds
    from the role's config);
 3. merges, exports ONNX (fp32 graph), then quantizes weights only to INT8 with MatMulNBits.
@@ -124,3 +127,10 @@ Android and desktop install released artifacts explicitly from **Settings → Lo
 (SHA-256 verified; nothing downloads during inference) and use them once any is installed. Both
 support merged INT8 models and the shared INT8 base + fp16 adapter shape, and prefer the adapter shape
 when the catalog offers both. The web keeps the deterministic utility family.
+## Session time
+
+Kaggle ends a session at 12 hours. The run keeps to `TIME_BUDGET_HOURS` (11): a role is started only
+when the time left covers the longest role so far (`ROLE_HOURS_ESTIMATE` before the first), and
+training stops at the deadline. What passed is already published; run again to continue. A role
+that failed its gate under an older `TRAIN_RECIPE` is trained again rather than skipped. The GPU gates
+generate `GATE_BATCH` rows at a time.
