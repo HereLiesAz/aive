@@ -19,6 +19,10 @@ Current visual grammar:
 - Crash Test Dummy: yellow elastic/wavy species with goggles and energetic motion.
 - Adversarial Reviewer/Antagonist: red or black sharp species with visibly hostile review motifs.
 - Queued/ready states stay restrained; active states move; blocked/failed states visibly sag or signal; complete states visibly resolve.
-- Detached arm sprites connect mascot silhouette edges without stretching, rotating, or deforming the mascot body.
+- Detached arm sprites connect mascot silhouette edges without stretching, rotating, or deforming the mascot body. For rigged creatures they attach at the rig's evaluated `arm-socket` attachment facing the partner node; if no socket faces that way, the silhouette-edge anchor is used.
 - Active nodes state what operation they are performing and show the real task name.
 - Drag/drop workflow authoring, external service visits, dependency adornments, persisted layout, and task selection remain part of the production interaction model.
+
+## Puppet-rig creatures
+
+Node creatures are drawn from the puppet rigs in `shared/src/commonMain/composeResources/files/rigs/` when one is mapped for the role (`CreatureRigs.kt`, `CreatureRigMapping`): exact character names first, then the role classifier, newest sheet when a role has several; unknown/custom roles get one of `generic-01..06` by a stable hash of the label. Roles without a sliced sheet (orchestrator, researcher, QA, release, UX designer, ...) and distinct Store personas keep the earlier sprite/procedural rendering, as does any node whose rig is still loading or fails to load. The rig is driven by the node's workflow state and the shared 2.4 s terrarium clock plus a stable per-node phase offset. Rigs are loaded once per slug (`CreatureRigCache`, atlas decoded off the main thread) and evaluated per frame without allocation (`CompiledPuppetRig`). `CreatureRigSettings.enabled` forces the old rendering; the web build shows a gallery at `?creatureRigs=1`.
