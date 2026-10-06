@@ -305,4 +305,7 @@ internal object MemoryAliases {
     }
 
     fun canonical(lowercaseWord: String): String = canonicalOf[lowercaseWord] ?: lowercaseWord
+
+    /** Every spelling in [lowercaseWord]'s group, itself included; just the word when it has none. */
+    fun group(lowercaseWord: String): Set<String> = groups.firstOrNull { lowercaseWord in it } ?: setOf(lowercaseWord)
 }

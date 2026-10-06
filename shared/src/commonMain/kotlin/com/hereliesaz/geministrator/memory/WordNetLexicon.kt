@@ -81,6 +81,9 @@ internal class WordNetLexicon private constructor(
         return found.sorted().joinToString("").also { partsOfSpeechCache[lower] = it }
     }
 
+    /** Number of noun and verb synsets; synset ids run 0 until this. */
+    val synsetCount: Int get() = synsetPos.size
+
     fun posOf(synset: Int): Pos = if (synsetPos[synset] == 'v') Pos.Verb else Pos.Noun
 
     fun lemmas(synset: Int): List<String> = synsetLemmas.get(synset).split('|')

@@ -600,6 +600,14 @@ Useful actions include call, invoke, fetch, parse, validate, serialize, deserial
 
 The same identifier may appear in both indexes. `saveUser()` can be an entity named `saveUser` and an action meaning save/persist user.
 
+### Tag keywords (engine, not clerk)
+
+Keywords are trigger words, not tags: generated from WordNet rather than taken from memories, and used only to match words said in a session so the tag they belong to fires. They never become memory nodes, tags or edges, and stay out of explicit `#tag` queries, tag listings and BM25.
+
+When the Tags stage commits, the engine (`MemoryTagKeywords.withKeywords`, called from consolidation, so every clerk engine's tags get them) attaches to each new NounTag/VerbTag a keyword list in metadata `keywords` (`term:weight|…`). It is written once with the tag and never recomputed. Per word of the tag (and the whole phrase when WordNet knows it), from the three most frequent noun and verb senses: synonyms 1.0, derivations 0.9, hypernyms 0.6 / 0.4 (two levels), hyponyms 0.5 (at most 24 per synset), same-lexname siblings 0.3; every word also carries itself and its `MemoryAliases` group at 1.0. Max weight per term, at most 64 terms, ties in discovery order. Without WordNet a tag gets only its words and aliases. The weights are one table (`MemoryTagKeywords.Weights`); the lists are deliberately noisy and the attention dial turns weak relations down. A model clerk does not write keywords; a list it does write is kept as is.
+
+**Trigger table.** Each workflow layer holds a `MemoryKeywordTriggers` table ready in memory: keyword (lowercased word or 2–3 word phrase) → (tag, weight), plus each tag's own text at 1.0. It is built from the stored lists on first use and updated the instant a tag is committed through the layer's store (`KeywordTriggeringStore`); a revision it did not see (a write that bypassed the layer, a replace) rebuilds it. Cue clouds consult it alongside the tag search (GRIP.md, Recall triggers in thought); what is delivered is always the tag.
+
 ## Prompt 0 — Shared generative training framework
 
 Build the common Kaggle framework for the eight generative clerks.

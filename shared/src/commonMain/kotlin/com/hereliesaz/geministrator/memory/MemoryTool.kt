@@ -123,7 +123,13 @@ class GraphMemoryTool(
         }
     }
 
-    override suspend fun termFrequency(term: String): MemoryTermFrequency = index().bm25.frequency(term.lowercase())
+    /** The larger of the term's text frequency and its tag-keyword frequency, so the common-word filter covers keywords too. */
+    override suspend fun termFrequency(term: String): MemoryTermFrequency {
+        val index = index()
+        val lower = term.lowercase()
+        val text = index.bm25.frequency(lower)
+        return text.copy(memories = max(text.memories, index.keywords.memoryCount(lower)))
+    }
 
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
         val index = index()
@@ -143,10 +149,18 @@ class GraphMemoryTool(
                 if (lexical <= 0f) null else node to lexical
             }
             .toList()
+        // Tag keywords: the caller's own words looked up in the stored WordNet keywords, each match at
+        // the relevance its keyword weight earns, so weak relations surface only at intrusive dials.
+        val keywords = index.keywordMatches(query, weights.filterValues { it >= 1.0 }.keys, active)
+        val lexicalById = scoredSeeds.associate { it.first.id to it.second }
+        val merged = scoredSeeds.map { (node, score) -> node to max(score, keywords[node.id] ?: 0f) } +
+            keywords.filterKeys { it !in lexicalById }.entries.sortedBy { it.key.value }
+                .mapNotNull { (id, score) -> index.nodesById[id]?.let { it to score } }
+        val seeds = merged
             .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
-        return index.recallFromSeeds(query, scoredSeeds, active).let { it.copy(hits = withLinks(index, it.hits)) }
+        return index.recallFromSeeds(query, seeds, active, keywords).let { it.copy(hits = withLinks(index, it.hits)) }
     }
 
     /**
@@ -328,7 +342,24 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     }
 
     fun terms(node: MemoryNode): Set<String> = terms.getOrPut(node.id) {
-        (node.text.memoryTerms() + node.metadata.values.flatMap(String::memoryTerms)).toSet()
+        (node.text.memoryTerms() + node.metadata.filterKeys { it != TAG_KEYWORDS }.values.flatMap(String::memoryTerms)).toSet()
+    }
+
+    val keywords: MemoryKeywordIndex by lazy { MemoryKeywordIndex(snapshot, activeIds) }
+
+    /**
+     * Keyword relevance ([MemoryTagKeywords.relevance]) per active node for [terms] and their adjacent
+     * pairs and triples (multi-word lemmas), restricted to [scoped].
+     */
+    fun keywordMatches(query: MemoryQuery, terms: Collection<String>, scoped: List<MemoryNode>): Map<MemoryNodeId, Float> {
+        if (terms.isEmpty() || keywords.isEmpty) return emptyMap()
+        val tokens = query.text.lowercase().split(Regex("[^\\p{L}\\p{N}_-]+")).filter(String::isNotEmpty)
+        val phrases = (2..3).flatMap { n -> tokens.windowed(n).map { it.joinToString(" ") } }
+        val wordNet = MemoryLanguageResources.loadedOrNull()?.wordNet
+        val scopedIds = if (scoped === active) activeIds else scoped.mapTo(hashSetOf(), MemoryNode::id)
+        return keywords.match(terms + phrases, wordNet)
+            .filterKeys { it in scopedIds }
+            .mapValues { MemoryTagKeywords.relevance(it.value) }
     }
 
     fun lowerText(node: MemoryNode): String = lowerTexts.getOrPut(node.id) { node.text.trim().lowercase() }
@@ -373,6 +404,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
     query: MemoryQuery,
     scoredSeeds: List<Pair<MemoryNode, Float>>,
     scopedActive: List<MemoryNode>,
+    keywords: Map<MemoryNodeId, Float> = emptyMap(),
 ): MemoryRecallBundle {
     if (scoredSeeds.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
@@ -414,7 +446,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
         projected[nodeId] = max(projected[nodeId] ?: 0f, pathScore)
     }
 
-    val hits = fusedOrder(query, projected.entries.mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } })
+    val hits = fusedOrder(query, projected.entries.mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }, keywords)
         .take(query.maxResults)
         .map { (node, score) ->
             MemoryRecallHit(
@@ -432,11 +464,16 @@ private fun MemoryRecallIndex.recallFromSeeds(
 /**
  * Orders recall candidates by weighted reciprocal rank fusion (Cormack et al.) instead of adding
  * signals and clamping: relevance (weight 2), scope affinity (0.4, when the query is scoped),
- * salience (0.15), confidence (0.1) and recency (0.15), each as Σ w / (k + rank) with k = 10. The
+ * salience (0.15), confidence (0.1), recency (0.15) and, when the query's words hit a tag keyword list, the
+ * keyword weight (0.5), each as Σ w / (k + rank) with k = 10. The
  * returned score stays the relevance itself (lexical match carried along the graph), so the
  * attention gate's threshold keeps its meaning: how strongly the memory matched, never boosted.
  */
-private fun MemoryRecallIndex.fusedOrder(query: MemoryQuery, candidates: List<Pair<MemoryNode, Float>>): List<Pair<MemoryNode, Float>> {
+private fun MemoryRecallIndex.fusedOrder(
+    query: MemoryQuery,
+    candidates: List<Pair<MemoryNode, Float>>,
+    keywords: Map<MemoryNodeId, Float> = emptyMap(),
+): List<Pair<MemoryNode, Float>> {
     if (candidates.size <= 1) return candidates
     val signals = buildList<Pair<Double, (Pair<MemoryNode, Float>) -> Double>> {
         add(FUSION_RELEVANCE to { it.second.toDouble() })
@@ -444,6 +481,7 @@ private fun MemoryRecallIndex.fusedOrder(query: MemoryQuery, candidates: List<Pa
         add(FUSION_SALIENCE to { it.first.salience.toDouble() })
         add(FUSION_CONFIDENCE to { it.first.confidence.toDouble() })
         add(FUSION_RECENCY to { it.first.createdAtEpochMillis.toDouble() })
+        if (keywords.isNotEmpty()) add(FUSION_KEYWORDS to { (keywords[it.first.id] ?: 0f).toDouble() })
     }
     val fused = DoubleArray(candidates.size)
     signals.forEach { (weight, value) ->
@@ -468,6 +506,7 @@ private const val FUSION_SCOPE = 0.4
 private const val FUSION_SALIENCE = 0.15
 private const val FUSION_CONFIDENCE = 0.1
 private const val FUSION_RECENCY = 0.15
+private const val FUSION_KEYWORDS = 0.5
 
 private const val MAX_RECALL_DEPTH = 6
 
@@ -866,7 +905,7 @@ internal class MemoryBm25Index(nodes: List<MemoryNode>) {
         /** Bookkeeping metadata whose values are ids, provenance or scores, not content. */
         val UNINDEXED_METADATA = setOf(
             "microAgentRole", "semanticSource", "salienceFeatures", TAG_KEY, TAG_SENSE, TAG_IMPLIED_BY, TAG_OBJECTS,
-            TAG_ALIASES, "sourceEpisodeIds", "sourceSectionIds", "representative", "appendedFrom", "salience",
+            TAG_ALIASES, TAG_KEYWORDS, "sourceEpisodeIds", "sourceSectionIds", "representative", "appendedFrom", "salience",
             "confidence", "collapsedRepeatedLines", "nearDuplicatesDropped", "summaryMethod", "taxonomy",
         )
     }
