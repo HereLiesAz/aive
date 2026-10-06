@@ -168,6 +168,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Package Desktop icon/metadata correctly for each supported OS.
 - [x] Add release notes/changelog generation from actual shipped changes.
 - [x] Centralize four-part build versioning and GitHub Release policy in `HereLiesAz/workflows`.
+- [x] Bring every local workflow under the `HereLiesAz/workflows` policy: CI declared with the central `ci-report` action, no locally duplicated version derivation.
 - [x] Group immutable `MAJOR.MINOR.PATCH.BUILD` artifacts under one `MAJOR.MINOR.PATCH` GitHub Release without moving exact-build tags.
 - [x] Make large Android local-model downloads resumable and integrity-verified across transport failures.
 - [x] Recover Azphalt workflow/role discovery from incorrectly empty app-scoped catalog responses without broadening host compatibility.
