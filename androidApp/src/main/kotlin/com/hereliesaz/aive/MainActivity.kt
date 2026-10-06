@@ -22,9 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
@@ -450,27 +450,16 @@ class MainActivity : ComponentActivity() {
 
             if (crashReportNoticeVisible) {
                 AzphaltAlertDialog(
-                    title = "Crash report sent",
-                    text = "Aive crashed or stopped responding earlier, and a report (stack trace, app version, " +
-                        "Android version, device model) was sent automatically to the HereLiesAz/aive " +
-                        "GitHub issue tracker. You can turn automatic crash reports off any time in " +
-                        "Settings → Crash Reports.",
-                    confirmLabel = "OK",
+                    title = stringResource(R.string.crash_report_sent_title),
+                    text = stringResource(R.string.crash_report_sent_body),
+                    confirmLabel = stringResource(R.string.common_ok),
                     onConfirm = {
                         CrashReporting.markFirstReportNoticeShown(this)
                         crashReportNoticeVisible = false
                     },
-                    title = { Text(stringResource(R.string.crash_report_sent_title)) },
-                    text = {
-                        Text(
-                            stringResource(R.string.crash_report_sent_body),
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            CrashReporting.markFirstReportNoticeShown(this)
-                            crashReportNoticeVisible = false
-                        }) { Text(stringResource(R.string.common_ok)) }
+                    onDismissRequest = {
+                        CrashReporting.markFirstReportNoticeShown(this)
+                        crashReportNoticeVisible = false
                     },
                 )
             }
