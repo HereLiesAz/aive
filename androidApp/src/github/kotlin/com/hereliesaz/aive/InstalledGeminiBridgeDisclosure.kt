@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /** Prominent disclosure shown before the user is sent to Accessibility settings. */
@@ -22,24 +23,14 @@ internal fun InstalledGeminiBridgeDisclosure(
         modifier = Modifier.fillMaxSize().padding(28.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Before you enable the Gemini bridge")
-        Text(
-            "The bridge is an Android accessibility service. While The Aive hands a task to the " +
-                "installed Gemini app, it types the task into Gemini and reads Gemini's reply from the " +
-                "screen. It only watches the Gemini app, and only while a handoff is running; it does " +
-                "not read other apps. The task text goes to Google through your signed-in Gemini app " +
-                "under Google's terms.",
-        )
-        Text(
-            "Android will open Accessibility settings, where you turn on \"The Aive · Gemini bridge\". " +
-                "You can turn it off there, or disconnect Gemini in The Aive, at any time. This bridge " +
-                "exists only in GitHub releases; Google Play builds use the Gemini API instead.",
-        )
+        Text(stringResource(R.string.gemini_bridge_disclosure_title))
+        Text(stringResource(R.string.gemini_bridge_disclosure_body))
+        Text(stringResource(R.string.gemini_bridge_disclosure_settings))
         Button(onClick = onAgree, modifier = Modifier.fillMaxWidth()) {
-            Text("I understand, enable the bridge")
+            Text(stringResource(R.string.gemini_bridge_disclosure_agree))
         }
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Back")
+            Text(stringResource(R.string.gemini_bridge_disclosure_back))
         }
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 
 internal sealed interface AndroidUpdateState {
     data object Idle : AndroidUpdateState
@@ -24,31 +25,31 @@ internal fun AndroidUpdatePrompt(
     when (state) {
         is AndroidUpdateState.ReadyToInstall -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("The Aive ${state.version} is ready") },
+            title = { Text(stringResource(R.string.update_ready_title, state.version)) },
             text = {
                 Text(
-                    "The GitHub build downloaded the update. Android will ask you to confirm installation; your projects, settings, credentials, roles, and workflows remain in place.",
+                    stringResource(R.string.update_ready_body),
                 )
             },
             confirmButton = {
-                TextButton(onClick = onInstallGithubUpdate) { Text("Install update") }
+                TextButton(onClick = onInstallGithubUpdate) { Text(stringResource(R.string.update_install)) }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Later") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
             },
         )
 
         AndroidUpdateState.PlayUpdateAvailable -> AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("A The Aive update is available") },
+            title = { Text(stringResource(R.string.update_play_title)) },
             text = {
-                Text("An update is available through Google Play.")
+                Text(stringResource(R.string.update_play_body))
             },
             confirmButton = {
-                TextButton(onClick = onOpenPlayStore) { Text("Open Play Store") }
+                TextButton(onClick = onOpenPlayStore) { Text(stringResource(R.string.update_open_play_store)) }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("Later") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
             },
         )
 

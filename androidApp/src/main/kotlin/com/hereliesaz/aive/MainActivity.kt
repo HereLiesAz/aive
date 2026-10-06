@@ -24,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -455,20 +456,17 @@ class MainActivity : ComponentActivity() {
                         CrashReporting.markFirstReportNoticeShown(this)
                         crashReportNoticeVisible = false
                     },
-                    title = { Text("Crash report sent") },
+                    title = { Text(stringResource(R.string.crash_report_sent_title)) },
                     text = {
                         Text(
-                            "Aive crashed or stopped responding earlier, and a report (stack trace, app version, " +
-                                "Android version, device model) was sent automatically to the HereLiesAz/aive " +
-                                "GitHub issue tracker. You can turn automatic crash reports off any time in " +
-                                "Settings → Crash Reports.",
+                            stringResource(R.string.crash_report_sent_body),
                         )
                     },
                     confirmButton = {
                         TextButton(onClick = {
                             CrashReporting.markFirstReportNoticeShown(this)
                             crashReportNoticeVisible = false
-                        }) { Text("OK") }
+                        }) { Text(stringResource(R.string.common_ok)) }
                     },
                 )
             }
