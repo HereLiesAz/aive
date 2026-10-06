@@ -22,41 +22,21 @@ internal fun AndroidUpdatePrompt(
 ) {
     when (state) {
         is AndroidUpdateState.ReadyToInstall -> AzphaltAlertDialog(
-            title = "The Aive ${state.version} is ready",
-            text = "The GitHub build downloaded the update. Android will ask you to confirm installation; your projects, settings, credentials, roles, and workflows remain in place.",
-            confirmLabel = "Install update",
+            title = stringResource(R.string.update_ready_title, state.version),
+            text = stringResource(R.string.update_ready_body),
+            confirmLabel = stringResource(R.string.update_install),
             onConfirm = onInstallGithubUpdate,
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.update_ready_title, state.version)) },
-            text = {
-                Text(
-                    stringResource(R.string.update_ready_body),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = onInstallGithubUpdate) { Text(stringResource(R.string.update_install)) }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
-            },
+            dismissLabel = stringResource(R.string.update_later),
         )
 
         AndroidUpdateState.PlayUpdateAvailable -> AzphaltAlertDialog(
-            title = "A The Aive update is available",
-            text = "An update is available through Google Play.",
-            confirmLabel = "Open Play Store",
+            title = stringResource(R.string.update_play_title),
+            text = stringResource(R.string.update_play_body),
+            confirmLabel = stringResource(R.string.update_open_play_store),
             onConfirm = onOpenPlayStore,
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.update_play_title)) },
-            text = {
-                Text(stringResource(R.string.update_play_body))
-            },
-            confirmButton = {
-                TextButton(onClick = onOpenPlayStore) { Text(stringResource(R.string.update_open_play_store)) }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.update_later)) }
-            },
+            dismissLabel = stringResource(R.string.update_later),
         )
 
         else -> Unit
