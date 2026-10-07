@@ -31,15 +31,20 @@ internal class AndroidOrchestrationDecisionModel(
         val session: OrtSession,
         val tokenizer: HuggingFaceTokenizer,
         val offsets: Map<String, Int>,
+        val thresholds: Map<String, Double>,
     )
 
     @Serializable
     private data class DecisionConfig(val maxLength: Int, val questions: List<DecisionHead>)
 
     @Serializable
-    private data class DecisionHead(val id: String, val options: List<String>, val offset: Int)
+    private data class DecisionHead(val id: String, val options: List<String>, val offset: Int, val minConfidence: Double? = null)
 
     fun isInstalled(): Boolean = installedRoot() != null
+
+    @Synchronized
+    override fun minConfidence(question: OrchestrationQuestion): Double? =
+        runCatching { load()?.thresholds?.get(question.id) }.getOrNull()
 
     @Synchronized
     override fun answer(text: String, questions: List<OrchestrationQuestion>): Map<OrchestrationQuestion, List<Double>>? =
@@ -74,9 +79,9 @@ internal class AndroidOrchestrationDecisionModel(
         release()
         val config = json.decodeFromString<DecisionConfig>(File(root, "config.json").readText())
         // A head whose options differ from the app's question would be read wrongly: leave it out.
-        val offsets = config.questions.filter { head ->
-            OrchestrationQuestion.byId(head.id)?.options == head.options
-        }.associate { it.id to it.offset }
+        val heads = config.questions.filter { head -> OrchestrationQuestion.byId(head.id)?.options == head.options }
+        val offsets = heads.associate { it.id to it.offset }
+        val thresholds = heads.mapNotNull { head -> head.minConfidence?.let { head.id to it } }.toMap()
         val tokenizer = HuggingFaceTokenizer.builder()
             .optTokenizerPath(root.toPath())
             .optMaxLength(config.maxLength)
@@ -84,7 +89,7 @@ internal class AndroidOrchestrationDecisionModel(
             .optPadding(false)
             .build()
         val session = environment.createSession(File(root, "model.onnx").absolutePath, OrtSession.SessionOptions())
-        return Loaded(root, session, tokenizer, offsets).also { loaded = it }
+        return Loaded(root, session, tokenizer, offsets, thresholds).also { loaded = it }
     }
 
     private fun release() {

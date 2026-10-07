@@ -52,21 +52,28 @@ CANDIDATES = [
     "sentence-transformers/all-MiniLM-L6-v2",  # 22M
     "jhu-clsp/ettin-encoder-32m",          # 32M
 ]
-TRAIN_ALL = False                    # True: train every candidate for the comparison table, not only up to the first pass
+TRAIN_ALL = True                     # every candidate is trained: the release is the one covering the most questions
 ROWS_PER_CLASS = 600
 MAX_LENGTH = 96                      # tokens; the longest criteria lists fit
 EPOCHS = 12
 PATIENCE = 3                         # epochs without a better worst-class validation score
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-MIN_CONFIDENCE = 0.8                 # DecisionInformedOrchestrationUtilities.DEFAULT_MIN_CONFIDENCE
-# Gates, per question. The runtime acts only on answers at or above MIN_CONFIDENCE, so what matters is
-# how often those are right; unconfident answers fall back to the heuristic.
+MIN_CONFIDENCE = 0.8                 # DecisionInformedOrchestrationUtilities.DEFAULT_MIN_CONFIDENCE; the floor
+# Gated per question, on the INT8 model as shipped. The runtime acts only on answers at or above a
+# question's threshold and falls back to its heuristic otherwise, so what matters is how often those
+# answers are right and how often there is one. Each question's threshold is the lowest (from
+# MIN_CONFIDENCE up) at which validation answers reach target_confident_accuracy; the test split then
+# has to hold up. A question that fails is left out of the release (the app keeps its heuristic); a
+# candidate needs min_questions to be released, and the one covering the most questions is chosen,
+# the smallest among equals.
 GATES = {
-    "min_class_accuracy": 0.85,      # test split, every class of every question
-    "min_confident_accuracy": 0.97,  # test split, answers at or above MIN_CONFIDENCE
+    "target_confident_accuracy": 0.98,   # validation, picks each question's threshold
+    "min_confident_accuracy": 0.95,      # test, answers at or above the threshold
+    "min_coverage": 0.3,                 # test, share of rows answered at or above the threshold
     "min_adversarial_confident_accuracy": 0.8,
-    "max_int8_accuracy_drop": 0.02,  # INT8 ONNX against the float model, test split
+    "max_int8_accuracy_drop": 0.02,      # INT8 ONNX against the float model, test split
+    "min_questions": 2,
 }
 
 def work_root():
@@ -273,29 +280,58 @@ def onnx_probabilities(path, tokenizer, rows):
 def accuracy(rows, probs):
     return sum(QUESTIONS[r["question"]][max(range(len(p)), key=p.__getitem__)] == r["label"] for r, p in zip(rows, probs)) / len(rows)
 
-def gate(test, adversarial, float_accuracy, int8_accuracy):
-    failures = []
-    for q, r in test.items():
-        for label, value in r["classes"].items():
-            if value < GATES["min_class_accuracy"]:
-                failures.append(f"{q} class {label}: {value:.3f} < {GATES['min_class_accuracy']}")
-        if r["confidentAccuracy"] < GATES["min_confident_accuracy"]:
-            failures.append(f"{q} confident accuracy {r['confidentAccuracy']:.3f} < {GATES['min_confident_accuracy']}")
-    rows = [r for r in adversarial.values()]
-    covered = sum(r["coverage"] * r["rows"] for r in rows)
-    hits = sum(r["confidentAccuracy"] * r["coverage"] * r["rows"] for r in rows)
-    adv = hits / covered if covered else 1.0
-    if adv < GATES["min_adversarial_confident_accuracy"]:
-        failures.append(f"adversarial confident accuracy {adv:.3f} < {GATES['min_adversarial_confident_accuracy']}")
+def at_threshold(rows, probs, question, threshold):
+    """(coverage, accuracy of the answers at or above [threshold]) for one question's rows."""
+    pairs = [(r, p) for r, p in zip(rows, probs) if r["question"] == question]
+    hits = [QUESTIONS[question][max(range(len(p)), key=p.__getitem__)] == r["label"] for r, p in pairs if max(p) >= threshold]
+    return (len(hits) / len(pairs) if pairs else 0.0), (sum(hits) / len(hits) if hits else 0.0), len(pairs)
+
+def choose_thresholds(rows, probs):
+    """Per question, the lowest threshold whose validation answers reach the target, or None."""
+    chosen = {}
+    for q in QUESTION_IDS:
+        chosen[q] = None
+        for step in range(int(MIN_CONFIDENCE * 100), 100):
+            coverage, accuracy, _ = at_threshold(rows, probs, q, step / 100)
+            if coverage < GATES["min_coverage"]:
+                break
+            if accuracy >= GATES["target_confident_accuracy"]:
+                chosen[q] = step / 100
+                break
+    return chosen
+
+def gate(thresholds, int8_probs, adversarial_probs, float_accuracy, int8_accuracy):
+    """(questions released, per-question report, candidate failures)."""
+    included, report_rows, failures = [], {}, []
+    for q in QUESTION_IDS:
+        t = thresholds[q]
+        if t is None:
+            report_rows[q] = {"threshold": None, "reason": "no validation threshold reaches the target"}
+            continue
+        coverage, accuracy, rows = at_threshold(SPLITS["test"], int8_probs, q, t)
+        adv_cov, adv_acc, adv_rows = at_threshold(SPLITS["adversarial"], adversarial_probs, q, t)
+        problems = []
+        if accuracy < GATES["min_confident_accuracy"]:
+            problems.append(f"test confident accuracy {accuracy:.3f} < {GATES['min_confident_accuracy']}")
+        if coverage < GATES["min_coverage"]:
+            problems.append(f"test coverage {coverage:.3f} < {GATES['min_coverage']}")
+        if adv_rows and adv_cov and adv_acc < GATES["min_adversarial_confident_accuracy"]:
+            problems.append(f"adversarial confident accuracy {adv_acc:.3f}")
+        report_rows[q] = {"threshold": t, "coverage": coverage, "confidentAccuracy": accuracy, "rows": rows,
+                          "adversarialCoverage": adv_cov, "adversarialConfidentAccuracy": adv_acc, "problems": problems}
+        if not problems:
+            included.append(q)
     if float_accuracy - int8_accuracy > GATES["max_int8_accuracy_drop"]:
         failures.append(f"INT8 drops accuracy by {float_accuracy - int8_accuracy:.3f}")
-    return failures, adv
+    if len(included) < GATES["min_questions"]:
+        failures.append(f"only {len(included)} questions pass (need {GATES['min_questions']})")
+    return included, report_rows, failures
 ''')
 
 code(r'''
 RESULTS_FILE = WORK / "results.json"
 results = json.loads(RESULTS_FILE.read_text()) if RESULTS_FILE.exists() else {}
-chosen = next((name for name in CANDIDATES if results.get(name, {}).get("passed")), None)
+chosen = None
 for name in CANDIDATES:
     if chosen and not TRAIN_ALL:
         break
@@ -305,34 +341,40 @@ for name in CANDIDATES:
     print(f"== {name}")
     started = time.time()
     model, tokenizer, training = train_candidate(name)
-    test = report(SPLITS["test"], probabilities(model, tokenizer, SPLITS["test"]))
-    adversarial = report(SPLITS["adversarial"], probabilities(model, tokenizer, SPLITS["adversarial"]))
     out = WORK / "candidates" / name.replace("/", "__")
     fp32, int8 = export_onnx(model, tokenizer, out)
     float_probs = probabilities(model, tokenizer, SPLITS["test"])
     int8_probs, latency = onnx_probabilities(int8, tokenizer, SPLITS["test"])
+    validation_probs, _ = onnx_probabilities(int8, tokenizer, SPLITS["validation"])
+    adversarial_probs, _ = onnx_probabilities(int8, tokenizer, SPLITS["adversarial"])
     float_accuracy, int8_accuracy = accuracy(SPLITS["test"], float_probs), accuracy(SPLITS["test"], int8_probs)
-    failures, adversarial_confident = gate(test, adversarial, float_accuracy, int8_accuracy)
+    thresholds = choose_thresholds(SPLITS["validation"], validation_probs)
+    included, questions, failures = gate(thresholds, int8_probs, adversarial_probs, float_accuracy, int8_accuracy)
     results[name] = {
-        "passed": not failures, "failures": failures, "training": training,
-        "test": test, "adversarial": adversarial, "adversarialConfidentAccuracy": adversarial_confident,
+        "passed": not failures, "failures": failures, "included": included, "questions": questions,
+        "training": training, "test": report(SPLITS["test"], int8_probs),
         "floatAccuracy": float_accuracy, "int8Accuracy": int8_accuracy,
         "int8Bytes": int8.stat().st_size, "cpuMillisPerText": latency, "minutes": (time.time() - started) / 60,
     }
     RESULTS_FILE.write_text(json.dumps(results, indent=2))
-    print(f"{name}: {'PASS' if not failures else 'FAIL'}; INT8 {int8.stat().st_size / 1e6:.1f} MB, "
-          f"{latency:.1f} ms/text on CPU, accuracy {float_accuracy:.3f} -> {int8_accuracy:.3f}")
+    print(f"{name}: {'PASS' if not failures else 'FAIL'}; releases {len(included)}/{len(QUESTION_IDS)} questions; "
+          f"INT8 {int8.stat().st_size / 1e6:.1f} MB, {latency:.1f} ms/text on CPU, accuracy {float_accuracy:.3f} -> {int8_accuracy:.3f}")
+    for q, r in questions.items():
+        print(f"    {q}: " + (f"threshold {r['threshold']}, coverage {r['coverage']:.2f}, right {r['confidentAccuracy']:.3f}"
+                              + (f" -> left out ({'; '.join(r['problems'])})" if r["problems"] else "")
+                              if r["threshold"] is not None else f"left out ({r['reason']})"))
     for failure in failures:
         print("   ", failure)
-    if not failures and chosen is None:
-        chosen = name
     del model; torch.cuda.empty_cache() if DEVICE == "cuda" else None
 
-print("\n| candidate | passed | INT8 MB | CPU ms/text | test accuracy (INT8) | adversarial confident |")
+# The most questions released wins; CANDIDATES order (smallest first) breaks ties.
+passing = [name for name in CANDIDATES if results.get(name, {}).get("passed")]
+chosen = max(passing, key=lambda name: (len(results[name]["included"]), -CANDIDATES.index(name))) if passing else None
+print("\n| candidate | passed | questions | INT8 MB | CPU ms/text | test accuracy (INT8) |")
 print("|---|---|---|---|---|---|")
 for name, r in results.items():
-    print(f"| {name} | {'yes' if r['passed'] else 'no'} | {r['int8Bytes'] / 1e6:.1f} | {r['cpuMillisPerText']:.1f} | "
-          f"{r['int8Accuracy']:.3f} | {r['adversarialConfidentAccuracy']:.3f} |")
+    print(f"| {name} | {'yes' if r['passed'] else 'no'} | {len(r['included'])} | {r['int8Bytes'] / 1e6:.1f} | "
+          f"{r['cpuMillisPerText']:.1f} | {r['int8Accuracy']:.3f} |")
 print("chosen:", chosen or "none passed; nothing to release")
 ''')
 
@@ -371,8 +413,10 @@ if chosen:
         "encoder": chosen,
         "maxLength": MAX_LENGTH,
         "minConfidence": MIN_CONFIDENCE,
-        "questions": [{"id": q, "options": QUESTIONS[q], "offset": OFFSETS[q][0]} for q in QUESTION_IDS],
-        "scores": {k: results[chosen][k] for k in ("test", "adversarial", "int8Accuracy", "cpuMillisPerText", "int8Bytes")},
+        # Only the questions that passed; the app keeps its heuristic for the rest.
+        "questions": [{"id": q, "options": QUESTIONS[q], "offset": OFFSETS[q][0],
+                       "minConfidence": results[chosen]["questions"][q]["threshold"]} for q in results[chosen]["included"]],
+        "scores": {k: results[chosen][k] for k in ("questions", "int8Accuracy", "cpuMillisPerText", "int8Bytes")},
     }, indent=2))
     asset = ASSETS / "aive-orchestration-decisions-int8.tar.gz"
     with tarfile.open(asset, "w:gz") as tar:

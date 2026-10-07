@@ -1,0 +1,907 @@
+{"question": "verification-operation", "text": "Docusaurus generates the static site", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "Hugo builds without errors", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "LaTeX compiles to PDF", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "mkdocs build succeeds", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "pandoc outputs the docx", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the EPUB is produced", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the Sphinx site builds", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the man pages are generated", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the thesis compiles with bibtex", "label": "build", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "build instructions section mentions Windows", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "changelog entry added", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "date of publication shown on the page", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "editor approves the draft", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "screenshots updated", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "style matches the house template", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "test section heading renamed to Evaluation", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the diagram matches the current architecture", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the source code link in the footer points to the new repo", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "tone reads as described in the brief", "label": "evidence-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "CDN serves the new docs version", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "Read the Docs project is live", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "docs.example.dev responds with 200", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "no 404s on the live landing page", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the API reference host is healthy", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the docs site is up", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the hosted notebook server is running", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the preview deployment is serving", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the search service for the docs is reachable", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the wiki is reachable after migration", "label": "health-check", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "Vale reports no errors", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "alex finds no insensitive wording", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "chktex reports no warnings", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "markdownlint passes", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "no broken-link warnings from the link checker", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "no style-rule violations in the docs linter", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "prettier leaves the docs unchanged", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "proselint has nothing to say", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "textlint is clean", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the spell checker passes in CI", "label": "lint", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "all facts in the whitepaper have citations", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "each benchmark number links to its source", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "each comparison claim links to vendor docs", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "every claim in the background section is cited", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "historical dates come with references", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "numbers in the summary point to primary sources", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "quotes are attributed with page numbers", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "statistics reference their original study", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the figures cite the dataset they're drawn from", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the literature review references are traceable", "label": "source-verification", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "doctests pass", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "examples in the API reference pass their tests", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "new tests cover the sample CLI commands", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "notebook tests in nbval pass", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "pytest over the tutorial notebooks passes", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "snippets are executed by the tests and succeed", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "tests for the analysis code pass", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the code samples' test suite runs green", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the regression tests for the figures pass", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "the replication scripts' unit tests pass", "label": "test", "domain": "documentation and research writing", "split": "test"}
+{"question": "verification-operation", "text": "ESP-IDF build completes", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "OTA bundle is generated", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "PlatformIO compiles all environments", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "Yocto image builds", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "firmware compiles for the STM32 target", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the binary links under the 256 KB limit", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the bootloader compiles", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the hex image is produced", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the signed image gets produced", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "west build succeeds for the nRF board", "label": "build", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "LED blinks as described", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "README updated", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "display style matches the spec", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "enclosure matches the CAD drawing", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "photo of the assembled board attached", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "serial log shows the version string", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "source selection menu lists the new sensor", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "test pads labelled on the silkscreen", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the build date is shown on the device info page", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the hardware lead signs off", "label": "evidence-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "MQTT broker accepts connections", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "devices check in with the cloud after update", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "gateway devices report online", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "heartbeats are arriving from the field units", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "no units offline in the dashboard after rollout", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "telemetry ingest endpoint returns 200", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the CoAP server is reachable", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the OTA server responds", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the device fleet backend is up", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the provisioning service is healthy", "label": "health-check", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "Coverity scan has no new defects", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "MISRA checker reports no violations", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "PC-lint finds nothing new", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "clang-format applied to the drivers", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "clippy passes on the firmware crate", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "cppcheck is clean", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "cpplint passes", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "no warnings with -Wall -Wextra", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "rustfmt check succeeds", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "static analyser shows no null dereferences", "label": "lint", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "all accuracy numbers trace to the calibration log", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "battery life claims are backed by the test reports", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "compliance claims reference the certification reports", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "component specs point to manufacturer datasheets", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "each regulatory limit quoted cites the standard", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "power figures in the datasheet summary cite the measurements", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "security claims cite the audit report", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "temperature ratings link to the vendor documentation", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the RF range figures reference the field study", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "timing numbers link to the scope captures", "label": "source-verification", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "Ceedling suite is green", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "Unity tests for the ring buffer pass", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "cargo test passes for the no_std crate", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "code coverage of the HAL above 80%", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "fuzz tests for the packet parser pass", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "hardware-in-the-loop tests pass", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "integration tests with the gateway pass", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "regression tests on the dev kit pass", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "the sensor driver tests succeed under QEMU", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "unit tests cover the CRC routine", "label": "test", "domain": "embedded and IoT", "split": "test"}
+{"question": "verification-operation", "text": "Android APK is generated", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "IL2CPP step completes and produces the executable", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "PS5 package uploads to the devkit", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "Unreal project compiles in Development config", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "a shipping package for Windows is produced", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "asset bundles get packaged", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the Switch build compiles", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the WebGL export completes", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the Xbox cook succeeds", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the dedicated server binary links", "label": "build", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "art director approves the character model", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "credits list updated", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "jump feels as described in the design doc", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "screenshot of the new HUD attached", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "source of the music listed in the credits screen", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "style of the font matches the logo", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "test level removed from the level select", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the boss shows its health bar", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the build version is shown on the title screen", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the menu matches the UI mockup", "label": "evidence-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "dedicated servers are reachable from all regions", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "game servers report healthy in the fleet dashboard", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "leaderboard API returns 200", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "lobby service accepts connections after the patch", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "matchmaking service is up", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "no crashes in the live server pods for an hour", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "patch CDN serves the new manifest", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the login endpoint responds", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the telemetry collector is ingesting", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the voice chat relay is online", "label": "health-check", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "Blueprint validator reports no issues", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "C# code passes the Roslyn analysers", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "GDScript linter is happy", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "clang-format leaves the physics files untouched", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "clang-tidy finds nothing in the gameplay module", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "luacheck passes on the mod scripts", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "no compiler warnings in the shader code", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "no static analysis findings in the netcode", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the formatting job passes", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "warnings-as-errors stays clean", "label": "lint", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "accessibility claims point to the guidelines they follow", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "benchmark fps numbers reference the capture files", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "each balance figure in the design doc is traceable to the playtest data", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "historical weapon details are referenced", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "market data in the pitch cites its origin", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "player statistics in the blog post are linked to their dashboard", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "quotes from the composer interview are attributed", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "rating board requirements quoted are referenced", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the lore wiki entries cite the canon documents", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the speedrun records listed link to the verified runs", "label": "source-verification", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "PlayMode tests pass", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "all EditMode specs pass", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "automated smoke test of the main menu flow passes", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "coverage of the AI module above 70%", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "new tests cover the damage formula", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "regression tests for save loading are green", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "replay determinism tests pass", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the automation suite in the editor finishes without failures", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "the gauntlet test run succeeds", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "unit tests for the inventory system pass", "label": "test", "domain": "game development", "split": "test"}
+{"question": "verification-operation", "text": "Nix derivation builds", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "base image produced for arm64", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "helm package produces the chart archive", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "terraform provider plugin compiles", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the Ansible collection is packaged", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the Go operator binary compiles", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the Packer AMI builds", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the RPM gets packaged", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the container image is built and pushed", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the deb artifact for the agent is generated", "label": "build", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "build agents show the new label in the UI", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "change approved by the CAB", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "on-call lead signs off", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "runbook updated", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "screenshot of the dashboard attached", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "style of the alert messages is consistent", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "test environment torn down", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the date of next rotation is shown in the cert inventory", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the diagram matches the deployed topology", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the source IP allowlist includes the office range", "label": "evidence-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "DNS resolves and answers", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "Prometheus scrapes the new exporter", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "Vault is unsealed and responding", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "load balancer targets report healthy", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "no 5xx at the ingress", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "readiness probes pass for all pods", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "service stays reachable during node drain", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the api is up after the rollout", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the database replica accepts connections", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the status page shows operational", "label": "health-check", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "ansible-lint passes on the playbooks", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "checkov static scan has no new findings", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "hadolint is clean on the Dockerfile", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "helm lint succeeds", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "kube-linter raises no warnings", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "no formatting diffs in the HCL", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "shellcheck reports nothing", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "terraform fmt -check is clean", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "tflint passes", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "yamllint finds no errors in the manifests", "label": "lint", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "CVE claims link to the advisories", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "SLA numbers in the runbook link to the contract", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "capacity estimates cite the benchmark they come from", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "compliance statements point to the control documents", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "cost figures in the proposal reference the billing export", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "every incident statistic is traceable to the tracker", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "latency figures in the RFC are attributed to the load test report", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the postmortem's timeline entries cite the alert logs", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "the vendor comparison table cites the pricing pages", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "uptime claims reference the monitoring data", "label": "source-verification", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "bats tests succeed", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "chaos tests in staging pass", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "conftest tests pass against the plans", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "integration tests for the backup script pass", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "kuttl tests are green", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "molecule tests for the role pass", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "new tests cover the rotation script", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "policy unit tests in OPA pass", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "regression tests for the DNS module pass", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "terratest suite passes", "label": "test", "domain": "infrastructure and operations", "split": "test"}
+{"question": "verification-operation", "text": "cargo build --release succeeds", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "dotnet publish produces the artifact", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "go build emits the binary for linux/amd64", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "gradle shadowJar produces the fat jar", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "mvn package produces the jar", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "native image compilation with GraalVM works", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no compile errors after the Spring Boot upgrade", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the OpenAPI client SDK gets generated", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the build outputs a reproducible binary", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the container image is pushed to the registry", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the docker image builds", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the gRPC stubs get generated and compile", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the helm chart packages without errors", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the lambda zip is packaged", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the multi-arch image is produced", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the protobuf changes compile in all consumers", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the service compiles", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the service links against the new libpq", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the wheel is built for the worker package", "label": "build", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "a sample response is attached", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "curl output pasted in the ticket", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "logs show the request id", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "tech lead approves the schema", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the API returns the style attribute unchanged", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the CSV export contains the totals row", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the OpenAPI docs show the new field", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the admin can see the audit entry", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the build version appears in the /info payload", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the changelog notes the breaking change", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the date header uses ISO 8601", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the error message reads as specified", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the latest order is returned first", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the response includes the created date", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the response shows the latest exchange rate", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the retry behaves as described in the ADR", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the security team reviews the auth change", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the source field is present in the event payload", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the test tenant is excluded from billing", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the webhook payload matches the documented example", "label": "evidence-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "/health returns 200", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "Consul shows all instances passing", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "liveness checks stay green for 24 hours", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no 502s from the load balancer", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "orders-api responds within 200 ms p99", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "synthetic checks on /v2/orders pass", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the API is reachable through the gateway", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the canary is healthy before promotion", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the database proxy is reachable from the pods", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the endpoint answers after the rollout", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the gRPC health check reports SERVING", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the new pods serve traffic", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the queue consumer is running and draining", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the readiness probe passes", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the search service is back serving queries", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the service is up in staging", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the service registers with discovery and responds", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the smoke ping against prod returns pong", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the webhook receiver accepts deliveries", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "uptime for the auth API stays above 99.9% after deploy", "label": "health-check", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "Checkstyle passes for the new DTOs", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "black leaves the files unchanged", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "cargo fmt --check passes", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "clippy has no warnings with -D warnings", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "go vet finds nothing", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "gofmt -l prints nothing", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "golangci-lint passes", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "mypy --strict is clean on the billing package", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no SQL lint errors from sqlfluff on migrations", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no compiler warnings in the Java service", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no new SpotBugs findings", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "phpstan level 8 is green", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "pylint score stays above 9", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "rubocop is clean on the controllers", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "ruff reports no issues", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "semgrep rules report no findings", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "staticcheck has no complaints", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the analyzer flags no nil dereference risk", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the checker is quiet on handlers/orders.go", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the openapi spec passes spectral linting", "label": "lint", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "assertions about the third-party API link to its docs", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "capacity estimates are backed by sourced data", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "claims about Postgres behavior cite the manual", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "compliance statements reference the SOC 2 control", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "each claim in the RFC references a benchmark", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "every metric in the review is sourced", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "every number in the postmortem is traceable", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the API deprecation note links the upstream announcement", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the HTTP semantics claim references RFC 9110", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the SLA figures reference the contract", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the cost estimate links to the pricing page", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the design doc cites the incident reports", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the encryption claim points to the NIST spec", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the error rate stat cites the Datadog query", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the latency figures trace to the Grafana dashboard", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the migration doc credits its sources", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the rate-limit numbers cite the vendor docs", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the retention policy cites the legal guidance", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the security claim quotes the CVE", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the throughput comparison lists its references", "label": "source-verification", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "CI is green on the suite for the orders API", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "JUnit tests for RateLimiter pass", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "Pact verification succeeds", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "add a test for the 409 conflict path", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "cargo test passes on stable", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "contract tests with the payments consumer pass", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "coverage for the auth service stays at 90%", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "go test ./... is green", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "integration tests against Postgres succeed", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "load test scenario in k6 meets its thresholds", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "newman collection runs with zero failures", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "no flaky failures in three consecutive runs", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "property tests for the serializer hold", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "pytest passes", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "rspec runs clean", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "testcontainers-based specs pass locally and in CI", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "tests cover the retry backoff logic", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the e2e API suite against staging passes", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the fuzz target runs an hour without crashes", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "the regression test for the pagination bug passes", "label": "test", "domain": "backend services and APIs", "split": "train"}
+{"question": "verification-operation", "text": "cmake --build finishes", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "electron-builder outputs installers for all platforms", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "meson builds the project", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "msbuild compiles the solution", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no compile errors after the C++20 switch", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "pyinstaller produces a single executable", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "tauri build produces the bundle", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the .dmg is built and notarized", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the AppImage gets created", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the Flatpak builds", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the MSI installer is produced", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the MSIX package is produced", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the app links against Qt 6.7", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the codesigned exe comes out of the pipeline", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the debug symbols are packaged", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the plugin SDK compiles", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the portable zip is generated", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the snap package is assembled", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the universal binary builds for Intel and Apple silicon", "label": "build", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "QA confirms the shortcuts work as described", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "UX approves the tray menu", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "a recording of the export is attached", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "dragging a file onto the window imports it", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "product owner signs off on the onboarding", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "screenshots on Windows and macOS attached", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the about box shows the build number", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the dark theme follows the OS setting", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the date format follows the system locale", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the file's modified date shows in the sidebar", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the installer text is approved by legal", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the latest files appear in the recent list", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the latest version number shows in the updater dialog", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the release notes are updated", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the settings window matches the mockup", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the style of the toolbar icons matches", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the test print matches the preview", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the view source option is in the context menu", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the welcome screen copy reads as agreed", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the window remembers its size", "label": "evidence-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the API the app polls reports healthy", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the OAuth server for desktop login answers", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the S3 bucket for updates is serving files", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the auto-update server is reachable", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the background service is running after install", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the cloud save service is responding", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the collaboration server accepts connections", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the crash report endpoint accepts uploads", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the font download CDN is serving", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the license activation service responds", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the local helper daemon responds on its port", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the notarization callback endpoint is reachable", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the plugin marketplace API returns 200", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the release server stays up after the launch", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the spellcheck dictionary server is up", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the support chat backend is reachable", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the sync backend is up", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the telemetry ingest is healthy", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the template gallery service is online", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the update feed URL serves the appcast", "label": "health-check", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "Qt's clazy has no complaints", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "StyleCop passes on the WPF project", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "clang-format leaves the tree unchanged", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "clang-tidy reports nothing new", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "cppcheck is clean", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "dotnet format verifies with no changes", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "eslint on the renderer passes", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "include-what-you-use suggests nothing", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no -Wall warnings from gcc", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no MSVC warnings at /W4", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no PVS-Studio warnings in the parser", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no Roslyn analyzer warnings", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no nullable warnings in the C# settings code", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no static analysis hits in the file importer", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "pylint is clean on the PyQt tool", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "rustfmt and clippy are both quiet", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the SwiftUI views pass swiftlint", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the Tauri frontend passes the linter", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the analyzer stops flagging the plugin loader", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the checker is quiet on the Electron main process", "label": "lint", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "benchmark numbers link to the test logs", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "claims about macOS sandboxing reference Apple docs", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "each claim about the file format cites the spec", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "each quote in the docs is attributed", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "every figure in the market report is cited", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "sources are listed for the energy usage estimate", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "statements on Windows 10 end of support link Microsoft", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the GPU support list cites driver release notes", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the accessibility statement references Section 508", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the battery-life comparison has sources", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the codec licensing note references the license", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the color accuracy claim cites the calibration report", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the comparison chart lists references", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the font license claims point to the license files", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the import fidelity numbers trace to the test corpus", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the memory usage stat is backed by profiling data", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the performance figures in the release blog are traceable", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the security whitepaper cites the audit", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the system requirements claims cite vendor docs", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the user count in the about box is sourced", "label": "source-verification", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "CI is green on the suite on Windows and macOS", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "GoogleTest suite for the renderer passes", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "NUnit runs green", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "Playwright for Electron covers the preferences window", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "Qt Test cases for the timeline pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "UI automation tests for the export dialog pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "WinAppDriver tests for the installer flow pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "XCTest cases for the menu bar app pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "add a test for opening a corrupted file", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "cargo test for the Tauri backend passes", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "coverage of the document model stays above 75%", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "ctest passes", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "no failing tests on the Linux runner", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "pytest-qt tests succeed", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the Spectron e2e suite is green", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the fuzz test for the file parser runs clean", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the memory leak test passes under ASan", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the regression test for the autosave crash passes", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "the undo/redo specs pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "xUnit tests pass", "label": "test", "domain": "desktop apps", "split": "train"}
+{"question": "verification-operation", "text": "cargo dist outputs installers", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "cross-compilation to arm64 works", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "goreleaser creates the release archives", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "nix build produces the derivation", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the Bazel target //tools/gen:gen builds", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the CLI binary is produced for macOS and Linux", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the VS Code extension .vsix is produced", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the binary is statically linked", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the build job succeeds", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the cached build finishes in under ten minutes", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the devcontainer image builds", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the docs generator compiles", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the homebrew bottle is created", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the npm package is packed", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the plugin jar is assembled", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the release pipeline publishes the build output", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the reusable workflow produces the artifact", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the runner image builds", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the tool compiles on Windows", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the wheel and sdist are built", "label": "build", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "a screenshot of the passing workflow summary is attached", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "platform team signs off", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the CHANGELOG is updated", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the CODEOWNERS file lists the new team", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the README documents the new flag", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the badge in the README displays", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the bot comments on the PR as described", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the build date appears in the version string", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the config example matches the schema", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the date in the release title follows the format", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the deprecation warning is printed once", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the help text reads as written in the ticket", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the job summary shows the timing table", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the latest tag is listed on the releases page", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the latest version is shown by --version", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the maintainer approves the release notes", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the notification goes to the right channel", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the source link in the error message points to the docs", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the style guide page is updated with the new rule", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the test fixtures folder is moved under testdata", "label": "evidence-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "Buildkite agents connect and report healthy", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "Renovate's server is healthy", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "Sonar server reports status UP", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the CI dashboard is reachable", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the Cloudflare Worker that dispatches jobs returns 200", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the GitHub App's callback URL responds", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the artifact cache server responds", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the build farm coordinator is up", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the code search service is back online", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the docs preview server responds", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the internal package registry is reachable", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the license server is up for the build agents", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the metrics exporter on the runner is up", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the mirror proxy serves packages", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the preview environment controller is serving", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the queue worker for CI jobs is alive", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the remote cache answers within 100 ms", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the secrets broker answers health probes", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the self-hosted runners are online", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the webhook endpoint for the bot is responding", "label": "health-check", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "actionlint passes on the workflows", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "commitlint accepts the commit messages", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "editorconfig-checker reports no violations", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "golangci-lint finds nothing in cmd/", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "hadolint finds no issues in the Dockerfile", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "markdownlint passes on the docs", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "no deprecated syntax flagged in the workflow files", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "no new static analysis alerts from CodeQL", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "no warnings from the TOML validator", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "no warnings when compiling the codegen tool", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "shellcheck is clean on scripts/release.sh", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "shfmt makes no changes", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "tflint passes on the runner module", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the JSON schema files pass ajv lint", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the checker is quiet on the CLI source", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the formatter check job passes", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the lint job in the pipeline is green", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the plugin source passes eslint", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the pre-commit config's hooks all pass", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "yamllint reports nothing", "label": "lint", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "assertions about runner quotas are referenced", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "claims about GitHub Actions limits reference the docs", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "cost-per-minute numbers link to the pricing page", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "each claim in the eval report is traceable", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "each recommendation in the tooling RFC links its source", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "every metric in the DX survey writeup is sourced", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "license compatibility claims cite the license texts", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "statements about the SLSA levels cite the spec", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "supply-chain claims reference the Sigstore docs", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the README's performance numbers link to the raw data", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the build time chart cites its data source", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the cache hit rate figure is backed by logs", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the comparison of build tools lists its references", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the deprecation notice references the vendor announcement", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the flake rate figures trace to the CI analytics", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the incident summary links to the source logs", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the migration guide credits upstream docs", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the security note cites the advisory", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the semver policy cites semver.org", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the speedup claim in the proposal cites the benchmark run", "label": "source-verification", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "act runs the workflow tests locally successfully", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "add tests for the --dry-run flag", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "bats tests for install.sh pass", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "coverage of the config parser is above 90%", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "golden-file tests match", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "integration tests for the cache action succeed", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "no tests are quarantined after the fix", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "snapshot tests of the generator output pass", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "tests run in under five minutes", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the CLI's unit tests pass", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the e2e test against a sample repo passes", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the extension's vscode-test suite succeeds", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the language server specs pass", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the matrix test job passes on all three OSes", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the pipeline shows green for every CLI spec", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the plugin's test harness reports no failures", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the pre-merge test gate passes", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the regression test for the path-quoting bug passes", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "the test shard rebalance keeps every job green", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "tox passes for py310 through py313", "label": "test", "domain": "developer tooling and CI", "split": "train"}
+{"question": "verification-operation", "text": "Kotlin compiles without errors after the AGP bump", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "R8 minification completes and outputs a mapping file", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "an AAB is generated for the Play upload", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "assembleRelease succeeds", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "bundle for the debug flavor is assembled", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "expo prebuild and eas build produce an installable", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "flutter build apk --release works", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "gradle sync and build finish cleanly", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no unresolved symbols at link time for the watch extension", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "pod install then build goes through", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the APK comes out of the pipeline", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the IPA gets signed and exported", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the KMP shared module links for iOS", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the TestFlight artifact is produced", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the app compiles with Xcode 16", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the iOS archive is produced without errors", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the project builds for arm64 and x86_64", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the widget extension target compiles", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "we get a working .app out of the CI job", "label": "build", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "PM reviews the onboarding recording", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "QA confirms the font size scales with system settings", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "a screen recording of the swipe gesture is attached", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "copy on the paywall approved by marketing", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "design signs off on the new tab bar", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "screenshots of the dark mode settings screen attached", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "tapping Share opens the system sheet as described", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the build number appears in the About screen", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the button style looks like the spec", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the changelog entry for 4.2 is updated", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the date picker shows the source timezone label", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the empty state shows the illustration", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the latest balance is shown on the wallet card", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the latest message preview appears in the inbox row", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the order status updates when the courier taps delivered", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the profile screen matches the Figma mockup", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the release date is visible on the What's New sheet", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the source language label reads English in settings", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the style of the toast matches the brand guide", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the test account banner is hidden for real users", "label": "evidence-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "/healthz on the sync API reports ok", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "analytics collector responds within 300 ms", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "crash reporting ingest is accepting events", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "remote config service stays healthy for an hour", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "staging API is serving traffic", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the OTA update server is serving bundles", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the auth server answers token requests", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the config endpoint the app calls returns 200", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the deep link resolver is live in prod", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the feature-flag service is reachable from staging", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the gateway the app talks to returns healthy status", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the image CDN serves avatars again", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the in-app purchase validation service is reachable", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the maps tile proxy is up and responding", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the mobile BFF is up after deploy", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the push notification backend responds to pings", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the readiness probe on the mobile-api pod passes", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the update-check endpoint is back online", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the websocket chat server accepts connections", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "uptime monitor for the app backend is green", "label": "health-check", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "Lint report for the release variant has no new errors", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "SwiftLint passes with the strict config", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "code is formatted per the house style config", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "detekt baseline is not grown", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "eslint on the react native bundle is clean", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "flutter analyze shows no issues", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "ktfmt formatting applied, nothing left to fix", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "ktlint reports zero violations", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no compiler warnings in the iOS target", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no complaints from the static checker about nullable misuse", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no deprecation warnings from xcodebuild analyze", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no new Android Lint warnings in the :feature-cart module", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no unused-resource warnings remain", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "spotless check passes", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "static analysis comes back clean for CheckoutViewModel", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "swift-format leaves the diff untouched", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the analyzer has nothing to say about lib/screens/profile.dart", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the checker is quiet on the new Compose files", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the pre-commit hooks stop flagging OnboardingActivity", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "zero findings from the code smell scanner on the wallet module", "label": "lint", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "App Store guideline numbers are quoted with links", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "accessibility claims cite the WCAG section", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "all figures in the performance writeup are cited", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "benchmark numbers are traceable to the raw run", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "claims about iOS 18 behavior are backed by Apple references", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "each privacy statement references the policy doc", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "each statement about GDPR consent cites the article", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "every number in the ASO report is sourced", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "permission rationale cites the Android docs page", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "references are given for the accessibility guidance", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "store listing claims link to supporting studies", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the API level adoption chart names its data source", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the battery figures in the release notes link to the benchmark source", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the comparison with competitor apps lists its references", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the crash rate numbers trace back to the Firebase report", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the health data claims point to the HealthKit docs", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the localization stats come with links to the vendor report", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the market share stat in the onboarding copy has a source", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the security advisory quotes the CVE entry", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the startup-time figure has a citation", "label": "source-verification", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "CI is green on the suite", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "Detox e2e for signup passes on both platforms", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "Espresso tests on the checkout flow pass", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "Maestro flows for onboarding run without failures", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "XCUITest run for SettingsScreen succeeds", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "add a test proving the cart badge resets on logout", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "all instrumented tests pass on API 34 emulator", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "coverage of the sync module stays above 80%", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "every assertion in OrderHistoryTests holds", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "flutter test exits 0", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "integration tests against the mock API succeed", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "jest suite for the RN bridge passes", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "new specs cover the offline queue", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "no failing cases in ./gradlew testDebugUnitTest", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "robolectric cases for the deep link router all go green", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "snapshot tests for the paywall pass", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "test coverage does not drop on the PR", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the flaky BiometricPromptTest now passes ten runs in a row", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "the regression suite for push notifications is green", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "unit tests for LoginRepository pass", "label": "test", "domain": "mobile apps", "split": "train"}
+{"question": "verification-operation", "text": "astro build generates the pages", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "next build finishes without errors", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "ng build --configuration production passes", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no build errors after removing moment.js", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "npm run build works on Node 22", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "rollup outputs ESM and CJS builds", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "source maps are produced alongside the bundle", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the PWA service worker file is emitted", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the SSR bundle is generated", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the docker image for the frontend gets built", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the preview deploy artifact is created by the pipeline", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the production bundle is emitted to dist/", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the site compiles after the Tailwind upgrade", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the static export produces HTML for every route", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the storybook static build is produced", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "tree-shaking still yields a working bundle", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "turbo build completes for the web workspace", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "vite build succeeds", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "webpack compiles with no errors", "label": "build", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "PM signs off on the onboarding tour", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "a Loom of the drag and drop is attached", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "copy on the 404 page is approved", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "design review approves the new header", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "hovering the chart shows the tooltip", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "keyboard focus moves into the dialog as described", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "screenshots at 375 and 1440 px attached", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "stakeholders confirm the nav order", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the CHANGELOG mentions the new filters", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the build badge in the README footer displays", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the dark theme toggle persists after reload", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the date range picker defaults to last 7 days", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the empty cart message reads as the spec says", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the footer shows the build date", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the hero matches the Figma frame", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the latest posts show first on the blog page", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the price shows with the currency symbol", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the style of the cards matches the design system", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the test banner no longer appears in prod", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the view source link opens the repo", "label": "evidence-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no 5xx from the edge for an hour after release", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "pingdom checks for the checkout page pass", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "production nginx serves the app", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "synthetic monitor for /pricing stays green", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the BFF the SPA calls answers health checks", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the CDN edge serves the new index.html", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the GraphQL gateway the UI uses is healthy", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the SSR server responds to requests", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the Vercel deployment is serving traffic", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the app answers on the custom domain", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the app shell responds in under one second", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the canary host returns healthy", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the docs site comes back online", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the feature-flag proxy for the web client is reachable", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the image optimizer endpoint is responding", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the marketing site is up after deploy", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the preview URL loads and returns 200", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the site is reachable from the EU region", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the staging frontend is live", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the status page shows the web app operational", "label": "health-check", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "angular lint passes on the forms module", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "biome check is clean", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "eslint passes with no errors", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "formatting matches the repo prettier config", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "lint-staged hook goes through without fixes", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no a11y lint findings from jsx-a11y", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no any types flagged by the typescript rules", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no console warnings from the react-hooks rule", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no new type-check warnings in strict mode", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no unused imports flagged in the dashboard pages", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "prettier --check reports nothing", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "stylelint is happy with the new SCSS", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "svelte-check finds nothing", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the CSS passes the property-order rule", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the checker is quiet about the new hooks", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the import sorter makes no changes", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the linter stays silent on src/components/Navbar.tsx", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the static analyser reports no dead code in utils/", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "tsc --noEmit gives zero type errors", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "vue-tsc and eslint report no problems", "label": "lint", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "MDN links back each API compatibility statement", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "accessibility claims reference WCAG 2.2 criteria", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "browser support claims link to caniuse", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "claims about the competitor point to public docs", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "each benchmark on the perf page links to the run", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "each customer-count claim has a reference", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "every stat on the landing page has a footnote", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "legal text quotes the cookie law with a link", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "statistics in the report widget come with citations", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "survey percentages on the homepage are traceable", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "testimonials quotes are attributed to their origin", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the Core Web Vitals numbers trace to the CrUX report", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the FAQ answer on data retention references the policy", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the blog post's figures are backed by references", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the carbon estimate names its methodology source", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the case study's revenue numbers are sourced", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the docs page credits the RFC it summarizes", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the pricing comparison table cites its sources", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the security page cites the audit report", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the uptime figure in the hero cites the status history", "label": "source-verification", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "CI is green on the suite after the router change", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "Cypress specs for the search page pass", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "MSW-backed integration tests pass", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "Playwright e2e for checkout is green", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "a regression test pins the double-submit bug", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "add unit coverage for the price formatter", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "component tests for DatePicker pass", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "every case in useAuth.test.ts passes", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "jest coverage for components/ stays above 85%", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "karma runs without failures", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "mutation testing score holds at 70", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "no skipped specs left in cart.spec.ts", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "npm test exits cleanly", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "react testing library cases for the modal all pass", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "storybook interaction tests succeed", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the axe tests in the test runner pass", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the e2e smoke run on preview passes", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "the flaky login spec is fixed and green", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "visual regression tests show no diff", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "vitest suite passes", "label": "test", "domain": "web frontends", "split": "train"}
+{"question": "verification-operation", "text": "Poetry builds the sdist", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "artifact uploaded to the internal registry", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "assembly step outputs a fat jar", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "container image gets produced for the scheduler", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "dbt compile completes without errors", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "docker image for the ingest worker builds", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "sbt package succeeds", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the Beam pipeline compiles", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the Flink job links against the new connector", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the Spark job jar assembles", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the UDF bundle compiles to a .so", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the wheel for the metrics library is produced", "label": "build", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "build number displayed in the footer of the data portal", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "changelog updated", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "date filter defaults to the last 7 days", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "finance signs off on the revenue numbers", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "reviewed by the analytics lead", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "screenshot of the new dashboard attached", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "source column renamed to origin_system in the UI", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "style of the charts follows the brand palette", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the CSV has the columns in the agreed order", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the funnel chart matches the mockup", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the last refreshed time is shown on the report", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the test accounts' rows no longer appear in the export", "label": "evidence-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "Airflow webserver responds on /health", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "Kafka consumers are connected and lag stays low", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "Superset is serving dashboards after the deploy", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "no 5xx from the reporting service after rollout", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "scheduler pods are running and ready", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the deployed Flink job is in RUNNING state", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the feature store service is healthy", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the ingest endpoint accepts traffic", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the metrics endpoint is reachable", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the query API returns 200", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the streaming aggregator is up in prod", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "warehouse proxy answers pings", "label": "health-check", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "SQL files conform to the house formatter", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "black leaves the transforms module unchanged", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "flake8 is quiet", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "formatting check is clean for the airflow dags", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "no mypy errors in the loader", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "no unused imports flagged in the notebooks' exported scripts", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "ruff passes on the ingest package", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "sqlfluff reports no violations on the models folder", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "static analysis raises nothing new", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the dbt project passes sqlfluff lint", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "type checker green on pipeline/utils.py", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "zero pylint warnings in etl/", "label": "lint", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "all quoted conversion rates link back to their dashboard", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "assumptions in the forecast memo cite where they came from", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "benchmark numbers link to the run they came from", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "claims in the methodology note are referenced", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "each KPI definition points to the dbt model it comes from", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "each chart caption names its data origin", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "every figure in the quarterly report cites its source table", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "external benchmarks cite the published paper", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "market size estimates reference the analyst report", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "numbers in the exec summary have footnoted provenance", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the churn statistics are traceable to the original query", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the population figures are attributed to the census release", "label": "source-verification", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "coverage of transforms stays above 85%", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "dbt test passes for every model", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "end-to-end run on the fixture dataset succeeds in the test harness", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "existing checks in the pytest suite keep passing", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "great_expectations suites pass in CI", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "integration tests against the staging warehouse succeed", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "no failing cases in tests/test_partitioning.py", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "pytest suite for the loader is green", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "regression suite for the revenue metrics passes", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "specs for the parser cover empty files", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the new dedup function has unit tests", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "verification-operation", "text": "the property-based tests for the date parser pass", "label": "test", "domain": "data pipelines and analytics", "split": "validation"}
