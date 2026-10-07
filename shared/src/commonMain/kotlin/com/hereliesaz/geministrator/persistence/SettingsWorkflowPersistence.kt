@@ -435,8 +435,8 @@ class SettingsWorkflowPersistence(
 
     suspend fun recoverFromCorruption(): Boolean {
         val hadData = settingsWorkflowPersistenceMutex.withLock {
-            val had = snapshotSettings.getStringOrNull(storageKey) != null ||
-                settings.getStringOrNull(LEGACY_STORAGE_KEY_V1) != null
+            val had = snapshotSettings.hasKey(storageKey) ||
+                settings.hasKey(LEGACY_STORAGE_KEY_V1)
             snapshotSettings.remove(storageKey)
             settings.remove(LEGACY_STORAGE_KEY_V1)
             had
