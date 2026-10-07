@@ -1,0 +1,54 @@
+name: Regenerate generic node redesigns
+
+on:
+  push:
+    branches:
+      - update/node-creature-redesigns
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: update/node-creature-redesigns
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install rig generator dependencies
+        run: python -m pip install --disable-pip-version-check pillow numpy scipy opencv-python-headless
+
+      - name: Slice redesigned generic node sheets
+        run: python tools/puppet-rig/slice/slice_parts.py --only 000_generic
+
+      - name: Build redesigned generic node rigs
+        run: python tools/puppet-rig/slice/build_rigs.py --only 000_generic --no-compare
+
+      - name: Validate regenerated rigs
+        shell: bash
+        run: |
+          for f in shared/src/commonMain/composeResources/files/rigs/generic-*.rig.json; do
+            node tools/puppet-rig/validate-rig.mjs "$f"
+          done
+
+      - name: Commit regenerated runtime assets
+        shell: bash
+        run: |
+          git checkout -- tools/puppet-rig/slice/rigs-report.json || true
+          git add shared/src/commonMain/composeResources/files/rigs/generic-*.rig.json
+          git add shared/src/commonMain/composeResources/files/rigs/generic_*_rig_atlas.png
+          if git diff --cached --quiet; then
+            echo "No generated changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Regenerate generic node rigs from redesigns [skip ci]"
+          git push origin HEAD:update/node-creature-redesigns
