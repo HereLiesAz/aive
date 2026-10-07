@@ -241,7 +241,7 @@ class SettingsWorkflowPersistenceTest {
             "\"version\":${SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION}",
             "\"version\":$futureVersion",
         )
-        settings.putString(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY, future)
+        snapshotSettings(settings).putString(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY, future)
 
         val restored = SettingsWorkflowPersistence(settings)
         val failure = assertFailsWith<IllegalArgumentException> {
