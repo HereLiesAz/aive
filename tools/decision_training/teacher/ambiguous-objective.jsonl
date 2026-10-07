@@ -1,0 +1,879 @@
+{"question": "ambiguous-objective", "text": "Add a code example for pagination to the REST API guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a figure showing the ablation results to Section 5 of the paper", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a glossary entry for \"idempotency key\"", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add alt text to every image in the tutorials folder", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add page numbers and a table of contents to the grant proposal PDF", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Better captions: rewrite Figure 3's caption to state the dataset and metric", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Bring table 2 figures in line with the final experiment run (seed 3)", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Convert the troubleshooting page from RST to Markdown", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Cut the abstract from 320 words to under 250 for the workshop limit", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Document the --dry-run flag in the CLI reference", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix citation [14], which points to the wrong arXiv paper", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the LaTeX build error caused by the undefined \\algorithmic command", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the broken link to the CLI reference in docs/getting-started.md", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve readability of the methods section by splitting the 200-word paragraph on sampling into steps", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve the README's install section by adding Windows steps using winget", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the related work section mention the three papers from the reading list sent Monday", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Rename the \"Setup\" page to \"Installation\" and update nav links", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Replace all \"click on\" with \"select\" in the user manual per the style guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Respond to Reviewer 2's comment about missing baselines by adding a paragraph citing the 2022 survey", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Shorten the FAQ by removing questions about the discontinued Basic plan", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Spell-check the onboarding handbook and correct British spellings to American", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Translate the quickstart into Spanish", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Update the changelog for release 4.2 with the three merged features", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Write a migration guide for upgrading from v2 to v3 of the SDK", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Write a one-page summary of the user interview findings for the design team", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "DOCS-77 updates", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Expand the guide", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve the README", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve the methodology section", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the API docs more helpful", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the thesis flow better overall", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the tutorial more beginner friendly somehow", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Restructure things so people can find stuff", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Simplify the onboarding doc", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "The literature review needs work", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "address reviewer comments (you know which)", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "bring the style guide up to date", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "can you make this clearer?", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "clean up the wiki", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "do the edits we discussed", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "finish the draft", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix the writing in that section", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "it reads weird, fix it", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "look over the whitepaper and do whatever", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "make the docs better", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "needs more citations i think", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "polish the report", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "rewrite the paper so reviewers like it more", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "tighten it up", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "update docs for the release", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a CRC32 check to the OTA image before swapping banks", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a heartbeat message every 60 seconds over Zigbee to the hub", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a unit test for the Modbus CRC function in the host test harness", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Better watchdog handling: kick the IWDG in the main loop only after all tasks report alive", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Calibrate the ADC offset for the current sensor using the 0A reading at boot", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Change the MQTT publish topic from sensors/temp to site1/greenhouse/temp", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Debounce the reset button on GPIO 4 with a 20 ms window", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Disable the unused SPI2 peripheral clock to save power", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the I2C bus lockup on the BME280 when SDA is held low after a brownout by adding a 9-clock recovery", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the build: the linker script overflows FLASH by 2 KB with -O0, switch debug builds to -Og", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the off-by-one in the ring buffer that drops the last byte of each CAN frame", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Handle the case where the GPS module returns an empty NMEA sentence by skipping it", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve battery life of the soil sensor node to 12 months by sleeping between 15-minute readings", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve the temperature reading accuracy to ±0.5°C by averaging 16 samples", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Increase the LoRa spreading factor to SF10 for the far-field nodes", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Limit motor PWM duty cycle to 80% when the board temperature exceeds 70°C", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Log the reset reason to flash on every boot", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the e-ink display refresh only when the value changes by more than 1%", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the status LED blink red twice when Wi-Fi provisioning fails", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Port the PWM fan control to use the timer TIM3 channel 2 instead of TIM2", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Raise the UART baud rate on the debug console from 115200 to 921600", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Reduce RAM usage on the STM32F103 build below 18 KB by moving lookup tables to flash", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Set BLE advertising interval to 1 s when idle and 100 ms after a button press", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Store the device serial number in the OTP area during factory provisioning", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "bump ESP-IDF from 5.1 to 5.2 in the gateway firmware", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Clean up the HAL code", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "FW-12: fixes", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Get memory usage down", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Handle the issues from the field reports", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve the motor control", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the MQTT stuff work properly", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the bootloader nicer", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Polish the firmware before shipping", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Refactor the drivers", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "The device acts weird after a while, look into it", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "The readings are off, sort it", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "can you modernize the build?", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "do the BLE changes we talked about", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix the sensor", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "improve battery life", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "improve stability of the gateway", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "make OTA more robust", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "make the LEDs look right", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "make the firmware better", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "optimize the firmware", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "reduce power usage", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "something with the I2C again", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "the mesh network is unreliable sometimes, please improve", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "tune things up on the thermostat board", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "update the device code like the customer asked", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "ambiguous-objective", "text": "Achievements: unlock \"Pacifist\" when finishing Chapter 2 with zero kills", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a \"hold to skip\" button for cutscenes, held for 1 second", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a 0.2s coyote-time window to the player jump in PlayerController.cs", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add controller rumble on successful parry", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Bake lightmaps for the Harbor level at 2x resolution", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Better enemy pathing: make Skeletons avoid lava tiles in the NavMesh", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Bump the max lobby size from 4 to 8 players in the matchmaking config", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Camera clips through walls in the Crypt level — add a sphere cast to pull the camera forward", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Cap particle count for the fireball VFX at 500", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Change the default FOV to 90 and allow 70–110 in settings", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Compress the 4K terrain textures to BC7 so the build fits under 2GB", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Fix the crash when the inventory has more than 64 items (index out of range in InventoryGrid)", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve Spider AI so it retreats when below 20% health", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve frame rate on the Forest level to a stable 60 fps on Steam Deck", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Localize the tutorial dialogue strings into French and German", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Lower the gold drop from Goblin Archers from 12 to 8", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the Golem boss's slam attack telegraph 0.5s longer on Normal difficulty", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the save file include the player's unlocked skins", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Patch the exploit where players can clip through the vault wall by crouch-jumping", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Polish: add screen shake when the player takes more than 30 damage", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Reduce the MainMenu scene load time from 9s to under 3s", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Remove the debug FPS overlay from release builds", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Retune audio: lower footstep volume by 6 dB on stone surfaces", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Show the remaining ammo count on the HUD next to the crosshair", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix desync in co-op where door states don't replicate to late joiners", "label": "no", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Address the feedback from the last build", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Balance pass", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Could you modernize the save system code?", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Do another pass on the audio", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Figure out what's wrong with the camera and make it right", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "GAME-88: misc gameplay fixes", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve onboarding for new players", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve performance", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the boss fight more fun", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Optimize assets", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Rework the economy", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "The shaders need some love", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "can you make the game run smoother?", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "clean up the player controller code", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "do the thing from the playtest notes", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix the jank", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "general stability improvements before the demo", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "handle that crash thing people reported", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "levels are kinda boring, sort that out", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "make combat feel better", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "make enemies smarter", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "make it feel more like the reference we looked at last week", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "polish the UI", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "the multiplayer is weird sometimes, look into it and fix", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "tweak the visuals so they pop more", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a DNS CNAME status.example.com pointing to the status page provider", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a Prometheus alert when disk usage on db-* hosts exceeds 85% for 10 minutes", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a Terraform module output for the VPC's private subnet IDs", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Better alerting: silence the CPUThrottling alert for batch namespaces", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Bump the Helm chart for ingress-nginx to 4.10.0", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Clean up: remove the decommissioned bastion-old host from the Ansible inventory", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Configure log retention to 30 days for the CloudWatch group /app/payments", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Drain and replace node ip-10-0-3-17 which keeps failing health checks", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Enable versioning on the S3 bucket terraform-state-prod", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Grant the data team read-only access to the prod RDS replica via IAM", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Harden SSH on the build hosts: disable password auth and root login", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve deploy reliability by adding a readiness probe to the orders deployment", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve p99 latency of the internal ingress from 800ms to under 200ms by raising nginx worker_connections", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Increase the HPA max replicas for checkout-svc from 10 to 25", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make backups of the Postgres primary every 6 hours and keep 14 days", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Make the Grafana \"API Overview\" dashboard show error rate per route", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Open port 9100 on the monitoring security group for node_exporter", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Reduce the monthly AWS bill by deleting unattached EBS volumes older than 30 days", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Restore last night's snapshot of the wiki VM to a new instance for the audit", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Rotate the TLS certificate for api.internal.example before it expires on the 14th", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Set memory limits of 512Mi on all pods in the logging namespace", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Upgrade the staging EKS cluster from 1.28 to 1.29", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Write a runbook entry for restarting the RabbitMQ cluster after a partition", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix the cron on backup-01 so pg_dump runs at 03:00 instead of 15:00", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "pin the base image in the CI runner Dockerfile to ubuntu:22.04", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Address the audit findings", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Get DNS under control", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Handle the capacity concern", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Harden the servers", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve our monitoring", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Improve security posture", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Kubernetes stuff - tidy up", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Look at the load balancer and make it good", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "OPS-301: improvements", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Scale things better", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "can you sort out the networking mess", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "clean up terraform", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "do what we agreed on in the incident review", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "fix the cluster", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "make backups better", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "make on-call less painful", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "make the infra more reliable", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "modernize the ops setup", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "optimize the AWS account", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "our alerts are noisy, fix please", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "reduce costs", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "streamline the runbooks and processes for the team as a whole", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "the VPN is acting up again", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "the deploys are flaky, do something", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "upgrade everything", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "ambiguous-objective", "text": "Add a 'region' field to the Order model with a migration defaulting existing rows to 'eu'", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a dead-letter queue for messages the order-consumer fails 3 times", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a feature flag check around the new pricing rules in QuoteService", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a unit test that the discount calculator never returns a negative total", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an OpenAPI description for the /refunds endpoints", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an idempotency-key header to POST /payments so retries don't double-charge", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add audit logging of every role change to the admin API", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add rate limiting of 100 requests per minute per API key to the public search endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add soft delete to Customers: set deleted_at instead of removing rows, and hide them from list endpoints", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "BE-302: /invoices should accept a ?status= filter (paid, open, void)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Bump the gRPC timeout between checkout and inventory from 1 s to 3 s", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Cache the result of /catalog/categories in Redis for 10 minutes", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Enforce TLS 1.2+ on the public API gateway listener", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Expose Prometheus metrics for request count and latency in the auth service", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix duplicate welcome emails sent when the signup handler is retried", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix memory leak in the notification service caused by never closing SSE connections", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the 500 on /search when the query contains an apostrophe", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the N+1 query in ProjectSerializer by prefetching members", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the race condition in ReservationService where two bookings can take the last seat", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix timezone bug: /reports/daily uses server local time instead of UTC for day boundaries", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix wrong rounding in tax calculation: round half up to 2 decimals per line item", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve error responses in the orders API so validation errors return 422 with a field list", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve observability of the payments API by adding trace ids to all log lines", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve reliability of the webhook dispatcher: retry failed deliveries 5 times with exponential backoff", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the backend's error handling for the SMS provider: map their 'invalid number' code to a 400", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the search endpoint by supporting prefix matches on product names", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve throughput of the image-resizer worker to 50 jobs/s by processing batches of 10", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Increase the DB connection pool for billing-api from 10 to 30 and expose the pool size as an env var", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Log a structured warning when the upstream geocoder takes longer than 2 s", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Lower the log level of the 'cache miss' message from INFO to DEBUG in pricing-svc", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make GraphQL queries deeper than 8 levels fail with a clear error", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make password reset tokens expire after 30 minutes and be single-use", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the CSV export endpoint stream rows instead of building the whole file in memory", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the payment-service log the Stripe request id on every failed charge", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the scheduler skip jobs that are already running instead of starting a duplicate", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Migrate the remaining raw SQL in ReportsRepository to the existing query builder", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Move password hashing in auth-service from SHA256 to bcrypt with cost 12, rehashing on next login", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Paginate GET /comments with cursor-based pagination, default page size 50", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce p95 latency of GET /v2/orders to under 150 ms by adding an index on orders(customer_id, created_at)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reject requests with bodies larger than 5 MB on the upload endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Remove the deprecated /v1/login endpoint and its tests", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Return 401 rather than 403 when the bearer token is missing", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Return 404 instead of 500 from GET /users/{id} when the user does not exist", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Return ETag headers on GET /articles/{slug} and honour If-None-Match", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Return the total count in an X-Total-Count header on GET /products", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rotate the JWT signing key monthly and accept tokens signed by the previous key for 24h", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Send a 429 with Retry-After when the per-tenant quota is exceeded", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Speed up the nightly reconciliation job from 40 min to under 10 min by bulk-loading ledger rows", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Store uploaded avatars in the existing S3 bucket under avatars/{user_id}.webp", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Support filtering GET /tickets by assignee and priority together", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "The /export job should email a download link when finished instead of blocking the request", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "The email-worker should skip users with unsubscribed=true", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade the Go service from 1.21 to 1.22 and fix any vet failures", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Validate that 'quantity' is a positive integer on POST /cart/items", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "When Kafka is unavailable, the event publisher should buffer up to 1000 messages in memory and retry", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "add 'updated_at' to the Product response schema and populate it from the DB column", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "add a /healthz endpoint to the inventory service that checks the DB connection", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "can the /me endpoint include the user's org name so the client doesn't need a second call", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the signup endpoint reject disposable email domains from the existing blocklist", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the user-service publish a UserDeleted event when an account is removed", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Address tech review comments", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Address the incident follow-ups", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "BE-91: backend improvements", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Better monitoring", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can we make the backend faster?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up the GraphQL schema a bit", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Deal with the Postgres issue", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do the backend part of the feature", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do what the platform team asked", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Finish the migration work", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the queue issues", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix what broke after the deploy", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Handle the customer complaint about the API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Handle the load", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Implement the new requirements for the user service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve logging", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve performance of the service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the data layer", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the search endpoint", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve throughput", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the service more robust", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Polish the API before the partner launch", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Refactor the auth code", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rework the caching", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Tidy the Go service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "backend tech debt", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "can you look into the API and fix whatever", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "clean up the endpoints", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "do the thing we discussed for the orders service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the 500s", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the backend", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the errors", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the payments thing", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the race condition somewhere", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the webhook problems", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle scaling", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the edge cases in the API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve API docs", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve error handling", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve reliability", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve security", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the worker", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it production ready", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it scale", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the API better", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the API consistent", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the API more RESTful i guess", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the code cleaner in the billing service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the database stuff faster", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the endpoints secure", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the rate limiter better", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "optimize memory", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "optimize queries", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "review and improve the service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "sort out the timeouts", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "the microservice needs work", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "the notifications service, please sort it", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "the server is acting weird, handle it", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the backend", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "upgrade stuff", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add CSV and JSON options to the Export menu of the Reports window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 'Recent files' submenu to the File menu showing the last 10 opened documents", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 'Reveal in Explorer/Finder' item to the file context menu", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a command-line flag --open <path> that opens a project on launch", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a dark theme that follows the OS setting on macOS and Windows", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a spell check toggle to the Edit menu using the OS dictionary", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a system tray icon with 'Show', 'Pause sync' and 'Quit' items", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a zoom slider (50%–200%) to the status bar of the image viewer", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an 'Always on top' toggle to the mini player window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add drag-and-drop reordering of items in the Playlist panel", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add keyboard navigation (arrow keys, Enter) to the file tree", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Better handling of locked files: if a file is open in another program, show which one and offer to retry", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Bundle the VC++ runtime in the Windows installer so first launch doesn't fail", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Cap the thumbnail cache at 500 MB and evict least recently used items", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "DESK-140: the app should remember window size and position between launches", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Disable hardware acceleration when the --safe-mode flag is passed", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix blurry text in the WPF editor on 150% scaling monitors", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix crash on Windows 11 when dragging a folder onto the main window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the Linux AppImage not showing an icon in the GNOME dock", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the Tauri app not restoring focus to the editor after closing the Find bar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the WinForms grid flickering when scrolling by enabling double buffering", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the crash reporter so it uploads minidumps on next launch, not only on exit", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix: closing the last tab on macOS should keep the app running with an empty window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve accessibility: every toolbar button needs a tooltip and an accessible name for screen readers", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve rendering of the timeline canvas: only redraw the visible range", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve startup time of the Electron app to under 1.5 s by lazy-loading the PDF preview module", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the export dialog: preselect the last used folder and format", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the plugin loader to skip plugins that fail to load and list them in the About dialog", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Let users pick a custom font and size for the editor in Preferences > Appearance", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Log renderer crashes to the existing Sentry project with the app version attached", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make Ctrl+Shift+P open the command palette on Windows and Linux, Cmd+Shift+P on macOS", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make Escape close any open modal dialog in the app", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the 'Check for updates' menu item show the current version in its dialog", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the Preferences window open as a single instance instead of spawning duplicates", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the app register the myapp:// protocol so links from the browser open the right project", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the auto-updater check for updates once a day instead of every launch", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the search panel highlight all matches in the current document", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the sidebar resizable with a minimum width of 180 px", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Migrate the desktop app's settings file from INI to JSON, converting existing settings on first launch", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Move file indexing off the UI thread so the window stays responsive while scanning large folders", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce idle memory of the Electron renderer from 600 MB to under 300 MB by disposing hidden tabs", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce the macOS app bundle size below 120 MB by stripping unused locales from Chromium", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Remove the legacy Flash-based preview plugin from the installer", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Ship an MSI installer alongside the existing NSIS .exe for enterprise deployment", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show a confirmation dialog when quitting with unsaved changes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show a progress bar in the taskbar icon during long exports on Windows", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show the file's full path in the window title bar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Sign and notarize the macOS .dmg in the release build so Gatekeeper doesn't block it", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Snap panels to the window edges when dragged within 20 px", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Stop the app from launching at login unless 'Start on login' is checked in settings", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Support multiple monitors: open new windows on the display where the cursor is", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Support opening .md files by double-clicking them in Finder via file association", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "The Qt settings dialog should validate the proxy port is between 1 and 65535", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Undo history should survive switching between tabs in the editor", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade Electron from 28 to 30 and fix the deprecated remote module usage", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Use native window controls on Windows instead of our custom title bar buttons", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "When the network drops, queue edits locally and sync them when reconnected, showing a 'Offline' badge in the status bar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the CPU spike to 100% when the app is minimized on macOS", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the GTK file chooser opening behind the main window on Wayland", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the printing: add page numbers in the footer of printed reports", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Address the QA notes", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can you make the app faster to open?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up the Tauri app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "DESK-55: improvements", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do the notarization stuff", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the auto-updater issues", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix up the native bits", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix whatever is wrong on macOS Sonoma", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve performance of the editor", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the undo stuff", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Look at the editor and make it better", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the app more stable", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the desktop and web versions closer", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Modernize the desktop UI", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Refactor the WPF project", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rework the toolbar", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "better keyboard support", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "better offline mode", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "can you improve the settings dialog?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "clean up the main process code", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "do the Linux stuff", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "do what we discussed for the Mac build", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the Electron thing", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the bugs reported last week", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the crashes", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the installer", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the issue Tom mentioned", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the rendering glitches", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the sync", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "get the app ready for release", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle multi-monitor", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the feedback from beta users", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the file associations", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the high DPI problems", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve accessibility in the app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve memory usage", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve startup", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the crash reporting", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the drag and drop", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the export", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the file handling", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the plugin system", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the printing", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it less resource hungry", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it look modern", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the UI smoother", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the app feel more native on Windows", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the app smaller", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the desktop app better", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the dialogs consistent", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the installer nicer", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the shortcuts better", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "optimize rendering", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "polish the tray icon thing", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "sort out the menus", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the preferences window needs rework", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the sidebar, sort it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the window stuff is broken, fix it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "tidy up the Qt code", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the desktop client", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a CI step that verifies all markdown links in docs/ resolve", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a CODEOWNERS entry so changes to infra/ require review from @platform", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a Makefile target `make lint-fix` that runs ruff --fix and black", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a `make bootstrap` target that installs deps and copies .env.example to .env", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a git hook that rejects commits larger than 5 MB", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a nightly workflow that runs the full regression suite against main", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a pre-commit hook that runs prettier on staged .ts files", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add shell completion for zsh and bash to the devctl CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add shellcheck to the lint stage for all scripts in tools/", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Automatically label PRs touching docs/ with 'documentation'", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Bump the golangci-lint version to 1.57 and fix the new 'unused' findings", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Cache Docker layers in the build job using the registry cache so rebuilds without code changes finish in under 2 min", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Cancel in-progress workflow runs on the same branch when a new commit is pushed", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Configure mypy in strict mode for the src/tooling package only", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "DEVX-88: fail the pipeline if test coverage of packages/core drops below 80%", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Detect secrets in commits with gitleaks in the pre-merge check", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Ensure the coverage report is uploaded even when tests fail", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fail the build when a TODO without an issue link is added", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix flaky test UserSyncTest.testConcurrentUpdate by replacing the sleep with a latch", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the Windows CI job failing on path separators in scripts/gen-index.js", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the cache key so it includes the lockfile hash and stops restoring stale node_modules", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Generate TypeScript types from openapi.yaml during the build instead of committing them", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Have the release job attach SHA256 checksums for every artifact", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve CI build time on the main workflow to under 10 minutes by caching ~/.gradle between runs", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve CI reliability by running the database tests against a service container instead of a shared host", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the CLI's error when the config file is missing: print the expected path and an example", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the pre-push hook speed by only type-checking changed packages", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make Renovate group all eslint-related updates into one weekly PR", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make `devtool test --watch` rerun only the tests affected by changed files", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make `tool doctor` report the installed versions of git, node and docker", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the Bazel remote cache read-only for PR builds and read-write for main", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the CLI's `init` command non-interactive when --yes is passed", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the build fail if any package declares a dependency it doesn't import", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the dev container install the same Python version as production (3.11.8)", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the release workflow publish the CLI binary for linux-arm64 as well as amd64", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the test runner print the 10 slowest tests at the end of every CI run", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Mark the nightly fuzz job as allowed to fail without blocking merges", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Move the duplicated setup steps in our workflows into one composite action under .github/actions/setup", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Pin the Node version in .nvmrc to 20.11 and use it in all workflows", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Post a comment on PRs with the bundle size diff from the build job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce the Docker image used in CI from 2.1 GB to under 800 MB by switching to the slim base", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Remove the duplicate test run in the 'build' and 'test' jobs", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Remove the unused Travis CI config from the repo root", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rename the CLI flag --verbose-mode to --verbose and keep the old one as a hidden alias", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Replace the hand-written changelog step with conventional-commit generated release notes", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Retry the npm install step once on network errors in CI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Run the integration test suite only when files under services/ change", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Set the default test timeout to 30 s in jest.config.js", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Split the 40-minute e2e job into 4 parallel shards", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Store JUnit XML results as CI artifacts and show them in the PR checks tab", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Teach the scaffolding CLI to create a new package with tsconfig, README and a sample test", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "The codegen step should fail CI if generated files differ from what is committed", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "The deploy-preview job should skip forks to avoid exposing secrets", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "The lint job should run eslint with --max-warnings 0", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Turn on dependency review for PRs so new packages with known CVEs fail the check", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade the GitHub Actions checkout action from v3 to v4 in every workflow", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upload the built wheel to the internal PyPI on tags matching v*", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "add a --dry-run flag to the release script that prints the version bump without tagging", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the version bump script so it also updates the version in package-lock.json", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the onboarding script so it checks for Docker and exits with a helpful message if missing", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Automate more", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can we make CI cheaper?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up the Jenkins jobs", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up the monorepo tooling", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "DEVX-14: CI improvements", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do what we agreed on for pre-commit", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the GitHub Actions", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the problems with the pre-merge checks", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix up the deploy scripts", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Get the tooling in shape", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Help with the CI stuff", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve build times", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the dev container", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the release notes tooling", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make Renovate less annoying", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the codegen faster", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the lint step stricter or something", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Refactor the build scripts", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rework the versioning", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Simplify CI", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "The scripts folder is a mess", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Update the scripts", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade the toolchain and stuff", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "better test reporting", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "can you improve our tooling?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "clean up the workflows", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "do the thing for the release process", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the flaky stuff", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the pipeline", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the release", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the tooling for the new repo", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the warnings", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix whatever is wrong with the cache", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the CI failures", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the dependency stuff", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the secrets thing in CI", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve artifact handling", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve caching", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve developer experience", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the bazel setup", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the git hooks", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the linter config", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the onboarding for new devs' environments", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "look into the runners and improve them", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make CI better", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the CLI nicer", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the build reproducible somehow", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the code generator better", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the dev setup easier", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the pipeline faster please", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the pipelines more reliable", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the tests run faster", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "modernize the build", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "optimize the pipeline", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "sort out the Docker builds", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "the CLI needs polish", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "the build is broken, deal with it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "the tooling is a pain, fix it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "tidy the Makefile", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the CI config like we said", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add Sign in with Apple to the iOS login screen alongside Google", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add VoiceOver labels to every icon button on the Player screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 'Copy link' action to the long-press menu on shared posts", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a crash-free sessions banner to... no wait, just add Crashlytics logging to the CheckoutViewModel errors", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a pull-to-refresh gesture to the Orders list in the Flutter app", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an empty state illustration to the Favorites tab when the list is empty", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add haptic feedback when a user favourites a recipe in RecipeDetailView", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Better caching: store product images on disk with a 7-day expiry in the Coil config", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Better error message on the PaymentSheet when the card is declined: show the decline reason from the API", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Bump minSdkVersion to 26 and remove the legacy notification channel shim", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can you make the avatar on ProfileHeader circular instead of square?", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Cut the APK size below 30 MB by removing unused drawable densities", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix crash on iOS 17 when opening the camera from the Profile screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix memory leak in MapFragment caused by not removing the location listener in onDestroy", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the keyboard covering the comment input on the PostDetail screen on small iPhones", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix wrong currency symbol on the Wallet screen for users in Japan", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix: tapping 'Forgot password' twice opens two sheets on iOS", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Have the app request notification permission only after the first completed booking", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve accessibility of the signup form by raising contrast of placeholder text to 4.5:1", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve app launch time on iOS to under 1.5 s by deferring analytics init", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve cold start of the Android app to under 2 s", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve scroll performance of FeedRecyclerView so it holds 60 fps on a Pixel 6", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the onboarding: add a skip button on screens 2 and 3 that jumps to the signup form", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "MOB-588: Settings screen should show app version and build number at the bottom", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make deep links of the form app://order/{id} open OrderDetailFragment", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the Android app fall back to the cached exchange rates when /rates times out", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the photo upload in ReportIssueScreen compress images to max 1600px before sending", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Optimize image loading in the Gallery grid so memory stays under 200 MB with 500 photos", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Persist the selected city filter in DataStore so it survives app restarts", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Push notification taps should open the chat thread they refer to, not the home tab", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce battery drain from location updates by switching WorkoutTracker to significant-change monitoring when the screen is off", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce crash rate on Android 9 devices by fixing the NullPointerException in AudioService.onStartCommand", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rename the 'Hub' tab to 'Community' in both apps", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Replace the hardcoded API base URL in NetworkModule.kt with a value from BuildConfig", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show a skeleton loader on the Search results screen while the query is in flight", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show the remaining free trial days on the Subscription screen, pulled from /me/subscription", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Stop the video player in StoryViewer from autoplaying with sound", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Support landscape orientation on the VideoCall screen only", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Swap the bottom nav order so Messages comes before Notifications", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "The 'Rate us' prompt should appear after the 5th completed order, not on first launch", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "The Android back button on PaymentConfirmFragment should return to the cart, not exit the app", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "The splash screen logo is blurry on xxhdpi devices — export a proper 3x asset", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Throttle the search field so it only queries the API 300 ms after the user stops typing", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Unit-test the PriceFormatter so 1000.5 renders as $1,000.50", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade the Kotlin version to 1.9.24 and fix the resulting compile warnings in :feature-chat", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "When the session token expires, redirect to the login screen and keep the deep link to resume after login", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "add an 'Undo' snackbar for 5 seconds after deleting a note", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "add biometric unlock (Face ID / fingerprint) as an option in Security settings", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "dark mode: the tab bar icons in MainTabView stay black, make them use the label color", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "ensure the TripSummary screen renders correctly on iPhone SE (375pt width) without truncating the price", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "iOS widget should display the next three calendar events instead of one", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the app's rating flow: send users who pick 1-3 stars to the in-app feedback form instead of the store", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "localize the Checkout screen strings into German and French using the existing Localizable.strings", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the Login button on SignInActivity disabled until both fields are filled", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the tablet layout of the Inbox use a two-pane list/detail view on screens wider than 840dp", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "migrate the Profile screen from XML layouts to Jetpack Compose, keeping the same look", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "pls make the onboarding carousel auto-advance every 4 seconds", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "remove the deprecated Firebase Dynamic Links code from the share sheet", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "upgrade react-native from 0.72 to 0.74 and get the iOS build green again", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "when offline, the cart screen should show the cached items with a banner saying 'You're offline'", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Address feedback", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Android: handle the issue", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can we improve the app?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can you take care of the mobile tasks?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up and improve the photo picker", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Clean up the mobile stuff", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do the changes from the meeting on the Kotlin side", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do the thing Priya asked for on the Android client", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Enhancements to the app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Finish the remaining work on the wallet screen", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the feedback from QA", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix whatever is broken in the latest TestFlight build", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Get the app store stuff done", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Handle that problem with the push tokens we saw", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve performance", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Look at the app and improve what you think needs improving", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "MOB-412: Improvements", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the Android build work properly", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the app faster for users", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the checkout flow nicer somehow", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Modernize the codebase", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Prepare the app for the next version", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Refactor", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rework the profile screen", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Sort out the crash stuff", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "The home feed needs work.", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Users are complaining. Fix it.", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "We need to do something about the login.", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "address the review comments from last sprint", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "any chance you could improve the UX here", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "app feels off, sort it out", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "apply the design changes", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "better offline support", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "can you do what we talked about for the iOS build?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "do the usual for the new release", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the bug", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the thing on mobile", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix up the widget", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the edge cases", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "iOS polish", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve accessibility", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve stability", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "just make the React Native app less janky", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it feel more native", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it pop", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make onboarding more engaging", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the animations better??", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the app better", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the map screen good", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the swift code nicer", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "optimize stuff", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "polish the onboarding a bit, you know what I mean", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "redo the cart screen", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "something is wrong with notifications, look into it maybe", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the iPad version, please handle that", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the settings page needs love", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "the tablet layout is weird, improve it", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "tidy things up in the Flutter project before Friday", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "update deps and whatever else", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 'Back to top' button that appears after scrolling 600px on long docs pages", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 'Remember me' checkbox that extends the session cookie to 30 days", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a skeleton state to the OrdersTable while /api/orders is loading", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an Open Graph image and description to every blog post page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add an error boundary around the Comments widget so a failure doesn't blank the article page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add aria-labels to the icon-only buttons in Toolbar.tsx", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add client-side validation to the signup form: email format and password at least 12 chars", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add e2e Playwright test covering login → create project → logout", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add keyboard shortcuts: '/' focuses search, 'Esc' closes the active modal", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Better UX for empty carts: show recommended products from /api/recommendations", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Bump Tailwind to v3.4 and fix any classes it renamed", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Convert the Settings page from class components to hooks without changing behaviour", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Disable the submit button and show a spinner while the contact form is sending", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the broken anchor links in the docs sidebar after the slug change", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the hydration mismatch warning on ProductCard caused by rendering Date.now() on the server", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the off-by-one in pagination where page 2 repeats the last item of page 1", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the z-index so the dropdown menu in TopBar appears above the sticky table header", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix: clicking 'Save' twice on the ProfileForm submits two PATCH requests", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Highlight the current page in the main navigation", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Implement infinite scroll on /explore that fetches the next 20 items when the user nears the bottom", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve Largest Contentful Paint on /pricing to under 2.5 s on mobile Lighthouse", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve SEO by adding a sitemap.xml generated from the CMS page list", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve performance of the ProductList filter: memoize the filtered array so typing doesn't rerender 2000 rows", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the UX of file uploads on /import: show per-file progress bars", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve the contrast of muted text in the footer to meet WCAG AA", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Lazy-load images below the fold on the blog index using loading=lazy", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the 'Export CSV' button on Reports download the currently filtered rows only", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the DataGrid on the admin Users page sortable by 'Created' and 'Last login'", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the date picker in FilterBar default to the last 30 days", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the header nav collapse into a hamburger menu below 768px", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the pricing toggle remember monthly vs annual across page reloads", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the sidebar collapsible and remember its state per user", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make video embeds on article pages responsive at all widths", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Migrate the Storybook config to v8 and make all existing stories render", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Move the feature flags fetch out of App.tsx render into a loader so it runs once", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "On the Kanban board, let cards be dragged between columns and persist the new status via PATCH /tasks/:id", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Raise the Lighthouse accessibility score of the homepage from 78 to at least 95", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Reduce the main JS bundle under 250 KB gzipped by lazy-loading the chart library on /analytics", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Remove the duplicated analytics script tag from _document.tsx", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Render prices with Intl.NumberFormat using the user's locale on the cart page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Replace moment.js with date-fns in the InvoiceTable component", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Replace the polling in NotificationBell with the existing websocket channel", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Search box on /docs should debounce input by 250 ms and highlight matched terms", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show a toast 'Copied!' when the user clicks the copy icon on API key rows", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show password strength meter under the password field on /register", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Show relative timestamps like '3 min ago' on the activity feed", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Stop the layout shift on the hero by reserving the image's aspect ratio", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "The Checkout page should preserve entered address fields when the coupon request fails", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Upgrade Next.js from 13 to 14 and fix the broken getServerSideProps pages", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Use the existing Button component in Modal footers instead of raw <button> tags", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "WEB-203: Dark theme — the code blocks in BlogPost still use a white background", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "When a user's session expires, show a modal asking them to log in again instead of a blank page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "can we get the tooltips on the revenue chart to show values with two decimals", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "cookie banner should not reappear after the user accepts, store consent in localStorage", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix Safari 16 bug where the date input on BookingForm shows an empty value", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "i18n: translate the onboarding wizard into Spanish using the existing messages file", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the 404 page: add a search box and links to the three most visited docs", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the checkout stepper show which step failed validation in red", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "remove the unused jQuery dependency from the marketing site", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "the signup button on the landing page should be green (#16a34a) per the new brand guide", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Address the design review", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can the checkout be improved?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can you improve load times on the site", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Can you look at the pricing page and make it work?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do a cleanup on the Angular side", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Do what marketing wants on the homepage", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the layout issues", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Fix the styling", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Implement the remaining items", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve page speed", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Improve test coverage on the web app", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the admin panel less clunky", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the app feel snappier in the browser", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the charts look good", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Make the dashboard nicer", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Modernize the UI", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Optimize the bundle", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Refactor the React code", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Rework the signup page", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Simplify the frontend", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "The nav needs rethinking", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "The settings page — you know what to do", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "WEB-77: UI improvements", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "apply the feedback", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "better error handling in the UI", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "can u clean up the CSS", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "clean up state management", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "do the redesign stuff we discussed", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix hydration issues?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix that rendering thing", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the bugs from yesterday", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the console errors and stuff", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "fix the frontend", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "frontend tech debt", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "get the frontend ready for launch", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle Safari", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the browser problems", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "handle the feedback from the client call", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve SEO", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve accessibility on the site", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve conversions", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the dark theme", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the editor", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "improve the user experience on the site", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it look like the mockups", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make it responsive", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the components more reusable i guess", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the docs site look professional", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the modal stuff consistent", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the search work better", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "make the website better", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "polish", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "sort out the Next.js thing", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "the forms are bad", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "the landing page is meh, do something", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "the table component is a mess, fix it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "tidy up the Vue components", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the frontend", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "update the styles to match the brand", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "web perf pass", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "ambiguous-objective", "text": "Add a 7-day rolling average line to the DAU chart on the exec dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Add a Great Expectations check that order_total is never negative in the payments ingest", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Add a not_null test to customer_id in the dbt model stg_customers", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Add a retry with exponential backoff (max 5 attempts) to the Stripe API extractor", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Add a unit test for the revenue_recognition macro covering refunds", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Alert #data-oncall in Slack when the marketing_spend load hasn't finished by 7am", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Backfill the page_views table for March 2024 after the ingestion outage", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Better dedup: drop duplicate events in raw_clicks by (event_id, user_id) before loading to silver", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Cleanup: drop the tmp_ tables older than 30 days in the analytics_scratch dataset", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Convert the Pandas script build_cohorts.py to Polars so it fits in 4 GB of memory", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Create a Looker explore over fct_subscriptions with plan, region and MRR", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Data quality: reject rows in vendor_feed.csv where sku is empty and write them to a quarantine table", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Document each column of dim_products in schema.yml", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Export the monthly revenue by region table to a CSV in the finance S3 bucket every 1st of the month", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Fix the broken join in int_orders_enriched that drops orders without a coupon", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Fix the timezone bug that makes daily_active_users count UTC midnight instead of America/Chicago midnight", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Fix: null country codes in geo_lookup breaking the Map tab of the sales dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Handle late-arriving events up to 48h in the hourly aggregation job by using a watermark", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Improve the nightly orders_etl Airflow DAG runtime from 3 hours to under 45 minutes", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Increase the BigQuery slot reservation for the reporting project from 500 to 1000 for quarter close", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Kafka consumer group inventory-sink is lagging by 2M messages; raise max.poll.records to 2000 and add consumer instances so lag stays below 10k", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Make sure the weekly KPI email shows WoW % change for each metric", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Make the NPS survey responses available in the warehouse as a daily-refreshed table", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Mask email addresses in the analytics_share dataset for external partners", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Migrate retention_curve.ipynb queries to use fct_events instead of raw_events", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Partition the Spark job clickstream_sessionize by event_date to cut shuffle size", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Reduce the size of the parquet files written by the export job to ~256MB each", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Remove the deprecated legacy_users source from the dbt project", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Rename the column rev_amt to revenue_usd in the fct_sales mart and update downstream Looker views", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Schedule the inventory snapshot DAG at 02:00 UTC instead of hourly", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Speed up the session_metrics query by clustering the events table on user_id", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Switch the Snowflake warehouse for the BI role from LARGE to MEDIUM to reduce credit spend", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "The ad_spend pipeline should pull Google Ads data for all 14 accounts, not just the first one", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "The funnel chart on the Growth dashboard double counts signups — change it to count distinct user_id", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Upgrade dbt-core from 1.5 to 1.7 in the transformations repo", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "better error messages when the CSV upload validator rejects a file: include row number and column", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "cast zip_code to string in stg_addresses so leading zeros stop disappearing", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "improve accuracy of the weekly sales forecast notebook by adding holiday regressors, target MAPE below 8%", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "make the churn dashboard load in under 5s by pre-aggregating weekly cohorts", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "optimize the top_products query so it scans less than 10GB per run", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Address feedback on the cohort analysis", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Can you take a pass over the notebooks?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Clean data", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Could you make the analytics more useful for the team?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Data quality — address concerns", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Do the usual cleanup on the event tables", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Get the warehouse costs under control", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Improve ETL performance", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Improve the dashboards' performance and overall experience for stakeholders who have been complaining lately", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Look at the Kafka consumers and do whatever's needed", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Make dbt models more maintainable", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Make the BI layer faster", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Make the KPIs make sense", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Pipeline improvements", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Please improve the forecast notebook — it just feels clunky", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Refactor the data layer so it's less bad", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Rework the transformations however you think best", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Sort out the schema mess", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Spark job — make it nicer", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "The finance export is weird again, please handle", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "The numbers look off, sort it out", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Ticket DATA-412: misc fixes", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "Update the reporting as discussed", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "clean up the warehouse", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "do what Priya mentioned in standup re: the reports", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "fix teh ingestion", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "fix the dashboard thing", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "handle the analytics stuff before the release", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "help with the data stuff for Q3", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "increase reliability of jobs", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "make the pipeline better", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "modernize our data stack a bit", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "optimize the queries", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "polish the churn report", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "revisit the attribution model", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "something's wrong with yesterday's load, deal with it", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "streamline things in the lakehouse", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "tidy up airflow", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "ambiguous-objective", "text": "we need the metrics to be more accurate somehow", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}

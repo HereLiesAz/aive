@@ -1,6 +1,10 @@
 """Corpus for Aive's orchestration decision model (OrchestrationQuestion in OrchestrationDecisions.kt).
 
-Usage: python3 tools/decision_training/generate_corpus.py [out_dir] [--rows-per-class N]
+Usage: python3 tools/decision_training/generate_corpus.py [out_dir] [--rows-per-class N] [--templates]
+
+When teacher/*.jsonl exists (verified teacher-written rows) the corpus is those rows plus the
+hand-written adversarial split; --templates also adds the template rows below to train. Without
+teacher rows the corpus is the template rows alone.
 
 Each row is one typed question about one text: {"question", "text", "label", "split", "tags"}.
 Labels come from construction: every template belongs to one answer. Two things keep the test split
@@ -10,8 +14,8 @@ honest about generalisation rather than recall:
 The adversarial split is hand-written near misses (a concrete "improve", an architecture-doc typo, a
 date picker that is not history, compatible criteria that look opposed, lexicon traps).
 
-The texts are what the runtime sends: the task objective as written, criteria joined with " ; ",
-and one part of a criterion as split by CRITERION_PARTS.
+The texts are what the runtime sends: the task objective as written, and one part of a criterion as
+split by CRITERION_PARTS.
 """
 import json
 import random
@@ -20,13 +24,11 @@ import sys
 from pathlib import Path
 
 SEED = 8
-SEPARATOR = " ; "  # CRITERIA_SEPARATOR in OrchestrationDecisions.kt
 QUESTIONS = {
     "ambiguous-objective": ["no", "yes"],
     "architectural-decision": ["no", "yes"],
     "multi-step-reasoning": ["no", "yes"],
     "chronological-context": ["no", "yes"],
-    "contradictory-criteria": ["no", "yes"],
     "verification-operation": ["evidence-check", "lint", "test", "build", "health-check", "source-verification"],
 }
 
@@ -136,26 +138,6 @@ TEMPLATES = {
     },
 }
 
-CONFLICTS = [
-    ("The app works fully offline", "The app always shows live data from the server"),
-    ("The public API stays unchanged", "The {s} endpoint is renamed"),
-    ("No new dependencies are added", "The {s} uses {b} as a new dependency"),
-    ("The {s} is removed", "The {s} keeps working as before"),
-    ("Data never leaves the device", "Data is synced to the cloud"),
-    ("The {s} loads without network access", "The {s} fetches fresh data on every open"),
-    ("The {s} is visible to every user", "The {s} is hidden behind a feature flag for everyone"),
-    ("Users are never asked for permissions", "The {s} requests location permission on start"),
-    ("The binary size does not grow", "The {s} bundles a 40 MB model"),
-    ("Only {p} is supported", "The {s} ships on every platform"),
-]
-COMPATIBLE = [
-    "The {s} supports dark mode", "The {s} supports light mode", "Unit tests pass", "Lint passes",
-    "The {s} loads in under 2 seconds", "The {s} is accessible with a screen reader", "The {s} works on {p}",
-    "The {s} strings are translated", "Crash rate stays below 1%", "The {s} has an empty state",
-    "Response time is under 100 ms", "Response time is under 200 ms", "The {s} logs errors",
-    "Existing users keep their settings", "The {s} is documented in the README",
-]
-
 VERIFICATION = {
     "lint": ["lint passes on the {s}", "no warnings from the style checker", "ktlint is clean",
              "the {s} code is formatted", "detekt reports no issues", "code style matches the guide",
@@ -208,13 +190,6 @@ ADVERSARIAL = {
         ("What changed in the sync engine since Monday?", "yes"), ("When did login start failing?", "yes"),
         ("Add a date picker to the export dialog", "no"), ("Show the latest messages first", "no"),
         ("Why was the cache removed in the last release?", "yes"), ("Add a 'last seen' timestamp to profiles", "no"),
-    ],
-    "contradictory-criteria": [
-        ("App works fully offline ; App always shows live server data", "yes"),
-        ("Keep the public API unchanged ; Rename the public endpoint", "yes"),
-        ("Tests pass ; Lint passes", "no"), ("Supports dark mode ; Supports light mode", "no"),
-        ("Response under 100 ms ; Response under 50 ms", "no"),
-        ("Data never leaves the device ; Back up data to the cloud", "yes"),
     ],
     "verification-operation": [
         ("no warnings from the style checker", "lint"), ("the app compiles on CI", "build"),
@@ -269,15 +244,6 @@ def rows_for(question, label, templates, rng, per_split, make):
             for split, texts in out.items() for text in sorted(texts)]
 
 
-def criteria_text(rng, vocab, conflict):
-    pool = [fill(c, rng, vocab) for c in rng.sample(COMPATIBLE, rng.randint(1, 3))]
-    if conflict is not None:
-        shared = slots(rng, vocab)  # both sides of a conflict are about the same thing
-        pool += [fill(side, rng, vocab, shared) for side in conflict]
-    rng.shuffle(pool)
-    return SEPARATOR.join(dict.fromkeys(pool))
-
-
 CRITERION_PREFIXES = ["", "", "Ensure ", "Verify that ", "Make sure ", "Check that ", "- "]
 CRITERION_SUFFIXES = ["", "", "", " before merge", " on {p}", " for the {s}", " after the change"]
 
@@ -288,22 +254,48 @@ def criterion_part(template, rng, vocab):
             + fill(rng.choice(CRITERION_SUFFIXES), rng, vocab, values))
 
 
-def generate(rows_per_class):
+TEACHER = Path(__file__).resolve().parent / "teacher"
+
+
+def teacher_rows():
+    """Verified teacher rows (teacher/*.jsonl): written by one model, kept only where an independent
+    blind relabelling agreed. Train, validation and test come from disjoint project domains."""
+    rows = []
+    for path in sorted(TEACHER.glob("*.jsonl")):
+        for line in path.open():
+            row = json.loads(line)
+            rows.append({"question": row["question"], "text": row["text"], "label": row["label"],
+                         "split": row["split"], "tags": [f"class:{row['label']}", "teacher", f"domain:{row['domain']}"]})
+    return rows
+
+
+def generate(rows_per_class, templates=None):
+    """Teacher rows when present, else template rows; [templates] True adds template rows to train."""
     rng = random.Random(SEED)
+    teacher = teacher_rows()
+    if templates is None:
+        templates = not teacher
+    if teacher and not templates:
+        rows = teacher + [{"question": q, "text": t, "label": l, "split": "adversarial", "tags": [f"class:{l}", "adversarial"]}
+                          for q, cases in ADVERSARIAL.items() for t, l in cases]
+        return dedupe(rows)
     per_split = {"train": rows_per_class, "validation": max(20, rows_per_class // 5), "test": max(20, rows_per_class // 5)}
     rows = []
     for question, answers in TEMPLATES.items():
         for label, templates in answers.items():
             rows += rows_for(question, label, templates, rng, per_split, lambda t, r, v: vary(fill(t, r, v), r))
-    for label, conflicts in (("yes", CONFLICTS), ("no", [None] * len(CONFLICTS))):
-        rows += rows_for("contradictory-criteria", label, conflicts, rng, per_split,
-                         lambda c, r, v: criteria_text(r, v, c))
     for label, templates in VERIFICATION.items():
         rows += rows_for("verification-operation", label, templates, rng, per_split, criterion_part)
     for question, cases in ADVERSARIAL.items():
         rows += [{"question": question, "text": text, "label": label, "split": "adversarial",
                   "tags": [f"class:{label}", "adversarial"]} for text, label in cases]
-    # A text in a later split never also appears in an earlier one for the same question.
+    if teacher:
+        rows = [r for r in rows if r["split"] == "train"] + teacher + [r for r in rows if r["split"] == "adversarial"]
+    return dedupe(rows)
+
+
+def dedupe(rows):
+    """A text in a later split never also appears in an earlier one for the same question."""
     seen, kept = set(), []
     for split in ("train", "validation", "test", "adversarial"):
         for row in rows:
@@ -319,13 +311,17 @@ def generate(rows_per_class):
 def main():
     args = sys.argv[1:]
     rows_per_class = 600
+    templates = None
+    if "--templates" in args:
+        args.remove("--templates")
+        templates = True
     if "--rows-per-class" in args:
         index = args.index("--rows-per-class")
         rows_per_class = int(args[index + 1])
         del args[index:index + 2]
     out = Path(args[0] if args else "build/decision-corpus")
     out.mkdir(parents=True, exist_ok=True)
-    rows = generate(rows_per_class)
+    rows = generate(rows_per_class, templates)
     with (out / "decisions.jsonl").open("w") as handle:
         for row in rows:
             handle.write(json.dumps(row) + "\n")
@@ -334,7 +330,7 @@ def main():
         counts.setdefault(row["question"], {}).setdefault(row["split"], {}).setdefault(row["label"], 0)
         counts[row["question"]][row["split"]][row["label"]] += 1
     (out / "manifest.json").write_text(json.dumps(
-        {"schema": 1, "seed": SEED, "separator": SEPARATOR, "questions": QUESTIONS, "counts": counts}, indent=2))
+        {"schema": 1, "seed": SEED, "questions": QUESTIONS, "counts": counts}, indent=2))
     print(json.dumps(counts, indent=1))
 
 

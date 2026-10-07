@@ -219,11 +219,10 @@ data class CapabilityAssessment(
     /** Share of recent local attempts that failed, 0..1. */
     val localFailureRate: Double = 0.0,
     /**
-     * The task's objective and acceptance criteria, for the decision model that fills the judgement
-     * flags above ([DecisionInformedOrchestrationUtilities]). Never serialized: no model input carries them.
+     * The task's objective, for the decision model that fills the judgement flags above
+     * ([DecisionInformedOrchestrationUtilities]). Never serialized: no model input carries it.
      */
     @Transient val objective: String = "",
-    @Transient val acceptanceCriteria: List<String> = emptyList(),
 )
 
 @Serializable

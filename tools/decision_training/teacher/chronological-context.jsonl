@@ -1,0 +1,880 @@
+{"question": "chronological-context", "text": "Add a 'last updated' line to the footer of each docs page", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add a changelog template to the docs repo", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add a glossary entry for 'idempotency'", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add a section on the project's history to the about page using the provided summary", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add a table of contents to the contributor guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add alt text to all figures in chapter 2", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add publication dates to every entry in the bibliography", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Convert the user manual from Word to Markdown", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Create a style guide entry on writing dates as YYYY-MM-DD", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Document the cron syntax supported by the scheduler", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Draft a tutorial on handling timezones in the SDK", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Explain the event timeline feature in the product guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Fix the broken link to the installation guide in the README", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Generate a PDF version of the API reference", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Proofread the abstract for grammar and length", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Reformat all citations to Chicago style", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Replace screenshots in the setup guide with the new UI", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Shorten the executive summary to 200 words", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Summarise the attached interview transcripts into key themes", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Translate the quickstart guide into Spanish", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write a FAQ answer about how long data is retained", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write a how-to for scheduling recurring exports", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write a literature review on federated learning for medical imaging", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write a section explaining how the date picker component works", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "sort the release notes index newest first", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Catch me up on the decisions made about the docs site navigation since I left", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Compare the current README with the one at the first public release and narrate what evolved", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "DOC-19 figure out when the install guide started recommending Python 3.8 and if anyone revisited it", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Determine whether the dataset description was changed before or after the ethics review", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Document how the architecture overview diagram changed over the last four releases", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Explain how terminology in the onboarding docs drifted across product rebrands", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Explain why the survey sample size was reduced between the pilot and the main study, using the old notes", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Find out why the style guide forbids passive voice — someone must have decided this years ago", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Find the original rationale for splitting the user manual into two volumes", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Go through the wiki history and find who removed the troubleshooting page and when", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Identify which edit broke the cross-references in chapter 4", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Locate the draft where the results table first showed the inflated effect size", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Look back at closed doc issues to understand why the FAQ was deprecated", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Prepare a timeline of how the research question narrowed over the three grant proposals", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Reconstruct which version of the literature review the reviewers actually commented on", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Recover the reviewer comments from round one that motivated the revised hypothesis", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Since the last editorial meeting, which chapters were rewritten?", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Summarise the sequence of revisions the API reference went through after the 3.0 release", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Trace the order in which co-authors joined and what each added to the paper", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Track down why the glossary dropped the term 'tenant' in the last restructure", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "When did the citation style switch from APA to Chicago, and why?", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write a changelog for the whitepaper by reconstructing what was edited across drafts", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Write the 'History' section of the design doc explaining how the plugin API evolved since v1", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "has the tutorial's code sample been updated since the SDK breaking change? check history", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "what changed in the methods section between the preprint and the accepted manuscript?", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "chronological-context", "text": "Add CRC checks to the UART frames", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add a 'last seen' time to each device in the fleet dashboard", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add a changelog file to the firmware repo", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add a daylight saving time rule to the thermostat schedule", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add an RTC-backed timestamp to every sensor reading", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add debounce to the reset button handler", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Blink the status LED red on sensor fault", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Calibrate the temperature offset with the provided reference values", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Disable JTAG in production builds", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Enable deep sleep between readings on the soil sensor", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Encrypt the config partition with AES-128", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Expose battery voltage over the BLE GATT service", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Implement OTA updates over BLE for the wristband", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Implement a scheduler that wakes the radio every 15 minutes", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Increase the MQTT keepalive to 120 s", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Lower the ADC sampling rate to 10 Hz to save power", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Port the HAL to the STM32U5", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Reduce firmware image size below 256 KB", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Retry I2C reads up to 3 times", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Schedule the irrigation valve to open at 06:00 daily", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Set the watchdog timeout to 8 seconds", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Show uptime in the device's local web page", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Sync the device clock via SNTP on boot", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Write a driver for the BME280 humidity sensor", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "store the last 24 hours of readings in a ring buffer in flash", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Build a timeline of field failures for the gateway units against firmware versions shipped", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Catch me up on what happened to the LoRa duty-cycle fix while I was out", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Compare today's pinout config with the rev B board and explain when each pin moved", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Determine when the camera module started reporting the wrong frame rate and what shipped then", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Determine whether battery drain complaints started before or after the BLE stack upgrade", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Dig up the decision record for disabling debug JTAG in production units", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Explain to the new firmware dev how the OTA update protocol evolved since v1", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "FW-302 bisect the bootloader commits to see when secure boot verification got skipped", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Find out why the team dropped Zephyr in favour of FreeRTOS back in 2023", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Find the commit where the I2C retry logic was removed", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Find which firmware release first caused the thermostat to drop off Wi-Fi after OTA", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Identify the first production batch where the reset loop appeared", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Look through the changelog to find when the MQTT keepalive was changed", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Prepare an incident timeline for the smart lock fleet unlocking itself last week", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Reconstruct the order in which the devices were migrated to the new cloud broker", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Recover the rationale for using a 115200 baud UART instead of SPI to the modem", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Since the switch to the new MCU, what has changed in the power management code?", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Summarise how the device provisioning flow changed across the three manufacturing partners", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Trace when the temperature drift in the HVAC controller readings began", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Track how the sensor calibration constants were adjusted over successive hardware revisions", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "What firmware versions have been rolled back in the past six months and why?", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Write up how memory usage on the edge gateway grew release over release", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "has anyone modified the flash partition table since the field recall?", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "when did the watchdog timeout get bumped to 8 s and who approved it", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "why did we lower the ADC sampling rate on the soil sensor board? need the old reasoning", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "chronological-context", "text": "Add a 'history' tab to the match stats screen showing past games", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a changelog popup listing what's new in this patch", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a day/night cycle with a configurable length to the overworld", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a seasonal event that unlocks on 31 October", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a speedrun timer with split support", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a timestamp to each save slot in the load menu", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add subtitles for all cutscenes in the prologue", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Allow players to rebind the sprint key", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Bake lightmaps for the harbour level", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Compress the texture atlas for the mobile build", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Fix the jump buffer so presses within 100 ms still register", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Fix z-fighting on the castle wall textures", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Implement a daily login reward calendar", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Lower the drop rate of legendary swords to 0.5%", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Make enemies use cover when the player is reloading", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Port the input system to the new controller API", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Raise the server tick rate to 60", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Replace the placeholder title music with the final track", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Schedule weekly leaderboard resets every Monday 00:00", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Show the in-game clock in the HUD corner", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Show the last played date under each character in the select screen", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Sort the replay list by most recent match", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Spawn the boss after a 90-second countdown", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "create a cooldown timer on the dash ability", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "implement rollback netcode for the fighting mode", "label": "no", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Assemble a timeline of crash spikes on Xbox with the builds shipped around them", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Compare the current input mapping to the one from the demo build and explain what moved and when", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Determine the first nightly where the audio desync in cutscenes was reported", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Dig up the original design reasoning for the stamina system before the redesign meeting", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Explain how the economy's gold sinks changed version by version since early access", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Figure out whether the frame drops predate the asset streaming rewrite or came after it", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Find out why the team abandoned the ECS migration in 2024", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Find the PR where the enemy AI stopped using cover and who approved it", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Find which build first introduced the physics jitter on the rope bridge level", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "GAME-231 bisect the engine fork to find when the save-file corruption on Switch began", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Identify when memory usage on the Steam Deck build crept past 12 GB", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Look at old design docs to see how the skill tree evolved from the prototype", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Prepare a post-mortem tracing the decisions that led to the overscoped boss rush mode", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Reconstruct the order of hotfixes we pushed during the launch weekend", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Recover why the anti-cheat integration was postponed twice", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Since patch 1.4, which balance changes were reverted and why?", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Trace back when localisation strings for German began truncating in the quest log", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Track how average match length evolved after each matchmaking tweak this year", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "When did the shader cache start invalidating on every launch? check commit log", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Write up how the loot table balancing changed across the last four seasons", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "catch me up on everything that happened to the inventory UI while I was out", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "has the level streaming budget been changed since we shipped? find each change", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "what has changed in the netcode since the closed beta? summarise for the new hire", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "which sprint did we drop controller rumble on PC, and what was the reason given", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "why did we cap the tick rate at 30 on the dedicated servers? need the history before raising it", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "chronological-context", "text": "Add a 'last deployed' timestamp to the internal service catalog page", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Add a changelog file to the terraform-modules repo", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Add uptime percentage for the past 90 days to the status dashboard", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Configure PagerDuty to escalate after 15 minutes", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Create a Grafana panel showing request rate over the last 24 hours", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Disable TLS 1.0 on the legacy ingress", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Enable NTP sync on all bare-metal hosts", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Increase the root volume of the CI runners to 200 GB", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Move secrets for the billing service into Vault", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Open port 9100 for node_exporter in the monitoring security group", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Pin the base image to a digest in the payments Dockerfile", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Raise the HPA max replicas for the api deployment to 20", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Replace the nginx ingress with the cloud load balancer controller", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Rotate the TLS certificate on the public ingress", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Schedule the database backup to run at 03:00 UTC nightly", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Set a maintenance window every Sunday 02:00–04:00", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Set the log retention in Loki to 30 days", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Sort the incident list in the status page by newest first", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Tag all EC2 instances with cost-center", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Template the Helm chart so replicas are configurable", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Turn on deletion protection for the orders RDS instance", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Upgrade the node pool to Kubernetes 1.31", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Write a runbook for restarting the Kafka brokers", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "add a cron job that prunes old Docker images weekly", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "create an alert when disk usage exceeds 85% for 10 minutes", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Bisect the Ansible playbook commits to locate when sshd hardening regressed", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Build a timeline of the DNS outage last Tuesday from the alerts and change log", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Catch up the new SRE on the history of the flaky etcd nodes", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Compare current IAM policies against the ones before the audit and explain each change", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Determine whether the disk pressure alerts began before or after the logging agent upgrade", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Dig through the history to see why TLS 1.0 is still enabled on the legacy ingress", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Explain how the network topology evolved from the single-region setup to today", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Figure out when the prod Kubernetes cluster started evicting pods during nightly backups", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Find the first deploy after which p99 latency on the edge proxies doubled", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Find when the base AMI was last rotated and which services still run the older one", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Gather why we decided against a service mesh in the 2023 platform review", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Identify who disabled the autoscaler on the batch pool and when", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "OPS-77 which Terraform apply first removed the deletion protection on the orders RDS?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Reconstruct how our cloud bill grew month by month and what drove each jump", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Recover the reasoning behind keeping two separate Vault clusters", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Since the datacenter move, which cron jobs have silently stopped running?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Summarise how our on-call rotation and escalation policy evolved over the past year", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Trace the sequence of config changes to the load balancer during the failed rollout", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "When did the backup verification job last succeed, and what changed right after?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Work out the order in which the three regions were cut over to the new CDN", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "Write a post-incident report ordering every action taken during the certificate expiry", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "has the retention on Prometheus been changed since we migrated to Thanos?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "look at the git blame on the firewall rules and tell me why port 8443 is open", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "what changed in the Helm values for the payment service since the last stable release", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "why was the NAT gateway moved to a separate VPC? find the original ticket before undoing it", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "chronological-context", "text": "API-998 – support ISO 8601 durations in the subscription period field", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add CORS config allowing the new admin domain", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add OpenAPI docs for the shipping-quotes endpoints", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'last_seen_at' field updated on each authenticated request", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'scheduled_at' field so marketing emails can be queued for later", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'since' cursor to the changes feed so clients get events newer than a timestamp", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a /versions endpoint to list saved revisions of a document", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a TTL of 24 hours to the session keys in Redis", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a created_after query parameter to the /orders endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a deprecation header to responses from /v1/legacy-search", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a health check that verifies the Kafka connection", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a historical exchange rates endpoint that takes a date parameter", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a retry with exponential backoff to the email sender", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add an audit log endpoint that returns a user's actions in chronological order", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add an endpoint returning a user's login history (time, IP country, device)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add an endpoint to cancel a scheduled payout before its execution time", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add an index on orders(customer_id, created_at)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add an updated_at timestamp column to the products table", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add pagination to the /history endpoint which lists a user's past orders", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add rate limiting to the login endpoint: 5 attempts per minute", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add structured JSON logging to the notification-worker", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Bump Spring Boot to 3.3.4 in the billing-service", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Cache GET /catalog responses for 5 minutes", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Create an endpoint returning the account's monthly usage for the last 12 months", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Expose the service build version and start time on /info", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Fix the 500 when /users/{id} is called with a non-numeric id", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Fix the off-by-one-day error in the 'events this week' query", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Fix the timezone offset bug when parsing dates without a zone in the reports API", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement a cron-style recurring jobs API for customers", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement a delayed-delivery option for webhook events", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement a scheduler that runs the invoice job every day at 02:00 UTC", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement an expiring signed URL for downloads valid for 15 minutes", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement optimistic locking with a version column on the cart table", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Implement soft delete for comments with a deleted_at column", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Increase the DB connection pool size to 40 on the reports-api", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Log request duration in milliseconds for every handler", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Make password reset tokens expire after 30 minutes", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Make the API respond with 404 instead of 500 for missing invoices", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Make the order export include the order's timeline of status changes", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Mask card numbers in the payment-service logs", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Move the SMTP password into the secrets manager lookup", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Paginate /audit-events in ascending timestamp order with a stable cursor", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Remove the unused /v0/ping route", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Rename the field 'ts' to 'created_at' in the activity API response", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Return 'age_in_days' computed from signup date in the profile API", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Return 429 with a Retry-After header when the quota is exceeded", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Return a Last-Modified header on GET /documents/{id}", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Return results sorted by newest first from /v1/posts", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Return the server time in the /time endpoint for client clock sync", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Schedule a nightly cleanup of expired uploads in S3 from the files-service", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Set statement_timeout to 5s for the analytics read replica connection", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Store timestamps as UTC in the events table", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Support filtering transactions by date range in the GraphQL schema", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Throw a validation error when an appointment is booked in the past", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Upgrade the Go toolchain to 1.23 in the gateway service", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Validate that start_date is before end_date in the booking request", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Validate webhook signatures using the shared secret", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Write a migration that backfills created_at for old rows using the insert id order", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Write integration tests for the refund endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "compress responses with gzip on the catalog API", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "API-317: identify the commit that removed rate limiting from the /search endpoint", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Before deleting the legacy auth endpoints, find out when they were last called and why they were kept", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Bisect the memory leak in the ingestion API; it wasn't present in 4.11", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Check the git history of the pagination helper to see why cursor and offset both exist", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Compare today's OpenAPI spec with the one from January and explain when each new field landed", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Determine the order in which endpoints were migrated off the legacy XML API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Determine when the coupon-service started accepting expired codes", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Determine whether the timezone bug in report generation predates the Java 21 upgrade", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Document the evolution of the tenant isolation model since the service launched", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Explain how the auth-service token format evolved from opaque tokens to JWTs", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Explain how we ended up with both REST and gRPC versions of the catalog API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Explain the historical reasons the search-service still talks to Elasticsearch 6", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Explain the sequence of decisions that led to the outbox pattern in the order-service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Explain why the order-events topic has three different schemas, in the order they appeared", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Figure out why the notification-worker retries were set to 7, read the history of that setting", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find how long the stale cache bug in the profile endpoint has existed", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find out how the rate-limit numbers for free tier evolved and who approved each change", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find out when the CSV export endpoint was last fast and which change slowed it", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find out whether the 502s on /v1/upload began before or after the gRPC gateway rollout", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find the last commit where the /health endpoint didn't hit the database", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Find which deploy caused p99 latency on the orders-api to double last week", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Gather the rationale from old ADRs for keeping user and profile data in separate services", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Identify every hotfix to the pricing-engine since the Q2 freeze and what it addressed", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Identify when the API started returning 200 with an error body instead of 4xx", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Investigate what changed in the auth flow since the SSO integration went live, some logins fail", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Investigate which dependency update since 3.2.0 broke TLS to the fraud-check vendor", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "List every breaking change to the public REST API since v2 was published", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Look into when the background reindex job started overlapping with peak traffic", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Look through old PRs to explain why the accounts service has its own copy of the currency table", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Outline how the API versioning policy has changed since the first public release", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Prepare an incident timeline for Saturday's payment-gateway outage", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Read through the history of the soft-delete implementation before we change it", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Rebuild a chronology of config changes to the API gateway during the March incident", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the order of events in the logs for request id 7f3a that got charged twice", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the sequence of schema migrations on the users table to explain the nullable email column", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Recover the reasoning behind the 30-second idle timeout on the internal load balancer config in the service repo", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Restore the previous retry behavior in the email-service and document what changed since it was altered", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Review past attempts to fix the flaky idempotency check in the payments API and why each failed", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Review the history of the feature flag for async checkout and list who changed it when", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Since the move to Kubernetes, which services changed their port configuration and when?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Since when has the webhook dispatcher been dropping events with large payloads?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Summarize how the error response format changed over the API's lifetime", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Summarize the history of the shipping-quotes service from its split out of the monolith to now", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Trace back why the ledger-service writes to two databases", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Trace when the cron job for expiring sessions stopped running in production", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Track down when the GraphQL resolver for Order.items started doing N+1 queries", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Track the regression window for the broken sorting in /v2/transactions", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Was the slow query on the reports-api introduced by the index drop last sprint or earlier?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "When did error rates on the recommendations endpoint start creeping up? use the deploy log", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "When did the billing-service start emitting duplicate invoice events? correlate with merges", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Which of the merges since Tuesday introduced the deadlock in the reservation-service?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Which release first logged PII in the request logger, and has it been fixed since?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Who added the special case for tenant 'acme-legacy' in the permissions middleware and why", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Write a changelog of all deprecations announced for the partner API over the past two years", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "find the PR that added the 5000 row cap on the bulk import endpoint and the reason given", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "tell me the backstory of the 'v1-compat' header that clients send", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "we keep re-adding then removing the request body size limit — find out what happened each time", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "what changed in the inventory service config since the last stable release? stock counts are off", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "what was the original reason for the 10 MB limit on attachment uploads?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "why did we choose Postgres advisory locks over Redis for the job scheduler? find the old design doc", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'Revert to saved' command that reloads the file from disk", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'clear recent files' item in the File menu", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'what's new' window shown after an update", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a context menu entry to 'Show in Finder/Explorer'", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a crash reporter that uploads minidumps with user consent", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a dark theme option to the preferences", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a date picker to the export dialog for choosing the report period", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a native macOS Share menu to the document window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a print preview to the invoice window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a reminder feature that pops a native notification at a chosen time", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a splash screen with a progress bar during startup", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a time zone option to the world clock tray app", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a timeline view to the video editor's clip panel", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a timestamp overlay option to the screen recorder output", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a version history panel that lists autosaved snapshots of the current document", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add an option to group photos by the date taken", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add an option to schedule the sync to run only at night", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add code signing for the Windows installer in the build script", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add keyboard navigation to the color picker", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add relative timestamps to the notifications popover", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add spell check languages selection to the editor settings", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Compress the bundled assets to reduce installer size", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Create a 'Restore previous session' option on startup", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "DESK-310 – add 'Undo close tab' with Ctrl+Shift+T", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Display a calendar heatmap of daily writing activity in the stats panel", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Enable file associations for .proj files on Linux via a desktop entry", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the crash when closing the app with an unsaved untitled document", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the date column sorting alphabetically instead of chronologically in the table view", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the hydration of preferences when the config file is empty", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the scrollbar jumping when new log lines are appended", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement a calendar sidebar in the desktop mail client", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement a timer widget for the pomodoro mode", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement auto-update download in the background with a restart prompt", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement multi-window support for the notes app", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Make search in the file browser match on 'modified since' dates", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the app minimize to tray instead of quitting when the window is closed", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the installer create a Start menu shortcut", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the log viewer highlight entries from the last 10 minutes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Persist the last used export folder", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Port the settings dialog layout to use the grid layout manager", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Reduce idle CPU usage of the tray app by lowering the polling frequency", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Remember window size and position between launches", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Rename the 'History' menu to 'Activity'", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Replace the custom date parsing in the import wizard with the Qt QDateTime API", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Schedule automatic backups every 6 hours in the background", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Set the autosave interval default to 2 minutes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show 'last saved at 14:32' in the status bar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show a 'trial expires in N days' banner", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show a progress dialog for long exports with an elapsed time counter", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show elapsed recording time in the title bar while capturing audio", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show the app version and build date in the About dialog", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Show the creation date in the file properties dialog", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Sort the recent files list by last opened, newest first", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Support drag and drop reordering of tabs", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Support high-DPI icons in the toolbar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Translate the settings window into Japanese", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Upgrade Electron to 32 and fix the deprecated API calls", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Write unit tests for the document serializer", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "add a 'snooze until tomorrow 9am' action to task reminders", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "display file modification times in the user's locale format in the file browser", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Bisect the high CPU usage in the tray app; 3.4 didn't have it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Check what happened to the portable build over the last few releases and why it's gone", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Compile a history of file format versions the app has written so we can support importing them all", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "DESK-77: identify the commit that broke drag and drop of files onto the main window", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Determine when the app started requesting accessibility permissions on macOS and why", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Determine whether the slow file open dialog predates enabling the cloud sync plugin", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Determine which merge since Friday broke code signing for the macOS notarization", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Did the font rendering issues on Linux start before or after we switched to Wayland-native mode?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Document how the release process for the desktop client changed after each bad update", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain how the plugin API of the editor evolved from v1 to v3", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain the decisions behind keeping a separate helper process for indexing, using the old design notes", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain the sequence of migrations from Java Swing to JavaFX to the current UI toolkit", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain when and why the default save location moved from Documents to AppData", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain why the app ships two copies of ffmpeg, based on the commit history", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Figure out why sandboxing was disabled in the Mac App Store build back then", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out how long the dark theme has been ignoring the system setting on Windows", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out when the Electron app's startup time went from 2s to 6s and which releases contributed", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out why the team switched from Squirrel to electron-updater originally", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find the first build where the app failed to launch on macOS 12", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find the last version where the app's window position was restored correctly", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find which change to the update channel config caused beta users to get stable builds since 2.9", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Find which earlier change made the app require admin rights to install", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Gather the history of the app's sandbox entitlements and why each was added", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Go through the git history of the keyboard shortcut map and explain the conflicting bindings", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "How did we end up with three different settings storage locations? trace it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Identify how memory usage trended per release since v4 and point out the jumps", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Identify the regression window for the broken undo in the timeline editor", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Identify when telemetry opt-out stopped being respected and which release fixed it, if any", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Investigate what changed in the GPU acceleration settings since users began seeing black windows", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Investigate when the clipboard paste of images started failing in the notes app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "List every change to the auto-updater since version 5.0", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Look at the history of the crash reporter integration and list why it was swapped each time", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Look back at the crash fixes made to the PDF renderer and list them in order", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Make a chronology of the installer size growth and which features added the most", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Outline how the licensing check changed across the paid versions", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Read the history of the export-to-CSV module before refactoring and list the bugs it was patched for", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the order of events leading to the corrupted settings files reported after the 7.2 update", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the steps from the crash dumps that led to the data loss on save", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Recover the rationale behind storing user projects in a SQLite file instead of JSON", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Restore the toolbar layout to what it was before the 6.0 redesign and document what changed since", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Review prior attempts to fix the high-DPI scaling on multi-monitor setups", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Since the Tauri migration started, which windows have been ported and in what order?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Since when has the installer been leaving files behind on uninstall?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Summarize every change made to the autosave interval logic over the last year", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Summarize why the team abandoned the WPF rewrite two years ago", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Trace back the origin of the custom titlebar implementation on Windows", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Trace when the bundled Python runtime version drifted from what the plugins expect", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Track down when the spell checker stopped working in the Linux build", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Was the memory leak in the image viewer present before we upgraded Electron to 30?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "When did the 'Open recent' list begin losing entries after restart?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "When did the macOS menu bar icon start rendering blurry on Retina screens?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Which PR added the Windows 7 compatibility shim, and why was it kept after support ended?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Who introduced the registry hack for file associations, and why?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Write a recap of how the onboarding tour in the desktop client has evolved", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Write a timeline of the crashes reported after the Windows 11 24H2 rollout and our responses", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "since the dependency refresh last Tuesday which features broke on Linux?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "tell me how the preferences dialog grew to its current 9 tabs", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "what changed in the Qt app's printing code since the last release where PDFs printed fine?", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "what was the original reason for bundling our own copy of Chromium flags in main.js", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "why did we move the Windows installer from NSIS to MSIX? find the original discussion", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "chronological-context", "text": "Add CODEOWNERS entries for the new payments package", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'devtool timeline' subcommand that renders deployment events on a time axis", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a --since flag to our dev CLI that lists commits after a given date", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a badge for build status to the README", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a check that blocks merging PRs older than 30 days without a rebase", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a command to the dev CLI that shows the history of a migration file", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a dry-run flag to the release script", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a git hook that rejects commits without a ticket id", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a job summary listing the test files that changed", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a job that verifies all workflow files pass actionlint", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a matrix for Node 20 and 22 to the test workflow", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a nightly scheduled workflow that runs the full test suite at 03:00", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a pre-push hook running the type checker", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a release workflow that tags the version and publishes to npm", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a step that prints the build timestamp into the artifact metadata", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a timestamp prefix to every log line the build script prints", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add a workflow_dispatch input for choosing the target environment", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add an expiry date to the temporary preview environments created per PR", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add retry logic around the flaky artifact upload step", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add semantic-release to the SDK repo", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add shellcheck to the lint stage", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add the release date to the generated GitHub release title", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Bump eslint to 9 and convert the config to the flat format", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "CI-640 – add a job that fails if the lockfile is out of date", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Cache node_modules in the CI test job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Configure Renovate to group minor updates weekly on Mondays", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Create a 'deps outdated' report that lists packages older than 180 days", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Enable concurrency groups so new pushes cancel running workflow runs", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Enable the TypeScript incremental build in the CLI package", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Fail the build when coverage drops below 80%", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Fix the formatter config so it ignores generated files", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Fix the lint job failing on files with CRLF line endings", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Fix the path filter so docs-only changes skip the build", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Generate SBOMs for every release build", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Install the Rust toolchain from rust-toolchain.toml in CI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Lint commit messages against conventional commit rules", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the CI fail on new compiler warnings in the C++ module", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the changelog generator group entries by release date", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the code generator output deterministic so diffs are stable", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the dependency audit job post results as a PR comment", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the dev container install the same Go version as CI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make the stale-bot close issues after 60 days of inactivity", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Mark the slowest 10 tests in the test report", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Print the current git SHA and date in the --version output of the CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Publish test results in JUnit format for the dashboard", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Rename the 'build-all' make target to 'build'", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Run unit tests in parallel shards of four", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Set a 30 minute timeout on the e2e job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Set up a weekly workflow that opens an issue listing failing nightly runs", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Show the duration of each step in the CI summary", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Sort the output of 'devtool list-branches' by last commit date", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Speed up the Docker build by reordering COPY steps for better layer caching", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Store build logs for 14 days instead of 90", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Upgrade the actions/checkout step to v4 across the workflows", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Use OIDC instead of a stored token to push images to the registry", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Write a cron workflow that cleans up old workflow artifacts weekly", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Write a script that generates CHANGELOG.md from conventional commits", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "add a makefile target to reset the local dev database", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "add a scheduled job to rotate the CI test database every Sunday", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "make the pre-commit hook run prettier on staged files only", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Bisect the pre-commit hook slowdown, it used to take 2 seconds", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "CI-212: identify the commit that disabled the license check step", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Check what happened to the canary pipeline over the last few weeks and why it's disabled", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Compile a history of breaking changes in our internal dev CLI for the migration guide", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Determine when the Renovate config started ignoring the major updates and why", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Determine whether the slow checkout step predates enabling git LFS", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Determine which of last week's merges broke the docs preview deployments", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Document how the release checklist changed after each failed release", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Explain how our release script evolved from bash to the current Python tool", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Explain the decisions behind splitting the CI into fast and slow lanes, from the original thread", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Explain the sequence of migrations from Travis to CircleCI to Actions", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Explain when and why the commit message lint started rejecting uppercase scopes", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Explain why the repo has two versions of the protobuf compiler checked in, based on commit history", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Figure out why the TypeScript strict flag was turned off in the CLI package back then", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find out how long the Sonar quality gate has been silently passing", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find out when the main pipeline went from 12 to 35 minutes and which workflow changes caused it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find out whether the cache misses in the Gradle build started before or after the remote cache migration", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find out why the monorepo task runner was switched from Lerna to Nx back then", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find the first commit where the generated API client stopped compiling", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find the last nightly build where the macOS artifacts were signed correctly", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find which change to the reusable workflow broke the release tagging since 1.14", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Find which earlier change made the e2e job depend on the staging database", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Gather the history of the build cache key format and why it changed", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Go through the history of the CODEOWNERS file and explain the big ownership changes", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "How did we end up with three separate changelog generators? trace it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Identify how the build times trended per release since v3 and point out the jumps", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Identify the regression window for the broken codegen step in the SDK repo", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Identify when artifact retention was lowered and whether that's why old builds vanished", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Investigate what changed in the self-hosted runner setup since jobs began queueing for 20 minutes", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Investigate when the docs site build started emitting broken link warnings", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "List every change to the lint config since the monorepo split", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Look at the history of the flaky test quarantine list and say when each test was added", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Look back at the pre-merge checks added over the past year and list who added each and why", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Make a chronology of the CI cost increases this year and which changes drove them", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Outline how the versioning scheme for the internal packages changed over time", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Read the history of tools/bootstrap.sh before rewriting it and list the problems it was patched for", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the order in which repos were onboarded onto the shared GitHub Actions workflows", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the sequence of events that leaked a secret into the build logs last month", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Recover the reasoning behind the 'skip-e2e' label and when it was introduced", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Restore the coverage threshold to what it was before someone lowered it, and explain the changes since", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Review prior attempts to parallelize the test suite and why they were rolled back", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Since the Bazel upgrade, which targets started rebuilding every time?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Since when have the Windows builds been skipped on pull requests?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Summarize every change to the Makefile's test target over the last six months", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Summarize past discussions about why we stopped using Jenkins", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Trace back the origin of the custom retry wrapper around npm install in CI", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Trace when the formatter version drifted between local dev and CI", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Track down when the code coverage report stopped uploading to the dashboard", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Was the out-of-memory failure in the test job present before we bumped the Node version?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "When did the dependabot PRs stop auto-merging?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "When did the integration test job start flaking on the arm64 runners?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Which PR introduced the matrix entry for Python 3.8, and why was it kept after EOL?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Who added the --no-verify flag to the release workflow and why", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Write a recap of how the code review bot's rules have evolved", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Write a timeline of yesterday's broken main branch incident from the CI logs", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "since the toolchain bump on the 3rd which jobs started failing?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "tell me how the branch protection rules got to their current state", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "what changed in the Dockerfile for the build image since the last green nightly?", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "what was the original reason for vendoring the linter binary instead of downloading it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "why did we pin the runner image to ubuntu-20.04? find the PR where that was decided", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "chronological-context", "text": "Add Apple Sign In button to the login screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'Clear search history' button on the search screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'version history' screen listing past document versions saved by the user", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a changelog dialog that shows what's new after the user updates the app", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a chronological view toggle to the photo gallery", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a date picker to the booking screen in the Android app", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add a timeline screen that shows delivery status events in order", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add an 'opening hours' section that greys out closed days on the store page", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add an expiry date check for the loyalty coupon before applying it", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add birthday field with a date wheel to the sign-up form", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add filter chips to the transactions list for This week / This month / This year", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add pull-to-refresh to the OrdersScreen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Bump the Kotlin version to 2.0.20 in the mobile project", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Cache the weather forecast for 30 minutes before refetching", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Clamp the max font scale on the PIN entry screen so digits don't wrap", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Convert all dp values in the onboarding layout to dimension resources", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Create a history tab showing the user's past workouts by date", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Display the app build number and build date at the bottom of the About screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix VoiceOver reading the price twice on the product detail page", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the crash when tapping Save on the profile screen with an empty name", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the date picker showing the wrong month in Arabic locale", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Fix the off-by-one in the streak counter when a workout is logged at midnight", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Format relative dates like 'yesterday' and '3 days ago' in the activity feed", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Hide the keyboard when the user scrolls the comments list", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement 'resume where you left off' for the podcast player using the saved playback position", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement a reminder scheduler that fires a local notification at the chosen time", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement countdown timer for the flash sale banner", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Implement the empty state illustration for the favorites screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Increase the tap target size of the back button to 48dp", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Let the user pick a recurring weekly time slot for medication reminders", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Let users schedule a message to send later in the chat screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "MOB-1203 – add 'Sort by oldest' to the saved articles list", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the 'Today' button in the agenda view jump to the current date", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the Android app respect the system time zone when rendering event times", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the calendar view start the week on Monday for EU locales", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the splash screen use the new brand color", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Make the timer screen keep running in the background with a foreground service", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Persist the selected tab across process death in MainActivity", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Remove the unused Lottie animation assets from the iOS bundle", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Rename the 'Recent' section on the home screen to 'Recently viewed'", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Replace the deprecated onActivityResult call in ScannerActivity with the activity result API", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Set a 10 second timeout on the image upload request", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Set the alarm screen to snooze for 9 minutes by default", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Show a 'last updated 5 min ago' label under the account balance", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Show the order date and estimated arrival time on the receipt screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Show the trip history map with points ordered by timestamp", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Sort the inbox list by newest message first", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Support swipe-to-archive on notification rows", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Track how long users spend on the paywall screen and send it as an analytics event", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Truncate long product names with an ellipsis in the cart", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Upgrade Flutter to the latest stable and fix the resulting analyzer warnings", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Write a migration that adds a created_at column to the local notes table", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Write unit tests for the CartViewModel", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "add an 'expires in 2 days' badge on subscription cards", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "add haptic feedback to the like button", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "change the default reminder lead time from 15 to 30 minutes", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "display timestamps in the chat bubbles using the device's 12/24h setting", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "iOS: store the time of the last successful sync and show it in Settings", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "localize the settings screen into Portuguese", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "show a skeleton loader while the product list loads", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Audit how the minimum supported iOS version has been raised over time and what drove each bump", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Before touching the in-app purchase code, read through its history and explain the past fixes in order", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Can you figure out when we started bundling the PDF viewer and why it was added", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Compare the current permissions manifest to the one from the first public release and explain each addition and when it came in", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Determine whether the dark-mode bug in the React Native app predates the Expo SDK 50 upgrade", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Determine which of last month's merges caused the Wear OS companion to lose pairing", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Did the crash on resume start before or after we enabled R8 full mode?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Document the history of the feature flag 'newFeedV2' from creation to now", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain the history behind the custom fork of the barcode scanner library", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain the sequence of migrations applied to the local SQLite schema so far before we add v12", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Explain why the photo upload retries were capped at three, based on the original design discussion", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Figure out how the app size grew from 30 MB to 85 MB and which additions are responsible, in order", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Figure out when the Android crash rate on the checkout screen started climbing and which release introduced it", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out how long the 'Remember me' toggle has been ignored on Android and which version broke it", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out when the notification channel IDs were renamed and whether that's why old channels linger", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find out why the team decided to drop tablet support for the Flutter app last year", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find the first build where users reported the keyboard covering the chat input", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find the regression window for the slow scroll in the FeedScreen LazyColumn", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Find when the iOS share extension was last working and what changed after that", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Go through the release tags and list when each supported language was added to the app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Historical context needed: why does the app store user prefs in both DataStore and SharedPreferences?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "How did the bottom navigation design change across versions 2 through 6?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Identify every hotfix shipped for the iOS app since the 7.0 launch and the bug each addressed", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Identify what has changed in the checkout flow since the conversion drop on the 14th", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Investigate what changed in the payments SDK integration since the last stable release, users see double charges", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Investigate when we first started seeing 'session expired' loops in the mobile banking app logs", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "List every change to the push notification permission flow since the 4.2 release", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Look back through the commit log and tell me why biometric login was disabled for Samsung devices", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Prepare an incident retrospective for last week's crash spike in the Android app, in chronological order", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Pull together a timeline of App Store rejections for the iOS client and what we changed after each", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Rebuild the sequence of events from the logs of Tuesday's failed staged rollout", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Recap the decisions made about the tablet layout since the project kicked off", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the order in which the onboarding screens were added so we can write the release notes retroactively", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Recover the original rationale for the 15-minute token refresh interval in the mobile auth module", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Restore the location prompt behavior to what it was before the privacy update and explain what changed since", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Review past attempts to fix the flaky video playback on Android TV and what each one changed", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Summarize how the offline sync layer in the Kotlin app evolved over the last two years", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Summarize the evolution of our Android minSdk policy and when each increase happened", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "The splash screen used to load in 800ms. Find which commit since January made it slow", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Ticket MOB-881: identify the release where the Android widget stopped updating", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Trace back the origin of the custom gesture handler in the swipe-to-delete list", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Trace when battery drain complaints about the GPS tracker started and correlate with our commits", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Track down when analytics events for the paywall screen stopped firing", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "We reverted the image cache change twice. Find out what happened each time before trying again", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Which build first shipped the broken deep link handler for /promo links on Android?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Which commit since the 6.3 tag disabled crash reporting in release builds?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Who added the hard-coded locale fallback in SettingsViewModel and why was it introduced", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Write a changelog of all accessibility fixes made to the wallet app since the audit last autumn", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Write a short history of why the app has two separate networking clients", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "check which PR first broke landscape rotation on the camera screen, it worked in 5.0.1", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "git bisect the ProfileFragment memory leak, it wasn't there in v3.8", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "recount the order in which we migrated screens from XML layouts to Compose", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "since when has the cart badge shown wrong counts on iOS 17?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "tell me what the onboarding funnel code looked like before the redesign and why it was changed", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "the font scaling regression - did it come in with the design system bump or earlier?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "was the ANR in MapActivity already present before we moved to Jetpack Compose?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "what changed in the login screen between the March and June builds? QA says the layout regressed", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "what was the reasoning behind pinning the Firebase SDK to 10.x - check the old PR discussions", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "why did we switch the iOS app from CoreData to Realm back in 2023? need the reasoning before reverting", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "why was the dark theme toggle moved into the system settings page originally? find the old ticket", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "chronological-context", "text": "Add Open Graph tags for blog posts", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'Last login' line to the user profile card", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'Recent searches' dropdown under the search bar", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a date range picker to the reports page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a filter for 'created in the last 30 days' on the tickets list", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a print stylesheet for the invoice page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a release notes link to the user menu", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a scheduled publishing option to the CMS post editor", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a session timeout warning modal two minutes before logout", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a sparkline of weekly signups to the admin overview", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a timeline component for shipment tracking events", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a timezone selector to the meeting scheduler form", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add an 'expires on' column to the API keys table", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add an archive page that groups blog posts by month", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add an optional end date to the recurring event form", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add aria-labels to the icon-only buttons in the toolbar", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add relative time formatting using Intl.RelativeTimeFormat in the activity feed", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Build a changelog page that renders entries from changelog.json", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Build an age gate that checks the entered birth date is over 18", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Convert the FAQ accordion to use the native details element", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Create a 'Recently viewed products' carousel on the homepage", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Create an empty state for the projects list", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Disable the submit button while the form is posting", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Fix the date input rejecting 29 Feb in leap years", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Fix the dropdown menu closing when hovering the scrollbar", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Fix the hydration mismatch caused by rendering Date.now() in the footer", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Fix the overflow on the pricing cards at 375px width", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Fix the tooltip positioning inside scrollable containers", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Highlight today's date in the mini calendar", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Implement a 'version history' sidebar in the doc editor listing saved revisions", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Implement a calendar view for the events page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Implement keyboard shortcuts for navigating between inbox messages", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Implement undo/redo in the whiteboard canvas", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Increase contrast on the disabled button style to meet WCAG AA", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make the 'Back to top' button appear after scrolling 800px", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make the cookie consent banner remember the choice for 6 months", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make the countdown banner hide itself once the sale ends", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make the dashboard auto-refresh every 60 seconds", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make the hero video pause when out of viewport", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Rename the 'History' tab to 'Activity' in the account dropdown", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Render a 'New' pill on products added in the last 7 days", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Replace moment.js with date-fns in the booking widget", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Set cache-control headers for hashed static assets in the Vite config", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show 'last edited 3 hours ago' next to each document title", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show a 'scheduled for' badge on posts queued for publishing", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show a toast when the autosave completes, including the save time", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show estimated reading time on blog articles", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show the article publish date in the blog post header", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show the copyright year dynamically in the footer", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Sort the comments section newest first by default", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Switch the font loading strategy to font-display: swap", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Translate the checkout page into German", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Upgrade Next.js to 15.1 and fix the type errors", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "WEB-901 – toggle between ascending and descending date sort in the invoices table", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Write Playwright tests for the signup flow", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "add skeleton states to the analytics dashboard cards", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "display order timestamps in the user's local time zone on the orders table", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "implement infinite scroll on the notifications page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "lazy load the testimonials section", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "remove the unused jQuery dependency from the marketing site", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Before rewriting the cart drawer, read its commit history and summarize prior attempts", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Check whether the CLS regression on product pages lines up with the font loading change from two sprints ago", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Compare the current nav markup with the original and explain each change and its reason", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Determine since when the mobile breakpoint on the orders table has been broken", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Dig up why the SVG sprite approach replaced inline icons originally", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Document how the color tokens changed across the last three rebrands", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Explain how the routing setup in the Next.js app evolved through the pages-to-app-router migration", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Explain the origin of the 'legacy' folder under src and when its components were last used", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Explain the reasoning documented in old ADRs for keeping the frontend in a separate repo", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Explain why the frontend has both styled-components and CSS modules — trace the history", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Figure out what we changed in the webpack config between the fast build in May and now", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Figure out why the team chose server-side rendering for the marketing site in the first place", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find out whether the hydration warnings existed before the React 19 upgrade", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find out who introduced the global z-index hack in layout.css and what problem it fixed back then", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find the last version of the settings page where the avatar upload worked", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find the sequence of events that led to the duplicate GA4 tags on the help center", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find when the 'Remember this device' checkbox stopped persisting on the login form", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Find which deploy made the dashboard's Largest Contentful Paint jump from 1.8s to 4s", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Gather the reasons behind each ESLint rule we disabled over the past year in the web repo", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Go through git blame on the date formatting util and explain the reasons behind each change", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "History check: why was the Storybook instance frozen at version 6?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Identify the build where the print stylesheet for invoices stopped applying", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Identify when the analytics script started loading synchronously and revert to the earlier behavior", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Investigate when the 404 rate on /blog/* links started rising after the CMS move", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Investigate which recent dependency update made the charts on the analytics page render blank", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "List all changes to the checkout page's CSS since the Black Friday freeze", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Look at the past three incidents involving the CDN cache for static assets and list what we learned each time", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Look into how the session timeout warning was introduced and later changed", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Make a chronology of hotfixes deployed to the storefront during the holiday season", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Outline how the onboarding wizard's steps were reordered over the last several releases", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Prepare a postmortem timeline for the broken login button outage on the customer portal", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct the order of A/B tests run on the landing hero over the past year", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct why the date picker library was forked internally and what patches were added since", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Reconstruct why we have two different button components and when each came about", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Recover the history of the feature flag gating the new search bar and who toggled it when", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Restore the search results page to how it behaved before last month's relevance tweak and list what changed since", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Show me the sequence of commits that touched the payment iframe integration and why each was needed", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Since the Tailwind migration began, which components were converted and in what order?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Summarize past discussions on why we dropped IE11 support and when it took effect", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Summarize what happened with the React Query cache config across the last four versions", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Tell me when the cookie banner started showing twice and what change preceded it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "The bundle size doubled sometime this quarter, find which PRs did it and in what order", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Trace back when the image lazy loading got disabled on the gallery page", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Trace the evolution of the error boundary strategy in the SPA", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Track down the first release in which the infinite scroll on the product grid started duplicating items", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "WEB-442: identify the commit that broke keyboard focus order in the signup modal", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "What's the history of the dark mode implementation - who started it and what was abandoned along the way", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "When did the header start flickering on Safari? bisect the frontend repo", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Which change since the design refresh caused the focus ring to disappear on links?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Which merges since release 12.4 touched the shared form validation hooks?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Why do we debounce the search input by 600ms? find the ticket that set it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Why is there a polyfill for IntersectionObserver still in the build? check when and why it was added", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Write a timeline of the design system's breaking changes from v1 to v4", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Write release notes covering every user-visible change to the editor since v2.0", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "did the Lighthouse accessibility score drop before or after we swapped the icon library?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "find out how long the broken favicon has been live on the docs site", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "what changed in the pricing page since last Thursday? conversions dropped", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "when exactly did the i18n keys for the footer get out of sync with the backend?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "which PR since Monday's deploy made the modal close on outside click?", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "why did we move from Redux to Zustand on the admin portal? dig up the original RFC", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "chronological-context", "text": "Add a 'last refreshed at' timestamp to the top of the revenue dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Add a changelog section to the README of the metrics library", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Add a cron expression validator to the job config schema", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Add a retention policy that deletes raw logs older than 90 days", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Add a timezone dropdown to the scheduled report builder", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Add an index on event_timestamp in the analytics Postgres replica", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Backfill missing country codes in dim_customer using the geo lookup table", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Build a date range picker for the self-serve analytics explorer", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Bump pyspark to 3.5 in the batch processing image", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Cap the BigQuery job at 2 TB scanned", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Convert all timestamp columns in the orders model to UTC", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Create a dbt model that computes weekly active users from session_events", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Deduplicate rows in staging_payments on transaction_id", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Drop the deprecated legacy_orders view", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Emit a watermark event once each hourly batch finishes loading", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Expose a 'created_at' filter in the warehouse query API", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Expose row counts per partition as a Prometheus metric", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Fix the off-by-one error in the rolling 7-day average calculation", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Generate a daily snapshot table of account balances at midnight", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Implement SCD type 2 tracking with valid_from/valid_to on dim_product", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Increase executor memory for the clickstream Spark job to 8g", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Let users pick 'last 30 days' or 'year to date' presets in the KPI explorer", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Make the anomaly alert email include the date window it covers", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Mask email addresses in the support tickets extract", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Move the shared SQL macros into a macros/ folder", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Paginate the run history endpoint of the orchestration API", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Partition the events table by event_date to speed up daily queries", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Rename the col cust_nm to customer_name in the CRM extract", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Render 'updated 3 hours ago' labels on each card in the data quality dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Replace the CSV exporter with Parquet output for the finance extract", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Rotate the service account key used by the Fivetran connector", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Schedule the inventory_sync DAG to run at 02:00 UTC every day", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Show the history tab in the dataset catalog with versions sorted chronologically", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Sort the job runs list by newest first in the pipeline monitor UI", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Support fiscal-year calendars in the reporting date dimension", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Write a SQL query returning month-over-month revenue growth", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Write a unit test for the parse_iso_date helper in the ingest library", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "add great_expectations checks for nulls in order_total", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "create a late-arriving-data window of 2 hours in the streaming aggregator", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "implement a time-series chart of hourly signups on the growth dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Audit the changelog of the ingestion config to find out who disabled schema validation and when", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Before touching the lookback window, dig up why it was set to 45 days originally", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Bisect the pipeline repo to see when the timezone normalisation in load_orders regressed", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Catch me up on everything that changed in the analytics repo while I was on leave", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Compare current lineage graph with the one from before the Snowflake cutover and note what was dropped", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "DATA-88 Explain the order in which the three backfills ran on the ledger tables and whether any overlapped", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Determine since when the anomaly detector has been ignoring weekend traffic", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Document how the KPI definitions for 'active seller' have shifted over the past two years", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "ETL-412: reconstruct the sequence of Airflow DAG failures over the weekend before the revenue dashboard broke", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Figure out when the orders_daily table started double-counting refunds", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Find out when the dedup step in the payments_stream job was removed and who signed off", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Find the decision record explaining why GDPR deletes are applied downstream instead of at ingest", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Go back through the deploy history and find when the retention query started timing out", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "How has the churn model's feature set changed across the last five retraining runs?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Identify the first run of the inventory_sync job where the checksum mismatch showed up", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Investigate whether the metric drift began before or after the upstream CRM vendor change", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "List every schema change to the subscriptions fact table since the Q2 warehouse migration", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Look through past PRs to learn why the Spark executor memory was bumped twice in March", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Our nightly snapshot row counts jumped around August — find what got deployed right before", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Pin down the earliest date the region field went blank in the sales extract and the job version then", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Prepare a retro covering the sequence of decisions that led to the duplicate shipments table", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Reconcile which job wrote the bad rows first: the CDC replicator or the nightly merge", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Reconstruct which version of the cohort definition was live when the board deck numbers were pulled", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Recover the original rationale for bucketing session_events by user hash instead of date", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Recreate the history of the forecast model's accuracy across retrains to see where it degraded", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Since the last on-call handover, what alerts on the billing pipeline have been muted?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Summarize how the warehouse cost allocation logic evolved since we moved off Redshift", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "The data contract for events v2 was relaxed at some point — find out when and why", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Trace when the late-arriving data handling in the Kafka consumer started skipping partitions", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Track how p95 latency of the streaming aggregator moved release by release since 2.0", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "What was the reason behind dropping the sampling step in the A/B analysis notebook? check old threads", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "When did the feature store start serving stale embeddings? correlate with deploy log", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Which commit introduced the null customer_id rows in the events_raw Parquet files?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Work out which order the migrations ran in on staging vs prod for the metrics schema", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "Write a timeline of incidents affecting the marketing attribution pipeline this quarter", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "explain how the partitioning strategy for clickstream evolved and why each change was made", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "has anyone touched the currency conversion UDF since the Euro rounding bug? check the history", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "need the backstory on why the funnel dashboard excludes iOS before I change it", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "what changed in the dbt models between the v3.2 and v3.5 tags that could explain the drop in DAU", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "chronological-context", "text": "why did we switch the clickstream ingest from hourly to 15-minute batches last year? need the reasoning before reverting", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
