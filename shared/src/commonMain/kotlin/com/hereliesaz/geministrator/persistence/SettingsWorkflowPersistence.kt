@@ -33,6 +33,11 @@ class SettingsWorkflowPersistence(
     private val json: Json = defaultJson,
 ) : WorkflowPersistence {
 
+    private val snapshotSettings: Settings = ChunkedStringSettings(
+        delegate = settings,
+        chunkedKeys = setOf(storageKey),
+    )
+
     /** Inference state shares this store's backing [settings]: the app's durable store for the default instance. */
     override val inferenceSettings: Settings by lazy {
         com.hereliesaz.geministrator.workflow.chunkedInferenceSettings(settings)
@@ -156,10 +161,7 @@ class SettingsWorkflowPersistence(
             runs = snapshot.runs.upsert(commit.nextRun) { it.id == commit.nextRun.id },
             events = snapshot.events + commit.decisionEvent,
         )
-        settings.putString(
-            storageKey,
-            json.encodeToString(PersistenceSnapshot.serializer(), next),
-        )
+        writeSnapshotUnlocked(next)
         true
     }
 
@@ -280,10 +282,7 @@ class SettingsWorkflowPersistence(
                 approvalGates = current.approvalGates.filterNot { it.workflowRunId in importedRunIds } +
                     imported.approvalGates,
             )
-            settings.putString(
-                storageKey,
-                json.encodeToString(PersistenceSnapshot.serializer(), merged),
-            )
+            writeSnapshotUnlocked(merged)
         }
         return project
     }
@@ -303,13 +302,13 @@ class SettingsWorkflowPersistence(
             settings.keys
                 .filter { it.startsWith(eventJournalRoot()) }
                 .forEach(settings::remove)
-            settings.putString(storageKey, json.encodeToString(PersistenceSnapshot.serializer(), migrated))
+            writeSnapshotUnlocked(migrated)
         }
     }
 
     suspend fun clearWorkflowData() {
         settingsWorkflowPersistenceMutex.withLock {
-            settings.remove(storageKey)
+            snapshotSettings.remove(storageKey)
             if (storageKey == DEFAULT_STORAGE_KEY) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
@@ -338,7 +337,7 @@ class SettingsWorkflowPersistence(
     private suspend fun update(transform: (PersistenceSnapshot) -> PersistenceSnapshot) {
         settingsWorkflowPersistenceMutex.withLock {
             val next = transform(readUnlocked()).copy(version = CURRENT_SCHEMA_VERSION)
-            settings.putString(storageKey, json.encodeToString(PersistenceSnapshot.serializer(), next))
+            writeSnapshotUnlocked(next)
         }
     }
 
@@ -347,24 +346,40 @@ class SettingsWorkflowPersistence(
         val countKey = "$prefix.count"
         var index = settings.getStringOrNull(countKey)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
 
-        while (settings.hasKey(eventKey(prefix, index))) {
+        while (eventValueSettings(eventKey(prefix, index)).hasKey(eventKey(prefix, index))) {
             index += 1
         }
 
-        settings.putString(
-            eventKey(prefix, index),
+        val key = eventKey(prefix, index)
+        eventValueSettings(key).putString(
+            key,
             json.encodeToString(WorkflowEvent.serializer(), event),
         )
         settings.putString(countKey, (index + 1).toString())
     }
 
     private fun readJournalEventsUnlocked(workflowRunId: WorkflowRunId): List<WorkflowEvent> {
-        val prefix = eventRunPrefix(workflowRunId)
+        val current = readJournalEventsAtPrefixUnlocked(workflowRunId, eventRunPrefix(workflowRunId))
+        val legacyPrefix = legacyEventRunPrefix(workflowRunId)
+        val legacy = if ("$legacyPrefix.count".length <= JAVA_PREFERENCES_MAX_KEY_LENGTH) {
+            readJournalEventsAtPrefixUnlocked(workflowRunId, legacyPrefix)
+        } else {
+            emptyList()
+        }
+        return (legacy + current)
+            .distinct()
+            .sortedBy { it.occurredAtEpochMillis }
+    }
+
+    private fun readJournalEventsAtPrefixUnlocked(
+        workflowRunId: WorkflowRunId,
+        prefix: String,
+    ): List<WorkflowEvent> {
         val countKey = "$prefix.count"
         val storedCount = settings.getStringOrNull(countKey)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         var recoveredCount = storedCount
 
-        while (settings.hasKey(eventKey(prefix, recoveredCount))) {
+        while (eventValueSettings(eventKey(prefix, recoveredCount)).hasKey(eventKey(prefix, recoveredCount))) {
             recoveredCount += 1
         }
         if (recoveredCount != storedCount) {
@@ -372,22 +387,45 @@ class SettingsWorkflowPersistence(
         }
 
         return (0 until recoveredCount).map { index ->
-            val encoded = requireNotNull(settings.getStringOrNull(eventKey(prefix, index))) {
+            val key = eventKey(prefix, index)
+            val encoded = requireNotNull(eventValueSettings(key).getStringOrNull(key)) {
                 "Workflow event journal is missing entry $index for ${workflowRunId.value}"
             }
-            json.decodeFromString(WorkflowEvent.serializer(), encoded)
+            json.decodeFromString(WorkflowEvent.serializer(), encoded).also { decoded ->
+                if (decoded.workflowRunId != workflowRunId) {
+                    throw PersistenceCorruptionException(
+                        "Workflow event journal collision for ${workflowRunId.value}.",
+                    )
+                }
+            }
         }
     }
 
     private fun eventJournalRoot(): String = "$storageKey.events."
 
     private fun eventRunPrefix(workflowRunId: WorkflowRunId): String =
-        "${eventJournalRoot()}${workflowRunId.value.toSettingsKeyToken()}"
+        "${eventJournalRoot()}${workflowRunId.value.toBoundedSettingsKeyToken()}"
+
+    private fun legacyEventRunPrefix(workflowRunId: WorkflowRunId): String =
+        "${eventJournalRoot()}${workflowRunId.value.toLegacySettingsKeyToken()}"
 
     private fun eventKey(prefix: String, index: Int): String = "$prefix.$index"
 
-    private fun String.toSettingsKeyToken(): String = buildString(length * 4) {
-        for (character in this@toSettingsKeyToken) {
+    private fun eventValueSettings(key: String): Settings = ChunkedStringSettings(
+        delegate = settings,
+        chunkedKeys = setOf(key),
+    )
+
+    private fun String.toBoundedSettingsKeyToken(): String {
+        var hash = FNV64_OFFSET_BASIS
+        for (character in this) {
+            hash = (hash xor character.code.toLong()) * FNV64_PRIME
+        }
+        return hash.toULong().toString(16).padStart(16, '0')
+    }
+
+    private fun String.toLegacySettingsKeyToken(): String = buildString(length * 4) {
+        for (character in this@toLegacySettingsKeyToken) {
             append(character.code.toString(16).padStart(4, '0'))
         }
     }
@@ -397,9 +435,9 @@ class SettingsWorkflowPersistence(
 
     suspend fun recoverFromCorruption(): Boolean {
         val hadData = settingsWorkflowPersistenceMutex.withLock {
-            val had = settings.getStringOrNull(storageKey) != null ||
+            val had = snapshotSettings.getStringOrNull(storageKey) != null ||
                 settings.getStringOrNull(LEGACY_STORAGE_KEY_V1) != null
-            settings.remove(storageKey)
+            snapshotSettings.remove(storageKey)
             settings.remove(LEGACY_STORAGE_KEY_V1)
             had
         }
@@ -408,7 +446,7 @@ class SettingsWorkflowPersistence(
     }
 
     private fun readUnlocked(): PersistenceSnapshot {
-        val currentEncoded = settings.getStringOrNull(storageKey)
+        val currentEncoded = snapshotSettings.getStringOrNull(storageKey)
         val legacyEncoded = if (currentEncoded == null && storageKey == DEFAULT_STORAGE_KEY) {
             settings.getStringOrNull(LEGACY_STORAGE_KEY_V1)
         } else {
@@ -433,15 +471,19 @@ class SettingsWorkflowPersistence(
 
         val migrated = migrate(snapshot)
         if (currentEncoded == null || migrated != snapshot) {
-            settings.putString(
-                storageKey,
-                json.encodeToString(PersistenceSnapshot.serializer(), migrated),
-            )
+            writeSnapshotUnlocked(migrated)
             if (legacyEncoded != null) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
         }
         return migrated
+    }
+
+    private fun writeSnapshotUnlocked(snapshot: PersistenceSnapshot) {
+        snapshotSettings.putString(
+            storageKey,
+            json.encodeToString(PersistenceSnapshot.serializer(), snapshot),
+        )
     }
 
     private fun migrate(snapshot: PersistenceSnapshot): PersistenceSnapshot {
@@ -522,6 +564,10 @@ class SettingsWorkflowPersistence(
     }
 
     companion object {
+        private const val JAVA_PREFERENCES_MAX_KEY_LENGTH: Int = 80
+        private const val FNV64_OFFSET_BASIS: Long = -3750763034362895579L
+        private const val FNV64_PRIME: Long = 1099511628211L
+
         const val CURRENT_SCHEMA_VERSION: Int = 3
         const val DEFAULT_STORAGE_KEY: String = "geministrator.workflow.persistence.v2"
         internal const val LEGACY_STORAGE_KEY_V1: String = "geministrator.workflow.persistence.v1"
