@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.TaskStarted
+import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.russhwolf.settings.MapSettings
@@ -295,6 +296,30 @@ class SettingsWorkflowPersistenceTest {
         restored.clearWorkflowData()
         assertTrue(restored.events.forRun(runId).isEmpty())
         assertTrue(settings.keys.none { it.startsWith("${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.") })
+    }
+
+    @Test
+    fun legacyJournalAtJavaKeyLimitRemainsReadable() = runBlocking {
+        val settings = JavaPreferencesLimitSettings()
+        val persistence = SettingsWorkflowPersistence(settings)
+        val runId = WorkflowRunId("1234567")
+        val event = TaskStarted(
+            workflowRunId = runId,
+            taskDefinitionId = TaskDefinitionId("task"),
+            attempt = 1,
+            occurredAtEpochMillis = 1L,
+        )
+        val legacyPrefix =
+            "${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.0031003200330034003500360037"
+
+        settings.putString(
+            "$legacyPrefix.0",
+            SettingsWorkflowPersistence.defaultJson.encodeToString(WorkflowEvent.serializer(), event),
+        )
+        settings.putString("$legacyPrefix.count", "1")
+
+        assertEquals(listOf(event), persistence.events.forRun(runId))
+        assertTrue(settings.maxObservedKeyLength <= 80)
     }
 
     @Test
