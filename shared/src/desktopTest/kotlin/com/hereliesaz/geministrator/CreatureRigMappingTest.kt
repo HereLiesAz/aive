@@ -4,6 +4,13 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.geministrator.puppet.CompiledPuppetRig
 import com.hereliesaz.geministrator.puppet.PuppetRig
 import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +56,26 @@ class CreatureRigMappingTest {
         // Distinct Store personas are not collapsed onto a shared rig body.
         assertNull(CreatureRigMapping.slugFor("Brand Strategist"))
         assertNull(CreatureRigMapping.slugFor(""))
+    }
+
+    @Test
+    fun genericRedesignRigsNeverUseLegacyNodeReferences() {
+        val report = Json.parseToJsonElement(
+            File("../tools/puppet-rig/slice/rigs-report.json").readText(),
+        ).jsonArray
+        val genericEntries = report
+            .map { it.jsonObject }
+            .filter { it.getValue("slug").jsonPrimitive.content in CreatureRigMapping.GENERIC_SLUGS }
+
+        assertEquals(
+            CreatureRigMapping.GENERIC_SLUGS.toSet(),
+            genericEntries.map { it.getValue("slug").jsonPrimitive.content }.toSet(),
+        )
+        genericEntries.forEach { entry ->
+            assertEquals(JsonNull, entry.getValue("ref"), entry.getValue("slug").jsonPrimitive.content)
+            assertEquals(false, entry.getValue("used_ref").jsonPrimitive.boolean)
+            assertEquals(0, entry.getValue("tendrils_matched").jsonPrimitive.int)
+        }
     }
 
     @Test

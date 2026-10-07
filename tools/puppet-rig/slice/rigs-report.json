@@ -2,115 +2,115 @@
  {
   "slug": "generic-01",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_36 AM-1.png",
-  "ref": "node_01.png",
+  "ref": null,
   "newest": false,
   "sheets_in_role": 6,
   "canvas": [
-   304.81,
-   451.25
+   374.57,
+   475.66
   ],
   "atlas": [
-   361,
-   404
+   395,
+   398
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 5,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 5
  },
  {
   "slug": "generic-02",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_37 AM-2.png",
-  "ref": "node_11.png",
+  "ref": null,
   "newest": false,
   "sheets_in_role": 6,
   "canvas": [
-   262.35,
-   463.99
+   310.98,
+   520
   ],
   "atlas": [
-   317,
-   379
+   356,
+   344
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 3,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 3
  },
  {
   "slug": "generic-03",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-3.png",
-  "ref": "node_21.png",
+  "ref": null,
   "newest": false,
   "sheets_in_role": 6,
   "canvas": [
-   389.9,
-   483.5
+   392.88,
+   515.74
   ],
   "atlas": [
-   412,
-   511
+   408,
+   510
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 3,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 4
  },
  {
   "slug": "generic-04",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-4.png",
-  "ref": "node_31.png",
+  "ref": null,
   "newest": false,
   "sheets_in_role": 6,
   "canvas": [
-   274.76,
-   462.9
+   308.94,
+   520
   ],
   "atlas": [
-   328,
-   356
+   356,
+   396
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 4,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 4
  },
  {
   "slug": "generic-05",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_39 AM-5.png",
-  "ref": "node_41.png",
+  "ref": null,
   "newest": false,
   "sheets_in_role": 6,
   "canvas": [
-   306.46,
-   408.48
+   367.79,
+   520
   ],
   "atlas": [
-   333,
-   408
+   419,
+   487
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 5,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 5
  },
  {
   "slug": "generic-06",
   "key": "000_generic/ChatGPT Image Oct 6, 2026, 01_19_40 AM-6.png",
-  "ref": "node_43.png",
+  "ref": null,
   "newest": true,
   "sheets_in_role": 6,
   "canvas": [
-   344.35,
-   400.62
+   383.53,
+   454.06
   ],
   "atlas": [
-   349,
-   360
+   394,
+   490
   ],
-  "used_ref": true,
-  "eyes_matched": true,
-  "tendrils_matched": 4,
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
   "tendrils": 5
  },
  {
@@ -125,7 +125,7 @@
   "newest": true,
   "sheets_in_role": 1,
   "canvas": [
-   520.0,
+   520,
    506.25
   ],
   "atlas": [
@@ -145,7 +145,7 @@
   "sheets_in_role": 2,
   "canvas": [
    415.63,
-   520.0
+   520
   ],
   "atlas": [
    410,
@@ -164,7 +164,7 @@
   "sheets_in_role": 2,
   "canvas": [
    368.87,
-   520.0
+   520
   ],
   "atlas": [
    359,
@@ -202,7 +202,7 @@
   "sheets_in_role": 1,
   "canvas": [
    500.6,
-   520.0
+   520
   ],
   "atlas": [
    493,
@@ -221,7 +221,7 @@
   "sheets_in_role": 1,
   "canvas": [
    418.56,
-   520.0
+   520
   ],
   "atlas": [
    535,
@@ -240,7 +240,7 @@
   "sheets_in_role": 1,
   "canvas": [
    421.26,
-   520.0
+   520
   ],
   "atlas": [
    415,
@@ -258,7 +258,7 @@
   "newest": true,
   "sheets_in_role": 1,
   "canvas": [
-   520.0,
+   520,
    514.05
   ],
   "atlas": [
@@ -335,7 +335,7 @@
   "sheets_in_role": 1,
   "canvas": [
    354.64,
-   480.0
+   480
   ],
   "atlas": [
    370,
@@ -544,7 +544,7 @@
   "sheets_in_role": 1,
   "canvas": [
    277.12,
-   520.0
+   520
   ],
   "atlas": [
    291,
@@ -620,7 +620,7 @@
   "sheets_in_role": 1,
   "canvas": [
    293.77,
-   520.0
+   520
   ],
   "atlas": [
    365,
@@ -791,7 +791,7 @@
   "sheets_in_role": 1,
   "canvas": [
    353.73,
-   520.0
+   520
   ],
   "atlas": [
    321,
@@ -810,7 +810,7 @@
   "sheets_in_role": 1,
   "canvas": [
    350.09,
-   520.0
+   520
   ],
   "atlas": [
    380,

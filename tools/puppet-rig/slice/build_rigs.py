@@ -86,7 +86,14 @@ def sheet_time(d: str, f: str) -> float:
 
 
 def references(d: str):
-    """Assembled-creature images of a role, best first: node renders, then other composed images."""
+    """Assembled references for a role; generic redesigns deliberately use no legacy node renders."""
+    if sp.role_slug(d) == "generic":
+        # The six 000_generic sheets are the redesigned node creatures themselves.  Using the old
+        # node_01/11/21/31/41/43 contact-sheet renders as pose references reintroduces those retired
+        # first-column designs, including an unrelated node_43 for generic-06.  Build generic rigs
+        # only from the redesign sheets' own anatomy.
+        return []
+
     nodes, other = [], []
     for f in sorted(os.listdir(os.path.join(CHAR_ROOT, d))):
         low = f.lower()

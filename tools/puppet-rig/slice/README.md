@@ -41,7 +41,8 @@ Both stages take `--only <substring>` (directory, sheet name or rig slug). `slic
   - beak and props.
 - **Placement.** Each tendril base is pulled onto the soma rim, with a small overlap, and the stalk is pointed outward. The tail hangs from the soma bottom.
   - With a reference (`node_*.png`, else a composed `Sep 25` or `Matplotlib` image), the reference sets the scale (inscribed soma circle), the eyes (template matching) and the limb angles and lengths (alpha outside the soma disc).
-  - Without a reference, the script uses a heuristic face-right layout.
+  - `000_generic` is intentionally reference-free: its six October redesign sheets are the generic node designs, so legacy `node_01/11/21/31/41/43` renders must never drive their pose or scale.
+  - Without a reference, the script uses a heuristic face-right layout based on the parts sheet itself.
 - **Motion.** Every state is defined (`Pending`, `Ready`, `Active`, `Gate`, `Blocked`, `Complete`, `Failed`). Motion includes body bob, tendril sway with per-tendril phase, tail wave and blinks (eye `scaleY` plus lid `scaleY` keys). Blocked droops, Failed sags and trembles, and Complete settles with a bounce. All sine frequencies are integers.
 - **Output.**
   - `shared/src/commonMain/composeResources/files/rigs/<slug>.rig.json` and `<slug_underscored>_rig_atlas.png`.
