@@ -359,10 +359,18 @@ class SettingsWorkflowPersistence(
     }
 
     private fun readJournalEventsUnlocked(workflowRunId: WorkflowRunId): List<WorkflowEvent> {
-        val current = readJournalEventsAtPrefixUnlocked(workflowRunId, eventRunPrefix(workflowRunId))
+        val current = readJournalEventsAtPrefixUnlocked(
+            workflowRunId = workflowRunId,
+            prefix = eventRunPrefix(workflowRunId),
+            chunked = true,
+        )
         val legacyPrefix = legacyEventRunPrefix(workflowRunId)
         val legacy = if ("$legacyPrefix.count".length <= JAVA_PREFERENCES_MAX_KEY_LENGTH) {
-            readJournalEventsAtPrefixUnlocked(workflowRunId, legacyPrefix)
+            readJournalEventsAtPrefixUnlocked(
+                workflowRunId = workflowRunId,
+                prefix = legacyPrefix,
+                chunked = false,
+            )
         } else {
             emptyList()
         }
@@ -374,12 +382,13 @@ class SettingsWorkflowPersistence(
     private fun readJournalEventsAtPrefixUnlocked(
         workflowRunId: WorkflowRunId,
         prefix: String,
+        chunked: Boolean,
     ): List<WorkflowEvent> {
         val countKey = "$prefix.count"
         val storedCount = settings.getStringOrNull(countKey)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
         var recoveredCount = storedCount
 
-        while (eventValueSettings(eventKey(prefix, recoveredCount)).hasKey(eventKey(prefix, recoveredCount))) {
+        while (journalHasKey(eventKey(prefix, recoveredCount), chunked)) {
             recoveredCount += 1
         }
         if (recoveredCount != storedCount) {
@@ -388,7 +397,7 @@ class SettingsWorkflowPersistence(
 
         return (0 until recoveredCount).map { index ->
             val key = eventKey(prefix, index)
-            val encoded = requireNotNull(eventValueSettings(key).getStringOrNull(key)) {
+            val encoded = requireNotNull(journalStringOrNull(key, chunked)) {
                 "Workflow event journal is missing entry $index for ${workflowRunId.value}"
             }
             json.decodeFromString(WorkflowEvent.serializer(), encoded).also { decoded ->
@@ -400,6 +409,12 @@ class SettingsWorkflowPersistence(
             }
         }
     }
+
+    private fun journalHasKey(key: String, chunked: Boolean): Boolean =
+        if (chunked) eventValueSettings(key).hasKey(key) else settings.hasKey(key)
+
+    private fun journalStringOrNull(key: String, chunked: Boolean): String? =
+        if (chunked) eventValueSettings(key).getStringOrNull(key) else settings.getStringOrNull(key)
 
     private fun eventJournalRoot(): String = "$storageKey.events."
 
