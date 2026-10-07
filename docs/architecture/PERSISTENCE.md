@@ -8,7 +8,7 @@ The engine therefore treats durable workflow state as a first-class product requ
 
 ## Current backend
 
-`SettingsWorkflowPersistence` is the current cross-platform persistence implementation. It stores a versioned serialized workflow snapshot through Multiplatform Settings. Workflow events appended during normal operation use a per-run settings journal so event growth does not force the entire snapshot to be deserialized and rewritten for every event.
+`SettingsWorkflowPersistence` is the current cross-platform persistence implementation. It stores a versioned serialized workflow snapshot through Multiplatform Settings. Snapshot values are generation-chunked so JVM Java Preferences never receives an oversized value. Workflow events appended during normal operation use a per-run settings journal so event growth does not force the entire snapshot to be deserialized and rewritten for every event. Journal run namespaces use bounded deterministic tokens, and individual event payloads use the same generation-chunked storage.
 
 Current platform backing stores are:
 
@@ -152,7 +152,7 @@ The current storage key is `geministrator.workflow.persistence.v2`. The previous
 
 ## Scale boundary
 
-The Settings-backed snapshot plus per-run event journal is a restart-safe baseline, not the final high-volume event database.
+The Settings-backed, generation-chunked snapshot plus per-run event journal is a restart-safe baseline, not the final high-volume event database.
 
 The repository contracts are intentionally replaceable. Likely future storage includes transactional SQL on Android/Desktop and IndexedDB on Web when event volume or indexed queries justify it.
 
