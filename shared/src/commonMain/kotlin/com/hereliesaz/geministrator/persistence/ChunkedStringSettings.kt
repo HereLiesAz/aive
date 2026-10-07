@@ -6,8 +6,8 @@ import com.russhwolf.settings.Settings
  * Settings decorator that stores selected String keys as generation-based chunks.
  *
  * JVM's Preferences-backed Settings implementation rejects values above its per-entry limit. The
- * inference snapshots are intentionally append-heavy, so a single JSON value eventually exceeds
- * that limit. Chunks are written under a new generation and the short manifest is switched last,
+ * selected durable snapshots and journal payloads can exceed that limit. Chunks are written under
+ * a new generation and the short manifest is switched last,
  * which also keeps readers on the previous complete generation if a write is interrupted.
  */
 internal class ChunkedStringSettings(
