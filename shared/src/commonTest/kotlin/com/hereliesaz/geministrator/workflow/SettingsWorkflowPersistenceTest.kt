@@ -13,8 +13,10 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.TaskStarted
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.russhwolf.settings.MapSettings
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,8 +145,8 @@ class SettingsWorkflowPersistenceTest {
         persistence.runs.put(legacyRun)
         persistence.artifacts.put(legacyProviderArtifact)
         persistence.artifacts.put(legacyGitHubArtifact)
-        val encoded = assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        settings.putString(
+        val encoded = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        snapshotSettings(settings).putString(
             SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY,
             encoded.replace(
                 "\"version\":${SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION}",
@@ -165,7 +167,7 @@ class SettingsWorkflowPersistenceTest {
         assertNull(restored.artifacts.get(legacyGitHubArtifact.id))
         assertEquals(3, restored.snapshotVersion())
         assertTrue(
-            assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+            assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
                 .contains("\"version\":3"),
         )
     }
@@ -181,14 +183,14 @@ class SettingsWorkflowPersistenceTest {
             updatedAtEpochMillis = 1L,
         )
         persistence.projects.put(project)
-        val encoded = assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        settings.remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
+        val encoded = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        snapshotSettings(settings).remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
         settings.putString(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1, encoded)
 
         val restored = SettingsWorkflowPersistence(settings)
 
         assertEquals(project, restored.projects.get(project.id))
-        assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
         assertFalse(settings.hasKey(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1))
     }
 
@@ -203,8 +205,8 @@ class SettingsWorkflowPersistenceTest {
             updatedAtEpochMillis = 1L,
         )
         defaultPersistence.projects.put(project)
-        val encoded = assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        settings.remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
+        val encoded = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        snapshotSettings(settings).remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
         settings.putString(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1, encoded)
 
         val customKey = "test.workflow.persistence"
@@ -233,7 +235,7 @@ class SettingsWorkflowPersistenceTest {
             updatedAtEpochMillis = 1L,
         )
         persistence.projects.put(project)
-        val current = assertNotNull(settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        val current = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
         val futureVersion = SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION + 1
         val future = current.replace(
             "\"version\":${SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION}",
@@ -247,7 +249,7 @@ class SettingsWorkflowPersistenceTest {
         }
 
         assertTrue(failure.message.orEmpty().contains("Unsupported workflow persistence schema $futureVersion"))
-        assertEquals(future, settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
+        assertEquals(future, snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
     }
 
     @Test
@@ -265,7 +267,7 @@ class SettingsWorkflowPersistenceTest {
 
         persistence.projects.put(project)
         val snapshotBeforeEvents = assertNotNull(
-            settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
+            snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
         )
 
         repeat(200) { index ->
@@ -281,7 +283,7 @@ class SettingsWorkflowPersistenceTest {
 
         assertEquals(
             snapshotBeforeEvents,
-            settings.getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
+            snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
         )
         assertTrue(settings.keys.any { it.startsWith("${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.") })
 
@@ -293,6 +295,60 @@ class SettingsWorkflowPersistenceTest {
         restored.clearWorkflowData()
         assertTrue(restored.events.forRun(runId).isEmpty())
         assertTrue(settings.keys.none { it.startsWith("${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.") })
+    }
+
+    @Test
+    fun defaultRunIdsAndLargeSnapshotsRespectJavaPreferencesLimits() = runBlocking {
+        val settings = JavaPreferencesLimitSettings()
+        val persistence = SettingsWorkflowPersistence(settings)
+        val largeObjective = "x".repeat(12_000)
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("large-workflow"),
+            name = "Large Workflow",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("large-task"),
+                    name = "Large Task",
+                    objective = largeObjective,
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val runId = WorkflowRunId("run-1728271234567")
+
+        persistence.definitions.put(definition)
+        persistence.events.append(
+            TaskStarted(
+                workflowRunId = runId,
+                taskDefinitionId = TaskDefinitionId("large-task"),
+                attempt = 1,
+                occurredAtEpochMillis = 1L,
+            ),
+        )
+
+        assertEquals(definition, persistence.definitions.get(definition.id))
+        assertEquals(1, persistence.events.forRun(runId).size)
+        assertTrue(settings.maxObservedKeyLength <= 80)
+        assertTrue(settings.maxObservedStringValueLength <= 8_192)
+    }
+
+    @Test
+    fun oversizedJournalPayloadIsChunkedUnderJavaPreferencesLimits() = runBlocking {
+        val settings = JavaPreferencesLimitSettings()
+        val persistence = SettingsWorkflowPersistence(settings)
+        val runId = WorkflowRunId("run-" + "r".repeat(9_000))
+        val event = TaskStarted(
+            workflowRunId = runId,
+            taskDefinitionId = TaskDefinitionId("task"),
+            attempt = 1,
+            occurredAtEpochMillis = 1L,
+        )
+
+        persistence.events.append(event)
+
+        assertEquals(listOf(event), persistence.events.forRun(runId))
+        assertTrue(settings.maxObservedKeyLength <= 80)
+        assertTrue(settings.maxObservedStringValueLength <= 8_192)
     }
 
     @Test
@@ -361,6 +417,53 @@ class SettingsWorkflowPersistenceTest {
             BuiltInRoles.ImplementationEngineer,
             destination.roles.get(BuiltInRoles.ImplementationEngineer.id),
         )
+    }
+
+
+    private fun snapshotSettings(settings: Settings): Settings = ChunkedStringSettings(
+        delegate = settings,
+        chunkedKeys = setOf(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
+    )
+
+    private class JavaPreferencesLimitSettings(
+        private val delegate: Settings = MapSettings(),
+    ) : Settings by delegate {
+        var maxObservedKeyLength: Int = 0
+            private set
+        var maxObservedStringValueLength: Int = 0
+            private set
+
+        override fun putString(key: String, value: String) {
+            checkKey(key)
+            require(value.length <= 8_192) { "Java Preferences value exceeds 8,192 characters" }
+            maxObservedStringValueLength = maxOf(maxObservedStringValueLength, value.length)
+            delegate.putString(key, value)
+        }
+
+        override fun getString(key: String, defaultValue: String): String {
+            checkKey(key)
+            return delegate.getString(key, defaultValue)
+        }
+
+        override fun getStringOrNull(key: String): String? {
+            checkKey(key)
+            return delegate.getStringOrNull(key)
+        }
+
+        override fun hasKey(key: String): Boolean {
+            checkKey(key)
+            return delegate.hasKey(key)
+        }
+
+        override fun remove(key: String) {
+            checkKey(key)
+            delegate.remove(key)
+        }
+
+        private fun checkKey(key: String) {
+            require(key.length <= 80) { "Java Preferences key exceeds 80 characters: ${key.length}" }
+            maxObservedKeyLength = maxOf(maxObservedKeyLength, key.length)
+        }
     }
 
 }
