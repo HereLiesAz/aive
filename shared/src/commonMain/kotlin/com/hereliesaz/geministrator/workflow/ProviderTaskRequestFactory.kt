@@ -246,6 +246,8 @@ private fun buildUtilityPromptBlocks(
             recommendedTier = "provider",
             retryCount = ((run.taskRuns[task.id]?.attempt ?: 1) - 1).coerceAtLeast(0),
             localFailureRate = run.failureRate(),
+            // On-device only: the decision model reads the real objective even when the provider prompt is redacted.
+            objective = task.objective,
         ),
     )
     val escalationBlock = PromptContextBlock(

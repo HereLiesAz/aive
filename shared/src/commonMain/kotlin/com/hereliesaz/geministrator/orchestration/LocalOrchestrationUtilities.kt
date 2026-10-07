@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /** Bounded local utility roles. These utilities decide routing/context/evidence; they do not solve user work. */
 @Serializable
@@ -217,6 +218,11 @@ data class CapabilityAssessment(
     val retryCount: Int = 0,
     /** Share of recent local attempts that failed, 0..1. */
     val localFailureRate: Double = 0.0,
+    /**
+     * The task's objective, for the decision model that fills the judgement flags above
+     * ([DecisionInformedOrchestrationUtilities]). Never serialized: no model input carries it.
+     */
+    @Transient val objective: String = "",
 )
 
 @Serializable
@@ -604,7 +610,14 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         )
     }
 
-    override fun planVerification(input: VerificationPlanningInput): VerificationPlan {
+    override fun planVerification(input: VerificationPlanningInput): VerificationPlan =
+        planVerificationWith(input, ::verificationOperationsFor)
+
+    /** [planVerification] with the criterion classifier supplied ([DecisionInformedOrchestrationUtilities]). */
+    internal fun planVerificationWith(
+        input: VerificationPlanningInput,
+        operationsFor: (String) -> List<String>,
+    ): VerificationPlan {
         val steps = linkedMapOf<String, VerificationStep>()
         fun add(operation: String, reason: String, criterion: String? = null, platform: String? = null, targets: List<String> = emptyList()) {
             val key = verificationStepKey(operation, criterion, platform, targets)
@@ -622,7 +635,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
 
         val criteria = input.acceptanceCriteria.filter(String::isNotBlank)
         criteria.forEach { criterion ->
-            verificationOperationsFor(criterion).forEach { add(it, "ACCEPTANCE_CRITERION", criterion) }
+            operationsFor(criterion).forEach { add(it, "ACCEPTANCE_CRITERION", criterion) }
         }
 
         val platforms = input.targetPlatforms.map(String::trim).filter(String::isNotEmpty).distinct()
@@ -702,11 +715,14 @@ internal fun executionOrder(definition: WorkflowDefinition): List<com.hereliesaz
  */
 internal fun verificationOperationsFor(criterion: String): List<String> {
     if (BEHAVIOUR_SPEC.containsMatchIn(criterion)) return listOf("test")
-    val operations = CRITERION_PARTS.split(criterion).flatMap { part ->
-        val words = VERIFICATION_WORD.findAll(part.lowercase()).map { verificationStem(it.value) }.toSet()
-        VERIFICATION_LEXICON.filter { (_, stems) -> stems.any(words::contains) }.map { it.first }.take(1)
-    }.distinct()
+    val operations = CRITERION_PARTS.split(criterion).mapNotNull(::lexiconOperationFor).distinct()
     return operations.ifEmpty { listOf("evidence-check") }
+}
+
+/** The lexicon's operation for one part of a criterion, or null when no word calls for one. */
+internal fun lexiconOperationFor(part: String): String? {
+    val words = VERIFICATION_WORD.findAll(part.lowercase()).map { verificationStem(it.value) }.toSet()
+    return VERIFICATION_LEXICON.firstOrNull { (_, stems) -> stems.any(words::contains) }?.first
 }
 
 /** First matching operation; kept for single-operation callers. */
@@ -729,5 +745,5 @@ private val VERIFICATION_LEXICON: List<Pair<String, Set<String>>> = listOf(
     "source-verification" to setOf("source", "citation", "cite", "cit", "reference", "dated", "publication"),
 )
 private val VERIFICATION_WORD = Regex("[a-z][a-z0-9]+")
-private val CRITERION_PARTS = Regex("\\s+and\\s+|[,;]\\s*|\\s+&\\s+")
-private val BEHAVIOUR_SPEC = Regex("\\b(?:given\\b.*\\bwhen\\b.*\\bthen|the system shall|shall)\\b", RegexOption.IGNORE_CASE)
+internal val CRITERION_PARTS = Regex("\\s+and\\s+|[,;]\\s*|\\s+&\\s+")
+internal val BEHAVIOUR_SPEC = Regex("\\b(?:given\\b.*\\bwhen\\b.*\\bthen|the system shall|shall)\\b", RegexOption.IGNORE_CASE)

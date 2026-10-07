@@ -40,7 +40,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
-import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
+import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -103,6 +103,10 @@ class MainActivity : ComponentActivity() {
         AndroidLocalOrchestrationModelExecutor(orchestrationSpecialistInstaller)
     }
     private val orchestrationSpecialistExecutor by orchestrationSpecialistExecutorDelegate
+    private val orchestrationDecisionModelDelegate = lazy {
+        AndroidOrchestrationDecisionModel(orchestrationSpecialistInstaller::decisionModelRoot)
+    }
+    private val orchestrationDecisionModel by orchestrationDecisionModelDelegate
 
     private fun orchestrationSpecialistExecutorDelegateInitialized(): Boolean =
         orchestrationSpecialistExecutorDelegate.isInitialized()
@@ -194,12 +198,13 @@ class MainActivity : ComponentActivity() {
                     AndroidOrchestrationSpecialists.utilities(
                         installer = orchestrationSpecialistInstaller,
                         executor = orchestrationSpecialistExecutor,
+                        decisions = orchestrationDecisionModel,
                     )
                 }
                 val localOrchestrationSetting = LocalOrchestrationSpecialistSetting(
                     status = localOrchestrationStatus,
                     releasedRoles = AndroidOrchestrationSpecialists.releasedRoleCount(),
-                    totalRoles = OrchestrationUtilityRole.entries.size,
+                    totalRoles = OrchestrationQuestion.entries.size,
                     onInstall = install@{
                         if (localOrchestrationStatus is LocalOrchestrationSpecialistStatus.Installing) return@install
                         localOrchestrationStatus = LocalOrchestrationSpecialistStatus.Installing("Starting…")
@@ -227,7 +232,10 @@ class MainActivity : ComponentActivity() {
                         uiScope.launch {
                             localOrchestrationStatus = withContext(Dispatchers.IO) {
                                 removeLocalOrchestrationSpecialists(
-                                    resetExecutor = { orchestrationSpecialistExecutor.reset() },
+                                    resetExecutor = {
+                                        orchestrationSpecialistExecutor.reset()
+                                        if (orchestrationDecisionModelDelegate.isInitialized()) orchestrationDecisionModel.close()
+                                    },
                                     removeArtifacts = { orchestrationSpecialistInstaller.removeReleased() },
                                 )
                             }
@@ -507,6 +515,9 @@ class MainActivity : ComponentActivity() {
         }
         if (orchestrationSpecialistExecutorDelegateInitialized()) {
             orchestrationSpecialistExecutor.close()
+        }
+        if (orchestrationDecisionModelDelegate.isInitialized()) {
+            orchestrationDecisionModel.close()
         }
         repositoryHttpClient.close()
         super.onDestroy()

@@ -1,0 +1,1502 @@
+{
+  "format": "aive-puppet-rig",
+  "version": 1,
+  "role": "ux-designer",
+  "canvas": {
+    "width": 200.0,
+    "height": 200.0
+  },
+  "atlas": {
+    "image": "ux_designer_rig_atlas.png",
+    "width": 256,
+    "height": 256
+  },
+  "parts": [
+    {
+      "id": "body",
+      "parent": null,
+      "z": 0,
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 101.0,
+        "y": 99.0,
+        "rotation": 0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "tendril.0",
+      "parent": "body",
+      "z": 0,
+      "rect": {
+        "x": 0,
+        "y": 64,
+        "w": 48,
+        "h": 96
+      },
+      "size": {
+        "w": 38.0,
+        "h": 80.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "rest": {
+        "x": -42.0,
+        "y": 5.4,
+        "rotation": -55,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "tendril.1",
+      "parent": "body",
+      "z": 0,
+      "rect": {
+        "x": 48,
+        "y": 64,
+        "w": 48,
+        "h": 96
+      },
+      "size": {
+        "w": 36.0,
+        "h": 78.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "rest": {
+        "x": 33.0,
+        "y": 1.64,
+        "rotation": 50,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "tendril.2",
+      "parent": "body",
+      "z": 0,
+      "rect": {
+        "x": 96,
+        "y": 64,
+        "w": 48,
+        "h": 96
+      },
+      "size": {
+        "w": 36.0,
+        "h": 80.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "rest": {
+        "x": -49.0,
+        "y": 67.4,
+        "rotation": -120,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "tendril.3",
+      "parent": "body",
+      "z": 0,
+      "rect": {
+        "x": 144,
+        "y": 64,
+        "w": 48,
+        "h": 96
+      },
+      "size": {
+        "w": 36.0,
+        "h": 80.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "rest": {
+        "x": 45.0,
+        "y": 63.4,
+        "rotation": 120,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "soma",
+      "parent": "body",
+      "z": 1,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "size": {
+        "w": 74.0,
+        "h": 74.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 0.0,
+        "y": 0.0,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "eye.left",
+      "parent": null,
+      "z": 2,
+      "rect": {
+        "x": 64,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 21.0,
+        "h": 21.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 87.5,
+        "y": 91.5,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "eye.right",
+      "parent": null,
+      "z": 2,
+      "rect": {
+        "x": 96,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 21.0,
+        "h": 21.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 111.5,
+        "y": 91.5,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "pupil.left",
+      "parent": null,
+      "z": 3,
+      "rect": {
+        "x": 128,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 14.0,
+        "h": 14.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 88.0,
+        "y": 92.0,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "pupil.right",
+      "parent": null,
+      "z": 3,
+      "rect": {
+        "x": 160,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 14.0,
+        "h": 14.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 112.0,
+        "y": 92.0,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "lid.upper.left",
+      "parent": null,
+      "z": 4,
+      "rect": {
+        "x": 192,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 22.4,
+        "h": 14.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.0
+      },
+      "rest": {
+        "x": 87.6,
+        "y": 78.4,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "lid.lower.left",
+      "parent": null,
+      "z": 4,
+      "rect": {
+        "x": 224,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 22.4,
+        "h": 12.8
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1.0
+      },
+      "rest": {
+        "x": 87.6,
+        "y": 103.8,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "lid.upper.right",
+      "parent": null,
+      "z": 4,
+      "rect": {
+        "x": 192,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 22.4,
+        "h": 14.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.0
+      },
+      "rest": {
+        "x": 111.6,
+        "y": 78.4,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "lid.lower.right",
+      "parent": null,
+      "z": 4,
+      "rect": {
+        "x": 224,
+        "y": 0,
+        "w": 32,
+        "h": 32
+      },
+      "size": {
+        "w": 22.4,
+        "h": 12.8
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1.0
+      },
+      "rest": {
+        "x": 111.6,
+        "y": 103.8,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    },
+    {
+      "id": "prop.heart",
+      "parent": null,
+      "z": 5,
+      "rect": {
+        "x": 192,
+        "y": 64,
+        "w": 64,
+        "h": 96
+      },
+      "size": {
+        "w": 34.0,
+        "h": 50.0
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rest": {
+        "x": 157.0,
+        "y": 91.0,
+        "rotation": 0.0,
+        "scaleX": 1,
+        "scaleY": 1,
+        "alpha": 1
+      }
+    }
+  ],
+  "attachments": [
+    {
+      "id": "arm.socket.a",
+      "part": "soma",
+      "x": 0.02,
+      "y": 0.62,
+      "kind": "arm-socket"
+    },
+    {
+      "id": "arm.socket.b",
+      "part": "soma",
+      "x": 0.98,
+      "y": 0.62,
+      "kind": "arm-socket"
+    },
+    {
+      "id": "prop.slot",
+      "part": "soma",
+      "x": 0.95,
+      "y": 0.45,
+      "kind": "prop-slot"
+    }
+  ],
+  "states": {
+    "Pending": {
+      "parts": {
+        "body": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 1.8,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 0.6,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        }
+      }
+    },
+    "Ready": {
+      "parts": {
+        "body": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 1.8,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 0.6,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        }
+      }
+    },
+    "Active": {
+      "parts": {
+        "body": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 6.7,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 8.0,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -8.0,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 8.0,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -8.0,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -4.8,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        }
+      }
+    },
+    "Gate": {
+      "parts": {
+        "body": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 1.8,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.56,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.56,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 0.6,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        }
+      }
+    },
+    "Blocked": {
+      "parts": {
+        "body": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.8,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.8,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.8,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.8,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 9
+              }
+            ],
+            "alpha": [
+              {
+                "t": 0,
+                "v": 0.55
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Complete": {
+      "parts": {
+        "body": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 3.4,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 5.76,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -5.76,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 5.76,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -5.76,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.5,
+                "ease": "step"
+              },
+              {
+                "t": 0.92,
+                "v": 0.91,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -8,
+                "ease": "easeOut"
+              },
+              {
+                "t": 0.25,
+                "v": -13,
+                "ease": "easeIn"
+              },
+              {
+                "t": 0.5,
+                "v": -8,
+                "ease": "easeOut"
+              },
+              {
+                "t": 0.75,
+                "v": -13,
+                "ease": "easeIn"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3.2,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        }
+      }
+    },
+    "Failed": {
+      "parts": {
+        "body": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "tendril.0": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.8,
+              "frequency": 1,
+              "phase": 0.1353
+            }
+          }
+        },
+        "tendril.1": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.8,
+              "frequency": 1,
+              "phase": 0.2515
+            }
+          }
+        },
+        "tendril.2": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": 2.8,
+              "frequency": 1,
+              "phase": 0.3676
+            }
+          }
+        },
+        "tendril.3": {
+          "keys": {},
+          "sine": {
+            "rotation": {
+              "amplitude": -2.8,
+              "frequency": 1,
+              "phase": 0.4838
+            }
+          }
+        },
+        "pupil.left": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.left": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "pupil.right": {
+          "keys": {},
+          "sine": {
+            "x": {
+              "amplitude": 2.0,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "lid.upper.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lid.lower.right": {
+          "keys": {
+            "scaleY": [
+              {
+                "t": 0,
+                "v": 0.64,
+                "ease": "step"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "prop.heart": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 9
+              }
+            ],
+            "alpha": [
+              {
+                "t": 0,
+                "v": 0.55
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    }
+  },
+  "fallbackState": "Pending"
+}

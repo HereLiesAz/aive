@@ -1,0 +1,880 @@
+{"question": "architectural-decision", "text": "Add a \"Last reviewed\" note to each runbook page", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add a FAQ entry about password resets", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add a code sample in Python to the auth guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add a link to the status page in the footer", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add a section on rate limits to the API reference", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add an architecture diagram to the existing contributing guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add screenshots to the onboarding tutorial", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Bump the Docusaurus version from 3.1 to 3.2", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Convert one diagram from PNG to SVG", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Correct the units in Table 4", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Describe the system architecture in Section 3 of the paper", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Fix broken anchors in the MkDocs nav", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Fix table formatting in the results section", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Fix typos in the installation guide", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Proofread the architecture decision record for clarity", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Reorder the sections in the tutorial so setup comes first", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Respond to reviewer comments on the related work", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Rewrite the README intro", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Summarize the interview transcripts into key themes", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Update the architecture overview page with the new service names", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Update the bibliography with the 2025 papers", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Update the version number in the docs config", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Write an abstract for the conference submission", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Write release notes for 3.1", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Write the discussion section of the paper", "label": "no", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Adopt OpenAPI as the source of truth and generate the API reference from it", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Choose a docs site generator — Docusaurus vs MkDocs — and migrate the docs", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Decide on the localization framework for docs (Crowdin vs in-house)", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Define the content model (types, fields, relations) for the knowledge base CMS", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Define the structure of the reproducibility package (code, data, environment) all papers must follow", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Design how docs versions map to API versions", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Design the information architecture for the new developer portal", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Design the schema for the research dataset documentation (datasheets) used across projects", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Design the taxonomy and tagging model for the internal research repository", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Establish a component library for docs (callouts, tabs, code groups) shared across sites", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a headless CMS for the help center", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a single-source publishing pipeline producing HTML and PDF from AsciiDoc", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate the paper from Word to LaTeX with a shared template for all future submissions", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate the thesis build from Overleaf to a local Makefile + Pandoc pipeline", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Move docs from Confluence into the repo as Markdown with docs-as-code CI", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Move the API docs to be generated from code comments rather than hand-written", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Pick a reference manager and citation format standard for the lab (Zotero + BibTeX vs Paperpile)", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Replace the PDF handbook with an interactive web handbook", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Replace the wiki with a static site built from the monorepo", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Restructure the documentation into tutorials, how-tos, reference and explanation sections", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Separate internal and public docs into two repositories with a sync process", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Set up a versioned docs architecture so each release has its own docs branch", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Split the single giant user manual into per-product doc sites with shared components", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Switch from Sphinx to Docusaurus", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "pick a search backend for the docs site (Algolia vs self-hosted Typesense)", "label": "yes", "domain": "documentation and research writing", "split": "test"}
+{"question": "architectural-decision", "text": "Add a delay after power-up before reading the humidity sensor", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add a log message when OTA download starts", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new MQTT topic for battery level under the existing hierarchy", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new command to the existing UART CLI to print the uptime", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new field \"rssi\" to the existing telemetry message", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add unit tests for the CRC module", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Bump ESP-IDF to 5.2.1", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Calibrate the accelerometer offsets", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Change the default Wi-Fi reconnect interval to 30 seconds", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Describe the bootloader architecture in the README", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Enable compiler warnings -Wall -Wextra for the firmware", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the GPS parser handling of negative longitudes", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the I2C timeout in the temperature sensor driver", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the LED blinking pattern for low battery", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the off-by-one in the ADC averaging", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the watchdog reset during flash writes", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Flash the new firmware to the 20 test units", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Increase the stack size of the network task to 4KB", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Lower the sampling rate from 100Hz to 50Hz", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Port the existing button driver to the new pin mapping on rev B", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Reduce the deep sleep current by disabling the unused LED", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Refactor the SPI driver to remove duplicate chip-select code", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Review the RTOS task priorities and document them", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Set the BLE device name to include the last 4 digits of the MAC", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Update the firmware architecture doc with the new task list", "label": "no", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Adopt CBOR instead of JSON for device telemetry payloads", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Choose an RTOS for the new board: FreeRTOS vs Zephyr", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Choose between storing config in EEPROM vs a flash filesystem (LittleFS)", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Decide on the IoT platform: AWS IoT Core vs Azure IoT Hub", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Define the MQTT topic hierarchy and payload schema for all devices", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Design the OTA update architecture with A/B partitions and a bootloader", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Design the binary protocol between the sensor nodes and the gateway", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Design the cloud device-shadow contract for the thermostat", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Design the data model for the time-series sensor readings on the edge gateway", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Design the secure boot chain and key management", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a hardware abstraction layer so the app code runs on STM32 and nRF52", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a publish/subscribe bus between drivers and application logic", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a state machine framework for the device lifecycle", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate from Wi-Fi to cellular (LTE-M) for field units", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate the firmware from Arduino framework to ESP-IDF", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Move edge processing from the device to the gateway", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Move from bare-metal superloop to an RTOS with tasks", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Pick a wireless stack — BLE vs Thread vs LoRa — for the asset tracker", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Pick an MCU family for the next hardware revision", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Replace polling loops with an event-driven architecture using message queues", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Replace the custom UART protocol with Modbus RTU", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Restructure the drivers into a board support package separate from application code", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Split the firmware into a bootloader, a core and loadable app modules", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Switch the build system from Make to CMake + Zephyr west", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "should we move from C to Rust for the new motor controller firmware?", "label": "yes", "domain": "embedded and IoT", "split": "test"}
+{"question": "architectural-decision", "text": "Add Steam achievements for completing each world", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a controller remapping screen", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new enemy type, the Fire Imp, using the existing Enemy base class", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new event to the existing event bus for when a chest is opened", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new field \"rarity\" to the item data in the existing table", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new level, Ice Caves, using existing tiles", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new sound effect for coin pickup", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a pause menu to the main game scene", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add localization keys for the new shop items", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Bump the network tick rate from 30 to 60 in the existing server config", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Explain the save system design in a README for new devs", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the camera shake intensity on explosions", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the double jump bug", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the leaderboard showing scores in wrong order", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the memory leak in the particle pool", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Fix z-fighting on the castle floor", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Increase the player's base health from 100 to 120", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Optimize the terrain shader by removing an unused texture sample", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Refactor PlayerController.cs to extract the dash logic into a private method", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Reimport the character models with corrected scale", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Rename the variable `spd` to `moveSpeed` in all movement scripts", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Tune the AI state machine's chase distance to 15 units", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Update the engine architecture doc with the new rendering pipeline section", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Upgrade Unity from 2022.3.10 to 2022.3.20", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Write a postmortem on the multiplayer architecture for the team blog", "label": "no", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Adopt a state machine framework for all AI agents", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Choose a networking model for multiplayer: lockstep or client-server with rollback", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Choose a scripting language for modding support (Lua vs Wren)", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Decide on a dedicated server host — PlayFab vs self-hosted Agones", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Define the replication protocol for player state between server and clients", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Design how quests, dialogue and cutscenes communicate (shared blackboard vs messages)", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Design the backend API contract for leaderboards and player profiles", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Design the inventory data model supporting stacking, durability and sockets", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Design the save-game data format and versioning scheme", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a global event bus for gameplay events instead of direct references", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce an ECS architecture for enemy simulation", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce dependency injection (Zenject) in the project", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate UI from IMGUI to UI Toolkit", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Move from Perforce to Git LFS for art assets", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Move game data (items, enemies, quests) out of code into ScriptableObjects / data tables", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Move matchmaking out of the game server into its own service", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Pick a physics engine for the custom C++ engine (Jolt vs PhysX)", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Port the renderer from OpenGL to Vulkan", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Replace singletons with a service locator across gameplay systems", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Replace the custom asset bundle loader with Addressables", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Restructure the codebase into runtime, editor and tools assemblies", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Separate the deterministic simulation from the presentation layer", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Split the monolithic GameManager into separate systems for input, scoring and spawning", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Switch from Unity to Godot for the next project", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "should we use FMOD or Wwise for audio middleware?", "label": "yes", "domain": "game development", "split": "test"}
+{"question": "architectural-decision", "text": "Add a CPU alert for the API pods", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new Ansible role task to install htop", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new Grafana panel for queue depth", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new environment variable to the payments deployment", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Add a new subdomain record for docs.example.com", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Add the new office IP to the VPN allowlist", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Clean up unused security groups", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Document the current network architecture in Confluence", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the Helm values typo that breaks the staging deploy", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the Terraform plan drift on the load balancer tags", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Fix the broken health check path for the auth service", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Increase log retention to 90 days", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Increase the disk size of the Elasticsearch nodes to 500GB", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Patch OpenSSL on all bastion hosts", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Raise the nginx client_max_body_size to 50m", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Reboot the hosts after the kernel update", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Refactor the monitoring Terraform module to use for_each instead of count", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Renew the wildcard certificate", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Resize the RDS instance from db.r5.large to db.r5.xlarge", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Restart the stuck Kafka broker 3", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Rotate the database credentials", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Scale the worker deployment to 6 replicas", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Update the infrastructure architecture diagram after last month's changes", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Upgrade the Kubernetes cluster from 1.29 to 1.30", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Write a runbook for the Vault unseal procedure", "label": "no", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Adopt GitOps with Argo CD as the deployment model", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Adopt OpenTelemetry as the tracing standard across services", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Choose a container registry and image promotion model", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Choose a service mesh: Istio or Linkerd", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Consolidate three monitoring stacks into one", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Define the module boundaries for our Terraform: one repo per env or shared modules?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Design the IAM role model for cross-account access", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Design the backup and DR strategy (RPO/RTO) across regions", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Design the multi-region failover topology for the API platform", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Design the network segmentation for the PCI environment", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Introduce a centralized ingress gateway in front of all services", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate DNS from BIND to Route 53", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate from Docker Swarm to Kubernetes", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Migrate infrastructure-as-code from CloudFormation to Terraform", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Move from Jenkins to GitHub Actions for all deployments", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Move from on-prem VMware to AWS", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Move logging from ELK self-hosted to a managed provider", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Move stateful workloads out of the shared cluster into a dedicated one", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Pick a secrets manager: Vault vs AWS Secrets Manager", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Replace Nagios with Prometheus and Grafana", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Replace cron jobs on VMs with a scheduled workflow system", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Split the shared prod VPC into per-team accounts with a transit gateway", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "Switch config management from Ansible to Nix", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "introduce a message queue (SQS vs RabbitMQ) between the web tier and workers", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "should we run Postgres on k8s or switch to RDS?", "label": "yes", "domain": "infrastructure and operations", "split": "test"}
+{"question": "architectural-decision", "text": "API-778 typo in the error message for invalid coupon", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add OpenAPI annotations for the new search parameters", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a CSV export for admin users using the existing job runner", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a Dockerfile HEALTHCHECK for the api container", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a Prometheus counter for failed webhook deliveries", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a `GET /orders/{id}/invoice` endpoint following the existing controller pattern", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a `last_login_at` timestamp updated on each login", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a `nickname` field to the user profile response", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a database migration that renames column `addr` to `address`", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a field-level description to the GraphQL Order type", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a health endpoint that checks DB connectivity", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new Kafka consumer for `order.cancelled` in the existing notifications service, same as the others", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new permission `reports:export` to the existing role definitions", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a unit test for the discount calculation edge case with 0 quantity", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add an admin endpoint to resend a verification email", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add an index on orders(customer_id, created_at)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add request logging of the correlation ID in the existing middleware", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add retries with backoff to the existing SMTP client call", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add soft delete to the comments table using the same pattern as posts", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add sorting by created_at desc to the comments endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add structured fields to the error logs in the existing logger", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add validation that email is unique on signup", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Bump Spring Boot from 3.2.4 to 3.2.9", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Bump the Go version in go.mod to 1.23", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Cache the exchange-rate lookup for 10 minutes in the existing in-process cache", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Change the default page size from 20 to 50", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Document the existing event schemas in the wiki (no changes)", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix a deadlock in the inventory reservation transaction", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix flaky test in PaymentWebhookTest", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix memory leak in the PDF generation worker", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the N+1 query on the /projects list endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the gRPC status mapping for not-found errors in the catalog handler", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the off-by-one in cursor pagination on /events", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the scheduler sending duplicate reminder emails", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the timezone bug where the daily report uses UTC midnight instead of account timezone", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Fix wrong HTTP status (200 instead of 201) on POST /teams", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Implement the refund partial-amount rule in RefundService", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the HTTP client timeout to the catalog service from 2s to 5s", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the connection pool size for the reporting DB", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Log a warning when the shipping carrier API responds slowly", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Make the bulk import endpoint accept up to 10k rows instead of 1k", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Make the password reset token expire after 30 minutes instead of 24 hours", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Make the slug generation handle unicode titles", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Mask card numbers in logs", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Refactor the 900-line OrderService class into smaller private methods in the same package", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Remove the deprecated /v1/legacy-login endpoint that has zero traffic", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Remove unused imports and dead code in the users package", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Return 404 instead of 500 when a user is not found", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Return 409 when a booking slot is already taken", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Return the `Retry-After` header on 429 responses from the existing rate limiter", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Rotate the Stripe API key in the payments config", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Support `?include=items` on the order detail endpoint using the existing serializer", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Support filtering invoices by status on the existing list endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "The /search endpoint ignores the `lang` param, fix it", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "The architecture is fine; just add caching to the one slow endpoint using our existing Redis helper", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Update docs/architecture.md to describe how the billing service talks to Kafka today", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Write a README section explaining the service architecture for onboarding", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Write integration tests for the refunds endpoint", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "the microservice architecture diagram link in the README is broken, fix it", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "upgrade psycopg2 to 2.9.10", "label": "no", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "API-342: design the data model for multi-tenant workspaces (tenants, members, roles, invitations)", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a hexagonal architecture in the shipping service so carriers are adapters behind ports", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a modular monolith structure with enforced module boundaries (ArchUnit rules) in the Kotlin backend", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a message broker for async jobs: Kafka, RabbitMQ or SQS", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Choose an observability stack (OpenTelemetry + which backend) and instrument services uniformly", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Choose between Elasticsearch and Postgres full-text search for product search", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Create a shared error contract (RFC 7807 problem details) across all services", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Decide where tenant isolation lives: schema-per-tenant, db-per-tenant or row-level security", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Define a public GraphQL schema for partners on top of the existing services", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Define the data model for the scheduling service: resources, slots, bookings, recurrence rules", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design a pagination contract (cursor-based) to be used across all list endpoints", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design a webhook delivery system: retries, signing, subscription model and payload schema", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design an event schema registry and versioning rules for the domain events on the bus", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the API for bulk imports: async job resource, status polling, result download", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the API versioning strategy (URL vs header) and deprecation policy for v2", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the REST API contract for the new Subscriptions resource (endpoints, payloads, error format, versioning)", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the contract for the internal pricing API used by checkout and quotes", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the idempotency key mechanism for the POST /payments API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the multi-region write strategy for the accounts database", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Design the sharding scheme for the messages table as we pass 2B rows", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Extract authentication into a dedicated identity service used by all apps", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce CQRS for the reporting endpoints, separate read models from the write path", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a cache-aside pattern with Redis for the profile endpoints and define invalidation ownership", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a domain event bus inside the monolith to decouple orders from emails and analytics", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a feature-flag service and an SDK all backend services call", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a policy engine (OPA) for authorization decisions instead of if-statements in handlers", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a read replica + caching layer architecture for the catalog API", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a saga orchestrator for the booking flow that spans hotels, flights and payments", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an API gateway in front of the billing, catalog and search services", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an outbox pattern so the payments service publishes events reliably", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce dependency injection (wire) in the Go API server instead of package-level globals", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Merge the three tiny pricing microservices back into one service", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the Java services from Spring MVC to Spring WebFlux", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the SOAP integration layer to REST + JSON", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the user service from MySQL to PostgreSQL", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Model the ledger for wallet balances as double-entry accounts and transactions", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move file storage from the local disk on app servers to S3 with signed URLs", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move from synchronous HTTP calls between order and inventory to events on Kafka", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move rate limiting out of each service into a shared middleware layer at the gateway", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move secrets handling from env files to Vault with a shared client library", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move session storage from in-memory to Redis so the auth service can scale horizontally", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Move the search indexer into its own worker service consuming change data capture events", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a background job framework for the Rails app (Sidekiq vs GoodJob) and move jobs to it", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Pick an ORM/query layer for the new Go services: sqlc, GORM or ent", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Port the Python Flask API to FastAPI with Pydantic models as the contract", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Redesign the audit log storage: append-only table vs streaming to a separate store", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Replace MongoDB with DynamoDB for the activity feed and redesign the access patterns", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Replace REST between internal services with gRPC and define the proto files", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Replace polling clients with server-sent events for job status; define the event stream format", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the cron-based batch jobs with a workflow engine (Temporal) and model the order pipeline as workflows", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the homegrown queue table in Postgres with NATS JetStream", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure the Django project into bounded-context apps with explicit interfaces between them", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the notification service from Node to Go", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the admin API from the public API into different deployables", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Should invoices be generated by the billing service or a separate document service? Decide and restructure", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Split the orders module out of the monolith into its own service with its own database", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Switch from JWT stateless auth to opaque tokens with a central introspection endpoint", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "introduce a plugin architecture for payment providers so adding Adyen doesn't touch core code", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "plan migration from Express to Fastify for all 6 node services", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "we keep hitting race conditions on inventory, redesign it around event sourcing?", "label": "yes", "domain": "backend services and APIs", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'Check for updates' menu item that calls our existing updater", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'Copy path' action to the tab context menu", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'Duplicate layer' command in the layers panel", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'Recent files' submenu to the File menu", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'sort by date modified' option to the library view", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a confirmation before closing with unsaved changes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a dark theme option to the preferences dialog using existing theme variables", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a keyboard shortcut Ctrl+Shift+E for export", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new export format (CSV) using the existing export plugin interface", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a print preview to the invoice window", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a progress bar during large file imports", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a status bar indicator for sync status using the existing sync events", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a version number to the title bar in beta builds", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a welcome screen on first launch", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add keyboard navigation to the color picker", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add right-click 'Reveal in Finder'", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add support for opening files passed on the command line", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add tests for the file format parser using sample files", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add tooltips to the toolbar buttons", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add zoom in/out with Ctrl+scroll in the canvas", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Bump .NET 8 patch version to 8.0.10", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Bump Electron from 31.2 to 31.7 for the security fix", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Draw the architecture diagram for the docs from the existing code (no code changes)", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix crash when opening a corrupted PNG", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix memory growth when switching between documents repeatedly", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix text clipping in the About dialog on Linux", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the Linux AppImage missing the desktop file", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the dialog appearing behind the main window on Windows", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the drag and drop of files from Finder not working on Sonoma", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the high CPU usage while idle caused by a timer in the status bar", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the installer failing on usernames with spaces", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the installer not creating a Start menu shortcut", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the scroll position jumping when a document is reloaded", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the spellchecker underlining correctly spelled German words", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the tray icon disappearing after explorer.exe restarts", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the window not restoring its size and position on relaunch", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "High-DPI icons look blurry on Windows, add 2x assets", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the autosave interval from 1 to 5 minutes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the max undo history from 50 to 200 steps", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Log unhandled exceptions to the existing log file", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the app respect the reduced-motion setting", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the search panel support regex", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the sidebar resizable and remember its width", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make toolbar icons follow the accent color", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Our plugin architecture works — just add the missing 'Sharpen' filter plugin", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Persist the last used export folder", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Refactor the 1200-line MainWindow.xaml.cs into partial classes in the same project", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Remove the obsolete 'Send feedback' menu item", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rename the 'Tools' menu to 'Extensions'", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Show a notification when export finishes", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Show a warning when disk space is below 500 MB before saving", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Show file size and modified date in the file browser panel", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Sign and notarize the macOS build", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "The app ignores the system proxy, read it from the OS settings", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Translate the menus into Japanese", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Update the app icon", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Update the architecture section of the developer wiki with the current IPC channels", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Upgrade Qt from 6.5 to 6.7", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Write UI tests for the settings dialog", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "fix the about box showing the wrong copyright year", "label": "no", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a dependency injection container in the WinForms app so services can be mocked", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt the Elm architecture for the Rust desktop app using iced", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Build a scripting layer: embed Lua and expose an API for automating the editor", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a UI framework for the Windows rewrite: WinUI 3, WPF or Avalonia", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a charting/rendering backend for the oscilloscope viewer (OpenGL vs Skia vs Direct2D)", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose between SQLite, LMDB and RocksDB for the photo catalog backend", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Convert the desktop app's background tasks into a job scheduler with persistent queue", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Decide how licensing works: online activation service vs offline signed license files; design the flow", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Decouple the spell checker into a language-server-like process with a request/response protocol", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define a theme engine architecture so third parties can ship themes as packages", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define the document file format (.pfx project files): versioned schema, assets bundling, backwards compatibility", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define the import/export plugin interface for new file formats", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design a local-first data model for the TaskDeck app with IndexedDB and server reconciliation", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design a plugin API for the PixelForge image editor so extensions can add filters and panels", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the IPC contract between the tray agent and the main window app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the collaboration architecture for co-editing in the diagram app (presence, ops, server relay)", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the multi-window architecture: shared document model, window ownership, focus handling", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the offline cache layer for the email client: message store format, indexing, eviction", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the protocol between the desktop app and the browser extension (native messaging)", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Extract the shared editing core into a library used by both the desktop app and the web version", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce MVVM with CommunityToolkit.Mvvm across the WPF app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a capability-based permissions model for plugins", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a crash reporting pipeline (minidumps + symbol server) and choose a backend", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a repository pattern for all persistence in the WPF budgeting app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a service layer between the Qt UI and the database so widgets stop running SQL directly", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a state management library (Redux vs Zustand) for the Electron renderer and move all global state into it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an event bus so panels in the IDE-like layout react to selection changes without direct references", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an undo/redo architecture using the command pattern for every editing action", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce modular feature loading so optional modules (OCR, cloud sync) ship as separate packages", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce reactive bindings (ReactiveUI) across the Avalonia app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the app's rendering pipeline data-driven via a scene graph instead of immediate drawing", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the .NET Framework 4.8 app to .NET 8", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the NoteVault desktop app from Electron to Tauri", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move all disk access out of the renderer into a sandboxed preload API", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move from in-app SQL queries to an ORM (EF Core) with a defined domain model", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move preferences sync to the cloud: design the API and conflict rules", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the app from single-process to a multi-process model where each open document is isolated", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the macOS app from AppKit to SwiftUI with a shared view-model layer", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the native C++ audio engine into a separate process with a shared-memory protocol", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a packaging/installer technology (MSIX vs WiX vs Inno Setup) and restructure the build around it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Pick an auto-update framework (Squirrel, Sparkle, electron-updater) and restructure the release channels around it", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Plan a migration from Electron + React to a native SwiftUI Mac app and WinUI Windows app", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Port the Qt Widgets UI of the CAD viewer to Qt Quick/QML", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Re-architect the file watcher subsystem around an event queue instead of callbacks into the UI", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the Win32 message loop code with a framework-level command routing system", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the custom XML project format with a ZIP container of JSON documents", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the embedded Chromium (CEF) with the system WebView", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the plain JSON settings file with an embedded SQLite database and design the schema", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure the Electron app into packages: core, ui, platform adapters", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the Java Swing inventory tool in JavaFX", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the Python Tkinter tool as a Tauri app with a Rust backend", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the VB6 point-of-sale client in C# with a modern UI framework", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the Mac menu bar helper into a login item with an XPC interface", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the rendering engine into its own native library with a C API the UI calls", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Should the desktop client sync via CRDTs or server-authoritative ops? Decide and design the sync protocol", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Split the Electron main process logic into separate utility processes with a defined IPC protocol", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Split the GTK app into a background daemon and a thin UI talking over D-Bus", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Standardize the Electron app on contextIsolation with a typed preload bridge contract", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "cross-platform desktop: flutter desktop or compose multiplatform for the new Markdown editor? pick", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "switch the desktop app's networking from raw sockets to HTTP/2 with a new API client layer", "label": "yes", "domain": "desktop apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add `--help` examples for the `devctl db` subcommands", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a CODEOWNERS check to the PR pipeline", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a Makefile target `make fmt`", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a Slack notification on failure using the existing notify action", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a `--dry-run` flag to the `devctl deploy` command", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a `--json` output flag to `devctl status` reusing the existing formatter", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a badge for build status to the README", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a cache step for node_modules in the existing CI workflow", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new ESLint rule to forbid console.log", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new subcommand `devctl logs` using the existing command framework", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a smoke test step after packaging the CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a step that uploads test reports as artifacts", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a timeout to the HTTP calls in the release bot", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add a weekly scheduled run of the dependency audit job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add autocompletion for zsh to the existing CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add code owners for the /infra folder", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add labels automatically to PRs that touch /docs", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add progress bars to the asset upload command", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add shellcheck to the existing lint stage", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add the missing license header to the scripts directory", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add timestamps to the deploy tool's log lines", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Bump actions/checkout from v3 to v4 in the build workflow", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Bump golangci-lint to v1.61 and fix new warnings", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "CI-219 flaky integration test in billing pipeline", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Document the existing flags of the `auditctl` CLI in its --help text", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Enable Prettier check on markdown files", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Explain the build architecture in CONTRIBUTING.md for new contributors", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the YAML indentation error in the deploy workflow", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the broken link checker job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the colored output being garbled on Windows terminals in our CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the failing lint job on main", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the matrix job that runs twice for tags", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the pre-commit hook not running on staged files only", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the self-hosted runner cleanup script that leaves temp dirs behind", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the typo in the PR template", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the version string showing 'dev' in released binaries", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Fix: the codegen tool writes files with CRLF on Windows", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the Renovate PR limit from 5 to 10", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Increase verbosity of the failing test output in CI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Make the coverage threshold 80% in the existing config", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Make the release script print the changelog before tagging", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Make the version bump script handle pre-release tags like -rc.1", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Our pipeline architecture is fine; just add a manual approval before prod in the existing deploy job", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Pin the Python version in the CI image to 3.12.6", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Refactor the argument parsing in tools/release.py into a helper function", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Remove the obsolete Node 16 entry from the test matrix", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Rename the workflow file from ci.yml to build-and-test.yml", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Retry the flaky npm install step up to 3 times", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Show a helpful error when the config file is missing in the `lintkit` CLI", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Skip the e2e job for docs-only changes using a path filter", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Speed up the unit test job by running pytest with -n auto", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Store the build duration as a job summary", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "The Docker build fails because of a missing apt package, add it", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "The architecture lint rule throws on empty files, make it skip them", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "The test job times out after 30 minutes, raise it to 45", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Update the CI architecture doc to describe the current pipeline stages", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Update the base image tag in the CI Dockerfile to the latest patch", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Update the onboarding script to install jq", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Upgrade the Gradle wrapper to 8.10", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Write tests for the changelog parser", "label": "no", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt Bazel remote execution and restructure BUILD targets per package", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt Nix for reproducible dev environments instead of the current asdf + Docker mix", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt trunk-based development with merge queues and restructure the branch/pipeline model", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Change the CLI's architecture from one binary to a core + plugin binaries discovered on PATH", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a build system for the monorepo: Bazel, Nx or Turborepo", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a container registry and image promotion model for CI-built images", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a static analysis platform (SonarQube vs Semgrep vs CodeQL) to standardize on", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Consolidate 14 repos into a monorepo and define package boundaries and ownership", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Decide how the internal SDK is distributed: private PyPI, git submodules, or vendoring", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Decide whether the release pipeline is driven by tags or by a release PR bot, and rebuild it accordingly", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Define a dev-container spec that every repo uses and a shared base image", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Define the architecture of the new benchmark harness: runners, result store, comparison service", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design a caching layer for the `codegen` CLI so outputs are keyed by input hashes", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design a plugin architecture for our internal CLI `devctl` so teams can ship their own subcommands", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design the API between the code-review bot and the CI system (events, payloads, auth)", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design the config file schema for the `lintkit` tool (layers, overrides, per-directory rules)", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design the data model for the flaky-test tracker (test ids, runs, quarantine state, owners)", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design the output format (JSON schema) for the `auditctl` CLI so other tools can consume it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Design the protocol between the IDE extension and our local analysis daemon", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce Backstage as the developer portal and define the catalog entity model", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a central reusable-workflow repository that every repo's pipeline calls instead of copy-pasted YAML", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a central secrets broker for pipelines (OIDC to cloud) instead of long-lived repo secrets", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a dependency injection container in the internal deploy CLI so providers are swappable for tests", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a language server for our internal config DSL", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a pipeline-as-code library (Dagger) so CI logic is Go code rather than YAML", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a shared versioned toolchain manifest that all repos read their tool versions from", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a state store for the deploy tool so concurrent deploys lock environments", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an event-driven architecture for CI notifications: pipelines emit events, a router sends to Slack/email", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce ephemeral preview environments per PR; decide on the platform and how pipelines provision them", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Make the linter pluggable: rules as separate packages discovered at runtime", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate CI from Jenkins to GitHub Actions for all repositories", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate Gradle build scripts from Groovy to Kotlin DSL with convention plugins in build-logic", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate from CircleCI to Buildkite with self-hosted agents", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the documentation build from Sphinx to MkDocs Material", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Move from Docker Compose for local dev to Tilt on a local k8s cluster", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Move test orchestration to a test-sharding service that pipelines call to split suites", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Move the build matrix definition into a single YAML schema consumed by a generator", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Move the code coverage aggregation into a separate service that pipelines upload to", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a remote caching backend for builds and wire every pipeline through it", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a self-hosted runner strategy (k8s ARC vs VM autoscaling) and restructure the runner fleet", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a test runner for the Python repos (pytest + xdist vs nox sessions) and set up the standard layout", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Plan migration of build containers from Ubuntu-based images to distroless/Chainguard bases", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Lerna with Nx and define the project graph and task pipeline", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Make + bash scripts with a task runner (just vs Taskfile) as the standard entrypoint", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Travis CI everywhere, pick a target and migrate", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Replace semantic-release with changesets and define the versioning model for all packages", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the homegrown code generator with OpenAPI Generator and restructure where generated code lives", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure pipelines so build once, promote the same artifact through staging and prod", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure the mono-pipeline into per-package pipelines triggered by changed paths", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Rework the bot so it's a GitHub App with webhooks instead of a cron that polls the API", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the pre-commit hooks setup on top of lefthook and define the shared hook config format", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the release tooling from Python scripts into a Go CLI with a defined command interface", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the CI config validation into a standalone service with an HTTP API used by the editor plugin", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Split the CI pipeline into separate build, test and deploy services that communicate through artifacts", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Split the shared GitHub Action into composite actions with clear inputs/outputs contracts", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Switch package management from npm to pnpm workspaces across the monorepo", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Turn the 3000-line deploy.sh into a modular tool with separate stages and a stage interface", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "devtools: choose between Renovate and Dependabot org-wide and standardize the config inheritance", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "move artifact storage from Nexus to GitHub Packages", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "switch from tslint/prettier to biome across all ts repos", "label": "yes", "domain": "developer tooling and CI", "split": "train"}
+{"question": "architectural-decision", "text": "Add Spanish plural rules to the cart item count string", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'Rate this app' prompt after the third completed order", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a confirm dialog before deleting a saved card", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a dark mode toggle to the Settings screen of the Android app", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new Favorites screen following the existing MVVM architecture and repository pattern", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new column `nickname` to the existing Room User entity and a migration", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new endpoint call to fetch loyalty points using the existing ApiService", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new settings row for notification sound using the existing preferences screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a retry button when the network request fails on the wallet screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a share button to the recipe screen that uses the native share sheet", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add a skeleton loader to the restaurant detail screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add accessibility labels to all buttons on the checkout screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add analytics event `checkout_started` using our existing AnalyticsTracker", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add biometric unlock prompt on the existing lock screen using BiometricPrompt", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add pull-to-refresh to the order history list on iOS", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Bump React Native from 0.74.1 to 0.74.5 for the security patch", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Bump compileSdk to 35 and fix the resulting deprecation warnings", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Change the primary brand color across the theme file", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Clean up unused drawables and string resources", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Explain the app's current architecture in the onboarding wiki page for new devs", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Extract the duplicated price-formatting code in CartScreen into a helper in the same module", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix crash when rotating the device on the PhotoEditor screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix flaky Espresso test in LoginFlowTest", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix memory leak in the camera preview fragment", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the RN Android build failing after the Gradle wrapper bump", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the VoiceOver order on the onboarding page", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the date picker showing UTC instead of local time on the booking screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the keyboard covering the password field on small Android phones", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Hide the debug menu in release builds", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Implement the redesigned profile header using the existing design-system components", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Increase tap target size on the bottom nav icons to 48dp", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Increase the image cache size from 50MB to 100MB in the existing Coil config", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "MOB-883 empty state for search results", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the onboarding carousel swipeable with indicators", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the splash screen respect the system theme", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the hardcoded API base URL into BuildConfig fields", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Our clean architecture layers are fine, just add a use case for deleting an address", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Pagination in the feed stops after page 3 on Android, investigate and fix", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Patch the deep link handler so /promo/{id} opens the promo screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Reduce APK size by enabling R8 resource shrinking", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Refactor ProfileViewModel to split the 600-line class into smaller private functions", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rename the `utils` package in the Android app to `common` within the same module", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Review the architecture section of the README for typos", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Show a badge count on the inbox tab", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Support Dynamic Type on the article reader", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Support landscape layout on the tablet version of the reader screen", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Swap the app icon for the holiday variant", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "The Compose preview for OrderCard is broken, fix it", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "The iOS widget shows stale data after midnight, fix refresh", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "The login button is misaligned on iPhone SE, fix the constraints", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "The swipe-to-delete animation stutters on Pixel 6, smooth it out", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Update Firebase Crashlytics SDK to latest minor version", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Update the architecture diagram in docs/mobile-architecture.md to show the new feature modules", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Upgrade Retrofit from 2.9 to 2.11", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Write a short ADR summarizing why we chose Compose last year (no changes to the code)", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Write unit tests for CartRepository using the existing fake DAO", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "add a loading spinner while the map tiles load", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "add haptic feedback when the user completes a workout", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "translate onboarding strings into German and French", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "update privacy manifest for the new App Store requirements", "label": "no", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt Kotlin Multiplatform to share business logic between the Android and iOS versions of Parkwise", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt MVVM with unidirectional data flow for the iOS app instead of the current Massive View Controller setup", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt TCA (The Composable Architecture) for the new onboarding and settings flows and set conventions for the rest", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a unidirectional MVI pattern for the checkout flow and document how state, intents and effects are modeled", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Can we move the Ionic app to Flutter? Evaluate and plan the migration", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a mobile CI/CD and release approach (fastlane lanes vs Bitrise workflows) for both platforms", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a navigation architecture for the Kotlin app: single-activity with Navigation component or keep multiple activities", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Choose how the watchOS companion app shares data with the phone app (WatchConnectivity vs shared App Group container)", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Convert the Objective-C networking layer to a Swift async/await API client with a new request/response contract", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Create a design-system module that all feature modules consume instead of each defining their own styles", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Decide between GraphQL (Apollo) and REST for the mobile app's new feed, then define the schema the client expects", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Decide where business rules live: server-driven UI for the home tab or keep logic client side", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define a versioned API contract between the mobile app and the backend so old app versions keep working", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define how the app caches API responses: HTTP cache headers vs a normalized client-side store", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Define the data model for cached itineraries on device so trips, legs and bookings can be queried offline", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design a background sync architecture using WorkManager with clear ownership of each sync job", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design a feature-flag architecture for the mobile apps: remote config provider, local overrides, how features read flags", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the deep link routing contract so marketing URLs map to screens consistently on iOS and Android", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the local encryption scheme and key storage approach for health records on device", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Design the sync protocol between the PocketLedger mobile app and the server for offline edits and conflict resolution", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Evaluate Expo vs bare React Native for the rebuild of the Kidsread app and commit to one", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Extract payments into a separate Swift package with its own public API that the main app depends on", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce Hilt dependency injection in the Android client and remove the hand-rolled ServiceLocator", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a clean architecture split (domain/data/presentation) in the Kotlin codebase of the BikeShare app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a coordinator pattern to own navigation in the iOS app instead of segues", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a middleware layer for logging, auth refresh and retries in the RN networking stack", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a plugin system so partner mini-apps can be embedded inside the SuperWallet app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a repository layer between Room and the ViewModels in the Grocerly Android app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce server-driven UI for the promotions screens: define the component schema the app renders", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "MOB-412: replace Redux in the RN app with Zustand + React Query, define the new store boundaries", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Make the map feature a separate dynamic feature module delivered on demand", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate push notifications from our custom socket service to Firebase Cloud Messaging", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the Android app from XML layouts to Jetpack Compose", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the RN app to the new architecture (Fabric + TurboModules)", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move auth token handling out of individual screens into a shared session module with a defined interface", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move from Firebase Realtime Database to Firestore for the mobile client's data layer", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move image loading from Picasso to Coil and standardize it behind an ImageLoader interface used by every feature", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the Flutter app's state management from setState to Riverpod across all features", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the chat feature to a websocket-based protocol instead of polling every 5 seconds", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Move the iOS app's persistence from UserDefaults blobs to SwiftData with a proper schema", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a crash reporting + analytics SDK family for both apps (Sentry vs Crashlytics vs Bugsnag) and wire an abstraction", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a local database for offline mode in the Tripnest iOS app: Core Data, Realm or SQLite via GRDB?", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rebuild the image upload path around a background upload service with resumable chunks, new client/server contract", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Redesign the offline queue: requests get persisted to disk and replayed by a background worker; define the job format", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Retrofit with Ktor client so networking code can be shared in a Kotlin Multiplatform module", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace RxJava with Kotlin coroutines and Flow throughout the Android client", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace SharedPreferences with DataStore and define typed preference schemas for all settings", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the Realm database in the Android app with Room and design the migration of existing user data", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the homegrown JSON parsing with kotlinx.serialization and generate DTOs from the OpenAPI spec", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure the Swift app into a modular architecture with Tuist-generated targets per feature", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rework how the mobile app talks to three backend services by putting a BFF in front; define its endpoints for the app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the Cordova shell of FieldNotes as a Capacitor app", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Rip out the global singletons in the Android app and introduce constructor injection", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the analytics tracking into its own layer with an event schema rather than calling SDKs from views", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Split the monolithic :app Gradle module into feature modules (:feature-checkout, :feature-profile, :core-network)", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Turn the in-app purchase code into a standalone billing module with an interface both apps implement", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "new app needs a cross-platform UI toolkit. compare flutter, RN, compose multiplatform; recommend one", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "should we go react native or native swift+kotlin for the new fitness tracker app? need a decision doc", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "switch the iOS app from cocoapods to swift package manager for all deps", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "we need an event bus between the player screen and the mini player, pick an approach (Flow, Combine, NotificationCenter?)", "label": "yes", "domain": "mobile apps", "split": "train"}
+{"question": "architectural-decision", "text": "Add Storybook stories for the Button and Badge components", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'copy to clipboard' button next to API keys in settings", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 'last updated' timestamp to each article", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a 404 page that matches the brand", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a CSV export button to the users table that calls the existing export endpoint", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a breadcrumb to the documentation pages", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a confirm step before deleting a workspace", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a dark theme variant of the hero illustration", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a loading skeleton to the analytics charts", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new Invoices page using our existing data hooks and layout", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a new prop `variant` to the Card component", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a sticky header to the pricing page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add an empty state illustration to the projects page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add aria-live announcements when the search results update", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add keyboard shortcuts (j/k) to move through the inbox list", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add pagination to the audit log page using the existing API params", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add print styles for the invoice page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add rel=noopener to all external links", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add sorting by newest to the comments list", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Bump Next.js from 14.2.3 to 14.2.15", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Change the date format in the activity feed to 'Oct 6, 2026'", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Correct the color contrast of the secondary button", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Debounce the search input by 300ms", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Explain in the README how the micro-frontend architecture is wired today", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "FE-512 tooltip text overflow on long labels", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix hydration mismatch warning on the profile page", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix layout shift caused by the cookie banner", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the ESLint errors in the components folder", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the Vite build warning about chunk size on the admin app", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the broken anchor links in the FAQ", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the chart legend overlapping on narrow screens", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Fix the dropdown closing when you click the scrollbar in Safari", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Implement the new pricing card design from Figma with existing tokens", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Improve Lighthouse accessibility score of the login page to 100", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Infinite scroll on the gallery loads duplicates, fix it", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Lazy load the images below the fold on the blog index", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Make table rows clickable to open the detail drawer", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Make the navbar collapse into a hamburger on mobile widths", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Make the signup form show inline validation errors under each field", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move the price formatting helper from Cart.tsx into utils/format.ts in the same package", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Our architecture uses Redux - just add a new slice for notifications like the others", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Preload the main web font to reduce FOUT", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Reduce the bundle size of the checkout page by removing the unused lodash import", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Refactor the 400-line Table component into smaller components inside the same folder", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Rename `useData` hook to `useProjectData` and update imports", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the footer links with the new legal URLs", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the placeholder copy on the onboarding page with the final text from marketing", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Show a toast after successfully saving profile settings", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Show the user's avatar initials when no image is set", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Support pasting images into the comment editor", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "The architecture review asked for nicer error messages on the upload page — add them", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "The cart badge count is off by one after removing an item", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Translate the error messages into Portuguese in the existing locale files", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Update the favicon and Open Graph image", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Update the frontend architecture page in Notion with the current folder structure", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Upgrade React from 18.2 to 18.3", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Upgrade Tailwind from 3.3 to 3.4", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Write Playwright tests for the password reset flow", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "fix: z-index of the date picker under the modal", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "the modal doesn't trap focus, fix that", "label": "no", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt XState for the checkout flow and model all steps as a statechart", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a headless commerce frontend (Hydrogen) for the shop instead of the Liquid theme", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt a monorepo layout (pnpm workspaces) to share UI components between the storefront and the admin app", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Adopt islands architecture for the landing pages to cut JS shipped", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Centralize permissions logic on the frontend into one access-control module that pages query", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a CSS approach for the new design system: Tailwind, CSS Modules or vanilla-extract", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Choose a charting library family for the reporting app and standardize on it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Choose between Next.js and Remix for the new partner portal", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Convert the Gatsby blog to Astro with content collections", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Convert the whole codebase from JavaScript to TypeScript with strict mode", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Create a shared API contract (types package) between the Express backend and React frontend", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Decide SSR vs static generation vs client rendering for the product catalog pages", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Decide on a state management strategy for the multi-step quote wizard and document it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Define a feature-flag architecture for the frontend: provider, evaluation on server vs client, typing of flags", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Define how the web app and the mobile web share components: one responsive codebase or separate apps", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design a plugin API so third parties can add panels to the Trellis web dashboard", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design the URL/routing scheme and state-in-URL contract for the search page filters", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design the client-side caching and invalidation rules for the search results and facets", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design the contract between the editor iframe and the host page (postMessage protocol, message types, versioning)", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design the frontend data model for the collaborative whiteboard so shapes, layers and selections are normalized", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Design the theming architecture: runtime CSS variables vs build-time themes for white-label customers", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "FE-221: introduce an event bus for cross-widget communication on the analytics dashboard", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Implement real-time updates on the order board using websockets instead of polling; pick a library and message format", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a BFF layer for the web app so the browser stops calling five microservices directly", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a micro-state approach (Jotai atoms) to replace the giant context in the spreadsheet app", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a service worker caching strategy so the PWA works offline; decide what's cached and how it updates", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a typed API client generated from the OpenAPI spec and route all fetch calls through it", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce a web worker layer for the heavy CSV parsing with a defined message protocol", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an error boundary + logging architecture with a shared telemetry client", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce an i18n framework (react-intl vs i18next) and a structure for message catalogs", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Introduce optimistic updates with a mutation queue architecture for the kanban board", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the Ember app to React", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate the marketing site from Create React App to Next.js with the app router", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Migrate unit tests infrastructure from Jest+Enzyme to Vitest+Testing Library across the repo", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move all third-party scripts behind a consent-aware loader module that owns their lifecycle", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move auth from localStorage tokens to httpOnly cookie sessions handled by the edge middleware", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move form handling to React Hook Form + Zod schemas as the standard for every form in the app", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move global styles to design tokens served from a shared package consumed by all three web apps", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move rendering of the pricing page to the edge (Cloudflare Workers) and decide which data it fetches there", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Move the frontend off the PHP templates and serve it as a separate SPA from a CDN", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a component library to build on (Radix, MUI, Chakra) for the redesign and set it as the base layer", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Pick a headless CMS for the marketing pages and define the content model the site renders", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Plan a migration of the e-commerce frontend from Angular to Svelte Kit", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Moment.js everywhere with date-fns and wrap it in our own date utility module", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace Redux Toolkit with TanStack Query for server state in the Billing dashboard and keep only UI state in a small store", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace prop drilling in the CRM app with a context-based dependency injection of services", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace styled-components with CSS Modules in all packages", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Replace the jQuery widgets on the help center with Web Components", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure src/ from type-based folders (components/, hooks/) to feature-sliced design", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Restructure the dashboard so each widget is a lazily loaded remote with its own data fetching boundary", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Rework the frontend to use a normalized entity cache (like Apollo's) for projects, tasks, users", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Rewrite the AngularJS customer portal in React, page by page behind a routing shim", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Separate the design system into its own versioned npm package with a Storybook", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Should the new dashboard use GraphQL with Relay or REST + SWR? Make the call and set it up", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Split the admin SPA into micro-frontends with module federation, one per team", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Standardize on one form of client-side validation shared with the backend via JSON Schema", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Swap webpack for Vite across all frontend apps", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "move from client-side rendering to React Server Components for the docs portal", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "replace our handrolled router with tanstack router, set up file-based routes", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "we're on Vue 2 which is EOL - plan and execute the move to Vue 3 + Pinia", "label": "yes", "domain": "web frontends", "split": "train"}
+{"question": "architectural-decision", "text": "Add a Kafka consumer for the existing payments topic following the same pattern as the orders consumer", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a column discount_code to fct_orders", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a freshness check to the marketing source in dbt", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a new chart for weekly signups to the Growth dashboard", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a new source table from the existing Postgres connector in Airbyte", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a not_null test to stg_users.email", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add a unit test for the parse_utm macro", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add an alert when the orders DAG takes longer than 2 hours", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add an index on events(user_id) in the reporting Postgres", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add retries to the Salesforce extractor task", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add the `region` dimension to the existing revenue explore", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Add the new product category values to the mapping seed file", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Backfill the sessions table for the last 90 days", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Bump apache-airflow from 2.7.2 to 2.7.3", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Correct the MRR calculation, which double counts annual plans", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Create a new Looker dashboard for the support team using existing explores", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Delete stale partitions older than 2 years from raw_logs", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Fix grammar in the data model documentation", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Fix the Airflow DAG that fails when the S3 prefix is empty", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Fix the flaky test in test_dedupe.py", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Fix the timezone conversion in the hourly rollup", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Increase the Spark executor memory to 8g for the clickstream job", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Lower the warehouse auto-suspend to 60 seconds", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Make the dashboard tiles load in parallel", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Move the helper functions in utils.py into a dates.py file in the same package", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Patch the CSV parser to handle quoted newlines", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Present the data platform architecture at Friday's all hands — prepare slides", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Refactor the transform_orders.py module to remove duplicated date-parsing helpers", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Rename fct_rev to fct_revenue and update refs", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Replace hardcoded bucket names in the export job with values from the existing config file", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Review the architecture decision record for the lakehouse and fix typos", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Run the existing schema migration script on the staging warehouse", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Schedule the cohort job to run after the orders DAG finishes using an ExternalTaskSensor", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Speed up the dim_customers model by switching it to incremental materialization", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Split the 900-line SQL model into CTEs for readability (same output)", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Update the data architecture diagram in the wiki to show the new Snowflake warehouse", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Write a SQL query for weekly retention by signup cohort", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Write docs explaining our medallion architecture for new hires", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "add logging around row counts in each pipeline step", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "upgrade great_expectations to latest minor", "label": "no", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Adopt a medallion (bronze/silver/gold) layering for the lakehouse", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Build a shared ingestion library that all source connectors must use, replacing per-team scripts", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Choose a streaming engine for sessionization (Flink vs Spark Structured Streaming)", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Choose between Airflow and Dagster for orchestrating our pipelines", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Consolidate three separate Kafka clusters into one with topic-level tenancy", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "DATA-ARCH-9: Replace Fivetran with Airbyte self-hosted", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Data mesh: carve the central warehouse into domain-owned datasets with owners per domain", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Decide where data quality checks live: inside each pipeline or as a separate validation service", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Define the contract (schema, SLA, ownership) for the finance revenue feed", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Define the data contract between the product events producer and the analytics consumers", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Design the API that downstream teams will use to query aggregated metrics", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Design the partitioning and clustering strategy for the new events table that will hold 50B rows", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Design the slowly-changing dimension model for customer attributes (SCD2 vs snapshots)", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Design the star schema for the new subscriptions mart", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Introduce a lambda architecture to serve both real-time and corrected batch counts", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Introduce a semantic layer so dashboards stop defining metrics themselves", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Introduce an event bus between the order service and the analytics pipeline instead of direct DB reads", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Introduce dependency injection for connectors in the ingestion framework so sources are pluggable", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Migrate orchestration from cron on a VM to Airflow on Kubernetes", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Migrate the warehouse from Redshift to Snowflake", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Move feature computation out of the training notebooks into a dedicated feature store", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Move from Pandas to Spark for the nightly jobs as data grows past 1TB", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Move metrics definitions from dashboards into a central metrics repository consumed by all BI tools", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Pick a reverse-ETL approach: build in-house or adopt Hightouch", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Pick a table format for the lake: Iceberg, Delta or Hudi", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Replace Looker with Superset as the BI tool", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Replace our hand-rolled Python scripts with dbt for all transformations", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Replace the nightly full reload with an incremental CDC-based architecture", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Restructure the warehouse into raw, staging and marts schemas with access boundaries", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Rework the event schema to a single envelope with typed payloads versioned via a schema registry", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Separate the ML scoring pipeline from the reporting pipeline into its own deployable", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Should analytics read from the OLTP replica or from a separate OLAP store? decide and set it up", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Split the monolithic etl repo into ingestion, transformation and serving services", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Standardize on Parquet + object storage instead of the shared NFS drop folder", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Swap the JSON event format for Avro with a schema registry", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "Switch event ingestion from REST batch uploads to a CDC stream off Postgres via Debezium", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "design the tables for the experimentation platform (assignments, exposures, metrics)", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "evaluate BigQuery vs ClickHouse for the real-time analytics backend", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "should we move from batch ETL to streaming with Kafka + Flink?", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}
+{"question": "architectural-decision", "text": "we need a proper data model for multi-touch attribution, can you design it", "label": "yes", "domain": "data pipelines and analytics", "split": "validation"}

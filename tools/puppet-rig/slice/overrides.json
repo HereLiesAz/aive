@@ -1,0 +1,200 @@
+{
+ "_comment": "Per-sheet corrections after visual review of preview.png. classes: component index -> class; drop: indices to discard; tail_chain: indices of a segmented tail from soma end to egg; no_rig: reason to skip rigging.",
+ "_skip_sheets": [
+  "072_programmatic_neuron/node_automated_tendrils.png"
+ ],
+ "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-3.png": {
+  "classes": {
+   "8": "lid.upper.right"
+  }
+ },
+ "001_orchestrator/ChatGPT Image Sep 21, 2026, 08_00_02 PM (1).png": {
+  "classes": {
+   "16": "eye.left",
+   "17": "eye.right",
+   "18": "pupil.left",
+   "19": "pupil.right",
+   "21": "lid.upper.left",
+   "22": "lid.upper.right"
+  },
+  "no_rig": "segmented kit (stalks, bulbs and pupils are separate pieces, music-note props); needs hand assembly in the editor"
+ },
+ "005_architect/ChatGPT Image Oct 5, 2026, 10_41_02 PM.png": {
+  "classes": {
+   "4": "lid.lower.left",
+   "5": "lid.lower.right",
+   "9": "prop",
+   "11": "prop",
+   "10": "tail"
+  }
+ },
+ "016_data_miner_sheet_1_variant/Crystal Mining Creature Sprite Sheet.png": {
+  "classes": {
+   "3": "prop"
+  }
+ },
+ "016_data_miner_sheet_1_variant/Crystalline Creature Parts Atlas.png": {
+  "classes": {
+   "9": "prop"
+  }
+ },
+ "017_knowledge_keeper_sheet_1_variant/Glossy Alien Creature Sprite Sheet.png": {
+  "drop": [
+   3
+  ]
+ },
+ "018_pattern_seeker_sheet_1_variant/ChatGPT Image Oct 6, 2026, 12_16_27 AM-1.png": {
+  "drop": [
+   3,
+   4,
+   6
+  ],
+  "classes": {
+   "5": "prop"
+  }
+ },
+ "020_connector_sheet_1_variant/ChatGPT Image Oct 6, 2026, 12_16_29 AM-3.png": {
+  "classes": {
+   "5": "lid.upper.left",
+   "11": "prop"
+  }
+ },
+ "022_knowledge_keeper_sheet_2_variant/ChatGPT Image Oct 6, 2026, 12_16_29 AM-4.png": {
+  "classes": {
+   "2": "prop",
+   "3": "prop"
+  }
+ },
+ "027_optimizer_sheet_2_variant/ChatGPT Image Oct 6, 2026, 12_16_30 AM-6.png": {
+  "classes": {
+   "8": "tendril"
+  }
+ },
+ "031_creative_synthesizer/ChatGPT Image Oct 6, 2026, 12_16_33 AM-10.png": {
+  "classes": {
+   "8": "tendril"
+  }
+ },
+ "041_resource_manager_sheet_3_variant/ChatGPT Image Oct 6, 2026, 12_27_26 AM-8.png": {
+  "classes": {
+   "3": "tendril",
+   "4": "tendril"
+  }
+ },
+ "042_communicator/ChatGPT Image Oct 5, 2026, 10_38_31 PM-2.png": {
+  "classes": {
+   "8": "lid.upper.right",
+   "11": "beak",
+   "16": "tailseg",
+   "17": "tailseg",
+   "18": "tailseg"
+  },
+  "drop": [
+   12
+  ],
+  "tail_chain": [
+   16,
+   18,
+   17,
+   15
+  ]
+ },
+ "043_integrator/ChatGPT Image Oct 5, 2026, 10_38_33 PM-4.png": {
+  "classes": {
+   "8": "beak"
+  },
+  "drop": [
+   9
+  ]
+ },
+ "044_security_analyst/ChatGPT Image Oct 6, 2026, 12_27_27 AM-9.png": {
+  "classes": {
+   "6": "tendril",
+   "16": "lid.lower.left"
+  }
+ },
+ "046_documentation_specialist/ChatGPT Image Oct 5, 2026, 10_38_32 PM-3.png": {
+  "classes": {
+   "14": "tailseg",
+   "16": "tailseg"
+  },
+  "drop": [
+   10
+  ],
+  "tail_chain": [
+   14,
+   16,
+   15
+  ]
+ },
+ "054_system_maintainer/Colorful Low-Poly Creature Sprite Sheet.png": {
+  "classes": {
+   "4": "prop",
+   "13": "tailseg"
+  },
+  "tail_chain": [
+   13,
+   12
+  ]
+ },
+ "055_sustainability_advocate/Glossy Slime Creature Sprite Parts (2).png": {
+  "classes": {
+   "13": "lid.lower.left",
+   "16": "tailseg",
+   "14": "tailseg"
+  },
+  "tail_chain": [
+   14,
+   16,
+   15
+  ]
+ },
+ "056_systems_analyst/ChatGPT Image Oct 6, 2026, 12_39_21 AM-7.png": {
+  "classes": {
+   "9": "tendril",
+   "10": "tendril",
+   "6": "lid.lower.left"
+  }
+ },
+ "058_network_engineer/ChatGPT Image Oct 5, 2026, 10_38_30 PM-1.png": {
+  "classes": {
+   "12": "beak"
+  },
+  "drop": [
+   13
+  ]
+ },
+ "060_build_engineer/Glossy Alien Sprite Sheet Pieces.png": {
+  "classes": {
+   "5": "tendril"
+  }
+ },
+ "061_test_automation_engineer/Glossy Slime Creature Sprite Parts (1).png": {
+  "classes": {
+   "0": "tendril"
+  }
+ },
+ "067_content_strategist/ChatGPT Image Oct 6, 2026, 01_00_53 AM-5.png": {
+  "classes": {
+   "0": "tendril"
+  }
+ },
+ "069_data_scientist/ChatGPT Image Oct 6, 2026, 01_00_52 AM-3.png": {
+  "classes": {
+   "5": "tendril"
+  },
+  "drop": [
+   16
+  ]
+ },
+ "070_ml_engineer/ChatGPT Image Oct 6, 2026, 01_00_52 AM-2.png": {
+  "classes": {
+   "10": "tendril"
+  }
+ },
+ "071_legal_counsel/ChatGPT Image Oct 6, 2026, 01_00_51 AM-1.png": {
+  "classes": {
+   "5": "tendril"
+  }
+ }
+}

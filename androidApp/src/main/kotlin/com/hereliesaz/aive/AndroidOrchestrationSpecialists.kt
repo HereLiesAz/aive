@@ -14,11 +14,13 @@ import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
 import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
 import com.hereliesaz.geministrator.orchestration.CatalogBackedLocalOrchestrationSpecialistRuntime
+import com.hereliesaz.geministrator.orchestration.DecisionInformedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.GuardedModelBackedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationModelExecutor
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistCatalog
+import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistPrompts
 import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
 import io.ktor.client.HttpClient
@@ -48,13 +50,18 @@ internal object AndroidOrchestrationSpecialists {
         supportsSharedBaseAdapters = true,
     )
 
-    fun releasedRoleCount(): Int = OrchestrationSpecialistCatalog.released().allSpecialists().size
+    /** Judgement calls the released decision model answers (the settings screen's "x of y"). */
+    fun releasedRoleCount(): Int =
+        if (OrchestrationSpecialistCatalog.hasDecisionModel()) OrchestrationQuestion.entries.size else 0
 
     fun utilities(
         installer: AndroidOrchestrationSpecialistInstaller,
         executor: AndroidLocalOrchestrationModelExecutor,
+        decisions: AndroidOrchestrationDecisionModel,
     ): LocalOrchestrationUtilityFamily =
-        if (!installer.hasAnyInstalledReleasedArtifact()) {
+        if (decisions.isInstalled()) {
+            DecisionInformedOrchestrationUtilities(decisions)
+        } else if (!installer.hasAnyInstalledReleasedArtifact()) {
             DeterministicLocalOrchestrationUtilities
         } else {
             GuardedModelBackedOrchestrationUtilities(
@@ -86,6 +93,17 @@ internal class AndroidOrchestrationSpecialistInstaller(
                 }
             }.getOrDefault(emptyList())
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
+    }
+
+    /** The installed decision model's directory, or null when it is not released or not installed. */
+    fun decisionModelRoot(): File? {
+        val plan = runCatching {
+            OrchestrationSpecialistCatalog.released().plan(
+                OrchestrationSpecialistCatalog.DECISIONS_SPECIALIST_ID,
+                AndroidOrchestrationSpecialists.runtimeCapabilities,
+            )
+        }.getOrNull() as? LocalModelLoadPlan.MergedModel ?: return null
+        return installed(plan.model)
     }
 
     fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }

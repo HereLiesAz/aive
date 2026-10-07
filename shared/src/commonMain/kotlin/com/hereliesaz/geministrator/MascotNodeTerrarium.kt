@@ -58,6 +58,8 @@ import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
+import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
+import kotlinx.coroutines.launch
 
 /**
  * Production workflow-mascot host.
@@ -180,6 +182,41 @@ private fun MascotNodeTerrarium(
             y = heightPx * 0.5f + (position.y - focusY) * heightPx * zoom,
         )
 
+        // Rigged creatures: arms attach at the rig's evaluated `arm-socket` attachments. Each node's
+        // pose is evaluated once per frame into a reused buffer; nodes without a loaded rig (or a
+        // socket facing the partner) keep the silhouette-edge anchor below.
+        val rigsEnabled = CreatureRigSettings.enabled
+        val rigSlugs = remember(subjects) {
+            subjects.associate { it.node.id to CreatureRigMapping.slugFor(it.node.label) }
+        }
+        LaunchedEffect(rigSlugs) {
+            rigSlugs.values.filterNotNull().toSet().forEach { slug -> launch { CreatureRigCache.get(slug) } }
+        }
+        val rigBuffers = remember { HashMap<String, PuppetPoseBuffer>() }
+        val rigPoses = HashMap<String, Pair<LoadedCreatureRig, PuppetPoseBuffer>>()
+        if (rigsEnabled && relationships.isNotEmpty()) {
+            subjects.forEach { subject ->
+                val loaded = rigSlugs[subject.node.id]?.let(CreatureRigCache::peek) ?: return@forEach
+                val compiled = loaded.compiled
+                val buffer = rigBuffers[subject.node.id]
+                    ?.takeIf { it.alpha.size == compiled.partCount && it.attachX.size == compiled.attachmentCount }
+                    ?: compiled.newBuffer().also { rigBuffers[subject.node.id] = it }
+                compiled.evaluate(
+                    compiled.stateIndex(subject.node.state.name),
+                    creatureRigPhase(motionPhase, subject.identitySeed),
+                    buffer,
+                )
+                rigPoses[subject.node.id] = loaded to buffer
+            }
+        }
+
+        fun rigSocket(nodeId: String, center: Offset, dirX: Float, dirY: Float): Offset? {
+            val (loaded, pose) = rigPoses[nodeId] ?: return null
+            val k = pickArmSocket(loaded.compiled, pose, dirX, dirY)
+            if (k < 0) return null
+            return creatureRigPointToScreen(pose.attachX[k], pose.attachY[k], loaded.rig, creatureSizePx, center, zoom)
+        }
+
         fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? {
             val fromSubject = subjectById[relationship.from] ?: return null
             val toSubject = subjectById[relationship.to] ?: return null
@@ -195,8 +232,11 @@ private fun MascotNodeTerrarium(
             // terminal anchors. Attach detached connection arms at the mascot silhouette edge.
             val normalized = Offset(direction.x / distance, direction.y / distance)
             val anchorRadius = creatureSizePx * zoom * 0.29f
-            return (fromCenter + normalized * anchorRadius) to
-                (toCenter - normalized * anchorRadius)
+            val start = rigSocket(relationship.from, fromCenter, normalized.x, normalized.y)
+                ?: (fromCenter + normalized * anchorRadius)
+            val end = rigSocket(relationship.to, toCenter, -normalized.x, -normalized.y)
+                ?: (toCenter - normalized * anchorRadius)
+            return start to end
         }
 
         Canvas(Modifier.fillMaxSize()) {
