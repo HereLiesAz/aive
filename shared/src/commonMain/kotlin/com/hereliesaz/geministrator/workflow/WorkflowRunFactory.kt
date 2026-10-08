@@ -96,25 +96,30 @@ object WorkflowRunFactory {
             val allCompleted = dependencyRuns.size == task.dependsOn.size &&
                 dependencyRuns.all { it.status == TaskRunStatus.Completed }
 
-            val conditionMet: Boolean = when (val c = task.condition) {
+            val conditionTargetRun = when (val c = task.condition) {
+                is TaskCondition.Always -> null
+                is TaskCondition.OnAnyOutcome -> run.taskRuns[c.ofTask]
+                is TaskCondition.OnFailure -> run.taskRuns[c.ofTask]
+            }
+            // A condition reference is a real scheduling edge even when it is not duplicated in
+            // dependsOn. Do not decide the branch until both explicit dependencies and the
+            // condition target have reached terminal state.
+            val conditionSettled = allTerminal &&
+                (conditionTargetRun == null || conditionTargetRun.status.isTerminal())
+            val conditionMet: Boolean = when (task.condition) {
                 is TaskCondition.Always -> allCompleted
-                is TaskCondition.OnAnyOutcome -> {
-                    val targetRun = run.taskRuns[c.ofTask]
-                    allTerminal && targetRun != null && targetRun.status.isTerminal()
-                }
-                is TaskCondition.OnFailure -> {
-                    val targetRun = run.taskRuns[c.ofTask]
-                    allTerminal && targetRun != null &&
-                        (targetRun.status == TaskRunStatus.Failed ||
-                            targetRun.status == TaskRunStatus.Escalated ||
-                            targetRun.status == TaskRunStatus.Cancelled)
-                }
+                is TaskCondition.OnAnyOutcome -> conditionSettled && conditionTargetRun != null
+                is TaskCondition.OnFailure -> conditionSettled && conditionTargetRun != null &&
+                    (conditionTargetRun.status == TaskRunStatus.Failed ||
+                        conditionTargetRun.status == TaskRunStatus.Escalated ||
+                        conditionTargetRun.status == TaskRunStatus.Cancelled)
             }
 
             // Always-conditioned tasks stay Blocked when a dep fails rather than being cancelled:
             // the happy-path semantics let the workflow continue via failure handlers without
             // prematurely cancelling tasks that haven't had a chance to run yet.
-            val conditionUnreachable = task.condition !is TaskCondition.Always && allTerminal && !conditionMet
+            val conditionUnreachable =
+                task.condition !is TaskCondition.Always && conditionSettled && !conditionMet
             when {
                 conditionMet -> taskRun.copy(
                     status = TaskRunStatus.Ready,
