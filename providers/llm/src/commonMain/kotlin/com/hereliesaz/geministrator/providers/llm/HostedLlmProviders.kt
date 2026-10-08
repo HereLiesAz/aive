@@ -17,6 +17,7 @@ data class HostedLlmProviderSpec(
     val displayName: String,
     val baseUrl: String,
     val defaultModel: String,
+    val protocols: List<String> = listOf("openai-chat"),
     val extraHeaders: Map<String, String> = emptyMap(),
     /** Serves free models without a key; a stored key only raises the quota. */
     val keyOptional: Boolean = false,
@@ -188,6 +189,7 @@ object HostedLlmProviders {
             displayName = llm.name,
             baseUrl = llm.baseUrl,
             defaultModel = llm.defaultModel,
+            protocols = llm.protocols,
             keyOptional = llm.keyOptional,
         )
     }
@@ -196,11 +198,22 @@ object HostedLlmProviders {
         spec: HostedLlmProviderSpec,
         credential: String,
         model: String = spec.defaultModel,
-    ): AgentProvider = TextLlmProvider(
-        id = AgentProviderId(spec.id),
-        displayName = spec.displayName,
-        api = textApi(spec, credential, model),
-    )
+    ): AgentProvider = when {
+        "moyai-session" in spec.protocols -> MoyaiProvider(
+            id = AgentProviderId(spec.id),
+            displayName = spec.displayName,
+            baseUrl = spec.baseUrl,
+            workspacePassword = credential.takeUnless {
+                it.isBlank() || it == ProviderCatalog.ANONYMOUS_CREDENTIAL
+            },
+        )
+        "openai-chat" in spec.protocols -> TextLlmProvider(
+            id = AgentProviderId(spec.id),
+            displayName = spec.displayName,
+            api = textApi(spec, credential, model),
+        )
+        else -> error("${spec.displayName} has no supported direct LLM protocol")
+    }
 
     /**
      * The raw chat API behind a hosted provider, for callers that need text generation only.
@@ -212,6 +225,7 @@ object HostedLlmProviders {
         credential: String,
         model: String = spec.defaultModel,
     ): TextGenerationApi {
+        require("openai-chat" in spec.protocols) { "${spec.displayName} does not expose OpenAI chat" }
         val clean = credential.trim()
         val anonymous = clean.isEmpty() || clean == ProviderCatalog.ANONYMOUS_CREDENTIAL
         require(!anonymous || spec.keyOptional) { "${spec.displayName} requires an API key" }
