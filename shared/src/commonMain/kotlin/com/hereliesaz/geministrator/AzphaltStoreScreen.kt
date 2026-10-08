@@ -571,7 +571,6 @@ internal fun AzphaltStoreScreen(
                             service.installModel(
                                 prepared = plan,
                                 nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
-                                inputValues = llmInputValues,
                                 allowUntrustedSigner = allowUntrustedSigner,
                                 allowPublisherChange = allowPublisherChange,
                             )
@@ -606,6 +605,7 @@ internal fun AzphaltStoreScreen(
                             service.installLlm(
                                 prepared = plan,
                                 nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                                inputValues = llmInputValues,
                                 allowUntrustedSigner = allowUntrustedSigner,
                                 allowPublisherChange = allowPublisherChange,
                             )
@@ -723,8 +723,16 @@ private fun StoreLlmRecord(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
                     endpoint?.let {
+                        val target = listOfNotNull(
+                            it.defaultModel?.takeIf(String::isNotBlank),
+                            it.baseUrl?.takeIf(String::isNotBlank),
+                        ).joinToString(" at ").ifBlank { it.protocols.joinToString() }
                         Text(
-                            "${it.defaultModel} at ${it.baseUrl}. Aive calls it directly; nothing runs on your GitHub.",
+                            if ("moyai-session" in it.protocols) {
+                                "$target. Aive connects to the remote Moyai workspace as an agent provider."
+                            } else {
+                                "$target. Aive calls this endpoint directly."
+                            },
                             style = AzphaltType.body,
                             color = Azphalt.currentGround.onPage,
                         )
