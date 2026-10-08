@@ -349,7 +349,7 @@ private class MoyaiApi(
                 "Moyai requires workspace authentication; connect this provider with the workspace password"
             }
             client.post("$baseUrl/api/login") {
-                header(HttpHeaders.Origin, origin)
+                header("Origin", origin)
                 contentType(ContentType.Application.Json)
                 setBody(MoyaiLogin(password))
             }.requireSuccess("sign in to Moyai")
@@ -360,7 +360,7 @@ private class MoyaiApi(
     }
 
     private fun io.ktor.client.request.HttpRequestBuilder.mutate() {
-        header(HttpHeaders.Origin, origin)
+        header("Origin", origin)
         header("X-CSRF-Token", requireNotNull(csrf))
     }
 
