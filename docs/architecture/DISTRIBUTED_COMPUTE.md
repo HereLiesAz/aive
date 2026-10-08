@@ -31,15 +31,18 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
    Origin disconnects do **not** cancel work. A claimed worker continues running; an unclaimed lease
    remains eligible for workers that join later.
-5. The relay retains terminal lease results for 24 hours. When the same logical origin node reconnects,
+5. The relay retains terminal lease results for 24 hours, and bounds offline unclaimed leases to the
+   same 24-hour resume window so abandoned origins cannot leak relay state indefinitely. When the same
+   logical origin node reconnects,
    the server replays the lease's accepted/claimed/progress/completed state using the existing protocol
    messages, so a restarted client can reconstruct its `DistributedLeaseState` without dispatching the
    task again. Terminal retention is bounded and expired entries are removed by the sweep.
 
 Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
 The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
-`Failed`. Connection replacement is peer-identity checked, so a stale socket closing cannot unregister
-the newer connection for the same logical node ID. When a worker completes/cancels work, newly freed
+`Failed`. Connection replacement is peer-identity checked on both disconnect and message dispatch, so a stale
+socket can neither unregister nor mutate state after a newer connection takes over the same logical
+node ID. When a worker completes/cancels work, newly freed
 capacity immediately re-offers pending leases.
 
 ## Durability boundary
