@@ -286,18 +286,34 @@ class DistributedComputeWorker(
                     }.first { it != null }
                     executionScope.cancel(CancellationException(requireNotNull(reason)))
                 }
+                suspend fun relaySend(action: String, block: suspend () -> Unit) {
+                    try {
+                        block()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Throwable) {
+                        throw CancellationException("Distributed relay became unavailable while $action")
+                    }
+                }
+
                 val heartbeat = launch {
                     val delayMillis = (envelope.leaseDurationMillis / 3).coerceAtLeast(1_000)
                     while (true) {
                         delay(delayMillis)
-                        client.heartbeatLease(envelope.leaseId)
+                        relaySend("renewing the lease") {
+                            client.heartbeatLease(envelope.leaseId)
+                        }
                     }
                 }
                 try {
                     val result = runner.run(envelope) { progress ->
-                        client.progress(envelope.leaseId, progress)
+                        relaySend("reporting lease progress") {
+                            client.progress(envelope.leaseId, progress)
+                        }
                     }
-                    client.complete(envelope.leaseId, result)
+                    relaySend("reporting lease completion") {
+                        client.complete(envelope.leaseId, result)
+                    }
                 } finally {
                     heartbeat.cancel()
                     leaseGuard.cancel()
