@@ -6,7 +6,9 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.EscalationPolicy
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RetryPolicy
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -19,12 +21,73 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.InMemoryWorkflowEventSink
 import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskEscalated
+import com.hereliesaz.geministrator.events.TaskStarted
+import com.hereliesaz.geministrator.providers.ProviderActionResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class WorkflowEngineFailureTest {
+    @Test
+    fun parallelSessionFailureCancelsCreatedSiblingsBeforeStateCommit() = runBlocking {
+        val firstId = TaskDefinitionId("first")
+        val secondId = TaskDefinitionId("second")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("parallel-start"),
+            name = "Parallel start",
+            tasks = listOf(
+                TaskDefinition(
+                    id = firstId,
+                    name = "First",
+                    objective = "Start first",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+                TaskDefinition(
+                    id = secondId,
+                    name = "Second",
+                    objective = "Start second",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("parallel-run"),
+            projectId = ProjectId("project"),
+            objective = "Start both",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { id -> TaskRunId("run-${id.value}") },
+        )
+        val gateway = FailingParallelGateway()
+        val events = InMemoryWorkflowEventSink()
+        val engine = WorkflowEngine(
+            sessionGateway = gateway,
+            roles = BuiltInRoles.all,
+            eventSink = events,
+        )
+
+        val failure = runCatching {
+            engine.dispatchReadyTasks(
+                project = Project(
+                    id = ProjectId("project"),
+                    name = "Project",
+                    createdAtEpochMillis = 0L,
+                    updatedAtEpochMillis = 0L,
+                ),
+                definition = definition,
+                run = run,
+                nowEpochMillis = 10L,
+            )
+        }.exceptionOrNull()
+
+        assertEquals("second session failed", failure?.message)
+        assertEquals(listOf(ProviderRunId("provider-run-first")), gateway.cancelled.map { it.providerRunId })
+        assertTrue(events.snapshot().none { it is TaskStarted })
+        assertTrue(run.taskRuns.values.all { it.status == TaskRunStatus.Ready })
+    }
+
     @Test
     fun failureRetriesThenReassignsWithoutLosingAuthorityDecision() = runBlocking {
         val taskId = TaskDefinitionId("implement")
@@ -121,4 +184,40 @@ private object NoOpGateway : ManagedSessionGateway {
     override suspend fun message(handle: ManagedSessionHandle, message: String) = error("not used")
     override suspend fun approvePlan(handle: ManagedSessionHandle) = error("not used")
     override suspend fun artifacts(handle: ManagedSessionHandle) = emptyList<com.hereliesaz.geministrator.providers.ProviderArtifact>()
+}
+
+
+private class FailingParallelGateway : ManagedSessionGateway {
+    private val providerId = AgentProviderId("parallel-provider")
+    private val firstCreated = CompletableDeferred<Unit>()
+    val cancelled = mutableListOf<ManagedSessionHandle>()
+
+    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = providerId
+
+    override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        val taskRunId = request.taskRequest.taskRunId
+        return if (request.taskRequest.objective == "Start first") {
+            val handle = ManagedSessionHandle(
+                taskRunId = taskRunId,
+                providerId = providerId,
+                providerRunId = ProviderRunId("provider-run-first"),
+            )
+            firstCreated.complete(Unit)
+            handle
+        } else {
+            firstCreated.await()
+            error("second session failed")
+        }
+    }
+
+    override suspend fun cancel(handle: ManagedSessionHandle): ProviderActionResult {
+        cancelled += handle
+        return ProviderActionResult.Accepted
+    }
+
+    override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus = ManagedSessionStatus.Unknown
+    override suspend fun message(handle: ManagedSessionHandle, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(handle: ManagedSessionHandle) = ProviderActionResult.Accepted
+    override suspend fun artifacts(handle: ManagedSessionHandle) =
+        emptyList<com.hereliesaz.geministrator.providers.ProviderArtifact>()
 }

@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
@@ -20,12 +21,14 @@ import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class ProviderBackedManagedSessionGateway(
     private val providerRegistry: AgentProviderRegistry,
@@ -85,9 +88,11 @@ class ProviderBackedManagedSessionGateway(
             capabilities = provider.capabilities(),
         )
         val taskRequest = prepared.request
+        var startedProviderRunId: ProviderRunId? = null
         return try {
             providerOperation("Unable to start provider session") {
                 val run = provider.start(taskRequest)
+                startedProviderRunId = run.providerRunId
                 inferenceFabric.bindProviderRun(
                     invocationId = prepared.plan.invocationId,
                     taskRunId = taskRequest.taskRunId,
@@ -109,9 +114,14 @@ class ProviderBackedManagedSessionGateway(
                         ManagedSessionStatus.Running
                     },
                 )
+                // No suspension occurs between clearing the rollback marker and returning the
+                // committed handle to the caller.
+                startedProviderRunId = null
                 handle
             }
         } catch (failure: CancellationException) {
+            cancelUnreturnedProviderRun(provider, startedProviderRunId)
+
             inferenceFabric.recordTerminal(
                 prepared.plan.invocationId,
                 InferenceTerminalStatus.Cancelled,
@@ -119,6 +129,7 @@ class ProviderBackedManagedSessionGateway(
             )
             throw failure
         } catch (failure: Throwable) {
+            cancelUnreturnedProviderRun(provider, startedProviderRunId)
             inferenceFabric.recordTerminal(
                 prepared.plan.invocationId,
                 InferenceTerminalStatus.Failed,
@@ -126,6 +137,16 @@ class ProviderBackedManagedSessionGateway(
             )
             providerRegistry.recordOutcome(provider.id, success = false)
             throw failure
+        }
+    }
+
+    private suspend fun cancelUnreturnedProviderRun(
+        provider: AgentProvider,
+        runId: ProviderRunId?,
+    ) {
+        if (runId == null) return
+        withContext(NonCancellable) {
+            runCatching { provider.cancel(runId) }
         }
     }
 
