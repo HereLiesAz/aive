@@ -9,10 +9,9 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /**
- * A hosted language model installed from an Azphalt `kind: "llm"` package. Aive calls its
- * OpenAI-compatible endpoint directly (azphalt spec/llm.md § Direct use): the package's setup script
- * never runs. The key, when one is linked, lives in the platform credential store under [providerId],
- * like any other provider's.
+ * A hosted language model installed from an Azphalt `kind: "llm"` package. Aive calls the signed
+ * manifest's direct endpoint through the matching native protocol adapter. Connection credentials,
+ * when any are needed, live in the platform credential store under [providerId].
  */
 @Serializable
 data class InstalledStoreLlm(
@@ -23,6 +22,8 @@ data class InstalledStoreLlm(
     val description: String? = null,
     val baseUrl: String,
     val defaultModel: String,
+    /** Direct transports declared by the signed package; old persisted entries default to OpenAI chat. */
+    val protocols: List<String> = listOf("openai-chat"),
     /** `none`, `optional-bearer` or `required-bearer`. */
     val auth: String,
     val keyLabel: String? = null,

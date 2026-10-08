@@ -66,8 +66,8 @@ data class AzphaltPackageSummary(
 
 /**
  * The `llm` block of a `kind: "llm"` package (azphalt spec/llm.md): an off-device language model.
- * Aive uses only `endpoint`-tier packages that speak `openai-chat`, and calls them directly (§ Direct
- * use): it never runs the package's setup script and never provisions a sandbox.
+ * Aive directly hosts endpoint-tier packages whose protocol has a native adapter (`openai-chat` or
+ * `moyai-session`). It never runs the package's setup script on the device.
  */
 @Serializable
 data class AzphaltLlm(
@@ -107,14 +107,26 @@ data class AzphaltLlmDataHandling(
     val terms: String? = null,
 )
 
+private val AZPHALT_DIRECT_LLM_PROTOCOLS: Set<String> = setOf("openai-chat", "moyai-session")
+private val AZPHALT_INPUT_REF: Regex = Regex("""^\$\{input:([^}]{1,128})}$""")
+
+/** The non-secret install input that supplies a templated endpoint URL, when one is declared. */
+fun AzphaltLlm.endpointUrlInput(): AzphaltLlmInput? {
+    val id = endpoint?.baseUrl?.let(AZPHALT_INPUT_REF::matchEntire)?.groupValues?.getOrNull(1) ?: return null
+    return inputs.firstOrNull { it.id == id && !it.password }
+}
+
 /** Why Aive cannot call this `llm` block directly, or null when it can (§ Direct use). */
 fun AzphaltLlm.directUseProblem(): String? {
     val endpoint = endpoint ?: return "declares no endpoint"
+    val direct = endpoint.protocols.filter(AZPHALT_DIRECT_LLM_PROTOCOLS::contains)
+    val endpointTemplate = endpointUrlInput()
+    val literalHttps = endpoint.baseUrl?.startsWith("https://", ignoreCase = true) == true
     return when {
         tier != "endpoint" -> "runs only in a GitHub sandbox ($tier tier), which Aive does not provide"
-        "openai-chat" !in endpoint.protocols -> "does not offer the openai-chat protocol"
-        endpoint.baseUrl?.startsWith("https://", ignoreCase = true) != true -> "endpoint is not an https:// URL"
-        endpoint.defaultModel.isNullOrBlank() -> "names no default model"
+        direct.isEmpty() -> "does not offer a direct protocol Aive supports"
+        !literalHttps && endpointTemplate == null -> "endpoint is not an https:// URL or declared endpoint input"
+        "openai-chat" in direct && endpoint.defaultModel.isNullOrBlank() -> "names no default model for openai-chat"
         endpoint.auth !in setOf("none", "optional-bearer", "required-bearer") -> "uses unknown auth ${endpoint.auth}"
         endpoint.auth != "none" && inputs.none { it.id == endpoint.authInput } -> "names an undeclared key input"
         dataHandling == null -> "does not say what the operator does with prompts"

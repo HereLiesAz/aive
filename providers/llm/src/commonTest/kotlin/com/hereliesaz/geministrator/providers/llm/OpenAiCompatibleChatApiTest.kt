@@ -21,6 +21,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 
 class OpenAiCompatibleChatApiTest {
     @Test
@@ -132,6 +133,35 @@ class OpenAiCompatibleChatApiTest {
             StoreLlmProviders.remove(llm.packageId)
             assertNull(HostedLlmProviders.entry(llm.providerId))
             assertEquals(emptyList(), HostedLlmProviders.configured(mapOf(llm.providerId to "key")))
+        } finally {
+            StoreLlmProviders.useSettings(MapSettings())
+        }
+    }
+
+    @Test
+    fun storeMoyaiProtocolBuildsNativeAgentProviderInsteadOfChatProvider() {
+        StoreLlmProviders.useSettings(MapSettings())
+        val llm = InstalledStoreLlm(
+            packageId = "com.hereliesaz.azphalt.llm.moyai",
+            version = "1.0.0",
+            repositoryUrl = "https://azphalt.store",
+            name = "Moyai",
+            baseUrl = "https://moyai.example",
+            defaultModel = "",
+            protocols = listOf("moyai-session"),
+            auth = "none",
+            keyLabel = "Moyai workspace password (optional)",
+        )
+        try {
+            StoreLlmProviders.put(llm)
+            val spec = HostedLlmProviders.entry(llm.providerId)!!
+            assertEquals(listOf("moyai-session"), spec.protocols)
+            assertIs<MoyaiProvider>(
+                HostedLlmProviders.create(spec, ProviderCatalog.ANONYMOUS_CREDENTIAL),
+            )
+            assertFailsWith<IllegalArgumentException> {
+                HostedLlmProviders.textApi(spec, ProviderCatalog.ANONYMOUS_CREDENTIAL)
+            }
         } finally {
             StoreLlmProviders.useSettings(MapSettings())
         }
