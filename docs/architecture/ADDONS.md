@@ -27,12 +27,12 @@ Model assets have their own install lifecycle and are never sent through the wor
 
 ## Language models from the Store
 
-Azphalt `kind:"llm"` packages describe an off-device language model. The Aive uses the ones it can
-call **directly** (azphalt `spec/llm.md` § Direct use): `endpoint` tier, `openai-chat` among
-`endpoint.protocols`, an `https://` `baseUrl`, a default model, and a `dataHandling` disclosure. The
-keyless gateways (Kilo, LLM7, OVHcloud) qualify, and so do keyed endpoints such as Groq or Mistral.
-`sandbox-weights` packages and runner-only packages are not listed: they need a GitHub sandbox, which
-The Aive does not provision.
+Azphalt `kind:"llm"` packages describe an off-device language model or model-backed agent endpoint.
+The Aive uses `endpoint`-tier packages for which it has a direct protocol adapter. `openai-chat`
+remains the common one-shot text path; `moyai-session` maps a durable self-hosted Moyai workspace
+onto Aive's existing `AgentProvider` lifecycle. Direct endpoint URLs must resolve to HTTPS and every
+package must disclose `dataHandling`. `sandbox-weights` packages and runner-only packages are not
+listed because The Aive does not provision their GitHub sandbox.
 
 - **Install:** the Store downloads the `.azp` and verifies its integrity, signature, publisher pin,
   revocation and `compat`. It reads the `llm` block from the signed manifest, not from the
@@ -40,13 +40,14 @@ The Aive does not provision.
   package's setup script never runs, and no GitHub access is used.
 - **Provider:** an installed package is recorded in `StoreLlmProviders` (settings key
   `aive.azphalt.installed-llms.v1`) as provider `azphalt:<package id>`. `ProviderCatalog.entries`
-  and `HostedLlmProviders.entries` append these after the built-in providers, so settings, the
-  credential stores, role routing, memory stages and planning see them with no other wiring, and
-  planning still prefers a built-in provider. Built-in ids cannot be shadowed.
+  and `HostedLlmProviders.entries` append these after the built-in providers. The protocol chooses
+  the adapter: `openai-chat` uses `TextLlmProvider`; `moyai-session` uses the native
+  `MoyaiProvider`. Role routing, memory stages, planning, approvals, and workflow state remain
+  provider-neutral. Built-in ids cannot be shadowed.
 - **Connect:** installing opens the usual credential screen. A key-optional package links with a blank
-  key, stored as the `anonymous` credential; a key is kept in the platform credential store and sent
-  only to the package's `baseUrl`, through the same OpenAI-compatible client as the built-in hosted
-  providers.
+  value stored as the `anonymous` credential. API keys and optional connection passwords live only
+  in the platform credential store. Moyai's model/provider keys remain on the self-hosted Moyai
+  server; Aive stores only its HTTPS endpoint and, when required, the Moyai workspace password.
 - **Remove:** disconnects the provider (deleting its key) and forgets the package.
 
 Only Android builds the Store today, so installs happen there.
