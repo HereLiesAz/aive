@@ -180,7 +180,7 @@ class RelayPool(
                 )
                 return@withLock
             }
-            val activeCount = leases.values.count { it.workerNodeId == workerNodeId }
+            val activeCount = leases.values.count { it.result == null && it.workerNodeId == workerNodeId }
             if (activeCount >= worker.descriptor.maxParallelLeases) {
                 outbound += worker.peer to ComputeRelayServerMessage.Error(
                     code = "worker-capacity",
@@ -331,6 +331,7 @@ class RelayPool(
             val lease = leases[leaseId] ?: return
             if (lease.result != null || lease.workerNodeId != null) return
             val activeByNode = leases.values
+                .filter { it.result == null }
                 .mapNotNull(LeaseRecord::workerNodeId)
                 .groupingBy { it }
                 .eachCount()
