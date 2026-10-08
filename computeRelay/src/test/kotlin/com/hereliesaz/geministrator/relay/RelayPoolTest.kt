@@ -2,6 +2,8 @@ package com.hereliesaz.geministrator.relay
 
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
+import com.hereliesaz.geministrator.distributed.DistributedExecutionProgress
+import com.hereliesaz.geministrator.distributed.DistributedExecutionResult
 import com.hereliesaz.geministrator.distributed.DistributedTaskEnvelope
 import com.hereliesaz.geministrator.domain.ComputePlatform
 import com.hereliesaz.geministrator.domain.DistributedComputeRequirements
@@ -80,8 +82,9 @@ class RelayPoolTest {
     }
 
     @Test
-    fun originDisconnectCancelsOutstandingWorkerLease() = runBlocking {
-        val pool = RelayPool("pool", nowEpochMillis = { 20_000L })
+    fun originDisconnectKeepsWorkerRunningAndReplaysCompletionOnReconnect() = runBlocking {
+        var now = 20_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
         val origin = RecordingPeer()
         val worker = RecordingPeer()
 
@@ -90,13 +93,107 @@ class RelayPoolTest {
         val envelope = envelope()
         pool.publish("origin", envelope)
         pool.claim("worker", envelope.leaseId)
+        pool.progress(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionProgress(
+                status = TaskRunStatus.Running,
+                progress = 0.5f,
+                message = "Halfway",
+            ),
+        )
 
-        pool.unregister("origin")
+        pool.unregister("origin", origin)
 
-        assertEquals(0, pool.pendingLeaseCount())
-        assertTrue(worker.messages.any {
+        assertEquals(1, pool.pendingLeaseCount())
+        assertTrue(worker.messages.none {
             it is ComputeRelayServerMessage.LeaseCancelled &&
                 it.reason == "Origin node disconnected"
+        })
+
+        now += 1_000
+        pool.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(
+                status = TaskRunStatus.Completed,
+                progressMessage = "Done",
+            ),
+        )
+        assertEquals(0, pool.pendingLeaseCount())
+
+        val resumedOrigin = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), resumedOrigin)
+        pool.replayOriginLeases("origin", resumedOrigin)
+
+        assertTrue(resumedOrigin.messages.any {
+            it is ComputeRelayServerMessage.LeaseCompleted &&
+                it.leaseId == envelope.leaseId &&
+                it.result.status == TaskRunStatus.Completed
+        })
+    }
+
+    @Test
+    fun staleConnectionCannotUnregisterReplacementNode() = runBlocking {
+        val pool = RelayPool("pool", nowEpochMillis = { 25_000L })
+        val oldPeer = RecordingPeer()
+        val replacementPeer = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), oldPeer)
+        pool.register(node("worker", setOf("tests")), worker)
+        pool.register(node("origin", setOf("origin")), replacementPeer)
+
+        pool.unregister("origin", oldPeer)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+
+        assertTrue(replacementPeer.messages.any {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == envelope.leaseId
+        })
+        assertTrue(worker.messages.none {
+            it is ComputeRelayServerMessage.NodeLeft && it.nodeId == "origin"
+        })
+    }
+
+    @Test
+    fun completingLeaseImmediatelyReoffersPendingWorkWhenCapacityFrees() = runBlocking {
+        var now = 30_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        pool.register(
+            node("worker", setOf("tests")).copy(maxParallelLeases = 1),
+            worker,
+        )
+
+        val first = envelope("lease-1")
+        val second = envelope("lease-2")
+        pool.publish("origin", first)
+        pool.claim("worker", first.leaseId)
+
+        val offersBeforeSecond = worker.messages.count {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
+        }
+        pool.publish("origin", second)
+        assertEquals(
+            offersBeforeSecond,
+            worker.messages.count {
+                it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
+            },
+        )
+
+        now += 1_000
+        pool.complete(
+            "worker",
+            first.leaseId,
+            DistributedExecutionResult(status = TaskRunStatus.Completed),
+        )
+
+        assertTrue(worker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
         })
     }
 
@@ -112,7 +209,10 @@ class RelayPoolTest {
         maxParallelLeases = 2,
     )
 
-    private fun envelope(leaseDurationMillis: Long = 30_000): DistributedTaskEnvelope {
+    private fun envelope(
+        leaseId: String = "lease",
+        leaseDurationMillis: Long = 30_000,
+    ): DistributedTaskEnvelope {
         val projectId = ProjectId("project")
         val workflowId = WorkflowDefinitionId("workflow")
         val taskId = TaskDefinitionId("test")
@@ -153,7 +253,7 @@ class RelayPoolTest {
             updatedAtEpochMillis = 1,
         )
         return DistributedTaskEnvelope(
-            leaseId = "lease",
+            leaseId = leaseId,
             originNodeId = "origin",
             project = Project(
                 id = projectId,
