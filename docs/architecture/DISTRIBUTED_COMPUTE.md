@@ -31,9 +31,9 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
    Origin disconnects do **not** cancel work. A claimed worker continues running; an unclaimed lease
    remains eligible for workers that join later.
-5. The relay retains terminal lease results for 24 hours, and bounds offline unclaimed leases to the
-   same 24-hour resume window so abandoned origins cannot leak relay state indefinitely. When the same
-   logical origin node reconnects,
+5. The relay retains terminal lease results for 24 hours. Unfinished origin-owned leases are not
+   expired merely because their UI device is offline; dropping them would make safe reconciliation
+   impossible without knowing whether side effects already ran. When the same logical origin node reconnects,
    the server replays the lease's accepted/claimed/progress/completed state using the existing protocol
    messages, so a restarted client can reconstruct its `DistributedLeaseState` without dispatching the
    task again. Terminal retention is bounded and expired entries are removed by the sweep.
