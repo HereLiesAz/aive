@@ -85,6 +85,7 @@ class MoyaiProvider(
      * workspace does not start before the user approves the execution shape.
      */
     override suspend fun draftPlan(request: AgentTaskRequest): String = buildString {
+        appendLine("Objective: ${request.objective.trim()}")
         appendLine("1. Start an isolated Moyai workspace for this Aive task.")
         if (request.repository != null) {
             appendLine("2. Inspect the linked repository and the approved upstream context without changing unrelated work.")
@@ -94,6 +95,10 @@ class MoyaiProvider(
             appendLine("3. Keep all generated work scoped to the task objective and approved context.")
         }
         appendLine("4. Run the verification available in the workspace and preserve its evidence.")
+        if (request.acceptanceCriteria.isNotEmpty()) {
+            appendLine("   Acceptance checks:")
+            request.acceptanceCriteria.forEach { appendLine("   - ${it.description.trim()}") }
+        }
         val outputs = request.requiredArtifacts
             .map { it.name }
             .sorted()
