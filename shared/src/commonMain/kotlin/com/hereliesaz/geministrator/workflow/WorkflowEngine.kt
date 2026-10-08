@@ -41,8 +41,12 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 class WorkflowEngine(
     private val sessionGateway: ManagedSessionGateway,
@@ -256,11 +260,35 @@ class WorkflowEngine(
             }
         }
 
-        // Phase 2: create sessions concurrently.
-        val createdHandles = coroutineScope {
-            pendingAgentDispatches.map { pending ->
-                async { pending to sessionGateway.createSession(pending.sessionRequest) }
-            }.map { it.await() }
+        // Phase 2: create sessions concurrently. This batch is transactional with respect to
+        // provider lifetime: Phase 3 is the only place handles become workflow state, so any
+        // session created before a sibling fails must be cancelled before the failure escapes.
+        val createdHandles = mutableListOf<Pair<PendingAgentDispatch, ManagedSessionHandle>>()
+        val createdHandlesMutex = Mutex()
+        try {
+            coroutineScope {
+                pendingAgentDispatches.map { pending ->
+                    async {
+                        val handle = sessionGateway.createSession(pending.sessionRequest)
+                        withContext(NonCancellable) {
+                            createdHandlesMutex.withLock {
+                                createdHandles += pending to handle
+                            }
+                        }
+                        pending to handle
+                    }
+                }.map { it.await() }
+            }
+        } catch (failure: Throwable) {
+            val rollbackHandles = withContext(NonCancellable) {
+                createdHandlesMutex.withLock { createdHandles.map { it.second } }
+            }
+            withContext(NonCancellable) {
+                rollbackHandles.forEach { handle ->
+                    runCatching { sessionGateway.cancel(handle) }
+                }
+            }
+            throw failure
         }
 
         // Phase 3: apply state mutations sequentially.
