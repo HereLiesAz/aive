@@ -68,11 +68,11 @@ class OpenAiCompatibleChatApi(
         }
 
         val payload = response.body<CompatibleChatResponse>()
-        val text = payload.choices
-            .asSequence()
-            .mapNotNull { it.message?.content?.trim()?.takeIf(String::isNotEmpty) }
-            .firstOrNull()
+        val choice = payload.choices
+            .firstOrNull { !it.message?.content?.trim().isNullOrEmpty() }
             ?: error("Compatible chat response did not contain assistant text")
+        requireCompleteFinishReason(choice.finishReason)
+        val text = requireNotNull(choice.message).content!!.trim()
 
         return TextGenerationResult(
             text = text,
@@ -97,6 +97,7 @@ class OpenAiCompatibleChatApi(
             val reasoning = StringBuilder()
             val splitter = ThinkTagSplitter()
             var usage: CompatibleChatUsage? = null
+            var finishReason: String? = null
             suspend fun deliver(chunks: List<TextGenerationChunk>) = chunks.forEach { chunk ->
                 when (chunk) {
                     is TextGenerationChunk.Thinking -> reasoning.append(chunk.text)
@@ -126,6 +127,7 @@ class OpenAiCompatibleChatApi(
                 chunk.error?.let { error("Compatible chat stream error: ${it.message ?: data.take(300)}") }
                 chunk.usage?.let { usage = it }
                 chunk.choices.forEach { choice ->
+                    choice.finishReason?.let { finishReason = it }
                     val delta = choice.delta ?: return@forEach
                     val thought = delta.reasoningContent ?: (delta.reasoning as? JsonPrimitive)?.takeIf { it.isString }?.content
                     thought?.takeIf(String::isNotEmpty)?.let { deliver(listOf(TextGenerationChunk.Thinking(it))) }
@@ -133,6 +135,7 @@ class OpenAiCompatibleChatApi(
                 }
             }
             deliver(splitter.finish())
+            requireCompleteFinishReason(finishReason)
             if (text.isBlank()) error("Compatible chat response did not contain assistant text")
             TextGenerationResult(
                 text = text.toString().trim(),
@@ -141,6 +144,13 @@ class OpenAiCompatibleChatApi(
                 thinking = reasoning.toString().trim().ifEmpty { null },
             )
         }
+    }
+}
+
+
+private fun requireCompleteFinishReason(finishReason: String?) {
+    if (finishReason.equals("length", ignoreCase = true)) {
+        error("Compatible chat response was truncated because the provider reached its output-token limit")
     }
 }
 
@@ -180,7 +190,10 @@ private data class CompatibleChatStreamChunk(
 )
 
 @Serializable
-private data class CompatibleChatStreamChoice(val delta: CompatibleChatDelta? = null)
+private data class CompatibleChatStreamChoice(
+    val delta: CompatibleChatDelta? = null,
+    @SerialName("finish_reason") val finishReason: String? = null,
+)
 
 @Serializable
 private data class CompatibleChatDelta(
@@ -207,6 +220,7 @@ private data class CompatibleChatResponse(
 @Serializable
 private data class CompatibleChatChoice(
     val message: CompatibleChatResponseMessage? = null,
+    @SerialName("finish_reason") val finishReason: String? = null,
 )
 
 @Serializable
