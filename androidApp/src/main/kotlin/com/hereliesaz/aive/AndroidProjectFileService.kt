@@ -74,16 +74,7 @@ internal class AndroidProjectFileService(
         withContext(Dispatchers.IO) {
             val directory = projectDirectory().apply { mkdirs() }
             val destination = File(directory, fileName.asIveFileName())
-            val temporary = File(directory, destination.name + ".tmp")
-            temporary.writeText(content)
-            if (destination.exists() && !destination.delete()) {
-                temporary.delete()
-                error("Could not replace ${destination.name}")
-            }
-            check(temporary.renameTo(destination)) {
-                temporary.delete()
-                "Could not save ${destination.name}"
-            }
+            writeTextReplacingSafely(destination, content)
             fileDescriptor(destination).also { descriptor ->
                 rememberLocation(descriptor.id, includeRecent = false)
             }
