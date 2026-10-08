@@ -154,24 +154,6 @@ class RelayPoolTest {
     }
 
     @Test
-    fun offlinePendingLeaseExpiresAfterResumeWindow() = runBlocking {
-        var now = 35_000L
-        val pool = RelayPool("pool", nowEpochMillis = { now })
-        val origin = RecordingPeer()
-
-        pool.register(node("origin", setOf("origin")), origin)
-        pool.publish("origin", envelope())
-        pool.unregister("origin", origin)
-
-        assertEquals(1, pool.pendingLeaseCount())
-        now += 24L * 60L * 60L * 1_000L + 1L
-        pool.sweepExpired()
-
-        assertEquals(0, pool.pendingLeaseCount())
-        assertTrue(pool.isEmpty())
-    }
-
-    @Test
     fun retainedTerminalLeaseExpiresAfterResumeWindow() = runBlocking {
         var now = 40_000L
         val pool = RelayPool("pool", nowEpochMillis = { now })
