@@ -162,6 +162,7 @@ internal fun AzphaltStoreScreen(
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
     var preparedModel by remember { mutableStateOf<AzphaltPreparedModelInstall?>(null) }
     var preparedLlm by remember { mutableStateOf<AzphaltPreparedLlmInstall?>(null) }
+    var llmInputValues by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var approvedPermissions by remember { mutableStateOf<Set<String>>(emptySet()) }
     var allowUntrustedSigner by remember { mutableStateOf(false) }
     var allowPublisherChange by remember { mutableStateOf(false) }
@@ -373,6 +374,7 @@ internal fun AzphaltStoreScreen(
                                 runCatching { service.prepareLlmInstall(item.id, item.latest) }
                                     .onSuccess { plan ->
                                         preparedLlm = plan
+                                        llmInputValues = emptyMap()
                                         prepared = null
                                         preparedModel = null
                                         allowUntrustedSigner = false
@@ -390,6 +392,7 @@ internal fun AzphaltStoreScreen(
                             service.removeLlm(llm.packageId)
                             status = "Removed ${item.name}."
                             preparedLlm = null
+                            llmInputValues = emptyMap()
                             refreshGeneration += 1
                         }
                     },
@@ -568,6 +571,7 @@ internal fun AzphaltStoreScreen(
                             service.installModel(
                                 prepared = plan,
                                 nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                                inputValues = llmInputValues,
                                 allowUntrustedSigner = allowUntrustedSigner,
                                 allowPublisherChange = allowPublisherChange,
                             )
@@ -587,6 +591,8 @@ internal fun AzphaltStoreScreen(
         preparedLlm?.let { plan ->
             PreparedStoreLlmPanel(
                 prepared = plan,
+                inputValues = llmInputValues,
+                onInputChanged = { id, value -> llmInputValues = llmInputValues + (id to value) },
                 allowUntrustedSigner = allowUntrustedSigner,
                 onAllowUntrustedSignerChanged = { allowUntrustedSigner = it },
                 allowPublisherChange = allowPublisherChange,
@@ -607,6 +613,7 @@ internal fun AzphaltStoreScreen(
                             status = getString(Res.string.store_installed_connect_it_to_use, installed.name) +
                                 if (installed.keyOptional) getString(Res.string.store_no_key_is_needed) else getString(Res.string.store_with_your_key)
                             preparedLlm = null
+                            llmInputValues = emptyMap()
                             refreshGeneration += 1
                             onConnectProvider(installed.providerId)
                         }.onFailure { failure ->
@@ -760,6 +767,8 @@ private fun StoreLlmRecord(
 @Composable
 private fun PreparedStoreLlmPanel(
     prepared: AzphaltPreparedLlmInstall,
+    inputValues: Map<String, String>,
+    onInputChanged: (String, String) -> Unit,
     allowUntrustedSigner: Boolean,
     onAllowUntrustedSignerChanged: (Boolean) -> Unit,
     allowPublisherChange: Boolean,
@@ -769,11 +778,15 @@ private fun PreparedStoreLlmPanel(
     val verification = prepared.verification
     val endpoint = prepared.endpoint
     val handling = prepared.llm.dataHandling
+    val configurationInputs = prepared.llm.inputs.filter { !it.password && it.id != endpoint.authInput }
     AzphaltRecord(
         seed = "azphalt-llm-prepared-${prepared.detail.id}",
         eyebrow = stringResource(Res.string.store_verified_language_model),
         title = "${prepared.detail.name} ${prepared.version}",
-        body = "${endpoint.defaultModel} at ${endpoint.baseUrl}",
+        body = listOfNotNull(
+            endpoint.defaultModel?.takeIf(String::isNotBlank),
+            endpoint.baseUrl?.takeIf(String::isNotBlank),
+        ).joinToString(" at ").ifBlank { endpoint.protocols.joinToString() },
         endCap = if (verification.trusted) {
             stringResource(Res.string.store_trusted)
         } else if (verification.packageContents.signed) {
@@ -793,13 +806,23 @@ private fun PreparedStoreLlmPanel(
                             (it.terms?.takeIf(String::isNotBlank)?.let { terms -> stringResource(Res.string.store_terms, terms) } ?: ""),
                     )
                 }
+                configurationInputs.forEach { input ->
+                    OutlinedTextField(
+                        value = inputValues[input.id].orEmpty(),
+                        onValueChange = { onInputChanged(input.id, it) },
+                        label = { Text(input.description ?: input.id) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 AzphaltNote(
                     seed = "azphalt-llm-prepared-key",
                     label = stringResource(Res.string.store_key),
                     value = when (endpoint.auth) {
                         "required-bearer" -> stringResource(Res.string.store_needs_a_key) + (prepared.keyInput?.description?.let { ": $it" } ?: ".")
                         "optional-bearer" -> stringResource(Res.string.store_no_key_needed) + (prepared.keyInput?.description?.let { "; $it" } ?: ".")
-                        else -> stringResource(Res.string.store_no_key_needed_2)
+                        else -> stringResource(Res.string.store_no_key_needed_2) +
+                            (prepared.connectionCredentialInput?.description?.let { " $it" } ?: "")
                     } + stringResource(Res.string.store_a_key_you_add_is_kept),
                 )
                 Text(
@@ -823,7 +846,8 @@ private fun PreparedStoreLlmPanel(
                 }
                 val trustReady = !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
-                if (trustReady && publisherReady) {
+                val inputsReady = configurationInputs.all { it.optional || inputValues[it.id]?.isNotBlank() == true }
+                if (trustReady && publisherReady && inputsReady) {
                     AzphaltPill(
                         label = stringResource(Res.string.store_install_and_connect),
                         seed = "azphalt-llm-install-${prepared.detail.id}",
