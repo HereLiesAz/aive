@@ -28,9 +28,26 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 1. The origin's `DistributedComputeExecutorIntegration` publishes a `DistributedTaskEnvelope` with lease ID `distributed:<runId>:<taskRunId>:<attempt>` and a default 30 s lease duration (minimum 5 s). Artifacts of other task runs are stripped from the envelope. The integration is used only while the relay client is connected.
 2. The relay offers the lease to every other node whose descriptor `canRun` it (accepting work, CPU/memory/accelerator/capability/model/node requirements, supported executor kind) and that is below its `maxParallelLeases`, ordered by preference score.
 3. A worker claims the lease; the relay assigns it to the first claimant and sets an expiry. The worker sends lease heartbeats every lease-duration/3 (at least 1 s), forwards `Running`/`Verifying` progress, and completes with `Completed` or `Failed` plus artifacts.
-4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s). If the origin disconnects, its leases are cancelled.
+4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
+   Origin disconnects do **not** cancel work. A claimed worker continues running; an unclaimed lease
+   remains eligible for workers that join later.
+5. The relay retains terminal lease results for 24 hours. When the same logical origin node reconnects,
+   the server replays the lease's accepted/claimed/progress/completed state using the existing protocol
+   messages, so a restarted client can reconstruct its `DistributedLeaseState` without dispatching the
+   task again. Terminal retention is bounded and expired entries are removed by the sweep.
 
-Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s). The origin maps lease phases back onto the `TaskRun`; a cancelled lease reports as `Failed`.
+Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
+The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
+`Failed`. Connection replacement is peer-identity checked, so a stale socket closing cannot unregister
+the newer connection for the same logical node ID. When a worker completes/cancels work, newly freed
+capacity immediately re-offers pending leases.
+
+## Durability boundary
+
+The current relay keeps lease state in process memory. Device or client-process disconnects are
+resumable, including results completed while the origin is offline, but restarting the relay process
+still loses its retained leases. Durable coordinator storage is a separate layer and is required
+before the relay itself can be treated as the authoritative always-on workflow home.
 
 ## What nodes accept
 
