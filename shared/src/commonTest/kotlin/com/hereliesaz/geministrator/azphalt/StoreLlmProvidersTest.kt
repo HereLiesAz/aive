@@ -36,15 +36,25 @@ class StoreLlmProvidersTest {
            "llm":{"tier":"endpoint","inputs":[{"id":"providerKey","password":true}],
              "endpoint":{"protocols":["openai-chat"],"baseUrl":"https://api.groq.com/openai/v1","defaultModel":"openai/gpt-oss-20b",
                "auth":"required-bearer","authInput":"providerKey"},
-             "dataHandling":{"prompts":"logged","modelPinned":true,"operator":"Groq"}}}
+             "dataHandling":{"prompts":"logged","modelPinned":true,"operator":"Groq"}}},
+          {"id":"com.hereliesaz.azphalt.llm.moyai","name":"Moyai","kind":"llm","version":"1.0.0",
+           "llm":{"tier":"endpoint",
+             "inputs":[{"id":"endpointUrl","type":"promptString","description":"Moyai URL"},
+                       {"id":"workspacePassword","type":"promptString","password":true,"optional":true,"description":"Workspace password"}],
+             "endpoint":{"protocols":["moyai-session"],"baseUrl":"${input:endpointUrl}","auth":"none"},
+             "dataHandling":{"prompts":"unknown","modelPinned":false,"operator":"Self-hosted Moyai"}}}
         ]}
     """.trimIndent()
 
     @Test
-    fun onlyEndpointPackagesSpeakingOpenAiChatAreDirectlyUsable() {
+    fun onlyEndpointPackagesWithSupportedDirectProtocolsAreDirectlyUsable() {
         val packages = json.decodeFromString(AzphaltPackageSearchResponse.serializer(), search).packages
         assertEquals(
-            listOf("com.hereliesaz.azphalt.llm.kilo", "com.hereliesaz.azphalt.llm.groq"),
+            listOf(
+                "com.hereliesaz.azphalt.llm.kilo",
+                "com.hereliesaz.azphalt.llm.groq",
+                "com.hereliesaz.azphalt.llm.moyai",
+            ),
             packages.filter { it.isDirectLlmPackage() }.map { it.id },
         )
         val sandbox = packages.single { it.id.endsWith("qwen2-5-1-5b") }.llm!!
@@ -63,6 +73,23 @@ class StoreLlmProvidersTest {
         assertNotNull(good.copy(endpoint = good.endpoint!!.copy(defaultModel = null)).directUseProblem())
         assertNotNull(good.copy(dataHandling = null).directUseProblem())
         assertNotNull(good.copy(endpoint = good.endpoint!!.copy(auth = "required-bearer", authInput = "missing")).directUseProblem())
+    }
+
+    @Test
+    fun moyaiSessionAcceptsConfiguredHttpsEndpointWithoutModelId() {
+        val moyai = json.decodeFromString(AzphaltPackageSearchResponse.serializer(), search)
+            .packages.single { it.id.endsWith(".moyai") }.llm!!
+        assertNull(moyai.directUseProblem())
+        assertEquals("endpointUrl", moyai.endpointUrlInput()!!.id)
+        assertTrue(moyai.inputs.single { it.id == "workspacePassword" }.password)
+        assertNull(
+            moyai.copy(endpoint = moyai.endpoint!!.copy(baseUrl = "http://moyai.example"))
+                .endpointUrlInput(),
+        )
+        assertNotNull(
+            moyai.copy(endpoint = moyai.endpoint!!.copy(baseUrl = "http://moyai.example"))
+                .directUseProblem(),
+        )
     }
 
     @Test
@@ -108,6 +135,7 @@ class StoreLlmProvidersTest {
         StoreLlmProviders.useSettings(settings)
         val reloaded = StoreLlmProviders.all().single()
         assertEquals("azphalt:p", reloaded.providerId)
+        assertEquals(listOf("openai-chat"), reloaded.protocols)
         assertFalse(reloaded.keyOptional)
     }
 }
