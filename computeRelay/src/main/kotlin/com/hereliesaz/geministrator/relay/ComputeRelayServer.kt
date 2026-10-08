@@ -153,6 +153,16 @@ fun Application.computeRelayModule(
                         )
                         continue
                     }
+                    if (!pool.isCurrentPeer(nodeId, peer)) {
+                        peer.send(
+                            ComputeRelayServerMessage.Error(
+                                code = "displaced",
+                                message = "This connection has been replaced by a newer session for the same node",
+                            ),
+                        )
+                        close(CloseReason(CloseReason.Codes.NORMAL, "Node session replaced"))
+                        break
+                    }
                     try {
                         when (message) {
                             is ComputeRelayClientMessage.Register -> {
