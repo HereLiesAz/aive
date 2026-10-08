@@ -12,9 +12,13 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.isMutation
 import com.hereliesaz.geministrator.workflow.isSystemExecutor
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -185,6 +189,34 @@ class SystemExecutorDistributedWorkloadRunner(
     )
 }
 
+/**
+ * Returns why a claimed worker must stop executing, or null while it still owns a live lease.
+ *
+ * Once execution has begun, Pending means the relay requeued the lease and a different worker may
+ * claim it. A claimed/running/verifying lease is valid only while this node remains its worker.
+ */
+internal fun workerLeaseInvalidationReason(
+    connected: Boolean,
+    state: DistributedLeaseState?,
+    nodeId: String,
+): String? {
+    if (!connected) return "Distributed relay disconnected while the lease was running"
+    val lease = state ?: return null
+    return when {
+        lease.phase == DistributedLeasePhase.Cancelled ->
+            lease.progressMessage?.takeIf(String::isNotBlank) ?: "Distributed lease was cancelled"
+        lease.phase == DistributedLeasePhase.Pending ->
+            lease.progressMessage?.takeIf(String::isNotBlank) ?: "Distributed lease was requeued"
+        lease.phase in setOf(
+            DistributedLeasePhase.Claimed,
+            DistributedLeasePhase.Running,
+            DistributedLeasePhase.Verifying,
+        ) && lease.workerNodeId != null && lease.workerNodeId != nodeId ->
+            "Distributed lease moved to another worker"
+        else -> null
+    }
+}
+
 class DistributedComputeWorker(
     private val client: RelayDistributedComputeClient,
     private val node: ComputeNodeDescriptor,
@@ -239,21 +271,40 @@ class DistributedComputeWorker(
             }
             if (claimed == null) return
 
-            val heartbeat = scope.launch {
-                val delayMillis = (envelope.leaseDurationMillis / 3).coerceAtLeast(1_000)
-                while (true) {
-                    delay(delayMillis)
-                    client.heartbeatLease(envelope.leaseId)
+            coroutineScope {
+                val executionScope = this
+                val leaseGuard = launch {
+                    val reason = combine(
+                        client.connected,
+                        client.leaseStates,
+                    ) { connected, states ->
+                        workerLeaseInvalidationReason(
+                            connected = connected,
+                            state = states[envelope.leaseId],
+                            nodeId = node.nodeId,
+                        )
+                    }.first { it != null }
+                    executionScope.cancel(CancellationException(requireNotNull(reason)))
+                }
+                val heartbeat = launch {
+                    val delayMillis = (envelope.leaseDurationMillis / 3).coerceAtLeast(1_000)
+                    while (true) {
+                        delay(delayMillis)
+                        client.heartbeatLease(envelope.leaseId)
+                    }
+                }
+                try {
+                    val result = runner.run(envelope) { progress ->
+                        client.progress(envelope.leaseId, progress)
+                    }
+                    client.complete(envelope.leaseId, result)
+                } finally {
+                    heartbeat.cancel()
+                    leaseGuard.cancel()
                 }
             }
-            try {
-                val result = runner.run(envelope) { progress ->
-                    client.progress(envelope.leaseId, progress)
-                }
-                client.complete(envelope.leaseId, result)
-            } finally {
-                heartbeat.cancel()
-            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Throwable) {
             runCatching {
                 client.complete(
