@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.HttpHeaders
@@ -197,7 +198,7 @@ class MoyaiProviderTest {
         }
     }
 
-    private fun json(
+    private fun MockRequestHandleScope.json(
         body: String,
         status: HttpStatusCode = HttpStatusCode.OK,
     ) = respond(
