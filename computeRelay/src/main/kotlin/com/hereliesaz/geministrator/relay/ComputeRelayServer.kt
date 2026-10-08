@@ -137,6 +137,7 @@ fun Application.computeRelayModule(
                     onlineNodes = online,
                 ),
             )
+            pool.replayOriginLeases(nodeId, peer)
 
             try {
                 for (frame in incoming) {
@@ -194,7 +195,7 @@ fun Application.computeRelayModule(
                     }
                 }
             } finally {
-                pool.unregister(nodeId)
+                pool.unregister(nodeId, peer)
             }
         }
     }
