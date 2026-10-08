@@ -121,3 +121,5 @@ The Workflows surface must:
 The runtime role registry must be refreshed after package installation before a newly installed role is dispatched. Installation must not require an application restart to make a role usable.
 
 The composed `WorkflowDefinition` is the durable execution contract. Package boundaries are provenance and update boundaries, not execution silos.
+
+Parallel role-agent dispatch is transactional at the provider-session boundary. The engine creates the selected sessions concurrently, but does not write any of their handles into workflow state until the whole creation batch succeeds. If one creation fails or the batch is cancelled, every sibling session that already returned a handle is cancelled before the failure escapes. The provider-backed gateway also cancels a provider run that started but failed before its handle could be returned.
