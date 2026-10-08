@@ -134,6 +134,51 @@ class RelayPoolTest {
     }
 
     @Test
+    fun pendingLeaseSurvivesOriginDisconnectAndIsOfferedToLaterWorker() = runBlocking {
+        val pool = RelayPool("pool", nowEpochMillis = { 22_000L })
+        val origin = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+        pool.unregister("origin", origin)
+
+        val lateWorker = RecordingPeer()
+        pool.register(node("worker", setOf("tests")), lateWorker)
+
+        assertEquals(1, pool.pendingLeaseCount())
+        assertTrue(lateWorker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == envelope.leaseId
+        })
+    }
+
+    @Test
+    fun retainedTerminalLeaseExpiresAfterResumeWindow() = runBlocking {
+        var now = 40_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        pool.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+        pool.claim("worker", envelope.leaseId)
+        pool.unregister("origin", origin)
+        pool.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(status = TaskRunStatus.Completed),
+        )
+        pool.unregister("worker", worker)
+
+        assertTrue(!pool.isEmpty())
+        now += 24L * 60L * 60L * 1_000L + 1L
+        pool.sweepExpired()
+        assertTrue(pool.isEmpty())
+    }
+
+    @Test
     fun staleConnectionCannotUnregisterReplacementNode() = runBlocking {
         val pool = RelayPool("pool", nowEpochMillis = { 25_000L })
         val oldPeer = RecordingPeer()
