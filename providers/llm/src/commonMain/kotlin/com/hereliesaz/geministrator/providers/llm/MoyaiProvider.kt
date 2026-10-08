@@ -66,6 +66,8 @@ class MoyaiProvider(
         supported = setOf(
             AgentCapability.RepositoryRead,
             AgentCapability.RepositoryWrite,
+            AgentCapability.PlanGeneration,
+            AgentCapability.PlanApproval,
             AgentCapability.Messaging,
             AgentCapability.ShellExecution,
             AgentCapability.Testing,
@@ -77,6 +79,28 @@ class MoyaiProvider(
 
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
         repository == null || repository.source == RepositorySource.GitHub
+
+    /**
+     * Aive owns this approval gate. Drafting is deliberately local and side-effect free so a Moyai
+     * workspace does not start before the user approves the execution shape.
+     */
+    override suspend fun draftPlan(request: AgentTaskRequest): String = buildString {
+        appendLine("1. Start an isolated Moyai workspace for this Aive task.")
+        if (request.repository != null) {
+            appendLine("2. Inspect the linked repository and the approved upstream context without changing unrelated work.")
+            appendLine("3. Perform the assigned role work against the task objective and acceptance criteria.")
+        } else {
+            appendLine("2. Perform the assigned role work in a repoless isolated workspace.")
+            appendLine("3. Keep all generated work scoped to the task objective and approved context.")
+        }
+        appendLine("4. Run the verification available in the workspace and preserve its evidence.")
+        val outputs = request.requiredArtifacts
+            .map { it.name }
+            .sorted()
+            .joinToString()
+            .ifBlank { "the final result" }
+        appendLine("5. Return $outputs to Aive; Aive decides acceptance, integration, and downstream execution.")
+    }.trim()
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
         require(supportsRepository(request.repository)) {
@@ -171,7 +195,7 @@ class MoyaiProvider(
 
     override suspend fun approvePlan(runId: ProviderRunId): ProviderActionResult =
         ProviderActionResult.Rejected(
-            "Moyai does not expose Aive's plan-approval contract; use workflow approval gates before dispatch",
+            "Moyai uses Aive's engine-owned pre-dispatch plan gate; no provider-side plan approval is expected",
         )
 
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult =
