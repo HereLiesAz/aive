@@ -62,6 +62,7 @@ class RelayPool(
             }
         }
         sendAll(outbound)
+        offerPendingLeases()
         return online
     }
 
@@ -281,7 +282,9 @@ class RelayPool(
         mutex.withLock {
             leases.entries.removeAll { (_, lease) ->
                 lease.result != null &&
-                    (lease.completedAtEpochMillis ?: Long.MAX_VALUE) + TERMINAL_RETENTION_MILLIS <= now
+                    lease.completedAtEpochMillis?.let { completedAt ->
+                        completedAt <= now - TERMINAL_RETENTION_MILLIS
+                    } == true
             }
             leases.values
                 .filter {
