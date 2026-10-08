@@ -114,6 +114,72 @@ class ConditionalBranchTest {
     }
 
     @Test
+    fun conditionOnlyEdgeWaitsForTargetBeforeResolving() {
+        val targetId = TaskDefinitionId("target")
+        val failureOnlyId = TaskDefinitionId("failure-only")
+        val anyOutcomeId = TaskDefinitionId("any-outcome")
+        val conditional = WorkflowDefinition(
+            id = WorkflowDefinitionId("condition-only"),
+            name = "Condition only",
+            tasks = listOf(
+                TaskDefinition(targetId, "Target", "Run target", roleId = null, executor = approvalExecutor),
+                TaskDefinition(
+                    id = failureOnlyId,
+                    name = "Failure only",
+                    objective = "Recover",
+                    roleId = null,
+                    executor = approvalExecutor,
+                    condition = TaskCondition.OnFailure(targetId),
+                ),
+                TaskDefinition(
+                    id = anyOutcomeId,
+                    name = "Any outcome",
+                    objective = "Cleanup",
+                    roleId = null,
+                    executor = approvalExecutor,
+                    condition = TaskCondition.OnAnyOutcome(targetId),
+                ),
+            ),
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        val created = WorkflowRunFactory.create(
+            definition = conditional,
+            workflowRunId = WorkflowRunId("condition-only-run"),
+            projectId = ProjectId("proj"),
+            objective = "test",
+            nowEpochMillis = 1L,
+            taskRunIdFactory = { TaskRunId(it.value) },
+        )
+
+        val runningTarget = created.copy(
+            taskRuns = created.taskRuns + (
+                targetId to created.taskRuns.getValue(targetId).copy(status = TaskRunStatus.Running)
+            ),
+        )
+        val whileRunning = WorkflowRunFactory.refreshReadiness(conditional, runningTarget, 2L)
+        assertEquals(TaskRunStatus.Blocked, whileRunning.taskRuns.getValue(failureOnlyId).status)
+        assertEquals(TaskRunStatus.Blocked, whileRunning.taskRuns.getValue(anyOutcomeId).status)
+
+        val failedTarget = runningTarget.copy(
+            taskRuns = runningTarget.taskRuns + (
+                targetId to runningTarget.taskRuns.getValue(targetId).copy(status = TaskRunStatus.Failed)
+            ),
+        )
+        val afterFailure = WorkflowRunFactory.refreshReadiness(conditional, failedTarget, 3L)
+        assertEquals(TaskRunStatus.Ready, afterFailure.taskRuns.getValue(failureOnlyId).status)
+        assertEquals(TaskRunStatus.Ready, afterFailure.taskRuns.getValue(anyOutcomeId).status)
+
+        val completedTarget = runningTarget.copy(
+            taskRuns = runningTarget.taskRuns + (
+                targetId to runningTarget.taskRuns.getValue(targetId).copy(status = TaskRunStatus.Completed)
+            ),
+        )
+        val afterSuccess = WorkflowRunFactory.refreshReadiness(conditional, completedTarget, 4L)
+        assertEquals(TaskRunStatus.Cancelled, afterSuccess.taskRuns.getValue(failureOnlyId).status)
+        assertEquals(TaskRunStatus.Ready, afterSuccess.taskRuns.getValue(anyOutcomeId).status)
+    }
+
+    @Test
     fun validatorRejectsMissingConditionTarget() {
         val badDef = WorkflowDefinition(
             id = WorkflowDefinitionId("bad"),

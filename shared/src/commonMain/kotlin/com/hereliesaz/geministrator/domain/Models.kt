@@ -116,9 +116,12 @@ fun TaskExecutor.displayName(): String = when (this) {
 /**
  * Condition under which a task is eligible to become Ready after its dependencies complete.
  * [Always] is the default: run whenever all [TaskDefinition.dependsOn] tasks are Completed.
- * [OnAnyOutcome] makes the task run regardless of whether a specific dependency succeeded or failed
- * (useful for cleanup/notification branches). [OnFailure] is the mirror of the default — only
- * eligible when the named dependency reached a Failed/Escalated terminal state.
+ * [OnAnyOutcome] makes the task run regardless of whether a specific referenced task succeeded or
+ * failed (useful for cleanup/notification branches). [OnFailure] is the mirror of the default —
+ * only eligible when the named task reached a Failed/Escalated/Cancelled terminal state.
+ *
+ * The task named by a non-[Always] condition is itself a scheduling edge. It need not also appear
+ * in [TaskDefinition.dependsOn], and readiness must not resolve the condition until that task is terminal.
  */
 @Serializable
 sealed interface TaskCondition {

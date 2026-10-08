@@ -224,10 +224,11 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
 - Workers re-check every lease before running it (`SystemExecutorDistributedWorkloadRunner`): the submitted workflow must validate; the task must be a distributed placement of the requested executor; a mutating repository operation needs a completed `HumanApproval` ancestor in the submitted run; and work that uses the worker's repository credentials (repository operations, GitHub Actions, GitHub-backed scripts) runs only against a repository of a project linked on the worker's own device. Anything else fails the lease as refused.
 - Relay tokens are stored in the platform credential store.
+- Origin disconnect does not destroy accepted work. The in-process relay retains unfinished leases until they complete/cancel; terminal results are bounded to a 24-hour resume window.
 
 **Remaining gaps**
 - There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted.
-- Envelopes are not end-to-end encrypted, so the relay operator sees them in plaintext.
+- Envelopes are not end-to-end encrypted, so the relay operator sees them in plaintext. Resumable lease state is currently retained in relay process memory for up to 24 hours; a future persistent coordinator must add an explicit at-rest protection policy before writing those envelopes to disk.
 - A pool member can still forge a run that claims its approval gate completed; the worker cannot verify that without signed approvals. The allow-list limits the damage to repositories the worker's owner already linked.
 - Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
 
