@@ -21,8 +21,10 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * Generic transport for hosted services that expose OpenAI Chat Completions semantics.
  *
- * This intentionally implements only the common text-generation subset Haive needs for a
+ * This intentionally implements only the common text-generation subset Aive needs for a
  * governed one-shot [TextLlmProvider]. Provider-specific features remain behind native adapters.
+ * A response finished because of an output-token limit (`finish_reason: "length"`) is rejected:
+ * partial text must never be promoted to a completed workflow result.
  */
 class OpenAiCompatibleChatApi(
     private val apiKeyProvider: LlmApiKeyProvider,
