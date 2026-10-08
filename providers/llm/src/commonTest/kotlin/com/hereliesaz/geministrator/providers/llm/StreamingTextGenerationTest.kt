@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -130,6 +131,28 @@ class StreamingTextGenerationTest {
         assertEquals("Final answer", result.text)
         assertEquals("First, then this", result.thinking)
         assertEquals(4L, result.inputTokens)
+    }
+
+    @Test
+    fun compatibleChatStreamRejectsTokenLimitTruncation() = runTest {
+        val client = sseClient(mutableListOf()) {
+            sse(
+                """{"choices":[{"delta":{"content":"partial answer"}}]}""",
+                """{"choices":[{"delta":{},"finish_reason":"length"}]}""",
+                "[DONE]",
+            )
+        }
+        val api = OpenAiCompatibleChatApi(
+            LlmApiKeyProvider { "k" },
+            model = "m",
+            baseUrl = "https://example.test/v1",
+            client = client,
+        )
+
+        val failure = assertFailsWith<IllegalStateException> {
+            api.stream("go") {}
+        }
+        assertTrue(failure.message.orEmpty().contains("truncated"))
     }
 
     @Test

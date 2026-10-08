@@ -69,6 +69,41 @@ class OpenAiCompatibleChatApiTest {
     }
 
     @Test
+    fun rejectsTokenLimitTruncationInsteadOfAcceptingPartialText() = runTest {
+        val client = HttpClient(MockEngine {
+            respond(
+                content = """{
+                    "choices":[{
+                      "message":{"role":"assistant","content":"partial answer"},
+                      "finish_reason":"length"
+                    }]
+                }""".trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true })
+            }
+        }
+
+        try {
+            val failure = assertFailsWith<IllegalStateException> {
+                OpenAiCompatibleChatApi(
+                    apiKeyProvider = LlmApiKeyProvider { "key" },
+                    model = "model",
+                    baseUrl = "https://example.test/v1",
+                    client = client,
+                ).generate("finish the task")
+            }
+            assertContains(failure.message.orEmpty(), "truncated")
+            assertContains(failure.message.orEmpty(), "output-token limit")
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun preservesProviderHttpFailure() = runTest {
         val client = HttpClient(MockEngine {
             respond(
