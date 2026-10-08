@@ -27,7 +27,6 @@ class RelayPool(
         val progress: com.hereliesaz.geministrator.distributed.DistributedExecutionProgress? = null,
         val result: com.hereliesaz.geministrator.distributed.DistributedExecutionResult? = null,
         val completedAtEpochMillis: Long? = null,
-        val originDisconnectedAtEpochMillis: Long? = null,
     )
 
     private val mutex = Mutex()
@@ -39,11 +38,6 @@ class RelayPool(
         var displacedPeer: RelayPeer? = null
         val online = mutex.withLock {
             val previous = nodes.put(node.nodeId, NodeSession(node, peer))
-            leases.entries
-                .filter { (_, lease) -> lease.originNodeId == node.nodeId && lease.result == null }
-                .forEach { (leaseId, lease) ->
-                    leases[leaseId] = lease.copy(originDisconnectedAtEpochMillis = null)
-                }
             val message = if (previous == null) {
                 ComputeRelayServerMessage.NodeJoined(node)
             } else {
@@ -99,12 +93,6 @@ class RelayPool(
 
             // Origin-owned leases intentionally survive origin disconnects. Their worker keeps
             // running, and terminal state is retained so the same logical node can resume later.
-            leases.entries
-                .filter { (_, lease) -> lease.originNodeId == nodeId && lease.result == null }
-                .forEach { (leaseId, lease) ->
-                    leases[leaseId] = lease.copy(originDisconnectedAtEpochMillis = nowEpochMillis())
-                }
-
             val workerLeases = leases.values.filter {
                 it.workerNodeId == removed.descriptor.nodeId && it.result == null
             }
@@ -296,15 +284,10 @@ class RelayPool(
         val now = nowEpochMillis()
         mutex.withLock {
             leases.entries.removeAll { (_, lease) ->
-                when {
-                    lease.result != null -> lease.completedAtEpochMillis?.let { completedAt ->
+                lease.result != null &&
+                    lease.completedAtEpochMillis?.let { completedAt ->
                         completedAt <= now - RESUME_RETENTION_MILLIS
                     } == true
-                    lease.workerNodeId == null -> lease.originDisconnectedAtEpochMillis?.let { disconnectedAt ->
-                        disconnectedAt <= now - RESUME_RETENTION_MILLIS
-                    } == true
-                    else -> false
-                }
             }
             leases.values
                 .filter {
