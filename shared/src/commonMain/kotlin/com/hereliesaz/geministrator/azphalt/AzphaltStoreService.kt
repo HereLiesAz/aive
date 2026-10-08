@@ -55,6 +55,9 @@ data class AzphaltPreparedLlmInstall(
 ) {
     val endpoint: AzphaltLlmEndpoint get() = requireNotNull(llm.endpoint)
     val keyInput: AzphaltLlmInput? get() = llm.inputs.firstOrNull { it.id == endpoint.authInput }
+    val endpointUrlInput: AzphaltLlmInput? get() = llm.endpointUrlInput()
+    val connectionCredentialInput: AzphaltLlmInput?
+        get() = keyInput ?: llm.inputs.firstOrNull { it.password }
 }
 
 data class AzphaltPreparedInstall(
@@ -348,6 +351,7 @@ class AzphaltStoreService(
     suspend fun installLlm(
         prepared: AzphaltPreparedLlmInstall,
         nowEpochMillis: Long,
+        inputValues: Map<String, String> = emptyMap(),
         allowUntrustedSigner: Boolean = false,
         allowPublisherChange: Boolean = false,
     ): InstalledStoreLlm {
@@ -362,16 +366,18 @@ class AzphaltStoreService(
         val manifest = verification.packageContents.manifest
         val endpoint = prepared.endpoint
         val handling = requireNotNull(prepared.llm.dataHandling)
+        val endpointUrl = resolveDirectEndpointUrl(prepared, inputValues)
         val installed = InstalledStoreLlm(
             packageId = manifest.id,
             version = manifest.version,
             repositoryUrl = prepared.repositoryUrl,
             name = manifest.name,
             description = manifest.description,
-            baseUrl = requireNotNull(endpoint.baseUrl).trimEnd('/'),
-            defaultModel = requireNotNull(endpoint.defaultModel),
+            baseUrl = endpointUrl,
+            defaultModel = endpoint.defaultModel.orEmpty(),
+            protocols = endpoint.protocols,
             auth = endpoint.auth,
-            keyLabel = prepared.keyInput?.description,
+            keyLabel = prepared.connectionCredentialInput?.description,
             prompts = handling.prompts,
             modelPinned = handling.modelPinned,
             operator = handling.operator,
@@ -388,6 +394,25 @@ class AzphaltStoreService(
     }
 
     fun removeLlm(packageId: String) = llmRegistry.remove(packageId)
+
+    private fun resolveDirectEndpointUrl(
+        prepared: AzphaltPreparedLlmInstall,
+        inputValues: Map<String, String>,
+    ): String {
+        val endpoint = prepared.endpoint
+        val raw = prepared.endpointUrlInput?.let { input ->
+            inputValues[input.id]?.trim().orEmpty().also { value ->
+                require(value.isNotBlank() || input.optional) { "${input.description ?: input.id} is required" }
+            }
+        }?.takeIf(String::isNotBlank) ?: endpoint.baseUrl.orEmpty().trim()
+        require(raw.startsWith("https://", ignoreCase = true)) {
+            "Language model endpoint must use HTTPS"
+        }
+        require('@' !in raw.substringAfter("https://").substringBefore('/')) {
+            "Language model endpoint URL must not contain embedded credentials"
+        }
+        return raw.trimEnd('/')
+    }
 
     suspend fun prepareInstall(
         packageId: String,
