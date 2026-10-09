@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -177,6 +178,74 @@ class RelayPoolTest {
         now += 24L * 60L * 60L * 1_000L + 1L
         pool.sweepExpired()
         assertTrue(pool.isEmpty())
+    }
+
+    @Test
+    fun unfinishedLeaseRequeuesAfterRelayProcessRestart() = runBlocking {
+        val directory = Files.createTempDirectory("aive-relay-test")
+        val store = EncryptedFileRelayStateStore(directory, "relay-secret")
+        val first = RelayPool("pool", nowEpochMillis = { 50_000L }, stateStore = store)
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        first.register(node("origin", setOf("origin")), origin)
+        first.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope("restart-pending")
+        first.publish("origin", envelope)
+        first.claim("worker", envelope.leaseId)
+
+        val restarted = RelayPool("pool", nowEpochMillis = { 51_000L }, stateStore = store)
+        val resumedOrigin = RecordingPeer()
+        val replacementWorker = RecordingPeer()
+        restarted.register(node("origin", setOf("origin")), resumedOrigin)
+        restarted.replayOriginLeases("origin", resumedOrigin)
+        restarted.register(node("worker-2", setOf("tests")), replacementWorker)
+
+        assertEquals(1, restarted.pendingLeaseCount())
+        assertTrue(resumedOrigin.messages.any {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == envelope.leaseId
+        })
+        assertTrue(resumedOrigin.messages.none {
+            it is ComputeRelayServerMessage.LeaseClaimed && it.leaseId == envelope.leaseId
+        })
+        assertTrue(replacementWorker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == envelope.leaseId
+        })
+    }
+
+    @Test
+    fun completedLeaseReplaysAfterRelayProcessRestart() = runBlocking {
+        val directory = Files.createTempDirectory("aive-relay-test")
+        val store = EncryptedFileRelayStateStore(directory, "relay-secret")
+        val first = RelayPool("pool", nowEpochMillis = { 60_000L }, stateStore = store)
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        first.register(node("origin", setOf("origin")), origin)
+        first.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope("restart-complete")
+        first.publish("origin", envelope)
+        first.claim("worker", envelope.leaseId)
+        first.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(
+                status = TaskRunStatus.Completed,
+                progressMessage = "Finished before restart",
+            ),
+        )
+
+        val restarted = RelayPool("pool", nowEpochMillis = { 61_000L }, stateStore = store)
+        val resumedOrigin = RecordingPeer()
+        restarted.register(node("origin", setOf("origin")), resumedOrigin)
+        restarted.replayOriginLeases("origin", resumedOrigin)
+
+        assertEquals(0, restarted.pendingLeaseCount())
+        val completed = resumedOrigin.messages
+            .filterIsInstance<ComputeRelayServerMessage.LeaseCompleted>()
+            .single { it.leaseId == envelope.leaseId }
+        assertEquals(TaskRunStatus.Completed, completed.result.status)
+        assertEquals("Finished before restart", completed.result.progressMessage)
     }
 
     @Test
