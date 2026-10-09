@@ -169,3 +169,7 @@ See [`../PRIVACY.md`](../PRIVACY.md).
 Memory is persisted outside the workflow schema, one store per workflow run: every run's memory bank is its own SQLite database (desktop `~/.aive/memory/banks/`, Android `aive-memory-w-*.db`, web one OPFS database per bank, each on its own worker), with browser storage keys per bank where OPFS is unavailable. A workflow's lineage bank reads its ancestors' banks by reference; nothing is copied. The lineage DAG (`WorkflowRun.parentWorkflowRunIds` as recorded by memory), project membership and expansions, and the list of banks are add-only records in Settings (`MemoryLineage`, `SettingsMemoryBankRegistry`). Storage is add-only; the single exception is the user's raw-history retention setting (default: keep everything), whose purges leave a tombstone on each episode.
 
 The earlier single shared memory store is split into workflow banks once on first start and then left untouched as the backup; anything drawn from several workflows is listed in the migration report and placed in no bank. See [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage).
+
+## Import commit ordering
+
+Project and full-snapshot imports write the replacement chunked snapshot before retiring existing event journals. A failed snapshot commit therefore leaves the prior snapshot and journal intact. Successful project import removes both current and legacy journal namespaces for replaced runs.
