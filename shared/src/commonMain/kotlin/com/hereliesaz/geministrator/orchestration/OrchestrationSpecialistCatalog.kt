@@ -24,7 +24,7 @@ import kotlinx.serialization.json.Json
  */
 object OrchestrationSpecialistCatalog {
     // register_catalog.py:begin
-    const val RELEASED: String = """{"specialists":[]}"""
+    const val RELEASED: String = """{"specialists":[{"specialistId":"orchestration:decisions","mergedVariants":[{"logicalArtifactId":"orchestration:decisions:int8","foundationModelId":"google/bert_uncased_L-4_H-256_A-4","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-decisions-v1","assetName":"aive-orchestration-decisions-int8.tar.gz","sha256":"8b6c7014691bb14793faafe465c1f76e5fe099b737b55bbad8e02d81cc058fe3","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["orchestration-decisions"]}]}]}"""
     // register_catalog.py:end
 
     private val json = Json { ignoreUnknownKeys = true }
