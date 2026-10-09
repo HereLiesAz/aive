@@ -309,7 +309,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 
 **Remaining gaps**
 - Imported run bundles are not cryptographically signed. A tampered bundle is accepted if it passes schema validation.
-- The web build encrypts credentials in `localStorage` with a non-extractable AES-GCM key held in IndexedDB (`credential-vault.js`). That defeats copied or dumped storage, not script running on the origin, which can still ask the key to decrypt. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) fall back to plaintext.
+- The web build encrypts credentials in `localStorage` with a non-extractable AES-GCM key held in IndexedDB (`credential-vault.js`). First-use key creation uses IndexedDB `add()` as the atomic winner across concurrent tabs; a losing tab discards its generated key and reloads the stored winner before encrypting. That defeats copied or dumped storage, not script running on the origin, which can still ask the key to decrypt. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) fall back to plaintext.
 
 ## Invariants
 
