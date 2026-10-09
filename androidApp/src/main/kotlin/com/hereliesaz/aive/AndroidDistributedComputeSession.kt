@@ -1,10 +1,13 @@
 package com.hereliesaz.aive
 
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
@@ -25,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 internal class AndroidDistributedComputeSession(
     context: Context,
@@ -39,28 +43,33 @@ internal class AndroidDistributedComputeSession(
         install(WebSockets)
     }
 
-    val node: ComputeNodeDescriptor = androidComputeNode(
+    @Volatile
+    private var currentNode: ComputeNodeDescriptor = androidComputeNode(
         context = appContext,
         configuration = configuration,
         supportedExecutorKinds = supportedExecutorKinds,
     )
+
+    val node: ComputeNodeDescriptor get() = currentNode
+
+    private val connectivity = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     val client = RelayDistributedComputeClient(
         httpClient = httpClient,
         relayBaseUrl = configuration.relayUrl,
         poolId = configuration.poolId,
         bearerToken = token,
-        initialNode = node,
+        initialNode = currentNode,
     )
 
-    private val gateway = RelayDistributedComputeGateway(client, node.nodeId)
+    private val gateway = RelayDistributedComputeGateway(client, currentNode.nodeId)
 
     val executorIntegrations: TaskExecutorIntegrationRegistry =
         baseIntegrations.withIntegration(DistributedComputeExecutorIntegration(gateway))
 
     private val worker = DistributedComputeWorker(
         client = client,
-        node = node,
+        nodeProvider = { currentNode },
         runners = listOf(
             SystemExecutorDistributedWorkloadRunner(
                 integrations = baseIntegrations,
@@ -74,16 +83,52 @@ internal class AndroidDistributedComputeSession(
         scope = scope,
     )
 
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = refreshNode()
+        override fun onLost(network: Network) = refreshNode()
+        override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) = refreshNode()
+    }
+
+    private val powerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) = refreshNode()
+    }
+
     fun start() {
+        connectivity.registerDefaultNetworkCallback(networkCallback)
+        appContext.registerReceiver(
+            powerReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+                addAction(Intent.ACTION_BATTERY_CHANGED)
+            },
+        )
         client.start(scope)
-        if (node.acceptsWork) {
-            worker.start()
-        }
+        // The worker stays subscribed even when this device is currently ineligible. Each offer is
+        // checked against [currentNode], so becoming eligible later does not require recreating the
+        // session or losing relay state.
+        worker.start()
+        refreshNode()
     }
 
     fun close() {
+        runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
+        runCatching { appContext.unregisterReceiver(powerReceiver) }
         scope.cancel()
         httpClient.close()
+    }
+
+    private fun refreshNode() {
+        val updated = androidComputeNode(
+            context = appContext,
+            configuration = configuration,
+            supportedExecutorKinds = supportedExecutorKinds,
+        )
+        if (updated == currentNode) return
+        currentNode = updated
+        scope.launch {
+            runCatching { client.updateNode(updated) }
+        }
     }
 }
 
