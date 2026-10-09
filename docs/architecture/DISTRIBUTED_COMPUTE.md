@@ -49,7 +49,7 @@ Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which acce
 - Android — `script`; `github-action` and `repository-operation` with a GitHub token; `repository-operation` with a GitLab token.
 - Desktop — `repository-operation`; `github-action` with a GitHub token.
 
-Android accepts work only when sharing is enabled and its metered-network and external-power policy is satisfied. Desktop cannot observe power state, so enabling "require external power" stops it accepting work.
+Android accepts new work only when sharing is enabled and its current metered-network and external-power policy is satisfied. The Android session watches default-network and battery/power broadcasts, updates its relay descriptor when those conditions change, and the local worker evaluates each incoming offer against that same live descriptor. An already-claimed lease is not cancelled merely because power/network policy later becomes ineligible; ownership loss/cancellation remains the authority for stopping side-effecting work. Desktop cannot observe power state, so enabling "require external power" stops it accepting work.
 
 ## Encrypted compute mesh primitives
 
