@@ -28,9 +28,19 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 1. The origin's `DistributedComputeExecutorIntegration` publishes a `DistributedTaskEnvelope` with lease ID `distributed:<runId>:<taskRunId>:<attempt>` and a default 30 s lease duration (minimum 5 s). Artifacts of other task runs are stripped from the envelope. The integration is used only while the relay client is connected.
 2. The relay offers the lease to every other node whose descriptor `canRun` it (accepting work, CPU/memory/accelerator/capability/model/node requirements, supported executor kind) and that is below its `maxParallelLeases`, ordered by preference score.
 3. A worker claims the lease; the relay assigns it to the first claimant and sets an expiry. The worker sends lease heartbeats every lease-duration/3 (at least 1 s), forwards `Running`/`Verifying` progress, and completes with `Completed` or `Failed` plus artifacts. While executing, the worker continuously guards its lease: explicit cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine. Transport loss is treated as cancellation, not fabricated task failure.
-4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s). If the origin disconnects, its leases are cancelled.
+4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
+   Origin disconnect does **not** cancel accepted work. A claimed worker continues while its own relay
+   session remains healthy; unclaimed work stays eligible for workers that join later.
+5. The relay retains terminal lease results for 24 hours. Unfinished leases are not time-expired merely
+   because their origin is offline: dropping an unfinished external run ID would make it unsafe to infer
+   that side effects can be repeated. When the same logical origin reconnects, the relay replays its
+   accepted/claimed/progress/completed state so the client can reconstruct the existing lease instead
+   of dispatching it again.
 
-Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s). The origin maps lease phases back onto the `TaskRun`; a cancelled lease reports as `Failed`.
+Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
+The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
+`Failed`. Connection replacement is fenced by peer identity, so a stale socket cannot unregister or
+mutate state after a newer connection takes over the same logical node ID.
 
 ## What nodes accept
 
