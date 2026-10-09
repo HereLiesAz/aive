@@ -24,6 +24,8 @@ import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
@@ -193,6 +195,10 @@ class RelayPoolTest {
         val envelope = envelope("restart-pending")
         first.publish("origin", envelope)
         first.claim("worker", envelope.leaseId)
+        assertNull(
+            store.load("pool").single().workerNodeId,
+            "Live worker ownership must never be persisted for unfinished work",
+        )
 
         val restarted = RelayPool("pool", nowEpochMillis = { 51_000L }, stateStore = store)
         val resumedOrigin = RecordingPeer()
@@ -246,6 +252,26 @@ class RelayPoolTest {
             .single { it.leaseId == envelope.leaseId }
         assertEquals(TaskRunStatus.Completed, completed.result.status)
         assertEquals("Finished before restart", completed.result.progressMessage)
+    }
+
+    @Test
+    fun persistenceFailureRollsBackNewLeaseAcceptance() = runBlocking {
+        val pool = RelayPool(
+            poolId = "pool",
+            nowEpochMillis = { 55_000L },
+            stateStore = FailingRelayStateStore(),
+        )
+        val origin = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), origin)
+
+        assertFailsWith<IllegalStateException> {
+            pool.publish("origin", envelope("not-committed"))
+        }
+
+        assertEquals(0, pool.pendingLeaseCount())
+        assertTrue(origin.messages.none {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == "not-committed"
+        })
     }
 
     @Test
@@ -388,6 +414,16 @@ class RelayPoolTest {
             submittedAtEpochMillis = 1,
             leaseDurationMillis = leaseDurationMillis,
         )
+    }
+
+    private class FailingRelayStateStore : RelayStateStore {
+        override fun load(poolId: String): List<PersistedRelayLease> = emptyList()
+        override fun save(poolId: String, leases: List<PersistedRelayLease>) {
+            throw IllegalStateException("simulated storage failure")
+        }
+        override fun delete(poolId: String) {
+            throw IllegalStateException("simulated storage failure")
+        }
     }
 
     private class RecordingPeer : RelayPeer {
