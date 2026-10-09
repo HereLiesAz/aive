@@ -377,6 +377,104 @@ class SettingsWorkflowPersistenceTest {
     }
 
     @Test
+    fun failedProjectImportPreservesExistingJournalUntilSnapshotCommit() = runBlocking {
+        val source = SettingsWorkflowPersistence(MapSettings())
+        val project = Project(
+            id = ProjectId("atomic-import-project"),
+            name = "Atomic Import",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 2L,
+        )
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("atomic-import-workflow"),
+            name = "Atomic Import Workflow",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("task"),
+                    name = "Task",
+                    objective = "Imported objective",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("atomic-import-run"),
+            projectId = project.id,
+            objective = "Imported objective",
+            nowEpochMillis = 1L,
+            taskRunIdFactory = { TaskRunId("atomic-import-task-run") },
+        )
+        val importedEvent = TaskStarted(
+            workflowRunId = run.id,
+            taskDefinitionId = TaskDefinitionId("task"),
+            attempt = 1,
+            occurredAtEpochMillis = 200L,
+        )
+        source.projects.put(project)
+        source.definitions.put(definition)
+        source.runs.put(run)
+        source.events.append(importedEvent)
+        val encoded = source.exportProjectFile(project.id, 300L)
+
+        val settings = SnapshotCommitFailingSettings()
+        val destination = SettingsWorkflowPersistence(settings)
+        destination.projects.put(project.copy(name = "Old Project"))
+        destination.definitions.put(definition)
+        destination.runs.put(run.copy(objective = "Old objective"))
+        val oldEvent = TaskStarted(
+            workflowRunId = run.id,
+            taskDefinitionId = TaskDefinitionId("task"),
+            attempt = 1,
+            occurredAtEpochMillis = 100L,
+        )
+        destination.events.append(oldEvent)
+
+        settings.failSnapshotCommit = true
+        assertFailsWith<IllegalStateException> {
+            destination.importProjectFile(encoded)
+        }
+        settings.failSnapshotCommit = false
+
+        assertEquals(listOf(oldEvent), destination.events.forRun(run.id))
+        assertEquals("Old objective", destination.runs.get(run.id)?.objective)
+    }
+
+    @Test
+    fun failedFullJsonImportPreservesExistingJournalUntilSnapshotCommit() = runBlocking {
+        val source = SettingsWorkflowPersistence(MapSettings())
+        val sourceRunId = WorkflowRunId("replacement-run")
+        source.events.append(
+            TaskStarted(
+                workflowRunId = sourceRunId,
+                taskDefinitionId = TaskDefinitionId("task"),
+                attempt = 1,
+                occurredAtEpochMillis = 200L,
+            ),
+        )
+        val encoded = source.exportJson()
+
+        val settings = SnapshotCommitFailingSettings()
+        val destination = SettingsWorkflowPersistence(settings)
+        val oldRunId = WorkflowRunId("existing-run")
+        val oldEvent = TaskStarted(
+            workflowRunId = oldRunId,
+            taskDefinitionId = TaskDefinitionId("task"),
+            attempt = 1,
+            occurredAtEpochMillis = 100L,
+        )
+        destination.events.append(oldEvent)
+
+        settings.failSnapshotCommit = true
+        assertFailsWith<IllegalStateException> {
+            destination.importJson(encoded)
+        }
+        settings.failSnapshotCommit = false
+
+        assertEquals(listOf(oldEvent), destination.events.forRun(oldRunId))
+    }
+
+    @Test
     fun iveProjectRoundTripPreservesProjectStateWithoutReplacingOtherProjects() = runBlocking {
         val source = SettingsWorkflowPersistence(MapSettings())
         val project = Project(
@@ -449,6 +547,22 @@ class SettingsWorkflowPersistenceTest {
         delegate = settings,
         chunkedKeys = setOf(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY),
     )
+
+    private class SnapshotCommitFailingSettings(
+        private val delegate: Settings = MapSettings(),
+    ) : Settings by delegate {
+        var failSnapshotCommit: Boolean = false
+
+        override fun putString(key: String, value: String) {
+            if (
+                failSnapshotCommit &&
+                key == "${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.__chunks"
+            ) {
+                throw IllegalStateException("simulated snapshot manifest failure")
+            }
+            delegate.putString(key, value)
+        }
+    }
 
     private class JavaPreferencesLimitSettings(
         private val delegate: Settings = MapSettings(),
