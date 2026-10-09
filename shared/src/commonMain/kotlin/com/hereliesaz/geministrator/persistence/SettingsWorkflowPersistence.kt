@@ -257,12 +257,6 @@ class SettingsWorkflowPersistence(
                 .flatMap { it.taskRuns.values }
                 .mapTo(linkedSetOf()) { it.id }
 
-            // Imported runs replace their own journal so repeated loads are idempotent.
-            importedRunIds.forEach { runId ->
-                val prefix = eventRunPrefix(runId)
-                settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
-            }
-
             val merged = current.copy(
                 version = CURRENT_SCHEMA_VERSION,
                 projects = imported.projects.fold(current.projects) { values, value ->
@@ -282,7 +276,11 @@ class SettingsWorkflowPersistence(
                 approvalGates = current.approvalGates.filterNot { it.workflowRunId in importedRunIds } +
                     imported.approvalGates,
             )
+            // Commit the replacement snapshot before retiring any old per-run journal. The
+            // generation-switched chunked snapshot keeps the previous complete snapshot readable
+            // if this write is interrupted or rejected.
             writeSnapshotUnlocked(merged)
+            importedRunIds.forEach(::removeJournalForRunUnlocked)
         }
         return project
     }
@@ -298,11 +296,12 @@ class SettingsWorkflowPersistence(
         }
         val migrated = migrate(snapshot).copy(version = CURRENT_SCHEMA_VERSION)
         settingsWorkflowPersistenceMutex.withLock {
-            // Clear existing per-run journal entries before restoring to prevent event mixing.
+            // The replacement snapshot is the durable commit point. Journals are retired only
+            // after it succeeds, so a failed import leaves the previous snapshot+journal intact.
+            writeSnapshotUnlocked(migrated)
             settings.keys
                 .filter { it.startsWith(eventJournalRoot()) }
                 .forEach(settings::remove)
-            writeSnapshotUnlocked(migrated)
         }
     }
 
@@ -415,6 +414,16 @@ class SettingsWorkflowPersistence(
 
     private fun journalStringOrNull(key: String, chunked: Boolean): String? =
         if (chunked) eventValueSettings(key).getStringOrNull(key) else settings.getStringOrNull(key)
+
+    private fun removeJournalForRunUnlocked(workflowRunId: WorkflowRunId) {
+        val prefixes = listOf(
+            eventRunPrefix(workflowRunId),
+            legacyEventRunPrefix(workflowRunId),
+        )
+        settings.keys
+            .filter { key -> prefixes.any(key::startsWith) }
+            .forEach(settings::remove)
+    }
 
     private fun eventJournalRoot(): String = "$storageKey.events."
 
