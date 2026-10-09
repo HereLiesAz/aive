@@ -146,7 +146,7 @@ class EncryptedFileRelayStateStore(
         require(poolId.isNotBlank()) { "poolId must not be blank" }
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(poolId.toByteArray(StandardCharsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         return directory.resolve("$digest.relay")
     }
 
