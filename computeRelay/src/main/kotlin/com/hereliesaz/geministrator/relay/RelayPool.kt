@@ -32,8 +32,9 @@ class RelayPool(
 
     private val mutex = Mutex()
     private val nodes = linkedMapOf<String, NodeSession>()
+    private val restoredLeases = stateStore.load(poolId)
     private val leases = linkedMapOf<String, LeaseRecord>().apply {
-        stateStore.load(poolId)
+        restoredLeases
             .filterNot { persisted ->
                 persisted.result != null &&
                     persisted.completedAtEpochMillis?.let { completedAt ->
@@ -56,6 +57,12 @@ class RelayPool(
                     ),
                 )
             }
+    }
+
+    init {
+        if (restoredLeases.size != leases.size) {
+            persistLocked()
+        }
     }
 
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
