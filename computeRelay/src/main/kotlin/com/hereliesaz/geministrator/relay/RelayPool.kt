@@ -13,6 +13,7 @@ fun interface RelayPeer {
 class RelayPool(
     private val poolId: String,
     private val nowEpochMillis: () -> Long,
+    private val stateStore: RelayStateStore = NoopRelayStateStore,
 ) {
     private data class NodeSession(
         val descriptor: ComputeNodeDescriptor,
@@ -31,7 +32,31 @@ class RelayPool(
 
     private val mutex = Mutex()
     private val nodes = linkedMapOf<String, NodeSession>()
-    private val leases = linkedMapOf<String, LeaseRecord>()
+    private val leases = linkedMapOf<String, LeaseRecord>().apply {
+        stateStore.load(poolId)
+            .filterNot { persisted ->
+                persisted.result != null &&
+                    persisted.completedAtEpochMillis?.let { completedAt ->
+                        completedAt <= nowEpochMillis() - RESUME_RETENTION_MILLIS
+                    } == true
+            }
+            .forEach { persisted ->
+                put(
+                    persisted.envelope.leaseId,
+                    LeaseRecord(
+                        envelope = persisted.envelope,
+                        originNodeId = persisted.originNodeId,
+                        // A relay restart severs every worker socket. Unfinished work must return to
+                        // pending rather than pretending the dead process still owns a claim.
+                        workerNodeId = persisted.workerNodeId.takeIf { persisted.result != null },
+                        expiresAtEpochMillis = null,
+                        progress = persisted.progress.takeIf { persisted.result != null },
+                        result = persisted.result,
+                        completedAtEpochMillis = persisted.completedAtEpochMillis,
+                    ),
+                )
+            }
+    }
 
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
@@ -147,6 +172,7 @@ class RelayPool(
                 envelope = envelope,
                 originNodeId = originNodeId,
             )
+            persistLocked()
             outbound += origin.peer to ComputeRelayServerMessage.LeaseAccepted(envelope.leaseId)
         }
         sendAll(outbound)
@@ -252,6 +278,7 @@ class RelayPool(
                 result = result,
                 completedAtEpochMillis = nowEpochMillis(),
             )
+            persistLocked()
             val completed = ComputeRelayServerMessage.LeaseCompleted(
                 leaseId = leaseId,
                 workerNodeId = workerNodeId,
@@ -270,6 +297,7 @@ class RelayPool(
             val lease = leases[leaseId] ?: return
             if (lease.originNodeId != originNodeId) return
             leases.remove(leaseId)
+            persistLocked()
             val cancelled = ComputeRelayServerMessage.LeaseCancelled(leaseId, reason)
             nodes[lease.originNodeId]?.let { origin -> outbound += origin.peer to cancelled }
             lease.workerNodeId?.let(nodes::get)?.let { worker -> outbound += worker.peer to cancelled }
@@ -283,12 +311,13 @@ class RelayPool(
         val reoffer = mutableListOf<String>()
         val now = nowEpochMillis()
         mutex.withLock {
-            leases.entries.removeAll { (_, lease) ->
+            val removedTerminal = leases.entries.removeAll { (_, lease) ->
                 lease.result != null &&
                     lease.completedAtEpochMillis?.let { completedAt ->
                         completedAt <= now - RESUME_RETENTION_MILLIS
                     } == true
             }
+            if (removedTerminal) persistLocked()
             leases.values
                 .filter {
                     it.result == null &&
@@ -391,6 +420,20 @@ class RelayPool(
                 ),
             )
         }
+    }
+
+    private fun persistLocked() {
+        val persisted = leases.values.map { lease ->
+            PersistedRelayLease(
+                envelope = lease.envelope,
+                originNodeId = lease.originNodeId,
+                workerNodeId = lease.workerNodeId,
+                progress = lease.progress,
+                result = lease.result,
+                completedAtEpochMillis = lease.completedAtEpochMillis,
+            )
+        }
+        if (persisted.isEmpty()) stateStore.delete(poolId) else stateStore.save(poolId, persisted)
     }
 
     private suspend fun sendAll(outbound: List<Pair<RelayPeer, ComputeRelayServerMessage>>) {
