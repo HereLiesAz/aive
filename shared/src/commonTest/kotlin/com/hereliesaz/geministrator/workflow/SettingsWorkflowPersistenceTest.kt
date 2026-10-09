@@ -519,7 +519,8 @@ class SettingsWorkflowPersistenceTest {
         val encoded = source.exportProjectFile(project.id, savedAtEpochMillis = 40L)
         assertTrue(encoded.contains("\"format\":\"the-aive-project\""))
 
-        val destination = SettingsWorkflowPersistence(MapSettings())
+        val destinationSettings = MapSettings()
+        val destination = SettingsWorkflowPersistence(destinationSettings)
         val existingProject = Project(
             id = ProjectId("existing-project"),
             name = "Existing Project",
@@ -527,6 +528,31 @@ class SettingsWorkflowPersistenceTest {
             updatedAtEpochMillis = 2L,
         )
         destination.projects.put(existingProject)
+        destination.events.append(
+            TaskStarted(
+                workflowRunId = run.id,
+                taskDefinitionId = TaskDefinitionId("portable-task"),
+                attempt = 1,
+                occurredAtEpochMillis = 5L,
+            ),
+        )
+        val legacyPrefix = SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY + ".events." +
+            run.id.value.map { character ->
+                character.code.toString(16).padStart(4, '0')
+            }.joinToString("")
+        destinationSettings.putString(
+            "$legacyPrefix.0",
+            SettingsWorkflowPersistence.defaultJson.encodeToString(
+                WorkflowEvent.serializer(),
+                TaskStarted(
+                    workflowRunId = run.id,
+                    taskDefinitionId = TaskDefinitionId("portable-task"),
+                    attempt = 1,
+                    occurredAtEpochMillis = 6L,
+                ),
+            ),
+        )
+        destinationSettings.putString("$legacyPrefix.count", "1")
 
         val imported = destination.importProjectFile(encoded)
 
@@ -535,7 +561,11 @@ class SettingsWorkflowPersistenceTest {
         assertEquals(existingProject, destination.projects.get(existingProject.id))
         assertEquals(definition, destination.definitions.get(definition.id))
         assertEquals(run, destination.runs.get(run.id))
-        assertEquals(1, destination.events.forRun(run.id).size)
+        assertEquals(
+            listOf(31L),
+            destination.events.forRun(run.id).map { it.occurredAtEpochMillis },
+        )
+        assertTrue(destinationSettings.keys.none { it.startsWith(legacyPrefix) })
         assertEquals(
             BuiltInRoles.ImplementationEngineer,
             destination.roles.get(BuiltInRoles.ImplementationEngineer.id),
