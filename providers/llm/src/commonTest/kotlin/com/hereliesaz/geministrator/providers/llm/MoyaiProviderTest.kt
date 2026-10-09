@@ -180,7 +180,7 @@ class MoyaiProviderTest {
                 provider.cancel(com.hereliesaz.geministrator.domain.ProviderRunId("run-1")),
             )
             assertEquals(
-                listOf(
+                listOf<Pair<String, String?>>(
                     "/api/runs/run-1/messages" to "csrf-direct",
                     "/api/runs/run-1/cancel" to "csrf-direct",
                 ),
