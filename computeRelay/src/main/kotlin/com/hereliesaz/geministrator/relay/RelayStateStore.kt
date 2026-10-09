@@ -137,7 +137,9 @@ class EncryptedFileRelayStateStore(
     }
 
     override fun delete(poolId: String) {
-        Files.deleteIfExists(pathFor(poolId))
+        if (Files.deleteIfExists(pathFor(poolId))) {
+            forceDirectoryMetadata()
+        }
     }
 
     fun stateFile(poolId: String): Path = pathFor(poolId)
