@@ -15,6 +15,12 @@ import com.hereliesaz.geministrator.ProjectFileService
 import com.hereliesaz.geministrator.RoleSurfaceFilePicker
 import com.hereliesaz.geministrator.asIveFileName
 import java.io.File
+import java.io.FileOutputStream
+import java.nio.charset.StandardCharsets
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,16 +80,7 @@ internal class AndroidProjectFileService(
         withContext(Dispatchers.IO) {
             val directory = projectDirectory().apply { mkdirs() }
             val destination = File(directory, fileName.asIveFileName())
-            val temporary = File(directory, destination.name + ".tmp")
-            temporary.writeText(content)
-            if (destination.exists() && !destination.delete()) {
-                temporary.delete()
-                error("Could not replace ${destination.name}")
-            }
-            check(temporary.renameTo(destination)) {
-                temporary.delete()
-                "Could not save ${destination.name}"
-            }
+            replaceProjectFile(destination, content)
             fileDescriptor(destination).also { descriptor ->
                 rememberLocation(descriptor.id, includeRecent = false)
             }
@@ -258,10 +255,49 @@ internal class AndroidProjectFileService(
         }
     }
 
+    private fun replaceProjectFile(destination: File, content: String) {
+        writeProjectFileReplacement(destination, content)
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "aive.project-files.v1"
         const val RECENT_LOCATIONS_KEY = "recent"
         const val LAST_LOCATION_KEY = "last-location"
         const val MAX_RECENT_FILES = 24
+    }
+}
+
+
+internal fun writeProjectFileReplacement(
+    destination: File,
+    content: String,
+    moveReplacement: (Path, Path) -> Unit = ::moveProjectFileReplacement,
+) {
+    val directory = requireNotNull(destination.parentFile) { "Project file needs a parent directory" }
+    directory.mkdirs()
+    val temporary = File.createTempFile(destination.name + ".", ".tmp", directory)
+    try {
+        FileOutputStream(temporary).use { output ->
+            output.write(content.toByteArray(StandardCharsets.UTF_8))
+            output.fd.sync()
+        }
+        moveReplacement(temporary.toPath(), destination.toPath())
+    } finally {
+        temporary.delete()
+    }
+}
+
+private fun moveProjectFileReplacement(source: Path, destination: Path) {
+    try {
+        Files.move(
+            source,
+            destination,
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+    } catch (_: AtomicMoveNotSupportedException) {
+        // REPLACE_EXISTING still avoids the unsafe delete-before-rename window on filesystems that
+        // do not expose an atomic move through java.nio.
+        Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING)
     }
 }
