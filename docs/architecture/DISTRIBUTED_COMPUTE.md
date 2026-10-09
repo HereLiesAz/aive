@@ -53,8 +53,10 @@ associated data.
 Persistence records only lease transport state (envelope, origin, last known worker for terminal
 history, progress/result and completion time). Live sockets are never persisted. On restart, unfinished
 leases are deliberately restored as **unclaimed** because the old relay process severed every worker
-WebSocket; worker-side ownership guards cancel work on that transport loss. Completed results remain
-replayable for the normal 24-hour terminal window.
+WebSocket; worker-side ownership guards cancel work on that transport loss. Completed results remain replayable for the normal 24-hour terminal window. Expired terminal entries
+are purged by the active relay sweep and when a persisted pool next loads; an encrypted snapshot for a
+pool that never reconnects can therefore remain on disk until that pool is accessed or the operator
+removes its state file.
 
 State writes use a temp file followed by atomic replace where the filesystem supports it, and owner-only
 POSIX permissions are applied when available. Changing the relay bearer token also changes the at-rest
