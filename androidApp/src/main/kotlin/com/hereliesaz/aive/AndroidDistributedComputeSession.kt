@@ -144,10 +144,11 @@ private fun androidComputeNode(
     val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     val plugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
     val onExternalPower = plugged != 0
-    val policyAllowsWork =
-        configuration.sharingEnabled &&
-            (configuration.allowMeteredNetwork || !metered) &&
-            (!configuration.requireExternalPower || onExternalPower)
+    val policyAllowsWork = androidComputePolicyAllowsWork(
+        configuration = configuration,
+        meteredNetwork = metered,
+        onExternalPower = onExternalPower,
+    )
 
     return ComputeNodeDescriptor(
         nodeId = configuration.nodeId,
@@ -170,3 +171,13 @@ private fun androidComputeNode(
         onExternalPower = onExternalPower,
     )
 }
+
+
+internal fun androidComputePolicyAllowsWork(
+    configuration: DistributedComputeConfiguration,
+    meteredNetwork: Boolean,
+    onExternalPower: Boolean,
+): Boolean =
+    configuration.sharingEnabled &&
+        (configuration.allowMeteredNetwork || !meteredNetwork) &&
+        (!configuration.requireExternalPower || onExternalPower)
