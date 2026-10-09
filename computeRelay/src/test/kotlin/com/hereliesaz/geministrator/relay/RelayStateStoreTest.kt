@@ -2,7 +2,6 @@ package com.hereliesaz.geministrator.relay
 
 import com.hereliesaz.geministrator.distributed.DistributedExecutionResult
 import com.hereliesaz.geministrator.distributed.DistributedTaskEnvelope
-import com.hereliesaz.geministrator.domain.ComputePlatform
 import com.hereliesaz.geministrator.domain.DistributedComputeRequirements
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
@@ -21,7 +20,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import javax.crypto.AEADBadTagException
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -40,7 +38,7 @@ class RelayStateStoreTest {
         store.save("private-pool", listOf(lease))
 
         val bytes = Files.readAllBytes(store.stateFile("private-pool"))
-        val raw = bytes.toString(StandardCharsets.ISO_8859_1)
+        val raw = String(bytes, StandardCharsets.ISO_8859_1)
         assertFalse(raw.contains("Sensitive project objective"))
         assertFalse(raw.contains("private-pool"))
         assertFalse(raw.contains("lease-sensitive"))
