@@ -10,6 +10,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeExecutorIntegration
@@ -95,13 +96,15 @@ internal class AndroidDistributedComputeSession(
 
     fun start() {
         connectivity.registerDefaultNetworkCallback(networkCallback)
-        appContext.registerReceiver(
+        ContextCompat.registerReceiver(
+            appContext,
             powerReceiver,
             IntentFilter().apply {
                 addAction(Intent.ACTION_POWER_CONNECTED)
                 addAction(Intent.ACTION_POWER_DISCONNECTED)
                 addAction(Intent.ACTION_BATTERY_CHANGED)
             },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         client.start(scope)
         // The worker stays subscribed even when this device is currently ineligible. Each offer is
