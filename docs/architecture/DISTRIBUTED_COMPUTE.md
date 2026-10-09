@@ -42,6 +42,26 @@ The origin maps replayed/current lease phases back onto the `TaskRun`; a cancell
 `Failed`. Connection replacement is fenced by peer identity, so a stale socket cannot unregister or
 mutate state after a newer connection takes over the same logical node ID.
 
+## Relay process-restart persistence
+
+By default the relay keeps lease state only in memory. Set `AIVE_RELAY_STATE_DIR` (legacy
+`HAIVE_RELAY_STATE_DIR` is accepted) to make lease state survive relay-process restarts. Each pool is
+stored in its own opaque hashed filename. The file payload is AES-256-GCM encrypted; the encryption key
+is domain-separated and derived from the relay bearer token, and the pool ID is authenticated as GCM
+associated data.
+
+Persistence records only lease transport state (envelope, origin, last known worker for terminal
+history, progress/result and completion time). Live sockets are never persisted. On restart, unfinished
+leases are deliberately restored as **unclaimed** because the old relay process severed every worker
+WebSocket; worker-side ownership guards cancel work on that transport loss. Completed results remain
+replayable for the normal 24-hour terminal window.
+
+State writes use a temp file followed by atomic replace where the filesystem supports it, and owner-only
+POSIX permissions are applied when available. Changing the relay bearer token also changes the at-rest
+key, so existing state must be drained/cleared or migrated before token rotation. If an encrypted state
+file cannot authenticate or decode, the relay fails that pool load rather than silently discarding
+authoritative lease state.
+
 ## What nodes accept
 
 Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Before running a lease the runner re-checks it and refuses (fails the lease) unless the submitted workflow validates, the task really is a distributed placement of the requested executor, any mutating repository operation has a completed human-approval ancestor in the submitted run, and credential-using work (repository operations, GitHub Actions, GitHub-backed scripts) targets a repository of a project linked on the worker's own device. Advertised `supportedExecutorKinds`:
