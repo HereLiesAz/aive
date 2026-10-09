@@ -25,13 +25,47 @@
         return request(open);
     }
 
+    function transactionSettled(transaction) {
+        return new Promise((resolve) => {
+            transaction.oncomplete = () => resolve();
+            transaction.onabort = () => resolve();
+        });
+    }
+
     async function loadKey() {
         const db = await openDb();
         const existing = await request(db.transaction(STORE, "readonly").objectStore(STORE).get(KEY_ID));
         if (existing) return existing;
-        const created = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-        await request(db.transaction(STORE, "readwrite").objectStore(STORE).put(created, KEY_ID));
-        return created;
+
+        // Generate outside an IndexedDB transaction: awaiting WebCrypto can make an otherwise idle
+        // transaction inactive. Multiple tabs may reach this point concurrently, so generation by
+        // itself is not ownership of KEY_ID.
+        const created = await crypto.subtle.generateKey(
+            { name: "AES-GCM", length: 256 },
+            false,
+            ["encrypt", "decrypt"],
+        );
+
+        const transaction = db.transaction(STORE, "readwrite");
+        const settled = transactionSettled(transaction);
+        try {
+            // add(), unlike put(), is a compare-and-set for this fixed key. Exactly one first-use
+            // tab can establish the vault key; a loser must never return its uncommitted key.
+            await request(transaction.objectStore(STORE).add(created, KEY_ID));
+            await settled;
+            return created;
+        } catch (error) {
+            await settled;
+            if (!error || error.name !== "ConstraintError") throw error;
+
+            const winner = await request(
+                db.transaction(STORE, "readonly").objectStore(STORE).get(KEY_ID),
+            );
+            if (!winner) {
+                throw new Error("Credential vault key race completed without a stored winner.");
+            }
+            return winner;
+        }
     }
 
     function key() {
