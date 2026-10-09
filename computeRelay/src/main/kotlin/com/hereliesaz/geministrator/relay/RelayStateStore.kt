@@ -4,11 +4,13 @@ import com.hereliesaz.geministrator.distributed.DistributedExecutionProgress
 import com.hereliesaz.geministrator.distributed.DistributedExecutionResult
 import com.hereliesaz.geministrator.distributed.DistributedTaskEnvelope
 import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -114,6 +116,9 @@ class EncryptedFileRelayStateStore(
         try {
             Files.write(temp, payload)
             restrictOwnerOnly(temp)
+            FileChannel.open(temp, StandardOpenOption.WRITE).use { channel ->
+                channel.force(true)
+            }
             try {
                 Files.move(
                     temp,
@@ -125,6 +130,7 @@ class EncryptedFileRelayStateStore(
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
             }
             restrictOwnerOnly(target)
+            forceDirectoryMetadata()
         } finally {
             Files.deleteIfExists(temp)
         }
@@ -148,6 +154,17 @@ class EncryptedFileRelayStateStore(
             .digest(poolId.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
         return directory.resolve("$digest.relay")
+    }
+
+    private fun forceDirectoryMetadata() {
+        // Directory fsync is supported on the Unix filesystems commonly used for relay deployments.
+        // Some platforms (notably Windows) reject opening a directory as a channel, so this remains
+        // best-effort there while the already-forced file contents and atomic replace still apply.
+        runCatching {
+            FileChannel.open(directory, StandardOpenOption.READ).use { channel ->
+                channel.force(true)
+            }
+        }
     }
 
     private fun restrictOwnerOnly(path: Path) {
