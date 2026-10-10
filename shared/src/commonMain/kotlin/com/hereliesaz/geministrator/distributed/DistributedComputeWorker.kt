@@ -219,7 +219,7 @@ internal fun workerLeaseInvalidationReason(
 
 class DistributedComputeWorker(
     private val client: RelayDistributedComputeClient,
-    private val node: ComputeNodeDescriptor,
+    private val nodeProvider: () -> ComputeNodeDescriptor,
     private val runners: List<DistributedWorkloadRunner>,
     private val scope: CoroutineScope,
 ) {
@@ -232,6 +232,7 @@ class DistributedComputeWorker(
         if (offerJob?.isActive == true) return
         offerJob = scope.launch {
             client.offers.collect { envelope ->
+                val node = nodeProvider()
                 if (envelope.originNodeId == node.nodeId) return@collect
                 if (!node.canRun(envelope.requirements, envelope.delegatedExecutor)) return@collect
                 val runner = runners.firstOrNull { it.supports(envelope) } ?: return@collect
@@ -244,7 +245,7 @@ class DistributedComputeWorker(
                     }
                 }
                 if (!accepted) return@collect
-                scope.launch { executeClaimed(envelope, runner) }
+                scope.launch { executeClaimed(envelope, runner, node.nodeId) }
             }
         }
     }
@@ -258,6 +259,7 @@ class DistributedComputeWorker(
     private suspend fun executeClaimed(
         envelope: DistributedTaskEnvelope,
         runner: DistributedWorkloadRunner,
+        nodeId: String,
     ) {
         try {
             client.claim(envelope.leaseId)
@@ -266,7 +268,7 @@ class DistributedComputeWorker(
                     .map { states -> states[envelope.leaseId] }
                     .first { state ->
                         state?.phase == DistributedLeasePhase.Claimed &&
-                            state.workerNodeId == node.nodeId
+                            state.workerNodeId == nodeId
                     }
             }
             if (claimed == null) return
@@ -281,7 +283,7 @@ class DistributedComputeWorker(
                         workerLeaseInvalidationReason(
                             connected = connected,
                             state = states[envelope.leaseId],
-                            nodeId = node.nodeId,
+                            nodeId = nodeId,
                         )
                     }.first { it != null }
                     executionScope.cancel(CancellationException(requireNotNull(reason)))

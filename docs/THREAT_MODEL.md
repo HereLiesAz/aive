@@ -217,7 +217,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - The relay can be reached over plain `ws://`.
 
 **Mitigations in place**
-- Distributed compute has no default relay and is off until configured. Accepting work also requires `sharingEnabled`, and can additionally require an unmetered network and external power.
+- Distributed compute has no default relay and is off until configured. Accepting new work also requires `sharingEnabled`, and can additionally require an unmetered network and external power. Android re-evaluates and republishes those conditions when network/power state changes, and its worker checks each offer against the same live descriptor.
 - A node advertises only the executor kinds its credentials support. The relay offers leases only to nodes that satisfy the lease's requirements. The worker re-checks those requirements and a per-node parallel-lease cap.
 - The relay requires `Authorization: Bearer <token>`. It rejects mismatched protocol versions and caps frames at 8 MiB.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued. Workers continuously watch relay ownership while executing; cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine rather than allowing stale work to continue.
