@@ -19,6 +19,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -39,11 +40,12 @@ private val relayJson = Json {
 
 class ComputeRelayHub(
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val stateStore: RelayStateStore = NoopRelayStateStore,
 ) {
     private val pools = ConcurrentHashMap<String, RelayPool>()
 
     fun pool(poolId: String): RelayPool = pools.computeIfAbsent(poolId) {
-        RelayPool(poolId, nowEpochMillis)
+        RelayPool(poolId, nowEpochMillis, stateStore)
     }
 
     suspend fun sweepExpired() {
@@ -223,11 +225,19 @@ fun main() {
             ?: System.getenv("HAIVE_RELAY_PORT")
             ?: "8080"
         ).toInt()
+    val stateDirectory = System.getenv("AIVE_RELAY_STATE_DIR")
+        ?.takeIf(String::isNotBlank)
+        ?: System.getenv("HAIVE_RELAY_STATE_DIR")
+            ?.takeIf(String::isNotBlank)
+    val stateStore = stateDirectory
+        ?.let { EncryptedFileRelayStateStore(Path.of(it), token) }
+        ?: NoopRelayStateStore
+    val hub = ComputeRelayHub(stateStore = stateStore)
     embeddedServer(
         factory = CIO,
         host = "0.0.0.0",
         port = port,
     ) {
-        computeRelayModule(token)
+        computeRelayModule(token, hub)
     }.start(wait = true)
 }

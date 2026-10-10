@@ -160,6 +160,9 @@ jobs:
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 
+      - name: Test distributed compute relay
+        run: ./gradlew :computeRelay:test
+
       - name: Test semantic workflow renderer
         run: ./gradlew -p vendor/conveyance-h2g2 desktopTest
 
