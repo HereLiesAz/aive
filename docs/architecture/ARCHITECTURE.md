@@ -249,12 +249,14 @@ Every workflow in `.github/workflows/` follows the `HereLiesAz/workflows` policy
 - **Target-local CI** (`local`, `ci: true` in the central registry): `multiplatform.yml`
   (Build and Deploy), `android-ci.yml`, `bitcos-engine.yml` and `dependency-submission.yml` run
   in this repository and declare themselves with the central `ci-report` action. Release
-  semantics inside `multiplatform.yml` come only from the central `four-part-version`,
-  `patch-grouped-release` and `google-play-publish` actions; the desktop installers take their
-  version from the same central action through the `version` job.
+  semantics inside `multiplatform.yml` come only from the central `four-part-version` and
+  `patch-grouped-release` actions; the desktop installers take their version from the same
+  central action through the `version` job. Google Play publication is not in this repository:
+  the central `android-play-release.yml` builds the `playRelease` bundle and publishes it to the
+  internal track on every push to `main`.
 - **Centrally executed** (trackers carrying `# centralized-by: HereLiesAz/workflows`):
-  `live-runtime-verification.yml`, `security-review.yml` and
-  `orchestration-specialist-training.yml`. Do not edit trackers; the sync rewrites them.
+  `live-runtime-verification.yml`, `security-review.yml`,
+  `orchestration-specialist-training.yml` and `android-play-release.yml`. Do not edit trackers; the sync rewrites them.
   Orchestration training is fire-and-forget: the central run submits the Kaggle kernel and exits,
   and Kaggle reports its result back through the central Worker.
 

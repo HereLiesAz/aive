@@ -2,9 +2,10 @@ name: Build and Deploy
 
 # Target-local CI under HereLiesAz/workflows policy: the build and installer jobs end with
 # the central ci-report action, which registers this workflow `local`, `ci: true`.
-# Version, tag/grouping and Play publication policy come from the central actions
-# (four-part-version, patch-grouped-release, google-play-publish); this file keeps only
-# aive-specific build, verification and packaging steps.
+# Version and tag/grouping policy come from the central actions (four-part-version,
+# patch-grouped-release); this file keeps only aive-specific build, verification and
+# packaging steps. Google Play publication runs centrally in HereLiesAz/workflows
+# (android-play-release.yml; tracker: .github/workflows/android-play-release.yml).
 
 on:
   push:
@@ -14,11 +15,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      publish_play:
-        description: "Publish the Android bundle to the Google Play internal track"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -659,39 +655,3 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
-
-  publish-play:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_play) }}
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Play Android release bundle
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-android-play-release
-          path: android-release
-
-      - name: Download release notes
-        uses: actions/download-artifact@v8
-        with:
-          name: aive-release-notes
-          path: fastlane/metadata/android/en-US/changelogs
-
-      - name: Prepare Google Play localized release notes
-        shell: bash
-        run: |
-          set -euo pipefail
-          NOTES_DIR="fastlane/metadata/android/en-US/changelogs"
-          test -s "$NOTES_DIR/default.txt"
-          cp "$NOTES_DIR/default.txt" "$NOTES_DIR/whatsnew-en-US"
-
-      - name: Publish to Google Play internal track
-        # Shared publisher: uploads the bundle plus the R8 mapping.txt embedded in it.
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
-        uses: HereLiesAz/workflows/.github/actions/google-play-publish@main
-        with:
-          service-account-json: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          package-name: com.hereliesaz.aive
-          aab-path: android-release/**/*.aab
-          tracks: '[{"track":"internal","status":"completed"}]'
-          release-notes-dir: fastlane/metadata/android/en-US/changelogs
