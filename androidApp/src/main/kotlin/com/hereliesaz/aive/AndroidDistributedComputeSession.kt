@@ -33,10 +33,10 @@ import kotlinx.coroutines.launch
 
 internal class AndroidDistributedComputeSession(
     context: Context,
-    configuration: DistributedComputeConfiguration,
+    private val configuration: DistributedComputeConfiguration,
     token: String,
     baseIntegrations: TaskExecutorIntegrationRegistry,
-    supportedExecutorKinds: Set<String>,
+    private val supportedExecutorKinds: Set<String>,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
