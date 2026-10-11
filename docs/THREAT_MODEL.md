@@ -217,18 +217,18 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - The relay can be reached over plain `ws://`.
 
 **Mitigations in place**
-- Distributed compute has no default relay and is off until configured. Accepting work also requires `sharingEnabled`, and can additionally require an unmetered network and external power.
+- Distributed compute has no default relay and is off until configured. Accepting new work also requires `sharingEnabled`, and can additionally require an unmetered network and external power. Android re-evaluates and republishes those conditions when network/power state changes, and its worker checks each offer against the same live descriptor.
 - A node advertises only the executor kinds its credentials support. The relay offers leases only to nodes that satisfy the lease's requirements. The worker re-checks those requirements and a per-node parallel-lease cap.
 - The relay requires `Authorization: Bearer <token>`. It rejects mismatched protocol versions and caps frames at 8 MiB.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued. Workers continuously watch relay ownership while executing; cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine rather than allowing stale work to continue.
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
 - Workers re-check every lease before running it (`SystemExecutorDistributedWorkloadRunner`): the submitted workflow must validate; the task must be a distributed placement of the requested executor; a mutating repository operation needs a completed `HumanApproval` ancestor in the submitted run; and work that uses the worker's repository credentials (repository operations, GitHub Actions, GitHub-backed scripts) runs only against a repository of a project linked on the worker's own device. Anything else fails the lease as refused.
 - Relay tokens are stored in the platform credential store.
-- Origin disconnect does not destroy accepted work. The in-process relay retains unfinished leases until they complete/cancel; terminal results are bounded to a 24-hour resume window.
+- Origin disconnect does not destroy accepted work. The relay retains unfinished leases until they complete/cancel; terminal results have a 24-hour replay window. When `AIVE_RELAY_STATE_DIR` is configured, those lease records survive relay-process restarts in AES-256-GCM-encrypted files keyed from the relay bearer secret. Expired terminal records are removed when an active/persisted pool is swept or loaded; an untouched encrypted pool snapshot can remain until it is accessed or explicitly removed by the operator.
 
 **Remaining gaps**
-- There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted.
-- Envelopes are not end-to-end encrypted, so the relay operator sees them in plaintext. Resumable lease state is currently retained in relay process memory for up to 24 hours; a future persistent coordinator must add an explicit at-rest protection policy before writing those envelopes to disk.
+- There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state.
+- Envelopes are not end-to-end encrypted in transit through the relay, so the relay operator sees them while processing. Optional process-restart persistence encrypts lease files at rest with AES-256-GCM and opaque pool filenames, but the relay process itself necessarily holds plaintext while routing work.
 - A pool member can still forge a run that claims its approval gate completed; the worker cannot verify that without signed approvals. The allow-list limits the damage to repositories the worker's owner already linked.
 - Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
 

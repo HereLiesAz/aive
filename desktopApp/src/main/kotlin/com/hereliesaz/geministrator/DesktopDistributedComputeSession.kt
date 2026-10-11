@@ -47,7 +47,7 @@ internal class DesktopDistributedComputeSession(
 
     private val worker = DistributedComputeWorker(
         client = client,
-        node = node,
+        nodeProvider = { node },
         runners = listOf(
             SystemExecutorDistributedWorkloadRunner(
                 integrations = baseIntegrations,

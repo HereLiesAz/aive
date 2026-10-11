@@ -42,6 +42,28 @@ The origin maps replayed/current lease phases back onto the `TaskRun`; a cancell
 `Failed`. Connection replacement is fenced by peer identity, so a stale socket cannot unregister or
 mutate state after a newer connection takes over the same logical node ID.
 
+## Relay process-restart persistence
+
+By default the relay keeps lease state only in memory. Set `AIVE_RELAY_STATE_DIR` (legacy
+`HAIVE_RELAY_STATE_DIR` is accepted) to make lease state survive relay-process restarts. Each pool is
+stored in its own opaque hashed filename. The file payload is AES-256-GCM encrypted; the encryption key
+is domain-separated and derived from the relay bearer token, and the pool ID is authenticated as GCM
+associated data.
+
+Persistence records only lease transport state (envelope, origin, last known worker for terminal
+history, progress/result and completion time). Live sockets are never persisted. On restart, unfinished
+leases are deliberately restored as **unclaimed** because the old relay process severed every worker
+WebSocket; worker-side ownership guards cancel work on that transport loss. Completed results remain replayable for the normal 24-hour terminal window. Expired terminal entries
+are purged by the active relay sweep and when a persisted pool next loads; an encrypted snapshot for a
+pool that never reconnects can therefore remain on disk until that pool is accessed or the operator
+removes its state file.
+
+State writes use a temp file followed by atomic replace where the filesystem supports it, and owner-only
+POSIX permissions are applied when available. Changing the relay bearer token also changes the at-rest
+key, so existing state must be drained/cleared or migrated before token rotation. If an encrypted state
+file cannot authenticate or decode, the relay fails that pool load rather than silently discarding
+authoritative lease state.
+
 ## What nodes accept
 
 Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Before running a lease the runner re-checks it and refuses (fails the lease) unless the submitted workflow validates, the task really is a distributed placement of the requested executor, any mutating repository operation has a completed human-approval ancestor in the submitted run, and credential-using work (repository operations, GitHub Actions, GitHub-backed scripts) targets a repository of a project linked on the worker's own device. Advertised `supportedExecutorKinds`:
@@ -49,7 +71,7 @@ Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which acce
 - Android — `script`; `github-action` and `repository-operation` with a GitHub token; `repository-operation` with a GitLab token.
 - Desktop — `repository-operation`; `github-action` with a GitHub token.
 
-Android accepts work only when sharing is enabled and its metered-network and external-power policy is satisfied. Desktop cannot observe power state, so enabling "require external power" stops it accepting work.
+Android accepts new work only when sharing is enabled and its current metered-network and external-power policy is satisfied. The Android session watches default-network and battery/power broadcasts, updates its relay descriptor when those conditions change, and the local worker evaluates each incoming offer against that same live descriptor. An already-claimed lease is not cancelled merely because power/network policy later becomes ineligible; ownership loss/cancellation remains the authority for stopping side-effecting work. Desktop cannot observe power state, so enabling "require external power" stops it accepting work.
 
 ## Encrypted compute mesh primitives
 
