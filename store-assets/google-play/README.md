@@ -8,7 +8,7 @@ python3 tools/play_store_assets.py --output-dir <dir> \
   --screenshot <shot-3.png> --screenshot <shot-4.png>
 ~~~
 
-CI's `publish-play` job uploads only the release bundle and release notes, so listing assets are uploaded to the Play Console manually.
+The central Play release (`android-play-release.yml` in HereLiesAz/workflows) uploads only the release bundle, its mapping and release notes, so listing assets are uploaded to the Play Console manually.
 
 The generator validates the Android adaptive icon structure and centered 66×66dp safe-zone geometry, enforces a single-color Android 13+ monochrome layer, produces a 512×512 RGBA Play icon, a 1024×500 24-bit feature graphic, three themed-icon previews, and normalizes four captured production-UI screenshots to 24-bit PNG.
 
