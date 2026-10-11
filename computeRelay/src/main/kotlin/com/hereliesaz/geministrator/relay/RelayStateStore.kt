@@ -188,6 +188,8 @@ class EncryptedFileRelayStateStore(
             encodeDefaults = true
             ignoreUnknownKeys = false
             classDiscriminator = "type"
+            // WorkflowRun.taskRuns is keyed by TaskDefinitionId, a structured (non-primitive) key.
+            allowStructuredMapKeys = true
         }
     }
 }
