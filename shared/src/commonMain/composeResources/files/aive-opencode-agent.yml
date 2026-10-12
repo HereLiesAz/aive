@@ -43,7 +43,11 @@ jobs:
       # The agent runs as its own unprivileged user: it cannot read the runner's environment
       # (/proc/<pid>/environ is owner-only) or change the runner's git configuration.
       - name: Isolate the agent
-        run: sudo useradd --create-home --shell /bin/bash aive-agent
+        # The checkout lives under the runner's home; the agent may traverse (not list) the
+        # directories above it. The token is only ever in the runner's environment, never on disk.
+        run: |
+          sudo useradd --create-home --shell /bin/bash aive-agent
+          sudo chmod o+x "$HOME" "$(dirname "$GITHUB_WORKSPACE")" "$GITHUB_WORKSPACE/.."
 
       - name: Run OpenCode
         shell: bash
@@ -180,10 +184,11 @@ jobs:
 
             const exitCode = await new Promise((resolve) => {
               execFileSync("sudo", ["chown", "-R", "aive-agent:aive-agent", workspace]);
-              // sudo starts the agent with a clean environment: only PATH is passed on.
+              // The agent gets a fresh environment: env -i drops whatever sudo keeps (the runner's
+              // sudoers preserve HOME), then only PATH and the agent's own HOME are set.
               const child = spawn("sudo", [
-                "-u", "aive-agent", "-H", "--",
-                "env", `PATH=${process.env.PATH}`,
+                "-u", "aive-agent", "--",
+                "env", "-i", `PATH=${process.env.PATH}`, "HOME=/home/aive-agent",
                 opencodeBin, "run", "--format", "json", "--auto", "-m", task.model, task.prompt,
               ], {
                 stdio: ["ignore", "pipe", "inherit"],
