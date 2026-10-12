@@ -1,0 +1,150 @@
+-- Workflow state, one row per record. Payloads are the same JSON the Settings snapshot holds
+-- (SettingsWorkflowPersistence.defaultJson), so export, import and .ive files are unchanged;
+-- columns beside the payload exist only to select and order without decoding.
+
+CREATE TABLE project (
+    id TEXT NOT NULL PRIMARY KEY,
+    payload TEXT NOT NULL
+);
+
+CREATE TABLE definition (
+    id TEXT NOT NULL PRIMARY KEY,
+    payload TEXT NOT NULL
+);
+
+CREATE TABLE run (
+    id TEXT NOT NULL PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX run_by_project ON run(project_id, updated_at);
+
+CREATE TABLE event (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    occurred_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX event_by_run ON event(run_id, occurred_at, seq);
+
+CREATE TABLE role (
+    id TEXT NOT NULL PRIMARY KEY,
+    payload TEXT NOT NULL
+);
+
+CREATE TABLE artifact (
+    id TEXT NOT NULL PRIMARY KEY,
+    task_run_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX artifact_by_task_run ON artifact(task_run_id);
+
+CREATE TABLE approval_gate (
+    id TEXT NOT NULL PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    open INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE INDEX approval_gate_by_run ON approval_gate(run_id, open);
+
+CREATE TABLE meta (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+-- Projects
+upsertProject:
+INSERT OR REPLACE INTO project(id, payload) VALUES (?, ?);
+project:
+SELECT payload FROM project WHERE id = ?;
+allProjects:
+SELECT payload FROM project ORDER BY rowid;
+
+-- Definitions
+upsertDefinition:
+INSERT OR REPLACE INTO definition(id, payload) VALUES (?, ?);
+definition:
+SELECT payload FROM definition WHERE id = ?;
+allDefinitions:
+SELECT payload FROM definition ORDER BY rowid;
+deleteDefinitions:
+DELETE FROM definition;
+
+-- Runs
+upsertRun:
+INSERT OR REPLACE INTO run(id, project_id, updated_at, payload) VALUES (?, ?, ?, ?);
+run:
+SELECT payload FROM run WHERE id = ?;
+runsByProject:
+SELECT payload FROM run WHERE project_id = ? ORDER BY updated_at DESC;
+allRuns:
+SELECT payload FROM run ORDER BY rowid;
+
+-- Events
+appendEvent:
+INSERT INTO event(run_id, occurred_at, payload) VALUES (?, ?, ?);
+eventsForRun:
+SELECT payload FROM event WHERE run_id = ? ORDER BY occurred_at, seq;
+allEvents:
+SELECT payload FROM event ORDER BY occurred_at, seq;
+deleteEventsForRun:
+DELETE FROM event WHERE run_id = ?;
+
+-- Roles
+upsertRole:
+INSERT OR REPLACE INTO role(id, payload) VALUES (?, ?);
+role:
+SELECT payload FROM role WHERE id = ?;
+allRoles:
+SELECT payload FROM role ORDER BY rowid;
+deleteRoles:
+DELETE FROM role;
+
+-- Artifacts
+upsertArtifact:
+INSERT OR REPLACE INTO artifact(id, task_run_id, created_at, payload) VALUES (?, ?, ?, ?);
+artifact:
+SELECT payload FROM artifact WHERE id = ?;
+artifactsForTaskRun:
+SELECT payload, created_at FROM artifact WHERE task_run_id = ?;
+allArtifacts:
+SELECT payload FROM artifact ORDER BY rowid;
+deleteArtifactsForTaskRun:
+DELETE FROM artifact WHERE task_run_id = ?;
+
+-- Approval gates
+upsertGate:
+INSERT OR REPLACE INTO approval_gate(id, run_id, open, created_at, payload) VALUES (?, ?, ?, ?, ?);
+gate:
+SELECT payload FROM approval_gate WHERE id = ?;
+openGatesForRun:
+SELECT payload FROM approval_gate WHERE run_id = ? AND open = 1 ORDER BY created_at;
+allGates:
+SELECT payload FROM approval_gate ORDER BY rowid;
+deleteGatesForRun:
+DELETE FROM approval_gate WHERE run_id = ?;
+
+-- Meta
+meta:
+SELECT value FROM meta WHERE key = ?;
+putMeta:
+INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?);
+
+-- Whole store
+clearProjects:
+DELETE FROM project;
+clearRuns:
+DELETE FROM run;
+clearEvents:
+DELETE FROM event;
+clearArtifacts:
+DELETE FROM artifact;
+clearGates:
+DELETE FROM approval_gate;
