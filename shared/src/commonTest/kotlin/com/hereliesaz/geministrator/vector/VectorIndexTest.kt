@@ -133,6 +133,8 @@ class BuiltInTextEmbedderTest {
     fun identifiersSplitIntoWordsAndInflectionsOverlap() {
         assertEquals(listOf("sql", "workflow", "persistence", "store", "path"), BuiltInTextEmbedder.tokens("SQLWorkflowPersistence store_path"))
         assertTrue(similarity("retrying failed builds", "retry the failed build") > 0.35f)
+        listOf("run" to "running", "make" to "making", "case" to "cases", "stop" to "stopped", "retry" to "retrying", "query" to "queries")
+            .forEach { (base, inflected) -> assertEquals(BuiltInTextEmbedder.stem(base), BuiltInTextEmbedder.stem(inflected), "$base/$inflected") }
     }
 
     @Test

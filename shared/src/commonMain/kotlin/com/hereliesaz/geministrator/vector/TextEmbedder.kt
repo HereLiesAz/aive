@@ -33,7 +33,8 @@ class BuiltInTextEmbedder(
     private val conceptsOf: ((String) -> IntArray)? = null,
 ) : TextEmbedder {
     override val id: String = if (conceptsOf == null) "builtin-hash" else "builtin-hash-wordnet"
-    override val version: Int = 1
+    /** 2: stem features added. Bump whenever a change moves existing vectors. */
+    override val version: Int = 2
 
     init {
         require(dimension >= 32) { "dimension must be at least 32" }
@@ -98,12 +99,20 @@ class BuiltInTextEmbedder(
                 .toList()
         }
 
-        /** Strips common English inflections, keeping at least three letters: not a full stemmer. */
+        /**
+         * Strips common English inflections, keeping at least three letters: not a full stemmer.
+         * Every stem, inflected or not, then drops a final silent "e" and un-doubles a final
+         * doubled consonant, so run/running, make/making and case/cases meet at one stem.
+         */
         fun stem(word: String): String {
             fun cut(suffix: String, replacement: String = ""): String? =
                 if (word.endsWith(suffix) && word.length - suffix.length >= 3) word.dropLast(suffix.length) + replacement else null
-            return cut("ies", "y") ?: cut("ing") ?: cut("ed") ?: cut("es")?.takeIf { word.endsWith("ses") || word.endsWith("xes") || word.endsWith("ches") || word.endsWith("shes") }
+            val stripped = cut("ies", "y") ?: cut("ing") ?: cut("ed") ?: cut("es")?.takeIf { word.endsWith("ses") || word.endsWith("xes") || word.endsWith("ches") || word.endsWith("shes") }
                 ?: (if (word.endsWith("ss")) null else cut("s")) ?: word
+            var stem = stripped
+            if (stem.length > 3 && stem.endsWith('e')) stem = stem.dropLast(1)
+            if (stem.length > 3 && stem[stem.length - 1] == stem[stem.length - 2] && stem.last() !in "aeiouls") stem = stem.dropLast(1)
+            return stem
         }
 
         fun fnv1a64(text: String): Long {
