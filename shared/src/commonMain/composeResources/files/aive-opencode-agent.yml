@@ -28,17 +28,26 @@ jobs:
     steps:
       # No stored credentials: the agent's shell must not be able to push. The runner pushes
       # the result branch itself with the token, which is kept out of the agent's environment.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
       - name: Install OpenCode
         run: npm install --global "opencode-ai@${OPENCODE_VERSION}"
+
+      # The agent runs as its own unprivileged user: it cannot read the runner's environment
+      # (/proc/<pid>/environ is owner-only) or change the runner's git configuration.
+      - name: Isolate the agent
+        # The checkout lives under the runner's home; the agent may traverse (not list) the
+        # directories above it. The token is only ever in the runner's environment, never on disk.
+        run: |
+          sudo useradd --create-home --shell /bin/bash aive-agent
+          sudo chmod o+x "$HOME" "$(dirname "$GITHUB_WORKSPACE")" "$GITHUB_WORKSPACE/.."
 
       - name: Run OpenCode
         shell: bash
@@ -131,9 +140,31 @@ jobs:
             }
           }
 
+          // The checkout was writable by the agent. Ignore its hooks and any global/system config,
+          // restore the repository config saved before it ran, and keep the token out of argv
+          // (world-readable in /proc) by passing the push credential through the environment.
+          const gitEnv = {
+            PATH: process.env.PATH,
+            HOME: process.env.HOME,
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_TERMINAL_PROMPT: "0",
+          };
           function git(...args) {
-            return execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+            return gitWith({}, ...args);
           }
+          function gitWith(extraEnv, ...args) {
+            return execFileSync("git", ["-c", "core.hooksPath=/dev/null", ...args], {
+              encoding: "utf8",
+              maxBuffer: 64 * 1024 * 1024,
+              env: { ...gitEnv, ...extraEnv },
+            });
+          }
+          const workspace = process.cwd();
+          const gitConfigSnapshot = path.join(process.env.RUNNER_TEMP, "aive-git-config");
+          fs.copyFileSync(path.join(workspace, ".git", "config"), gitConfigSnapshot);
+          const opencodeBin = execFileSync("which", ["opencode"], { encoding: "utf8" }).trim();
+          const runnerOwner = `${process.getuid()}:${process.getgid()}`;
 
           function writeResult(result) {
             fs.writeFileSync(path.join(outDir, "aive-result.json"), JSON.stringify(result));
@@ -152,12 +183,15 @@ jobs:
             const ticker = setInterval(() => publish("in_progress"), 3000);
 
             const exitCode = await new Promise((resolve) => {
-              const agentEnv = { ...process.env };
-              delete agentEnv.GITHUB_TOKEN;
-              delete agentEnv.AIVE_TASK;
-              const child = spawn("opencode", ["run", "--format", "json", "--auto", "-m", task.model, task.prompt], {
+              execFileSync("sudo", ["chown", "-R", "aive-agent:aive-agent", workspace]);
+              // The agent gets a fresh environment: env -i drops whatever sudo keeps (the runner's
+              // sudoers preserve HOME), then only PATH and the agent's own HOME are set.
+              const child = spawn("sudo", [
+                "-u", "aive-agent", "--",
+                "env", "-i", `PATH=${process.env.PATH}`, "HOME=/home/aive-agent",
+                opencodeBin, "run", "--format", "json", "--auto", "-m", task.model, task.prompt,
+              ], {
                 stdio: ["ignore", "pipe", "inherit"],
-                env: agentEnv,
               });
               let buffer = "";
               child.stdout.on("data", (chunk) => {
@@ -178,6 +212,10 @@ jobs:
               child.on("close", resolve);
             });
             clearInterval(ticker);
+            // Nothing the agent started may outlive it; then take the checkout back.
+            try { execFileSync("sudo", ["pkill", "-KILL", "-u", "aive-agent"]); } catch {}
+            execFileSync("sudo", ["chown", "-R", runnerOwner, workspace]);
+            fs.copyFileSync(gitConfigSnapshot, path.join(workspace, ".git", "config"));
 
             git("config", "user.name", "aive-opencode[bot]");
             git("config", "user.email", "aive-opencode@users.noreply.github.com");
@@ -186,12 +224,17 @@ jobs:
             let patch = "";
             if (changed) {
               git("checkout", "-b", task.branch);
-              git("commit", "--quiet", "-m", task.commitMessage);
+              git("commit", "--quiet", "--no-verify", "-m", task.commitMessage);
               patch = git("show", "--format=", "HEAD");
               const host = new URL(process.env.GITHUB_SERVER_URL).host;
-              const remote = `https://x-access-token:${process.env.GITHUB_TOKEN}@${host}/${repo}.git`;
+              const remote = `https://${host}/${repo}.git`;
+              const basic = Buffer.from(`x-access-token:${process.env.GITHUB_TOKEN}`).toString("base64");
               try {
-                git("push", "--quiet", remote, `HEAD:refs/heads/${task.branch}`);
+                gitWith({
+                  GIT_CONFIG_COUNT: "1",
+                  GIT_CONFIG_KEY_0: `http.https://${host}/.extraheader`,
+                  GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}`,
+                }, "push", "--quiet", "--no-verify", remote, `HEAD:refs/heads/${task.branch}`);
               } catch (error) {
                 const detail = String(error.stderr || error.message || error).split(process.env.GITHUB_TOKEN).join("***");
                 throw new Error(`git push failed: ${detail.trim()}`);
@@ -224,7 +267,7 @@ jobs:
 
       - name: Publish Aive result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: aive-result
           path: ${{ runner.temp }}/aive-result/aive-result.json

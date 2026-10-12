@@ -437,14 +437,7 @@ private sealed interface LocalGitOperation {
             }
         }
 
-        private fun requireSafeRef(raw: String): String {
-            val ref = raw.trim()
-            require(ref.isNotEmpty()) { "Git ref is required" }
-            require(!ref.startsWith('-')) { "Git refs may not begin with '-'" }
-            require(ref.none { it == '\u0000' || it == '\n' || it == '\r' }) {
-                "Git ref contains invalid control characters"
-            }
-            return ref
-        }
+        private fun requireSafeRef(raw: String): String =
+            com.hereliesaz.geministrator.workflow.GitRefNames.requireSafe(raw, "Git ref")
     }
 }
