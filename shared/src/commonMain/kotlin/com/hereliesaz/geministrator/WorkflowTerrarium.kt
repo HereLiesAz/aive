@@ -22,7 +22,6 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
-import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
@@ -49,7 +48,7 @@ internal fun GeministratorWorkflowTerrarium(
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
-    val fallbackDraftPersistence = remember { SettingsWorkflowPersistence.createDefault() }
+    val fallbackDraftPersistence = remember { com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     val layoutDefinitionId = run.workflowDefinitionId
     var positions by remember(layoutDefinitionId) {
         mutableStateOf(layoutStore.load(layoutDefinitionId))

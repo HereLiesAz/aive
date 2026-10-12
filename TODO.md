@@ -150,7 +150,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Ensure active provider/executor sessions reconnect rather than duplicate after restart.
 - [x] Add run export/import for debugging and portability.
 - [x] Decide when Settings-backed storage has reached its scale limit (triggers documented in `docs/architecture/STORAGE_SCALE.md`).
-- [ ] Implement SQL/IndexedDB backends behind the existing repository contracts once a documented trigger is hit. Only Settings-backed storage exists today.
+- [x] Implement a SQL backend behind the existing repository contracts once a documented trigger is hit. The trigger was hit (`StorageScaleMeasurementTest`: 10 runs already exceed the 500 KB snapshot limit); Android and desktop now use `SqlWorkflowPersistence`, with a one-time move from Settings. Web stays on Settings for 1.0.
 - [x] Add retention/deletion controls consistent with `docs/PRIVACY.md`.
 
 ## P1 — H2G2 execution surface

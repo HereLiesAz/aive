@@ -2,9 +2,27 @@
 
 ## Current approach
 
-Workflow state is persisted via platform Settings APIs (Android SharedPreferences, Desktop
-java.util.prefs, Web localStorage). Each platform's implementation serializes the full
-`WorkflowRun` + events journal as JSON strings, keyed by `WorkflowRunId`.
+Android and desktop store workflow state in SQLite (`SqlWorkflowPersistence`), one row per
+record. The web keeps the Settings snapshot (`SettingsWorkflowPersistence`, browser
+localStorage), a single JSON document holding every project, run, definition, artifact and gate
+plus a per-run event journal.
+
+## Measurement (2026-10-12)
+
+`StorageScaleMeasurementTest` (desktop, JVM) keeps N runs of a 15-task workflow with three
+~4 KB text artifacts per task, then times one `runs.put` and one `runs.get` (median of nine). The
+Settings snapshot is rewritten and re-decoded whole on every write and read, so cost follows the
+user's history, not the active run:
+
+| Runs kept | Settings snapshot | put | get |
+|---|---|---|---|
+| 10 | 1.9 MB | 16 ms | 6 ms |
+| 50 | 9.6 MB | 83 ms | 40 ms |
+| 150 | 28.8 MB | 313 ms | 115 ms |
+| 300 | 57.6 MB | 754 ms | 249 ms |
+
+The 500 KB trigger below was met at 10 runs, so Android and desktop moved to SQL. The test
+reports both stores side by side in `shared/build/reports/storage-scale.txt`.
 
 ## When to migrate to a structured backend
 
@@ -33,6 +51,9 @@ Web Storage API. All three share the same serialization format; only the storage
 sites differ.
 
 ## Decision
+
+Migrated (Android, desktop). The web remains on Settings while it is a preview; move it to the
+SQL store over the browser worker driver before it ships as 1.0. Originally:
 
 Do not migrate until one of the trigger conditions above is met and measured on a real run.
 Settings-backed storage is reliable, requires no schema migrations beyond the existing

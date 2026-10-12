@@ -34,11 +34,13 @@ Depending on how you use the app, The Aive may store:
 - settings, such as distributed-compute configuration and whether crash reporting or the Gemini bridge is enabled
 - on the Android GitHub release flavor, crash/ANR reports waiting to be sent (only while crash reporting is on)
 
-The current persistence backend uses platform-local storage:
+Workflow state is stored locally:
 
-- Android: SharedPreferences
-- Desktop/JVM: Java Preferences
+- Android: a SQLite database (`aive-workflows.db`) in the app's private database directory
+- Desktop/JVM: a SQLite database at `~/.aive/workflows.db`
 - Web: browser localStorage
+
+When an Android or desktop install first opens the SQLite store, workflow state saved by an earlier version (SharedPreferences or Java Preferences) is moved into it. A JSON copy of that earlier state is kept beside it (`workflows-settings-backup-<time>.json`, in the app's private files on Android, in `~/.aive` on desktop) until you delete it, clear the app's data or uninstall.
 
 Agent memory (banked session text and the graph derived from it) is kept in SQLite databases, one memory bank per workflow run: on Android, `aive-memory-<run>.db` (and the pre-split `aive-memory.db`, kept as a backup) in the app's private database directory; on desktop, `~/.aive/memory/memory.db`. On the web it is a SQLite database in the browser's Origin Private File System for this site (browsers without it keep browser localStorage), and a memory log stored by an earlier version in localStorage is moved into it the first time it opens. The Memory screen can export a run's memory, forget individual episodes, or clear the selected run's memory bank; other runs' banks are not affected. To remove all memory, clear the app's data/storage. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.
 
