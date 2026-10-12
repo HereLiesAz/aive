@@ -1,0 +1,6 @@
+[submodule "convey"]
+	path = convey
+	url = https://github.com/HereLiesAz/convey.git
+[submodule "convey-web"]
+	path = convey-web
+	url = https://github.com/HereLiesAz/convey-web
