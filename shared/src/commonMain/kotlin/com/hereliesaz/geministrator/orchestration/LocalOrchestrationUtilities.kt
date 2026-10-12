@@ -105,6 +105,8 @@ data class AgentRouteCandidate(
     val consecutiveFailures: Int = 0,
     /** Share of recent runs that succeeded, 0..1; null when unknown (treated as 1). */
     val successRate: Double? = null,
+    /** What this agent is for, in words; breaks ties by similarity to [AgentRoutingInput.taskText]. */
+    val description: String = "",
 )
 
 @Serializable
@@ -113,6 +115,8 @@ data class AgentRoutingInput(
     val requiredContextTokens: Int = 0,
     val candidates: List<AgentRouteCandidate>,
     val requiredContextType: String = "task",
+    /** The task in words; only ever breaks ties among otherwise equal capable agents. */
+    val taskText: String = "",
 )
 
 @Serializable
@@ -138,6 +142,8 @@ data class ToolCapability(
     val preferenceRank: Int = Int.MAX_VALUE,
     /** Inputs this tool cannot run without. */
     val requiredInputs: Set<String> = emptySet(),
+    /** What this tool does, in words; breaks ties by similarity to [ToolRoutingInput.taskText]. */
+    val description: String = "",
 )
 
 @Serializable
@@ -150,6 +156,8 @@ data class ToolRoutingInput(
     val requiredInputs: List<String> = emptyList(),
     /** Inputs the caller can supply; null when unknown, which skips the input check. */
     val providedInputs: List<String>? = null,
+    /** The task in words; only ever breaks ties among equally preferred supporting tools. */
+    val taskText: String = "",
 )
 
 @Serializable
@@ -426,7 +434,7 @@ object DeterministicLocalOrchestrationUtilities : LocalOrchestrationUtilityFamil
         }
         val supporting = input.capabilities
             .filter { it.available && operation in it.operationClasses }
-            .sortedWith(compareBy<ToolCapability> { it.preferenceRank }.thenBy { it.id })
+            .sortedWith(compareBy<ToolCapability> { it.preferenceRank }.then(bySimilarityTo(input.taskText) { it.description }).thenBy { it.id })
         val provided = input.providedInputs?.toSet()
         val runnable = if (provided == null) supporting else supporting.filter { provided.containsAll(it.requiredInputs) }
         if (supporting.isNotEmpty() && runnable.isEmpty()) {
