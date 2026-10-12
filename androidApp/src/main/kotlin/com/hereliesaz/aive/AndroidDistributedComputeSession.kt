@@ -18,7 +18,6 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeWorker
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeClient
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeGateway
 import com.hereliesaz.geministrator.distributed.SystemExecutorDistributedWorkloadRunner
-import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.domain.ComputeAccelerator
 import com.hereliesaz.geministrator.domain.ComputePlatform
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -77,7 +76,7 @@ internal class AndroidDistributedComputeSession(
                 nowEpochMillis = System::currentTimeMillis,
                 // Pool leases may use this device's repository credentials only for its own projects.
                 trustedRepositories = {
-                    SettingsWorkflowPersistence.createDefault().projects.all().mapNotNull { it.repository }
+                    com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable.projects.all().mapNotNull { it.repository }
                 },
             ),
         ),

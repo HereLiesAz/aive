@@ -120,6 +120,13 @@ sqldelight {
             // The browser driver is asynchronous; generating suspend queries keeps one store for all targets.
             generateAsync.set(true)
         }
+        // Workflow state (projects, runs, events, artifacts, gates) on Android and desktop; see
+        // docs/architecture/STORAGE_SCALE.md. Its own source directory keeps the two schemas apart.
+        create("WorkflowDatabase") {
+            packageName.set("com.hereliesaz.geministrator.persistence.db")
+            srcDirs.setFrom("src/commonMain/sqldelight-workflow")
+            generateAsync.set(true)
+        }
     }
 }
 

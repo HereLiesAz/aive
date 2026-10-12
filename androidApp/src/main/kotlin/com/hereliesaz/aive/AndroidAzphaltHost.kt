@@ -18,7 +18,6 @@ import com.hereliesaz.geministrator.azphalt.KmpZipAzphaltArchiveReader
 import com.hereliesaz.geministrator.azphalt.SettingsAzphaltInstallStore
 import com.hereliesaz.geministrator.azphalt.SettingsAzphaltPublisherPinStore
 import com.hereliesaz.geministrator.azphalt.defaultAzphaltEd25519Verifier
-import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import io.ktor.client.HttpClient
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +43,7 @@ internal class AndroidAzphaltHost(
         publisherPins = publisherPins,
     )
 
-    val persistence = SettingsWorkflowPersistence.createDefault()
+    val persistence = com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable
     private val modelInstaller = AndroidAzphaltModelPackageInstaller(appContext, httpClient)
 
     val service = AzphaltStoreService(

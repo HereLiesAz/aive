@@ -34,7 +34,7 @@ import com.hereliesaz.geministrator.distributed.withTaskComputeDelegation
 import com.hereliesaz.geministrator.distributed.withWorkflowComputeDelegation
 import com.hereliesaz.geministrator.persistence.PersistenceCorruptionException
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
-import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
+import com.hereliesaz.geministrator.persistence.DurableWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
@@ -460,7 +460,7 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun recoverFromCorruption() {
-        val settingsPersistence = persistence as? SettingsWorkflowPersistence ?: return
+        val settingsPersistence = persistence as? DurableWorkflowPersistence ?: return
         settingsPersistence.recoverFromCorruption()
         loadLatest()
     }
@@ -475,7 +475,7 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun exportJson(): String? =
-        (persistence as? SettingsWorkflowPersistence)?.exportJson()
+        (persistence as? DurableWorkflowPersistence)?.exportJson()
 
     suspend fun exportCurrentProjectFile(): IveProjectExport? {
         val project = when (val snapshot = state.value) {
@@ -483,7 +483,7 @@ class ApplicationRuntime private constructor(
             is ApplicationRuntimeState.Live -> snapshot.presentation.project
             else -> runtimeMutex.withLock { viewingRun?.project ?: current?.project }
         } ?: return null
-        val settingsPersistence = persistence as? SettingsWorkflowPersistence ?: return null
+        val settingsPersistence = persistence as? DurableWorkflowPersistence ?: return null
         val encoded = settingsPersistence.exportProjectFile(project.id, nowEpochMillis())
         return IveProjectExport(
             projectId = project.id.value,
@@ -494,8 +494,8 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun importProjectFile(encoded: String): Project {
-        val settingsPersistence = persistence as? SettingsWorkflowPersistence
-            ?: error(".ive project import requires durable Settings persistence")
+        val settingsPersistence = persistence as? DurableWorkflowPersistence
+            ?: error(".ive project import requires durable persistence")
         return settingsPersistence.importProjectFile(encoded)
     }
 
@@ -531,7 +531,7 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun importJson(encoded: String) {
-        (persistence as? SettingsWorkflowPersistence)?.importJson(encoded)
+        (persistence as? DurableWorkflowPersistence)?.importJson(encoded)
         loadLatest()
     }
 
@@ -735,7 +735,7 @@ class ApplicationRuntime private constructor(
         suspend fun create(
             providers: Collection<AgentProvider>,
             scope: CoroutineScope,
-            persistence: WorkflowPersistence = SettingsWorkflowPersistence.createDefault(),
+            persistence: WorkflowPersistence = com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable,
             executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
             roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
             providerRegistry: AgentProviderRegistry? = null,

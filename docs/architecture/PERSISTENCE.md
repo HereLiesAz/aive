@@ -8,12 +8,14 @@ The engine therefore treats durable workflow state as a first-class product requ
 
 ## Current backend
 
-`SettingsWorkflowPersistence` is the current cross-platform persistence implementation. It stores a versioned serialized workflow snapshot through Multiplatform Settings. Snapshot values are generation-chunked so JVM Java Preferences never receives an oversized value. Workflow events appended during normal operation use a per-run settings journal so event growth does not force the entire snapshot to be deserialized and rewritten for every event. Journal run namespaces use bounded deterministic tokens, and individual event payloads use the same generation-chunked storage.
+`SqlWorkflowPersistence` is the workflow store on Android (`aive-workflows.db`) and desktop (`~/.aive/workflows.db`): one SQLite row per project, definition, run, event, role, artifact and approval gate (`shared/src/commonMain/sqldelight-workflow`), so a write touches only the rows it changes. Rows hold the same JSON as the Settings snapshot below, so whole-store export/import and `.ive` project files are identical across backends (`PersistenceSnapshots.kt`). On first use it moves any Settings-stored state in once, writes a JSON backup of it beside the database, and clears the Settings copy (`LegacySettingsMigration`). `WorkflowPersistenceFactory.durable` is the one instance per process; on Android, `AndroidWorkflowPersistence.install(context)` must run first (MainActivity does).
+
+`SettingsWorkflowPersistence` remains the web (JS/Wasm) store, which is a preview for 1.0. It stores a versioned serialized workflow snapshot through Multiplatform Settings. Snapshot values are generation-chunked so JVM Java Preferences never receives an oversized value. Workflow events appended during normal operation use a per-run settings journal so event growth does not force the entire snapshot to be deserialized and rewritten for every event. Journal run namespaces use bounded deterministic tokens, and individual event payloads use the same generation-chunked storage.
 
 Current platform backing stores are:
 
-- Android: SharedPreferences
-- Desktop/JVM: Java Preferences
+- Android: SharedPreferences (before the SQL store)
+- Desktop/JVM: Java Preferences (before the SQL store)
 - Web JS: browser localStorage
 - Web Wasm: browser localStorage
 
@@ -152,7 +154,7 @@ The current storage key is `geministrator.workflow.persistence.v2`. The previous
 
 ## Scale boundary
 
-The Settings-backed, generation-chunked snapshot plus per-run event journal is a restart-safe baseline, not the final high-volume event database.
+The Settings-backed, generation-chunked snapshot plus per-run event journal is a restart-safe baseline, not the final high-volume event database; Android and desktop use the SQL store instead.
 
 The repository contracts are intentionally replaceable. Likely future storage includes transactional SQL on Android/Desktop and IndexedDB on Web when event volume or indexed queries justify it.
 

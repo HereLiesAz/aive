@@ -13,23 +13,28 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
+import com.hereliesaz.geministrator.persistence.WorkflowPersistence
+import com.hereliesaz.geministrator.persistence.desktopSqlWorkflowPersistence
+import java.nio.file.Files
 import com.russhwolf.settings.MapSettings
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 
 /**
- * Measures Settings-backed persistence against the triggers in docs/architecture/STORAGE_SCALE.md.
+ * Measures the Settings and SQL workflow stores against the triggers in docs/architecture/STORAGE_SCALE.md.
  * The snapshot holds every run, so per-write cost grows with history, not with the active run.
  * Results go to build/reports/storage-scale.txt; the test only fails if persistence itself fails.
  */
 class StorageScaleMeasurementTest {
     @Test
     fun measureSnapshotGrowthWithRunHistory() = runBlocking {
-        val report = StringBuilder("runs\tsnapshot_kb\tput_ms_median\tget_ms_median\n")
-        for (runCount in listOf(10, 50, 150, 300)) {
+        val report = StringBuilder("store\truns\tstored_kb\tput_ms_median\tget_ms_median\n")
+        for (store in listOf("settings", "sql")) for (runCount in listOf(10, 50, 150, 300)) {
             val settings = MapSettings()
-            val persistence = SettingsWorkflowPersistence(settings)
+            val databaseFile = Files.createTempDirectory("aive-scale").toFile().resolve("workflows.db")
+            val persistence: WorkflowPersistence =
+                if (store == "sql") desktopSqlWorkflowPersistence(databaseFile) else SettingsWorkflowPersistence(settings)
             val project = Project(ProjectId("p"), "Project", createdAtEpochMillis = 1L, updatedAtEpochMillis = 1L)
             persistence.projects.put(project)
             val definition = definition()
@@ -66,10 +71,14 @@ class StorageScaleMeasurementTest {
                     )
                 }
             }
-            val snapshotChars = settings.keys.sumOf { key -> settings.getStringOrNull(key)?.length ?: 0 }
+            val storedKb = if (store == "sql") {
+                databaseFile.length() / 1024
+            } else {
+                settings.keys.sumOf { key -> settings.getStringOrNull(key)?.length ?: 0 } / 1024L
+            }
             val putTimes = (1..9).map { timed { persistence.runs.put(lastRun) } }.sorted()
             val getTimes = (1..9).map { timed { persistence.runs.get(lastRun.id) } }.sorted()
-            report.append("$runCount\t${snapshotChars / 1024}\t${putTimes[4]}\t${getTimes[4]}\n")
+            report.append("$store\t$runCount\t$storedKb\t${putTimes[4]}\t${getTimes[4]}\n")
         }
         File("build/reports").mkdirs()
         File("build/reports/storage-scale.txt").writeText(report.toString())

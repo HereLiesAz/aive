@@ -125,6 +125,8 @@ class MainActivity : ComponentActivity() {
         // Draw behind system bars on every API level; the shared Scaffold pads content by its insets.
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Before anything opens the workflow store (WorkflowPersistenceFactory.durable).
+        com.hereliesaz.geministrator.persistence.AndroidWorkflowPersistence.install(this)
         CrashReporting.install(this) { crashReportNoticeVisible = true }
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)

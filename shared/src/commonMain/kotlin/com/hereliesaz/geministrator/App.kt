@@ -31,7 +31,6 @@ import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
-import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
@@ -94,7 +93,7 @@ fun App(
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
 ) {
     val scope = rememberCoroutineScope()
-    val workflowPersistence = remember(persistence) { persistence ?: SettingsWorkflowPersistence.createDefault() }
+    val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
@@ -462,7 +461,7 @@ fun App(
                         onClearWorkflowData = {
                             scope.launch {
                                 try {
-                                    (runtime?.persistence as? SettingsWorkflowPersistence)?.clearWorkflowData()
+                                    (runtime?.persistence as? com.hereliesaz.geministrator.persistence.DurableWorkflowPersistence)?.clearWorkflowData()
                                     runtime?.loadLatest()
                                 } catch (failure: CancellationException) {
                                     throw failure
