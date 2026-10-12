@@ -34,7 +34,14 @@ class StorageScaleMeasurementTest {
             persistence.projects.put(project)
             val definition = definition()
             persistence.definitions.put(definition)
-            var lastRun = WorkflowRunFactory.create(definition, WorkflowRunId("seed"), project.id, "seed", 1L) { TaskRunId("seed-t") }
+            var lastRun = WorkflowRunFactory.create(
+                definition = definition,
+                workflowRunId = WorkflowRunId("seed"),
+                projectId = project.id,
+                objective = "seed",
+                nowEpochMillis = 1L,
+                taskRunIdFactory = { TaskRunId("seed-t") },
+            )
             repeat(runCount) { index ->
                 var taskIndex = 0
                 lastRun = WorkflowRunFactory.create(
