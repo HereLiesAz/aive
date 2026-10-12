@@ -43,7 +43,7 @@ internal suspend fun HttpClient.postServerSentEvents(
         configure()
     }.execute { response ->
         if (response.status.value !in 200..299) {
-            throw StreamRejected(response.status.value, response.bodyAsText().take(800), operation)
+            throw StreamRejected(response.status.value, response.bodyAsText().redactSecrets().take(800), operation)
         }
         val channel = response.bodyAsChannel()
         var event: String? = null

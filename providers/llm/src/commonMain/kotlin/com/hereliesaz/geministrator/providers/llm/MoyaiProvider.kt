@@ -371,7 +371,7 @@ private class MoyaiApi(
 
     private suspend fun HttpResponse.requireSuccess(operation: String): HttpResponse {
         if (status.value in 200..299) return this
-        val detail = bodyAsText().take(800)
+        val detail = bodyAsText().redactSecrets().take(800)
         error("Unable to $operation: HTTP ${status.value}" + detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty())
     }
 }

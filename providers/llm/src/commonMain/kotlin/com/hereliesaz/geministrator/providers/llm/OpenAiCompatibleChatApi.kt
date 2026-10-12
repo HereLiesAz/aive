@@ -62,7 +62,7 @@ class OpenAiCompatibleChatApi(
         }
 
         if (response.status.value !in 200..299) {
-            val responseBody = response.bodyAsText().take(800)
+            val responseBody = response.bodyAsText().redactSecrets().take(800)
             error(
                 "Unable to generate compatible chat response: HTTP ${response.status.value}" +
                     responseBody.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),

@@ -596,7 +596,7 @@ class OpenAiNodeCharacterImageApi(
             setBody(request)
         }
         if (response.status.value !in 200..299) {
-            val body = response.bodyAsText().take(1_200)
+            val body = response.bodyAsText().redactSecrets().take(1_200)
             error(
                 "OpenAI node-character request failed: HTTP ${response.status.value}" +
                     body.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
