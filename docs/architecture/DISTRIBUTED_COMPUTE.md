@@ -4,6 +4,10 @@ The Aive can place a task on another authenticated device in the same compute po
 
 Code: `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/distributed/` (protocol, client, worker, executor integration, delegation helpers, configuration) and `computeRelay/` (the relay server).
 
+## Availability
+
+The Android Play build does not offer distributed compute for 1.0: the Compute screen is hidden and no relay session starts (`DISTRIBUTED_COMPUTE_AVAILABLE` in `androidApp/src/play`). The Android GitHub release build, desktop and web keep it.
+
 ## Topology
 
 - **Relay** — `computeRelay/` is a standalone Ktor (CIO) WebSocket server. Nodes connect to `/v1/compute/{poolId}`. Pools are created on demand and removed once they have no nodes and no leases.

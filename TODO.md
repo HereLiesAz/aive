@@ -4,6 +4,23 @@ This is the canonical near-term roadmap for The Aive. It is ordered by product d
 
 Tracking issue: #35
 
+## 1.0 release scope
+
+Decided 2026-10-12. Items outside this scope stay on this list as post-1.0 work; they do not block the release.
+
+- **Platform:** Android first. Desktop, JS and Wasm keep shipping preview builds and reach 1.0 in a later release.
+- **Local models:** 1.0 ships on the built-in rule-based orchestration and memory clerks plus the released Agent Router and Handoff Composer. The remaining orchestration roles, the trained memory clerks, BitNet and the optimization pipeline are post-1.0.
+- **Distributed compute:** held back. `computeRelay` and the Compute screen are not part of 1.0.
+
+Release blockers, in order:
+
+1. Android on-device acceptance run (see "Make one complete workflow actually work end-to-end").
+2. Live GitHub dispatch through the app (P1 — Provider system).
+3. Memory store split verified on Android (P1 — Persistence and recovery).
+4. Crash/ANR reporting opt-in and privacy policy aligned (P2 — Security and privacy hardening).
+5. Themed Android icon validated (P2 — Brand and release polish).
+6. Distributed compute hidden from the 1.0 Android build.
+
 A checked box means implemented and covered by automated tests. It does not mean verified live on a device or runtime: that evidence comes only from a successful centralized Live Runtime Verification run ([`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)) and is tracked by the unchecked on-runtime verification item and the "Make one complete workflow actually work end-to-end" section below.
 
 ## P0 — Make the runtime model correct
