@@ -414,7 +414,7 @@ private suspend fun LlmApiKeyProvider.requireKey(providerName: String): String =
 
 private suspend fun HttpResponse.requireSuccess(operation: String) {
     if (status.value in 200..299) return
-    val responseBody = bodyAsText().take(800)
+    val responseBody = bodyAsText().redactSecrets().take(800)
     error(
         "Unable to $operation: HTTP ${status.value}" +
             responseBody.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),

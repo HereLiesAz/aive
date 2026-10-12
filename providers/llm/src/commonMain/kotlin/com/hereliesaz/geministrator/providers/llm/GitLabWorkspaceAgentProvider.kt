@@ -874,7 +874,7 @@ private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
     if (status.value !in 200..299) {
         error(
             "Unable to $operation: HTTP ${status.value}" +
-                body.take(500).takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
+                body.redactSecrets().take(500).takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
         )
     }
     return body
