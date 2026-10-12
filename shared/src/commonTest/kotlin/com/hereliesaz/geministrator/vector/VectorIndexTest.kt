@@ -10,10 +10,16 @@ import kotlin.test.assertTrue
 class VectorIndexTest {
     private val dimension = 48
 
-    /** Clustered data, like real embeddings: points scattered around a few centres. */
+    /** Fixed cluster centres shared by the data and the queries, like a real embedding space. */
+    private val centres = Random(7).let { random -> List(12) { FloatArray(dimension) { random.nextFloat() * 2 - 1 } } }
+
+    /**
+     * Clustered data: points scattered around [centres]. Queries use the same centres with
+     * different noise, so they land near stored vectors the way real queries do; queries far from
+     * every cluster make all candidates near-ties, which no approximate index ranks reliably.
+     */
     private fun dataset(count: Int, seed: Int = 7): List<Pair<String, FloatArray>> {
         val random = Random(seed)
-        val centres = List(12) { FloatArray(dimension) { random.nextFloat() * 2 - 1 } }
         return List(count) { i ->
             val centre = centres[i % centres.size]
             "v$i" to FloatArray(dimension) { centre[it] + (random.nextFloat() - 0.5f) * 0.6f }

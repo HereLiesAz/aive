@@ -18,7 +18,8 @@ interface TextEmbedder {
  * The always-available embedder: deterministic, pure Kotlin, no model download. Text becomes a
  * bag of weighted features, hashed into [dimension] signed buckets (the hashing trick):
  *
- * - words (camelCase, snake_case and paths split), with sublinear term frequency;
+ * - words (camelCase, snake_case and paths split), with sublinear term frequency, and their
+ *   light suffix-stripped stems;
  * - adjacent word pairs, for a little word order;
  * - character trigrams of each word, so spelling variants and inflections overlap;
  * - concepts, when [conceptsOf] is given: WordNet synsets (and their hypernyms) for each word,
@@ -50,6 +51,8 @@ class BuiltInTextEmbedder(
         for ((word, count) in counts) {
             val weight = 1f + ln(count.toFloat())
             add(vector, "w:$word", weight)
+            // The stem, so "retrying"/"retry" and "builds"/"build" share a feature.
+            add(vector, "t:${stem(word)}", STEM_WEIGHT * weight)
             val padded = "^$word$"
             val trigrams = (0..padded.length - 3).map { padded.substring(it, it + 3) }
             val trigramWeight = TRIGRAM_WEIGHT * weight / trigrams.size.coerceAtLeast(1)
@@ -75,6 +78,7 @@ class BuiltInTextEmbedder(
         const val TRIGRAM_WEIGHT = 0.6f
         const val CONCEPT_WEIGHT = 0.8f
         const val BIGRAM_WEIGHT = 0.4f
+        const val STEM_WEIGHT = 0.8f
         const val MAX_SENSES = 2
 
         private val STOP_WORDS = setOf(
@@ -92,6 +96,14 @@ class BuiltInTextEmbedder(
                 .map { it.value.lowercase() }
                 .filter { it.length > 1 && it !in STOP_WORDS }
                 .toList()
+        }
+
+        /** Strips common English inflections, keeping at least three letters: not a full stemmer. */
+        fun stem(word: String): String {
+            fun cut(suffix: String, replacement: String = ""): String? =
+                if (word.endsWith(suffix) && word.length - suffix.length >= 3) word.dropLast(suffix.length) + replacement else null
+            return cut("ies", "y") ?: cut("ing") ?: cut("ed") ?: cut("es")?.takeIf { word.endsWith("ses") || word.endsWith("xes") || word.endsWith("ches") || word.endsWith("shes") }
+                ?: (if (word.endsWith("ss")) null else cut("s")) ?: word
         }
 
         fun fnv1a64(text: String): Long {
