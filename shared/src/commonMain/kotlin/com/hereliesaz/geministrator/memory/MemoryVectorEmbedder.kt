@@ -9,7 +9,7 @@ import com.hereliesaz.geministrator.vector.TextEmbedder
  * vector is made and every vector in this space includes concepts; if the resource cannot be read
  * the embedder falls back to the plain space, under its own id so the two never mix.
  */
-class MemoryTextEmbedder(override val dimension: Int = 384) : TextEmbedder {
+class MemoryVectorEmbedder(override val dimension: Int = 384) : TextEmbedder {
     private var delegate: BuiltInTextEmbedder? = null
 
     override val id: String get() = delegate?.id ?: "builtin-hash-wordnet"

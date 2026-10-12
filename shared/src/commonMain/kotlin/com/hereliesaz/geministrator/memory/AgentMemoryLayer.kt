@@ -93,7 +93,7 @@ class AgentMemoryLayer private constructor(
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
             summarizer: MemorySummarizerChain = MemorySummarizerChain(),
             /** Semantic recall; `null` keeps recall lexical (docs/architecture/VECTOR_STORES.md). */
-            embedder: com.hereliesaz.geministrator.vector.TextEmbedder? = MemoryTextEmbedder(),
+            embedder: com.hereliesaz.geministrator.vector.TextEmbedder? = MemoryVectorEmbedder(),
         ): AgentMemoryLayer {
             val queue = MemoryConsolidationQueue(
                 store,
