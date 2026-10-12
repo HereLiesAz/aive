@@ -19,6 +19,7 @@ import no.synth.kmpzip.zip.ZipOutputStream
 import kotlin.test.Test
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import kotlin.test.assertContains
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -187,8 +188,22 @@ class OpenCodeActionsAgentProviderTest {
 
         assertContains(template, "workflow_dispatch")
         assertContains(template, OpenCodeAgentWorkflow.TASK_INPUT)
-        assertContains(template, "opencode\", [\"run\", \"--format\", \"json\"")
+        assertContains(template, "opencodeBin, \"run\", \"--format\", \"json\"")
         assertContains(template, "checks: write")
+    }
+
+    @Test
+    fun bundledWorkflowKeepsThePushTokenFromTheAgent() = runBlocking<Unit> {
+        val template = OpenCodeAgentWorkflow.template()
+
+        // The agent runs as its own user, the runner's git ignores hooks and global config,
+        // and the token never appears in a command line.
+        assertContains(template, "\"-u\", \"aive-agent\"")
+        assertContains(template, "core.hooksPath=/dev/null")
+        assertContains(template, "GIT_CONFIG_GLOBAL: \"/dev/null\"")
+        assertContains(template, "GIT_CONFIG_VALUE_0")
+        assertFalse("x-access-token:${'$'}{process.env.GITHUB_TOKEN}@" in template)
+        assertFalse(Regex("""uses: [^@\s]+@v\d""").containsMatchIn(template), "actions must be pinned to commit SHAs")
     }
 
     @Test

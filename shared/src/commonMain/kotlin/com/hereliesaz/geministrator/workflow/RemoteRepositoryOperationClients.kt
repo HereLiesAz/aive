@@ -370,15 +370,7 @@ private sealed interface RemoteRepositoryOperation {
             }
         }
 
-        private fun requireSafeBranch(raw: String): String {
-            val branch = raw.trim()
-            require(branch.isNotEmpty()) { "Branch name is required" }
-            require(!branch.startsWith('-')) { "Branch names may not begin with '-'" }
-            require(branch.none { it == '\u0000' || it == '\n' || it == '\r' }) {
-                "Branch name contains invalid control characters"
-            }
-            return branch
-        }
+        private fun requireSafeBranch(raw: String): String = GitRefNames.requireSafe(raw)
     }
 }
 
