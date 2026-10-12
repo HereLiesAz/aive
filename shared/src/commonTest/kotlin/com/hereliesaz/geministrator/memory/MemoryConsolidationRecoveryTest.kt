@@ -187,6 +187,51 @@ class MemoryConsolidationRecoveryTest {
         assertEquals(listOf("old-context", "old-summary"), neighborhood.map { it.id })
     }
 
+    @Test
+    fun anEmbedderAddsNeighboursThatShareMeaningButNoWords() = runBlocking {
+        val old = episode("old")
+        val current = episode("current")
+        fun node(id: String, text: String, episode: MemoryEpisode) =
+            MemoryNode(MemoryNodeId(id), MemoryNodeKind.Context, text, sourceEpisodeIds = setOf(episode.id), createdAtEpochMillis = 1L)
+        // Each run consumes the association entry, so each gets its own store.
+        suspend fun store() = InMemoryMemoryStore().apply {
+            commit(
+                0,
+                MemoryStoreMutation(
+                    episodesToAdd = listOf(old, current),
+                    nodesToAdd = listOf(
+                        node("old-meaning", "Picked a relational datastore.", old),
+                        node("old-unrelated", "Splash animation stutters.", old),
+                        node("current", "Chose Postgres.", current),
+                    ),
+                    queueUpserts = listOf(queued("q-current", 1, current.id).copy(stage = MemoryConsolidationStage.Associations)),
+                ),
+            )
+        }
+        // Database texts share one direction, everything else another.
+        val embedder = object : com.hereliesaz.geministrator.vector.TextEmbedder {
+            override val id = "test"
+            override val version = 1
+            override val dimension = 2
+            override suspend fun embed(texts: List<String>) = texts.map {
+                if ("Postgres" in it || "datastore" in it) floatArrayOf(1f, 0f) else floatArrayOf(0f, 1f)
+            }
+        }
+        var neighborhood = emptyList<MemoryWorkItem>()
+        val manager = object : MemoryManagerAgent {
+            override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
+                neighborhood = packet.neighborhood
+                return MemoryMutationBatch()
+            }
+        }
+
+        MemoryConsolidator(store(), manager, policy).processNext(10L)
+        assertTrue(neighborhood.isEmpty(), "lexical-only neighbourhood: ${neighborhood.map { it.id }}")
+
+        MemoryConsolidator(store(), manager, policy, embedder = embedder).processNext(10L)
+        assertEquals(listOf("old-meaning"), neighborhood.map { it.id })
+    }
+
     private suspend fun condensationStore(
         texts: List<String> = listOf("a", "b", "c").map { "The connection pool is shared, note $it." },
     ): InMemoryMemoryStore {

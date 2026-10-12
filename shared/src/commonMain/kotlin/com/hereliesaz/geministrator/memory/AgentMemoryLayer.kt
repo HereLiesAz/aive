@@ -105,7 +105,7 @@ class AgentMemoryLayer private constructor(
                 tool = LexicalMemoryTool(graphTool, lexicon),
                 queue = queue,
                 sessionObserver = QueuedMemorySessionObserver(queue),
-                consolidator = manager?.let { MemoryConsolidator(store, it, policy, summarizer) },
+                consolidator = manager?.let { MemoryConsolidator(store, it, policy, summarizer, embedder) },
                 programmaticAssociator = MemoryProgrammaticAssociator(store),
                 lexicalAssociator = MemoryLexicalAssociator(store, lexicon),
                 summarizer = summarizer,
