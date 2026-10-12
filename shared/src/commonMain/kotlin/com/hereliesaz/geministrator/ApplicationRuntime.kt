@@ -742,6 +742,11 @@ class ApplicationRuntime private constructor(
             orchestrationUtilities: LocalOrchestrationUtilityFamily =
                 DeterministicLocalOrchestrationUtilities,
             localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
+            /** Repository and artifact chunks offered to the Context Packer; upstream artifacts only by default. */
+            contextRetriever: com.hereliesaz.geministrator.retrieval.ContextRetriever? =
+                com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
+                    listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource),
+                ),
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
@@ -755,6 +760,7 @@ class ApplicationRuntime private constructor(
                 providerRegistry = registry,
                 scope = runtimeScope,
                 orchestrationUtilities = orchestrationUtilities,
+                contextRetriever = contextRetriever,
             )
             val publisher = WorkflowRuntimePublisher()
             val effectiveExecutorIntegrations = executorIntegrations

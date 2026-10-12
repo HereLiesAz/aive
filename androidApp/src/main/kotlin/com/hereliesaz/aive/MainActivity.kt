@@ -348,6 +348,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
+                // A linked GitHub account lets agents retrieve relevant files from the project's repository.
+                val contextChunkSources = remember(repositoryCredentials) {
+                    repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
+                        listOf(
+                            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
+                                GitHubTokenProvider { token },
+                                repositoryHttpClient,
+                            ),
+                        )
+                    }.orEmpty()
+                }
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredAndroidRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
                 }
@@ -407,6 +418,7 @@ class MainActivity : ComponentActivity() {
                         azphaltPackageImportRequest = azphaltHost.importRequest,
                         onAzphaltPackageImportHandled = azphaltHost::consumeImport,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
+                        contextChunkSources = contextChunkSources,
                         onSearchRepositories = repositoryDiscovery::search,
                         onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                         onDisconnectRepositoryService = { serviceId ->
