@@ -8,7 +8,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VectorIndexTest {
-    private val dimension = 48
+    // Realistic sentence-embedding width; binary codes in particular are far too coarse at low dimensions.
+    private val dimension = 384
 
     /** Fixed cluster centres shared by the data and the queries, like a real embedding space. */
     private val centres = Random(7).let { random -> List(12) { FloatArray(dimension) { random.nextFloat() * 2 - 1 } } }
