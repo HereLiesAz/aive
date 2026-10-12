@@ -86,6 +86,7 @@ fun App(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
@@ -168,7 +169,8 @@ fun App(
                 ).name,
             )
         }
-        val destination = ControlRoomDestination.entries
+        val destinations = ControlRoomDestination.available(distributedComputeAvailable)
+        val destination = destinations
             .firstOrNull { it.name == destinationName }
             ?: startupControlRoomDestination(hasConfiguredProvider = providers.isNotEmpty())
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
@@ -288,6 +290,7 @@ fun App(
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,
+                        destinations = destinations,
                         onDestinationSelected = { target ->
                             if (target != destination) {
                                 navigationHistory = navigationHistory + destination

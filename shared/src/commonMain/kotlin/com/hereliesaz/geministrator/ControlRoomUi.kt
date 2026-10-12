@@ -76,6 +76,13 @@ enum class ControlRoomDestination(val label: String) {
     Memory("Memory"),
     AddOns("AZPHALT STORE"),
     Settings("Settings"),
+    ;
+
+    companion object {
+        /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
+        fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
+            entries.filter { distributedComputeAvailable || it != Compute }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +90,7 @@ enum class ControlRoomDestination(val label: String) {
 fun ControlRoom(
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    destinations: List<ControlRoomDestination> = ControlRoomDestination.entries,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
     onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
@@ -150,7 +158,7 @@ fun ControlRoom(
         if (compact) {
             Column(Modifier.fillMaxSize()) {
                 CompactHeader()
-                CompactNavigation(destination, onDestinationSelected)
+                CompactNavigation(destination, onDestinationSelected, destinations)
                 MainDestination(
                     destination = destination,
                     onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
@@ -212,6 +220,7 @@ fun ControlRoom(
                 PillNavigation(
                     destination = destination,
                     onDestinationSelected = onDestinationSelected,
+                    destinations = destinations,
                     runtimeState = runtimeState,
                     modifier = Modifier.width(220.dp).fillMaxHeight(),
                 )
@@ -300,6 +309,7 @@ fun ControlRoom(
 private fun PillNavigation(
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    destinations: List<ControlRoomDestination>,
     runtimeState: ApplicationRuntimeState,
     modifier: Modifier = Modifier,
 ) {
@@ -311,7 +321,7 @@ private fun PillNavigation(
         Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
         Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
         Spacer(Modifier.height(12.dp))
-        ControlRoomDestination.entries.forEachIndexed { index, item ->
+        destinations.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
                 seed = "nav-$index-${item.name}",
@@ -320,7 +330,7 @@ private fun PillNavigation(
                 onClick = { onDestinationSelected(item) },
                 modifier = Modifier
                     .fillMaxWidth(if (item == destination) 0.96f else 0.84f - (index % 3) * 0.03f)
-                    .azphaltEntrance(entrance, index, ControlRoomDestination.entries.size),
+                    .azphaltEntrance(entrance, index, destinations.size),
             )
         }
         Spacer(Modifier.weight(1f))
@@ -354,19 +364,20 @@ private fun CompactHeader() {
 private fun CompactNavigation(
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    destinations: List<ControlRoomDestination>,
 ) {
     val entrance = remember { AzphaltEntrance.roll() }
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ControlRoomDestination.entries.forEachIndexed { index, item ->
+        destinations.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
                 seed = "compact-$index-${item.name}",
                 selected = item == destination,
                 onClick = { onDestinationSelected(item) },
-                modifier = Modifier.azphaltEntrance(entrance, index, ControlRoomDestination.entries.size),
+                modifier = Modifier.azphaltEntrance(entrance, index, destinations.size),
             )
         }
     }

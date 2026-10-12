@@ -305,7 +305,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
-                    if (computeConfiguration.configured && token != null) {
+                    if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
                         AndroidDistributedComputeSession(
                             context = this,
                             configuration = computeConfiguration,
@@ -438,6 +438,7 @@ class MainActivity : ComponentActivity() {
                                 computeToken = computeCredentialStore.readToken()
                             }
                         },
+                        distributedComputeAvailable = DISTRIBUTED_COMPUTE_AVAILABLE,
                         onDisconnectDistributedCompute = {
                             computeCredentialStore.clear()
                             computeToken = null
