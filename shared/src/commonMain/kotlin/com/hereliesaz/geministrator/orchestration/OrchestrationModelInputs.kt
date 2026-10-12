@@ -51,7 +51,7 @@ internal data class AgentRoutingModelInput(
             val eligible = routing.eligible.map { it.id }.toSet()
             val open = routing.open.map { it.id }.toSet()
             val candidates = input.candidates
-                .sortedWith(agentRoutingOrder)
+                .sortedWith(agentRoutingOrder(input.taskText))
                 .map { candidate ->
                     AgentCandidateFacts(
                         id = candidate.id,

@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.memory.MemoryLanguageResources
 import com.hereliesaz.geministrator.memory.MemorySalienceFeatures
 import com.hereliesaz.geministrator.memory.MemoryTechnicalLexicon
 import com.hereliesaz.geministrator.memory.WordNetLexicon
+import com.hereliesaz.geministrator.vector.BuiltInTextEmbedder
+import com.hereliesaz.geministrator.vector.dot
 
 /*
  * The computations behind the deterministic baselines that the specialist model inputs also expose,
@@ -270,8 +272,32 @@ internal data class AgentRouting(
 )
 
 /** Routing order: preference rank, then cost per unit of reliability, then id. */
-internal val agentRoutingOrder: Comparator<AgentRouteCandidate> =
-    compareBy<AgentRouteCandidate> { it.preferenceRank }.thenBy(::costPerReliability).thenBy { it.id }
+/**
+ * Preference rank, then cost per reliability, then similarity of the agent's description to
+ * [taskText] (a tie-break only: it never overrides the capability filter or an explicit rank),
+ * then id.
+ */
+internal fun agentRoutingOrder(taskText: String): Comparator<AgentRouteCandidate> =
+    compareBy<AgentRouteCandidate> { it.preferenceRank }
+        .thenBy(::costPerReliability)
+        .then(bySimilarityTo(taskText) { it.description })
+        .thenBy { it.id }
+
+private val routingEmbedder = BuiltInTextEmbedder(dimension = 256)
+
+/**
+ * Most similar to [taskText] first, by the built-in embedder (deterministic, synchronous). With no
+ * task text, or no description on either side, everything compares equal and the next key decides.
+ */
+internal fun <T> bySimilarityTo(taskText: String, describe: (T) -> String): Comparator<T> {
+    if (taskText.isBlank()) return Comparator { _, _ -> 0 }
+    val task = routingEmbedder.embedOne(taskText)
+    val scores = HashMap<String, Float>()
+    fun score(item: T): Float = describe(item).let { text ->
+        if (text.isBlank()) 0f else scores.getOrPut(text) { dot(task, routingEmbedder.embedOne(text)) }
+    }
+    return compareByDescending(::score)
+}
 
 /** Estimated cost divided by success rate (unknown counts as 1; floored at 0.05). */
 internal fun costPerReliability(candidate: AgentRouteCandidate): Double =
@@ -288,12 +314,13 @@ internal fun capableAgent(candidate: AgentRouteCandidate, input: AgentRoutingInp
  * gets a single trial (half-open), so routing never stalls on history alone.
  */
 internal fun agentRouting(input: AgentRoutingInput): AgentRouting {
-    val capable = input.candidates.filter { capableAgent(it, input) }.sortedWith(agentRoutingOrder)
+    val order = agentRoutingOrder(input.taskText)
+    val capable = input.candidates.filter { capableAgent(it, input) }.sortedWith(order)
     val (open, closed) = capable.partition { it.consecutiveFailures >= CIRCUIT_OPEN_FAILURES }
     return when {
         closed.isNotEmpty() -> AgentRouting(closed, open, halfOpen = false)
         open.isNotEmpty() -> AgentRouting(
-            listOf(open.minWith(compareBy<AgentRouteCandidate> { it.consecutiveFailures }.then(agentRoutingOrder))),
+            listOf(open.minWith(compareBy<AgentRouteCandidate> { it.consecutiveFailures }.then(order))),
             open,
             halfOpen = true,
         )
