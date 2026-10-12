@@ -29,7 +29,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- `vendor/` — `conveyance-h2g2`, the H2G2 style library included as a composite build
+- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned SHAs; to build locally, clone them there at the SHAs in `.github/workflows/multiplatform.yml` (the JitPack fallback has no desktop variant).
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt workflow/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character manifests, role prompts, and source sheets

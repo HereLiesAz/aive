@@ -25,12 +25,16 @@ import kotlin.test.Test
  * Measures the Settings and SQL workflow stores against the triggers in docs/architecture/STORAGE_SCALE.md.
  * The snapshot holds every run, so per-write cost grows with history, not with the active run.
  * Results go to build/reports/storage-scale.txt; the test only fails if persistence itself fails.
+ *
+ * The Settings store rewrites its whole snapshot on every write, so the full sweep is quadratic and
+ * takes most of an hour. Ordinary test runs do a small smoke sweep; set AIVE_STORAGE_SCALE=full to
+ * take the measurements recorded in STORAGE_SCALE.md.
  */
 class StorageScaleMeasurementTest {
     @Test
     fun measureSnapshotGrowthWithRunHistory() = runBlocking {
         val report = StringBuilder("store\truns\tstored_kb\tput_ms_median\tget_ms_median\n")
-        for (store in listOf("settings", "sql")) for (runCount in listOf(10, 50, 150, 300)) {
+        for (store in listOf("settings", "sql")) for (runCount in RUN_COUNTS) {
             val settings = MapSettings()
             val databaseFile = Files.createTempDirectory("aive-scale").toFile().resolve("workflows.db")
             val persistence: WorkflowPersistence =
@@ -105,6 +109,7 @@ class StorageScaleMeasurementTest {
     )
 
     private companion object {
+        val RUN_COUNTS = if (System.getenv("AIVE_STORAGE_SCALE") == "full") listOf(10, 50, 150, 300) else listOf(5)
         const val TASKS = 15
         const val ARTIFACTS_PER_TASK = 3
         val OBJECTIVE = "Build the feature described in the issue, with tests and documentation. ".repeat(8)

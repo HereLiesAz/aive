@@ -49,3 +49,6 @@ native/bitcos/target/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Checked out by CI at the pinned SHAs (see .github/workflows); clone locally to build (settings.gradle.kts).
+/vendor/conveyance-h2g2/
