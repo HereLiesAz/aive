@@ -89,11 +89,8 @@ class CrashReportPolicy(private val store: CrashReportKeyValueStore, private val
     }
 
     companion object {
-        /**
-         * On by default while The Aive is pre-release (users can turn it off in Settings).
-         * Flip to false when the production release is published: reporting then becomes opt-in.
-         */
-        const val DEFAULT_ENABLED = true
+        /** Off by default since the production release: reporting is opt-in from Settings. */
+        const val DEFAULT_ENABLED = false
 
         const val KEY_ENABLED = "auto-report-enabled"
         const val KEY_NOTICE_SHOWN = "first-report-notice-shown"
