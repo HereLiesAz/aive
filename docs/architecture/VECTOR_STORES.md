@@ -32,12 +32,12 @@ Each embedder is its own vector space, named by `TextEmbedder.space` (id, versio
 |---|---|---|
 | Memory recall | `GraphMemoryTool.grip` / `fusedOrder` (`memory/MemoryTool.kt`) | Union semantic nearest neighbours into the seed set and add a semantic signal to the reciprocal-rank fusion beside relevance, scope, salience, confidence, recency and keywords. |
 | Memory associations | `MemoryConsolidator.semanticNeighbours` → `relatedNeighborhood` (`memory/MemoryConsolidation.kt`) | Done: with an embedder (on by default via `AgentMemoryLayer.create`), the association packet's neighbourhood adds memories from anywhere in the bank at cosine ≥ 0.45, fused with shared-word overlap by reciprocal rank; same-kind still first. The index is persistent per consolidator (each node embedded once), HNSW past 5,000 memories. |
-| Agent retrieval | `ProviderBackedManagedSessionGateway` (memory blocks are packed there today) | Retrieve repository-file and artifact chunks by similarity to the task and add them as `ContextEvidence` for the Context Packer. Needs a repository chunking/reading step that does not exist yet. |
+| Agent retrieval | `ProviderBackedManagedSessionGateway.withRecalledMemory`, `retrieval/` | Done: `SimilarityContextRetriever` ranks chunks (`chunkText`: paragraphs packed to 1,200 chars) by similarity to the task's objective and acceptance criteria. Sources: `ArtifactChunkSource` (upstream artifacts' text, always) and `GitHubRepositoryChunkSource` (with a linked GitHub account: the tree, refreshed every 5 minutes; up to 24 text files whose paths share words with the task, plus READMEs; chunks cached by blob SHA; build, vendor and generated paths skipped). The best 8 at cosine ≥ 0.2 go to the Context Packer as `ContextEvidence` below memory, within their own 1,500-token budget; text already in the prompt is never repeated. Runs even when memory recalls nothing. |
 | Agent routing | `routeAgent` / `routeTool` (`orchestration/LocalOrchestrationUtilities.kt`, `bySimilarityTo` in `OrchestrationBaselineSupport.kt`) | Done: `AgentRoutingInput.taskText` / `AgentRouteCandidate.description` and `ToolRoutingInput.taskText` / `ToolCapability.description`. Similarity (built-in embedder; routing is synchronous) breaks ties after preference rank and cost per reliability, before the id; it never overrides the capability filter or an explicit rank. Today's callers rank every candidate distinctly, so they route as before until they pass equal ranks and descriptions. |
 
 ## Storage
 
-Memory vectors live in each memory bank's SQLite database (new table keyed by node id, embedder id and version). Repository and artifact chunk vectors live in the workflow database. On the web, the memory banks already use SQLite in OPFS through the worker driver; the workflow store stays on Settings for 1.0, so agent retrieval on the web keeps its index in memory for the session.
+Memory vectors live in each memory bank's SQLite database (new table keyed by node id, embedder id and version). Repository and artifact chunk vectors are cached in memory by the retriever (bounded); the trees and files they come from are re-read from GitHub as needed. On the web, the memory banks already use SQLite in OPFS through the worker driver; the workflow store stays on Settings for 1.0, so agent retrieval on the web keeps its index in memory for the session.
 
 ## Order of work
 
@@ -46,4 +46,4 @@ Memory vectors live in each memory bank's SQLite database (new table keyed by no
 3. ~~Whole-bank neighbours for associations.~~ Done.
 4. ~~MiniLM adapter and Settings install.~~ Done (browser adapter outstanding).
 5. ~~Routing tie-breaks.~~ Done.
-6. Repository/artifact chunking and retrieval.
+6. ~~Repository/artifact chunking and retrieval.~~ Done (GitHub repositories; GitLab and local paths outstanding).

@@ -91,6 +91,8 @@ fun App(
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
+    /** Extra chunk sources (a connected repository) retrieved from beside upstream artifacts. */
+    contextChunkSources: List<com.hereliesaz.geministrator.retrieval.ContextChunkSource> = emptyList(),
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -103,7 +105,7 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, runtimeGeneration) {
+    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -115,6 +117,9 @@ fun App(
                 executorIntegrations = executorIntegrations,
                 roleSurfaceRuntime = roleSurfaceRuntime,
                 orchestrationUtilities = orchestrationUtilities,
+                contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
+                    listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
+                ),
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))

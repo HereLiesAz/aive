@@ -73,6 +73,53 @@ class MemoryPromptInjectionTest {
     }
 
     @Test
+    fun retrievedChunksAreInjectedEvenWithoutMemoryAndNeverRepeated() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = RecordingStartProvider()
+        try {
+            MemoryRuntimeBridge.promptContextProvider = MemoryPromptContextProvider { _, _ -> MemoryPromptRecall() }
+            val retriever = com.hereliesaz.geministrator.retrieval.ContextRetriever {
+                listOf(
+                    com.hereliesaz.geministrator.retrieval.RetrievedChunk(
+                        com.hereliesaz.geministrator.retrieval.TextChunk("repo:a", "Repository file Gateway.kt", "class RepositoryGateway"),
+                        0.9f,
+                    ),
+                    com.hereliesaz.geministrator.retrieval.RetrievedChunk(
+                        com.hereliesaz.geministrator.retrieval.TextChunk("repo:b", "Repository file Task.kt", "Update the repository gateway"),
+                        0.8f,
+                    ),
+                )
+            }
+            val gateway = ProviderBackedManagedSessionGateway(
+                providerRegistry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope = scope,
+                contextRetriever = retriever,
+            )
+            gateway.createSession(
+                ManagedSessionRequest(
+                    providerSelection = ProviderSelectionRequest(),
+                    taskRequest = AgentTaskRequest(
+                        taskRunId = TaskRunId("retrieval-task"),
+                        objective = "Update the repository gateway",
+                        roleInstructions = "Implement the requested change.",
+                        acceptanceCriteria = emptyList(),
+                        promptContext = com.hereliesaz.geministrator.providers.PromptContext(
+                            dynamicContext = listOf(PromptContextBlock("Task", "Update the repository gateway")),
+                        ),
+                    ),
+                ),
+            )
+
+            val labels = requireNotNull(provider.startedRequest).promptContext.dynamicContext.map { it.label }
+            assertTrue("Repository file Gateway.kt" in labels, labels.toString())
+            assertTrue("Repository file Task.kt" !in labels, "a chunk already in the prompt is not repeated: $labels")
+        } finally {
+            MemoryRuntimeBridge.reset()
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun requestTermsFeedTheComposerAndFirstPassWordsGetOneSecondPassQuery() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = RecordingStartProvider()

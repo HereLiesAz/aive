@@ -19,6 +19,10 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.providers.PromptContextBlock
+import com.hereliesaz.geministrator.retrieval.ArtifactChunkSource
+import com.hereliesaz.geministrator.retrieval.ContextRetriever
+import com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
@@ -37,6 +41,11 @@ class ProviderBackedManagedSessionGateway(
     inferenceFabric: CompoundInferenceFabric = providerRegistry.inferenceFabric,
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
+    /**
+     * Repository and artifact chunks relevant to each request, offered to the Context Packer beside
+     * recalled memory. Upstream artifacts only, by default.
+     */
+    private val contextRetriever: ContextRetriever? = SimilarityContextRetriever(listOf(ArtifactChunkSource)),
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -47,6 +56,8 @@ class ProviderBackedManagedSessionGateway(
 
     private companion object {
         const val MAX_MEMORY_QUERIES = 6
+        /** Token budget for retrieved repository and artifact chunks, on top of memory's own. */
+        const val RETRIEVAL_TOKENS = 1_500
         const val APPROXIMATE_CHARS_PER_TOKEN = 4
         const val OBSERVER_RETRY_MILLIS = 1_000L
         const val MAX_OBSERVER_FAILURES = 10
@@ -180,21 +191,33 @@ class ProviderBackedManagedSessionGateway(
             maxQueries = MAX_MEMORY_QUERIES,
         )
         var queryPlan = orchestrationUtilities.composeMemoryQueries(queryInput)
-        if (queryPlan.enoughEvidence || queryPlan.queries.isEmpty()) return this
-        val feedback = guarded(emptyMap()) { memory.feedbackTerms(this, queryPlan) }
-        if (feedback.isNotEmpty()) {
-            queryPlan = orchestrationUtilities.composeMemoryQueries(
-                queryInput.copy(
-                    feedbackTerms = feedback.keys.toList(),
-                    termDocumentFrequency = queryInput.termDocumentFrequency + feedback,
-                ),
-            )
+        val recallMemory = !queryPlan.enoughEvidence && queryPlan.queries.isNotEmpty()
+        if (recallMemory) {
+            val feedback = guarded(emptyMap()) { memory.feedbackTerms(this, queryPlan) }
+            if (feedback.isNotEmpty()) {
+                queryPlan = orchestrationUtilities.composeMemoryQueries(
+                    queryInput.copy(
+                        feedbackTerms = feedback.keys.toList(),
+                        termDocumentFrequency = queryInput.termDocumentFrequency + feedback,
+                    ),
+                )
+            }
         }
 
-        val recalled = guarded(com.hereliesaz.geministrator.memory.MemoryPromptRecall()) { memory.recallFor(this, queryPlan) }
-        if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty()) return this
+        val recalled = if (recallMemory) {
+            guarded(com.hereliesaz.geministrator.memory.MemoryPromptRecall()) { memory.recallFor(this, queryPlan) }
+        } else {
+            com.hereliesaz.geministrator.memory.MemoryPromptRecall()
+        }
+        // A chunk already present in the prompt (an artifact the handoff carries, say) is not repeated.
+        val present = (promptContext.stablePrefix + promptContext.dynamicContext).map(PromptContextBlock::content)
+        val retrieved = contextRetriever?.let { retriever -> guarded(emptyList()) { retriever.retrieve(this) } }.orEmpty()
+            .filterNot { hit -> present.any { hit.chunk.text in it } }
+        if (recalled.blocks.isEmpty() && recalled.memoryAddresses.isEmpty() && retrieved.isEmpty()) return this
 
-        val evidence = recalled.blocks.mapIndexed { index, block ->
+        val blocksById = linkedMapOf<String, PromptContextBlock>()
+        val memoryEvidence = recalled.blocks.mapIndexed { index, block ->
+            blocksById["memory-context-$index"] = block
             ContextEvidence(
                 id = "memory-context-$index",
                 estimatedTokens = approximateTokens(block.content),
@@ -202,16 +225,26 @@ class ProviderBackedManagedSessionGateway(
                 text = block.content,
             )
         }
-        val budget = recalled.maxContextTokens
-            ?: evidence.sumOf(ContextEvidence::estimatedTokens)
+        // Retrieved chunks rank by similarity among themselves and below every memory block.
+        val retrievedEvidence = retrieved.mapIndexed { index, hit ->
+            val id = "retrieved-context-$index"
+            blocksById[id] = PromptContextBlock(label = hit.chunk.label, content = hit.chunk.text)
+            ContextEvidence(
+                id = id,
+                estimatedTokens = approximateTokens(hit.chunk.text),
+                priority = -(index + 1),
+                text = hit.chunk.text,
+            )
+        }
+        val memoryBudget = recalled.maxContextTokens ?: memoryEvidence.sumOf(ContextEvidence::estimatedTokens)
+        val retrievalBudget = minOf(RETRIEVAL_TOKENS, retrievedEvidence.sumOf(ContextEvidence::estimatedTokens))
         val packing = orchestrationUtilities.packContext(
             ContextPackingInput(
-                tokenBudget = budget,
-                evidence = evidence,
+                tokenBudget = memoryBudget + retrievalBudget,
+                evidence = memoryEvidence + retrievedEvidence,
             ),
         )
         // The packer's prompt order: the most important block first, the next most important last.
-        val blocksById = recalled.blocks.withIndex().associate { (index, block) -> "memory-context-$index" to block }
         val selectedBlocks = packing.selectedEvidenceIds.mapNotNull(blocksById::get)
 
         return copy(
