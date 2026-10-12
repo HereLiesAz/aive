@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.vector.FlatVectorIndex
+import com.hereliesaz.geministrator.vector.HnswVectorIndex
+import com.hereliesaz.geministrator.vector.TextEmbedder
+import com.hereliesaz.geministrator.vector.VectorIndex
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -61,14 +65,51 @@ class GraphMemoryTool(
     /** Writes a link's pair summary at recall if consolidation has not yet (a counted violation). */
     private val summarizer: MemorySummarizerChain = MemorySummarizerChain(),
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /**
+     * Adds meaning to recall (docs/architecture/VECTOR_STORES.md): memories similar to the query
+     * become candidates even without a shared word, and similarity is one more fused signal.
+     * `null` keeps recall purely lexical.
+     */
+    private val embedder: TextEmbedder? = null,
 ) : MemoryTool {
     /** Rebuilt only when the store hands out a different snapshot; recall between commits reuses it. */
     private var cachedIndex: MemoryRecallIndex? = null
 
+    /** Vectors by node, kept across snapshots so a commit embeds only new or changed memories. */
+    private val vectors = HashMap<MemoryNodeId, Pair<String, FloatArray>>()
+
     private suspend fun index(): MemoryRecallIndex {
         val snapshot = store.read()
         cachedIndex?.takeIf { it.snapshot === snapshot }?.let { return it }
-        return MemoryRecallIndex(snapshot).also { cachedIndex = it }
+        return MemoryRecallIndex(snapshot).also { index ->
+            index.semantic = embedder?.let { semanticIndex(it, index.active) }
+            cachedIndex = index
+        }
+    }
+
+    private suspend fun semanticIndex(embedder: TextEmbedder, active: List<MemoryNode>): VectorIndex {
+        val stale = active.filter { vectors[it.id]?.first != it.text }
+        if (stale.isNotEmpty()) {
+            embedder.embed(stale.map { it.text }).forEachIndexed { i, vector -> vectors[stale[i].id] = stale[i].text to vector }
+        }
+        val activeIds = active.mapTo(hashSetOf()) { it.id }
+        vectors.keys.retainAll(activeIds)
+        // Exact search is fast enough for an ordinary bank; a graph index takes over beyond that.
+        val index: VectorIndex = if (active.size > HNSW_THRESHOLD) HnswVectorIndex(embedder.dimension) else FlatVectorIndex(embedder.dimension)
+        active.forEach { node -> vectors[node.id]?.let { index.upsert(node.id.value, it.second) } }
+        return index
+    }
+
+    /** Active memories at least [SEMANTIC_MIN_SIMILARITY] similar to the query, by similarity. */
+    private suspend fun semanticMatches(index: MemoryRecallIndex, query: MemoryQuery, active: List<MemoryNode>): Map<MemoryNodeId, Float> {
+        val semantic = index.semantic ?: return emptyMap()
+        val embedder = embedder ?: return emptyMap()
+        if (query.text.isBlank()) return emptyMap()
+        val queryVector = embedder.embed(listOf(query.text)).single()
+        val allowed = if (active === index.active) index.activeIds else active.mapTo(hashSetOf()) { it.id }
+        return semantic.search(queryVector, max(query.maxResults * 4, 24)) { MemoryNodeId(it) in allowed }
+            .filter { it.score >= SEMANTIC_MIN_SIMILARITY }
+            .associate { MemoryNodeId(it.id) to it.score }
     }
 
     override suspend fun bank(request: MemoryBankRequest): MemoryQueueEntry = queue.enqueueBank(request)
@@ -152,15 +193,20 @@ class GraphMemoryTool(
         // Tag keywords: the caller's own words looked up in the stored WordNet keywords, each match at
         // the relevance its keyword weight earns, so weak relations surface only at intrusive dials.
         val keywords = index.keywordMatches(query, weights.filterValues { it >= 1.0 }.keys, active)
+        val semantic = semanticMatches(index, query, active)
         val lexicalById = scoredSeeds.associate { it.first.id to it.second }
         val merged = scoredSeeds.map { (node, score) -> node to max(score, keywords[node.id] ?: 0f) } +
             keywords.filterKeys { it !in lexicalById }.entries.sortedBy { it.key.value }
-                .mapNotNull { (id, score) -> index.nodesById[id]?.let { it to score } }
+                .mapNotNull { (id, score) -> index.nodesById[id]?.let { it to score } } +
+            // Meaning without a shared word: a seed whose relevance is its similarity, scaled down
+            // so a lexical match of the same strength still ranks first.
+            semantic.filterKeys { it !in lexicalById && it !in keywords }.entries.sortedBy { it.key.value }
+                .mapNotNull { (id, similarity) -> index.nodesById[id]?.let { it to similarity * SEMANTIC_RELEVANCE } }
         val seeds = merged
             .sortedWith(memorySeedComparator())
             .take(max(query.maxResults * 4, 24))
 
-        return index.recallFromSeeds(query, seeds, active, keywords).let { it.copy(hits = withLinks(index, it.hits)) }
+        return index.recallFromSeeds(query, seeds, active, keywords, semantic).let { it.copy(hits = withLinks(index, it.hits)) }
     }
 
     /**
@@ -272,6 +318,8 @@ private val semanticCueKinds = setOf(
  * each node's lexical terms. Node text is immutable, so none of it changes until the next commit.
  */
 private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
+    /** Similarity search over [active], when the tool has an embedder. */
+    var semantic: VectorIndex? = null
     val nodesById: Map<MemoryNodeId, MemoryNode> = snapshot.nodes.associateBy(MemoryNode::id)
     val episodesById: Map<MemoryEpisodeId, MemoryEpisode> = snapshot.episodes.associateBy(MemoryEpisode::id)
     private val superseded: Set<MemoryNodeId> = snapshot.edges
@@ -405,6 +453,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
     scoredSeeds: List<Pair<MemoryNode, Float>>,
     scopedActive: List<MemoryNode>,
     keywords: Map<MemoryNodeId, Float> = emptyMap(),
+    semantic: Map<MemoryNodeId, Float> = emptyMap(),
 ): MemoryRecallBundle {
     if (scoredSeeds.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
@@ -446,7 +495,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
         projected[nodeId] = max(projected[nodeId] ?: 0f, pathScore)
     }
 
-    val hits = fusedOrder(query, projected.entries.mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }, keywords)
+    val hits = fusedOrder(query, projected.entries.mapNotNull { (nodeId, score) -> nodesById[nodeId]?.let { it to score } }, keywords, semantic)
         .take(query.maxResults)
         .map { (node, score) ->
             MemoryRecallHit(
@@ -465,7 +514,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
  * Orders recall candidates by weighted reciprocal rank fusion (Cormack et al.) instead of adding
  * signals and clamping: relevance (weight 2), scope affinity (0.4, when the query is scoped),
  * salience (0.15), confidence (0.1), recency (0.15) and, when the query's words hit a tag keyword list, the
- * keyword weight (0.5), each as Σ w / (k + rank) with k = 10. The
+ * keyword weight (0.5) and, with an embedder, semantic similarity (1.0), each as Σ w / (k + rank) with k = 10. The
  * returned score stays the relevance itself (lexical match carried along the graph), so the
  * attention gate's threshold keeps its meaning: how strongly the memory matched, never boosted.
  */
@@ -473,6 +522,7 @@ private fun MemoryRecallIndex.fusedOrder(
     query: MemoryQuery,
     candidates: List<Pair<MemoryNode, Float>>,
     keywords: Map<MemoryNodeId, Float> = emptyMap(),
+    semantic: Map<MemoryNodeId, Float> = emptyMap(),
 ): List<Pair<MemoryNode, Float>> {
     if (candidates.size <= 1) return candidates
     val signals = buildList<Pair<Double, (Pair<MemoryNode, Float>) -> Double>> {
@@ -482,6 +532,7 @@ private fun MemoryRecallIndex.fusedOrder(
         add(FUSION_CONFIDENCE to { it.first.confidence.toDouble() })
         add(FUSION_RECENCY to { it.first.createdAtEpochMillis.toDouble() })
         if (keywords.isNotEmpty()) add(FUSION_KEYWORDS to { (keywords[it.first.id] ?: 0f).toDouble() })
+        if (semantic.isNotEmpty()) add(FUSION_SEMANTIC to { (semantic[it.first.id] ?: 0f).toDouble() })
     }
     val fused = DoubleArray(candidates.size)
     signals.forEach { (weight, value) ->
@@ -507,6 +558,16 @@ private const val FUSION_SALIENCE = 0.15
 private const val FUSION_CONFIDENCE = 0.1
 private const val FUSION_RECENCY = 0.15
 private const val FUSION_KEYWORDS = 0.5
+private const val FUSION_SEMANTIC = 1.0
+
+/** Below this cosine similarity a memory is not offered as a meaning match. */
+private const val SEMANTIC_MIN_SIMILARITY = 0.45f
+
+/** A meaning-only seed's relevance is its similarity times this. */
+private const val SEMANTIC_RELEVANCE = 0.5f
+
+/** Above this many active memories the semantic index is HNSW rather than exact. */
+private const val HNSW_THRESHOLD = 5_000
 
 private const val MAX_RECALL_DEPTH = 6
 

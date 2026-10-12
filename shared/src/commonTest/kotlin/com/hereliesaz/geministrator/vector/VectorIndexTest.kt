@@ -109,3 +109,38 @@ class VectorIndexTest {
         unit.indices.forEach { assertTrue(kotlin.math.abs(unit[it] - quantized[it]) < 0.01f) }
     }
 }
+
+class BuiltInTextEmbedderTest {
+    private val embedder = BuiltInTextEmbedder(dimension = 256)
+
+    private fun similarity(a: String, b: String): Float = dot(embedder.embedOne(a), embedder.embedOne(b))
+
+    @Test
+    fun relatedTextScoresAboveUnrelatedText() {
+        val related = similarity("Chose Postgres for the workflow database", "workflow database uses Postgres")
+        val unrelated = similarity("Chose Postgres for the workflow database", "the splash screen animation stutters")
+        assertTrue(related > unrelated + 0.3f, "related=$related unrelated=$unrelated")
+    }
+
+    @Test
+    fun identifiersSplitIntoWordsAndInflectionsOverlap() {
+        assertEquals(listOf("sql", "workflow", "persistence", "store", "path"), BuiltInTextEmbedder.tokens("SQLWorkflowPersistence store_path"))
+        assertTrue(similarity("retrying failed builds", "retry the failed build") > 0.35f)
+    }
+
+    @Test
+    fun conceptsLinkWordsThatShareNoSpelling() {
+        val concepts = mapOf("fix" to intArrayOf(7), "repair" to intArrayOf(7))
+        val withConcepts = BuiltInTextEmbedder(dimension = 256) { concepts[it] ?: IntArray(0) }
+        val plain = dot(embedder.embedOne("fix crash"), embedder.embedOne("repair crash"))
+        val conceptual = dot(withConcepts.embedOne("fix crash"), withConcepts.embedOne("repair crash"))
+        assertTrue(conceptual > plain, "conceptual=$conceptual plain=$plain")
+        assertEquals("builtin-hash-wordnet", withConcepts.id)
+    }
+
+    @Test
+    fun embeddingIsDeterministicAndEmptyTextIsZero() {
+        assertContentEquals(embedder.embedOne("same text"), embedder.embedOne("same text"))
+        assertTrue(embedder.embedOne("the and of").all { it == 0f })
+    }
+}

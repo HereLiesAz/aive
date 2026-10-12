@@ -92,12 +92,14 @@ class AgentMemoryLayer private constructor(
             maxChunkChars: Int = 6_000,
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
             summarizer: MemorySummarizerChain = MemorySummarizerChain(),
+            /** Semantic recall; `null` keeps recall lexical (docs/architecture/VECTOR_STORES.md). */
+            embedder: com.hereliesaz.geministrator.vector.TextEmbedder? = MemoryTextEmbedder(),
         ): AgentMemoryLayer {
             val queue = MemoryConsolidationQueue(
                 store,
                 minOf(maxChunkChars, policy.maxPacketChars),
             )
-            val graphTool = GraphMemoryTool(store, queue, summarizer)
+            val graphTool = GraphMemoryTool(store, queue, summarizer, embedder = embedder)
             return AgentMemoryLayer(
                 store = store,
                 tool = LexicalMemoryTool(graphTool, lexicon),
