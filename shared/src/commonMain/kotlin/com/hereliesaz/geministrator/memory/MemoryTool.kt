@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.vector.FlatVectorIndex
 import com.hereliesaz.geministrator.vector.HnswVectorIndex
 import com.hereliesaz.geministrator.vector.TextEmbedder
 import com.hereliesaz.geministrator.vector.VectorIndex
+import com.hereliesaz.geministrator.vector.space
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -78,6 +79,9 @@ class GraphMemoryTool(
     /** Vectors by node, kept across snapshots so a commit embeds only new or changed memories. */
     private val vectors = HashMap<MemoryNodeId, Pair<String, FloatArray>>()
 
+    /** The embedding space [vectors] belong to; when the embedder's space changes they are dropped. */
+    private var vectorSpace: String? = null
+
     private suspend fun index(): MemoryRecallIndex {
         val snapshot = store.read()
         cachedIndex?.takeIf { it.snapshot === snapshot }?.let { return it }
@@ -88,9 +92,19 @@ class GraphMemoryTool(
     }
 
     private suspend fun semanticIndex(embedder: TextEmbedder, active: List<MemoryNode>): VectorIndex {
+        if (vectorSpace != embedder.space) {
+            vectors.clear()
+            vectorSpace = embedder.space
+        }
         val stale = active.filter { vectors[it.id]?.first != it.text }
         if (stale.isNotEmpty()) {
             embedder.embed(stale.map { it.text }).forEachIndexed { i, vector -> vectors[stale[i].id] = stale[i].text to vector }
+        }
+        if (vectorSpace != embedder.space) {
+            // The model fell back while embedding: start over in the fallback space (the switch is permanent).
+            vectors.clear()
+            vectorSpace = embedder.space
+            embedder.embed(active.map { it.text }).forEachIndexed { i, vector -> vectors[active[i].id] = active[i].text to vector }
         }
         val activeIds = active.mapTo(hashSetOf()) { it.id }
         vectors.keys.retainAll(activeIds)
@@ -106,6 +120,11 @@ class GraphMemoryTool(
         val embedder = embedder ?: return emptyMap()
         if (query.text.isBlank()) return emptyMap()
         val queryVector = embedder.embed(listOf(query.text)).single()
+        if (queryVector.size != semantic.dimension || vectorSpace != embedder.space) {
+            // The embedder changed space since the index was built: rebuild on the next recall.
+            cachedIndex = null
+            return emptyMap()
+        }
         val allowed = if (active === index.active) index.activeIds else active.mapTo(hashSetOf()) { it.id }
         return semantic.search(queryVector, max(query.maxResults * 4, 24)) { MemoryNodeId(it) in allowed }
             .filter { it.score >= SEMANTIC_MIN_SIMILARITY }
