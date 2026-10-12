@@ -22,7 +22,9 @@ user's history, not the active run:
 | 300 | 57.6 MB | 754 ms | 249 ms |
 
 The 500 KB trigger below was met at 10 runs, so Android and desktop moved to SQL. The test
-reports both stores side by side in `shared/build/reports/storage-scale.txt`.
+reports both stores side by side in `shared/build/reports/storage-scale.txt`. Ordinary test runs
+do a 5-run smoke sweep; the table above comes from `AIVE_STORAGE_SCALE=full ./gradlew
+:shared:desktopTest --tests '*StorageScaleMeasurementTest*'`, which takes most of an hour.
 
 ## When to migrate to a structured backend
 
