@@ -9,7 +9,8 @@ package com.hereliesaz.geministrator.vector
  *   quantization [QuantizedVectorIndex] uses; decodes to an approximation of the normalized vector.
  */
 object VectorCodec {
-    enum class Format(val tag: Byte) { Float32(1), Int8(2) }
+    /** Tag 2 was a fixed-scale int8 layout that was never persisted; it stays unassigned so no blob is misread. */
+    enum class Format(val tag: Byte) { Float32(1), Int8(3) }
 
     fun encode(vector: FloatArray, format: Format = Format.Float32): ByteArray = when (format) {
         Format.Float32 -> ByteArray(1 + vector.size * 4).also { bytes ->
