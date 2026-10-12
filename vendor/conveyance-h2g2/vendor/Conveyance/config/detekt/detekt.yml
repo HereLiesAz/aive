@@ -1,0 +1,62 @@
+# Detekt configuration for Conveyance.
+#
+# Built on detekt's defaults. The overrides below are where this codebase deliberately differs,
+# and each one has a reason rather than a preference.
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+complexity:
+  # Syllables.
+  #
+  # A composable is a word, and a word can have too many syllables. The previous configuration
+  # exempted @Composable from this rule outright, on the reasoning that composables "legitimately
+  # take more parameters" -- which is the identical excuse that produced the 27-parameter DSL
+  # functions this project's own review of AzNavRail complains about. The exemption is gone.
+  # Composables are the thing this rule most needs to police, not the thing it should excuse.
+  LongParameterList:
+    active: true
+    functionThreshold: 5
+    constructorThreshold: 6
+    # Syllables are what you pronounce, not what is in the dictionary entry. A parameter with a
+    # default is not something a caller says, so it is not a syllable -- Act.send("id", subject, to)
+    # is three syllables however long its signature reads. Counting declarations instead would
+    # punish exactly the design that keeps call sites short.
+    ignoreDefaultParameters: true
+  LongMethod:
+    active: true
+    threshold: 80
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 30
+    thresholdInClasses: 30
+    thresholdInObjects: 30
+
+style:
+  MagicNumber:
+    active: true
+    # Layout and motion constants are the substance of a UI framework, not magic.
+    ignoreAnnotated: ['Composable']
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+  ForbiddenComment:
+    active: true
+
+naming:
+  FunctionNaming:
+    active: true
+    # Composables are PascalCase by convention.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Za-z][_A-Za-z0-9]*'
+
+comments:
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false

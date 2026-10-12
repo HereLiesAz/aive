@@ -126,6 +126,7 @@ class AgentMemoryLayer private constructor(
             lexicon: MemoryLexicon = RuleBasedMemoryLexicon,
             programmaticSemanticFastPaths: Boolean = true,
             summarizer: MemorySummarizerChain = summarizerChainFor(agents),
+            embedder: com.hereliesaz.geministrator.vector.TextEmbedder? = embedderFor(agents),
         ): AgentMemoryLayer {
             val routedAgents = if (programmaticSemanticFastPaths) {
                 agents.withProgrammaticSemanticFastPaths()
@@ -141,8 +142,19 @@ class AgentMemoryLayer private constructor(
                 maxChunkChars = minOf(maxChunkChars, constrainedPolicy.maxPacketChars),
                 lexicon = lexicon,
                 summarizer = summarizer,
+                embedder = embedder,
             )
         }
+
+        /**
+         * The recall and association embedder the [agents] support: the AssociationLinker's
+         * installed MiniLM model, falling back to the built-in space if it cannot answer; the
+         * built-in space alone without one.
+         */
+        fun embedderFor(agents: Collection<MemoryMicroAgent>): com.hereliesaz.geministrator.vector.TextEmbedder =
+            agents.filterIsInstance<EmbeddingAssociationLinkerMicroAgent>().firstOrNull()
+                ?.let { linker -> ModelTextEmbedder(linker.model.modelId, linker::embedTexts) }
+                ?: MemoryVectorEmbedder()
 
         /**
          * The summarizer chain the [agents] support: the SummarySynthesizer clerk when it is a local

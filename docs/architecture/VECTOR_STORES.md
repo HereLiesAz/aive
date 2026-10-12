@@ -19,12 +19,12 @@ Indexes live in memory and are rebuilt from stored vectors. The stored form is t
 
 ## Embedders
 
-Nothing produced embeddings before this work: the ONNX embedding runtimes exist (`MemoryEmbeddingInferenceRuntime`, desktop/Android/browser) but no model adapter was wired. Two embedders feed the indexes:
+Two embedders feed the indexes:
 
 - **Built-in (always available).** Pure Kotlin, deterministic, no download: hashed word and character n-gram features, expanded through the shipped WordNet synonym groups, projected to a fixed dimension. Closer to concept-aware keyword matching than to a neural model, but it works on every platform from first launch.
-- **MiniLM (optional).** A sentence-embedding ONNX model (int8, about 23 MB) installed from Settings like the other local models, with SHA verification, run through the existing ONNX runtimes.
+- **MiniLM (optional).** The AssociationLinker's int8 sentence-embedding ONNX model, installed from Settings → Memory → Models (SHA-verified release asset) and run through the desktop and Android ONNX runtimes, which tokenize with its `tokenizer.json` and mean-pool. `AgentMemoryLayer.createWithMicroAgents` wraps it as `ModelTextEmbedder` (`memory/ModelTextEmbedder.kt`) for recall and associations. There is no browser adapter yet, so the web keeps the built-in space.
 
-Each embedder is its own vector space: a vector records the embedder id and version it came from, and indexes never mix spaces. Installing or removing MiniLM re-embeds lazily in the background; the built-in space stays as the fallback.
+Each embedder is its own vector space, named by `TextEmbedder.space` (id, version, dimension). `ModelTextEmbedder` reports the model's space while the model answers and the built-in space when it cannot (not installed, removed, runtime failure), retrying the model every five minutes so one installed mid-session is picked up. The recall index (`GraphMemoryTool`) and the association index (`MemoryConsolidator`) compare the space before and after embedding and re-embed from scratch whenever it changes, so spaces never mix.
 
 ## Where they plug in
 
@@ -44,6 +44,6 @@ Memory vectors live in each memory bank's SQLite database (new table keyed by no
 1. Indexes and codec.
 2. Built-in embedder; vector table in memory banks; semantic recall signal.
 3. ~~Whole-bank neighbours for associations.~~ Done.
-4. MiniLM adapter and Settings install.
+4. ~~MiniLM adapter and Settings install.~~ Done (browser adapter outstanding).
 5. Routing tie-breaks.
 6. Repository/artifact chunking and retrieval.

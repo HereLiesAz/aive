@@ -1,0 +1,50 @@
+[versions]
+# Toolchain baseline. AGP 9.4.1 is the current stable release and supports API 37.
+# Kotlin 2.4.20 includes the fix for CVE-2026-53914 (unsafe build-cache deserialization).
+agp = "9.4.1"
+gradle = "9.7.1"
+kotlin = "2.4.20"
+# Compose Multiplatform: latest stable plugin.
+compose = "1.12.1"
+# material3 is taken at alpha deliberately: the Expressive shape-morph machinery
+# (MaterialShapes, Morph) lives there and nowhere else. Used as geometry, never as
+# a channel vocabulary -- Conveyance assigns its own meanings and cannot import M3's.
+androidxMaterial3 = "1.5.0-alpha28"
+compileSdk = "37"
+compileSdkMinor = "1"
+minSdk = "24"
+coroutines = "1.11.0"
+# detekt: required by the KMP Security Pipeline workflow, which runs ./gradlew detekt.
+detekt = "1.23.8"
+# The generated API reference, built from the KDoc already written throughout the codebase.
+dokka = "2.2.0"
+# The auditor calls Claude to run the two rules no structural check can settle.
+anthropic = "2.65.0"
+jackson = "2.22.3"
+jvmToolchain = "21"
+# The Android entry point (conveyance-demo-android) is a plain, non-KMP application module --
+# AGP 9 forbids com.android.application and the KMP library plugin in the same module -- so it
+# needs its own Activity host, which needs its own version of the bridge between the two.
+androidxActivityCompose = "1.13.0"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "6.1.3" }
+androidx-material3 = { module = "androidx.compose.material3:material3", version.ref = "androidxMaterial3" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
+anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
+jackson-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+
+[plugins]
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# AGP 9 dropped com.android.library for Kotlin Multiplatform; this is its replacement.
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+# The one plugin a KMP module is not allowed to carry alongside it -- reserved for the plain
+# Android application module that actually launches something on a phone.
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

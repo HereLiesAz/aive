@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.vector.FlatVectorIndex
 import com.hereliesaz.geministrator.vector.HnswVectorIndex
 import com.hereliesaz.geministrator.vector.TextEmbedder
 import com.hereliesaz.geministrator.vector.VectorIndex
+import com.hereliesaz.geministrator.vector.space
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -169,6 +170,9 @@ class MemoryConsolidator(
 
     /** Whole-bank similarity index over memory text; node text is immutable, so each is embedded once. */
     private var neighborhoodIndex: VectorIndex? = null
+
+    /** The embedding space [neighborhoodIndex] holds. */
+    private var neighborhoodSpace: String? = null
 
     /** Episodes whose contrast step has been committed by this instance (the step is idempotent anyway). */
     private val registeredEpisodes = hashSetOf<MemoryEpisodeId>()
@@ -542,23 +546,43 @@ class MemoryConsolidator(
         val text = needles.joinToString("\n") { it.text }
         if (text.isBlank()) return emptyMap()
         val memories = snapshot.nodes.filter { it.kind.isClerkMemory }
-        var index = neighborhoodIndex ?: FlatVectorIndex(embedder.dimension)
-        val fresh = memories.filter { it.id.value !in index }
-        if (fresh.isNotEmpty()) {
-            if (index is FlatVectorIndex && index.size + fresh.size > HNSW_THRESHOLD) {
-                val rebuilt = HnswVectorIndex(embedder.dimension)
-                embedder.embed(memories.map { it.text }).forEachIndexed { i, v -> rebuilt.upsert(memories[i].id.value, v) }
-                index = rebuilt
-            } else {
-                embedder.embed(fresh.map { it.text }).forEachIndexed { i, v -> index.upsert(fresh[i].id.value, v) }
-            }
-        }
-        neighborhoodIndex = index
+        val index = updatedNeighborhoodIndex(embedder, memories) ?: return emptyMap()
         val query = embedder.embed(listOf(text)).single()
+        if (query.size != index.dimension || neighborhoodSpace != embedder.space) {
+            neighborhoodIndex = null
+            return emptyMap()
+        }
         // Over-fetch: the neighbourhood filters out the packet's own episode and superseded memories.
         return index.search(query, maxItems * 4 + needles.size)
             .filter { it.score >= SEMANTIC_MIN_SIMILARITY }
             .associate { MemoryNodeId(it.id) to it.score }
+    }
+
+    /**
+     * [neighborhoodIndex] brought up to date with [memories]: new memories embedded into it, or a
+     * rebuild when the embedder's space changed (first use, or a model falling back mid-call) or the
+     * bank outgrew exact search.
+     */
+    private suspend fun updatedNeighborhoodIndex(embedder: TextEmbedder, memories: List<MemoryNode>): VectorIndex? {
+        if (memories.isEmpty()) return neighborhoodIndex.takeIf { neighborhoodSpace == embedder.space }
+        val current = neighborhoodIndex.takeIf { neighborhoodSpace == embedder.space }
+        val fresh = if (current == null) memories else memories.filter { it.id.value !in current }
+        if (fresh.isEmpty()) return current
+        val spaceBefore = embedder.space
+        val vectors = embedder.embed(fresh.map { it.text })
+        val index = if (current != null && embedder.space == spaceBefore &&
+            !(current is FlatVectorIndex && current.size + fresh.size > HNSW_THRESHOLD)
+        ) {
+            current.also { vectors.forEachIndexed { i, v -> it.upsert(fresh[i].id.value, v) } }
+        } else {
+            val all = if (current == null && embedder.space == spaceBefore) vectors else embedder.embed(memories.map { it.text })
+            val rebuilt: VectorIndex = if (memories.size > HNSW_THRESHOLD) HnswVectorIndex(embedder.dimension) else FlatVectorIndex(embedder.dimension)
+            all.forEachIndexed { i, v -> rebuilt.upsert(memories[i].id.value, v) }
+            rebuilt
+        }
+        neighborhoodIndex = index
+        neighborhoodSpace = embedder.space
+        return index
     }
 
     private fun validateBatch(

@@ -125,3 +125,6 @@ class BuiltInTextEmbedder(
         }
     }
 }
+
+/** The vector space this embedder currently writes into: vectors with different spaces never mix. */
+val TextEmbedder.space: String get() = "$id@$version/$dimension"
