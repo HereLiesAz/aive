@@ -18,7 +18,8 @@ interface TextEmbedder {
  * The always-available embedder: deterministic, pure Kotlin, no model download. Text becomes a
  * bag of weighted features, hashed into [dimension] signed buckets (the hashing trick):
  *
- * - words (camelCase, snake_case and paths split), with sublinear term frequency;
+ * - words (camelCase, snake_case and paths split), with sublinear term frequency, and their
+ *   light suffix-stripped stems;
  * - adjacent word pairs, for a little word order;
  * - character trigrams of each word, so spelling variants and inflections overlap;
  * - concepts, when [conceptsOf] is given: WordNet synsets (and their hypernyms) for each word,
@@ -32,7 +33,8 @@ class BuiltInTextEmbedder(
     private val conceptsOf: ((String) -> IntArray)? = null,
 ) : TextEmbedder {
     override val id: String = if (conceptsOf == null) "builtin-hash" else "builtin-hash-wordnet"
-    override val version: Int = 1
+    /** 2: stem features added. Bump whenever a change moves existing vectors. */
+    override val version: Int = 2
 
     init {
         require(dimension >= 32) { "dimension must be at least 32" }
@@ -50,6 +52,8 @@ class BuiltInTextEmbedder(
         for ((word, count) in counts) {
             val weight = 1f + ln(count.toFloat())
             add(vector, "w:$word", weight)
+            // The stem, so "retrying"/"retry" and "builds"/"build" share a feature.
+            add(vector, "t:${stem(word)}", STEM_WEIGHT * weight)
             val padded = "^$word$"
             val trigrams = (0..padded.length - 3).map { padded.substring(it, it + 3) }
             val trigramWeight = TRIGRAM_WEIGHT * weight / trigrams.size.coerceAtLeast(1)
@@ -75,6 +79,7 @@ class BuiltInTextEmbedder(
         const val TRIGRAM_WEIGHT = 0.6f
         const val CONCEPT_WEIGHT = 0.8f
         const val BIGRAM_WEIGHT = 0.4f
+        const val STEM_WEIGHT = 0.8f
         const val MAX_SENSES = 2
 
         private val STOP_WORDS = setOf(
@@ -92,6 +97,22 @@ class BuiltInTextEmbedder(
                 .map { it.value.lowercase() }
                 .filter { it.length > 1 && it !in STOP_WORDS }
                 .toList()
+        }
+
+        /**
+         * Strips common English inflections, keeping at least three letters: not a full stemmer.
+         * Every stem, inflected or not, then drops a final silent "e" and un-doubles a final
+         * doubled consonant, so run/running, make/making and case/cases meet at one stem.
+         */
+        fun stem(word: String): String {
+            fun cut(suffix: String, replacement: String = ""): String? =
+                if (word.endsWith(suffix) && word.length - suffix.length >= 3) word.dropLast(suffix.length) + replacement else null
+            val stripped = cut("ies", "y") ?: cut("ing") ?: cut("ed") ?: cut("es")?.takeIf { word.endsWith("ses") || word.endsWith("xes") || word.endsWith("ches") || word.endsWith("shes") }
+                ?: (if (word.endsWith("ss")) null else cut("s")) ?: word
+            var stem = stripped
+            if (stem.length > 3 && stem.endsWith('e')) stem = stem.dropLast(1)
+            if (stem.length > 3 && stem[stem.length - 1] == stem[stem.length - 2] && stem.last() !in "aeiouls") stem = stem.dropLast(1)
+            return stem
         }
 
         fun fnv1a64(text: String): Long {

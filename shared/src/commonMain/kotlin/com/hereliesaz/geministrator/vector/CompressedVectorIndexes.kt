@@ -3,8 +3,9 @@ package com.hereliesaz.geministrator.vector
 import kotlin.math.roundToInt
 
 /**
- * int8 scalar quantization: each normalized component (in -1..1) is stored as a byte, a quarter
- * of the float size. Candidates are scored on the bytes, then the best [rerankFactor]·k are
+ * int8 scalar quantization: each component is stored as a byte, scaled per vector so its largest
+ * magnitude maps to 127 (normalized high-dimension vectors have small components; a fixed -1..1
+ * scale would waste most of the byte range). A quarter of the float size, plus one float scale. Candidates are scored on the bytes, then the best [rerankFactor]·k are
  * re-scored exactly when [keepFloats] holds the originals (it does by default; turn it off to save
  * memory where approximate scores are enough).
  */
@@ -13,7 +14,7 @@ class QuantizedVectorIndex(
     private val rerankFactor: Int = 4,
     private val keepFloats: Boolean = true,
 ) : VectorIndex {
-    private val codes = LinkedHashMap<String, ByteArray>()
+    private val codes = LinkedHashMap<String, Quantized>()
     private val exact = FlatVectorIndex(dimension)
 
     init {
@@ -45,18 +46,26 @@ class QuantizedVectorIndex(
         for ((id, code) in codes) {
             if (!filter(id)) continue
             var sum = 0
-            for (i in q.indices) sum += q[i] * code[i]
-            candidates.offer(id, sum / (SCALE * SCALE))
+            for (i in q.bytes.indices) sum += q.bytes[i] * code.bytes[i]
+            candidates.offer(id, sum * q.step * code.step)
         }
         val approximate = candidates.result()
         return if (keepFloats) exact.rerank(unit, approximate.map { it.id }, k) else approximate
     }
 
-    internal companion object {
-        const val SCALE = 127f
+    /** [bytes] times [step] approximates the vector. */
+    internal class Quantized(val bytes: ByteArray, val step: Float)
 
-        fun quantize(unit: FloatArray): ByteArray =
-            ByteArray(unit.size) { (unit[it].coerceIn(-1f, 1f) * SCALE).roundToInt().toByte() }
+    internal companion object {
+        const val LEVELS = 127f
+
+        fun quantize(vector: FloatArray): Quantized {
+            var largest = 0f
+            for (value in vector) largest = maxOf(largest, kotlin.math.abs(value))
+            if (largest == 0f) return Quantized(ByteArray(vector.size), 0f)
+            val step = largest / LEVELS
+            return Quantized(ByteArray(vector.size) { (vector[it] / step).roundToInt().toByte() }, step)
+        }
     }
 }
 
@@ -67,7 +76,7 @@ class QuantizedVectorIndex(
  */
 class BinaryVectorIndex(
     override val dimension: Int,
-    private val rerankFactor: Int = 10,
+    private val rerankFactor: Int = 40,
     private val keepFloats: Boolean = true,
 ) : VectorIndex {
     private val words = (dimension + 63) / 64

@@ -9,7 +9,7 @@ All implement `VectorIndex` (`upsert`, `remove`, `search(query, k, filter)`), st
 | Index | Storage per 384-dim vector | Search | Use |
 |---|---|---|---|
 | `FlatVectorIndex` | 1.5 KB (float32) | exact, linear | reference; small sets (roles, tools, one bank's recent memories) |
-| `QuantizedVectorIndex` | 384 B (int8) + optional floats for re-rank | linear on bytes, exact re-rank | medium banks where memory matters |
+| `QuantizedVectorIndex` | 388 B (int8 + scale) + optional floats for re-rank | linear on bytes, exact re-rank | medium banks where memory matters |
 | `BinaryVectorIndex` | 48 B (1 bit/dim) + optional floats | Hamming shortlist, exact re-rank | large banks; cheap first cut |
 | `HnswVectorIndex` | floats + graph links | approximate, roughly logarithmic | large banks and repository chunks |
 

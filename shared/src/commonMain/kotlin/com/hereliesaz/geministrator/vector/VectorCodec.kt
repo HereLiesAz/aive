@@ -5,11 +5,12 @@ package com.hereliesaz.geministrator.vector
  * live in memory and are rebuilt from these rows, so the stored form is the source of truth.
  *
  * - [Format.Float32]: 4 bytes per dimension, exact.
- * - [Format.Int8]: 1 byte per dimension, the same scalar quantization [QuantizedVectorIndex] uses;
- *   decodes to an approximation of the normalized vector.
+ * - [Format.Int8]: a float scale, then 1 byte per dimension: the same per-vector scalar
+ *   quantization [QuantizedVectorIndex] uses; decodes to an approximation of the normalized vector.
  */
 object VectorCodec {
-    enum class Format(val tag: Byte) { Float32(1), Int8(2) }
+    /** Tag 2 was a fixed-scale int8 layout that was never persisted; it stays unassigned so no blob is misread. */
+    enum class Format(val tag: Byte) { Float32(1), Int8(3) }
 
     fun encode(vector: FloatArray, format: Format = Format.Float32): ByteArray = when (format) {
         Format.Float32 -> ByteArray(1 + vector.size * 4).also { bytes ->
@@ -23,7 +24,10 @@ object VectorCodec {
                 bytes[at + 3] = (bits ushr 24).toByte()
             }
         }
-        Format.Int8 -> byteArrayOf(format.tag) + QuantizedVectorIndex.quantize(normalized(vector))
+        Format.Int8 -> QuantizedVectorIndex.quantize(normalized(vector)).let { q ->
+            val bits = q.step.toRawBits()
+            byteArrayOf(format.tag, bits.toByte(), (bits ushr 8).toByte(), (bits ushr 16).toByte(), (bits ushr 24).toByte()) + q.bytes
+        }
     }
 
     fun decode(bytes: ByteArray): FloatArray {
@@ -41,7 +45,14 @@ object VectorCodec {
                     )
                 }
             }
-            Format.Int8.tag -> FloatArray(bytes.size - 1) { bytes[it + 1] / QuantizedVectorIndex.SCALE }
+            Format.Int8.tag -> {
+                require(bytes.size >= 5) { "Truncated int8 vector blob" }
+                val step = Float.fromBits(
+                    (bytes[1].toInt() and 0xff) or ((bytes[2].toInt() and 0xff) shl 8) or
+                        ((bytes[3].toInt() and 0xff) shl 16) or ((bytes[4].toInt() and 0xff) shl 24),
+                )
+                FloatArray(bytes.size - 5) { bytes[it + 5] * step }
+            }
             else -> throw IllegalArgumentException("Unknown vector blob format ${bytes[0]}")
         }
     }

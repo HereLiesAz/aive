@@ -13,7 +13,7 @@ class MemoryVectorEmbedder(override val dimension: Int = 384) : TextEmbedder {
     private var delegate: BuiltInTextEmbedder? = null
 
     override val id: String get() = delegate?.id ?: "builtin-hash-wordnet"
-    override val version: Int get() = 1
+    override val version: Int get() = delegate?.version ?: BUILT_IN_VERSION
 
     override suspend fun embed(texts: List<String>): List<FloatArray> = resolve().embed(texts)
 
@@ -28,5 +28,9 @@ class MemoryVectorEmbedder(override val dimension: Int = 384) : TextEmbedder {
             }
         }
         BuiltInTextEmbedder(dimension, concepts).also { delegate = it }
+    }
+
+    private companion object {
+        val BUILT_IN_VERSION = BuiltInTextEmbedder().version
     }
 }
