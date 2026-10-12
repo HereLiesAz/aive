@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.vector.FlatVectorIndex
+import com.hereliesaz.geministrator.vector.HnswVectorIndex
+import com.hereliesaz.geministrator.vector.TextEmbedder
+import com.hereliesaz.geministrator.vector.VectorIndex
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -154,9 +158,17 @@ class MemoryConsolidator(
     private val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
     /** The on-device summarizer chain for the episode summary tree ([MemorySummaryTree]). */
     private val summarizer: MemorySummarizerChain = MemorySummarizerChain(),
+    /**
+     * With an embedder, association neighbourhoods also draw on memories anywhere in the bank that
+     * mean the same thing without sharing a word, not only lexical neighbours.
+     */
+    private val embedder: TextEmbedder? = null,
 ) {
     /** Node text is immutable, so each node is tokenized once for neighborhood search. */
     private val neighborhoodTerms = hashMapOf<MemoryNodeId, Set<String>>()
+
+    /** Whole-bank similarity index over memory text; node text is immutable, so each is embedded once. */
+    private var neighborhoodIndex: VectorIndex? = null
 
     /** Episodes whose contrast step has been committed by this instance (the step is idempotent anyway). */
     private val registeredEpisodes = hashSetOf<MemoryEpisodeId>()
@@ -385,7 +397,7 @@ class MemoryConsolidator(
         }
     }
 
-    private fun buildPacket(snapshot: MemorySnapshot, entry: MemoryQueueEntry): PacketPlan? {
+    private suspend fun buildPacket(snapshot: MemorySnapshot, entry: MemoryQueueEntry): PacketPlan? {
         val episode = snapshot.episodes.firstOrNull { it.id == entry.episodeId }
             ?: error("Memory episode ${entry.episodeId.value} is missing")
 
@@ -494,6 +506,7 @@ class MemoryConsolidator(
                 maxItems = remainingItems,
                 maxChars = remainingChars,
                 termsOf = { node -> neighborhoodTerms.getOrPut(node.id) { node.text.memoryTerms().toSet() } },
+                similarity = semanticNeighbours(snapshot, selected, remainingItems),
             )
         } else {
             emptyList()
@@ -513,6 +526,39 @@ class MemoryConsolidator(
             hasMore = !lastPart || entry.cursor + selected.size < allItems.size,
             nextPart = if (lastPart) 0 else entry.part + 1,
         )
+    }
+
+    /**
+     * Memories across the whole bank at least [SEMANTIC_MIN_SIMILARITY] similar to the packet's
+     * items, by similarity. New memories are embedded into the persistent index as they appear;
+     * past [HNSW_THRESHOLD] the index is rebuilt as HNSW.
+     */
+    private suspend fun semanticNeighbours(
+        snapshot: MemorySnapshot,
+        needles: List<MemoryWorkItem>,
+        maxItems: Int,
+    ): Map<MemoryNodeId, Float> {
+        val embedder = embedder ?: return emptyMap()
+        val text = needles.joinToString("\n") { it.text }
+        if (text.isBlank()) return emptyMap()
+        val memories = snapshot.nodes.filter { it.kind.isClerkMemory }
+        var index = neighborhoodIndex ?: FlatVectorIndex(embedder.dimension)
+        val fresh = memories.filter { it.id.value !in index }
+        if (fresh.isNotEmpty()) {
+            if (index is FlatVectorIndex && index.size + fresh.size > HNSW_THRESHOLD) {
+                val rebuilt = HnswVectorIndex(embedder.dimension)
+                embedder.embed(memories.map { it.text }).forEachIndexed { i, v -> rebuilt.upsert(memories[i].id.value, v) }
+                index = rebuilt
+            } else {
+                embedder.embed(fresh.map { it.text }).forEachIndexed { i, v -> index.upsert(fresh[i].id.value, v) }
+            }
+        }
+        neighborhoodIndex = index
+        val query = embedder.embed(listOf(text)).single()
+        // Over-fetch: the neighbourhood filters out the packet's own episode and superseded memories.
+        return index.search(query, maxItems * 4 + needles.size)
+            .filter { it.score >= SEMANTIC_MIN_SIMILARITY }
+            .associate { MemoryNodeId(it.id) to it.score }
     }
 
     private fun validateBatch(
@@ -981,15 +1027,18 @@ private fun MemorySnapshot.episodeNodes(
 
 private const val MAX_CACHED_TERMS = 200_000
 
+private class Neighbour(val node: MemoryNode, val sameKind: Boolean, val overlap: Int, val similarity: Float)
+
 private fun MemorySnapshot.relatedNeighborhood(
     episodeId: MemoryEpisodeId,
     needles: List<MemoryWorkItem>,
     maxItems: Int,
     maxChars: Int,
     termsOf: (MemoryNode) -> Set<String> = { it.text.memoryTerms().toSet() },
+    similarity: Map<MemoryNodeId, Float> = emptyMap(),
 ): List<MemoryWorkItem> {
     val terms = needles.flatMap { it.text.memoryTerms() }.toSet()
-    if (terms.isEmpty() || maxItems <= 0 || maxChars <= 0) return emptyList()
+    if ((terms.isEmpty() && similarity.isEmpty()) || maxItems <= 0 || maxChars <= 0) return emptyList()
     // Same-kind memories come first: the programmatic linker links only those, and only they can
     // later condense together. Other kinds fill the remaining slots for linkers that relate across
     // kinds (embeddings). A superseded memory is already represented by its condensation.
@@ -1003,16 +1052,23 @@ private fun MemorySnapshot.relatedNeighborhood(
         .filter { it.kind.isClerkMemory && episodeId !in it.sourceEpisodeIds && it.id !in superseded }
         .map { node ->
             val candidateTerms = termsOf(node)
-            val overlap = terms.count { it in candidateTerms }
-            Triple(node, "node:${node.kind.name}" in kinds, overlap)
+            Neighbour(node, "node:${node.kind.name}" in kinds, terms.count { it in candidateTerms }, similarity[node.id] ?: 0f)
         }
-        .filter { (_, _, overlap) -> overlap > 0 }
-        .sortedWith(compareByDescending<Triple<MemoryNode, Boolean, Int>> { it.second }.thenByDescending { it.third })
-        .map { (node, _, _) -> node.asWorkItem() }
+        .filter { it.overlap > 0 || it.similarity > 0f }
         .toList()
+    // Within each kind group, shared words and similarity are fused by reciprocal rank, so a
+    // meaning-only neighbour can rank beside a lexical one without either scale dominating.
+    val overlapRank = candidates.sortedByDescending { it.overlap }.withIndex().associate { (i, n) -> n.node.id to i }
+    val similarityRank = candidates.sortedByDescending { it.similarity }.withIndex().associate { (i, n) -> n.node.id to i }
+    fun fused(n: Neighbour): Double =
+        (if (n.overlap > 0) 1.0 / (10 + overlapRank.getValue(n.node.id)) else 0.0) +
+            (if (n.similarity > 0f) 1.0 / (10 + similarityRank.getValue(n.node.id)) else 0.0)
+    val ordered = candidates
+        .sortedWith(compareByDescending<Neighbour> { it.sameKind }.thenByDescending(::fused).thenBy { it.node.id.value })
+        .map { it.node.asWorkItem() }
 
     return buildList {
-        for (item in candidates) {
+        for (item in ordered) {
             if (size >= maxItems) break
             if (isNotEmpty() && chars + item.text.length > maxChars) break
             val bounded = if (isEmpty() && item.text.length > maxChars) item.copy(text = item.text.take(maxChars)) else item

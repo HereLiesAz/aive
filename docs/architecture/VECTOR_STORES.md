@@ -31,7 +31,7 @@ Each embedder is its own vector space: a vector records the embedder id and vers
 | Use | Seam | Change |
 |---|---|---|
 | Memory recall | `GraphMemoryTool.grip` / `fusedOrder` (`memory/MemoryTool.kt`) | Union semantic nearest neighbours into the seed set and add a semantic signal to the reciprocal-rank fusion beside relevance, scope, salience, confidence, recency and keywords. |
-| Memory associations | `MemorySnapshot.relatedNeighborhood` (`memory/MemoryConsolidation.kt`) and `EmbeddingAssociationLinkerMicroAgent` | Neighbours come from an index over the whole bank, not only the packet's lexical neighbourhood; stored vectors replace the in-RAM embedding cache. |
+| Memory associations | `MemoryConsolidator.semanticNeighbours` → `relatedNeighborhood` (`memory/MemoryConsolidation.kt`) | Done: with an embedder (on by default via `AgentMemoryLayer.create`), the association packet's neighbourhood adds memories from anywhere in the bank at cosine ≥ 0.45, fused with shared-word overlap by reciprocal rank; same-kind still first. The index is persistent per consolidator (each node embedded once), HNSW past 5,000 memories. |
 | Agent retrieval | `ProviderBackedManagedSessionGateway` (memory blocks are packed there today) | Retrieve repository-file and artifact chunks by similarity to the task and add them as `ContextEvidence` for the Context Packer. Needs a repository chunking/reading step that does not exist yet. |
 | Agent routing | `routeAgent` / `routeTool` (`orchestration/LocalOrchestrationUtilities.kt`) | Add task text and role/tool descriptions to the routing inputs; similarity breaks ties among candidates that already satisfy the hard capability filter, never overriding it. |
 
@@ -43,7 +43,7 @@ Memory vectors live in each memory bank's SQLite database (new table keyed by no
 
 1. Indexes and codec.
 2. Built-in embedder; vector table in memory banks; semantic recall signal.
-3. Whole-bank neighbours for associations.
+3. ~~Whole-bank neighbours for associations.~~ Done.
 4. MiniLM adapter and Settings install.
 5. Routing tie-breaks.
 6. Repository/artifact chunking and retrieval.

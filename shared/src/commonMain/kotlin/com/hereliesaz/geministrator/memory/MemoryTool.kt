@@ -561,13 +561,13 @@ private const val FUSION_KEYWORDS = 0.5
 private const val FUSION_SEMANTIC = 1.0
 
 /** Below this cosine similarity a memory is not offered as a meaning match. */
-private const val SEMANTIC_MIN_SIMILARITY = 0.45f
+internal const val SEMANTIC_MIN_SIMILARITY = 0.45f
 
 /** A meaning-only seed's relevance is its similarity times this. */
 private const val SEMANTIC_RELEVANCE = 0.5f
 
 /** Above this many active memories the semantic index is HNSW rather than exact. */
-private const val HNSW_THRESHOLD = 5_000
+internal const val HNSW_THRESHOLD = 5_000
 
 private const val MAX_RECALL_DEPTH = 6
 
