@@ -46,4 +46,4 @@ Memory vectors live in each memory bank's SQLite database (new table keyed by no
 3. ~~Whole-bank neighbours for associations.~~ Done.
 4. ~~MiniLM adapter and Settings install.~~ Done (browser adapter outstanding).
 5. ~~Routing tie-breaks.~~ Done.
-6. ~~Repository/artifact chunking and retrieval.~~ Done (GitHub repositories; GitLab and local paths outstanding).
+6. ~~Repository/artifact chunking and retrieval.~~ Done (GitHub and local Git repositories; GitLab outstanding). Local repositories (desktop, `LocalRepositoryChunkSource`) are read at the commit the agent's worktree branch starts from: the upstream task's `headCommit`, else HEAD, never the uncommitted working copy.

@@ -67,7 +67,9 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
             else -> parsed.command(root)
         }
         val result = runGit(command)
-        val snapshot = inspect(root)
+        // A worktree branch reports the new worktree's state; the user's checkout is untouched.
+        val worktree = (parsed as? LocalGitOperation.WorktreeBranch)?.directory(root)
+        val snapshot = inspect(worktree ?: root)
         val now = System.currentTimeMillis()
         val output = result.output.ifBlank {
             if (result.exitCode == 0) "Git operation completed successfully."
@@ -85,6 +87,7 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
                 put("operation", operation)
                 put("command", command.joinToString(" "))
                 put("exitCode", result.exitCode.toString())
+                worktree?.let { put("worktreePath", it.absolutePath) }
                 snapshot.branch?.let { put("branch", it) }
                 snapshot.headCommit?.let { put("headCommit", it) }
                 snapshot.dirtyFileCount?.let { put("dirtyFileCount", it.toString()) }
@@ -400,6 +403,22 @@ private sealed interface LocalGitOperation {
         override fun command(root: File) = listOf("git", "-C", root.absolutePath, "switch", "-c", branch)
     }
 
+    /**
+     * Creates [branch] from [base] (HEAD when absent) in a new Git worktree beside the repository,
+     * at `<repo>-worktrees/<branch>`, so a task works in isolation and the user's checkout, its
+     * branch and its uncommitted changes are left alone.
+     */
+    data class WorktreeBranch(val branch: String, val base: String?) : LocalGitOperation {
+        override val label = "Create branch $branch in a worktree"
+
+        fun directory(root: File): File =
+            File(root.absoluteFile.parentFile, "${root.name}-worktrees").resolve(branch.replace('/', '-'))
+
+        override fun command(root: File) = listOf(
+            "git", "-C", root.absolutePath, "worktree", "add", "-b", branch, directory(root).absolutePath, base ?: "HEAD",
+        )
+    }
+
     data class Commit(val message: String) : LocalGitOperation {
         override val label = "Commit staged changes"
         override fun command(root: File) = listOf("git", "-C", root.absolutePath, "commit", "-m", message)
@@ -422,6 +441,12 @@ private sealed interface LocalGitOperation {
                 operation == "push" -> Push
                 operation.startsWith("checkout:") -> Checkout(requireSafeRef(operation.substringAfter(':')))
                 operation.startsWith("create-branch:") -> CreateBranch(requireSafeRef(operation.substringAfter(':')))
+                operation.startsWith("worktree-branch:") -> operation.substringAfter(':').let { spec ->
+                    WorktreeBranch(
+                        branch = requireSafeRef(spec.substringBefore('@')),
+                        base = spec.substringAfter('@', "").takeIf(String::isNotEmpty)?.let(::requireSafeRef),
+                    )
+                }
                 operation.startsWith("commit:") -> Commit(
                     operation.substringAfter(':').trim().also {
                         require(it.isNotEmpty()) { "Commit message is required" }
@@ -432,6 +457,7 @@ private sealed interface LocalGitOperation {
                 else -> error(
                     "Unsupported Local Git operation '$operation'. Supported operations: " +
                         "status, fetch, pull, add-all, push, checkout:<ref>, create-branch:<branch>, " +
+                        "worktree-branch:<branch>[@<base>], " +
                         "commit:<message>, push-set-upstream:<branch>",
                 )
             }

@@ -11,6 +11,7 @@ Supported operation strings:
 - `push`
 - `checkout:<ref>`
 - `create-branch:<branch>`
+- `worktree-branch:<branch>[@<base>]` — creates the branch from `<base>` (HEAD when omitted) in a new worktree at `<repo>-worktrees/<branch>` beside the repository, leaving the user's checkout, branch and uncommitted changes untouched; the artifact's `worktreePath`, `branch` and `headCommit` describe the new worktree
 - `commit:<message>`
 - `push-set-upstream:<branch>`
 

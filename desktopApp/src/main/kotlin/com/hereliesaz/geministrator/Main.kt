@@ -298,14 +298,16 @@ fun main() {
                 )
                 // A linked GitHub account lets agents retrieve relevant files from the project's repository.
                 val contextChunkSources = remember(repositoryCredentials) {
-                    repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
-                        listOf(
-                            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
-                                GitHubTokenProvider { token },
-                                httpClient,
-                            ),
-                        )
-                    }.orEmpty()
+                    // Local Git folders always; GitHub repositories once an account is linked.
+                    listOf(com.hereliesaz.geministrator.retrieval.LocalRepositoryChunkSource()) +
+                        repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
+                            listOf(
+                                com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
+                                    GitHubTokenProvider { token },
+                                    httpClient,
+                                ),
+                            )
+                        }.orEmpty()
                 }
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
