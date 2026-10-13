@@ -76,6 +76,8 @@ kotlin {
             // Overrides the provider's vulnerable transitive bcprov 1.83.
             implementation(libs.bouncycastle.bcprov)
             implementation(libs.sqldelight.android.driver)
+            // Local Git on Android: imported repositories are read and changed through JGit.
+            implementation(libs.jgit)
         }
 
         getByName("desktopMain").dependencies {

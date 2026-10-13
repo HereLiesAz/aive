@@ -61,7 +61,7 @@ class LocalRepositoryChunkSourceTest {
             // An uncommitted edit in the user's checkout is not what the agent's worktree starts from.
             File(root, "src/WorkflowDatabase.kt").writeText("class WorkflowDatabase { fun migrate() = 3 }")
 
-            val source = LocalRepositoryChunkSource()
+            val source = LocalRepositoryChunkSource(GitCliRepositoryReader)
             val atHead = source.chunks(request(root, "Migrate the workflow database"))
             assertEquals(listOf("Repository file src/WorkflowDatabase.kt"), atHead.map { it.label })
             assertTrue("= 2" in atHead.single().text, atHead.single().text)
@@ -78,7 +78,7 @@ class LocalRepositoryChunkSourceTest {
         val root = Files.createTempDirectory("aive-local-folder").toFile()
         try {
             File(root, "WorkflowDatabase.kt").writeText("class WorkflowDatabase")
-            val chunks = LocalRepositoryChunkSource().chunks(request(root, "workflow database"))
+            val chunks = LocalRepositoryChunkSource(GitCliRepositoryReader).chunks(request(root, "workflow database"))
             assertEquals(listOf("Repository file WorkflowDatabase.kt"), chunks.map { it.label })
         } finally {
             root.deleteRecursively()

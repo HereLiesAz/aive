@@ -108,7 +108,7 @@ internal fun MindMapRunScreen(
     onOpenSettings: () -> Unit = {},
     onValidateWorkflow: () -> List<String> = { emptyList() },
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
-    onPickLocalRepository: (() -> String?)? = null,
+    onPickLocalRepository: (suspend () -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
     onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     compact: Boolean,
@@ -317,9 +317,16 @@ internal fun MindMapRunScreen(
                         label = stringResource(Res.string.overview_choose_git_folder),
                         seed = "choose-local-git-folder",
                         onClick = {
-                            onPickLocalRepository()?.let { path ->
-                                repositoryLocator = path
-                                repositoryError = null
+                            scope.launch {
+                                // Android imports the picked folder first, so this can take a moment.
+                                runCatching { onPickLocalRepository() }
+                                    .onSuccess { path ->
+                                        path?.let {
+                                            repositoryLocator = it
+                                            repositoryError = null
+                                        }
+                                    }
+                                    .onFailure { repositoryError = it.message }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

@@ -75,7 +75,7 @@ fun App(
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
     availableRepositorySources: Set<RepositorySource> = setOf(RepositorySource.GitHub, RepositorySource.GitLab),
-    onPickLocalRepository: (() -> String?)? = null,
+    onPickLocalRepository: (suspend () -> String?)? = null,
     connectedRepositoryServiceIds: Set<String> = emptySet(),
     onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     onConfigureRepositoryService: (String) -> Unit = {},

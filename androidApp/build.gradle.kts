@@ -165,6 +165,7 @@ tasks.matching { task ->
 
 dependencies {
     implementation(projects.shared)
+    implementation(libs.jgit)
     implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.fragment)
