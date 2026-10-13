@@ -19,3 +19,11 @@
 -dontwarn javax.sound.sampled.**
 -dontwarn javax.tools.**
 -dontwarn java.lang.management.**
+
+# JGit (Local Git on Android): reflection-free core, but it references JVM-only APIs
+# (management, JSch, Apache HTTP) that Android lacks and that the app never calls.
+-dontwarn org.eclipse.jgit.**
+-dontwarn org.slf4j.**
+-dontwarn com.googlecode.javaewah.**
+-keep class org.eclipse.jgit.internal.JGitText { *; }
+-keep class org.eclipse.jgit.lib.CoreConfig$* { *; }

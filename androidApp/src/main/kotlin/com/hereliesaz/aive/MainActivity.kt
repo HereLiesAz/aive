@@ -95,6 +95,8 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    /** Local Git folders, imported into app storage and worked on through JGit. */
+    private val localRepositories by lazy { AndroidLocalRepositoryStore(applicationContext) }
     private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
     private val orchestrationSpecialistInstaller by lazy {
         AndroidOrchestrationSpecialistInstaller(this, repositoryHttpClient)
@@ -132,6 +134,7 @@ class MainActivity : ComponentActivity() {
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
         val projectFileService = AndroidProjectFileService(this)
+        val localRepositoryPicker = AndroidLocalRepositoryPicker(this, localRepositories)
         updateCoordinator = AndroidUpdateCoordinator(this)
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
@@ -290,6 +293,7 @@ class MainActivity : ComponentActivity() {
                         repositoryCredentials = repositoryCredentials,
                         httpClient = repositoryHttpClient,
                         roleSurfaceRuntime = roleSurfaceRuntime,
+                        localRepositories = localRepositories,
                     )
                     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
                         configured
@@ -350,7 +354,12 @@ class MainActivity : ComponentActivity() {
                 val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
                 // A linked GitHub account lets agents retrieve relevant files from the project's repository.
                 val contextChunkSources = remember(repositoryCredentials) {
-                    repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
+                    // Imported local folders always; GitHub repositories once an account is linked.
+                    listOf(
+                        com.hereliesaz.geministrator.retrieval.LocalRepositoryChunkSource(
+                            com.hereliesaz.geministrator.retrieval.JGitRepositoryReader,
+                        ),
+                    ) + repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
                         listOf(
                             com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
                                 GitHubTokenProvider { token },
@@ -419,6 +428,8 @@ class MainActivity : ComponentActivity() {
                         onAzphaltPackageImportHandled = azphaltHost::consumeImport,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         contextChunkSources = contextChunkSources,
+                        availableRepositorySources = com.hereliesaz.geministrator.domain.RepositorySource.entries.toSet(),
+                        onPickLocalRepository = { localRepositoryPicker.pick() },
                         onSearchRepositories = repositoryDiscovery::search,
                         onConfigureRepositoryService = { configuringRepositoryServiceId = it },
                         onDisconnectRepositoryService = { serviceId ->
@@ -660,10 +671,19 @@ internal fun configuredAndroidExecutorIntegrations(
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry(
         listOf(AndroidRoleSurfaceIntegration(context, httpClient)),
     ),
+    localRepositories: AndroidLocalRepositoryStore = AndroidLocalRepositoryStore(context),
 ): TaskExecutorIntegrationRegistry {
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val repositoryClients = buildList {
+        add(
+            AndroidLocalGitRepositoryOperationClient(export = { root, files ->
+                val folder = requireNotNull(localRepositories.pickedFolder(root)) {
+                    "The folder this repository was imported from is no longer accessible; pick it again."
+                }
+                localRepositories.export(folder, files)
+            }),
+        )
         githubToken?.let { token ->
             add(
                 GitHubRestRepositoryOperationClient(
@@ -684,13 +704,11 @@ internal fun configuredAndroidExecutorIntegrations(
     return TaskExecutorIntegrationRegistry(
         buildList {
             add(AndroidJavaScriptExecutorIntegration(context, roleSurfaceRuntime))
-            if (repositoryClients.isNotEmpty()) {
-                add(
-                    RepositoryOperationExecutorIntegration(
-                        RoutingRepositoryOperationClient(repositoryClients),
-                    ),
-                )
-            }
+            add(
+                RepositoryOperationExecutorIntegration(
+                    RoutingRepositoryOperationClient(repositoryClients),
+                ),
+            )
             githubToken?.let { token ->
                 add(
                     GitHubActionsExecutorIntegration(

@@ -298,14 +298,16 @@ fun main() {
                 )
                 // A linked GitHub account lets agents retrieve relevant files from the project's repository.
                 val contextChunkSources = remember(repositoryCredentials) {
-                    repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
-                        listOf(
-                            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
-                                GitHubTokenProvider { token },
-                                httpClient,
-                            ),
-                        )
-                    }.orEmpty()
+                    // Local Git folders always; GitHub repositories once an account is linked.
+                    listOf(com.hereliesaz.geministrator.retrieval.LocalRepositoryChunkSource(com.hereliesaz.geministrator.retrieval.GitCliRepositoryReader)) +
+                        repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)?.let { token ->
+                            listOf(
+                                com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource(
+                                    GitHubTokenProvider { token },
+                                    httpClient,
+                                ),
+                            )
+                        }.orEmpty()
                 }
                 val repositoryDiscovery = remember(repositoryCredentials) {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
@@ -342,7 +344,7 @@ fun main() {
                         orchestrationUtilities = orchestrationUtilities,
                         projectFileService = projectFileService,
                         availableRepositorySources = RepositorySource.entries.toSet(),
-                        onPickLocalRepository = ::pickLocalGitFolder,
+                        onPickLocalRepository = { pickLocalGitFolder() },
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         contextChunkSources = contextChunkSources,
                         onSearchRepositories = repositoryDiscovery::search,

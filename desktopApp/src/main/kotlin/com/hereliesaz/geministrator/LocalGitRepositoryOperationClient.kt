@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.workflow.ExternalExecutionRun
 import com.hereliesaz.geministrator.workflow.ExternalExecutionStatus
+import com.hereliesaz.geministrator.workflow.LocalGitOperation
 import com.hereliesaz.geministrator.workflow.RepositoryOperationClient
 import java.io.File
 import java.io.FileInputStream
@@ -67,7 +68,9 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
             else -> parsed.command(root)
         }
         val result = runGit(command)
-        val snapshot = inspect(root)
+        // A worktree branch reports the new worktree's state; the user's checkout is untouched.
+        val worktree = (parsed as? LocalGitOperation.WorktreeBranch)?.worktreeDirectory(root.path)?.let(::File)
+        val snapshot = inspect(worktree ?: root)
         val now = System.currentTimeMillis()
         val output = result.output.ifBlank {
             if (result.exitCode == 0) "Git operation completed successfully."
@@ -85,6 +88,7 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
                 put("operation", operation)
                 put("command", command.joinToString(" "))
                 put("exitCode", result.exitCode.toString())
+                worktree?.let { put("worktreePath", it.absolutePath) }
                 snapshot.branch?.let { put("branch", it) }
                 snapshot.headCommit?.let { put("headCommit", it) }
                 snapshot.dirtyFileCount?.let { put("dirtyFileCount", it.toString()) }
@@ -360,84 +364,21 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
     }
 }
 
-private sealed interface LocalGitOperation {
-    val label: String
-    fun command(root: File): List<String>
-
-    data object Status : LocalGitOperation {
-        override val label = "Repository status"
-        override fun command(root: File) =
-            listOf("git", "-C", root.absolutePath, "status", "--short", "--branch", "--untracked-files=all")
-    }
-
-    data object Fetch : LocalGitOperation {
-        override val label = "Fetch remotes"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "fetch", "--prune")
-    }
-
-    data object Pull : LocalGitOperation {
-        override val label = "Pull fast-forward"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "pull", "--ff-only")
-    }
-
-    data object AddAll : LocalGitOperation {
-        override val label = "Stage all changes"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "add", "--all")
-    }
-
-    data object Push : LocalGitOperation {
-        override val label = "Push current branch"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "push")
-    }
-
-    data class Checkout(val ref: String) : LocalGitOperation {
-        override val label = "Checkout $ref"
-        override fun command(root: File) = error("Checkout command is resolved against the repository")
-    }
-
-    data class CreateBranch(val branch: String) : LocalGitOperation {
-        override val label = "Create branch $branch"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "switch", "-c", branch)
-    }
-
-    data class Commit(val message: String) : LocalGitOperation {
-        override val label = "Commit staged changes"
-        override fun command(root: File) = listOf("git", "-C", root.absolutePath, "commit", "-m", message)
-    }
-
-    data class PushSetUpstream(val branch: String) : LocalGitOperation {
-        override val label = "Push $branch and set upstream"
-        override fun command(root: File) =
-            listOf("git", "-C", root.absolutePath, "push", "--set-upstream", "origin", branch)
-    }
-
-    companion object {
-        fun parse(raw: String): LocalGitOperation {
-            val operation = raw.trim()
-            return when {
-                operation == "status" -> Status
-                operation == "fetch" -> Fetch
-                operation == "pull" -> Pull
-                operation == "add-all" -> AddAll
-                operation == "push" -> Push
-                operation.startsWith("checkout:") -> Checkout(requireSafeRef(operation.substringAfter(':')))
-                operation.startsWith("create-branch:") -> CreateBranch(requireSafeRef(operation.substringAfter(':')))
-                operation.startsWith("commit:") -> Commit(
-                    operation.substringAfter(':').trim().also {
-                        require(it.isNotEmpty()) { "Commit message is required" }
-                    },
-                )
-                operation.startsWith("push-set-upstream:") ->
-                    PushSetUpstream(requireSafeRef(operation.substringAfter(':')))
-                else -> error(
-                    "Unsupported Local Git operation '$operation'. Supported operations: " +
-                        "status, fetch, pull, add-all, push, checkout:<ref>, create-branch:<branch>, " +
-                        "commit:<message>, push-set-upstream:<branch>",
-                )
-            }
-        }
-
-        private fun requireSafeRef(raw: String): String =
-            com.hereliesaz.geministrator.workflow.GitRefNames.requireSafe(raw, "Git ref")
+/** The git command line for each [LocalGitOperation]; Checkout is resolved against the repository. */
+private fun LocalGitOperation.command(root: File): List<String> {
+    val git = listOf("git", "-C", root.absolutePath)
+    return when (this) {
+        LocalGitOperation.Status -> git + listOf("status", "--short", "--branch", "--untracked-files=all")
+        LocalGitOperation.Fetch -> git + listOf("fetch", "--prune")
+        LocalGitOperation.Pull -> git + listOf("pull", "--ff-only")
+        LocalGitOperation.AddAll -> git + listOf("add", "--all")
+        LocalGitOperation.Push -> git + "push"
+        is LocalGitOperation.Checkout -> error("Checkout command is resolved against the repository")
+        is LocalGitOperation.CreateBranch -> git + listOf("switch", "-c", branch)
+        is LocalGitOperation.WorktreeBranch ->
+            git + listOf("worktree", "add", "-b", branch, worktreeDirectory(root.path).let(::File).absolutePath, base ?: "HEAD")
+        is LocalGitOperation.Commit -> git + listOf("commit", "-m", message)
+        is LocalGitOperation.PushSetUpstream -> git + listOf("push", "--set-upstream", "origin", branch)
+        is LocalGitOperation.Export -> error("Export applies to imported repositories (Android) only")
     }
 }

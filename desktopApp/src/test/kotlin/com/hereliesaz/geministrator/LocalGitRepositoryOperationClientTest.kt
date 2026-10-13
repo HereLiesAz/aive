@@ -85,6 +85,27 @@ class LocalGitRepositoryOperationClientTest {
         updatedAtEpochMillis = 1L,
     )
 
+    @Test
+    fun worktreeBranchLeavesTheCheckoutAlone() = withGitRepository { root ->
+        root.resolve("README.md").writeText("uncommitted\n")
+        val client = LocalGitRepositoryOperationClient()
+        val worktree = root.resolveSibling("${root.fileName}-worktrees").resolve("feature-x")
+        try {
+            val execution = runBlocking { client.start(project(root), "worktree-branch:feature/x") }
+
+            assertEquals(ExternalExecutionStatus.Completed, execution.status, execution.message)
+            val artifact = execution.artifacts.single()
+            assertEquals(worktree.toFile().absolutePath, artifact.metadata["worktreePath"])
+            assertEquals("feature/x", artifact.metadata["branch"])
+            assertEquals("initial\n", worktree.resolve("README.md").toFile().readText())
+            assertEquals("uncommitted\n", root.resolve("README.md").toFile().readText())
+            assertTrue(git(root, "rev-parse", "--abbrev-ref", "HEAD").trim() != "feature/x")
+        } finally {
+            runCatching { git(root, "worktree", "remove", "--force", worktree.toString()) }
+            worktree.parent.toFile().deleteRecursively()
+        }
+    }
+
     private fun withGitRepository(block: (Path) -> Unit) {
         val root = createTempDirectory("haive-local-git-test-")
         try {
