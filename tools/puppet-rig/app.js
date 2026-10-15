@@ -14,7 +14,7 @@ function emptyDoc() {
     role: 'creature',
     canvas: { width: 256, height: 256 },
     sources: [], // {id, name, url}
-    parts: [], // {id, source, cut:{x,y,w,h}, poly:[{x,y}]|null, parent, z, pivot, size, rest}
+    parts: [], // {id, source, cut, poly, parent, z, pivot, size, rest, kind, rigidity, stretch, connectTo}
     attachments: [], // {id, part, x, y, kind}
     states: {}, // stateName -> {parts: {partId: {keys:{ch:[{t,v,ease}]}, sine:{ch:{amplitude,frequency,phase}}}}}
     fallbackState: 'Pending',
@@ -27,6 +27,7 @@ const ui = {
   source: null, // selected source id (cut mode)
   sel: null, // selected part id
   tool: { cut: 'rect', rig: 'move' },
+  attachmentKind: 'arm-socket',
   view: { s: 1, ox: 0, oy: 0 },
   fitted: { cut: false, rig: false },
   polyDraft: null,
@@ -52,6 +53,7 @@ const uid = (prefix, taken) => {
 };
 const round = (v, d = 3) => Math.round(v * 10 ** d) / 10 ** d;
 const partById = (id) => doc.parts.find((p) => p.id === id);
+const attachmentKinds = ['arm-socket', 'tail-base', 'tail-tip', 'tendril-base', 'tendril-tip', 'prop-slot', 'eye', 'other'];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function toast(msg) {
@@ -231,6 +233,10 @@ async function importRig(jsonFile, pngs) {
         poly: null,
         parent: p.parent ?? null,
         z: p.z ?? 0,
+        kind: p.kind || 'other',
+        rigidity: p.rigidity ?? 0,
+        stretch: p.stretch ? { ...p.stretch } : null,
+        connectTo: p.connectTo ?? null,
         pivot: { x: 0.5, y: 0.5, ...(p.pivot || {}) },
         size: { w: sz.w, h: sz.h },
         rest: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1, ...(p.rest || {}) },
@@ -260,6 +266,10 @@ function addPart(id, source, cut, poly) {
     poly,
     parent: null,
     z: n,
+    kind: 'other',
+    rigidity: 0,
+    stretch: null,
+    connectTo: null,
     pivot: { x: 0.5, y: 0.5 },
     size: { w: Math.round(cut.w), h: Math.round(cut.h) },
     rest: { x: doc.canvas.width / 2 + (n % 5) * 6, y: doc.canvas.height / 2 + (n % 5) * 6, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1 },
@@ -286,11 +296,65 @@ function renamePart(oldId, newId) {
 
 function deletePart(id) {
   const p = partById(id);
+  if (!p) return;
+  doc.parts.filter((q) => q.parent === id).forEach((q) => setParent(q.id, p.parent));
   doc.parts = doc.parts.filter((q) => q.id !== id);
-  doc.parts.forEach((q) => { if (q.parent === id) q.parent = p.parent; });
   doc.attachments = doc.attachments.filter((a) => a.part !== id);
-  for (const s of Object.values(doc.states)) delete s.parts?.[id];
+  for (const state of Object.values(doc.states)) delete state.parts?.[id];
+  partCanvases.delete(id);
   ui.sel = doc.parts[0]?.id ?? null;
+}
+
+function duplicatePart(id) {
+  const original = partById(id);
+  if (!original) return;
+  const copy = structuredClone(original);
+  copy.id = uniquePartId(`${original.id}-copy`);
+  copy.rest.x += 12;
+  copy.rest.y += 12;
+  doc.parts.splice(doc.parts.indexOf(original) + 1, 0, copy);
+  const levels = [...doc.parts].sort((a, b) => a.z - b.z || doc.parts.indexOf(a) - doc.parts.indexOf(b));
+  levels.splice(levels.indexOf(copy), 1);
+  levels.splice(levels.indexOf(original) + 1, 0, copy);
+  levels.forEach((p, i) => { p.z = i; });
+  for (const state of Object.values(doc.states)) {
+    const motion = state.parts?.[id];
+    if (motion) state.parts[copy.id] = structuredClone(motion);
+  }
+  const ids = new Set(doc.attachments.map((a) => a.id));
+  for (const a of doc.attachments.filter((a) => a.part === id)) {
+    const attachmentId = uid(`${a.id}-copy-`, ids);
+    ids.add(attachmentId);
+    doc.attachments.push({ ...a, id: attachmentId, part: copy.id });
+  }
+  ui.sel = copy.id;
+}
+
+function moveLayer(id, direction) {
+  const levels = [...doc.parts].sort((a, b) => a.z - b.z || doc.parts.indexOf(a) - doc.parts.indexOf(b));
+  const i = levels.findIndex((p) => p.id === id);
+  const j = i + direction;
+  if (i < 0 || j < 0 || j >= levels.length) return;
+  [levels[i], levels[j]] = [levels[j], levels[i]];
+  levels.forEach((p, index) => { p.z = index; });
+}
+
+function setConnection(p, connectionId) {
+  const current = doc.attachments.find((a) => a.id === p.connectTo && a.part === p.parent);
+  const oldOffset = current ? core.attachmentOffset(partById(p.parent), current) : { x: 0, y: 0 };
+  const socket = doc.attachments.find((a) => a.id === connectionId && a.part === p.parent);
+  if (connectionId && !socket) return toast('Choose a connection point on the parent part.');
+  if (socket) {
+    // Selecting a socket connects this part's pivot directly to that point.
+    p.connectTo = socket.id;
+    p.rest.x = 0;
+    p.rest.y = 0;
+  } else {
+    // Detaching leaves the part where it was, including when its socket was deleted.
+    p.rest.x = round(p.rest.x + oldOffset.x);
+    p.rest.y = round(p.rest.y + oldOffset.y);
+    p.connectTo = null;
+  }
 }
 
 /** Re-parent while keeping the part's current rest placement on screen. */
@@ -302,6 +366,7 @@ function setParent(id, parentId) {
   const parentM = parentId ? pose.byId[parentId].m : core.IDENTITY;
   const local = core.mul(core.invert(parentM), world);
   p.parent = parentId || null;
+  p.connectTo = null;
   p.rest.x = round(local[4]);
   p.rest.y = round(local[5]);
   p.rest.rotation = round((Math.atan2(local[1], local[0]) * 180) / Math.PI);
@@ -374,7 +439,14 @@ function buildExport() {
     atlas: { image: atlasName, width: atlas.width, height: atlas.height },
     parts: doc.parts.map((p) => {
       const at = pack.placements.get(p.id);
-      const out = { id: p.id, parent: p.parent ?? null, z: p.z };
+      const out = {
+        id: p.id, parent: p.parent ?? null, z: p.z,
+        kind: p.kind || 'other', rigidity: round(p.rigidity ?? 0, 3),
+      };
+      if (p.connectTo) out.connectTo = p.connectTo;
+      if (p.stretch && (p.kind === 'tail' || p.kind === 'tendril')) {
+        out.stretch = { axis: p.stretch.axis, length: round(p.stretch.length) };
+      }
       if (at) out.rect = { x: at.x, y: at.y, w: Math.round(p.cut.w), h: Math.round(p.cut.h) };
       out.size = { w: round(p.size.w), h: round(p.size.h) };
       out.pivot = { x: round(p.pivot.x, 4), y: round(p.pivot.y, 4) };
@@ -611,12 +683,23 @@ stage.addEventListener('pointerdown', (ev) => {
     if (!e) return toast('Tap inside a part to add an attachment point.');
     const l = core.apply(core.invert(e.m), w.x, w.y);
     const id = uid('attach.', new Set(doc.attachments.map((a) => a.id)));
-    doc.attachments.push({ id, part: e.part.id, x: round(e.part.pivot.x + l.x / e.w, 4), y: round(e.part.pivot.y + l.y / e.h, 4), kind: 'arm-socket' });
+    if (!e.w || !e.h) return toast('Cannot place a point on a zero-size part.');
+    doc.attachments.push({ id, part: e.part.id, x: round(e.part.pivot.x + l.x / e.w, 4), y: round(e.part.pivot.y + l.y / e.h, 4), kind: ui.attachmentKind });
     ui.sel = e.part.id;
     renderPanel(); changed();
     return;
   }
   if (sel && ui.mode === 'rig') {
+    const point = doc.attachments.find((a) => {
+      if (a.part !== ui.sel) return false;
+      const pos = pose.attachments[a.id];
+      const q = pos && toScreen(pos.x, pos.y);
+      return q && Math.hypot(q.x - sp.x, q.y - sp.y) < 12;
+    });
+    if (ui.tool.rig === 'move' && point) {
+      drag = { kind: 'attachment', id: point.id };
+      return;
+    }
     const rh = rotateHandle(sel), pv = pivotScreen(sel);
     if (Math.hypot(rh.x - sp.x, rh.y - sp.y) < 14) {
       drag = { kind: 'rotate', start: Math.atan2(sp.y - pv.y, sp.x - pv.x), rot: partById(ui.sel).rest.rotation };
@@ -684,6 +767,20 @@ stage.addEventListener('pointermove', (ev) => {
       movePivotTo(p, w);
       syncInspector();
       break;
+    case 'attachment': {
+      const a = doc.attachments.find((v) => v.id === drag.id);
+      const e = currentPose().byId[a?.part];
+      if (!a || !e || !e.w || !e.h) break;
+      const l = core.apply(core.invert(e.m), w.x, w.y);
+      a.x = round(e.part.pivot.x + l.x / e.w, 4);
+      a.y = round(e.part.pivot.y + l.y / e.h, 4);
+      const row = [...panel.querySelectorAll('[data-attach]')].find((el) => el.dataset.attach === a.id);
+      if (row) {
+        row.querySelector('[data-af=x]').value = a.x;
+        row.querySelector('[data-af=y]').value = a.y;
+      }
+      break;
+    }
   }
   draw();
 });
@@ -757,13 +854,17 @@ function renderStageTools() {
       (ui.tool.cut === 'poly' ? '<button class="btn" data-act="close-poly">Close polygon</button>' : '') +
       '<button class="btn ghost" data-act="fit">Fit</button><span class="small">shift-drag / two fingers to pan, wheel or pinch to zoom</span>';
   } else if (ui.mode === 'rig') {
-    t.innerHTML = btn('move', 'Move / rotate / pivot', ui.tool.rig === 'move') + btn('attach', 'Add attachment', ui.tool.rig === 'attach') +
-      '<button class="btn ghost" data-act="fit">Fit</button><span class="small">drag part = move · white ring = rotate (shift snaps) · centre dot = pivot</span>';
+    t.innerHTML = btn('move', 'Move / rotate / pivot / point', ui.tool.rig === 'move') + btn('attach', 'Add point', ui.tool.rig === 'attach') +
+      `<select id="new-attachment-kind" aria-label="New point type">${attachmentKinds.map((k) => `<option value="${k}" ${k === ui.attachmentKind ? 'selected' : ''}>${k}</option>`).join('')}</select>` +
+      '<button class="btn ghost" data-act="fit">Fit</button><span class="small">drag part = move · white ring = rotate · centre dot = pivot · cross = connection point</span>';
   } else {
     t.innerHTML = '<button class="btn ghost" data-act="fit">Fit</button><span class="small">tap a part to edit its motion for the selected state</span>';
   }
 }
 
+$('#stage-tools').addEventListener('change', (ev) => {
+  if (ev.target.id === 'new-attachment-kind') ui.attachmentKind = ev.target.value;
+});
 $('#stage-tools').addEventListener('click', (ev) => {
   const b = ev.target.closest('button');
   if (!b) return;
@@ -776,7 +877,7 @@ $('#stage-tools').addEventListener('click', (ev) => {
   if (b.dataset.act === 'close-poly') finishPoly();
 });
 
-function partListHtml(tree) {
+function partListHtml(tree, layers = false) {
   if (!doc.parts.length) return '<p class="small">No parts yet.</p>';
   const rows = [];
   const walk = (parent, depth) => {
@@ -786,8 +887,10 @@ function partListHtml(tree) {
     });
   };
   if (tree) walk(null, 0);
-  else doc.parts.forEach((p) => rows.push(`<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}">${esc(p.id)}<span class="meta">${p.poly ? 'poly' : 'rect'} ${p.cut ? `${p.cut.w}×${p.cut.h}` : ''}</span></li>`));
-  return `<ul class="list" id="part-list">${rows.join('')}</ul>`;
+  else (layers ? [...doc.parts].sort((a, b) => a.z - b.z) : doc.parts).forEach((p) => rows.push(
+    `<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}">${esc(p.id)}<span class="meta">${layers ? `z ${p.z}` : `${p.poly ? 'poly' : 'rect'} ${p.cut ? `${p.cut.w}×${p.cut.h}` : ''}`}</span></li>`
+  ));
+  return `<ul class="list" id="${layers ? 'layer-list' : 'part-list'}">${rows.join('')}</ul>`;
 }
 
 const num = (field, value, step = 1, extra = '') =>
@@ -808,20 +911,43 @@ function renderPanel() {
         <div class="row"><label>name</label><input type="text" id="part-name" value="${esc(p.id)}"></div>
         ${p.cut ? `<div class="row"><label>cut</label>${num('cut.x', p.cut.x)}${num('cut.y', p.cut.y)}</div>
         <div class="row"><label></label>${num('cut.w', p.cut.w, 1, 'min=1')}${num('cut.h', p.cut.h, 1, 'min=1')}</div>` : ''}
-        <div class="row"><button class="btn" data-act="delete-part">Delete part</button></div>`;
+        <div class="row"><button class="btn" data-act="duplicate-part">Duplicate</button><button class="btn ghost" data-act="delete-part">Delete part</button></div>`;
     }
   } else if (ui.mode === 'rig') {
     html += `<h3>Creature</h3>
       <div class="row"><label>role</label><input type="text" id="role" value="${esc(doc.role)}"></div>
       <div class="row"><label>artboard</label>${num('canvas.width', doc.canvas.width, 1, 'min=1')}${num('canvas.height', doc.canvas.height, 1, 'min=1')}</div>
-      <h3>Hierarchy</h3>${partListHtml(true)}`;
+      <h3>Hierarchy</h3>${partListHtml(true)}
+      <h3>Layers · back to front</h3>${partListHtml(false, true)}`;
     if (p) {
       const banned = descendants(p.id);
       const opts = ['<option value="">(none)</option>', ...doc.parts.filter((q) => q.id !== p.id && !banned.has(q.id))
         .map((q) => `<option value="${esc(q.id)}" ${q.id === p.parent ? 'selected' : ''}>${esc(q.id)}</option>`)].join('');
+      const sockets = doc.attachments.filter((a) => a.part === p.parent);
+      const connectionOptions = ['<option value="">(free offset)</option>', ...sockets.map((a) =>
+        `<option value="${esc(a.id)}" ${a.id === p.connectTo ? 'selected' : ''}>${esc(a.id)} (${esc(a.kind)})</option>`)].join('');
+      const stretch = p.stretch || {
+        axis: p.size.h >= p.size.w ? 'y' : 'x',
+        length: Math.max(p.size.h, p.size.w),
+      };
       html += `<h3>${esc(p.id)}</h3>
+        <div class="row"><label>name</label><input type="text" id="part-name" value="${esc(p.id)}"></div>
+        <div class="row"><button class="btn ghost" data-act="layer-back">Send backward</button>
+          <button class="btn ghost" data-act="layer-front">Bring forward</button></div>
+        <div class="row"><button class="btn" data-act="duplicate-part">Duplicate part</button>
+          <button class="btn ghost" data-act="delete-part">Delete part</button></div>
+        <div class="row"><label>kind</label><select id="part-kind">${['body', 'tail', 'tendril', 'other'].map((k) =>
+          `<option value="${k}" ${k === (p.kind || 'other') ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+        <div class="row"><label>rigidity</label>${num('rigidity', p.rigidity ?? 0, 0.05, 'min=0 max=1')}
+          <span class="small">0 flexible · 1 rigid</span></div>
         <div class="row"><label>parent</label><select id="parent">${opts}</select></div>
+        <div class="row"><label>connect</label><select id="connection" ${p.parent ? '' : 'disabled'}>${connectionOptions}</select></div>
         <div class="row"><label>z</label>${num('z', p.z, 1)}</div>
+        ${p.kind === 'tail' || p.kind === 'tendril' ? `<div class="row"><label>length</label>
+          ${num('stretch.length', stretch.length, 1, 'min=1')}
+          <select id="stretch-axis"><option value="x" ${stretch.axis === 'x' ? 'selected' : ''}>horizontal</option>
+          <option value="y" ${stretch.axis === 'y' ? 'selected' : ''}>vertical</option></select>
+          <span class="small">artboard px; stretches the sprite</span></div>` : ''}
         <div class="row"><label>pivot</label>${num('pivot.x', p.pivot.x, 0.01)}${num('pivot.y', p.pivot.y, 0.01)}</div>
         <div class="row"><label>x, y</label>${num('rest.x', p.rest.x, 0.5)}${num('rest.y', p.rest.y, 0.5)}</div>
         <div class="row"><label>rotation</label>${num('rest.rotation', p.rest.rotation, 1)}</div>
@@ -832,7 +958,7 @@ function renderPanel() {
         <h3>Attachment points</h3>
         ${doc.attachments.filter((a) => a.part === p.id).map((a) => `
           <div class="row" data-attach="${esc(a.id)}"><input type="text" data-af="id" value="${esc(a.id)}">
-            <select data-af="kind">${['arm-socket', 'prop-slot', 'eye', 'other'].map((k) => `<option ${k === a.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
+            <select data-af="kind">${[...new Set([...attachmentKinds, a.kind || 'other'])].map((k) => `<option ${k === a.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
             <input type="number" data-af="x" value="${a.x}" step="0.01"><input type="number" data-af="y" value="${a.y}" step="0.01">
             <button class="btn ghost" data-act="del-attach">×</button></div>`).join('') || '<p class="small">Use "Add attachment" and tap the part.</p>'}`;
     }
@@ -876,8 +1002,15 @@ panel.addEventListener('click', (ev) => {
   const p = partById(ui.sel);
   const act = b.dataset.act;
   if (act === 'delete-part' && p) deletePart(p.id);
-  if (act === 'reset-size' && p) { p.size = { w: p.cut.w, h: p.cut.h }; }
-  if (act === 'del-attach') doc.attachments = doc.attachments.filter((a) => a.id !== b.closest('[data-attach]').dataset.attach);
+  if (act === 'duplicate-part' && p) duplicatePart(p.id);
+  if (act === 'layer-back' && p) moveLayer(p.id, -1);
+  if (act === 'layer-front' && p) moveLayer(p.id, 1);
+  if (act === 'reset-size' && p && p.cut) { p.size = { w: p.cut.w, h: p.cut.h }; }
+  if (act === 'del-attach') {
+    const id = b.closest('[data-attach]').dataset.attach;
+    doc.parts.filter((part) => part.connectTo === id).forEach((part) => setConnection(part, null));
+    doc.attachments = doc.attachments.filter((a) => a.id !== id);
+  }
   if (act === 'add-key' && p) {
     const ch = b.dataset.ch;
     const m = partMotion(ui.state, p.id, true);
@@ -931,8 +1064,14 @@ panel.addEventListener('input', (ev) => {
   if (!f || !Number.isFinite(v)) return;
   if (f.startsWith('canvas.')) { doc.canvas[f.split('.')[1]] = Math.max(1, v); return changed(); }
   if (!p) return;
-  const [a, b] = f.split('.');
-  if (b) p[a][b] = v; else p[a] = v;
+  if (f === 'rigidity') p.rigidity = Math.max(0, Math.min(1, v));
+  else if (f === 'stretch.length') {
+    const initial = p.stretch || { axis: p.size.h >= p.size.w ? 'y' : 'x', length: Math.max(p.size.w, p.size.h) };
+    p.stretch = { ...initial, length: Math.max(1, v) };
+  } else {
+    const [a, b] = f.split('.');
+    if (b) p[a][b] = v; else p[a] = v;
+  }
   changed();
 });
 
@@ -941,12 +1080,24 @@ panel.addEventListener('change', (ev) => {
   const p = partById(ui.sel);
   if (el.id === 'part-name' && p) renamePart(p.id, el.value);
   else if (el.id === 'parent' && p) setParent(p.id, el.value || null);
+  else if (el.id === 'connection' && p) setConnection(p, el.value || null);
+  else if (el.id === 'part-kind' && p) p.kind = el.value;
+  else if (el.id === 'stretch-axis' && p) {
+    p.stretch = { axis: el.value, length: p.stretch?.length ?? Math.max(p.size.w, p.size.h) };
+  }
   else if (el.id === 'fallback') doc.fallbackState = el.value || null;
   else if (el.dataset.af === 'id') {
     const a = doc.attachments.find((x) => x.id === el.closest('[data-attach]').dataset.attach);
     const next = el.value.trim();
-    if (next && !doc.attachments.some((x) => x.id === next)) a.id = next;
-  } else if (el.dataset.f === 'z' || el.closest('tr[data-ch]')) { /* re-sort lists / keys */ } else return;
+    if (!a || !next || doc.attachments.some((x) => x.id === next && x !== a)) {
+      toast('Attachment ID must be unique and non-empty.');
+    } else {
+      doc.parts.filter((part) => part.connectTo === a.id).forEach((part) => { part.connectTo = next; });
+      a.id = next;
+    }
+  } else if (el.dataset.f === 'z' || el.dataset.f === 'rigidity' || el.dataset.f === 'stretch.length' || el.closest('tr[data-ch]')) {
+    /* Refresh sorted layers, motion keys and clamped numeric fields. */
+  } else return;
   renderPanel();
   changed();
 });

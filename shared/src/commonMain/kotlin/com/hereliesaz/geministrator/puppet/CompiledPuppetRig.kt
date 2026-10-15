@@ -38,6 +38,9 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     private val restSx = FloatArray(partCount) { rig.parts[it].rest.scaleX }
     private val restSy = FloatArray(partCount) { rig.parts[it].rest.scaleY }
     private val restAlpha = FloatArray(partCount) { rig.parts[it].rest.alpha }
+    private val flexibility = FloatArray(partCount) { 1f - rig.parts[it].rigidity }
+    private val anchorX = FloatArray(partCount)
+    private val anchorY = FloatArray(partCount)
 
     /** Per state (index into [stateNames]), per part, per channel ([CHANNELS] order): motion or null. */
     private val stateNames: List<String> = rig.states.keys.toList()
@@ -54,6 +57,15 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         val idToIndex = HashMap<String, Int>()
         rig.parts.forEachIndexed { i, p -> idToIndex[p.id] = i }
         parentIndex = IntArray(partCount) { i -> rig.parts[i].parent?.let { idToIndex[it] } ?: -1 }
+        val attachmentsById = rig.attachments.associateBy { it.id }
+        rig.parts.forEachIndexed { i, part ->
+            val parent = parentIndex[i].takeIf { it >= 0 }?.let { rig.parts[it] }
+            val socket = part.connectTo?.let(attachmentsById::get)
+            if (parent != null && socket?.part == parent.id) {
+                anchorX[i] = (socket.x - parent.pivot.x) * parent.drawnWidth
+                anchorY[i] = (socket.y - parent.pivot.y) * parent.drawnHeight
+            }
+        }
         val order = ArrayList<Int>(partCount)
         val visited = BooleanArray(partCount)
         fun visit(i: Int) {
@@ -106,11 +118,12 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         val w = out.world
         for (i in evalOrder) {
             val ch = motion?.get(i)
-            val x = restX[i] + sample(ch, CH_X, cycle, 0f)
-            val y = restY[i] + sample(ch, CH_Y, cycle, 0f)
-            val deg = restRot[i] + sample(ch, CH_ROT, cycle, 0f)
-            val sx = restSx[i] * sample(ch, CH_SX, cycle, 1f)
-            val sy = restSy[i] * sample(ch, CH_SY, cycle, 1f)
+            val f = flexibility[i]
+            val x = anchorX[i] + restX[i] + sample(ch, CH_X, cycle, 0f) * f
+            val y = anchorY[i] + restY[i] + sample(ch, CH_Y, cycle, 0f) * f
+            val deg = restRot[i] + sample(ch, CH_ROT, cycle, 0f) * f
+            val sx = restSx[i] * (1f + (sample(ch, CH_SX, cycle, 1f) - 1f) * f)
+            val sy = restSy[i] * (1f + (sample(ch, CH_SY, cycle, 1f) - 1f) * f)
             val al = restAlpha[i] * sample(ch, CH_ALPHA, cycle, 1f)
             val r = deg * DEG
             val cs = cos(r)

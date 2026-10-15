@@ -99,6 +99,61 @@ const shot = process.argv[3] || path.join(os.tmpdir(), 'puppet-rig.png');
   if (!rig.states.Active?.parts?.arm?.sine?.rotation) throw new Error('motion not exported');
   if (!rig.attachments.length) throw new Error('attachment not exported');
 
+  // Edit an already-cut part: rigidity, extensible tail, parent connection and typed points.
+  await page.locator('#part-list li', { hasText: 'arm' }).click();
+  await page.selectOption('#part-kind', 'tail');
+  await page.fill('input[data-f="rigidity"]', '0.5');
+  await page.selectOption('#stretch-axis', 'y');
+  await page.fill('input[data-f="stretch.length"]', '80');
+  const bodySocket = await page.evaluate(() => window.puppetRig.doc.attachments.find((a) => a.part === 'body')?.id);
+  if (!bodySocket) throw new Error('missing body socket for tail connection');
+  await page.selectOption('#connection', bodySocket);
+
+  const pose = await page.evaluate(() => window.puppetRig.evaluate('Active', 0.25));
+  const angle = Math.atan2(pose.byId.arm.m[1], pose.byId.arm.m[0]) * 180 / Math.PI;
+  // Rest -30° plus half the 12° animation sine at quarter phase.
+  if (Math.abs(angle - (-24)) > 0.02) throw new Error(`rigidity did not attenuate motion: ${angle}`);
+  if (pose.byId.arm.h !== 80) throw new Error('tail was not stretched to 80px');
+
+  await page.selectOption('#new-attachment-kind', 'tail-tip');
+  await page.click('button[data-tool=attach]');
+  const armPoint = await page.evaluate(() => {
+    const e = window.puppetRig.evaluate('Pending', 0).byId.arm;
+    return { x: e.m[4] + e.m[2] * 20, y: e.m[5] + e.m[3] * 20 };
+  });
+  await page.mouse.click(box.x + rv.ox + armPoint.x * rv.s, box.y + rv.oy + armPoint.y * rv.s);
+  await page.click('button[data-tool=move]');
+  const hasTip = await page.evaluate(() => window.puppetRig.doc.attachments.some((a) => a.part === 'arm' && a.kind === 'tail-tip'));
+  if (!hasTip) throw new Error('tail-tip connection point not placed');
+
+  const initialOrder = await page.evaluate(() => Object.fromEntries(window.puppetRig.doc.parts.map((p) => [p.id, p.z])));
+  await page.click('button[data-act=layer-back]');
+  const behind = await page.evaluate(() => Object.fromEntries(window.puppetRig.doc.parts.map((p) => [p.id, p.z])));
+  if (!(behind.arm < behind.body && initialOrder.arm > initialOrder.body)) throw new Error('send backward failed');
+  await page.click('button[data-act=layer-front]');
+
+  await page.click('button[data-act=duplicate-part]');
+  const duplicated = await page.evaluate(() => ({
+    ids: window.puppetRig.doc.parts.map((p) => p.id),
+    duplicate: window.puppetRig.doc.parts.find((p) => p.id === 'arm-copy'),
+    newAttachments: window.puppetRig.doc.attachments.filter((a) => a.part === 'arm-copy'),
+    newMotion: window.puppetRig.doc.states.Active.parts['arm-copy'],
+  }));
+  if (!duplicated.duplicate || duplicated.duplicate.connectTo !== bodySocket ||
+      duplicated.duplicate.stretch.length !== 80 || duplicated.duplicate.rigidity !== 0.5 ||
+      !duplicated.newAttachments.some((a) => a.kind === 'tail-tip') ||
+      !duplicated.newMotion?.sine?.rotation) throw new Error('duplicate lost rig settings or animation');
+  await page.selectOption('#part-kind', 'tendril');
+  await page.locator('#part-list li', { hasText: 'arm' }).first().click();
+  await page.click('button[data-act=delete-part]');
+  const edited = await page.evaluate(() => window.puppetRig.buildExport().json);
+  if (edited.parts.some((p) => p.id === 'arm') ||
+      !edited.parts.some((p) => p.id === 'arm-copy' && p.kind === 'tendril') ||
+      edited.attachments.some((a) => a.part === 'arm') ||
+      !edited.states.Active.parts['arm-copy']) throw new Error('delete, reattribute or duplicate not persisted');
+  const editedErrors = validateRig(edited);
+  if (editedErrors.length) throw new Error(`edited export invalid: ${editedErrors.join('; ')}`);
+
   // Round-trip: import the transcribed UX Designer reference rig (JSON + atlas) and preview it.
   const rigs = path.join(__dirname, '..', '..', '..', 'shared', 'src', 'commonMain', 'composeResources', 'files', 'rigs');
   await page.setInputFiles('#import', [path.join(rigs, 'ux-designer.rig.json'), path.join(rigs, 'ux_designer_rig_atlas.png')]);

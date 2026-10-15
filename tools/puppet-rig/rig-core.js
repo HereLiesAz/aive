@@ -39,10 +39,19 @@ export function invert(m) {
 }
 
 export function partSize(p) {
+  const w = p.size?.w ?? p.rect?.w ?? 0;
+  const h = p.size?.h ?? p.rect?.h ?? 0;
+  const stretch = (p.kind === 'tail' || p.kind === 'tendril') ? p.stretch : null;
   return {
-    w: p.size?.w ?? p.rect?.w ?? 0,
-    h: p.size?.h ?? p.rect?.h ?? 0,
+    w: stretch?.axis === 'x' ? stretch.length : w,
+    h: stretch?.axis === 'y' ? stretch.length : h,
   };
+}
+
+export function attachmentOffset(p, a) {
+  const { w, h } = partSize(p);
+  const pivot = p.pivot || { x: 0.5, y: 0.5 };
+  return { x: (a.x - pivot.x) * w, y: (a.y - pivot.y) * h };
 }
 
 export function ease(kind, u) {
@@ -91,16 +100,20 @@ export function evaluate(rig, state, phase) {
   const motion = resolved ? rig.states[resolved] : null;
   const cycle = phase - Math.floor(phase);
   const byIdPart = Object.fromEntries(rig.parts.map((p) => [p.id, p]));
+  const byIdAttachment = Object.fromEntries((rig.attachments || []).map((a) => [a.id, a]));
   const world = {};
   const resolve = (p, depth = 0) => {
     if (world[p.id]) return world[p.id];
     const parentPart = p.parent ? byIdPart[p.parent] : null;
     const parent = parentPart && depth < 256 ? resolve(parentPart, depth + 1) : { m: IDENTITY, alpha: 1 };
     const pm = motion?.parts?.[p.id];
-    const ch = (name) => channelValue(pm, name, cycle);
+    const flexibility = 1 - (p.rigidity ?? 0);
+    const ch = (name) => channelIdentity(name) + (channelValue(pm, name, cycle) - channelIdentity(name)) * flexibility;
     const r = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1, ...(p.rest || {}) };
-    const local = trs(r.x + ch('x'), r.y + ch('y'), r.rotation + ch('rotation'), r.scaleX * ch('scaleX'), r.scaleY * ch('scaleY'));
-    const alpha = Math.min(1, Math.max(0, parent.alpha * r.alpha * ch('alpha')));
+    const socket = byIdAttachment[p.connectTo];
+    const anchor = parentPart && socket?.part === parentPart.id ? attachmentOffset(parentPart, socket) : { x: 0, y: 0 };
+    const local = trs(anchor.x + r.x + ch('x'), anchor.y + r.y + ch('y'), r.rotation + ch('rotation'), r.scaleX * ch('scaleX'), r.scaleY * ch('scaleY'));
+    const alpha = Math.min(1, Math.max(0, parent.alpha * r.alpha * channelValue(pm, 'alpha', cycle)));
     world[p.id] = { m: mul(parent.m, local), alpha };
     return world[p.id];
   };
@@ -118,8 +131,8 @@ export function evaluate(rig, state, phase) {
   for (const a of rig.attachments || []) {
     const e = byId[a.part];
     if (!e) continue;
-    const pv = e.part.pivot || { x: 0.5, y: 0.5 };
-    attachments[a.id] = apply(e.m, (a.x - pv.x) * e.w, (a.y - pv.y) * e.h);
+    const offset = attachmentOffset(e.part, a);
+    attachments[a.id] = apply(e.m, offset.x, offset.y);
   }
   return { parts, byId, attachments, resolvedState: resolved };
 }
@@ -149,6 +162,10 @@ export function validateRig(rig) {
     if (p.size != null) need(num(p.size.w) && num(p.size.h), `${at}: size must be numbers`);
     if (p.pivot != null) need(num(p.pivot.x) && num(p.pivot.y), `${at}: pivot must be numbers`);
     if (p.z != null) need(num(p.z), `${at}: z must be a number`);
+    if (p.kind != null) need(['body', 'tail', 'tendril', 'other'].includes(p.kind), `${at}: unknown kind`);
+    if (p.rigidity != null) need(num(p.rigidity) && p.rigidity >= 0 && p.rigidity <= 1, `${at}: rigidity must be in [0,1]`);
+    if (p.stretch != null) need(['x', 'y'].includes(p.stretch.axis) && num(p.stretch.length) && p.stretch.length > 0,
+      `${at}: stretch needs axis x/y and positive length`);
     if (p.rest != null) for (const k of Object.keys(p.rest)) need(num(p.rest[k]), `${at}: rest.${k} must be a number`);
   }
   const byId = Object.fromEntries(rig.parts.map((p) => [p.id, p]));
@@ -161,8 +178,19 @@ export function validateRig(rig) {
       cur = byId[cur]?.parent; hops++;
     }
   }
+  const attachmentIds = new Set();
   for (const a of rig.attachments || []) {
-    need(typeof a.id === 'string' && byId[a.part] && num(a.x) && num(a.y), `attachment ${a.id}: needs id, existing part, numeric x/y`);
+    need(typeof a.id === 'string' && a.id.length > 0 && byId[a.part] && num(a.x) && num(a.y),
+      `attachment ${a.id}: needs id, existing part, numeric x/y`);
+    need(!attachmentIds.has(a.id), `attachment ${a.id}: duplicate id`);
+    attachmentIds.add(a.id);
+  }
+  const attachments = Object.fromEntries((rig.attachments || []).map((a) => [a.id, a]));
+  for (const p of rig.parts) {
+    if (p.connectTo != null) {
+      need(p.parent != null && attachments[p.connectTo]?.part === p.parent,
+        `part ${p.id}: connectTo must name an attachment on its parent`);
+    }
   }
   for (const [state, sm] of Object.entries(rig.states || {})) {
     need(STATE_NAMES.includes(state), `state "${state}" is not an H2g2WorkflowState name`);

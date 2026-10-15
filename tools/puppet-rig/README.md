@@ -26,8 +26,17 @@ Opening `index.html` from `file://` does not work. ES modules and the service wo
    - Set the role and the artboard size (the creature's bounding box).
    - Drag a part to move it. Drag the ring handle to rotate it (Shift snaps to 15°). Drag the center dot to move the pivot; the part stays in place.
    - Pick the parent in the inspector. Re-parenting keeps the on-screen placement.
-   - Set z, rest transform, size and alpha in the inspector.
-   - **Add attachment**, then tap a part to drop a named point (`arm-socket`, `prop-slot`, ...).
+   - Rename, delete, duplicate, or reorder layers with **Send backward** / **Bring forward**.
+     Deleting a part keeps its children in place; duplicates inherit the part's motion and
+     copy its attachment points. Reassign any part to another parent without moving it.
+   - Set z, rest transform, size, alpha, and a **rigidity** value (0 = fully animated,
+     1 = no local position/rotation/scale motion; parent motion still applies).
+   - Mark a part as **tail** or **tendril**, choose its longitudinal axis, and edit its
+     drawn **length** in artboard pixels. This stretches the sprite without editing the atlas.
+   - Choose a **connect** point on its parent to anchor the part to a body/tail/tendril
+     socket; `x/y` remain adjustable offsets. Use **Add point**, select
+     `tail-base`/`tail-tip` or `tendril-base`/`tendril-tip`, and tap the part.
+     Points can be dragged, renamed, moved numerically, or deleted.
 4. **Animate tab.**
    - Pick a workflow state (`Pending`, `Ready`, `Active`, `Gate`, `Blocked`, `Complete`, `Failed`; the exact `H2g2WorkflowState` names) and use play/pause/scrub.
    - For the selected part, add keyframes per channel (`x y rotation scaleX scaleY alpha`) at the current phase, with an ease, and/or a sine oscillator (amplitude, frequency, phase).
@@ -57,7 +66,15 @@ if (loaded != null) RiggedPuppetSurface(loaded.rig, loaded.atlas, state.name, mo
 | `test/smoke.cjs` | Headless Playwright smoke test (see below). |
 | `samples/make_ux_designer_rig.py` | Regenerates the reference `ux-designer.rig.json` from the values hard-coded in the Kotlin UX Designer surface. |
 
-## Smoke test
+## Validation and smoke tests
+
+The dependency-free core regression is run by the GitHub Pages deployment job,
+alongside JavaScript syntax checks. The browser smoke test additionally exercises
+the UI, exports and importing a shipped rig.
+
+```sh
+node tools/puppet-rig/test/rig-core.mjs
+```
 
 ```sh
 python3 -m http.server 8765 --directory tools/puppet-rig &
@@ -69,6 +86,8 @@ The test:
 - imports a generated sheet, cuts two parts by dragging, and renames them;
 - parents one part to the other, rotates it, adds an attachment point, and keys `Active` motion;
 - exports through the button and validates the downloaded JSON;
+- exercises kind reassignment, rigidity and stretched length, attachment connection, layer
+  ordering, duplication (with motion and points), deletion, and re-validates the edited rig;
 - re-imports the UX Designer reference rig and its atlas, re-validates its re-export, and saves screenshots.
 
 ## Deployment

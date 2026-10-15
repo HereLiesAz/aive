@@ -58,3 +58,7 @@ button, input, select { font: inherit; color: inherit; }
   .panel { border-left: 0; border-top: 1px solid var(--line); }
   .bar { padding: 8px 16px; }
 }
+
+.stage-tools select { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+#layer-list { margin-bottom: 10px; }
+#layer-list li .meta { font-variant-numeric: tabular-nums; }

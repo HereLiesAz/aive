@@ -8,6 +8,42 @@ import kotlin.test.assertTrue
 /** The allocation-free evaluator must match the reference [PuppetRigEvaluator] on every shipped rig. */
 class CompiledPuppetRigTest {
     @Test
+    fun compiledRigHonorsSocketStretchAndRigidity() {
+        val rig = PuppetRig(
+            canvas = PuppetCanvas(100f, 100f),
+            atlas = PuppetAtlas("a.png", 40, 40),
+            parts = listOf(
+                PuppetPart("body", rect = PuppetRect(0, 0, 20, 20), rest = PuppetTransform(x = 50f, y = 50f)),
+                PuppetPart(
+                    id = "tendril", parent = "body", rect = PuppetRect(20, 0, 10, 20),
+                    kind = "tendril", pivot = PuppetPoint(0.5f, 0f), rigidity = 0.5f,
+                    stretch = PuppetStretch("y", 80f), connectTo = "base",
+                ),
+            ),
+            attachments = listOf(
+                PuppetAttachment("base", "body", 1f, 0.5f, "tendril-base"),
+                PuppetAttachment("tip", "tendril", 0.5f, 1f, "tendril-tip"),
+            ),
+            states = mapOf("Active" to PuppetStateMotion(
+                mapOf("tendril" to PuppetPartMotion(keys = mapOf(
+                    "x" to listOf(PuppetKeyframe(0f, 20f)),
+                    "scaleY" to listOf(PuppetKeyframe(0f, 3f)),
+                ))),
+            )),
+        )
+        rig.validate()
+        val compiled = CompiledPuppetRig(rig)
+        val buffer = compiled.newBuffer()
+        compiled.evaluate(compiled.stateIndex("Active"), 0f, buffer)
+        // Body 50 + right-edge socket 10 + half of 20px translation.
+        assertTrue(abs(buffer.world[10] - 70f) < 0.001f)
+        assertTrue(abs(buffer.world[11] - 50f) < 0.001f)
+        // Body socket (60,50), then tail pivot (70,50), scaled 80px tip at y=210.
+        assertTrue(abs(buffer.attachX[1] - 70f) < 0.001f)
+        assertTrue(abs(buffer.attachY[1] - 210f) < 0.001f)
+    }
+
+    @Test
     fun matchesReferenceEvaluator() {
         val dir = File("src/commonMain/composeResources/files/rigs")
         val files = dir.listFiles { f -> f.name.endsWith(".rig.json") }.orEmpty()

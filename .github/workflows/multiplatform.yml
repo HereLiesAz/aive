@@ -612,6 +612,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Verify standalone puppet-rig
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check tools/puppet-rig/app.js
+          node --check tools/puppet-rig/rig-core.js
+          node --check tools/puppet-rig/test/smoke.cjs
+          node tools/puppet-rig/test/rig-core.mjs
+
       - name: Stage standalone puppet-rig editor
         shell: bash
         run: |

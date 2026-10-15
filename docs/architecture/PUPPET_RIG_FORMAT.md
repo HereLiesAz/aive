@@ -18,6 +18,8 @@ A rig ships as two files:
 | `pivot`, attachment `x/y` | **normalized** to the part's drawn box: (0,0) = top-left, (1,1) = bottom-right |
 | rotation | degrees, **positive = clockwise on screen** (same as Compose `rotate` / Canvas 2D) |
 | `scaleX/scaleY/alpha` | unitless factors |
+| `rigidity` | normalized 0 (full authored motion) to 1 (no local transform motion) |
+| `stretch.length` | **artboard px**, drawn length along the specified local axis |
 | keyframe `t`, sine `phase` | phase of the loop in cycles, 0..1 |
 
 The artboard is `canvas.width` x `canvas.height`, origin at the top-left, +x right, +y down. It is
@@ -77,13 +79,32 @@ Readers ignore unknown fields.
 - `pivot`: rotation/scale origin, normalized to the drawn box. Default `(0.5, 0.5)`.
 - `rest`: bind transform. `(x, y)` is where the pivot sits **in the parent's local frame**: artboard
   px for a root part; for a child, the parent's pivot-origin frame, before the parent's rotation and scale. Defaults: 0, 0, 0°, 1, 1, 1.
+- `kind`: `body`, `tail`, `tendril`, or `other` (default, for older rigs).
+- `rigidity`: number in [0, 1]. Applies to the part's **own** keyed/sine x/y, rotation,
+  scaleX and scaleY motion (not inherited parent motion or opacity). 0 keeps full authored
+  motion; 1 suppresses local transform motion; intermediate values scale the deviations
+  from the channel identity. This is deterministic stiffness, **not** a physics/spring simulation.
+- `stretch`: optional `{ "axis": "x" | "y", "length": positiveNumber }` on a tail or tendril.
+  This replaces the drawn size **along that axis only**, stretching pixels from its atlas
+  crop. A tail's rotation/pivot/parent are unaffected, and the actual atlas remains unchanged.
+  A `stretch` on other part kinds is retained but is not applied.
+- `connectTo`: optional **attachment id on the immediate parent**. The parent's attachment
+  offset (relative to its pivot, evaluated using its stretched size) is added before the
+  child's `rest.x/y`. A child with no `connectTo` uses the parent's pivot as before.
+  The editor snaps the child's pivot to the chosen socket (rest x/y = 0); clearing the\nconnection preserves its current placement.
 
 ### Transform composition
 
 For each part, with channel values `dx, dy, dθ, kx, ky, ka` from the current state (below):
 
 ```
-local = T(rest.x + dx, rest.y + dy) · R(rest.rotation + dθ) · S(rest.scaleX · kx, rest.scaleY · ky)
+f = 1 − rigidity
+effective dx/dy/dθ = (dx/dy/dθ) · f
+effective kx/ky = 1 + (kx/ky − 1) · f
+anchor = connectTo ? localPoint(parent, attachment) : (0, 0)
+local = T(anchor.x + rest.x + effective dx, anchor.y + rest.y + effective dy)
+      · R(rest.rotation + effective dθ)
+      · S(rest.scaleX · effective kx, rest.scaleY · effective ky)
 world = world(parent) · local                 (root: world = local)
 alpha = clamp(alpha(parent) · rest.alpha · ka, 0, 1)
 ```
@@ -104,6 +125,14 @@ world transform. Its world position is `world(part) · ((x − pivot.x)·w, (y �
 - `arm-socket`: where a detached `NodeArmAssets` arm attaches (the arm's `socketPivot`).
 - `prop-slot`: where a prop is held.
 - `eye`: eye centers, for gaze effects.
+- `tail-base` / `tail-tip`: root/tip points of a tail.
+- `tendril-base` / `tendril-tip`: root/tip points of a tendril.
+
+These `kind` names are metadata for consumers; the evaluator transforms all points
+the same way. To join a tail or tendril to the body, place an attachment on the **body**,
+set the appendage's `parent` to the body, then select that attachment as its `connectTo`.
+The appendage's own base/tip points stay available to other consumers. Attachment ids
+must be unique; missing parent-point references are invalid.
 
 ## States and motion
 
@@ -161,6 +190,15 @@ Keys are sorted by `t`. One key gives a constant. Between key *i* and key *i+1* 
 `frequency` defaults to 1 and `phase` (in cycles) defaults to 0. Use an integer frequency for a seamless loop.
 This is the declarative form of the `sin(cycle · 2π + offset)` motion in `MascotPuppetRig`. A radian
 offset `o` becomes `phase = o / 2π`.
+
+## Editor part operations
+
+The editor supports deletion (children are reparented without jumping), duplication
+(new part id, shared source crop, cloned animations and attachment points), part renaming,
+parent reassignment, and forward/backward layer reordering via `z`. Its Rig inspector
+edits `kind`, `rigidity`, tail/tendril `stretch`, and the parent `connectTo` attachment.
+Attachment points can be created with an explicit kind, renamed, positioned numerically or
+dragged in Rig mode, and deleted. Export/import retain all these fields.
 
 ## Atlas
 
