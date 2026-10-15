@@ -240,53 +240,6 @@ jobs:
       - name: Build Web Wasm
         run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
 
-      - name: Stage GitHub Pages
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf webApp/build/pages
-
-          JS_BUNDLE="$(find webApp/build -type f -path '*/js/productionExecutable/haive.js' -print -quit)"
-          WASM_BUNDLE="$(find webApp/build -type f -path '*/wasmJs/productionExecutable/haive.js' -print -quit)"
-          if [ -z "$JS_BUNDLE" ] || [ -z "$WASM_BUNDLE" ]; then
-            echo "Production bundles found under webApp/build:"
-            find webApp/build -type f -name 'haive.js' -print
-            exit 1
-          fi
-
-          JS_DIR="$(dirname "$JS_BUNDLE")"
-          WASM_DIR="$(dirname "$WASM_BUNDLE")"
-          echo "Staging JS bundle from $JS_DIR"
-          echo "Staging Wasm bundle from $WASM_DIR"
-
-          mkdir -p webApp/build/pages/wasm
-          cp -R "$JS_DIR"/. webApp/build/pages/
-          cp -R "$WASM_DIR"/. webApp/build/pages/wasm/
-          cp -R webApp/src/webMain/resources/. webApp/build/pages/
-          cp -R webApp/src/webMain/resources/. webApp/build/pages/wasm/
-          # Publish the standalone puppet-rig PWA alongside the JS and Wasm apps.
-          mkdir -p webApp/build/pages/puppet-rig
-          cp -R tools/puppet-rig/{index.html,style.css,app.js,rig-core.js,sw.js,manifest.webmanifest,icons} \
-            webApp/build/pages/puppet-rig/
-          for staged in \
-            webApp/build/pages/index.html \
-            webApp/build/pages/haive.js \
-            webApp/build/pages/wasm/index.html \
-            webApp/build/pages/wasm/haive.js \
-            webApp/build/pages/puppet-rig/index.html \
-            webApp/build/pages/puppet-rig/style.css \
-            webApp/build/pages/puppet-rig/app.js \
-            webApp/build/pages/puppet-rig/rig-core.js \
-            webApp/build/pages/puppet-rig/sw.js \
-            webApp/build/pages/puppet-rig/manifest.webmanifest \
-            webApp/build/pages/puppet-rig/icons/icon-192.png \
-            webApp/build/pages/puppet-rig/icons/icon-512.png; do
-            if [ ! -f "$staged" ]; then
-              echo "::error::Expected staged GitHub Pages file was not found: $staged"
-              exit 1
-            fi
-          done
-
       - name: Generate release notes
         if: github.event_name != 'pull_request'
         shell: bash
@@ -392,16 +345,6 @@ jobs:
           name: aive-release-notes
           path: fastlane/metadata/android/en-US/changelogs/
           if-no-files-found: error
-
-      - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v6
-
-      - name: Upload GitHub Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v5
-        with:
-          path: webApp/build/pages
 
       # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
       - name: Report CI
@@ -656,14 +599,52 @@ jobs:
           make-latest: "true"
           migrate-legacy-build-releases: "true"
 
+  # Standalone puppet-rig PWA until the full Aive browser app is connected.
+  # Deliberately independent of Android/Desktop/JS/Wasm build success.
   deploy-pages:
     if: github.event_name != 'pull_request'
-    needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Stage standalone puppet-rig editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/aive-pages"
+          cp -R tools/puppet-rig/{index.html,style.css,app.js,rig-core.js,sw.js,manifest.webmanifest,icons} \
+            "$RUNNER_TEMP/aive-pages/"
+          # Keep the privacy URL required by the Android manifest reachable.
+          cp -R webApp/src/webMain/resources/privacy "$RUNNER_TEMP/aive-pages/"
+          for staged in \
+            index.html \
+            style.css \
+            app.js \
+            rig-core.js \
+            sw.js \
+            manifest.webmanifest \
+            icons/icon-192.png \
+            icons/icon-512.png \
+            privacy/index.html; do
+            if [ ! -s "$RUNNER_TEMP/aive-pages/$staged" ]; then
+              echo "::error::Missing or empty Pages file: $staged"
+              exit 1
+            fi
+          done
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/aive-pages
+
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

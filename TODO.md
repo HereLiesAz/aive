@@ -58,7 +58,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Preserve retry-attempt artifact identity and deduplicate replayed provider artifacts.
 - [x] Replace whole-snapshot event rewrites with append-only Settings event journaling.
 - [x] Preserve reconstructable workflow-created events and strict approval-gate identity with legacy compatibility.
-- [x] Build and stage both JS and Wasm outputs for GitHub Pages.
+- [x] Build JS and Wasm outputs in CI. Pages currently serves the standalone puppet-rig editor.
+- [ ] Reconnect the full Aive JS/Wasm PWA to GitHub Pages when ready.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
 - [x] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
   - Centralized run [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915) passed against Kilo Gateway (no key) on 2026-09-29; JS and Wasm passed locally against LLM7 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). No Android run is recorded yet.

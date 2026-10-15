@@ -162,8 +162,12 @@ class ApplicationRuntime private constructor(
                 }
 
                 val (project, run) = latestProjectRun
-                val definition = persistence.definitions.get(run.workflowDefinitionId)
+                val storedDefinition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
+                val definition = repairKnownNodeCreatureRigCycle(storedDefinition)
+                if (definition !== storedDefinition) {
+                    persistence.definitions.put(definition)
+                }
                 val runtimeState = try {
                     coordinator.resume(run.id)
                 } catch (failure: Throwable) {
@@ -832,6 +836,33 @@ class ApplicationRuntime private constructor(
             return runtime
         }
     }
+}
+
+
+/**
+ * Correct only the persisted Node Creature Rig Pipeline back-edge. Provenance review must
+ * precede rig generation, and QC must wait for the generated sheets. All other stored graphs
+ * and run data are deliberately left untouched.
+ */
+internal fun repairKnownNodeCreatureRigCycle(definition: WorkflowDefinition): WorkflowDefinition {
+    if (definition.id != WorkflowDefinitionId("node-creature-rig-pipeline")) return definition
+    val batchReview = TaskDefinitionId("batch-review")
+    val qcAudit = TaskDefinitionId("qc-audit")
+    val firstRig = TaskDefinitionId("rig-01")
+    val cycle = com.hereliesaz.geministrator.workflow.WorkflowValidationError.Cycle(
+        setOf(batchReview, qcAudit, firstRig),
+    )
+    if (WorkflowGraphValidator.validate(definition) != listOf(cycle)) return definition
+
+    val reviewTask = definition.tasks.singleOrNull { it.id == batchReview } ?: return definition
+    if (qcAudit !in reviewTask.dependsOn) return definition
+
+    val corrected = definition.copy(
+        tasks = definition.tasks.map { task ->
+            if (task.id == batchReview) task.copy(dependsOn = task.dependsOn - qcAudit) else task
+        },
+    )
+    return corrected.takeIf { WorkflowGraphValidator.validate(it).isEmpty() } ?: definition
 }
 
 @OptIn(ExperimentalTime::class)
