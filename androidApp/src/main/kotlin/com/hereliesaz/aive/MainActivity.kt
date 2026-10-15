@@ -1,5 +1,6 @@
 package com.hereliesaz.aive
 
+import com.hereliesaz.aive.remote.AiveRemoteBridge
 import android.content.Intent
 import android.os.Bundle
 import android.os.Build
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -258,6 +260,7 @@ class MainActivity : ComponentActivity() {
                         InstalledGeminiTextGenerationApi(this, fallback)
                     }
                 }
+                val remoteLaunchRequests by AiveRemoteBridge.pendingLaunches.collectAsState()
                 val providers = remember(
                     credentials,
                     repositoryCredentials,
@@ -426,6 +429,9 @@ class MainActivity : ComponentActivity() {
                         azphaltStoreService = azphaltHost.service,
                         azphaltPackageImportRequest = azphaltHost.importRequest,
                         onAzphaltPackageImportHandled = azphaltHost::consumeImport,
+                        externalWorkflowLaunchRequests = remoteLaunchRequests,
+                        onExternalWorkflowLaunchHandled = AiveRemoteBridge::consume,
+                        onRuntimeStateChanged = AiveRemoteBridge::publish,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         contextChunkSources = contextChunkSources,
                         availableRepositorySources = com.hereliesaz.geministrator.domain.RepositorySource.entries.toSet(),

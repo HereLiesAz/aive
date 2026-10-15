@@ -27,6 +27,8 @@ import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
@@ -93,6 +95,11 @@ fun App(
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
     /** Extra chunk sources (a connected repository) retrieved from beside upstream artifacts. */
     contextChunkSources: List<com.hereliesaz.geministrator.retrieval.ContextChunkSource> = emptyList(),
+    /** Workflows another app asked for, oldest first; each is launched once, then handed back. */
+    externalWorkflowLaunchRequests: List<ExternalWorkflowLaunchRequest> = emptyList(),
+    onExternalWorkflowLaunchHandled: (Long) -> Unit = {},
+    /** Every runtime state, for observers outside the UI (the Android remote service). */
+    onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -163,6 +170,72 @@ fun App(
             runtime?.close()
             runtime = null
         }
+    }
+
+    /** Launches [objective] the way the launch form does; ignored while a launch is in progress. */
+    fun launchObjective(
+        projectName: String,
+        objective: String,
+        repository: RepositoryRef?,
+        continuesWorkflowRunIds: List<WorkflowRunId>,
+        existingProject: Project?,
+    ) {
+        if (launching) {
+            platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
+            return
+        }
+        launching = true
+        launchSteps.clear()
+        scope.launch(LaunchProgress(launchSteps::push)) {
+            try {
+                platformDebugLog(
+                    "AiveLaunch",
+                    "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
+                )
+                val activeRuntime = runtime ?: error(getString(Res.string.app_runtime_is_unavailable))
+                if (orchestrationRuntime != null) {
+                    activeRuntime.launchOrchestratedWorkflow(
+                        projectName = projectName,
+                        objective = objective,
+                        orchestrationRuntime = orchestrationRuntime,
+                        repository = repository,
+                        existingProject = existingProject,
+                        continuesWorkflowRunIds = continuesWorkflowRunIds,
+                    )
+                } else {
+                    launchSteps.push("Starting the starter workflow…")
+                    activeRuntime.launchStarterWorkflow(
+                        projectName = projectName,
+                        objective = objective,
+                        repository = repository,
+                        existingProject = existingProject,
+                        continuesWorkflowRunIds = continuesWorkflowRunIds,
+                    )
+                }
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Throwable) {
+                // Catch Throwable, not Exception: on-device model failures such as
+                // OutOfMemoryError are Errors and previously escaped this handler,
+                // leaving the launch button silently doing nothing.
+                platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
+                runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_launch_failed))
+            } finally {
+                launching = false
+            }
+        }
+    }
+
+    LaunchedEffect(runtimeState) { onRuntimeStateChanged(runtimeState) }
+
+    // External requests wait for a runtime and for any launch in progress, then go through the
+    // same path as the launch form, each in a new project unless one is open without a run.
+    LaunchedEffect(externalWorkflowLaunchRequests.firstOrNull()?.requestId, runtime, launching) {
+        val request = externalWorkflowLaunchRequests.firstOrNull() ?: return@LaunchedEffect
+        if (runtime == null || launching) return@LaunchedEffect
+        val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
+        launchObjective(request.projectName, request.objective, request.repository, emptyList(), existingProject)
+        onExternalWorkflowLaunchHandled(request.requestId)
     }
 
     GeministratorTheme {
@@ -312,7 +385,7 @@ fun App(
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
                         },
                         onLoadLaunchableRuns = { runtime?.loadLaunchableRuns() ?: emptyList() },
-                        onLaunchWorkflow = onLaunch@{ projectName, objective, repository, continuesWorkflowRunIds ->
+                        onLaunchWorkflow = { projectName, objective, repository, continuesWorkflowRunIds ->
                             val existingProject = when (val state = runtimeState) {
                                 is ApplicationRuntimeState.NoRun -> state.project
                                 // "Continue" from a finished run's view stays in that run's project.
@@ -320,50 +393,7 @@ fun App(
                                     state.presentation.project.takeIf { continuesWorkflowRunIds.isNotEmpty() }
                                 else -> null
                             }
-                            if (launching) {
-                                platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
-                                return@onLaunch
-                            }
-                            launching = true
-                            launchSteps.clear()
-                            scope.launch(LaunchProgress(launchSteps::push)) {
-                                try {
-                                    platformDebugLog(
-                                        "AiveLaunch",
-                                        "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
-                                    )
-                                    val activeRuntime = runtime ?: error(getString(Res.string.app_runtime_is_unavailable))
-                                    if (orchestrationRuntime != null) {
-                                        activeRuntime.launchOrchestratedWorkflow(
-                                            projectName = projectName,
-                                            objective = objective,
-                                            orchestrationRuntime = orchestrationRuntime,
-                                            repository = repository,
-                                            existingProject = existingProject,
-                                            continuesWorkflowRunIds = continuesWorkflowRunIds,
-                                        )
-                                    } else {
-                                        launchSteps.push("Starting the starter workflow…")
-                                        activeRuntime.launchStarterWorkflow(
-                                            projectName = projectName,
-                                            objective = objective,
-                                            repository = repository,
-                                            existingProject = existingProject,
-                                            continuesWorkflowRunIds = continuesWorkflowRunIds,
-                                        )
-                                    }
-                                } catch (failure: CancellationException) {
-                                    throw failure
-                                } catch (failure: Throwable) {
-                                    // Catch Throwable, not Exception: on-device model failures such as
-                                    // OutOfMemoryError are Errors and previously escaped this handler,
-                                    // leaving the launch button silently doing nothing.
-                                    platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_launch_failed))
-                                } finally {
-                                    launching = false
-                                }
-                            }
+                            launchObjective(projectName, objective, repository, continuesWorkflowRunIds, existingProject)
                         },
                         onApproveTask = { taskId ->
                             scope.launch {
