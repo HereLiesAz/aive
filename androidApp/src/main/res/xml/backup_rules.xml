@@ -4,6 +4,7 @@
     <exclude domain="sharedpref" path="haive.credentials.xml" />
     <exclude domain="sharedpref" path="haive.repository.credentials.xml" />
     <exclude domain="sharedpref" path="haive.distributed-compute.credentials.xml" />
+    <exclude domain="sharedpref" path="aive.remote-relay.credentials.xml" />
     <exclude domain="file" path="haive/memory" />
     <exclude domain="file" path="haive/orchestration-specialists" />
     <exclude domain="file" path="azphalt/models" />

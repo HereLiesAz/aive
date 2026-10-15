@@ -10,9 +10,17 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-internal class AndroidDistributedComputeCredentialStore(context: Context) {
+/**
+ * One Keystore-encrypted secret in its own preferences file. Defaults hold the distributed-compute
+ * relay token; [forRemoteRelayPairing] holds The Aive's remote-relay pairing code.
+ */
+internal class AndroidDistributedComputeCredentialStore(
+    context: Context,
+    private val keyAlias: String = KEY_ALIAS,
+    preferencesName: String = PREFERENCES_NAME,
+) {
     private val preferences = context.applicationContext.getSharedPreferences(
-        PREFERENCES_NAME,
+        preferencesName,
         Context.MODE_PRIVATE,
     )
 
@@ -53,12 +61,12 @@ internal class AndroidDistributedComputeCredentialStore(context: Context) {
 
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        (keyStore.getKey(keyAlias, null) as? SecretKey)?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
+                keyAlias,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
@@ -69,13 +77,21 @@ internal class AndroidDistributedComputeCredentialStore(context: Context) {
         return generator.generateKey()
     }
 
-    private companion object {
-        const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "haive.distributed-compute.relay-token"
-        const val PREFERENCES_NAME = "haive.distributed-compute.credentials"
-        const val KEY_CIPHERTEXT = "relay-token.ciphertext"
-        const val KEY_IV = "relay-token.iv"
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val GCM_TAG_BITS = 128
+    companion object {
+        fun forRemoteRelayPairing(context: Context) = AndroidDistributedComputeCredentialStore(
+            context,
+            keyAlias = "aive.remote-relay.pairing",
+            preferencesName = REMOTE_RELAY_PREFERENCES_NAME,
+        )
+
+        /** Excluded from backup like the other credential files. */
+        const val REMOTE_RELAY_PREFERENCES_NAME = "aive.remote-relay.credentials"
+        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+        private const val KEY_ALIAS = "haive.distributed-compute.relay-token"
+        private const val PREFERENCES_NAME = "haive.distributed-compute.credentials"
+        private const val KEY_CIPHERTEXT = "relay-token.ciphertext"
+        private const val KEY_IV = "relay-token.iv"
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val GCM_TAG_BITS = 128
     }
 }
