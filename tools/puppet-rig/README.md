@@ -73,14 +73,16 @@ The test:
 
 ## Deployment
 
-The aive web app and this puppet-rig editor are published to GitHub Pages by
-`.github/workflows/multiplatform.yml` on pushes to `main` or manual dispatch.
+The puppet-rig editor is the standalone GitHub Pages application for this repository:
 
-The `Stage GitHub Pages` step assembles `webApp/build/pages/`: the JS bundle at the root,
-Wasm under `wasm/`, and the editor's complete PWA shell under `puppet-rig/`. The Pages
-artifact is then uploaded and deployed by `deploy-pages`.
+https://hereliesaz.github.io/aive/
 
-Editor URL: https://hereliesaz.github.io/aive/puppet-rig/
+`.github/workflows/multiplatform.yml` deploys the static files from `tools/puppet-rig/`
+directly to the Pages root via the independent `deploy-pages` job. The editor does not
+require the Android, Desktop, JavaScript, or Wasm builds to finish. Its service worker and
+manifest use paths relative to the Pages project root (`/aive/`), so the editor remains
+installable and works offline once its shell is cached.
 
-The editor's links are relative, and its service worker is scoped to `puppet-rig/`, so
-it does not interfere with the main web app.
+The published artifact also retains `/aive/privacy/`, which the Android application
+manifest references. The full Aive JS/Wasm web app continues to build in CI but is **not**
+included in the Pages artifact until it is connected later.

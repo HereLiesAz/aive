@@ -109,7 +109,7 @@ tasks.matching { task ->
     }
 }
 
-// The webpack tasks above copy the brand assets next to the bundle (GitHub Pages stages from there);
+// The webpack tasks above copy brand assets next to the JS/Wasm bundles for CI builds;
 // the distribution also receives them from resources. The copies are identical.
 tasks.matching { it.name.endsWith("BrowserDistribution") }.configureEach {
     (this as? AbstractCopyTask)?.duplicatesStrategy = DuplicatesStrategy.EXCLUDE
