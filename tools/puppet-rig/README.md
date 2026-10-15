@@ -73,17 +73,14 @@ The test:
 
 ## Deployment
 
-The aive web app is published to GitHub Pages by `.github/workflows/multiplatform.yml`. Its `web` job assembles
-`webApp/build/pages/` (JS bundle at the root, Wasm under `wasm/`), uploads that folder with
-`actions/upload-pages-artifact`, and `deploy-pages` publishes it.
+The aive web app and this puppet-rig editor are published to GitHub Pages by
+`.github/workflows/multiplatform.yml` on pushes to `main` or manual dispatch.
 
-The editor is not deployed yet. Serving it at `<pages-url>/puppet-rig/` needs one extra step in the `web` job,
-after the "assemble pages" step and before the upload:
+The `Stage GitHub Pages` step assembles `webApp/build/pages/`: the JS bundle at the root,
+Wasm under `wasm/`, and the editor's complete PWA shell under `puppet-rig/`. The Pages
+artifact is then uploaded and deployed by `deploy-pages`.
 
-```sh
-mkdir -p webApp/build/pages/puppet-rig
-cp -R tools/puppet-rig/{index.html,style.css,app.js,rig-core.js,sw.js,manifest.webmanifest,icons} webApp/build/pages/puppet-rig/
-```
+Editor URL: https://hereliesaz.github.io/aive/puppet-rig/
 
-All paths in the app are relative, and the service worker is scoped to its own folder, so it does not
-interfere with the main app. The workflow change was intentionally left out of this branch so it can be made in a dedicated workflow change.
+The editor's links are relative, and its service worker is scoped to `puppet-rig/`, so
+it does not interfere with the main web app.
