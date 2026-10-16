@@ -21,7 +21,7 @@ The relay reads a single shared bearer token from `AIVE_RELAY_TOKEN` (`HAIVE_REL
 Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `haive.distributed-compute.configuration.v1`. The token is stored separately:
 
 - Android — encrypted with an Android Keystore AES-GCM key in private SharedPreferences.
-- Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store (macOS `security`, Windows PowerShell credential manager, Linux `secret-tool`).
+- Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store: macOS `security`, Linux `secret-tool`, and on Windows a per-user file under `%LOCALAPPDATA%\Aive` encrypted with DPAPI (`ConvertFrom-SecureString`), written and read through PowerShell with the token on stdin/stdout, never on a command line. When no store works (for example, no `secret-tool`), or the stored token does not read back, the token falls back to **plaintext** Java user preferences (`com/hereliesaz/haive/distributed-compute`).
 
 ## Delegation targets
 
