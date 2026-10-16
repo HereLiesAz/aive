@@ -254,7 +254,7 @@ class MoyaiProviderTest {
                 displayName = "Moyai",
                 baseUrl = "https://moyai.example",
                 client = client,
-                pollIntervalMillis = 1,
+                pollIntervalMillis = 250,
             )
             val runId = com.hereliesaz.geministrator.domain.ProviderRunId("run-1")
             provider.reconnect(runId, request.copy(requirePlanApproval = false), planGenerated = true, planApproved = true, planPreview = null)
