@@ -583,6 +583,16 @@
     <string name="settings_reconfigure">Reconfigure</string>
     <string name="settings_refresh_detected_project_files">Refresh detected project files</string>
     <string name="settings_refresh_health">Refresh health</string>
+    <string name="settings_remote_access">Remote Access</string>
+    <string name="settings_remote_access_description">Let your own IDEaz on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
+    <string name="settings_remote_access_on">Remote access: ON</string>
+    <string name="settings_remote_access_off">Remote access: OFF</string>
+    <string name="settings_remote_access_relay_url">Relay URL</string>
+    <string name="settings_remote_access_pairing_code">Pairing code</string>
+    <string name="settings_remote_access_warning">Anyone with this code can run prompts on your linked AI providers and start workflows. Treat it like a password. Turn off to revoke.</string>
+    <string name="settings_remote_access_copy">Copy code</string>
+    <string name="settings_remote_access_share">Share code</string>
+    <string name="settings_remote_access_reset">Reset pairing</string>
     <string name="settings_relay_pool_device_identity_and_token">Relay, pool, device identity, and token are required</string>
     <string name="settings_relay_token">Relay token</string>
     <string name="settings_relay_token_leave_blank_to_keep">Relay token (leave blank to keep existing)</string>
