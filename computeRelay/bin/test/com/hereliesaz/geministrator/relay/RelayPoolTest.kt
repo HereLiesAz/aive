@@ -2,6 +2,8 @@ package com.hereliesaz.geministrator.relay
 
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
+import com.hereliesaz.geministrator.distributed.DistributedExecutionProgress
+import com.hereliesaz.geministrator.distributed.DistributedExecutionResult
 import com.hereliesaz.geministrator.distributed.DistributedTaskEnvelope
 import com.hereliesaz.geministrator.domain.ComputePlatform
 import com.hereliesaz.geministrator.domain.DistributedComputeRequirements
@@ -18,8 +20,12 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
@@ -80,8 +86,9 @@ class RelayPoolTest {
     }
 
     @Test
-    fun originDisconnectCancelsOutstandingWorkerLease() = runBlocking {
-        val pool = RelayPool("pool", nowEpochMillis = { 20_000L })
+    fun originDisconnectKeepsWorkerRunningAndReplaysCompletionOnReconnect() = runBlocking {
+        var now = 20_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
         val origin = RecordingPeer()
         val worker = RecordingPeer()
 
@@ -90,13 +97,247 @@ class RelayPoolTest {
         val envelope = envelope()
         pool.publish("origin", envelope)
         pool.claim("worker", envelope.leaseId)
+        pool.progress(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionProgress(
+                status = TaskRunStatus.Running,
+                progress = 0.5f,
+                message = "Halfway",
+            ),
+        )
 
-        pool.unregister("origin")
+        pool.unregister("origin", origin)
 
-        assertEquals(0, pool.pendingLeaseCount())
-        assertTrue(worker.messages.any {
+        assertEquals(1, pool.pendingLeaseCount())
+        assertTrue(worker.messages.none {
             it is ComputeRelayServerMessage.LeaseCancelled &&
                 it.reason == "Origin node disconnected"
+        })
+
+        now += 1_000
+        pool.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(
+                status = TaskRunStatus.Completed,
+                progressMessage = "Done",
+            ),
+        )
+        assertEquals(0, pool.pendingLeaseCount())
+
+        val resumedOrigin = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), resumedOrigin)
+        pool.replayOriginLeases("origin", resumedOrigin)
+
+        assertTrue(resumedOrigin.messages.any {
+            it is ComputeRelayServerMessage.LeaseCompleted &&
+                it.leaseId == envelope.leaseId &&
+                it.result.status == TaskRunStatus.Completed
+        })
+    }
+
+    @Test
+    fun pendingLeaseSurvivesOriginDisconnectAndIsOfferedToLaterWorker() = runBlocking {
+        val pool = RelayPool("pool", nowEpochMillis = { 22_000L })
+        val origin = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+        pool.unregister("origin", origin)
+
+        val lateWorker = RecordingPeer()
+        pool.register(node("worker", setOf("tests")), lateWorker)
+
+        assertEquals(1, pool.pendingLeaseCount())
+        assertTrue(lateWorker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == envelope.leaseId
+        })
+    }
+
+    @Test
+    fun retainedTerminalLeaseExpiresAfterResumeWindow() = runBlocking {
+        var now = 40_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        pool.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+        pool.claim("worker", envelope.leaseId)
+        pool.unregister("origin", origin)
+        pool.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(status = TaskRunStatus.Completed),
+        )
+        pool.unregister("worker", worker)
+
+        assertTrue(!pool.isEmpty())
+        now += 24L * 60L * 60L * 1_000L + 1L
+        pool.sweepExpired()
+        assertTrue(pool.isEmpty())
+    }
+
+    @Test
+    fun unfinishedLeaseRequeuesAfterRelayProcessRestart() = runBlocking {
+        val directory = Files.createTempDirectory("aive-relay-test")
+        val store = EncryptedFileRelayStateStore(directory, "relay-secret")
+        val first = RelayPool("pool", nowEpochMillis = { 50_000L }, stateStore = store)
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        first.register(node("origin", setOf("origin")), origin)
+        first.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope("restart-pending")
+        first.publish("origin", envelope)
+        first.claim("worker", envelope.leaseId)
+        assertNull(
+            store.load("pool").single().workerNodeId,
+            "Live worker ownership must never be persisted for unfinished work",
+        )
+
+        val restarted = RelayPool("pool", nowEpochMillis = { 51_000L }, stateStore = store)
+        val resumedOrigin = RecordingPeer()
+        val replacementWorker = RecordingPeer()
+        restarted.register(node("origin", setOf("origin")), resumedOrigin)
+        restarted.replayOriginLeases("origin", resumedOrigin)
+        restarted.register(node("worker-2", setOf("tests")), replacementWorker)
+
+        assertEquals(1, restarted.pendingLeaseCount())
+        assertTrue(resumedOrigin.messages.any {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == envelope.leaseId
+        })
+        assertTrue(resumedOrigin.messages.none {
+            it is ComputeRelayServerMessage.LeaseClaimed && it.leaseId == envelope.leaseId
+        })
+        assertTrue(replacementWorker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == envelope.leaseId
+        })
+    }
+
+    @Test
+    fun completedLeaseReplaysAfterRelayProcessRestart() = runBlocking {
+        val directory = Files.createTempDirectory("aive-relay-test")
+        val store = EncryptedFileRelayStateStore(directory, "relay-secret")
+        val first = RelayPool("pool", nowEpochMillis = { 60_000L }, stateStore = store)
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        first.register(node("origin", setOf("origin")), origin)
+        first.register(node("worker", setOf("tests")), worker)
+        val envelope = envelope("restart-complete")
+        first.publish("origin", envelope)
+        first.claim("worker", envelope.leaseId)
+        first.complete(
+            "worker",
+            envelope.leaseId,
+            DistributedExecutionResult(
+                status = TaskRunStatus.Completed,
+                progressMessage = "Finished before restart",
+            ),
+        )
+
+        val restarted = RelayPool("pool", nowEpochMillis = { 61_000L }, stateStore = store)
+        val resumedOrigin = RecordingPeer()
+        restarted.register(node("origin", setOf("origin")), resumedOrigin)
+        restarted.replayOriginLeases("origin", resumedOrigin)
+
+        assertEquals(0, restarted.pendingLeaseCount())
+        val completed = resumedOrigin.messages
+            .filterIsInstance<ComputeRelayServerMessage.LeaseCompleted>()
+            .single { it.leaseId == envelope.leaseId }
+        assertEquals(TaskRunStatus.Completed, completed.result.status)
+        assertEquals("Finished before restart", completed.result.progressMessage)
+    }
+
+    @Test
+    fun persistenceFailureRollsBackNewLeaseAcceptance() = runBlocking {
+        val pool = RelayPool(
+            poolId = "pool",
+            nowEpochMillis = { 55_000L },
+            stateStore = FailingRelayStateStore(),
+        )
+        val origin = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), origin)
+
+        assertFailsWith<IllegalStateException> {
+            pool.publish("origin", envelope("not-committed"))
+        }
+
+        assertEquals(0, pool.pendingLeaseCount())
+        assertTrue(origin.messages.none {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == "not-committed"
+        })
+    }
+
+    @Test
+    fun staleConnectionCannotUnregisterReplacementNode() = runBlocking {
+        val pool = RelayPool("pool", nowEpochMillis = { 25_000L })
+        val oldPeer = RecordingPeer()
+        val replacementPeer = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), oldPeer)
+        pool.register(node("worker", setOf("tests")), worker)
+        pool.register(node("origin", setOf("origin")), replacementPeer)
+
+        assertFalse(pool.isCurrentPeer("origin", oldPeer))
+        assertTrue(pool.isCurrentPeer("origin", replacementPeer))
+
+        pool.unregister("origin", oldPeer)
+        val envelope = envelope()
+        pool.publish("origin", envelope)
+
+        assertTrue(replacementPeer.messages.any {
+            it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == envelope.leaseId
+        })
+        assertTrue(worker.messages.none {
+            it is ComputeRelayServerMessage.NodeLeft && it.nodeId == "origin"
+        })
+    }
+
+    @Test
+    fun completingLeaseImmediatelyReoffersPendingWorkWhenCapacityFrees() = runBlocking {
+        var now = 30_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
+        val origin = RecordingPeer()
+        val worker = RecordingPeer()
+
+        pool.register(node("origin", setOf("origin")), origin)
+        pool.register(
+            node("worker", setOf("tests")).copy(maxParallelLeases = 1),
+            worker,
+        )
+
+        val first = envelope("lease-1")
+        val second = envelope("lease-2")
+        pool.publish("origin", first)
+        pool.claim("worker", first.leaseId)
+
+        val offersBeforeSecond = worker.messages.count {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
+        }
+        pool.publish("origin", second)
+        assertEquals(
+            offersBeforeSecond,
+            worker.messages.count {
+                it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
+            },
+        )
+
+        now += 1_000
+        pool.complete(
+            "worker",
+            first.leaseId,
+            DistributedExecutionResult(status = TaskRunStatus.Completed),
+        )
+
+        assertTrue(worker.messages.any {
+            it is ComputeRelayServerMessage.LeaseOffered && it.envelope.leaseId == second.leaseId
         })
     }
 
@@ -112,7 +353,10 @@ class RelayPoolTest {
         maxParallelLeases = 2,
     )
 
-    private fun envelope(leaseDurationMillis: Long = 30_000): DistributedTaskEnvelope {
+    private fun envelope(
+        leaseId: String = "lease",
+        leaseDurationMillis: Long = 30_000,
+    ): DistributedTaskEnvelope {
         val projectId = ProjectId("project")
         val workflowId = WorkflowDefinitionId("workflow")
         val taskId = TaskDefinitionId("test")
@@ -153,7 +397,7 @@ class RelayPoolTest {
             updatedAtEpochMillis = 1,
         )
         return DistributedTaskEnvelope(
-            leaseId = "lease",
+            leaseId = leaseId,
             originNodeId = "origin",
             project = Project(
                 id = projectId,
@@ -170,6 +414,16 @@ class RelayPoolTest {
             submittedAtEpochMillis = 1,
             leaseDurationMillis = leaseDurationMillis,
         )
+    }
+
+    private class FailingRelayStateStore : RelayStateStore {
+        override fun load(poolId: String): List<PersistedRelayLease> = emptyList()
+        override fun save(poolId: String, leases: List<PersistedRelayLease>) {
+            throw IllegalStateException("simulated storage failure")
+        }
+        override fun delete(poolId: String) {
+            throw IllegalStateException("simulated storage failure")
+        }
     }
 
     private class RecordingPeer : RelayPeer {
