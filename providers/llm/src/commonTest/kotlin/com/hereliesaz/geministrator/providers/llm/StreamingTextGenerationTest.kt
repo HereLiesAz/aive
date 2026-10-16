@@ -40,6 +40,7 @@ class StreamingTextGenerationTest {
                 """{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Check the cache first."}}""",
                 """{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Done."}}""",
                 """{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}""",
+                """{"type":"message_stop"}""",
             )
         }
         val chunks = mutableListOf<TextGenerationChunk>()
@@ -60,7 +61,10 @@ class StreamingTextGenerationTest {
             when {
                 "adaptive" in body -> respond("""{"error":{"message":"thinking.type adaptive is not supported"}}""", HttpStatusCode.BadRequest)
                 "budget_tokens" in body -> respond("""{"error":{"message":"thinking is not supported on this model"}}""", HttpStatusCode.BadRequest)
-                else -> sse("""{"type":"content_block_delta","delta":{"type":"text_delta","text":"plain"}}""")
+                else -> sse(
+                    """{"type":"content_block_delta","delta":{"type":"text_delta","text":"plain"}}""",
+                    """{"type":"message_stop"}""",
+                )
             }
         }
         val api = AnthropicMessagesApi(LlmApiKeyProvider { "k" }, client = client)
@@ -93,6 +97,7 @@ class StreamingTextGenerationTest {
             sse(
                 """{"type":"response.reasoning_summary_text.delta","delta":"Plan the change."}""",
                 """{"type":"response.output_text.delta","delta":"done"}""",
+                """{"type":"response.completed","response":{}}""",
             )
         }
         val chunks = mutableListOf<TextGenerationChunk>()
@@ -106,7 +111,7 @@ class StreamingTextGenerationTest {
         val client = sseClient(bodies) {
             sse(
                 """{"candidates":[{"content":{"parts":[{"text":"Weighing options.","thought":true}]}}]}""",
-                """{"candidates":[{"content":{"parts":[{"text":"Answer."}]}}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}""",
+                """{"candidates":[{"content":{"parts":[{"text":"Answer."}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":2}}""",
             )
         }
         val result = GeminiGenerateContentApi(LlmApiKeyProvider { "k" }, client = client).stream("go") {}
@@ -153,6 +158,84 @@ class StreamingTextGenerationTest {
             api.stream("go") {}
         }
         assertTrue(failure.message.orEmpty().contains("truncated"))
+    }
+
+    @Test
+    fun aStreamCutOffBeforeItsTerminalEventIsAnError() = runTest {
+        val anthropic = sseClient(mutableListOf()) {
+            sse("""{"type":"content_block_delta","delta":{"type":"text_delta","text":"half an ans"}}""")
+        }
+        assertFailsWith<IllegalStateException> {
+            AnthropicMessagesApi(LlmApiKeyProvider { "k" }, client = anthropic).stream("go") {}
+        }
+
+        val openAi = sseClient(mutableListOf()) {
+            sse("""{"type":"response.output_text.delta","delta":"half an ans"}""")
+        }
+        assertFailsWith<IllegalStateException> {
+            OpenAiResponsesApi(LlmApiKeyProvider { "k" }, client = openAi).stream("go") {}
+        }
+
+        val gemini = sseClient(mutableListOf()) {
+            sse("""{"candidates":[{"content":{"parts":[{"text":"half an ans"}]}}]}""")
+        }
+        assertFailsWith<IllegalStateException> {
+            GeminiGenerateContentApi(LlmApiKeyProvider { "k" }, client = gemini).stream("go") {}
+        }
+
+        val compatible = sseClient(mutableListOf()) {
+            sse("""{"choices":[{"delta":{"content":"half an ans"}}]}""")
+        }
+        assertFailsWith<IllegalStateException> {
+            OpenAiCompatibleChatApi(LlmApiKeyProvider { "k" }, model = "m", baseUrl = "https://example.test/v1", client = compatible)
+                .stream("go") {}
+        }
+    }
+
+    @Test
+    fun geminiRejectsTokenLimitTruncation() = runTest {
+        val streamed = sseClient(mutableListOf()) {
+            sse("""{"candidates":[{"content":{"parts":[{"text":"partial"}]},"finishReason":"MAX_TOKENS"}]}""")
+        }
+        val failure = assertFailsWith<IllegalStateException> {
+            GeminiGenerateContentApi(LlmApiKeyProvider { "k" }, client = streamed).stream("go") {}
+        }
+        assertTrue(failure.message.orEmpty().contains("truncated"))
+
+        val oneShot = sseClient(mutableListOf()) {
+            respond(
+                """{"candidates":[{"content":{"parts":[{"text":"partial"}]},"finishReason":"MAX_TOKENS"}]}""",
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        assertFailsWith<IllegalStateException> {
+            GeminiGenerateContentApi(LlmApiKeyProvider { "k" }, client = oneShot).generate("go")
+        }
+    }
+
+    @Test
+    fun openAiResponsesRejectsAnIncompleteOneShotResponse() = runTest {
+        val client = sseClient(mutableListOf()) {
+            respond(
+                """{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},""" +
+                    """"output":[{"content":[{"type":"output_text","text":"partial"}]}]}""",
+                HttpStatusCode.OK,
+                headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val failure = assertFailsWith<IllegalStateException> {
+            OpenAiResponsesApi(LlmApiKeyProvider { "k" }, client = client).generate("go")
+        }
+        assertTrue(failure.message.orEmpty().contains("max_output_tokens"))
+    }
+
+    @Test
+    fun anAuthenticationRefusalDoesNotSwitchReasoningOff() {
+        assertFalse(StreamRejected(401, """{"error":{"message":"Unrecognized API key"}}""", "op").rejectsReasoning())
+        assertFalse(StreamRejected(403, """{"error":{"message":"Please verify your account"}}""", "op").rejectsReasoning())
+        assertFalse(StreamRejected(400, """{"error":{"message":"model not supported"}}""", "op").rejectsReasoning())
+        assertTrue(StreamRejected(400, """{"error":{"message":"thinking is not supported on this model"}}""", "op").rejectsReasoning())
     }
 
     @Test
