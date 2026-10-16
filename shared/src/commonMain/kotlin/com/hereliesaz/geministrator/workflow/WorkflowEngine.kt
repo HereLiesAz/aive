@@ -182,6 +182,11 @@ class WorkflowEngine(
                                 reason = "Executor failed. Last status: $reason",
                                 nowEpochMillis = nowEpochMillis,
                             )
+                            if (nextRun.status.isTerminal()) {
+                                // The task's policy failed the workflow: start nothing else, and keep
+                                // the terminal status rather than overwriting it below.
+                                return DispatchResult(nextRun, handles)
+                            }
                             continue
                         }
                         if (drafted != null) {

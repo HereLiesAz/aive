@@ -21,8 +21,10 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 data class WorkflowRuntimeState(
     val run: WorkflowRun,
@@ -142,14 +144,17 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
         artifactIdFactory: (TaskRun, ProviderArtifact, Int) -> ArtifactId,
     ): WorkflowRuntimeState {
-        if (state.run.status.isTerminal()) return state
+        if (state.run.status.isTerminal()) {
+            // A run made terminal outside the cycle (an escalation decision) must not leave its
+            // provider sessions running and billing.
+            if (state.handles.isEmpty()) return state
+            cancelSessions(state.run, state.handles)
+            return state.copy(handles = emptyMap())
+        }
 
         var nextRun = reconcileResolvedApprovalGates(definition, state.run, nowEpochMillis)
         if (nextRun.status.isTerminal()) {
-            nextRun = closeFailureEscalationsForTerminalRun(nextRun, nowEpochMillis)
-            val terminalState = WorkflowRuntimeState(nextRun, emptyMap())
-            persist(project, definition, terminalState)
-            return terminalState
+            return terminate(project, definition, nextRun, state.handles, nowEpochMillis)
         }
 
         nextRun = recoverAvailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
@@ -228,10 +233,7 @@ class WorkflowRuntimeCoordinator(
         }
 
         if (nextRun.status.isTerminal()) {
-            nextRun = closeFailureEscalationsForTerminalRun(nextRun, nowEpochMillis)
-            val terminalState = WorkflowRuntimeState(nextRun, emptyMap())
-            persist(project, definition, terminalState)
-            return terminalState
+            return terminate(project, definition, nextRun, state.handles, nowEpochMillis)
         }
 
         ensureMissingFailureEscalationGates(nextRun, nowEpochMillis)
@@ -302,10 +304,7 @@ class WorkflowRuntimeCoordinator(
         }
 
         if (nextRun.status.isTerminal()) {
-            nextRun = closeFailureEscalationsForTerminalRun(nextRun, nowEpochMillis)
-            nextState = WorkflowRuntimeState(nextRun, emptyMap())
-            persist(project, definition, nextState)
-            return nextState
+            return terminate(project, definition, nextRun, nextHandles, nowEpochMillis)
         }
 
         val dispatched = engine.dispatchReadyTasks(
@@ -316,16 +315,59 @@ class WorkflowRuntimeCoordinator(
             nowEpochMillis = nowEpochMillis,
         )
         nextRun = dispatched.run
+        if (nextRun.status.isTerminal()) {
+            return terminate(project, definition, nextRun, dispatched.handles, nowEpochMillis)
+        }
         nextHandles = dispatched.handles.filterKeys { taskId ->
             nextRun.taskRuns[taskId]?.status?.isActiveProviderStatus() == true
-        }
-        if (nextRun.status.isTerminal()) {
-            nextRun = closeFailureEscalationsForTerminalRun(nextRun, nowEpochMillis)
-            nextHandles = emptyMap()
         }
         nextState = WorkflowRuntimeState(nextRun, nextHandles)
         persist(project, definition, nextState)
         return nextState
+    }
+
+    /**
+     * Cancels [state]'s run: every unfinished task, and every provider session it still holds.
+     * Used when a run is abandoned, such as a new launch replacing it.
+     */
+    suspend fun cancel(
+        project: Project,
+        definition: WorkflowDefinition,
+        state: WorkflowRuntimeState,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState = cycleMutex.withLock {
+        val persistedRun = persistence.runs.get(state.run.id)
+            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
+            ?: state.run
+        if (persistedRun.status.isTerminal()) {
+            cancelSessions(persistedRun, state.handles)
+            return@withLock WorkflowRuntimeState(persistedRun, emptyMap())
+        }
+        terminate(project, definition, engine.cancelWorkflow(persistedRun, nowEpochMillis), state.handles, nowEpochMillis)
+    }
+
+    /** Ends a run that has just become terminal: closes its gates, stops its sessions, persists it. */
+    private suspend fun terminate(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState {
+        val closed = closeFailureEscalationsForTerminalRun(run, nowEpochMillis)
+        cancelSessions(closed, handles)
+        val terminalState = WorkflowRuntimeState(closed, emptyMap())
+        persist(project, definition, terminalState)
+        return terminalState
+    }
+
+    /** Best effort: a session that already finished, or a provider that is unreachable, is not an error here. */
+    private suspend fun cancelSessions(run: WorkflowRun, handles: Map<TaskDefinitionId, ManagedSessionHandle>) {
+        val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status != TaskRunStatus.Completed }
+        if (live.isEmpty()) return
+        withContext(NonCancellable) {
+            live.values.forEach { handle -> runCatching { sessionGateway.cancel(handle) } }
+        }
     }
 
     private suspend fun persistArtifacts(run: WorkflowRun) {
