@@ -76,7 +76,7 @@ class RelayHostRouterTest {
         assertEquals("result", result.str("t"))
         assertEquals(5L, result.num("id"))
         assertEquals("echo:hi", result.str("text"))
-        assertEquals(listOf(Triple("hi", "kilo", "m1")), actions.prompts)
+        assertEquals(listOf<Triple<String, String?, String?>>(Triple("hi", "kilo", "m1")), actions.prompts.toList())
     }
 
     @Test
@@ -88,7 +88,7 @@ class RelayHostRouterTest {
         assertEquals(6L, error.num("id"))
         assertEquals("Aive provider kilo is not linked", error.str("error"))
         // Blank provider and model are passed on as "unspecified", never filled in here.
-        assertEquals(listOf(Triple("hi", null, null)), actions.prompts)
+        assertEquals(listOf<Triple<String, String?, String?>>(Triple("hi", null, null)), actions.prompts.toList())
     }
 
     @Test
@@ -131,7 +131,7 @@ class RelayHostRouterTest {
         assertEquals("launched", launched.str("t"))
         assertEquals(20L, launched.num("id"))
         assertEquals(42L, launched.num("launchId"))
-        assertEquals(listOf(Triple("P", "ship it", "https://github.com/a/b")), actions.launches)
+        assertEquals(listOf<Triple<String?, String?, String?>>(Triple("P", "ship it", "https://github.com/a/b")), actions.launches.toList())
 
         actions.launchFailure = IllegalArgumentException("Objective is required")
         router.onFrame("c1", client.frame { put("t", "launch"); put("id", 21); put("projectName", "P") })
