@@ -10,6 +10,14 @@
     <string name="crash_report_sent_title">Crash report sent</string>
     <string name="crash_report_sent_body">Aive crashed or stopped responding earlier, and a report (stack trace, app version, Android version, device model) was sent automatically to the HereLiesAz/aive GitHub issue tracker. You can turn automatic crash reports off any time in Settings → Crash Reports.</string>
 
+    <!-- Remote access (AiveRelayHostService) -->
+    <string name="remote_access_channel_name">Remote access</string>
+    <string name="remote_access_notification_title">Remote access is on</string>
+    <string name="remote_access_notification_connecting">Connecting to the relay</string>
+    <string name="remote_access_notification_stop">Turn off</string>
+    <string name="remote_access_copied">Pairing code copied</string>
+    <string name="remote_access_share_title">Share pairing code</string>
+
     <!-- In-app update prompt (AndroidUpdateUi) -->
     <string name="update_ready_title">The Aive %1$s is ready</string>
     <string name="update_ready_body">The GitHub build downloaded the update. Android will ask you to confirm installation; your projects, settings, credentials, roles, and workflows remain in place.</string>
