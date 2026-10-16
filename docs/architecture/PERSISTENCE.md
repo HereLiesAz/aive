@@ -104,6 +104,13 @@ Credentials belong in platform-secure storage or, where a browser cannot safely 
 
 ## Resume invariant
 
+For a persisted `node-creature-rig-pipeline` definition whose **only** graph validation error
+is the known `batch-review → qc-audit → rig-01` cycle, resume removes just the incorrect
+`batch-review` dependency on `qc-audit`. The canonical pipeline reviews provenance before
+generating the rig sheets and audits the completed sheets afterward. The corrected definition is
+stored before reconnecting the existing run; task-run statuses, artifacts, attempts, and external
+execution IDs remain unchanged. Other workflows and invalid graphs are never silently rewritten.
+
 A task with an existing executor/provider run identifier must reconnect to that existing run when possible. Restarting The Aive must not create duplicate external work merely because the local process restarted.
 
 `TaskRun` persists executor identity separately from responsibility and provider state:

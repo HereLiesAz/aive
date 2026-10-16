@@ -166,7 +166,9 @@ object HostedLlmProviders {
             id = OVHCLOUD_ID,
             displayName = "OVHcloud AI Endpoints",
             baseUrl = "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
-            defaultModel = "Qwen3-Coder-30B-A3B-Instruct",
+            // Qwen3-Coder-30B-A3B-Instruct was retired (HTTP 404 model_not_found on 2026-10-15);
+            // gpt-oss-120b answers anonymously with tool calls.
+            defaultModel = "gpt-oss-120b",
             keyOptional = true,
         ),
     )

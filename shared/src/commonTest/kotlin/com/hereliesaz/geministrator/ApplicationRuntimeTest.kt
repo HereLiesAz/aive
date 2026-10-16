@@ -223,6 +223,104 @@ class ApplicationRuntimeTest {
         }
     }
 
+
+    @Test
+    fun persistedNodeCreatureRigBackEdgeIsRemovedWithoutChangingItsRun() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val project = project("rig-project", updatedAt = 1L)
+        val preflight = TaskDefinitionId("preflight")
+        val review = TaskDefinitionId("batch-review")
+        val rig = TaskDefinitionId("rig-01")
+        val audit = TaskDefinitionId("qc-audit")
+        val tasks = listOf(
+            TaskDefinition(preflight, "Preflight", "Validate source-backed batch", roleId = null, executor = TaskExecutor.HumanApproval()),
+            TaskDefinition(review, "Batch review", "Review batch provenance", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(preflight, audit)),
+            TaskDefinition(rig, "Rig 1", "Generate and inspect rig sheet 1", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(preflight, review)),
+            TaskDefinition(audit, "QC", "Audit completed rig batch", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(preflight, rig)),
+        )
+        val broken = WorkflowDefinition(
+            id = WorkflowDefinitionId("node-creature-rig-pipeline"),
+            name = "Node Creature Rig Pipeline",
+            tasks = tasks,
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        val run = WorkflowRun(
+            id = WorkflowRunId("rig-run"),
+            projectId = project.id,
+            workflowDefinitionId = broken.id,
+            objective = "Generate source-backed rigs",
+            status = WorkflowRunStatus.Completed,
+            taskRuns = tasks.associate { task ->
+                task.id to TaskRun(
+                    id = TaskRunId("run-${task.id.value}"),
+                    taskDefinitionId = task.id,
+                    status = TaskRunStatus.Completed,
+                    assignedRoleId = null,
+                    executor = TaskExecutor.HumanApproval(),
+                    progress = 1f,
+                )
+            },
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 2L,
+        )
+        persistence.projects.put(project)
+        persistence.definitions.put(broken)
+        persistence.runs.put(run)
+
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val runtime = ApplicationRuntime.create(
+                providers = emptyList(),
+                scope = scope,
+                persistence = persistence,
+            )
+            val repaired = assertIs<ApplicationRuntimeState.Live>(runtime.state.value).presentation.definition
+            assertEquals(setOf(preflight), repaired.tasks.single { it.id == review }.dependsOn)
+            assertEquals(setOf(preflight, review), repaired.tasks.single { it.id == rig }.dependsOn)
+            assertEquals(setOf(preflight, rig), repaired.tasks.single { it.id == audit }.dependsOn)
+            assertTrue(com.hereliesaz.geministrator.workflow.WorkflowGraphValidator.validate(repaired).isEmpty())
+            assertEquals(repaired, persistence.definitions.get(broken.id))
+            assertEquals(run, persistence.runs.get(run.id))
+            assertEquals(repaired, repairKnownNodeCreatureRigCycle(repaired))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun knownBackEdgeRepairPreservesUnrelatedWorkflowsAndOtherCycles() {
+        val preflight = TaskDefinitionId("preflight")
+        val review = TaskDefinitionId("batch-review")
+        val rig = TaskDefinitionId("rig-01")
+        val audit = TaskDefinitionId("qc-audit")
+        val tasks = listOf(
+            TaskDefinition(preflight, "Preflight", "Validate", roleId = null, executor = TaskExecutor.HumanApproval()),
+            TaskDefinition(review, "Review", "Review", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(preflight, audit)),
+            TaskDefinition(rig, "Rig", "Rig", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(review)),
+            TaskDefinition(audit, "Audit", "Audit", roleId = null, executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(rig)),
+        )
+        val userWorkflow = WorkflowDefinition(
+            id = WorkflowDefinitionId("user-authored"),
+            name = "User workflow",
+            tasks = tasks,
+        )
+        assertEquals(userWorkflow, repairKnownNodeCreatureRigCycle(userWorkflow))
+
+        val differentCycle = userWorkflow.copy(
+            id = WorkflowDefinitionId("node-creature-rig-pipeline"),
+            tasks = tasks.map { task ->
+                if (task.id == rig) task.copy(dependsOn = setOf(review, audit)) else task
+            },
+        )
+        assertEquals(differentCycle, repairKnownNodeCreatureRigCycle(differentCycle))
+    }
+
     @Test
     fun providerUnavailableClassifiesAsDisconnected() {
         val failure = ApplicationRuntime.classifyRuntimeFailure(

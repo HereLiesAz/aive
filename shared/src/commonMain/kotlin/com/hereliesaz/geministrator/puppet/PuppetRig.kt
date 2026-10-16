@@ -57,7 +57,24 @@ data class PuppetRig(
         val ids = parts.map { it.id }
         require(ids.toSet().size == ids.size) { "Duplicate part ids." }
         val byId = parts.associateBy { it.id }
+        val attachmentsById = attachments.associateBy { it.id }
+        require(attachmentsById.size == attachments.size) { "Duplicate attachment ids." }
         parts.forEach { part ->
+            require(part.kind in setOf("body", "tail", "tendril", "other")) {
+                "Part ${part.id} has an unknown kind."
+            }
+            require(part.rigidity.isFinite() && part.rigidity in 0f..1f) {
+                "Part ${part.id} rigidity must be between 0 and 1."
+            }
+            part.stretch?.let {
+                require(it.axis in setOf("x", "y") && it.length.isFinite() && it.length > 0f) {
+                    "Part ${part.id} stretch must have a valid axis and positive length."
+                }
+            }
+            require(part.connectTo == null ||
+                (part.parent != null && attachmentsById[part.connectTo]?.part == part.parent)) {
+                "Part ${part.id} connection must be an attachment on its parent."
+            }
             require(part.parent == null || byId.containsKey(part.parent)) {
                 "Part ${part.id} references missing parent ${part.parent}."
             }
@@ -105,6 +122,14 @@ data class PuppetTransform(
 )
 
 @Serializable
+data class PuppetStretch(
+    /** Axis along which a tail or tendril is stretched, in part-local coordinates. */
+    val axis: String,
+    /** Drawn length in artboard px (without changing the source atlas crop). */
+    val length: Float,
+)
+
+@Serializable
 data class PuppetPart(
     val id: String,
     val parent: String? = null,
@@ -117,9 +142,21 @@ data class PuppetPart(
     val pivot: PuppetPoint = PuppetPoint(0.5f, 0.5f),
     /** Rest transform; (x, y) is where the pivot sits in the parent's local frame. */
     val rest: PuppetTransform = PuppetTransform(),
+    /** Visual role of this part; existing rigs default to other. */
+    val kind: String = "other",
+    /** 0 = full local animation; 1 = rigid against local position/rotation/scale animation. */
+    val rigidity: Float = 0f,
+    /** Optional explicit length for tail/tendril geometry. */
+    val stretch: PuppetStretch? = null,
+    /** Optional attachment id on the immediate parent; offsets in rest remain editable. */
+    val connectTo: String? = null,
 ) {
-    val drawnWidth: Float get() = size?.w ?: rect?.w?.toFloat() ?: 0f
-    val drawnHeight: Float get() = size?.h ?: rect?.h?.toFloat() ?: 0f
+    val drawnWidth: Float get() =
+        stretch?.takeIf { (kind == "tail" || kind == "tendril") && it.axis == "x" }?.length
+            ?: size?.w ?: rect?.w?.toFloat() ?: 0f
+    val drawnHeight: Float get() =
+        stretch?.takeIf { (kind == "tail" || kind == "tendril") && it.axis == "y" }?.length
+            ?: size?.h ?: rect?.h?.toFloat() ?: 0f
 }
 
 @Serializable

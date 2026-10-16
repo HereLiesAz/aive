@@ -219,7 +219,10 @@ Pushes to `main`:
 - upload Android and Desktop artifacts
 - derive the four-part public build version through the centralized `HereLiesAz/workflows` version action
 - publish exact-build assets into the patch-grouped GitHub Release through the centralized release action
-- deploy the JS production bundle to GitHub Pages after a successful build
+- publish the standalone puppet-rig editor to the Pages root independently of Android/Desktop/JS/Wasm build completion; keep `/aive/privacy/` available
+
+The full Aive JS/Wasm browser app remains a CI build target, not a deployed Pages artifact;
+its integration is deferred. See [Puppet rig deployment](../../tools/puppet-rig/README.md#deployment).
 
 The composite build runs on JDK 21, and every module (Android included) targets JVM 21 bytecode. The Aive and the pinned H2G2 renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
 

@@ -8,6 +8,7 @@ import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -70,7 +71,8 @@ internal class AndroidLocalRepositoryStore(context: Context) {
                         DocumentsContract.buildDocumentUriUsingTree(treeUri, parent),
                         DocumentsContract.Document.MIME_TYPE_DIR,
                         folder,
-                    )!!.let(DocumentsContract::getDocumentId)
+                    )?.let(DocumentsContract::getDocumentId)
+                    ?: throw IOException("Could not create folder $folder in the picked folder; pick it again.")
             }
             val existing = child(treeUri, parent, parts.last())?.first
             val target = existing?.let { DocumentsContract.buildDocumentUriUsingTree(treeUri, it) }
@@ -79,8 +81,10 @@ internal class AndroidLocalRepositoryStore(context: Context) {
                     DocumentsContract.buildDocumentUriUsingTree(treeUri, parent),
                     "application/octet-stream",
                     parts.last(),
-                )!!
-            resolver.openOutputStream(target, "wt")!!.use { it.write(bytes) }
+                )
+                ?: throw IOException("Could not create $path in the picked folder; pick it again.")
+            (resolver.openOutputStream(target, "wt") ?: throw IOException("Could not write $path; pick the folder again."))
+                .use { it.write(bytes) }
         }
     }
 
@@ -91,8 +95,10 @@ internal class AndroidLocalRepositoryStore(context: Context) {
                 file.mkdirs()
                 copyTree(treeUri, id, file)
             } else {
-                resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(treeUri, id))!!.use { input ->
-                    file.outputStream().use(input::copyTo)
+                val input = resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(treeUri, id))
+                    ?: throw IOException("Could not read $name from the picked folder.")
+                input.use { stream ->
+                    file.outputStream().use(stream::copyTo)
                 }
             }
         }

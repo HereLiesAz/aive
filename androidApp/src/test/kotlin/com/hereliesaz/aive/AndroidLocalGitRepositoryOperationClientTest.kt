@@ -87,7 +87,9 @@ class AndroidLocalGitRepositoryOperationClientTest {
             repository = project(root).repository,
         )
         val chunks = runBlocking { LocalRepositoryChunkSource(JGitRepositoryReader).chunks(request) }
-        assertEquals(listOf("Repository file src/WorkflowDatabase.kt"), chunks.map { it.label })
-        assertTrue("= 1" in chunks.single().text, chunks.single().text)
+        // READMEs always qualify, so the fixture's README rides along with the matched file.
+        assertEquals(listOf("Repository file src/WorkflowDatabase.kt", "Repository file README.md"), chunks.map { it.label })
+        val database = chunks.first { it.label == "Repository file src/WorkflowDatabase.kt" }
+        assertTrue("= 1" in database.text, database.text)
     }
 }

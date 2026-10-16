@@ -128,6 +128,78 @@ class PuppetRigEvaluatorTest {
     }
 
     @Test
+    fun tailLengthSocketAndRigidityAffectEvaluatedGeometry() {
+        val body = PuppetPart(
+            id = "body",
+            rect = PuppetRect(0, 0, 20, 20),
+            rest = PuppetTransform(x = 50f, y = 50f),
+        )
+        val tail = PuppetPart(
+            id = "tail",
+            parent = "body",
+            rect = PuppetRect(20, 0, 10, 20),
+            pivot = PuppetPoint(0.5f, 0f),
+            kind = "tail",
+            rigidity = 0.5f,
+            stretch = PuppetStretch(axis = "y", length = 80f),
+            connectTo = "body-tail-root",
+        )
+        val state = motion("tail", PuppetPartMotion(
+            keys = mapOf(
+                "x" to listOf(PuppetKeyframe(0f, 20f)),
+                "scaleY" to listOf(PuppetKeyframe(0f, 3f)),
+            ),
+        ))
+        val r = rig(
+            parts = listOf(body, tail),
+            states = mapOf("Active" to state),
+            attachments = listOf(
+                PuppetAttachment("body-tail-root", "body", 1f, 0.5f, "tail-base"),
+                PuppetAttachment("tail-tip", "tail", 0.5f, 1f, "tail-tip"),
+            ),
+        )
+        r.validate()
+        val pose = PuppetRigEvaluator.evaluate(r, "Active", 0f)
+        // Parent pivot (50,50) + right-edge socket (10,0) + half of 20px motion.
+        near(70f, pose.part("tail")!!.pivotWorld.x)
+        near(50f, pose.part("tail")!!.pivotWorld.y)
+        // Half-rigid tail: scaleY=1+(3-1)/2=2; 80px tail stretches to 160px.
+        near(70f, pose.attachments.getValue("tail-tip").x)
+        near(210f, pose.attachments.getValue("tail-tip").y)
+
+        val rigid = r.copy(parts = listOf(body, tail.copy(rigidity = 1f)))
+        val rigidPose = PuppetRigEvaluator.evaluate(rigid, "Active", 0f)
+        near(60f, rigidPose.part("tail")!!.pivotWorld.x)
+        near(130f, rigidPose.attachments.getValue("tail-tip").y)
+    }
+
+    @Test
+    fun editorExtensionsRoundTripAndInvalidConnectionsAreRejected() {
+        val body = PuppetPart("body")
+        val tail = PuppetPart(
+            id = "tail", parent = "body", kind = "tail", rigidity = 0.4f,
+            stretch = PuppetStretch("x", 90f), connectTo = "socket",
+        )
+        val base = rig(
+            listOf(body, tail),
+            attachments = listOf(PuppetAttachment("socket", "body", 1f, 0.5f)),
+        )
+        assertEquals(base, PuppetRig.parse(PuppetRig.encode(base)))
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(parts = listOf(body, tail.copy(connectTo = "missing"))).validate()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(parts = listOf(body, tail.copy(rigidity = 1.5f))).validate()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(parts = listOf(body, tail.copy(stretch = PuppetStretch("y", -1f)))).validate()
+        }
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(attachments = base.attachments + base.attachments.first()).validate()
+        }
+    }
+
+    @Test
     fun parserRoundTripsAndRejectsBadRigs() {
         val r = rig(listOf(PuppetPart("a"), PuppetPart("b", parent = "a")))
         assertEquals(r, PuppetRig.parse(PuppetRig.encode(r)))

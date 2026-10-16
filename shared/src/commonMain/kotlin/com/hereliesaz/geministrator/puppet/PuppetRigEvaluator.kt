@@ -78,22 +78,35 @@ object PuppetRigEvaluator {
         val motion = resolved?.let { rig.states[it] }
         val cycle = phase - floor(phase)
         val byId = rig.parts.associateBy { it.id }
+        val attachmentsById = rig.attachments.associateBy { it.id }
         val world = HashMap<String, Pair<PuppetAffine, Float>>()
 
         fun resolve(part: PuppetPart): Pair<PuppetAffine, Float> {
             world[part.id]?.let { return it }
             val parent = part.parent?.let { byId[it] }?.let(::resolve) ?: (PuppetAffine.Identity to 1f)
             val m = motion?.parts?.get(part.id)
-            fun ch(name: String) = channelValue(m, name, cycle)
+            val flexibility = 1f - part.rigidity
+            fun ch(name: String): Float {
+                val identity = PuppetChannel.identity(name)
+                return identity + (channelValue(m, name, cycle) - identity) * flexibility
+            }
+            val parentPart = part.parent?.let(byId::get)
+            val socket = part.connectTo?.let(attachmentsById::get)
+            val anchorX = if (parentPart != null && socket?.part == parentPart.id) {
+                (socket.x - parentPart.pivot.x) * parentPart.drawnWidth
+            } else 0f
+            val anchorY = if (parentPart != null && socket?.part == parentPart.id) {
+                (socket.y - parentPart.pivot.y) * parentPart.drawnHeight
+            } else 0f
             val rest = part.rest
             val local = PuppetAffine.trs(
-                x = rest.x + ch(PuppetChannel.X),
-                y = rest.y + ch(PuppetChannel.Y),
+                x = anchorX + rest.x + ch(PuppetChannel.X),
+                y = anchorY + rest.y + ch(PuppetChannel.Y),
                 degrees = rest.rotation + ch(PuppetChannel.Rotation),
                 sx = rest.scaleX * ch(PuppetChannel.ScaleX),
                 sy = rest.scaleY * ch(PuppetChannel.ScaleY),
             )
-            val alpha = (parent.second * rest.alpha * ch(PuppetChannel.Alpha)).coerceIn(0f, 1f)
+            val alpha = (parent.second * rest.alpha * channelValue(m, PuppetChannel.Alpha, cycle)).coerceIn(0f, 1f)
             val result = (parent.first * local) to alpha
             world[part.id] = result
             return result

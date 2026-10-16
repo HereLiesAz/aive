@@ -47,6 +47,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Workflow add-ons / Azphalt](docs/architecture/ADDONS.md)
 - [Live runtime acceptance](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
+- [Remote API (Android)](docs/Remote-API.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
 
