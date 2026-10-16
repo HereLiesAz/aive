@@ -633,6 +633,7 @@
     <string name="store_inspect_update">Inspect update</string>
     <string name="store_install_and_connect">Install and connect</string>
     <string name="store_install_despite_an_unrecognized_signing_key">Install despite an unrecognized signing key</string>
+    <string name="store_install_unsigned_package">Install this unsigned package anyway</string>
     <string name="store_install_required_dependencies_before_this_package">Install required dependencies before this package.</string>
     <string name="store_install_verified_model">Install verified model</string>
     <string name="store_install_verified_package">Install verified package</string>
