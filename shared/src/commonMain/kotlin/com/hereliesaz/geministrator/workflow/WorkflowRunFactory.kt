@@ -93,8 +93,12 @@ object WorkflowRunFactory {
             val allTerminal = dependencyRuns.size == task.dependsOn.size &&
                 dependencyRuns.all { it.status.isTerminal() }
 
-            val allCompleted = dependencyRuns.size == task.dependsOn.size &&
-                dependencyRuns.all { it.status == TaskRunStatus.Completed }
+            // A dependency skipped because its own condition was not met is a branch that was not
+            // taken, not a failure: an Always join after it proceeds on the branches that did run.
+            val allCompletedOrSkipped = allTerminal &&
+                dependencyRuns.all { it.status == TaskRunStatus.Completed || it.isSkippedBranch() }
+            val anyCompleted = dependencyRuns.isEmpty() ||
+                dependencyRuns.any { it.status == TaskRunStatus.Completed }
 
             val conditionTargetRun = when (val c = task.condition) {
                 is TaskCondition.Always -> null
@@ -107,7 +111,7 @@ object WorkflowRunFactory {
             val conditionSettled = allTerminal &&
                 (conditionTargetRun == null || conditionTargetRun.status.isTerminal())
             val conditionMet: Boolean = when (task.condition) {
-                is TaskCondition.Always -> allCompleted
+                is TaskCondition.Always -> allCompletedOrSkipped && anyCompleted
                 is TaskCondition.OnAnyOutcome -> conditionSettled && conditionTargetRun != null
                 is TaskCondition.OnFailure -> conditionSettled && conditionTargetRun != null &&
                     (conditionTargetRun.status == TaskRunStatus.Failed ||
@@ -117,9 +121,15 @@ object WorkflowRunFactory {
 
             // Always-conditioned tasks stay Blocked when a dep fails rather than being cancelled:
             // the happy-path semantics let the workflow continue via failure handlers without
-            // prematurely cancelling tasks that haven't had a chance to run yet.
-            val conditionUnreachable =
-                task.condition !is TaskCondition.Always && conditionSettled && !conditionMet
+            // prematurely cancelling tasks that haven't had a chance to run yet. Once every
+            // dependency is Completed or Cancelled, though, nothing can unblock them, so a join
+            // that no completed branch reaches is skipped instead of waiting forever.
+            val conditionUnreachable = if (task.condition is TaskCondition.Always) {
+                allTerminal && !conditionMet &&
+                    dependencyRuns.all { it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled }
+            } else {
+                conditionSettled && !conditionMet
+            }
             when {
                 conditionMet -> taskRun.copy(
                     status = TaskRunStatus.Ready,
@@ -128,7 +138,7 @@ object WorkflowRunFactory {
                 conditionUnreachable -> taskRun.copy(
                     status = TaskRunStatus.Cancelled,
                     blockingReason = BlockingReason(
-                        code = "CONDITION_NOT_MET",
+                        code = CONDITION_NOT_MET,
                         message = "Task condition was not satisfied; task will not run.",
                     ),
                 )
@@ -136,9 +146,17 @@ object WorkflowRunFactory {
             }
         }
 
+        // Unchanged readiness leaves the run untouched, so an idle cycle can recognise it has
+        // nothing to do instead of rewriting the run every second.
+        if (refreshed == run.taskRuns) return run
         return run.copy(
             taskRuns = refreshed,
             updatedAtEpochMillis = nowEpochMillis,
         )
     }
+
+    private fun TaskRun.isSkippedBranch() =
+        status == TaskRunStatus.Cancelled && blockingReason?.code == CONDITION_NOT_MET
+
+    private const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
 }

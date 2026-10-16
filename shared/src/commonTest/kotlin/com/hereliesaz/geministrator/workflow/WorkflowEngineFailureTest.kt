@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.InMemoryWorkflowEventSink
 import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskEscalated
@@ -173,6 +174,22 @@ class WorkflowEngineFailureTest {
         assertEquals(BuiltInRoles.RecoveryEngineer.id, reassigned.taskRuns.getValue(taskId).assignedRoleId)
         assertEquals(TaskRunStatus.Retrying, reassigned.taskRuns.getValue(taskId).status)
         assertTrue(events.snapshot().any { it is TaskEscalated && it.reassignedRoleId == BuiltInRoles.RecoveryEngineer.id })
+        assertEquals(3, reassigned.taskRuns.getValue(taskId).attempt)
+
+        // The reassigned attempt failing too ends the run instead of reassigning forever.
+        val reassignedFailed = reassigned.copy(
+            taskRuns = reassigned.taskRuns + (taskId to reassigned.taskRuns.getValue(taskId).copy(status = TaskRunStatus.Failed)),
+        )
+        val failed = engine.handleFailure(
+            definition = definition,
+            run = reassignedFailed,
+            taskDefinitionId = taskId,
+            retryReason = RetryReason.ProviderFailure,
+            reason = "recovery failed too",
+            nowEpochMillis = 30L,
+        )
+        assertEquals(WorkflowRunStatus.Failed, failed.status)
+        assertEquals(TaskRunStatus.Failed, failed.taskRuns.getValue(taskId).status)
     }
 }
 

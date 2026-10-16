@@ -98,6 +98,15 @@ class OpenAiResponsesApi(
         }
         response.requireSuccess("generate OpenAI response")
         val payload = response.body<OpenAiResponse>()
+        // A response cut off by max_output_tokens (or a content filter) is `incomplete`: partial
+        // text must never be promoted to a completed result.
+        if (payload.status == "incomplete" || payload.status == "failed") {
+            error(
+                "OpenAI response ${payload.status}: " +
+                    (payload.error?.message ?: payload.incompleteDetails?.reason ?: "no detail") +
+                    "; output is incomplete",
+            )
+        }
         val text = payload.output
             .asSequence()
             .flatMap { it.content.asSequence() }
@@ -119,6 +128,7 @@ class OpenAiResponsesApi(
             val text = StringBuilder()
             val thinking = StringBuilder()
             var usage: OpenAiUsage? = null
+            var completed = false
             client.postServerSentEvents(
                 url = "$baseUrl/responses",
                 operation = "stream OpenAI response",
@@ -149,7 +159,10 @@ class OpenAiResponsesApi(
                         text.append(it)
                         onChunk(TextGenerationChunk.Text(it))
                     }
-                    "response.completed" -> usage = event.response?.usage
+                    "response.completed" -> {
+                        usage = event.response?.usage
+                        completed = true
+                    }
                     "response.failed", "response.incomplete" -> error(
                         "OpenAI response ${event.type.substringAfter('.')}: " +
                             (event.response?.error?.message ?: event.response?.incompleteDetails?.reason ?: "no detail"),
@@ -157,6 +170,7 @@ class OpenAiResponsesApi(
                     "error" -> error("OpenAI stream error: ${event.message ?: data.take(300)}")
                 }
             }
+            requireStreamTerminated(completed, "OpenAI")
             if (text.isBlank()) error("OpenAI response did not contain output text")
             TextGenerationResult(
                 text = text.toString(),
@@ -252,6 +266,7 @@ class AnthropicMessagesApi(
         var inputTokens: Long? = null
         var outputTokens: Long? = null
         var stopReason: String? = null
+        var stopped = false
         client.postServerSentEvents(
             url = "$baseUrl/messages",
             operation = "stream Claude response",
@@ -291,9 +306,11 @@ class AnthropicMessagesApi(
                     event.delta?.stopReason?.let { stopReason = it }
                     event.usage?.outputTokens?.let { outputTokens = it }
                 }
+                "message_stop" -> stopped = true
                 "error" -> error("Claude stream error: ${event.error?.message ?: data.take(300)}")
             }
         }
+        requireStreamTerminated(stopped, "Claude")
         when (stopReason) {
             "max_tokens" -> error("Claude response was truncated at the token limit; output is incomplete")
             "refusal" -> error("Claude declined this request")
@@ -338,6 +355,7 @@ class GeminiGenerateContentApi(
         }
         response.requireSuccess("generate Gemini response")
         val payload = response.body<GeminiGenerateContentResponse>()
+        payload.candidates.firstOrNull()?.finishReason?.let(::requireCompleteGeminiFinish)
         val text = payload.candidates
             .asSequence()
             .flatMap { it.content?.parts.orEmpty().asSequence() }
@@ -359,6 +377,7 @@ class GeminiGenerateContentApi(
             val text = StringBuilder()
             val reasoning = StringBuilder()
             var usage: GeminiUsageMetadata? = null
+            var finishReason: String? = null
             client.postServerSentEvents(
                 url = "$baseUrl/models/$model:streamGenerateContent?alt=sse",
                 operation = "stream Gemini response",
@@ -376,6 +395,7 @@ class GeminiGenerateContentApi(
                 val chunk = streamJson.decodeFromString<GeminiGenerateContentResponse>(data)
                 chunk.error?.let { error("Gemini stream error: ${it.message ?: data.take(300)}") }
                 chunk.usageMetadata?.let { usage = it }
+                chunk.candidates.firstOrNull()?.finishReason?.let { finishReason = it }
                 chunk.candidates.flatMap { it.content?.parts.orEmpty() }.forEach { part ->
                     val piece = part.text?.takeIf(String::isNotEmpty) ?: return@forEach
                     if (part.thought == true) {
@@ -387,6 +407,9 @@ class GeminiGenerateContentApi(
                     }
                 }
             }
+            // The last chunk carries the finish reason; a stream without one was cut off.
+            requireStreamTerminated(finishReason != null, "Gemini")
+            finishReason?.let(::requireCompleteGeminiFinish)
             if (text.isBlank()) error("Gemini response did not contain text")
             TextGenerationResult(
                 text = text.toString(),
@@ -457,6 +480,9 @@ private data class OpenAiIncompleteDetails(val reason: String? = null)
 private data class OpenAiResponse(
     val output: List<OpenAiOutputItem> = emptyList(),
     val usage: OpenAiUsage? = null,
+    val status: String? = null,
+    val error: OpenAiStreamError? = null,
+    @SerialName("incomplete_details") val incompleteDetails: OpenAiIncompleteDetails? = null,
 )
 
 @Serializable
@@ -578,7 +604,17 @@ private data class GeminiGenerateContentResponse(
 @Serializable
 private data class GeminiCandidate(
     val content: GeminiContent? = null,
+    val finishReason: String? = null,
 )
+
+/** Only a natural stop is a complete answer; MAX_TOKENS, SAFETY, RECITATION and the like are not. */
+private fun requireCompleteGeminiFinish(finishReason: String) {
+    when (finishReason) {
+        "STOP", "FINISH_REASON_UNSPECIFIED" -> Unit
+        "MAX_TOKENS" -> error("Gemini response was truncated at the token limit; output is incomplete")
+        else -> error("Gemini response stopped early ($finishReason); output is incomplete")
+    }
+}
 
 @Serializable
 private data class GeminiUsageMetadata(

@@ -1,6 +1,6 @@
 # Privacy Policy for The Aive
 
-**Effective date: October 15, 2026**
+**Effective date: October 16, 2026**
 
 This policy describes the current source-available builds of **The Aive**, application ID `com.hereliesaz.aive`.
 
@@ -13,6 +13,7 @@ Android ships in two flavors. The **GitHub release** flavor (APKs published on G
 - The current source does **not** include advertising SDKs.
 - The current source does **not** include third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry SDKs.
 - The GitHub release flavor for Android has opt-in crash/ANR reporting: it is **off unless you turn it on** in Settings. It is first-party code that posts to a first-party relay, not a telemetry SDK. See [Crash and ANR reports](#crash-and-anr-reports-github-release-flavor-only).
+- Android has an opt-in **Remote access** feature, **off by default**, that lets your own IDEaz on another device reach The Aive through a relay. The relay sees only encrypted data, a room name and your IP address. See [Remote access](#remote-access-android).
 - The Aive does **not** sell personal information.
 - Workflow state is stored locally by the application unless it must be sent to an external service to perform work you requested.
 - External providers process data under their own privacy policies and retention practices.
@@ -31,7 +32,7 @@ Depending on how you use the app, The Aive may store:
 - workflow events
 - artifacts and references to artifacts
 - provider/executor run identifiers needed to resume work
-- settings, such as distributed-compute configuration and whether crash reporting or the Gemini bridge is enabled
+- settings, such as distributed-compute configuration and whether crash reporting, the Gemini bridge or Remote access is enabled
 - on the Android GitHub release flavor, crash/ANR reports waiting to be sent (only while crash reporting is on)
 
 Workflow state is stored locally:
@@ -56,7 +57,7 @@ The Aive works with external services only when you connect them and assign work
 
 - **Hosted LLM providers.** OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud, Z.ai, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply. If you connect OpenAI, node-character image generation also sends its image prompts to OpenAI's Images API.
 - **Keyless free tiers.** Kilo Gateway, LLM7, and OVHcloud AI Endpoints can be linked without a key. Prompts then go to those gateways unauthenticated, and their rate limits are keyed by your IP address.
-- **Companion apps on Android (IDEaz).** Apps signed with The Aive's own key can ask it to run a prompt or start a workflow ([Remote API](Remote-API.md)). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this.
+- **Companion apps on Android (IDEaz).** Apps signed with The Aive's own key can ask it to run a prompt or start a workflow ([Remote API](Remote-API.md)). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this. With [Remote access](#remote-access-android) on, your own IDEaz on another device can do the same through an encrypted relay.
 - **Language models from the Azphalt Store.** A hosted model you install from the Store becomes a provider that The Aive calls directly at the address in its signed package. Prompts go to that operator, and the Store shows what the operator does with them (for example, that a free route may log and train on prompts) before you install. A key you add stays in this device's credential store and is sent only to that address. The package's setup script is never run.
 - **GitLab workspace agents** (gitlab.com). A linked LLM provider receives a bounded file tree and selected file contents from your GitLab project. The Aive then uses your GitLab token to commit the model's changes to a new `haive/...` branch.
 - **Local Git workspace agents** (desktop only). A linked LLM provider receives a bounded snapshot of files from your local repository. Changes are committed to a new local `haive/...` branch. Nothing is pushed unless a separate repository operation pushes it.
@@ -116,6 +117,16 @@ The Android GitHub release flavor includes automatic crash and app-not-respondin
 
 Like any web request, a report reveals your IP address to the relay's host. The payload itself does not include it.
 
+## Remote access (Android)
+
+Remote access lets IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It exists in both Android flavors and is **off by default**: nothing runs, connects or is created until you turn on **Settings → Remote Access**.
+
+- **What turning it on does.** The Aive creates a random pairing (a room name, two relay tokens and an encryption key) and runs a foreground service, shown by a persistent notification, that keeps a connection to a relay open. The relay defaults to `https://aive-relay.hereliesaz.workers.dev`, operated by the project maintainer on Cloudflare; you can enter your own relay before turning it on.
+- **What the relay sees.** Every message between The Aive and IDEaz is encrypted on your devices with a key that never leaves the pairing code, so the relay and Cloudflare see only ciphertext, its size and timing, the room name, and the IP addresses of the two devices. They cannot read your prompts, the replies or your workflows. The relay stores only hashes of the two tokens, and deletes a room 30 days after The Aive last connected to it.
+- **What the pairing code allows.** The code is what you give IDEaz. Anyone who has it can run prompts on your linked AI providers (using your credentials and quota) and queue workflows on this device, until you revoke it. Treat it like a password. The code is shown only on this screen, never sent anywhere by The Aive, and does not contain the host token; the pairing, host token included, is stored encrypted under the Android Keystore and is excluded from backup and device transfer.
+- **Where your data goes.** A prompt received this way goes to the provider IDEaz names or else the one you linked for planning, exactly as for the local [companion-app](#external-providers-and-executors) path; it is never sent to an unlinked keyless gateway.
+- **Revoking.** Turn Remote access off (or press **Turn off** in the notification) to delete the room on the relay and forget the pairing at once; the old code then stops working. **Reset pairing** does the same and creates a new pairing, so IDEaz must be given the new code. If the relay cannot be reached when you revoke, the pairing is still forgotten on this device and the relay deletes the unused room after 30 days.
+
 ## Updates and downloads
 
 - **Android GitHub release flavor.** The app periodically checks the public GitHub Releases API for `HereLiesAz/aive`, without authentication. When a newer APK is available, the app downloads it from GitHub Releases, verifies GitHub's published SHA-256 digest when one is present, and installs it only after you confirm.
@@ -137,7 +148,7 @@ A workflow may store the **name** of a required secret, but not its value.
 
 Where credentials are stored today (a key for a provider the app no longer supports, such as Jules, is deleted the next time credentials are read):
 
-- **Android.** Provider, repository, and relay credentials are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.
+- **Android.** Provider, repository, and relay credentials, and the Remote access pairing, are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.
 - **Desktop.** Credentials are kept in the macOS Keychain, the Linux Secret Service (`secret-tool`), or Windows DPAPI. If none of these is available, the credential is refused instead of being stored in plain text.
 - **Web.** Credentials are stored in the browser's localStorage for the site, encrypted with a non-extractable AES-GCM key kept in the site's IndexedDB. A copy of the storage alone does not reveal them, but code running on the page can still use the key. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) store them unencrypted.
 
@@ -159,7 +170,7 @@ Deleting local data does not automatically delete data already sent to an extern
 
 ## Data sharing
 
-The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. The current application does not sell personal data or share workflow content with advertisers.
+The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. If you enable Remote access, encrypted messages pass through the relay you chose. The current application does not sell personal data or share workflow content with advertisers.
 
 ## Children's privacy
 

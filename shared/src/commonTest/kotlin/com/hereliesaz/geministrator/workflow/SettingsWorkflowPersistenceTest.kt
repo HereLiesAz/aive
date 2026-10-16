@@ -254,6 +254,18 @@ class SettingsWorkflowPersistenceTest {
     }
 
     @Test
+    fun identicalEventsInTheJournalAreBothKept() = runBlocking {
+        val persistence = SettingsWorkflowPersistence(MapSettings())
+        val runId = WorkflowRunId("run-identical")
+        val event = TaskStarted(runId, TaskDefinitionId("task"), attempt = 1, occurredAtEpochMillis = 5L)
+
+        persistence.events.append(event)
+        persistence.events.append(event)
+
+        assertEquals(listOf<WorkflowEvent>(event, event), persistence.events.forRun(runId))
+    }
+
+    @Test
     fun eventJournalDoesNotRewriteWholeSnapshotForEveryAppend() = runBlocking {
         val settings = MapSettings()
         val persistence = SettingsWorkflowPersistence(settings)

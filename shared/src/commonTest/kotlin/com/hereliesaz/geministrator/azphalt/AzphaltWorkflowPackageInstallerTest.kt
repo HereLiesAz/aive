@@ -87,6 +87,48 @@ class AzphaltWorkflowPackageInstallerTest {
     }
 
     @Test
+    fun unsignedPackageNeedsTheSameExplicitApprovalAsAnUntrustedSigner() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val installer = installer(persistence, SettingsAzphaltInstallStore(MapSettings()))
+        val unsigned = packageFor().copy(signed = false, signerPublicKey = null)
+        val plan = installer.inspect(verification(unsigned, trusted = false, reason = "unsigned: no signer to trust"))
+
+        assertFailsWith<IllegalArgumentException> {
+            installer.install(plan, AZPHALT_STORE_URL, emptySet(), 10L)
+        }
+        assertNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+
+        installer.install(plan, AZPHALT_STORE_URL, emptySet(), 10L, allowUntrustedSigner = true)
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+        Unit
+    }
+
+    @Test
+    fun upgradeRemovesDefinitionsDroppedFromTheNewVersion() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val store = SettingsAzphaltInstallStore(MapSettings())
+        val installer = installer(persistence, store)
+        installer.install(
+            installer.inspect(verification(packageFor(definitionId = "old-flow"))),
+            AZPHALT_STORE_URL,
+            emptySet(),
+            10L,
+        )
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("old-flow")))
+
+        installer.install(
+            installer.inspect(verification(packageFor(version = "2.0.0", definitionId = "new-flow"))),
+            AZPHALT_STORE_URL,
+            emptySet(),
+            20L,
+        )
+
+        assertNull(persistence.definitions.get(WorkflowDefinitionId("old-flow")))
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("new-flow")))
+        assertEquals(listOf("new-flow"), store.get("com.example.release")?.workflowDefinitionIds)
+    }
+
+    @Test
     fun packageCannotOverwriteUnownedWorkflowId() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
