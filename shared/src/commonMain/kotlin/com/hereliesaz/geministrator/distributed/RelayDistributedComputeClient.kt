@@ -125,6 +125,9 @@ class RelayDistributedComputeClient(
         require(relayBaseUrl.isNotBlank()) { "relayBaseUrl must not be blank" }
         require(poolId.isNotBlank()) { "poolId must not be blank" }
         require(bearerToken.isNotBlank()) { "bearerToken must not be blank" }
+        require(isSecureRelayUrl(relayBaseUrl)) {
+            "The relay bearer token is only sent over wss:// or https:// (plain ws:// and http:// are allowed for localhost only)"
+        }
 
         val socket = httpClient.webSocketSession(
             urlString = relayBaseUrl.trimEnd('/') + "/v1/compute/" + poolId,
@@ -294,4 +297,15 @@ class RelayDistributedComputeGateway(
     override suspend fun submit(envelope: DistributedTaskEnvelope) = client.publish(envelope)
 
     override suspend fun cancel(leaseId: String, reason: String?) = client.cancel(leaseId, reason)
+}
+
+/** True for wss/https, or ws/http to a loopback host, where the bearer token cannot cross a network in clear. */
+internal fun isSecureRelayUrl(url: String): Boolean {
+    val trimmed = url.trim()
+    val scheme = trimmed.substringBefore("://", missingDelimiterValue = "").lowercase()
+    if (scheme == "wss" || scheme == "https") return true
+    if (scheme != "ws" && scheme != "http") return false
+    val authority = trimmed.substringAfter("://").substringBefore('/').substringBefore('?').substringAfterLast('@')
+    val host = if (authority.startsWith("[")) authority.substringBefore(']') + "]" else authority.substringBefore(':')
+    return host.lowercase() in setOf("localhost", "127.0.0.1", "[::1]")
 }
