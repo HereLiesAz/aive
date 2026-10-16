@@ -1,0 +1,13 @@
+# The Aive remote relay: forwards end-to-end encrypted frames between a paired
+# Aive device (host) and IDEaz (clients). See docs/Remote-API.md.
+name = "aive-relay"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RemoteRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RemoteRoom"]

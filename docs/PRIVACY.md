@@ -1,6 +1,6 @@
 # Privacy Policy for The Aive
 
-**Effective date: October 12, 2026**
+**Effective date: October 15, 2026**
 
 This policy describes the current source-available builds of **The Aive**, application ID `com.hereliesaz.aive`.
 
@@ -56,6 +56,7 @@ The Aive works with external services only when you connect them and assign work
 
 - **Hosted LLM providers.** OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud, Z.ai, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply. If you connect OpenAI, node-character image generation also sends its image prompts to OpenAI's Images API.
 - **Keyless free tiers.** Kilo Gateway, LLM7, and OVHcloud AI Endpoints can be linked without a key. Prompts then go to those gateways unauthenticated, and their rate limits are keyed by your IP address.
+- **Companion apps on Android (IDEaz).** Apps signed with The Aive's own key can ask it to run a prompt or start a workflow ([Remote API](Remote-API.md)). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this.
 - **Language models from the Azphalt Store.** A hosted model you install from the Store becomes a provider that The Aive calls directly at the address in its signed package. Prompts go to that operator, and the Store shows what the operator does with them (for example, that a free route may log and train on prompts) before you install. A key you add stays in this device's credential store and is sent only to that address. The package's setup script is never run.
 - **GitLab workspace agents** (gitlab.com). A linked LLM provider receives a bounded file tree and selected file contents from your GitLab project. The Aive then uses your GitLab token to commit the model's changes to a new `haive/...` branch.
 - **Local Git workspace agents** (desktop only). A linked LLM provider receives a bounded snapshot of files from your local repository. Changes are committed to a new local `haive/...` branch. Nothing is pushed unless a separate repository operation pushes it.

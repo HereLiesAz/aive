@@ -3,6 +3,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+      Remote API (docs/Remote-API.md): only apps signed with The Aive's key (IDEaz) may bind
+      AiveRemoteService. Only The Aive defines it; clients just request it.
+    -->
+    <permission
+        android:name="com.hereliesaz.aive.permission.REMOTE"
+        android:label="Use The Aive's models and workflows"
+        android:protectionLevel="signature" />
+
 
     <application
         android:allowBackup="true"
@@ -43,6 +52,15 @@
                 <data android:mimeType="application/x-azphalt" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".remote.AiveRemoteService"
+            android:exported="true"
+            android:permission="com.hereliesaz.aive.permission.REMOTE">
+            <intent-filter>
+                <action android:name="com.hereliesaz.aive.action.REMOTE" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>

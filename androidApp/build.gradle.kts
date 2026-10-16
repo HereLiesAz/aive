@@ -163,6 +163,21 @@ tasks.matching { task ->
     dependsOn(buildAndroidBitcosNative, buildAndroidDjlTokenizerNative)
 }
 
+// A release package without the keystore is unusable (Play rejects it; sideloads cannot update
+// the installed signature), so fail loudly instead of emitting an unsigned artifact. Minify-only
+// tasks stay unguarded: PR CI runs R8 without secrets.
+val releaseKeystoreConfigured = !System.getenv("HAIVE_KEYSTORE_PATH").isNullOrBlank()
+// packagePlayRelease, packageGithubRelease, signPlayReleaseBundle; not packageXReleaseResources,
+// which R8 depends on.
+val releasePackagingTask = Regex("^(package[A-Z]\\w*Release|sign[A-Z]\\w*ReleaseBundle)$")
+tasks.matching { task -> releasePackagingTask.matches(task.name) }.configureEach {
+    doFirst {
+        check(releaseKeystoreConfigured) {
+            "Release signing is not configured: set HAIVE_KEYSTORE_PATH, KEYSTORE_PASSWORD and KEY_ALIAS."
+        }
+    }
+}
+
 dependencies {
     implementation(projects.shared)
     implementation(libs.jgit)
