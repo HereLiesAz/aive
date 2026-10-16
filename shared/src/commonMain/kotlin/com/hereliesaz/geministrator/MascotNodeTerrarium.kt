@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +62,11 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.terrarium_reset_zoom
+import com.hereliesaz.geministrator.resources.terrarium_zoom_in
+import com.hereliesaz.geministrator.resources.terrarium_zoom_out
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Production workflow-mascot host.
@@ -874,27 +881,40 @@ private fun TerrariumZoomControls(
             .background(Azphalt.Ink.copy(alpha = 0.86f)),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = "+",
-            style = AzphaltType.section,
-            color = Azphalt.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.clickable(onClick = onZoomIn).padding(horizontal = 15.dp, vertical = 7.dp),
-        )
-        Text(
-            text = "${(zoom * 100f).roundToInt()}%",
-            style = AzphaltType.endCap,
-            color = Azphalt.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.clickable(onClick = onReset).padding(horizontal = 8.dp, vertical = 6.dp),
-        )
-        Text(
-            text = "−",
-            style = AzphaltType.section,
-            color = Azphalt.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.clickable(onClick = onZoomOut).padding(horizontal = 15.dp, vertical = 7.dp),
-        )
+        val zoomPercent = "${(zoom * 100f).roundToInt()}%"
+        TerrariumZoomButton(
+            label = stringResource(Res.string.terrarium_zoom_in),
+            onClick = onZoomIn,
+        ) {
+            Text(text = "+", style = AzphaltType.section, color = Azphalt.White, textAlign = TextAlign.Center)
+        }
+        TerrariumZoomButton(
+            label = stringResource(Res.string.terrarium_reset_zoom, zoomPercent),
+            onClick = onReset,
+        ) {
+            Text(text = zoomPercent, style = AzphaltType.endCap, color = Azphalt.White, textAlign = TextAlign.Center)
+        }
+        TerrariumZoomButton(
+            label = stringResource(Res.string.terrarium_zoom_out),
+            onClick = onZoomOut,
+        ) {
+            Text(text = "−", style = AzphaltType.section, color = Azphalt.White, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/** A zoom control with a 48dp touch target, a button role and a spoken [label]. */
+@Composable
+private fun TerrariumZoomButton(label: String, onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = label }
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 

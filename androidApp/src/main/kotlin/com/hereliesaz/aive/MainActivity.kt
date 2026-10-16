@@ -132,6 +132,8 @@ class MainActivity : ComponentActivity() {
         // Before anything opens the workflow store (WorkflowPersistenceFactory.durable).
         com.hereliesaz.geministrator.persistence.AndroidWorkflowPersistence.install(this)
         CrashReporting.install(this) { crashReportNoticeVisible = true }
+        // Before the queue reaches App: a request that waited too long is reported, not launched.
+        AiveRemoteBridge.pruneExpired()
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
@@ -430,7 +432,7 @@ class MainActivity : ComponentActivity() {
                         azphaltPackageImportRequest = azphaltHost.importRequest,
                         onAzphaltPackageImportHandled = azphaltHost::consumeImport,
                         externalWorkflowLaunchRequests = remoteLaunchRequests,
-                        onExternalWorkflowLaunchHandled = AiveRemoteBridge::consume,
+                        onExternalWorkflowLaunchHandled = AiveRemoteBridge::complete,
                         onRuntimeStateChanged = AiveRemoteBridge::publish,
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         contextChunkSources = contextChunkSources,
@@ -523,6 +525,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        AiveRemoteBridge.pruneExpired()
         if (::updateCoordinator.isInitialized) {
             updateCoordinator.onResume()
         }

@@ -10,7 +10,6 @@ import android.os.Message
 import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import android.os.RemoteException
-import com.hereliesaz.aive.AndroidProviderCredentialStore
 import com.hereliesaz.aive.remote.AiveRemoteProtocol as P
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -30,12 +29,23 @@ import kotlinx.coroutines.withContext
  */
 class AiveRemoteService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val watchers = mutableMapOf<IBinder, Job>()
+    private val watchers = mutableMapOf<IBinder, Watcher>()
     private val messenger by lazy { Messenger(Handler(Looper.getMainLooper(), ::handle)) }
+    private val handler by lazy { AiveRemoteHandler(this) }
+
+    /** A watching client's stream and the death link that ends it when the client dies. */
+    private class Watcher(val job: Job, val deathRecipient: IBinder.DeathRecipient)
 
     override fun onBind(intent: Intent): IBinder = messenger.binder
 
+    /** Every client has unbound, so nobody is left to watch. */
+    override fun onUnbind(intent: Intent): Boolean {
+        watchers.keys.toList().forEach(::stopWatching)
+        return false
+    }
+
     override fun onDestroy() {
+        watchers.keys.toList().forEach(::stopWatching)
         scope.cancel()
         super.onDestroy()
     }
@@ -61,10 +71,7 @@ class AiveRemoteService : Service() {
         scope.launch {
             try {
                 val prompt = withContext(Dispatchers.IO) { readPrompt(requireNotNull(fd) { "No prompt was sent" }) }
-                val credentials = withContext(Dispatchers.IO) { AndroidProviderCredentialStore(this@AiveRemoteService).readAll() }
-                val api = remoteTextApi(credentials, providerId, model)
-                    ?: error("Aive provider ${providerId ?: "(default)"} is not linked")
-                val text = withContext(Dispatchers.IO) { api.generate(prompt).text }
+                val text = handler.prompt(prompt, providerId, model)
                 reply(replyTo, P.MSG_RESULT, requestId) { putString(P.KEY_TEXT, text) }
             } catch (failure: CancellationException) {
                 throw failure
@@ -75,29 +82,31 @@ class AiveRemoteService : Service() {
     }
 
     private fun launchWorkflow(replyTo: Messenger, requestId: Long, data: Bundle) {
-        val objective = data.getString(P.KEY_OBJECTIVE)?.trim().orEmpty()
-        val projectName = data.getString(P.KEY_PROJECT_NAME)?.trim().orEmpty()
-        val repositoryUrl = data.getString(P.KEY_REPOSITORY_URL)?.takeIf(String::isNotBlank)
-        val repository = gitHubRepositoryRef(repositoryUrl)
-        val problem = when {
-            objective.isEmpty() -> "Objective is required"
-            projectName.isEmpty() -> "Project name is required"
-            repositoryUrl != null && repository == null -> "Only https://github.com/owner/name repositories are supported"
-            else -> null
-        }
-        if (problem != null) {
-            reply(replyTo, P.MSG_ERROR, requestId) { putString(P.KEY_ERROR, problem) }
+        val launchId = try {
+            handler.launchWorkflow(
+                projectName = data.getString(P.KEY_PROJECT_NAME),
+                objective = data.getString(P.KEY_OBJECTIVE),
+                repositoryUrl = data.getString(P.KEY_REPOSITORY_URL),
+            )
+        } catch (problem: IllegalArgumentException) {
+            reply(replyTo, P.MSG_ERROR, requestId) { putString(P.KEY_ERROR, problem.message) }
+            return
+        } catch (problem: IllegalStateException) {
+            reply(replyTo, P.MSG_ERROR, requestId) { putString(P.KEY_ERROR, problem.message) }
             return
         }
-        AiveRemoteBridge.enqueue(projectName, objective, repository)
-        reply(replyTo, P.MSG_RESULT, requestId) {}
+        reply(replyTo, P.MSG_RESULT, requestId) { putLong(P.KEY_LAUNCH_ID, launchId) }
     }
 
-    /** Streams [AiveRemoteBridge.runStatus] until the client's binder dies or it watches again. */
+    /**
+     * Streams [AiveRemoteBridge.runStatus] and launch outcomes until the client's binder dies, it
+     * watches again, or every client unbinds.
+     */
     private fun watchRun(replyTo: Messenger, requestId: Long) {
         val binder = replyTo.binder
-        watchers.remove(binder)?.cancel()
-        val job = scope.launch {
+        stopWatching(binder)
+        val job = Job(scope.coroutineContext[Job])
+        scope.launch(job) {
             AiveRemoteBridge.runStatus.filterNotNull().collect { status ->
                 val delivered = reply(replyTo, P.MSG_RUN_STATUS, requestId) {
                     putString(P.KEY_RUN_ID, status.runId)
@@ -107,11 +116,36 @@ class AiveRemoteService : Service() {
                     putInt(P.KEY_TASKS_DONE, status.tasksDone)
                     putString(P.KEY_PROGRESS_MESSAGE, status.progressMessage)
                 }
-                if (!delivered) cancel()
+                if (!delivered) job.cancel()
             }
         }
-        watchers[binder] = job
-        job.invokeOnCompletion { if (watchers[binder] === job) watchers.remove(binder) }
+        scope.launch(job) {
+            AiveRemoteBridge.outcomes.collect { outcome ->
+                val delivered = reply(replyTo, P.MSG_LAUNCH_OUTCOME, requestId) {
+                    putLong(P.KEY_LAUNCH_ID, outcome.requestId)
+                    putBoolean(P.KEY_LAUNCH_STARTED, outcome.started)
+                    putString(P.KEY_ERROR, outcome.error)
+                }
+                if (!delivered) job.cancel()
+            }
+        }
+        // The client can die without unbinding cleanly and before anything is sent to it, so a
+        // failed reply alone would never notice; the death link does.
+        val deathRecipient = IBinder.DeathRecipient { scope.launch { stopWatching(binder) } }
+        try {
+            binder.linkToDeath(deathRecipient, 0)
+        } catch (_: RemoteException) {
+            job.cancel()
+            return
+        }
+        watchers[binder] = Watcher(job, deathRecipient)
+        job.invokeOnCompletion { scope.launch { if (watchers[binder]?.job === job) stopWatching(binder) } }
+    }
+
+    private fun stopWatching(binder: IBinder) {
+        val watcher = watchers.remove(binder) ?: return
+        watcher.job.cancel()
+        runCatching { binder.unlinkToDeath(watcher.deathRecipient, 0) }
     }
 
     private fun readPrompt(fd: ParcelFileDescriptor): String =

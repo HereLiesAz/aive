@@ -98,13 +98,27 @@ class LiveStepsFeedModel(val maxRows: Int = 5) {
                 rows = listOfNotNull(evicted?.let { LiveStepRow(it.id, it.text, slot = -1, exiting = true) }) + visible,
             )
         }
-        // Publish the latest snapshot (not this call's result) so concurrent pushes converge.
-        _rows.value = state.value.rows
+        publishLatest()
     }
 
     fun clear() {
         state.update { State(nextId = it.nextId) }
-        _rows.value = emptyList()
+        publishLatest()
+    }
+
+    /**
+     * Copies the latest snapshot to [rows]. A plain `_rows.value = state.value.rows` can lose a
+     * race: a caller that read an older snapshot may write it after a newer one was published.
+     * Here a caller returns only once its compare-and-set succeeded and the snapshot it published
+     * was still the latest afterwards; any caller that overwrote a newer value retries, so the
+     * last caller to return leaves [rows] matching the state.
+     */
+    private fun publishLatest() {
+        while (true) {
+            val shown = _rows.value
+            val snapshot = state.value
+            if (_rows.compareAndSet(shown, snapshot.rows) && state.value === snapshot) return
+        }
     }
 }
 

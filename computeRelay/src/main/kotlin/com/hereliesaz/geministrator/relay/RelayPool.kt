@@ -28,6 +28,8 @@ class RelayPool(
         val progress: com.hereliesaz.geministrator.distributed.DistributedExecutionProgress? = null,
         val result: com.hereliesaz.geministrator.distributed.DistributedExecutionResult? = null,
         val completedAtEpochMillis: Long? = null,
+        /** Relay clock, not the origin's: an unfinished lease is dropped [MAX_UNFINISHED_LEASE_AGE_MILLIS] after it. */
+        val acceptedAtEpochMillis: Long,
     )
 
     private val mutex = Mutex()
@@ -54,6 +56,7 @@ class RelayPool(
                         progress = persisted.progress.takeIf { persisted.result != null },
                         result = persisted.result,
                         completedAtEpochMillis = persisted.completedAtEpochMillis,
+                        acceptedAtEpochMillis = persisted.acceptedAtEpochMillis ?: nowEpochMillis(),
                     ),
                 )
             }
@@ -65,33 +68,27 @@ class RelayPool(
         }
     }
 
+    /**
+     * Registers [node] on [peer]. Throws [NodeIdInUseException] while another connection holds the
+     * same node ID: node IDs are self-asserted, so letting a newcomer displace a live connection
+     * would let any token holder take over a node, receive its replayed leases and cancel its work.
+     * A node that reconnects is accepted once the relay has noticed its old connection close.
+     */
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
-        var displacedPeer: RelayPeer? = null
         val online = mutex.withLock {
-            val previous = nodes.put(node.nodeId, NodeSession(node, peer))
-            val message = if (previous == null) {
+            val current = nodes[node.nodeId]
+            if (current != null && current.peer !== peer) throw NodeIdInUseException(node.nodeId)
+            nodes[node.nodeId] = NodeSession(node, peer)
+            val message = if (current == null) {
                 ComputeRelayServerMessage.NodeJoined(node)
             } else {
-                // A different connection is replacing an existing registration for the same node ID.
-                // Notify the displaced peer so it knows its connection is no longer active.
-                displacedPeer = previous.peer
                 ComputeRelayServerMessage.NodeUpdated(node)
             }
             nodes.values
                 .filter { it.descriptor.nodeId != node.nodeId }
                 .forEach { outbound += it.peer to message }
             nodes.values.map(NodeSession::descriptor)
-        }
-        displacedPeer?.let {
-            runCatching {
-                it.send(
-                    ComputeRelayServerMessage.Error(
-                        code = "displaced",
-                        message = "This node has been re-registered by a new connection; this connection is no longer active",
-                    ),
-                )
-            }
         }
         sendAll(outbound)
         offerPendingLeases()
@@ -175,10 +172,18 @@ class RelayPool(
                 replayMessages(existing).forEach { outbound += origin.peer to it }
                 return@withLock
             }
+            require(envelope.leaseDurationMillis <= MAX_LEASE_DURATION_MILLIS) {
+                "leaseDurationMillis must be at most $MAX_LEASE_DURATION_MILLIS"
+            }
+            check(leases.values.count { it.originNodeId == originNodeId && it.result == null } < MAX_UNFINISHED_LEASES_PER_ORIGIN) {
+                "This node already has $MAX_UNFINISHED_LEASES_PER_ORIGIN unfinished leases"
+            }
+            check(leases.size < MAX_LEASES_PER_POOL) { "This pool already holds $MAX_LEASES_PER_POOL leases" }
             mutatePersistedLocked {
                 leases[envelope.leaseId] = LeaseRecord(
                     envelope = envelope,
                     originNodeId = originNodeId,
+                    acceptedAtEpochMillis = nowEpochMillis(),
                 )
             }
             outbound += origin.peer to ComputeRelayServerMessage.LeaseAccepted(envelope.leaseId)
@@ -329,10 +334,24 @@ class RelayPool(
                         } == true
                 }
                 .map { it.envelope.leaseId }
-            if (expiredTerminalIds.isNotEmpty()) {
+            // Unfinished work does not live forever either: nothing else bounds a lease no worker
+            // can run, or one whose origin never comes back to cancel it.
+            val abandoned = leases.values.filter { lease ->
+                lease.result == null && lease.acceptedAtEpochMillis <= now - MAX_UNFINISHED_LEASE_AGE_MILLIS
+            }
+            if (expiredTerminalIds.isNotEmpty() || abandoned.isNotEmpty()) {
                 mutatePersistedLocked {
                     expiredTerminalIds.forEach(leases::remove)
+                    abandoned.forEach { leases.remove(it.envelope.leaseId) }
                 }
+            }
+            abandoned.forEach { lease ->
+                val cancelled = ComputeRelayServerMessage.LeaseCancelled(
+                    leaseId = lease.envelope.leaseId,
+                    reason = "Lease did not finish within 24 hours and was dropped",
+                )
+                nodes[lease.originNodeId]?.let { origin -> outbound += origin.peer to cancelled }
+                lease.workerNodeId?.let(nodes::get)?.let { worker -> outbound += worker.peer to cancelled }
             }
             leases.values
                 .filter {
@@ -460,6 +479,7 @@ class RelayPool(
                 progress = lease.progress.takeIf { terminal },
                 result = lease.result,
                 completedAtEpochMillis = lease.completedAtEpochMillis,
+                acceptedAtEpochMillis = lease.acceptedAtEpochMillis,
             )
         }
         if (persisted.isEmpty()) stateStore.delete(poolId) else stateStore.save(poolId, persisted)
@@ -473,7 +493,23 @@ class RelayPool(
 
     override fun toString(): String = "RelayPool(" + poolId + ")"
 
-    private companion object {
-        const val RESUME_RETENTION_MILLIS: Long = 24L * 60L * 60L * 1_000L
+    companion object {
+        private const val RESUME_RETENTION_MILLIS: Long = 24L * 60L * 60L * 1_000L
+
+        /** Longest heartbeat window a lease may ask for; workers renew it while they run. */
+        const val MAX_LEASE_DURATION_MILLIS: Long = 10L * 60L * 1_000L
+
+        /** Unfinished leases one origin may have in a pool at once. */
+        const val MAX_UNFINISHED_LEASES_PER_ORIGIN: Int = 64
+
+        /** Leases, unfinished and retained terminal ones, one pool may hold. */
+        const val MAX_LEASES_PER_POOL: Int = 512
+
+        /** An unfinished lease is cancelled and dropped this long after the relay accepted it. */
+        const val MAX_UNFINISHED_LEASE_AGE_MILLIS: Long = 24L * 60L * 60L * 1_000L
     }
 }
+
+/** Another live connection already holds [nodeId] in this pool. */
+class NodeIdInUseException(val nodeId: String) :
+    IllegalStateException("Node ID $nodeId is already connected to this pool")

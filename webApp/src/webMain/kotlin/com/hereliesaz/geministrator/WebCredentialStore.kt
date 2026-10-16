@@ -12,16 +12,19 @@ import kotlinx.coroutines.await
 private external object AiveCredentialVault : JsAny {
     val ready: Boolean
 
-    fun seal(plaintext: String): Promise<JsString>
+    fun seal(plaintext: String, storageKey: String): Promise<JsString>
 
-    fun open(stored: String): Promise<JsString>
+    fun open(stored: String, storageKey: String): Promise<JsString>
 
     fun isSealed(stored: String): Boolean
+
+    fun isLegacySealed(stored: String): Boolean
 }
 
 /**
  * Provider and repository credentials in localStorage, encrypted with a non-extractable AES-GCM
- * key held in IndexedDB. Plaintext values written by older versions are re-sealed on first read.
+ * key held in IndexedDB and bound to their storage key, so a value copied under another key does
+ * not open. Plaintext and unbound (v1) values written by older versions are re-sealed on first read.
  * Browsers without Web Crypto or IndexedDB (for example, insecure http origins) fall back to
  * plaintext, as before.
  */
@@ -34,14 +37,17 @@ internal object WebCredentialStore {
             write(storageKey, stored.trim())
             return stored.trim()
         }
-        return runCatching { AiveCredentialVault.open(stored).await<JsString>().toString().trim() }
+        val opened = runCatching { AiveCredentialVault.open(stored, storageKey).await<JsString>().toString().trim() }
             .getOrNull()
             ?.takeIf(String::isNotEmpty)
+            ?: return null
+        if (AiveCredentialVault.isLegacySealed(stored)) write(storageKey, opened)
+        return opened
     }
 
     suspend fun write(storageKey: String, value: String) {
         val clean = value.trim()
-        val stored = if (AiveCredentialVault.ready) AiveCredentialVault.seal(clean).await<JsString>().toString() else clean
+        val stored = if (AiveCredentialVault.ready) AiveCredentialVault.seal(clean, storageKey).await<JsString>().toString() else clean
         window.localStorage.setItem(storageKey, stored)
     }
 

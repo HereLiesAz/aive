@@ -2,7 +2,6 @@ package com.hereliesaz.geministrator.distributed
 
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.ScriptRunner
-import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -139,10 +138,11 @@ class SystemExecutorDistributedWorkloadRunner(
             return "the task is not a distributed placement of the requested executor"
         }
         val delegate = envelope.delegatedExecutor
-        if (delegate is TaskExecutor.RepositoryOperation && delegate.isMutation() &&
-            !hasCompletedApprovalAncestor(envelope, declared.id)
-        ) {
-            return "repository operation '${delegate.operation}' has no completed human approval"
+        // Approval state arrives in the envelope, which any pool-token holder can forge, so a
+        // remote worker cannot tell a real human approval from a claimed one. Mutations therefore
+        // run only on the origin device, where the approval was actually given.
+        if (delegate is TaskExecutor.RepositoryOperation && delegate.isMutation()) {
+            return "repository operation '${delegate.operation}' changes the repository; remote workers run only read-only operations"
         }
         if (delegate.usesRepositoryCredentials()) {
             val repository = envelope.project.repository ?: return "the project has no linked repository"
@@ -151,21 +151,6 @@ class SystemExecutorDistributedWorkloadRunner(
             }
         }
         return null
-    }
-
-    private fun hasCompletedApprovalAncestor(envelope: DistributedTaskEnvelope, taskId: TaskDefinitionId): Boolean {
-        val tasks = envelope.definition.tasks.associateBy { it.id }
-        val visited = mutableSetOf<TaskDefinitionId>()
-        fun visit(id: TaskDefinitionId): Boolean {
-            if (!visited.add(id)) return false
-            return tasks[id]?.dependsOn.orEmpty().any { dependencyId ->
-                val dependency = tasks[dependencyId] ?: return@any false
-                val approved = dependency.executor is TaskExecutor.HumanApproval &&
-                    envelope.run.taskRuns[dependencyId]?.status == TaskRunStatus.Completed
-                approved || visit(dependencyId)
-            }
-        }
-        return visit(taskId)
     }
 
     private fun TaskExecutor.usesRepositoryCredentials(): Boolean = when (this) {

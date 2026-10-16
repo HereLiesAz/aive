@@ -32,8 +32,12 @@ class DistributedLeaseValidationTest {
     private val approvalId = TaskDefinitionId("approve")
     private val pushId = TaskDefinitionId("push")
     private val push = TaskExecutor.RepositoryOperation("push")
+    private val fetch = TaskExecutor.RepositoryOperation("fetch")
 
-    private fun definition(withApproval: Boolean = true) = WorkflowDefinition(
+    private fun definition(
+        withApproval: Boolean = true,
+        operation: TaskExecutor.RepositoryOperation = push,
+    ) = WorkflowDefinition(
         id = WorkflowDefinitionId("wf"),
         name = "Workflow",
         tasks = listOfNotNull(
@@ -50,7 +54,7 @@ class DistributedLeaseValidationTest {
                 objective = "Push the branch",
                 roleId = null,
                 dependsOn = if (withApproval) setOf(approvalId) else emptySet(),
-                executor = TaskExecutor.Distributed(push, DistributedComputeRequirements()),
+                executor = TaskExecutor.Distributed(operation, DistributedComputeRequirements()),
             ),
         ),
     )
@@ -85,7 +89,7 @@ class DistributedLeaseValidationTest {
             ),
             task = task,
             taskRun = runs.getValue(pushId),
-            delegatedExecutor = push,
+            delegatedExecutor = (task.executor as TaskExecutor.Distributed).delegate,
             requirements = DistributedComputeRequirements(),
             submittedAtEpochMillis = 0,
         )
@@ -117,12 +121,23 @@ class DistributedLeaseValidationTest {
     }
 
     @Test
-    fun approvedLeaseForLinkedRepositoryRuns() = runBlocking<Unit> {
+    fun readOnlyLeaseForLinkedRepositoryRuns() = runBlocking<Unit> {
         val integration = RecordingIntegration()
-        val result = runner(integration).run(envelope()) {}
+        val result = runner(integration).run(envelope(definition = definition(withApproval = false, operation = fetch))) {}
 
         assertEquals(TaskRunStatus.Completed, result.status)
         assertEquals(1, integration.dispatched)
+    }
+
+    @Test
+    fun mutationIsRefusedEvenWithAnApprovalTheEnvelopeClaimsCompleted() = runBlocking<Unit> {
+        // The envelope's own run says the approval gate completed; a pool member can forge that.
+        val integration = RecordingIntegration()
+        val result = runner(integration).run(envelope(approvalStatus = TaskRunStatus.Completed)) {}
+
+        assertEquals(TaskRunStatus.Failed, result.status)
+        assertContains(result.failureMessage.orEmpty(), "remote workers run only read-only operations")
+        assertEquals(0, integration.dispatched)
     }
 
     @Test
@@ -131,7 +146,6 @@ class DistributedLeaseValidationTest {
         val result = runner(integration).run(envelope(approvalStatus = TaskRunStatus.AwaitingApproval)) {}
 
         assertEquals(TaskRunStatus.Failed, result.status)
-        assertContains(result.failureMessage.orEmpty(), "no completed human approval")
         assertEquals(0, integration.dispatched)
     }
 
@@ -148,7 +162,10 @@ class DistributedLeaseValidationTest {
     fun leaseForRepositoryNotLinkedOnThisDeviceIsRefused() = runBlocking<Unit> {
         val integration = RecordingIntegration()
         val result = runner(integration).run(
-            envelope(projectRepository = RepositoryRef(owner = "someone-else", name = "app")),
+            envelope(
+                definition = definition(withApproval = false, operation = fetch),
+                projectRepository = RepositoryRef(owner = "someone-else", name = "app"),
+            ),
         ) {}
 
         assertEquals(TaskRunStatus.Failed, result.status)

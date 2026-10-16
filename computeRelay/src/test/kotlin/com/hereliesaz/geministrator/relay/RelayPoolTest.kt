@@ -275,29 +275,75 @@ class RelayPoolTest {
     }
 
     @Test
-    fun staleConnectionCannotUnregisterReplacementNode() = runBlocking {
+    fun liveNodeIdCannotBeTakenOverAndStalePeerCannotUnregisterIt() = runBlocking {
         val pool = RelayPool("pool", nowEpochMillis = { 25_000L })
-        val oldPeer = RecordingPeer()
-        val replacementPeer = RecordingPeer()
+        val original = RecordingPeer()
+        val impostor = RecordingPeer()
         val worker = RecordingPeer()
 
-        pool.register(node("origin", setOf("origin")), oldPeer)
+        pool.register(node("origin", setOf("origin")), original)
         pool.register(node("worker", setOf("tests")), worker)
-        pool.register(node("origin", setOf("origin")), replacementPeer)
+        assertFailsWith<NodeIdInUseException> { pool.register(node("origin", setOf("origin")), impostor) }
 
-        assertFalse(pool.isCurrentPeer("origin", oldPeer))
-        assertTrue(pool.isCurrentPeer("origin", replacementPeer))
+        assertTrue(pool.isCurrentPeer("origin", original))
+        assertFalse(pool.isCurrentPeer("origin", impostor))
+        pool.unregister("origin", impostor)
+        assertTrue(pool.isCurrentPeer("origin", original))
+        assertTrue(worker.messages.none { it is ComputeRelayServerMessage.NodeLeft && it.nodeId == "origin" })
 
-        pool.unregister("origin", oldPeer)
+        // Once the original connection is gone, the node may reconnect.
+        pool.unregister("origin", original)
+        val reconnected = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), reconnected)
         val envelope = envelope()
         pool.publish("origin", envelope)
-
-        assertTrue(replacementPeer.messages.any {
+        assertTrue(reconnected.messages.any {
             it is ComputeRelayServerMessage.LeaseAccepted && it.leaseId == envelope.leaseId
         })
-        assertTrue(worker.messages.none {
-            it is ComputeRelayServerMessage.NodeLeft && it.nodeId == "origin"
+    }
+
+    @Test
+    fun leaseDurationAndCountAreCapped() = runBlocking {
+        val pool = RelayPool("pool", nowEpochMillis = { 26_000L })
+        pool.register(node("origin", setOf("origin")), RecordingPeer())
+
+        assertFailsWith<IllegalArgumentException> {
+            pool.publish("origin", envelope("too-long", leaseDurationMillis = RelayPool.MAX_LEASE_DURATION_MILLIS + 1))
+        }
+        repeat(RelayPool.MAX_UNFINISHED_LEASES_PER_ORIGIN) { pool.publish("origin", envelope("lease-$it")) }
+        assertFailsWith<IllegalStateException> { pool.publish("origin", envelope("one-too-many")) }
+        assertEquals(RelayPool.MAX_UNFINISHED_LEASES_PER_ORIGIN, pool.pendingLeaseCount())
+    }
+
+    @Test
+    fun unfinishedLeaseIsDroppedAfterMaximumAge() = runBlocking {
+        var now = 27_000L
+        val pool = RelayPool("pool", nowEpochMillis = { now })
+        val origin = RecordingPeer()
+        pool.register(node("origin", setOf("origin")), origin)
+        val envelope = envelope("nobody-can-run-this")
+        pool.publish("origin", envelope)
+
+        now += RelayPool.MAX_UNFINISHED_LEASE_AGE_MILLIS - 1
+        pool.sweepExpired()
+        assertEquals(1, pool.pendingLeaseCount())
+
+        now += 1
+        pool.sweepExpired()
+        assertEquals(0, pool.pendingLeaseCount())
+        assertTrue(origin.messages.any {
+            it is ComputeRelayServerMessage.LeaseCancelled && it.leaseId == envelope.leaseId
         })
+        pool.unregister("origin", origin)
+        assertTrue(pool.isEmpty())
+    }
+
+    @Test
+    fun tokenComparisonRequiresTheExactBearerToken() {
+        assertTrue(isAuthorized("Bearer secret-token", "secret-token"))
+        assertFalse(isAuthorized("Bearer secret-tokeN", "secret-token"))
+        assertFalse(isAuthorized("secret-token", "secret-token"))
+        assertFalse(isAuthorized(null, "secret-token"))
     }
 
     @Test

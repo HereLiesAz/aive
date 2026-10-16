@@ -20,6 +20,7 @@ import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import io.ktor.websocket.send
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,13 @@ private class WebSocketRelayPeer(
     }
 }
 
+/** Compares the bearer token in constant time, so response timing does not leak the token. */
+internal fun isAuthorized(authorizationHeader: String?, relayToken: String): Boolean {
+    val presented = (authorizationHeader ?: "").toByteArray(Charsets.UTF_8)
+    val expected = "Bearer $relayToken".toByteArray(Charsets.UTF_8)
+    return MessageDigest.isEqual(presented, expected)
+}
+
 fun Application.computeRelayModule(
     relayToken: String,
     hub: ComputeRelayHub = ComputeRelayHub(),
@@ -92,7 +100,7 @@ fun Application.computeRelayModule(
     routing {
         webSocket("/v1/compute/{poolId}") {
             val authorization = call.request.headers[HttpHeaders.Authorization]
-            if (authorization != "Bearer $relayToken") {
+            if (!isAuthorized(authorization, relayToken)) {
                 close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
                 return@webSocket
             }
@@ -131,7 +139,13 @@ fun Application.computeRelayModule(
             val nodeId = registration.node.nodeId
             val pool = hub.pool(poolId)
             val peer = WebSocketRelayPeer { payload -> send(payload) }
-            val online = pool.register(registration.node, peer)
+            val online = try {
+                pool.register(registration.node, peer)
+            } catch (inUse: NodeIdInUseException) {
+                peer.send(ComputeRelayServerMessage.Error(code = "node-id-in-use", message = inUse.message ?: "Node ID in use"))
+                close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Node ID in use"))
+                return@webSocket
+            }
             peer.send(
                 ComputeRelayServerMessage.Registered(
                     protocolVersion = DISTRIBUTED_COMPUTE_PROTOCOL_VERSION,

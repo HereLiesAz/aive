@@ -21,7 +21,7 @@ The relay reads a single shared bearer token from `AIVE_RELAY_TOKEN` (`HAIVE_REL
 Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `haive.distributed-compute.configuration.v1`. The token is stored separately:
 
 - Android — encrypted with an Android Keystore AES-GCM key in private SharedPreferences.
-- Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store (macOS `security`, Windows PowerShell credential manager, Linux `secret-tool`).
+- Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store: macOS `security`, Linux `secret-tool`, and on Windows a per-user file under `%LOCALAPPDATA%\Aive` encrypted with DPAPI (`ConvertFrom-SecureString`), written and read through PowerShell with the token on stdin/stdout, never on a command line. When no store works (for example, no `secret-tool`), or the stored token does not read back, the token falls back to **plaintext** Java user preferences (`com/hereliesaz/haive/distributed-compute`).
 
 ## Delegation targets
 
@@ -35,16 +35,22 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
    Origin disconnect does **not** cancel accepted work. A claimed worker continues while its own relay
    session remains healthy; unclaimed work stays eligible for workers that join later.
-5. The relay retains terminal lease results for 24 hours. Unfinished leases are not time-expired merely
+5. The relay retains terminal lease results for 24 hours. Unfinished leases are not expired merely
    because their origin is offline: dropping an unfinished external run ID would make it unsafe to infer
    that side effects can be repeated. When the same logical origin reconnects, the relay replays its
    accepted/claimed/progress/completed state so the client can reconstruct the existing lease instead
-   of dispatching it again.
+   of dispatching it again. They are bounded all the same: an unfinished lease is cancelled
+   (`LeaseCancelled` to origin and worker) and dropped 24 hours after the relay accepted it.
+6. Publishing is capped: a lease may ask for at most a 10-minute lease duration, an origin may have
+   at most 64 unfinished leases in a pool, and a pool holds at most 512 leases including retained
+   terminal ones. Over a cap, `PublishLease` gets a `bad-request` or `bad-state` error.
 
 Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
 The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
-`Failed`. Connection replacement is fenced by peer identity, so a stale socket cannot unregister or
-mutate state after a newer connection takes over the same logical node ID.
+`Failed`. A node ID cannot be taken over while its connection is live: a second registration for it
+gets `node-id-in-use` and is closed (code 1013), so a node that reconnects is accepted only once the
+relay has seen its old socket close (at most the 45 s WebSocket timeout). State changes are also
+fenced by peer identity, so a stale socket cannot unregister the node or act for it.
 
 ## Relay process-restart persistence
 
@@ -70,7 +76,7 @@ authoritative lease state.
 
 ## What nodes accept
 
-Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Before running a lease the runner re-checks it and refuses (fails the lease) unless the submitted workflow validates, the task really is a distributed placement of the requested executor, any mutating repository operation has a completed human-approval ancestor in the submitted run, and credential-using work (repository operations, GitHub Actions, GitHub-backed scripts) targets a repository of a project linked on the worker's own device. Advertised `supportedExecutorKinds`:
+Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which accepts only system executors that the node has a local integration for. Role-agent and human-approval work is not executed remotely by the shipped runners. Before running a lease the runner re-checks it and refuses (fails the lease) unless the submitted workflow validates, the task really is a distributed placement of the requested executor, the task is not a mutating repository operation (only `status` and `fetch` run remotely: approval state arrives in the envelope, which any pool-token holder can forge, so a worker cannot trust it and mutations stay on the origin device), and credential-using work (repository operations, GitHub Actions, GitHub-backed scripts) targets a repository of a project linked on the worker's own device. Advertised `supportedExecutorKinds`:
 
 - Android — `script`; `github-action` and `repository-operation` with a GitHub token; `repository-operation` with a GitLab token.
 - Desktop — `repository-operation`; `github-action` with a GitHub token.
