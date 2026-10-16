@@ -594,14 +594,19 @@ class WorkflowEngine(
                     taskRuns = run.taskRuns + (
                         taskDefinitionId to taskRun.copy(
                             status = TaskRunStatus.Retrying,
+                            // A new attempt: counted against the policy, with fresh attempt-keyed
+                            // gate ids and none of the failed attempt's output or plan.
+                            attempt = taskRun.attempt + 1,
                             assignedRoleId = decision.roleId,
                             executor = TaskExecutor.RoleAgent(decision.roleId),
                             assignedProviderId = null,
                             providerRunId = null,
                             externalRunId = null,
+                            artifacts = emptyList(),
                             blockingReason = null,
                             progress = null,
                             progressMessage = null,
+                            providerPlan = null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
