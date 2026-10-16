@@ -146,6 +146,9 @@ object WorkflowRunFactory {
             }
         }
 
+        // Unchanged readiness leaves the run untouched, so an idle cycle can recognise it has
+        // nothing to do instead of rewriting the run every second.
+        if (refreshed == run.taskRuns) return run
         return run.copy(
             taskRuns = refreshed,
             updatedAtEpochMillis = nowEpochMillis,

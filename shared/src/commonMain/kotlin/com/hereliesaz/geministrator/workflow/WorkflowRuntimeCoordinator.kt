@@ -119,7 +119,9 @@ class WorkflowRuntimeCoordinator(
         val authoritativeState = if (
             persistedRun != null &&
             persistedRun != state.run &&
-            persistedRun.updatedAtEpochMillis > state.run.updatedAtEpochMillis
+            // Every state this coordinator produces is persisted, so a different persisted run with
+            // the same timestamp was written by someone else (a decision in the same millisecond).
+            persistedRun.updatedAtEpochMillis >= state.run.updatedAtEpochMillis
         ) {
             WorkflowRuntimeState(
                 run = persistedRun,

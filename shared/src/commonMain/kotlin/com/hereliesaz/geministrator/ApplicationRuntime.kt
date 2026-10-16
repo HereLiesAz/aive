@@ -187,6 +187,18 @@ class ApplicationRuntime private constructor(
 
     suspend fun refresh() = loadLatest()
 
+    /**
+     * Runs [block] with the active run under the runtime lock, so a decision is built from the
+     * current run (not a published snapshot or a historical view) and no cycle commits meanwhile.
+     */
+    internal suspend fun <T> withActiveRun(block: suspend (WorkflowRun) -> T): T =
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val live = snapshot.state.run
+            val persisted = persistence.runs.get(live.id)
+            block(persisted?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis } ?: live)
+        }
+
     suspend fun loadRunHistory(): List<Pair<Project, List<WorkflowRun>>> {
         val projects = persistence.projects.all()
         return projects.map { project ->
