@@ -13,6 +13,7 @@ fun interface RelayPeer {
 class RelayPool(
     private val poolId: String,
     private val nowEpochMillis: () -> Long,
+    private val stateStore: RelayStateStore = NoopRelayStateStore,
 ) {
     private data class NodeSession(
         val descriptor: ComputeNodeDescriptor,
@@ -24,11 +25,45 @@ class RelayPool(
         val originNodeId: String,
         val workerNodeId: String? = null,
         val expiresAtEpochMillis: Long? = null,
+        val progress: com.hereliesaz.geministrator.distributed.DistributedExecutionProgress? = null,
+        val result: com.hereliesaz.geministrator.distributed.DistributedExecutionResult? = null,
+        val completedAtEpochMillis: Long? = null,
     )
 
     private val mutex = Mutex()
     private val nodes = linkedMapOf<String, NodeSession>()
-    private val leases = linkedMapOf<String, LeaseRecord>()
+    private val restoredLeases = stateStore.load(poolId)
+    private val leases = linkedMapOf<String, LeaseRecord>().apply {
+        restoredLeases
+            .filterNot { persisted ->
+                persisted.result != null &&
+                    persisted.completedAtEpochMillis?.let { completedAt ->
+                        completedAt <= nowEpochMillis() - RESUME_RETENTION_MILLIS
+                    } == true
+            }
+            .forEach { persisted ->
+                put(
+                    persisted.envelope.leaseId,
+                    LeaseRecord(
+                        envelope = persisted.envelope,
+                        originNodeId = persisted.originNodeId,
+                        // A relay restart severs every worker socket. Unfinished work must return to
+                        // pending rather than pretending the dead process still owns a claim.
+                        workerNodeId = persisted.workerNodeId.takeIf { persisted.result != null },
+                        expiresAtEpochMillis = null,
+                        progress = persisted.progress.takeIf { persisted.result != null },
+                        result = persisted.result,
+                        completedAtEpochMillis = persisted.completedAtEpochMillis,
+                    ),
+                )
+            }
+    }
+
+    init {
+        if (restoredLeases.size != leases.size) {
+            persistLocked()
+        }
+    }
 
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
@@ -59,6 +94,7 @@ class RelayPool(
             }
         }
         sendAll(outbound)
+        offerPendingLeases()
         return online
     }
 
@@ -76,29 +112,22 @@ class RelayPool(
         offerPendingLeases()
     }
 
-    suspend fun unregister(nodeId: String) {
+    suspend fun unregister(nodeId: String, peer: RelayPeer) {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         val reoffer = mutableListOf<String>()
         mutex.withLock {
+            val current = nodes[nodeId] ?: return
+            // An older connection can finish after a replacement has already registered. Only the
+            // currently registered peer owns the right to remove this logical node.
+            if (current.peer !== peer) return
             val removed = nodes.remove(nodeId) ?: return
             nodes.values.forEach { outbound += it.peer to ComputeRelayServerMessage.NodeLeft(nodeId) }
 
-            val originLeaseIds = leases.values
-                .filter { it.originNodeId == nodeId }
-                .map { it.envelope.leaseId }
-            originLeaseIds.forEach { leaseId ->
-                val lease = leases.remove(leaseId) ?: return@forEach
-                lease.workerNodeId
-                    ?.let(nodes::get)
-                    ?.let { worker ->
-                        outbound += worker.peer to ComputeRelayServerMessage.LeaseCancelled(
-                            leaseId = leaseId,
-                            reason = "Origin node disconnected",
-                        )
-                    }
+            // Origin-owned leases intentionally survive origin disconnects. Their worker keeps
+            // running, and terminal state is retained so the same logical node can resume later.
+            val workerLeases = leases.values.filter {
+                it.workerNodeId == removed.descriptor.nodeId && it.result == null
             }
-
-            val workerLeases = leases.values.filter { it.workerNodeId == removed.descriptor.nodeId }
             workerLeases.forEach { lease ->
                 leases[lease.envelope.leaseId] = lease.copy(
                     workerNodeId = null,
@@ -117,6 +146,21 @@ class RelayPool(
         reoffer.forEach { offerLease(it) }
     }
 
+    suspend fun isCurrentPeer(nodeId: String, peer: RelayPeer): Boolean =
+        mutex.withLock { nodes[nodeId]?.peer === peer }
+
+    suspend fun replayOriginLeases(nodeId: String, peer: RelayPeer) {
+        val replay = mutex.withLock {
+            val current = nodes[nodeId] ?: return
+            if (current.peer !== peer) return
+            leases.values
+                .filter { it.originNodeId == nodeId }
+                .flatMap(::replayMessages)
+                .map { peer to it }
+        }
+        sendAll(replay)
+    }
+
     suspend fun publish(originNodeId: String, envelope: DistributedTaskEnvelope) {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         mutex.withLock {
@@ -128,13 +172,15 @@ class RelayPool(
                 require(existing.originNodeId == originNodeId) {
                     "Lease ID is already owned by another origin"
                 }
-                outbound += origin.peer to ComputeRelayServerMessage.LeaseAccepted(envelope.leaseId)
+                replayMessages(existing).forEach { outbound += origin.peer to it }
                 return@withLock
             }
-            leases[envelope.leaseId] = LeaseRecord(
-                envelope = envelope,
-                originNodeId = originNodeId,
-            )
+            mutatePersistedLocked {
+                leases[envelope.leaseId] = LeaseRecord(
+                    envelope = envelope,
+                    originNodeId = originNodeId,
+                )
+            }
             outbound += origin.peer to ComputeRelayServerMessage.LeaseAccepted(envelope.leaseId)
         }
         sendAll(outbound)
@@ -146,6 +192,14 @@ class RelayPool(
         mutex.withLock {
             val worker = nodes[workerNodeId] ?: return
             val lease = leases[leaseId] ?: return
+            if (lease.result != null) {
+                outbound += worker.peer to ComputeRelayServerMessage.Error(
+                    code = "lease-terminal",
+                    message = "Lease is already complete",
+                    leaseId = leaseId,
+                )
+                return@withLock
+            }
             if (lease.workerNodeId != null) {
                 outbound += worker.peer to ComputeRelayServerMessage.Error(
                     code = "lease-already-claimed",
@@ -164,7 +218,7 @@ class RelayPool(
                 )
                 return@withLock
             }
-            val activeCount = leases.values.count { it.workerNodeId == workerNodeId }
+            val activeCount = leases.values.count { it.result == null && it.workerNodeId == workerNodeId }
             if (activeCount >= worker.descriptor.maxParallelLeases) {
                 outbound += worker.peer to ComputeRelayServerMessage.Error(
                     code = "worker-capacity",
@@ -190,7 +244,7 @@ class RelayPool(
     suspend fun heartbeat(workerNodeId: String, leaseId: String) {
         mutex.withLock {
             val lease = leases[leaseId] ?: return
-            if (lease.workerNodeId != workerNodeId) return
+            if (lease.result != null || lease.workerNodeId != workerNodeId) return
             leases[leaseId] = lease.copy(
                 expiresAtEpochMillis = nowEpochMillis() + lease.envelope.leaseDurationMillis,
             )
@@ -205,7 +259,8 @@ class RelayPool(
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         mutex.withLock {
             val lease = leases[leaseId] ?: return
-            if (lease.workerNodeId != workerNodeId) return
+            if (lease.result != null || lease.workerNodeId != workerNodeId) return
+            leases[leaseId] = lease.copy(progress = progress)
             nodes[lease.originNodeId]?.let { origin ->
                 outbound += origin.peer to ComputeRelayServerMessage.LeaseProgress(
                     leaseId = leaseId,
@@ -225,8 +280,14 @@ class RelayPool(
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         mutex.withLock {
             val lease = leases[leaseId] ?: return
-            if (lease.workerNodeId != workerNodeId) return
-            leases.remove(leaseId)
+            if (lease.result != null || lease.workerNodeId != workerNodeId) return
+            mutatePersistedLocked {
+                leases[leaseId] = lease.copy(
+                    expiresAtEpochMillis = null,
+                    result = result,
+                    completedAtEpochMillis = nowEpochMillis(),
+                )
+            }
             val completed = ComputeRelayServerMessage.LeaseCompleted(
                 leaseId = leaseId,
                 workerNodeId = workerNodeId,
@@ -236,6 +297,7 @@ class RelayPool(
             nodes[workerNodeId]?.let { worker -> outbound += worker.peer to completed }
         }
         sendAll(outbound)
+        offerPendingLeases()
     }
 
     suspend fun cancel(originNodeId: String, leaseId: String, reason: String?) {
@@ -243,12 +305,15 @@ class RelayPool(
         mutex.withLock {
             val lease = leases[leaseId] ?: return
             if (lease.originNodeId != originNodeId) return
-            leases.remove(leaseId)
+            mutatePersistedLocked {
+                leases.remove(leaseId)
+            }
             val cancelled = ComputeRelayServerMessage.LeaseCancelled(leaseId, reason)
             nodes[lease.originNodeId]?.let { origin -> outbound += origin.peer to cancelled }
             lease.workerNodeId?.let(nodes::get)?.let { worker -> outbound += worker.peer to cancelled }
         }
         sendAll(outbound)
+        offerPendingLeases()
     }
 
     suspend fun sweepExpired() {
@@ -256,8 +321,25 @@ class RelayPool(
         val reoffer = mutableListOf<String>()
         val now = nowEpochMillis()
         mutex.withLock {
+            val expiredTerminalIds = leases.values
+                .filter { lease ->
+                    lease.result != null &&
+                        lease.completedAtEpochMillis?.let { completedAt ->
+                            completedAt <= now - RESUME_RETENTION_MILLIS
+                        } == true
+                }
+                .map { it.envelope.leaseId }
+            if (expiredTerminalIds.isNotEmpty()) {
+                mutatePersistedLocked {
+                    expiredTerminalIds.forEach(leases::remove)
+                }
+            }
             leases.values
-                .filter { it.workerNodeId != null && (it.expiresAtEpochMillis ?: Long.MAX_VALUE) <= now }
+                .filter {
+                    it.result == null &&
+                        it.workerNodeId != null &&
+                        (it.expiresAtEpochMillis ?: Long.MAX_VALUE) <= now
+                }
                 .forEach { lease ->
                     val oldWorker = lease.workerNodeId
                     leases[lease.envelope.leaseId] = lease.copy(
@@ -283,7 +365,7 @@ class RelayPool(
         reoffer.forEach { offerLease(it) }
     }
 
-    suspend fun pendingLeaseCount(): Int = mutex.withLock { leases.size }
+    suspend fun pendingLeaseCount(): Int = mutex.withLock { leases.values.count { it.result == null } }
 
     suspend fun isEmpty(): Boolean = mutex.withLock { nodes.isEmpty() && leases.isEmpty() }
 
@@ -298,8 +380,9 @@ class RelayPool(
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         mutex.withLock {
             val lease = leases[leaseId] ?: return
-            if (lease.workerNodeId != null) return
+            if (lease.result != null || lease.workerNodeId != null) return
             val activeByNode = leases.values
+                .filter { it.result == null }
                 .mapNotNull(LeaseRecord::workerNodeId)
                 .groupingBy { it }
                 .eachCount()
@@ -323,6 +406,65 @@ class RelayPool(
         sendAll(outbound)
     }
 
+    private fun replayMessages(lease: LeaseRecord): List<ComputeRelayServerMessage> = buildList {
+        add(ComputeRelayServerMessage.LeaseAccepted(lease.envelope.leaseId))
+        val workerNodeId = lease.workerNodeId
+        if (workerNodeId != null && lease.result == null) {
+            add(
+                ComputeRelayServerMessage.LeaseClaimed(
+                    leaseId = lease.envelope.leaseId,
+                    workerNodeId = workerNodeId,
+                    expiresAtEpochMillis = lease.expiresAtEpochMillis ?: nowEpochMillis(),
+                ),
+            )
+            lease.progress?.let { progress ->
+                add(
+                    ComputeRelayServerMessage.LeaseProgress(
+                        leaseId = lease.envelope.leaseId,
+                        workerNodeId = workerNodeId,
+                        progress = progress,
+                    ),
+                )
+            }
+        }
+        lease.result?.let { result ->
+            add(
+                ComputeRelayServerMessage.LeaseCompleted(
+                    leaseId = lease.envelope.leaseId,
+                    workerNodeId = workerNodeId ?: "remote-node",
+                    result = result,
+                ),
+            )
+        }
+    }
+
+    private fun mutatePersistedLocked(mutation: () -> Unit) {
+        val before = leases.toMap()
+        try {
+            mutation()
+            persistLocked()
+        } catch (failure: Throwable) {
+            leases.clear()
+            leases.putAll(before)
+            throw failure
+        }
+    }
+
+    private fun persistLocked() {
+        val persisted = leases.values.map { lease ->
+            val terminal = lease.result != null
+            PersistedRelayLease(
+                envelope = lease.envelope,
+                originNodeId = lease.originNodeId,
+                workerNodeId = lease.workerNodeId.takeIf { terminal },
+                progress = lease.progress.takeIf { terminal },
+                result = lease.result,
+                completedAtEpochMillis = lease.completedAtEpochMillis,
+            )
+        }
+        if (persisted.isEmpty()) stateStore.delete(poolId) else stateStore.save(poolId, persisted)
+    }
+
     private suspend fun sendAll(outbound: List<Pair<RelayPeer, ComputeRelayServerMessage>>) {
         outbound.forEach { (peer, message) ->
             runCatching { peer.send(message) }
@@ -330,4 +472,8 @@ class RelayPool(
     }
 
     override fun toString(): String = "RelayPool(" + poolId + ")"
+
+    private companion object {
+        const val RESUME_RETENTION_MILLIS: Long = 24L * 60L * 60L * 1_000L
+    }
 }

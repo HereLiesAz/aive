@@ -1,0 +1,299 @@
+package com.hereliesaz.geministrator
+
+import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
+import com.hereliesaz.geministrator.inference.LocalModelArtifactDescriptor
+import com.hereliesaz.geministrator.inference.LocalModelArtifactKind
+import com.hereliesaz.geministrator.inference.LocalModelLibrary
+import com.hereliesaz.geministrator.inference.LocalModelLoadPlan
+import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
+import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
+import com.hereliesaz.geministrator.orchestration.CatalogBackedLocalOrchestrationSpecialistRuntime
+import com.hereliesaz.geministrator.orchestration.DecisionInformedOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.GuardedModelBackedOrchestrationUtilities
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationModelExecutor
+import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
+import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistCatalog
+import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
+import com.hereliesaz.geministrator.orchestration.OrchestrationSpecialistPrompts
+import com.hereliesaz.geministrator.orchestration.OrchestrationUtilityRole
+import io.ktor.client.HttpClient
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Local orchestration specialists on desktop.
+ *
+ * Used once any released artifact is installed from Settings, as on Android. A role only uses a model
+ * that is released in [OrchestrationSpecialistCatalog] and installed with
+ * [DesktopOrchestrationSpecialistInstaller]; inference never downloads. When a catalog offers both
+ * shapes, a role prefers the shared base plus its LoRA file over the merged model. Every answer still
+ * passes [GuardedModelBackedOrchestrationUtilities], so the deterministic baseline remains the floor.
+ */
+internal object DesktopOrchestrationSpecialists {
+    val runtimeCapabilities = LocalModelRuntimeCapabilities(
+        runtimeId = "desktop-onnxruntime",
+        supportedFormats = setOf("onnx", "safetensors"),
+        supportedPrecisions = setOf("int8", "fp16"),
+        supportsSharedBaseAdapters = true,
+    )
+
+    /** Judgement calls the released decision model answers (the settings screen's "x of y"). */
+    fun releasedRoleCount(): Int =
+        if (OrchestrationSpecialistCatalog.hasDecisionModel()) OrchestrationQuestion.entries.size else 0
+
+    fun utilities(
+        installer: DesktopOrchestrationSpecialistInstaller,
+        executor: DesktopLocalOrchestrationModelExecutor,
+        decisions: DesktopOrchestrationDecisionModel,
+    ): LocalOrchestrationUtilityFamily =
+        if (decisions.isInstalled()) {
+            DecisionInformedOrchestrationUtilities(decisions)
+        } else if (!installer.hasAnyInstalledReleasedArtifact()) {
+            DeterministicLocalOrchestrationUtilities
+        } else {
+            GuardedModelBackedOrchestrationUtilities(
+                runtime = CatalogBackedLocalOrchestrationSpecialistRuntime(
+                    library = installer.library(),
+                    runtimeCapabilities = runtimeCapabilities,
+                    executor = executor,
+                ),
+            )
+        }
+}
+
+/**
+ * Installs released specialists under ~/.aive/models/orchestration-utilities on explicit request.
+ * Model archives are verified against the catalog's SHA-256 before they are unpacked; adapters are
+ * single verified `.safetensors` files under `adapters/`.
+ */
+internal class DesktopOrchestrationSpecialistInstaller(
+    httpClient: HttpClient,
+    private val installRoot: File = File(System.getProperty("user.home"), ".aive/models/orchestration-utilities"),
+    /** The released catalog; tests pass a fixture. */
+    val library: () -> LocalModelLibrary = OrchestrationSpecialistCatalog::released,
+) {
+    private val mutex = Mutex()
+    private val downloader = DesktopResumableFileDownloader(httpClient)
+
+    /** The artifacts the released catalog's preferred load plans need on desktop. */
+    fun releasedArtifacts(): List<LocalModelArtifactDescriptor> {
+        val library = library()
+        return library.allSpecialists().flatMap { specialist ->
+            runCatching {
+                when (val plan = library.plan(specialist.specialistId, DesktopOrchestrationSpecialists.runtimeCapabilities)) {
+                    is LocalModelLoadPlan.MergedModel -> listOf(plan.model)
+                    is LocalModelLoadPlan.Standalone -> listOf(plan.model)
+                    is LocalModelLoadPlan.SharedBaseAdapter -> listOf(plan.base, plan.adapter)
+                }
+            }.getOrDefault(emptyList())
+        }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
+    }
+
+    /** The installed decision model's directory, or null when it is not released or not installed. */
+    fun decisionModelRoot(): File? {
+        val plan = runCatching {
+            library().plan(OrchestrationSpecialistCatalog.DECISIONS_SPECIALIST_ID, DesktopOrchestrationSpecialists.runtimeCapabilities)
+        }.getOrNull() as? LocalModelLoadPlan.MergedModel ?: return null
+        return installed(plan.model)
+    }
+
+    fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
+
+    fun allReleasedInstalled(): Boolean {
+        val artifacts = releasedArtifacts()
+        return artifacts.isNotEmpty() && artifacts.all { installed(it) != null }
+    }
+
+    /** Installs every released artifact; [onProgress] receives human-readable status lines. */
+    suspend fun installReleased(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val artifacts = releasedArtifacts()
+        require(artifacts.isNotEmpty()) { "No released orchestration specialists are compatible with desktop" }
+        artifacts.forEachIndexed { index, artifact ->
+            val label = "${index + 1}/${artifacts.size} ${artifact.assetName}"
+            install(artifact) { event ->
+                when (event) {
+                    is DownloadProgress.Transferring -> onProgress("Downloading $label: ${formatTransfer(event.received, event.total)}")
+                    DownloadProgress.Verifying -> onProgress("Verifying $label…")
+                }
+            }
+        }
+    }
+
+    /**
+     * Removes every artifact the released catalog knows about, not only the preferred load plans: an
+     * older install may hold a merged model after the catalog starts preferring shared-base adapters.
+     */
+    suspend fun removeReleased() = mutex.withLock {
+        withContext(Dispatchers.IO) { removeAll() }
+    }
+
+    private fun removeAll() {
+        library().allArtifacts().forEach { artifact ->
+            if (artifact.kind == LocalModelArtifactKind.Adapter) {
+                val file = adapterFile(artifact)
+                file.delete()
+                File(file.path + ".sha256").delete()
+            } else {
+                directory(artifact).deleteRecursively()
+            }
+        }
+        File(installRoot, ".staging").deleteRecursively()
+    }
+
+    /** The unpacked model directory for [artifact], or null. Cheap: compares the recorded digest only. */
+    fun installed(artifact: LocalModelArtifactDescriptor): File? {
+        if (artifact.kind == LocalModelArtifactKind.Adapter) {
+            val file = adapterFile(artifact)
+            val marker = File(file.path + ".sha256")
+            return file.takeIf { it.isFile && marker.isFile && marker.readText().trim() == artifact.sha256 }
+        }
+        val dir = directory(artifact)
+        val marker = File(dir, INSTALLED_MARKER)
+        return dir.takeIf {
+            marker.isFile && marker.readText().trim() == artifact.sha256 &&
+                File(dir, "model.onnx").isFile && File(dir, "tokenizer.json").isFile && File(dir, "config.json").isFile
+        }
+    }
+
+    suspend fun install(artifact: LocalModelArtifactDescriptor, onProgress: (DownloadProgress) -> Unit = {}): File =
+        mutex.withLock {
+            installed(artifact)?.let { return@withLock it }
+            val staging = File(installRoot, ".staging").apply { mkdirs() }
+            if (artifact.kind == LocalModelArtifactKind.Adapter) {
+                val downloaded = downloader.downloadVerified(
+                    url = artifact.downloadUrl,
+                    output = File(staging, artifact.assetName),
+                    expectedSha256 = artifact.sha256,
+                    onProgress = onProgress,
+                )
+                val destination = adapterFile(artifact)
+                destination.parentFile?.mkdirs()
+                downloaded.copyTo(destination, overwrite = true)
+                downloaded.delete()
+                File(destination.path + ".sha256").writeText(artifact.sha256 + "\n")
+                return@withLock installed(artifact) ?: error("${artifact.assetName} did not install")
+            }
+            val archive = downloader.downloadVerified(
+                url = artifact.downloadUrl,
+                output = File(staging, artifact.assetName),
+                expectedSha256 = artifact.sha256,
+                onProgress = onProgress,
+            )
+            val extracted = File(staging, "${artifact.logicalArtifactId.safeName()}.extracted").apply {
+                deleteRecursively()
+                mkdirs()
+            }
+            extractTarGzSafely(archive, extracted)
+            File(extracted, INSTALLED_MARKER).writeText(artifact.sha256 + "\n")
+            val destination = directory(artifact)
+            destination.deleteRecursively()
+            destination.parentFile?.mkdirs()
+            if (!extracted.renameTo(destination)) extracted.copyRecursively(destination, overwrite = true)
+            archive.delete()
+            installed(artifact) ?: error("${artifact.assetName} has no model.onnx, tokenizer.json and config.json")
+        }
+
+    private fun directory(artifact: LocalModelArtifactDescriptor) = File(installRoot, artifact.logicalArtifactId.safeName())
+
+    private fun adapterFile(artifact: LocalModelArtifactDescriptor) =
+        File(installRoot, "adapters/${artifact.logicalArtifactId.safeName()}.safetensors")
+
+    private fun String.safeName() = replace(Regex("[^A-Za-z0-9._-]"), "_")
+
+    private companion object {
+        const val INSTALLED_MARKER = ".installed-sha256"
+    }
+}
+
+/**
+ * Runs an installed specialist with ONNX Runtime; returns null when it is not installed.
+ *
+ * A shared-base plan loads the base session once for every role and feeds the role's LoRA weights as
+ * graph inputs. The most recently used adapters stay in memory (about 35 MB each as fp32).
+ */
+internal class DesktopLocalOrchestrationModelExecutor(
+    private val installer: DesktopOrchestrationSpecialistInstaller,
+    private val generator: DesktopOrtCausalGenerator = DesktopOrtCausalGenerator(),
+) : LocalOrchestrationModelExecutor {
+    private var sessions = DesktopOrtMemorySessionManager()
+
+    private val adapters = object : LinkedHashMap<String, DesktopLoraAdapter>(ADAPTER_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DesktopLoraAdapter>): Boolean =
+            (size > ADAPTER_CACHE_SIZE).also { evict -> if (evict) eldest.value.close() }
+    }
+
+    /** Closes every session and cached adapter, so installed files can be removed. */
+    @Synchronized
+    fun reset() {
+        sessions.close()
+        synchronized(adapters) {
+            adapters.values.forEach(DesktopLoraAdapter::close)
+            adapters.clear()
+        }
+        sessions = DesktopOrtMemorySessionManager()
+    }
+
+    // Synchronized with [reset]: a run must not read a session or adapter that is being closed.
+    @Synchronized
+    override fun generate(role: OrchestrationUtilityRole, plan: LocalModelLoadPlan, inputJson: String): String? =
+        when (plan) {
+            is LocalModelLoadPlan.MergedModel -> run(role, plan.model, inputJson, emptyMap())
+            is LocalModelLoadPlan.SharedBaseAdapter -> {
+                val file = installer.installed(plan.adapter) ?: return null
+                // Serialized: an adapter's tensors must not be evicted while a run still reads them.
+                synchronized(adapters) {
+                    val adapter = adapters.getOrPut(plan.adapter.sha256) { DesktopLoraAdapter.load(file) }
+                    val expectedBase = adapter.metadata["base"]
+                    require(expectedBase == null || expectedBase == plan.base.logicalArtifactId) {
+                        "${plan.adapter.assetName} was trained for $expectedBase, not ${plan.base.logicalArtifactId}"
+                    }
+                    run(role, plan.base, inputJson, adapter.tensors)
+                }
+            }
+            else -> null
+        }
+
+    private fun run(
+        role: OrchestrationUtilityRole,
+        model: LocalModelArtifactDescriptor,
+        inputJson: String,
+        extraInputs: Map<String, ai.onnxruntime.OnnxTensor>,
+    ): String? {
+        val root = installer.installed(model) ?: return null
+        // The executor contract is synchronous; ONNX Runtime inference blocks regardless.
+        val prepared = runBlocking {
+            sessions.sessionFor(
+                File(root, "model.onnx").absolutePath,
+                MemoryMicroAgentModelSpec(modelId = model.logicalArtifactId, quantization = model.precision),
+            )
+        }
+        return HuggingFaceTokenizer.newInstance(root.toPath()).use { tokenizer ->
+            generator.generate(
+                session = prepared.session,
+                tokenizer = tokenizer,
+                modelRoot = root,
+                prompt = chatPrompt(role, inputJson),
+                maxNewTokens = MAX_NEW_TOKENS,
+                extraInputs = extraInputs,
+            )
+        }
+    }
+
+    private companion object {
+        const val MAX_NEW_TOKENS = 512
+        const val ADAPTER_CACHE_SIZE = 3
+
+        /** Qwen2.5 chat template, identical to what the training notebook applies. */
+        fun chatPrompt(role: OrchestrationUtilityRole, inputJson: String) = buildString {
+            append("<|im_start|>system\n").append(OrchestrationSpecialistPrompts.system(role)).append("<|im_end|>\n")
+            append("<|im_start|>user\n").append(inputJson).append("<|im_end|>\n")
+            append("<|im_start|>assistant\n")
+        }
+    }
+}
