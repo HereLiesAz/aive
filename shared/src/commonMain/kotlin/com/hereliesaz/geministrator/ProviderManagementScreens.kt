@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.coroutines.cancellation.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -516,8 +517,11 @@ internal fun ProviderSettingsScreen(
 
         if (healthChecking) {
             LaunchedEffect(Unit) {
-                healthResults = onCheckProviderHealth()
-                healthChecking = false
+                try {
+                    healthResults = settingsActionOrNull("Provider health check") { onCheckProviderHealth() }
+                } finally {
+                    healthChecking = false
+                }
             }
         }
         AzphaltPill(
@@ -929,8 +933,11 @@ internal fun ProviderSettingsScreen(
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
-                exportedJson = onExportJson()
-                exportTriggered = false
+                try {
+                    exportedJson = settingsActionOrNull("JSON export") { onExportJson() }
+                } finally {
+                    exportTriggered = false
+                }
             }
         }
         if (exportedJson == null) {
@@ -983,8 +990,11 @@ internal fun ProviderSettingsScreen(
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
-                diagnosticBundle = onExportDiagnosticBundle()
-                diagnosticTriggered = false
+                try {
+                    diagnosticBundle = settingsActionOrNull("Diagnostic export") { onExportDiagnosticBundle() }
+                } finally {
+                    diagnosticTriggered = false
+                }
             }
         }
         if (diagnosticBundle == null) {
@@ -1044,4 +1054,17 @@ private fun RoleDefinition.providerDepartment(): String = when (id.value) {
     "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
     "release-engineer" -> "Delivery"
     else -> "Custom"
+}
+
+/**
+ * Runs a settings action started from an effect. A failure is logged and yields null, so it
+ * neither crashes the composition nor leaves the action's in-progress flag set.
+ */
+private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -> T): T? = try {
+    action()
+} catch (failure: CancellationException) {
+    throw failure
+} catch (failure: Exception) {
+    platformDebugLog("AiveSettings", "$label failed: ${failure::class.simpleName}: ${failure.message}")
+    null
 }

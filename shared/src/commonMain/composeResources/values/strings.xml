@@ -830,6 +830,9 @@
 
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage workflow edit.</string>
     <string name="terrarium_draft_wiring_staged_now_depends">Draft wiring staged: %1$s now depends on %2$s.</string>
+    <string name="terrarium_reset_zoom">Reset zoom, now %1$s</string>
+    <string name="terrarium_zoom_in">Zoom in</string>
+    <string name="terrarium_zoom_out">Zoom out</string>
 
     <!-- Count-dependent text -->
     <plurals name="store_update_count">
