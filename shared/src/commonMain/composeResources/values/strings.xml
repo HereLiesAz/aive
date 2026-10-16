@@ -18,6 +18,7 @@
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
     <string name="app_import_failed">Import failed</string>
+    <string name="app_launch_already_in_progress">Another workflow is launching. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
     <string name="app_provider_message_failed">Provider message failed</string>
     <string name="app_reachable_capabilities">Reachable · %1$s capabilities</string>
