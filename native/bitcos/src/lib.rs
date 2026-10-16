@@ -639,7 +639,8 @@ fn read_bits_u64(bytes: &[u8], bit_offset: u64) -> u64 {
 
 /// A u64 read from untrusted bytes, as an in-memory size or offset on this target.
 fn to_usize(value: u64) -> Result<usize, BitcosError> {
-    usize::try_from(value).map_err(|_| BitcosError::InvalidContainer("value exceeds addressable memory"))
+    usize::try_from(value)
+        .map_err(|_| BitcosError::InvalidContainer("value exceeds addressable memory"))
 }
 
 fn checked_shape_product(shape: &[u64]) -> Result<u64, BitcosError> {
