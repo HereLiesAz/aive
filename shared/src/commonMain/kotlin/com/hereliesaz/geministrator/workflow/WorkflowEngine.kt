@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -442,7 +443,8 @@ class WorkflowEngine(
             val previousStatus = taskRun.status
             val status = sessionGateway.status(handle)
             val providerProgress = sessionGateway.progress(handle)
-            runCatching {
+            // Usage is best effort, but cancellation of the cycle must still propagate.
+            try {
                 sessionGateway.usageReport(handle)?.let { usage ->
                     eventSink.append(
                         ProviderUsageRecorded(
@@ -459,6 +461,9 @@ class WorkflowEngine(
                         ),
                     )
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
             }
             val durableArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
                 ArtifactRef(
