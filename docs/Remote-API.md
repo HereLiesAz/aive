@@ -37,3 +37,42 @@ Field details:
   - The queue lives in memory only. It is lost if Android kills The Aive's process, holds at most 10 requests (further requests get `ERROR`), and a request still queued an hour after it arrived expires with a failed `LAUNCH_OUTCOME` instead of launching.
 - **Watching** reports whichever run The Aive is currently showing, plus the outcomes of queued launches (the 10 most recent are replayed when watching starts). Updates continue until the client unbinds, dies, or sends another watch request.
 - Version 2 added `launchId` and `LAUNCH_OUTCOME`; version 1 clients can ignore both.
+
+## Relay
+
+`relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. Nothing in The Aive or IDEaz implements the pairing or connects to it yet, and it has not been deployed; this section is the contract a client must follow.
+
+### Pairing
+
+The Aive creates the pairing. It generates:
+
+- a room id: 16 to 64 characters of `A-Z a-z 0-9 _ -`;
+- a **host token**, which it keeps and never shares;
+- a **client token**, which goes into the invitation for IDEaz together with the room id.
+
+Each token is base64url (no padding) of at least 32 bytes from a secure random source, so at least 43 characters. The relay rejects shorter tokens, tokens over 128 characters and tokens with fewer than 16 distinct characters, and the two tokens must differ. The relay stores only SHA-256 hashes of both.
+
+### Requests
+
+All requests carry `Authorization: Bearer <token>`. WebSocket clients therefore need a stack that can set request headers on the upgrade (OkHttp can; browsers cannot).
+
+| Request | Token | Effect |
+|---|---|---|
+| `POST /v1/rooms/{roomId}` with JSON `{"clientToken": "..."}` | host | Creates the room (`201`). On an existing room with the same host token, replaces the client token and disconnects every client (`204`). Another host token gets `403`. |
+| `DELETE /v1/rooms/{roomId}` | host | Deletes the room and disconnects everyone (`204`). |
+| `GET /v1/rooms/{roomId}?role=host` (WebSocket) | host | Connects as host, replacing an earlier host socket (closed with `4000`). |
+| `GET /v1/rooms/{roomId}?role=client` (WebSocket) | client | Connects as a client. `404` if the room does not exist, `429` when 8 clients are already connected. |
+
+A client token never authenticates as host, so a client cannot create a room, evict the host or receive other clients' frames.
+
+### Frames
+
+Frames are JSON text, at most 1,000,000 UTF-8 bytes; anything larger or binary closes the socket with `1009`. The relay reads only the fields below and forwards `data` as an opaque string; sealing it (for example with a key in the invitation) is the apps' job.
+
+- Client to relay: `{"data": "..."}`. The host receives `{"from": "<clientId>", "data": "..."}`; the relay assigns each client connection a random UUID.
+- Host to relay: `{"to": "<clientId>", "data": "..."}`. Only that client receives `{"data": "..."}`; a `to` that is not a connected client's id is dropped.
+- Relay events to clients: `{"event": "host-online"}` and `{"event": "host-offline"}`, sent when a client connects, when the host connects, and when the host's socket closes or errors.
+
+### Lifetime
+
+A room is deleted, with its stored hashes, 30 days after its host last connected or disconnected. A connected host keeps the room alive. Clients are closed with `4001` when the client token is rotated and `4002` when the room is deleted or expires.
