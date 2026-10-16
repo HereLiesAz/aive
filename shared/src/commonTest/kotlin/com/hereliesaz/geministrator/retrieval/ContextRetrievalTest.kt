@@ -3,6 +3,8 @@ package com.hereliesaz.geministrator.retrieval
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.vector.BuiltInTextEmbedder
+import com.hereliesaz.geministrator.vector.TextEmbedder
 import com.hereliesaz.geministrator.workflow.GitHubTokenProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -43,6 +45,36 @@ class ContextRetrievalTest {
         }
         val hits = SimilarityContextRetriever(listOf(source), maxChunks = 1).retrieve(request("Add a SQL table to the workflow database schema"))
         assertEquals(listOf("db"), hits.map { it.chunk.id })
+    }
+
+    @Test
+    fun vectorCacheEvictsTheLeastRecentlyUsedText() = runBlocking {
+        val builtIn = BuiltInTextEmbedder()
+        val embedded = mutableListOf<String>()
+        val counting = object : TextEmbedder by builtIn {
+            override suspend fun embed(texts: List<String>): List<FloatArray> {
+                embedded += texts
+                return builtIn.embed(texts)
+            }
+        }
+        var current = listOf<TextChunk>()
+        val source = ContextChunkSource { current }
+        val retriever = SimilarityContextRetriever(listOf(source), embedder = counting, maxCachedVectors = 2)
+        fun chunk(name: String) = TextChunk(name, name, "workflow database $name")
+        suspend fun retrieveWith(vararg names: String) {
+            current = names.map(::chunk)
+            retriever.retrieve(request("workflow database"))
+        }
+
+        retrieveWith("a")
+        retrieveWith("b")
+        retrieveWith("a") // a is now the most recently used
+        retrieveWith("c") // evicts b, not a
+        embedded.clear()
+        retrieveWith("a")
+        assertTrue("workflow database a" !in embedded, embedded.toString())
+        retrieveWith("b")
+        assertTrue("workflow database b" in embedded, embedded.toString())
     }
 
     @Test
