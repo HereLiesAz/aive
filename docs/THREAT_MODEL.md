@@ -212,19 +212,21 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 **Threats**
 - Anyone holding the pool's shared bearer token can join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
 - A rogue member can publish leases that try to make sharing devices run repository operations or dispatch GitHub Actions with those devices' credentials.
-- A rogue member can re-register an existing node ID to displace it.
+- A rogue member can register a node ID that is not currently connected and so act as that node (receive its replayed leases, cancel its leases).
 - A worker can return fabricated results.
 - The relay can be reached over plain `ws://`.
 
 **Mitigations in place**
 - Distributed compute has no default relay and is off until configured. Accepting new work also requires `sharingEnabled`, and can additionally require an unmetered network and external power. Android re-evaluates and republishes those conditions when network/power state changes, and its worker checks each offer against the same live descriptor.
 - A node advertises only the executor kinds its credentials support. The relay offers leases only to nodes that satisfy the lease's requirements. The worker re-checks those requirements and a per-node parallel-lease cap.
-- The relay requires `Authorization: Bearer <token>`. It rejects mismatched protocol versions and caps frames at 8 MiB.
+- The relay requires `Authorization: Bearer <token>`, compared in constant time. It rejects mismatched protocol versions and caps frames at 8 MiB.
+- A node ID held by a live connection cannot be registered again until that connection closes.
+- Lease duration (10 minutes), unfinished leases per origin (64) and leases per pool (512) are capped, and an unfinished lease is dropped 24 hours after the relay accepted it.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued. Workers continuously watch relay ownership while executing; cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine rather than allowing stale work to continue.
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
 - Workers re-check every lease before running it (`SystemExecutorDistributedWorkloadRunner`): the submitted workflow must validate; the task must be a distributed placement of the requested executor; mutating repository operations are refused outright, because the approval state in an envelope is self-attested; and work that uses the worker's repository credentials (repository operations, GitHub Actions, GitHub-backed scripts) runs only against a repository of a project linked on the worker's own device. Anything else fails the lease as refused.
 - Relay tokens are stored in the platform credential store.
-- Origin disconnect does not destroy accepted work. The relay retains unfinished leases until they complete/cancel; terminal results have a 24-hour replay window. When `AIVE_RELAY_STATE_DIR` is configured, those lease records survive relay-process restarts in AES-256-GCM-encrypted files keyed from the relay bearer secret. Expired terminal records are removed when an active/persisted pool is swept or loaded; an untouched encrypted pool snapshot can remain until it is accessed or explicitly removed by the operator.
+- Origin disconnect does not destroy accepted work. The relay retains unfinished leases until they complete, are cancelled or reach the 24-hour cap; terminal results have a 24-hour replay window. When `AIVE_RELAY_STATE_DIR` is configured, those lease records survive relay-process restarts in AES-256-GCM-encrypted files keyed from the relay bearer secret. Expired terminal records are removed when an active/persisted pool is swept or loaded; an untouched encrypted pool snapshot can remain until it is accessed or explicitly removed by the operator.
 
 **Remaining gaps**
 - There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state.

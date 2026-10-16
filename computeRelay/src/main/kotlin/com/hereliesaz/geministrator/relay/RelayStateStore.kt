@@ -36,6 +36,8 @@ data class PersistedRelayLease(
     val progress: DistributedExecutionProgress? = null,
     val result: DistributedExecutionResult? = null,
     val completedAtEpochMillis: Long? = null,
+    /** Absent in files written before it existed; restored leases then count from the restore. */
+    val acceptedAtEpochMillis: Long? = null,
 )
 
 /** Persistence boundary for one relay deployment. Implementations must be crash-safe. */

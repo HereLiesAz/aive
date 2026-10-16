@@ -35,16 +35,22 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 4. Expired or disconnected worker leases are requeued and reoffered (the relay sweeps every 5 s).
    Origin disconnect does **not** cancel accepted work. A claimed worker continues while its own relay
    session remains healthy; unclaimed work stays eligible for workers that join later.
-5. The relay retains terminal lease results for 24 hours. Unfinished leases are not time-expired merely
+5. The relay retains terminal lease results for 24 hours. Unfinished leases are not expired merely
    because their origin is offline: dropping an unfinished external run ID would make it unsafe to infer
    that side effects can be repeated. When the same logical origin reconnects, the relay replays its
    accepted/claimed/progress/completed state so the client can reconstruct the existing lease instead
-   of dispatching it again.
+   of dispatching it again. They are bounded all the same: an unfinished lease is cancelled
+   (`LeaseCancelled` to origin and worker) and dropped 24 hours after the relay accepted it.
+6. Publishing is capped: a lease may ask for at most a 10-minute lease duration, an origin may have
+   at most 64 unfinished leases in a pool, and a pool holds at most 512 leases including retained
+   terminal ones. Over a cap, `PublishLease` gets a `bad-request` or `bad-state` error.
 
 Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
 The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
-`Failed`. Connection replacement is fenced by peer identity, so a stale socket cannot unregister or
-mutate state after a newer connection takes over the same logical node ID.
+`Failed`. A node ID cannot be taken over while its connection is live: a second registration for it
+gets `node-id-in-use` and is closed (code 1013), so a node that reconnects is accepted only once the
+relay has seen its old socket close (at most the 45 s WebSocket timeout). State changes are also
+fenced by peer identity, so a stale socket cannot unregister the node or act for it.
 
 ## Relay process-restart persistence
 
