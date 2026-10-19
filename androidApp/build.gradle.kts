@@ -199,6 +199,7 @@ dependencies {
     add("playImplementation", "com.google.android.play:app-update:2.1.0")
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.kotlinx.serialization.json)

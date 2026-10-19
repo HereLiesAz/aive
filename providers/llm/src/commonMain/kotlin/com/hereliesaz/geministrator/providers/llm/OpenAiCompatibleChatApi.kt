@@ -100,6 +100,7 @@ class OpenAiCompatibleChatApi(
             val splitter = ThinkTagSplitter()
             var usage: CompatibleChatUsage? = null
             var finishReason: String? = null
+            var done = false
             suspend fun deliver(chunks: List<TextGenerationChunk>) = chunks.forEach { chunk ->
                 when (chunk) {
                     is TextGenerationChunk.Thinking -> reasoning.append(chunk.text)
@@ -124,7 +125,10 @@ class OpenAiCompatibleChatApi(
                     )
                 },
             ) { _, data ->
-                if (data.trim() == "[DONE]") return@postServerSentEvents
+                if (data.trim() == "[DONE]") {
+                    done = true
+                    return@postServerSentEvents
+                }
                 val chunk = streamJson.decodeFromString<CompatibleChatStreamChunk>(data)
                 chunk.error?.let { error("Compatible chat stream error: ${it.message ?: data.take(300)}") }
                 chunk.usage?.let { usage = it }
@@ -137,6 +141,7 @@ class OpenAiCompatibleChatApi(
                 }
             }
             deliver(splitter.finish())
+            requireStreamTerminated(done || finishReason != null, "Compatible chat")
             requireCompleteFinishReason(finishReason)
             if (text.isBlank()) error("Compatible chat response did not contain assistant text")
             TextGenerationResult(

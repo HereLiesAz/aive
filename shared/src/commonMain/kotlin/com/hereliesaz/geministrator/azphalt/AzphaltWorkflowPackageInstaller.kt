@@ -269,8 +269,14 @@ class AzphaltWorkflowPackageInstaller(
         require(!plan.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${plan.packageId}; explicit publisher-change approval is required"
         }
-        require(!plan.signed || plan.trusted || allowUntrustedSigner) {
-            "Signed package publisher is not trusted: ${plan.trustReason}"
+        // Unsigned is strictly less trustworthy than signed-by-an-unknown-key, so it needs the
+        // same explicit approval.
+        require(plan.trusted || allowUntrustedSigner) {
+            if (plan.signed) {
+                "Signed package publisher is not trusted: ${plan.trustReason}"
+            } else {
+                "Package ${plan.packageId} is unsigned; explicit untrusted-install approval is required"
+            }
         }
 
         val previous = installStore.get(plan.packageId)
@@ -287,6 +293,15 @@ class AzphaltWorkflowPackageInstaller(
                 }
             }
                 plan.definitions.forEach { persistence.definitions.put(it) }
+                // An upgrade that drops a definition must take it with it; otherwise it lingers
+                // unowned, can never be removed with the package, and blocks other packages.
+                val droppedDefinitionIds = ownedDefinitions - plan.definitions.map { it.id.value }.toSet()
+                if (droppedDefinitionIds.isNotEmpty()) {
+                    persistence.replaceCatalog(
+                        definitions = persistence.definitions.all().filterNot { it.id.value in droppedDefinitionIds },
+                        roles = persistence.roles.all(),
+                    )
+                }
             }
 
             if (plan.packageKind == "role") {

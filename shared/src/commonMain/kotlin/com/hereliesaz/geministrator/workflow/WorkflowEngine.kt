@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -182,6 +183,11 @@ class WorkflowEngine(
                                 reason = "Executor failed. Last status: $reason",
                                 nowEpochMillis = nowEpochMillis,
                             )
+                            if (nextRun.status.isTerminal()) {
+                                // The task's policy failed the workflow: start nothing else, and keep
+                                // the terminal status rather than overwriting it below.
+                                return DispatchResult(nextRun, handles)
+                            }
                             continue
                         }
                         if (drafted != null) {
@@ -437,7 +443,8 @@ class WorkflowEngine(
             val previousStatus = taskRun.status
             val status = sessionGateway.status(handle)
             val providerProgress = sessionGateway.progress(handle)
-            runCatching {
+            // Usage is best effort, but cancellation of the cycle must still propagate.
+            try {
                 sessionGateway.usageReport(handle)?.let { usage ->
                     eventSink.append(
                         ProviderUsageRecorded(
@@ -454,6 +461,9 @@ class WorkflowEngine(
                         ),
                     )
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
             }
             val durableArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
                 ArtifactRef(
@@ -594,14 +604,19 @@ class WorkflowEngine(
                     taskRuns = run.taskRuns + (
                         taskDefinitionId to taskRun.copy(
                             status = TaskRunStatus.Retrying,
+                            // A new attempt: counted against the policy, with fresh attempt-keyed
+                            // gate ids and none of the failed attempt's output or plan.
+                            attempt = taskRun.attempt + 1,
                             assignedRoleId = decision.roleId,
                             executor = TaskExecutor.RoleAgent(decision.roleId),
                             assignedProviderId = null,
                             providerRunId = null,
                             externalRunId = null,
+                            artifacts = emptyList(),
                             blockingReason = null,
                             progress = null,
                             progressMessage = null,
+                            providerPlan = null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,

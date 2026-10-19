@@ -209,6 +209,47 @@ class GitLabWorkspaceAgentProviderTest {
         assertTrue(requests.none { it.method == HttpMethod.Post })
     }
 
+    @Test
+    fun cancelDuringChangeGenerationWritesNothing() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val engine = MockEngine { request ->
+            requests += request
+            when {
+                request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/tree") ->
+                    respondJson("""[{"path":"README.md","type":"blob"}]""")
+                request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/files/README.md/raw") ->
+                    respondText("initial\n")
+                else -> respondJson(
+                    """{"default_branch":"main","web_url":"https://gitlab.com/group/sub/repo"}""",
+                )
+            }
+        }
+        lateinit var provider: GitLabWorkspaceAgentProvider
+        var runId: com.hereliesaz.geministrator.domain.ProviderRunId? = null
+        val queued = QueueTextApi(
+            TextGenerationResult(text = "Inspect README.\nFILES:\nREADME.md"),
+            TextGenerationResult(
+                text = """{"commitMessage":"Update","actions":[{"action":"update","filePath":"README.md","content":"new"}]}""",
+            ),
+        )
+        val api = object : TextGenerationApi {
+            override suspend fun generate(prompt: String): TextGenerationResult {
+                val result = queued.generate(prompt)
+                // The user cancels while the change set is being generated.
+                if (queued.callCount == 2) provider.cancel(runId!!)
+                return result
+            }
+        }
+        provider = provider(api, HttpClient(engine), "cancelled-gitlab")
+
+        runId = provider.start(request(TaskRunId("cancelled-task"))).providerRunId
+        val events = provider.observe(runId!!).toList()
+
+        assertIs<AgentEvent.Failed>(events.last())
+        assertTrue(events.none { it is AgentEvent.ArtifactProduced })
+        assertTrue(requests.none { it.method == HttpMethod.Post })
+    }
+
     private fun provider(
         api: TextGenerationApi,
         client: HttpClient,

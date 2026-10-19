@@ -287,11 +287,7 @@ class AzphaltStoreService(
         require(!verification.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${prepared.detail.id}; explicit publisher-change approval is required"
         }
-        require(
-            !verification.packageContents.signed ||
-                verification.trusted ||
-                allowUntrustedSigner,
-        ) { "Signed package publisher is not trusted: ${verification.trustReason}" }
+        requireTrustApproved(prepared.detail.id, verification, allowUntrustedSigner)
         val installed = host.install(prepared, nowEpochMillis)
         if (verification.packageContents.signerPublicKey != null &&
             (verification.pinnedPublisherKey == null || allowPublisherChange)
@@ -360,9 +356,9 @@ class AzphaltStoreService(
         require(!verification.publisherChanged || allowPublisherChange) {
             "Publisher key changed for ${prepared.detail.id}; explicit publisher-change approval is required"
         }
-        require(!verification.packageContents.signed || verification.trusted || allowUntrustedSigner) {
-            "Signed package publisher is not trusted: ${verification.trustReason}"
-        }
+        // An llm package's baseUrl later receives the user's API key: an unsigned or untrusted
+        // manifest must never get there without explicit approval.
+        requireTrustApproved(prepared.detail.id, verification, allowUntrustedSigner)
         val manifest = verification.packageContents.manifest
         val endpoint = prepared.endpoint
         val handling = requireNotNull(prepared.llm.dataHandling)
@@ -394,6 +390,20 @@ class AzphaltStoreService(
     }
 
     fun removeLlm(packageId: String) = llmRegistry.remove(packageId)
+
+    private fun requireTrustApproved(
+        packageId: String,
+        verification: AzphaltPackageVerification,
+        allowUntrustedSigner: Boolean,
+    ) {
+        require(verification.trusted || allowUntrustedSigner) {
+            if (verification.packageContents.signed) {
+                "Signed package publisher is not trusted: ${verification.trustReason}"
+            } else {
+                "Package $packageId is unsigned; explicit untrusted-install approval is required"
+            }
+        }
+    }
 
     private fun resolveDirectEndpointUrl(
         prepared: AzphaltPreparedLlmInstall,

@@ -151,6 +151,7 @@ open class TextLlmProvider(
             // reconstructed by reconnect() after a restart only has the durable plan
             // flag, not the generation itself, so it executes exactly once here.
             val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
+            if (cancelledDuringGeneration(runId, session)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -162,6 +163,7 @@ open class TextLlmProvider(
                 return@flow
             }
             val result = generateOrFail(runId, session) ?: return@flow
+            if (cancelledDuringGeneration(runId, session)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
             if (result.inputTokens != null || result.outputTokens != null) {
                 emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
@@ -169,6 +171,20 @@ open class TextLlmProvider(
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
+    }
+
+    /**
+     * cancel() only flips the phase; a generation already streaming runs to its end. Its result must
+     * then be dropped, not delivered as the artifact of a run the engine believes cancelled.
+     */
+    private suspend fun FlowCollector<AgentEvent>.cancelledDuringGeneration(
+        runId: ProviderRunId,
+        session: Session,
+    ): Boolean {
+        if (session.phase.value != TextLlmSessionPhase.Cancelled) return false
+        emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
+        mutex.withLock { sessions.remove(runId) }
+        return true
     }
 
     /**

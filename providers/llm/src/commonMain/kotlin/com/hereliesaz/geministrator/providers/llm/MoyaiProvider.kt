@@ -140,8 +140,15 @@ class MoyaiProvider(
         var initialized = false
         var lastEventId = 0L
         var lastMessageId = 0L
+        // "idle" is where a chat-enabled run rests once it has answered, but also where a run can
+        // sit before it starts: it only means done after the run has visibly worked.
+        var sawWork = false
         while (true) {
             val snapshot = api.getRun(runId.value)
+            val status = snapshot.status.lowercase()
+            sawWork = sawWork ||
+                status !in setOf("idle", "queued", "pending") ||
+                snapshot.messages.any { it.role == "assistant" && it.content.isNotBlank() }
             if (!initialized) {
                 lastEventId = snapshot.events.maxOfOrNull { it.id } ?: 0L
                 lastMessageId = snapshot.messages.maxOfOrNull { it.id } ?: 0L
@@ -164,8 +171,8 @@ class MoyaiProvider(
                     }
             }
 
-            when (snapshot.status.lowercase()) {
-                "completed", "idle" -> {
+            when (if (status == "idle" && sawWork) "completed" else status) {
+                "completed" -> {
                     terminalArtifacts(request, snapshot, runId).forEach {
                         emit(AgentEvent.ArtifactProduced(runId, it))
                     }
@@ -261,8 +268,21 @@ class MoyaiProvider(
         metadata = mapOf("moyaiRunId" to runId.value),
     )
 
+    /**
+     * Idempotency key: a retried send of the same message to the same run is deduplicated by Moyai.
+     * 64-bit FNV-1a over the whole run id and message, so distinct messages do not collide the way
+     * two 32-bit String.hashCode values trivially can.
+     */
     private fun clientId(runId: ProviderRunId, message: String): String =
-        "aive-${runId.value.hashCode().toUInt().toString(16)}-${message.hashCode().toUInt().toString(16)}"
+        "aive-${fnv1a64(runId.value).toString(16)}-${fnv1a64(message).toString(16)}"
+
+    private fun fnv1a64(value: String): ULong {
+        var hash = 0xcbf29ce484222325UL
+        value.encodeToByteArray().forEach { byte ->
+            hash = (hash xor byte.toUByte().toULong()) * 0x100000001b3UL
+        }
+        return hash
+    }
 }
 
 private fun AgentTaskRequest.toMoyaiPrompt(): String = buildString {
@@ -302,14 +322,14 @@ private class MoyaiApi(
         if (parsed.port != parsed.protocol.defaultPort) append(':').append(parsed.port)
     }
     private var csrf: String? = null
+    private val sessionMutex = Mutex()
 
     init {
         require(this.baseUrl.startsWith("https://", ignoreCase = true)) { "Moyai baseUrl must use HTTPS" }
     }
 
-    suspend fun start(prompt: String, repositoryUrl: String): MoyaiRun {
-        ensureSession()
-        return client.post("$baseUrl/api/runs") {
+    suspend fun start(prompt: String, repositoryUrl: String): MoyaiRun = withSession {
+        client.post("$baseUrl/api/runs") {
             mutate()
             contentType(ContentType.Application.Json)
             setBody(
@@ -323,30 +343,45 @@ private class MoyaiApi(
         }.requireSuccess("start Moyai session").body()
     }
 
-    suspend fun getRun(runId: String): MoyaiRun {
-        ensureSession()
-        return client.get("$baseUrl/api/runs/$runId").requireSuccess("read Moyai session").body()
+    suspend fun getRun(runId: String): MoyaiRun = withSession {
+        client.get("$baseUrl/api/runs/$runId").requireSuccess("read Moyai session").body()
     }
 
-    suspend fun sendMessage(runId: String, message: String, clientId: String) {
-        ensureSession()
+    suspend fun sendMessage(runId: String, message: String, clientId: String) = withSession {
         client.post("$baseUrl/api/runs/$runId/messages") {
             mutate()
             contentType(ContentType.Application.Json)
             setBody(MoyaiChatMessage(content = message, clientId = clientId, sendNow = true))
         }.requireSuccess("message Moyai session")
+        Unit
     }
 
-    suspend fun cancel(runId: String) {
-        ensureSession()
+    suspend fun cancel(runId: String) = withSession {
         client.post("$baseUrl/api/runs/$runId/cancel") { mutate() }
             .requireSuccess("cancel Moyai session")
+        Unit
+    }
+
+    /**
+     * Runs [block] in an authenticated session. When the cookie session has expired (401/403), the
+     * session and CSRF token are re-established once and the call retried; a refused request was
+     * not carried out, so the retry cannot apply it twice.
+     */
+    private suspend fun <T> withSession(block: suspend () -> T): T {
+        val used = ensureSession()
+        return try {
+            block()
+        } catch (expired: MoyaiSessionExpired) {
+            sessionMutex.withLock { if (csrf == used) csrf = null }
+            ensureSession()
+            block()
+        }
     }
 
     fun artifactUrl(runId: String): String = "$baseUrl/api/runs/$runId/artifact"
 
-    private suspend fun ensureSession() {
-        if (csrf != null) return
+    private suspend fun ensureSession(): String = sessionMutex.withLock {
+        csrf?.let { return@withLock it }
         var session = client.get("$baseUrl/api/session").requireSuccess("read Moyai login session").body<MoyaiSession>()
         if (!session.authenticated) {
             val password = workspacePassword?.trim().orEmpty()
@@ -362,6 +397,7 @@ private class MoyaiApi(
         }
         require(session.authenticated && session.csrf.isNotBlank()) { "Moyai workspace did not establish an authenticated session" }
         csrf = session.csrf
+        session.csrf
     }
 
     private fun io.ktor.client.request.HttpRequestBuilder.mutate() {
@@ -372,9 +408,13 @@ private class MoyaiApi(
     private suspend fun HttpResponse.requireSuccess(operation: String): HttpResponse {
         if (status.value in 200..299) return this
         val detail = bodyAsText().redactSecrets().take(800)
-        error("Unable to $operation: HTTP ${status.value}" + detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty())
+        val message = "Unable to $operation: HTTP ${status.value}" + detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
+        if (status.value == 401 || status.value == 403) throw MoyaiSessionExpired(message)
+        error(message)
     }
 }
+
+private class MoyaiSessionExpired(message: String) : IllegalStateException(message)
 
 private fun moyaiClient(): HttpClient = HttpClient {
     expectSuccess = false
