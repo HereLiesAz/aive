@@ -414,6 +414,26 @@ class MemoryLayerController(
     suspend fun importJson(json: String) {
         val snapshot = SettingsMemoryStore.defaultJson.decodeFromString(MemorySnapshot.serializer(), json)
         drainMutex.withLock {
+            val workflowId = selectedWorkflow() ?: throw IllegalStateException("No workflow's memory bank is selected")
+            // An export is untrusted input: it must form a whole graph (citing at most this
+            // workflow's ancestors) before it replaces anything, as every commit must.
+            val ancestorParts = lineage.ancestorsOf(workflowId).map { banks.store(it).read() }
+            snapshot.requireConsistentGraph(
+                MemoryIdIndex(
+                    MemorySnapshot(
+                        episodes = ancestorParts.flatMap { it.episodes },
+                        sections = ancestorParts.flatMap { it.sections },
+                        nodes = ancestorParts.flatMap { it.nodes },
+                        edges = ancestorParts.flatMap { it.edges },
+                    ),
+                ),
+            )
+            snapshot.nodes.forEach { node ->
+                val tagged = node.metadata[PRODUCED_BY_WORKFLOW]
+                require(tagged == null || tagged == workflowId) {
+                    "Memory ${node.id.value} is tagged with workflow $tagged but is imported into $workflowId"
+                }
+            }
             requireSelectedOwnStore().replace(snapshot)
             resetLayers()
         }

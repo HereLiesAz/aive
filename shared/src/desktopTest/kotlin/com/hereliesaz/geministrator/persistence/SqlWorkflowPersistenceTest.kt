@@ -209,4 +209,21 @@ class SqlWorkflowPersistenceTest {
         assertEquals(listOf(project), reopened.projects.all())
         assertEquals(1, backups.size)
     }
+
+    @Test
+    fun failedMigrationDoesNotBrickTheStoreAndIsRetriedLater() = runBlocking {
+        val previous = SettingsWorkflowPersistence(MapSettings())
+        previous.projects.put(project)
+        val file = tempDatabase()
+
+        val sql = desktopSqlWorkflowPersistence(file, LegacySettingsMigration(previous) { error("disk full") })
+        assertTrue(sql.projects.all().isEmpty())
+        sql.projects.put(project.copy(id = ProjectId("new")))
+        assertEquals(listOf(project), previous.projects.all(), "the old store is left for a retry")
+
+        val backups = mutableListOf<String>()
+        val reopened = desktopSqlWorkflowPersistence(file, LegacySettingsMigration(previous) { backups += it })
+        assertEquals(setOf(project.id, ProjectId("new")), reopened.projects.all().map { it.id }.toSet())
+        assertEquals(1, backups.size)
+    }
 }

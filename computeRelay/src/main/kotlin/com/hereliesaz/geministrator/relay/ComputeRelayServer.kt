@@ -45,16 +45,32 @@ class ComputeRelayHub(
 ) {
     private val pools = ConcurrentHashMap<String, RelayPool>()
 
-    fun pool(poolId: String): RelayPool = pools.computeIfAbsent(poolId) {
-        RelayPool(poolId, nowEpochMillis, stateStore)
+    // When each pool was last handed out. A pool is empty from creation until its connection
+    // registers, so emptiness alone must not let the sweep remove it in that window: the connecting
+    // node would register on an orphan and the next connection would build a second pool.
+    private val handedOutAt = ConcurrentHashMap<String, Long>()
+
+    fun pool(poolId: String): RelayPool {
+        handedOutAt[poolId] = nowEpochMillis()
+        return pools.computeIfAbsent(poolId) { RelayPool(poolId, nowEpochMillis, stateStore) }
     }
 
     suspend fun sweepExpired() {
         pools.values.forEach { it.sweepExpired() }
-        val emptyPoolIds = pools.entries
-            .filter { it.value.isEmpty() }
-            .map { it.key }
-        emptyPoolIds.forEach { pools.remove(it) }
+        val now = nowEpochMillis()
+        val candidates = pools.entries
+            .filter { now - (handedOutAt[it.key] ?: 0L) >= POOL_REMOVAL_GRACE_MILLIS && it.value.isEmpty() }
+        // Removal is conditional on the same pool instance, so a pool replaced or re-handed-out
+        // meanwhile is never dropped by a stale decision.
+        candidates.forEach { (id, pool) ->
+            if (now - (handedOutAt[id] ?: 0L) >= POOL_REMOVAL_GRACE_MILLIS && pools.remove(id, pool)) {
+                handedOutAt.remove(id)
+            }
+        }
+    }
+
+    private companion object {
+        const val POOL_REMOVAL_GRACE_MILLIS = 60_000L
     }
 }
 

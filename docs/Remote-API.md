@@ -40,7 +40,7 @@ Field details:
 
 ## Relay
 
-`relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. Nothing in The Aive or IDEaz implements the pairing or connects to it yet, and it has not been deployed; this section is the contract a client must follow.
+`relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. The Aive (the host) creates a pairing, keeps a WebSocket open to the relay while the user has **Remote access** on, and answers sealed messages from IDEaz (the client). The relay has not been deployed yet; this section is the contract both apps follow.
 
 ### Pairing
 
@@ -72,6 +72,70 @@ Frames are JSON text, at most 1,000,000 UTF-8 bytes; anything larger or binary c
 - Client to relay: `{"data": "..."}`. The host receives `{"from": "<clientId>", "data": "..."}`; the relay assigns each client connection a random UUID.
 - Host to relay: `{"to": "<clientId>", "data": "..."}`. Only that client receives `{"data": "..."}`; a `to` that is not a connected client's id is dropped.
 - Relay events to clients: `{"event": "host-online"}` and `{"event": "host-offline"}`, sent when a client connects, when the host connects, and when the host's socket closes or errors.
+
+### Sealed frames and messages
+
+The relay forwards `data` without reading it. The apps seal it end to end with a key that only the pairing code carries, so the relay sees ciphertext only.
+
+**Pairing code.** `aive1:` followed by base64url (no padding) of the UTF-8 JSON
+
+~~~json
+{"v": 1, "relay": "https://aive-relay.hereliesaz.workers.dev", "room": "<roomId>", "clientToken": "<token>", "key": "<base64url of 32 random bytes>"}
+~~~
+
+The host token is not in the code; The Aive keeps it. IDEaz connects with `clientToken` as `role=client` to `relay` and `room`, and seals with `key`. The default relay is `https://aive-relay.hereliesaz.workers.dev`; the user can enter another before turning Remote access on, and the code carries whichever was used. The reference implementation is `RemoteRelayPairing` in `androidApp/.../remote/RemoteRelayPairing.kt`.
+
+**Frame `data`.** `<seq>.<base64url(nonce12 || ciphertext || tag16)>` (no padding):
+
+- AES-256-GCM with the pairing key and a fresh random 12-byte nonce for every frame (never reuse one);
+- associated data is the UTF-8 string `aive-relay/1|<room>|<dir>|<seq>`, where `<dir>` is `c2h` for client to host and `h2c` for host to client, and `<seq>` is the decimal prefix. A frame therefore cannot be moved between rooms, directions or positions;
+- the plaintext is UTF-8 JSON of at most 600,000 bytes (the sealed frame stays under the relay's 1,000,000-byte limit).
+
+**Envelope.** Every plaintext JSON object carries:
+
+- `sid`: the sender's random 16-character lowercase hex session id, chosen once per connection;
+- `seq`: the same decimal as the prefix, strictly increasing per `sid`, starting at 1;
+- `ts`: the sender's clock in epoch milliseconds.
+
+A receiver silently drops (no reply) a frame whose tag or associated data does not verify, whose `seq` differs from its prefix, whose `seq` is not greater than the last one it accepted for that `sid`, or whose `ts` is more than 10 minutes from its own clock. The host remembers the last `seq` for at most 256 `sid`s (least recently used are forgotten), so a client must pick a new `sid` for each connection and keep its clock roughly right.
+
+**Client to host** (`t` selects the message; `id` is the client's request id, echoed back):
+
+| `t` | Fields | Reply |
+|---|---|---|
+| `prompt` | `id`, `prompt`; optional `providerId`, `model` | `result` or `error` |
+| `launch` | `id`, `projectName`, `objective`; optional `repositoryUrl` | `launched` or `error` |
+| `watch` | `id` | `run_status` now (if a run is showing) and whenever it changes, and `launch_outcome` for queued launches |
+| `ping` | `id` | `pong` |
+
+**Host to client:**
+
+| `t` | Fields |
+|---|---|
+| `result` | `id`, `text` |
+| `error` | `id`, `error` (a user-facing message; `id` is 0 when the request had none) |
+| `launched` | `id`, `launchId` |
+| `launch_outcome` | `launchId`, `started`, optional `error` |
+| `run_status` | `runId`, `objective`, `runStatus`, `tasksTotal`, `tasksDone`, optional `progressMessage` |
+| `pong` | `id` |
+
+The messages mean the same as the Messenger ones above, and run through the same code (`AiveRemoteHandler`, `AiveRemoteBridge`), so a prompt is never sent to an unlinked keyless provider on this path either. Relay-specific limits: a prompt over 500,000 UTF-8 bytes gets an `error`; at most 4 prompts run at once per host (more get an `error`); a reply that cannot fit in 600,000 bytes becomes an `error`. `watch` subscriptions last until the client's connection ends (the host keeps at most 16 watching clients).
+
+### Opt-in and the foreground service
+
+Remote access is off by default, in both Android flavors. **Settings → Remote Access** turns it on, with a relay URL field (HTTPS only; plain HTTP is accepted only for loopback) that can be edited while it is off. Turning it on creates the pairing, stores it (host token included) encrypted under the Android Keystore (`aive.remote-relay.pairing`, excluded from backup), shows the pairing code with Copy and Share buttons and a warning that anyone holding it can run prompts on the user's linked AI providers and start workflows, and starts `AiveRelayHostService`.
+
+`AiveRelayHostService` is a non-exported foreground service (`foregroundServiceType="specialUse"`, with a persistent notification that has a **Turn off** action). On start it creates the room (`POST /v1/rooms/{room}`, which also drops any connected client, so clients must reconnect), then holds the host WebSocket and reconnects with exponential backoff (1 s doubling to 60 s, with jitter). It creates the room again only if the relay answers 404 or closes the socket with `4002`. It never deletes anything on its own: stopping the process, losing the network or rebooting leaves the room and pairing in place (the service restarts the next time The Aive is opened). Turning Remote access off, or pressing **Turn off** in the notification, deletes the room (`DELETE /v1/rooms/{room}`) and forgets the pairing, so the old code stops working. **Reset pairing** does that and creates a new room, tokens and key; IDEaz must be given the new code.
+
+Android 13 and later ask for the notification permission when Remote access is turned on; the link works if it is refused, but the notification is hidden.
+
+**Limitation: workflows over the relay start later.** Prompts run headless, as with the Messenger API. Workflows run on the runtime that belongs to The Aive's UI, so `launch` only queues the request in memory (`launched` confirms that) and the workflow starts when The Aive is next opened on that device; a `watch`ing client then receives its `launch_outcome` and `run_status`. A request still queued an hour after it arrived expires, as described under Behavior.
+
+### Release steps
+
+- **Google Play Console.** The service uses the `specialUse` foreground service type, which needs a declaration under App content → Foreground service permissions: choose "Other" (special use), paste the subtype text from the manifest property `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE`, describe the feature as above (opt-in, user-visible notification, encrypted link to the user's own app), and attach a short video of turning Remote access on. Without it a Play release that targets Android 14 or later is rejected.
+- **Cloudflare.** Deploy `relay/` (`cd relay && npx wrangler@4 deploy`) under the account whose workers.dev subdomain matches the default relay URL, or change `RelayProtocol.DEFAULT_RELAY_URL` to match.
+- **Privacy.** `docs/PRIVACY.md` describes Remote access; keep it, the published page and the Play data-safety form in step.
 
 ### Lifetime
 

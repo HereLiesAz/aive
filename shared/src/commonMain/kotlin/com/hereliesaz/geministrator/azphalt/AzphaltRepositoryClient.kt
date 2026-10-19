@@ -1,17 +1,20 @@
 package com.hereliesaz.geministrator.azphalt
 
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentLength
 import io.ktor.http.contentType
+import io.ktor.utils.io.readAvailable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -30,7 +33,12 @@ class AzphaltRepositoryClient(
         ignoreUnknownKeys = true
         encodeDefaults = true
     },
+    private val maxDownloadBytes: Int = KmpZipAzphaltArchiveReader.DEFAULT_MAX_ARCHIVE_BYTES,
 ) {
+    init {
+        require(maxDownloadBytes > 0)
+    }
+
     val repositoryUrl: String = normalizeRepositoryUrl(repositoryUrl)
 
     suspend fun index(): AzphaltRepositoryIndex {
@@ -118,21 +126,48 @@ class AzphaltRepositoryClient(
     ): ByteArray {
         val id = requirePackageId(packageId)
         val safeVersion = requireVersion(version)
-        val response = httpClient.get("$repositoryUrl/packages/$id/versions/$safeVersion/download") {
+        // Streamed so the size cap applies while reading: a hostile repository must not be able to
+        // exhaust memory before the archive reader's own limit is consulted.
+        return httpClient.prepareGet("$repositoryUrl/packages/$id/versions/$safeVersion/download") {
             entitlementToken?.trim()?.takeIf(String::isNotEmpty)?.let { token ->
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
+        }.execute { response ->
+            when (response.status) {
+                HttpStatusCode.Unauthorized -> throw AzphaltRepositoryException.AuthenticationRequired(
+                    response.errorMessage("Authentication required for $id@$safeVersion"),
+                )
+                HttpStatusCode.PaymentRequired -> throw AzphaltRepositoryException.PaymentRequired(
+                    response.errorMessage("Payment or package entitlement required for $id@$safeVersion"),
+                )
+                else -> response.requireSuccess("download Azphalt package $id@$safeVersion")
+            }
+            response.readBodyCapped("$id@$safeVersion")
         }
-        when (response.status) {
-            HttpStatusCode.Unauthorized -> throw AzphaltRepositoryException.AuthenticationRequired(
-                response.errorMessage("Authentication required for $id@$safeVersion"),
-            )
-            HttpStatusCode.PaymentRequired -> throw AzphaltRepositoryException.PaymentRequired(
-                response.errorMessage("Payment or package entitlement required for $id@$safeVersion"),
-            )
-            else -> response.requireSuccess("download Azphalt package $id@$safeVersion")
+    }
+
+    private suspend fun HttpResponse.readBodyCapped(label: String): ByteArray {
+        val tooLarge = "Azphalt package $label exceeds the download size limit of $maxDownloadBytes bytes"
+        contentLength()?.let { declared -> require(declared <= maxDownloadBytes) { tooLarge } }
+        val channel = bodyAsChannel()
+        val chunks = mutableListOf<ByteArray>()
+        var total = 0
+        val buffer = ByteArray(DOWNLOAD_BUFFER_BYTES)
+        while (true) {
+            val read = channel.readAvailable(buffer, 0, buffer.size)
+            if (read == -1) break
+            if (read == 0) continue
+            require(read <= maxDownloadBytes - total) { tooLarge }
+            chunks += buffer.copyOf(read)
+            total += read
         }
-        return response.body()
+        val result = ByteArray(total)
+        var offset = 0
+        chunks.forEach { chunk ->
+            chunk.copyInto(result, offset)
+            offset += chunk.size
+        }
+        return result
     }
 
     suspend fun updates(installed: Collection<AzphaltInstalledPackageRef>): List<AzphaltPackageUpdate> {
@@ -161,26 +196,6 @@ class AzphaltRepositoryClient(
         return json.decodeFromString<AzphaltRevocationsResponse>(response.bodyAsText()).revocations
     }
 
-    suspend fun resolveInstallLink(
-        link: AzphaltInstallLink,
-        entitlementToken: String? = null,
-    ): AzphaltResolvedDownload {
-        val client = if (normalizeRepositoryUrl(link.repositoryUrl) == repositoryUrl) {
-            this
-        } else {
-            AzphaltRepositoryClient(
-                httpClient = httpClient,
-                repositoryUrl = link.repositoryUrl,
-                hostAppId = hostAppId,
-                json = json,
-            )
-        }
-        val detail = client.detail(link.packageId)
-        val version = link.version ?: detail.latest ?: detail.version
-        val bytes = client.download(detail.id, version, entitlementToken)
-        return AzphaltResolvedDownload(client.repositoryUrl, detail, version, bytes)
-    }
-
     private suspend fun HttpResponse.requireSuccess(action: String) {
         if (status.value in 200..299) return
         throw AzphaltRepositoryException.Http(
@@ -195,6 +210,7 @@ class AzphaltRepositoryClient(
     }
 
     companion object {
+        private const val DOWNLOAD_BUFFER_BYTES = 64 * 1024
         private val packageIdPattern = Regex("^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?$")
         private val versionPattern = Regex("^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$")
 
@@ -219,10 +235,3 @@ class AzphaltRepositoryClient(
         }
     }
 }
-
-data class AzphaltResolvedDownload(
-    val repositoryUrl: String,
-    val detail: AzphaltPackageDetail,
-    val version: String,
-    val bytes: ByteArray,
-)

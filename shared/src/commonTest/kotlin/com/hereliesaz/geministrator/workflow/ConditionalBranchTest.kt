@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
@@ -111,6 +112,52 @@ class ConditionalBranchTest {
         assertEquals(TaskRunStatus.Blocked, refreshed.taskRuns.getValue(happyPathId).status)
         assertEquals(TaskRunStatus.Ready, refreshed.taskRuns.getValue(failureHandlerId).status)
         assertEquals(TaskRunStatus.Ready, refreshed.taskRuns.getValue(alwaysRunId).status)
+    }
+
+    @Test
+    fun alwaysJoinAfterASkippedBranchDoesNotBlockForever() {
+        val joinId = TaskDefinitionId("join")
+        val afterHandlerId = TaskDefinitionId("after-handler")
+        val withJoins = definition.copy(
+            tasks = definition.tasks + listOf(
+                TaskDefinition(
+                    id = joinId,
+                    name = "Join",
+                    objective = "Join both branches",
+                    roleId = null,
+                    executor = approvalExecutor,
+                    dependsOn = setOf(happyPathId, failureHandlerId),
+                ),
+                TaskDefinition(
+                    id = afterHandlerId,
+                    name = "After handler",
+                    objective = "Follow the failure handler",
+                    roleId = null,
+                    executor = approvalExecutor,
+                    dependsOn = setOf(failureHandlerId),
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = withJoins,
+            workflowRunId = WorkflowRunId("run"),
+            projectId = ProjectId("proj"),
+            objective = "test",
+            nowEpochMillis = 1L,
+            taskRunIdFactory = { TaskRunId(it.value) },
+        )
+        fun WorkflowRun.with(id: TaskDefinitionId, status: TaskRunStatus) =
+            copy(taskRuns = taskRuns + (id to taskRuns.getValue(id).copy(status = status)))
+
+        // Main succeeds: the failure handler is skipped, the happy path runs.
+        var current = WorkflowRunFactory.refreshReadiness(withJoins, run.with(mainTaskId, TaskRunStatus.Completed), 2L)
+        assertEquals(TaskRunStatus.Cancelled, current.taskRuns.getValue(failureHandlerId).status)
+        current = WorkflowRunFactory.refreshReadiness(withJoins, current.with(happyPathId, TaskRunStatus.Completed), 3L)
+
+        // The join proceeds on the branch that ran; the handler's follow-up is skipped with it.
+        assertEquals(TaskRunStatus.Ready, current.taskRuns.getValue(joinId).status)
+        assertEquals(TaskRunStatus.Cancelled, current.taskRuns.getValue(afterHandlerId).status)
+        assertEquals("CONDITION_NOT_MET", current.taskRuns.getValue(afterHandlerId).blockingReason?.code)
     }
 
     @Test

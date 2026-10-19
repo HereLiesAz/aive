@@ -124,6 +124,16 @@ import com.hereliesaz.geministrator.resources.settings_ready
 import com.hereliesaz.geministrator.resources.settings_reconfigure
 import com.hereliesaz.geministrator.resources.settings_refresh_detected_project_files
 import com.hereliesaz.geministrator.resources.settings_refresh_health
+import com.hereliesaz.geministrator.resources.settings_remote_access
+import com.hereliesaz.geministrator.resources.settings_remote_access_description
+import com.hereliesaz.geministrator.resources.settings_remote_access_on
+import com.hereliesaz.geministrator.resources.settings_remote_access_off
+import com.hereliesaz.geministrator.resources.settings_remote_access_relay_url
+import com.hereliesaz.geministrator.resources.settings_remote_access_pairing_code
+import com.hereliesaz.geministrator.resources.settings_remote_access_warning
+import com.hereliesaz.geministrator.resources.settings_remote_access_copy
+import com.hereliesaz.geministrator.resources.settings_remote_access_share
+import com.hereliesaz.geministrator.resources.settings_remote_access_reset
 import com.hereliesaz.geministrator.resources.settings_relay_pool_device_identity_and_token
 import com.hereliesaz.geministrator.resources.settings_relay_token
 import com.hereliesaz.geministrator.resources.settings_relay_token_leave_blank_to_keep
@@ -403,6 +413,7 @@ internal fun ProviderSettingsScreen(
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
+    remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     modifier: Modifier = Modifier,
@@ -550,6 +561,67 @@ internal fun ProviderSettingsScreen(
                 onClick = { setting.onEnabledChange(!setting.enabled) },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        remoteAccessSetting?.let { setting ->
+            ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
+            Text(
+                stringResource(Res.string.settings_remote_access_description),
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            AzphaltPill(
+                if (setting.enabled) stringResource(Res.string.settings_remote_access_on) else stringResource(Res.string.settings_remote_access_off),
+                "remote-access-toggle",
+                selected = setting.enabled,
+                onClick = { setting.onEnabledChange(!setting.enabled) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!setting.enabled) {
+                OutlinedTextField(
+                    value = setting.relayUrl,
+                    onValueChange = setting.onRelayUrlChange,
+                    label = { Text(stringResource(Res.string.settings_remote_access_relay_url)) },
+                    placeholder = { Text(setting.defaultRelayUrl) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            setting.status?.let { status ->
+                Text(status, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            }
+            setting.pairingCode?.let { code ->
+                Text(
+                    stringResource(Res.string.settings_remote_access_warning),
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(Res.string.settings_remote_access_pairing_code)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AzphaltPill(
+                        stringResource(Res.string.settings_remote_access_copy),
+                        "remote-access-copy",
+                        onClick = { setting.onCopyPairingCode(code) },
+                    )
+                    AzphaltPill(
+                        stringResource(Res.string.settings_remote_access_share),
+                        "remote-access-share",
+                        onClick = { setting.onSharePairingCode(code) },
+                    )
+                }
+                AzphaltPill(
+                    stringResource(Res.string.settings_remote_access_reset),
+                    "remote-access-reset",
+                    onClick = setting.onResetPairing,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         localPlannerSetting?.let { setting ->
