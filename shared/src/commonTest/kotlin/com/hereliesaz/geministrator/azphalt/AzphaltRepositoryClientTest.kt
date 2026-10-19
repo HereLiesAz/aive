@@ -235,6 +235,24 @@ class AzphaltRepositoryClientTest {
     }
 
     @Test
+    fun downloadLargerThanTheCapIsRefused() = runBlocking {
+        val http = HttpClient(MockEngine {
+            respond(
+                content = ByteArray(1_000),
+                headers = headersOf(HttpHeaders.ContentType, AZPHALT_PACKAGE_MEDIA_TYPE),
+            )
+        })
+        val capped = AzphaltRepositoryClient(http, maxDownloadBytes = 999)
+        assertFailsWith<IllegalArgumentException> {
+            capped.download("com.example.big", "1.0.0")
+        }
+
+        val exact = AzphaltRepositoryClient(http, maxDownloadBytes = 1_000)
+        assertEquals(1_000, exact.download("com.example.big", "1.0.0").size)
+        http.close()
+    }
+
+    @Test
     fun installLinkParsesPackageVersionAndCustomRepository() {
         val parsed = AzphaltInstallLink.parse(
             "azphalt://install?id=com.example.release&version=1.2.0&repo=https%3A%2F%2Frepo.example",

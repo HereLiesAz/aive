@@ -63,6 +63,7 @@ import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.humanReadable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -186,6 +187,18 @@ class ApplicationRuntime private constructor(
 
     suspend fun refresh() = loadLatest()
 
+    /**
+     * Runs [block] with the active run under the runtime lock, so a decision is built from the
+     * current run (not a published snapshot or a historical view) and no cycle commits meanwhile.
+     */
+    internal suspend fun <T> withActiveRun(block: suspend (WorkflowRun) -> T): T =
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val live = snapshot.state.run
+            val persisted = persistence.runs.get(live.id)
+            block(persisted?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis } ?: live)
+        }
+
     suspend fun loadRunHistory(): List<Pair<Project, List<WorkflowRun>>> {
         val projects = persistence.projects.all()
         return projects.map { project ->
@@ -271,6 +284,17 @@ class ApplicationRuntime private constructor(
                 parentWorkflowRunIds = parents,
             )
 
+            // The run being replaced would otherwise be orphaned Running with its provider
+            // sessions still live: cancel it, best effort, before switching.
+            current?.takeUnless { it.state.run.status.isTerminal() }?.let { previous ->
+                try {
+                    coordinator.cancel(previous.project, previous.definition, previous.state, now)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    // The new run still starts; the old one stays as persisted.
+                }
+            }
             replaceCurrent(Current(project, prepared, runtimeState))
             publishCurrent()
             startCycling()
@@ -391,6 +415,7 @@ class ApplicationRuntime private constructor(
     private fun startCycling() {
         if (cycleJob?.isActive == true) return
         cycleJob = runtimeScope.launch {
+            var consecutiveFailures = 0
             while (isActive) {
                 delay(CYCLE_INTERVAL_MILLIS)
                 var failed = false
@@ -410,14 +435,26 @@ class ApplicationRuntime private constructor(
                         if (currentGeneration != snapshotGeneration || current !== snapshot) return@withLock
                         replaceCurrent(snapshot.copy(state = nextState))
                         publishCurrent()
-                    } catch (failure: Throwable) {
-                        if (currentGeneration == snapshotGeneration && current === snapshot) {
-                            publishFailure(classifyRuntimeFailure(failure))
-                        }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (failure: Exception) {
                         failed = true
+                        val classified = classifyRuntimeFailure(failure)
+                        // A transient error keeps the Live view; it is only replaced when the store
+                        // is corrupted or the failure persists across several cycles.
+                        val persistent = classified is ApplicationRuntimeFailure.Corrupted ||
+                            consecutiveFailures + 1 >= TRANSIENT_FAILURE_LIMIT
+                        if (persistent && currentGeneration == snapshotGeneration && current === snapshot) {
+                            publishFailure(classified)
+                        }
                     }
                 }
-                if (failed) delay(RETRY_BACKOFF_MILLIS)
+                if (failed) {
+                    consecutiveFailures += 1
+                    delay(RETRY_BACKOFF_MILLIS * consecutiveFailures.coerceAtMost(MAX_BACKOFF_MULTIPLIER))
+                } else {
+                    consecutiveFailures = 0
+                }
             }
         }
     }
@@ -716,6 +753,8 @@ class ApplicationRuntime private constructor(
     companion object {
         private const val CYCLE_INTERVAL_MILLIS = 1_000L
         private const val RETRY_BACKOFF_MILLIS = 2_000L
+        private const val MAX_BACKOFF_MULTIPLIER = 15
+        private const val TRANSIENT_FAILURE_LIMIT = 3
 
         internal fun classifyResumeFailure(failure: Throwable): ApplicationRuntimeFailure =
             classifyRuntimeFailure(failure)

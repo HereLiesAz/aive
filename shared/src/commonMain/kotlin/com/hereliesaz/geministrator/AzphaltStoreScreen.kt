@@ -71,6 +71,7 @@ import com.hereliesaz.geministrator.resources.store_inspect_model_update
 import com.hereliesaz.geministrator.resources.store_inspect_update
 import com.hereliesaz.geministrator.resources.store_install_and_connect
 import com.hereliesaz.geministrator.resources.store_install_despite_an_unrecognized_signing_key
+import com.hereliesaz.geministrator.resources.store_install_unsigned_package
 import com.hereliesaz.geministrator.resources.store_install_required_dependencies_before_this_package
 import com.hereliesaz.geministrator.resources.store_install_verified_model
 import com.hereliesaz.geministrator.resources.store_install_verified_package
@@ -838,11 +839,17 @@ private fun PreparedStoreLlmPanel(
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
-                if (verification.packageContents.signed && !verification.trusted) {
+                if (!verification.trusted) {
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
+                        text = stringResource(
+                            if (verification.packageContents.signed) {
+                                Res.string.store_install_despite_an_unrecognized_signing_key
+                            } else {
+                                Res.string.store_install_unsigned_package
+                            },
+                        ),
                     )
                 }
                 if (verification.publisherChanged) {
@@ -852,7 +859,7 @@ private fun PreparedStoreLlmPanel(
                         text = stringResource(Res.string.store_approve_publisher_key_change_for_this),
                     )
                 }
-                val trustReady = !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
+                val trustReady = verification.trusted || allowUntrustedSigner
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
                 val inputsReady = configurationInputs.all { it.optional || inputValues[it.id]?.isNotBlank() == true }
                 if (trustReady && publisherReady && inputsReady) {
@@ -925,11 +932,17 @@ private fun PreparedAzphaltModelInstallPanel(
                     )
                 }
 
-                if (verification.packageContents.signed && !verification.trusted) {
+                if (!verification.trusted) {
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
+                        text = stringResource(
+                            if (verification.packageContents.signed) {
+                                Res.string.store_install_despite_an_unrecognized_signing_key
+                            } else {
+                                Res.string.store_install_unsigned_package
+                            },
+                        ),
                     )
                 }
                 if (verification.publisherChanged) {
@@ -940,8 +953,7 @@ private fun PreparedAzphaltModelInstallPanel(
                     )
                 }
 
-                val trustReady =
-                    !verification.packageContents.signed || verification.trusted || allowUntrustedSigner
+                val trustReady = verification.trusted || allowUntrustedSigner
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
                 if (trustReady && publisherReady) {
                     AzphaltPill(
@@ -1016,11 +1028,17 @@ private fun PreparedAzphaltInstall(
                     }
                 }
 
-                if (plan.signed && !plan.trusted) {
+                if (!plan.trusted) {
                     ConfirmationRow(
                         checked = allowUntrustedSigner,
                         onCheckedChange = onAllowUntrustedSignerChanged,
-                        text = stringResource(Res.string.store_install_despite_an_unrecognized_signing_key),
+                        text = stringResource(
+                            if (plan.signed) {
+                                Res.string.store_install_despite_an_unrecognized_signing_key
+                            } else {
+                                Res.string.store_install_unsigned_package
+                            },
+                        ),
                     )
                 }
                 if (plan.publisherChanged) {
@@ -1055,7 +1073,7 @@ private fun PreparedAzphaltInstall(
                     }
                 }
 
-                val trustReady = !plan.signed || plan.trusted || allowUntrustedSigner
+                val trustReady = plan.trusted || allowUntrustedSigner
                 val publisherReady = !plan.publisherChanged || allowPublisherChange
                 val dependenciesReady = prepared.blockingDependencies.isEmpty()
                 if (trustReady && publisherReady && dependenciesReady) {

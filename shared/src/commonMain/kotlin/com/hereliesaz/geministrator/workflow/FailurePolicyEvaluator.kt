@@ -26,7 +26,13 @@ object FailurePolicyEvaluator {
         return when (escalationPolicy) {
             EscalationPolicy.FailWorkflow -> FailureDecision.FailWorkflow
             EscalationPolicy.RequireHumanDecision -> FailureDecision.RequireHumanDecision
-            is EscalationPolicy.Reassign -> FailureDecision.Reassign(escalationPolicy.roleId)
+            // Reassignment is one more attempt past the retry budget, not an open-ended loop: once
+            // the reassigned attempt has failed too, the workflow fails.
+            is EscalationPolicy.Reassign -> if (taskRun.attempt <= retryPolicy.maxAttempts) {
+                FailureDecision.Reassign(escalationPolicy.roleId)
+            } else {
+                FailureDecision.FailWorkflow
+            }
         }
     }
 }

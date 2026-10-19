@@ -6,6 +6,8 @@ import com.hereliesaz.geministrator.vector.FlatVectorIndex
 import com.hereliesaz.geministrator.vector.TextEmbedder
 import com.hereliesaz.geministrator.vector.space
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * A piece of retrievable text: a slice of a repository file or of an upstream artifact.
@@ -46,8 +48,10 @@ class SimilarityContextRetriever(
     private val minSimilarity: Float = 0.2f,
     private val maxCachedVectors: Int = 4_096,
 ) : ContextRetriever {
+    // Least recently used first. Guarded by [cacheMutex]: retrieve() suspends while embedding.
     private val vectors = LinkedHashMap<String, FloatArray>()
     private var vectorSpace: String? = null
+    private val cacheMutex = Mutex()
 
     init {
         require(maxChunks > 0)
@@ -69,21 +73,29 @@ class SimilarityContextRetriever(
         if (chunks.isEmpty()) return emptyList()
 
         val queryVector = embedder.embed(listOf(query)).single()
-        if (vectorSpace != embedder.space) {
-            vectors.clear()
-            vectorSpace = embedder.space
-        }
-        val missing = chunks.map { it.text }.distinct().filter { it !in vectors }
-        if (missing.isNotEmpty()) {
-            embedder.embed(missing).forEachIndexed { i, vector -> vectors[missing[i]] = vector }
-            while (vectors.size > maxOf(maxCachedVectors, chunks.size)) vectors.remove(vectors.keys.first())
+        val texts = chunks.map { it.text }.distinct()
+        val requestVectors = cacheMutex.withLock {
+            if (vectorSpace != embedder.space) {
+                vectors.clear()
+                vectorSpace = embedder.space
+            }
+            val missing = texts.filter { it !in vectors }
+            if (missing.isNotEmpty()) {
+                embedder.embed(missing).forEachIndexed { i, vector -> vectors[missing[i]] = vector }
+            }
+            // Touch this request's vectors so they are the most recently used, then evict from the
+            // least recently used end; the cap never drops below this request's own size.
+            val current = buildMap { texts.forEach { text -> vectors.remove(text)?.let { put(text, it) } } }
+            vectors.putAll(current)
+            while (vectors.size > maxOf(maxCachedVectors, texts.size)) vectors.remove(vectors.keys.first())
+            current
         }
         // The space can change while embedding (a model falling back): then this request goes without.
         if (vectorSpace != embedder.space || queryVector.size != embedder.dimension) return emptyList()
 
         val index = FlatVectorIndex(embedder.dimension)
         val byId = chunks.associateBy { it.id }
-        chunks.forEach { chunk -> vectors[chunk.text]?.let { index.upsert(chunk.id, it) } }
+        chunks.forEach { chunk -> requestVectors[chunk.text]?.let { index.upsert(chunk.id, it) } }
         return index.search(queryVector, maxChunks)
             .filter { it.score >= minSimilarity }
             .map { RetrievedChunk(byId.getValue(it.id), it.score) }

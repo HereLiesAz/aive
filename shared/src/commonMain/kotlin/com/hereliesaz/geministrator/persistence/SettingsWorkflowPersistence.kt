@@ -83,7 +83,7 @@ class SettingsWorkflowPersistence(
             settingsWorkflowPersistenceMutex.withLock {
                 val legacyEmbedded = readUnlocked().events.filter { it.workflowRunId == workflowRunId }
                 val journaled = readJournalEventsUnlocked(workflowRunId)
-                (legacyEmbedded + journaled).sortedBy { it.occurredAtEpochMillis }
+                mergeEventSources(legacyEmbedded, journaled).sortedBy { it.occurredAtEpochMillis }
             }
     }
 
@@ -248,8 +248,7 @@ class SettingsWorkflowPersistence(
             readJournalEventsUnlocked(run.id)
         }
         return snapshot.copy(
-            events = (snapshot.events + journaledEvents)
-                .distinctBy { event -> event.workflowRunId to event }
+            events = mergeEventSources(snapshot.events, journaledEvents)
                 .sortedBy { it.occurredAtEpochMillis },
         )
     }
@@ -294,9 +293,28 @@ class SettingsWorkflowPersistence(
         } else {
             emptyList()
         }
-        return (legacy + current)
-            .distinct()
+        return mergeEventSources(legacy, current)
             .sortedBy { it.occurredAtEpochMillis }
+    }
+
+    /**
+     * Joins two event sources that may both hold a copy of the same event (a journal moved between
+     * layouts). Only copies across the sources collapse: two identical events within one source are
+     * two real events (same run, task, text and millisecond) and both are kept.
+     */
+    private fun mergeEventSources(first: List<WorkflowEvent>, second: List<WorkflowEvent>): List<WorkflowEvent> {
+        if (first.isEmpty()) return second
+        if (second.isEmpty()) return first
+        val unmatched = first.groupingBy { it }.eachCount().toMutableMap()
+        return first + second.filter { event ->
+            val copies = unmatched[event] ?: 0
+            if (copies > 0) {
+                unmatched[event] = copies - 1
+                false
+            } else {
+                true
+            }
+        }
     }
 
     private fun readJournalEventsAtPrefixUnlocked(
@@ -317,14 +335,16 @@ class SettingsWorkflowPersistence(
 
         return (0 until recoveredCount).map { index ->
             val key = eventKey(prefix, index)
-            val encoded = requireNotNull(journalStringOrNull(key, chunked)) {
-                "Workflow event journal is missing entry $index for ${workflowRunId.value}"
+            val encoded = trackingCorruption { journalStringOrNull(key, chunked) }
+                ?: throw corruption("Workflow event journal is missing entry $index for ${workflowRunId.value}.")
+            val decoded = try {
+                json.decodeFromString(WorkflowEvent.serializer(), encoded)
+            } catch (failure: Exception) {
+                throw corruption("Workflow event journal entry $index for ${workflowRunId.value} is unreadable.", failure)
             }
-            json.decodeFromString(WorkflowEvent.serializer(), encoded).also { decoded ->
+            decoded.also {
                 if (decoded.workflowRunId != workflowRunId) {
-                    throw PersistenceCorruptionException(
-                        "Workflow event journal collision for ${workflowRunId.value}.",
-                    )
+                    throw corruption("Workflow event journal collision for ${workflowRunId.value}.")
                 }
             }
         }
@@ -368,6 +388,17 @@ class SettingsWorkflowPersistence(
     override var lastCorruptionError: Throwable? = null
         private set
 
+    /** Every corruption this store reports is also recorded in [lastCorruptionError]. */
+    private fun corruption(message: String, cause: Throwable? = null): PersistenceCorruptionException =
+        PersistenceCorruptionException(message, cause).also { lastCorruptionError = it }
+
+    private inline fun <T> trackingCorruption(read: () -> T): T = try {
+        read()
+    } catch (failure: PersistenceCorruptionException) {
+        lastCorruptionError = failure
+        throw failure
+    }
+
     override suspend fun recoverFromCorruption(): Boolean {
         val hadData = settingsWorkflowPersistenceMutex.withLock {
             val had = snapshotSettings.hasKey(storageKey) ||
@@ -381,7 +412,8 @@ class SettingsWorkflowPersistence(
     }
 
     private fun readUnlocked(): PersistenceSnapshot {
-        val currentEncoded = snapshotSettings.getStringOrNull(storageKey)
+        // A chunked snapshot with missing chunks reports itself as corrupt while being read.
+        val currentEncoded = trackingCorruption { snapshotSettings.getStringOrNull(storageKey) }
         val legacyEncoded = if (currentEncoded == null && storageKey == DEFAULT_STORAGE_KEY) {
             settings.getStringOrNull(LEGACY_STORAGE_KEY_V1)
         } else {

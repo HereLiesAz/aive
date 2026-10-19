@@ -50,6 +50,22 @@ class RelayStateStoreTest {
     }
 
     @Test
+    fun keyIsSaltedPerDirectory() {
+        val first = Files.createTempDirectory("aive-relay-state")
+        val second = Files.createTempDirectory("aive-relay-state")
+        val lease = PersistedRelayLease(envelope("lease"), "origin")
+        val a = EncryptedFileRelayStateStore(first, "same-token")
+        a.save("pool", listOf(lease))
+        EncryptedFileRelayStateStore(second, "same-token").save("pool", listOf(lease))
+
+        // A state file moved to another deployment (same token, different salt) does not decrypt.
+        Files.copy(a.stateFile("pool"), EncryptedFileRelayStateStore(second, "same-token").stateFile("pool"), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        assertFailsWith<AEADBadTagException> { EncryptedFileRelayStateStore(second, "same-token").load("pool") }
+        // The salt persists, so the same directory reopens.
+        assertEquals(1, EncryptedFileRelayStateStore(first, "same-token").load("pool").size)
+    }
+
+    @Test
     fun wrongRelayTokenCannotDecryptPersistedState() {
         val directory = Files.createTempDirectory("aive-relay-state")
         EncryptedFileRelayStateStore(directory, "correct-token").save(

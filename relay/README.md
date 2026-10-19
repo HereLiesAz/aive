@@ -1,6 +1,6 @@
 # aive-relay
 
-Cloudflare Worker meant to let IDEaz reach The Aive on another device. It forwards frames between one host (The Aive) and its paired clients (IDEaz) without reading them. Nothing in this repository deploys it or connects to it yet. For the wire protocol, see [`docs/Remote-API.md`](../docs/Remote-API.md#relay).
+Cloudflare Worker that lets IDEaz reach The Aive on another device. It forwards frames between one host (The Aive) and its paired clients (IDEaz) without reading them; the apps seal every frame end to end. The Aive connects to it only while the user has turned on Remote access. Nothing in this repository deploys it. For the wire protocol, see [`docs/Remote-API.md`](../docs/Remote-API.md#relay).
 
 ## Test
 
