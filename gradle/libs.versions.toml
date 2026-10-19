@@ -5,7 +5,7 @@
 jgit = "5.13.4.202507202350-r"
 agp = "9.4.1"
 kotlin = "2.4.21"
-compose = "1.12.1"
+compose = "1.12.2"
 android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "37"
