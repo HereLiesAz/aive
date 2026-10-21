@@ -37,7 +37,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "body"
     },
     {
       "id": "tendril 1",
@@ -64,7 +65,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "tendril"
     },
     {
       "id": "tendril 2",
@@ -91,7 +93,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "tendril"
     },
     {
       "id": "tail",
@@ -118,7 +121,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "tail"
     },
     {
       "id": "tendril 3",
@@ -145,7 +149,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "tendril"
     },
     {
       "id": "tendril 4",
@@ -172,7 +177,8 @@
         "scaleX": 1,
         "scaleY": 1,
         "alpha": 1
-      }
+      },
+      "kind": "tendril"
     },
     {
       "id": "eye",
@@ -256,7 +262,983 @@
       }
     }
   ],
-  "attachments": [],
-  "states": {},
+  "attachments": [
+    {
+      "id": "eye.center",
+      "part": "eye",
+      "x": 0.5,
+      "y": 0.5,
+      "kind": "eye"
+    },
+    {
+      "id": "arm.socket.left",
+      "part": "soma",
+      "x": 0.04,
+      "y": 0.62,
+      "kind": "arm-socket"
+    },
+    {
+      "id": "arm.socket.right",
+      "part": "soma",
+      "x": 0.96,
+      "y": 0.62,
+      "kind": "arm-socket"
+    }
+  ],
+  "states": {
+    "Pending": {
+      "parts": {
+        "soma": {
+          "keys": {},
+          "sine": {
+            "y": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 5,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Ready": {
+      "parts": {
+        "soma": {
+          "keys": {},
+          "sine": {
+            "y": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 5,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 5,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 5,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 5,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 5,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Active": {
+      "parts": {
+        "soma": {
+          "keys": {},
+          "sine": {
+            "y": {
+              "amplitude": 6,
+              "frequency": 2,
+              "phase": 0
+            },
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 9,
+              "frequency": 2,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 9,
+              "frequency": 2,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 9,
+              "frequency": 2,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 9,
+              "frequency": 2,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 0,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 10,
+              "frequency": 2,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -2,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 2,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Gate": {
+      "parts": {
+        "soma": {
+          "keys": {},
+          "sine": {
+            "y": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0
+            },
+            "scaleX": {
+              "amplitude": 0.03,
+              "frequency": 2,
+              "phase": 0
+            },
+            "scaleY": {
+              "amplitude": 0.03,
+              "frequency": 2,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -9,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -9,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -9,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -9,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -6,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 3,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -4,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 4,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Blocked": {
+      "parts": {
+        "soma": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 8,
+                "ease": "linear"
+              }
+            ],
+            "rotation": [
+              {
+                "t": 0,
+                "v": -5,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "y": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 14,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 14,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 14,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 14,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 2,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 4,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -2,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Complete": {
+      "parts": {
+        "soma": {
+          "keys": {},
+          "sine": {
+            "y": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -10,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": -8,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 4,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 3,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -1,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    },
+    "Failed": {
+      "parts": {
+        "soma": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 16,
+                "ease": "linear"
+              }
+            ],
+            "rotation": [
+              {
+                "t": 0,
+                "v": -6,
+                "ease": "linear"
+              }
+            ],
+            "alpha": [
+              {
+                "t": 0,
+                "v": 0.92,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "y": {
+              "amplitude": 1,
+              "frequency": 1,
+              "phase": 0
+            },
+            "x": {
+              "amplitude": 2,
+              "frequency": 13,
+              "phase": 0
+            }
+          }
+        },
+        "tendril 1": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 22,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 1.5,
+              "frequency": 1,
+              "phase": 0.0
+            }
+          }
+        },
+        "tendril 2": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 22,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 1.5,
+              "frequency": 1,
+              "phase": 0.25
+            }
+          }
+        },
+        "tendril 3": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 22,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 1.5,
+              "frequency": 1,
+              "phase": 0.5
+            }
+          }
+        },
+        "tendril 4": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 22,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 1.5,
+              "frequency": 1,
+              "phase": 0.75
+            }
+          }
+        },
+        "tail": {
+          "keys": {
+            "rotation": [
+              {
+                "t": 0,
+                "v": 18,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {
+            "rotation": {
+              "amplitude": 1.5,
+              "frequency": 1,
+              "phase": 0.125
+            }
+          }
+        },
+        "upper eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": 8,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        },
+        "lower eyelid": {
+          "keys": {
+            "y": [
+              {
+                "t": 0,
+                "v": -6,
+                "ease": "linear"
+              }
+            ]
+          },
+          "sine": {}
+        }
+      }
+    }
+  },
   "fallbackState": "Pending"
 }
