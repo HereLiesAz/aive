@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # Keep Android API 26 support. Allow 5.x maintenance updates; newer major
+      # lines require API 26 device tests of local Git and minified releases first.
+      - dependency-name: "org.eclipse.jgit:org.eclipse.jgit"
+        update-types: ["version-update:semver-major"]
     groups:
       kotlin:
         patterns: ["org.jetbrains.kotlin*", "org.jetbrains.compose*"]

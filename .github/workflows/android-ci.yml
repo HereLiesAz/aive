@@ -195,23 +195,27 @@ jobs:
           exit "$EXIT_CODE"
 
       - name: Run Android release lint
+        id: release-lint
         run: |
-          ./gradlew             :androidApp:lintVitalPlayRelease             :androidApp:lintVitalGithubRelease             --build-cache --no-daemon
+          set -o pipefail
+          ./gradlew             :androidApp:lintVitalPlayRelease             :androidApp:lintVitalGithubRelease             --build-cache --no-daemon 2>&1 | tee lint.log
 
       - name: Report build failure
-        if: failure() && steps.gradle-build.outcome == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: failure() && (steps.gradle-build.outcome == 'failure' || steps.release-lint.outcome == 'failure') && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+            const lintFailed = '${{ steps.release-lint.outcome }}' === 'failure';
+            const logFile = lintFailed ? 'lint.log' : 'build.log';
             let logTail = 'Log file not found.';
-            try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
+            try { logTail = fs.readFileSync(logFile, 'utf8').slice(-4000); } catch (e) {}
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
-              body: `The main-branch build failed.\n\n**Log (last 4000 characters):**\n\`\`\`\n${logTail}\n\`\`\``,
+              title: `${lintFailed ? 'Release Lint' : 'Build'} Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
+              body: `The main-branch ${lintFailed ? 'release lint' : 'build'} failed.\n\n**Log (last 4000 characters):**\n\`\`\`\n${logTail}\n\`\`\``,
               labels: ['bug']
             });
 

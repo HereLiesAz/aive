@@ -1,0 +1,9 @@
+{
+  "name": "aive-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/worker.js && node --check src/protocol.js",
+    "test": "node --test"
+  }
+}

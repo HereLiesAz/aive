@@ -233,6 +233,11 @@ class GitLabWorkspaceAgentProvider(
                 }
                 emit(AgentEvent.Progress(runId, "Designing the pre-code verification contract"))
                 val generated = session.generation.run(specificationPrompt(session.request)) { emit(AgentEvent.Thinking(runId, it)) }
+                if (session.phase.value == Phase.Cancelled) {
+                    emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                    sessionsMutex.withLock { sessions.remove(runId) }
+                    return@flow
+                }
                 val artifactKinds = session.request.requiredArtifacts.ifEmpty {
                     setOf(
                         ArtifactKind.AcceptanceTestPlan,
@@ -327,6 +332,11 @@ class GitLabWorkspaceAgentProvider(
                 val review = session.generation.run(
                     reviewPrompt(session.request, approvedPlan, context, snapshot.text),
                 ) { emit(AgentEvent.Thinking(runId, it)) }
+                if (session.phase.value == Phase.Cancelled) {
+                    emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                    sessionsMutex.withLock { sessions.remove(runId) }
+                    return@flow
+                }
                 emit(
                     AgentEvent.ArtifactProduced(
                         runId,
@@ -365,6 +375,14 @@ class GitLabWorkspaceAgentProvider(
                 trackedFiles = context.trackedFiles.toSet(),
                 editablePaths = snapshot.completePaths,
             )
+
+            // cancel() only flips the phase while the generation streams; nothing may reach the
+            // user's GitLab project for a run that was cancelled meanwhile.
+            if (session.phase.value == Phase.Cancelled) {
+                emit(AgentEvent.Failed(runId, "$displayName GitLab workspace session cancelled"))
+                sessionsMutex.withLock { sessions.remove(runId) }
+                return@flow
+            }
 
             val branch = workspaceBranch(session.request, runId)
             emit(AgentEvent.Progress(runId, "Creating GitLab branch $branch"))

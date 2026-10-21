@@ -191,6 +191,83 @@ class MoyaiProviderTest {
         }
     }
 
+    @Test
+    fun anExpiredSessionIsReestablishedOnceAndTheCallRetried() = runTest {
+        var sessionReads = 0
+        val tokens = mutableListOf<String?>()
+        val client = jsonClient(MockEngine { call ->
+            when (call.url.encodedPath) {
+                "/api/session" -> {
+                    sessionReads += 1
+                    json("""{"authenticated":true,"csrf":"csrf-$sessionReads"}""")
+                }
+                "/api/runs/run-1/cancel" -> {
+                    tokens += call.headers["X-CSRF-Token"]
+                    if (call.headers["X-CSRF-Token"] == "csrf-1") {
+                        json("""{"error":"session expired"}""", HttpStatusCode.Forbidden)
+                    } else {
+                        json("""{"id":"run-1","status":"cancelled"}""")
+                    }
+                }
+                else -> error("Unexpected request ${call.method.value} ${call.url}")
+            }
+        })
+        try {
+            val provider = MoyaiProvider(
+                id = AgentProviderId("azphalt:moyai"),
+                displayName = "Moyai",
+                baseUrl = "https://moyai.example",
+                client = client,
+            )
+            assertIs<ProviderActionResult.Accepted>(
+                provider.cancel(com.hereliesaz.geministrator.domain.ProviderRunId("run-1")),
+            )
+            assertEquals(listOf<String?>("csrf-1", "csrf-2"), tokens)
+            assertEquals(2, sessionReads)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun anIdleRunThatHasNotWorkedYetIsNotCompleted() = runTest {
+        var polls = 0
+        val client = jsonClient(MockEngine { call ->
+            when (call.url.encodedPath) {
+                "/api/session" -> json("""{"authenticated":true,"csrf":"csrf"}""")
+                "/api/runs/run-1" -> {
+                    polls += 1
+                    when (polls) {
+                        1, 2 -> json("""{"id":"run-1","status":"idle"}""")
+                        3 -> json("""{"id":"run-1","status":"running"}""")
+                        else -> json(
+                            """{"id":"run-1","status":"idle","messages":[{"id":1,"role":"assistant","content":"Done."}]}""",
+                        )
+                    }
+                }
+                else -> error("Unexpected request ${call.method.value} ${call.url}")
+            }
+        })
+        try {
+            val provider = MoyaiProvider(
+                id = AgentProviderId("azphalt:moyai"),
+                displayName = "Moyai",
+                baseUrl = "https://moyai.example",
+                client = client,
+                pollIntervalMillis = 250,
+            )
+            val runId = com.hereliesaz.geministrator.domain.ProviderRunId("run-1")
+            provider.reconnect(runId, request.copy(requirePlanApproval = false), planGenerated = true, planApproved = true, planPreview = null)
+
+            val events = provider.observe(runId).toList()
+
+            assertIs<AgentEvent.Completed>(events.last())
+            assertEquals(4, polls, "the first idle polls are not completion")
+        } finally {
+            client.close()
+        }
+    }
+
     private fun jsonClient(engine: MockEngine) = HttpClient(engine) {
         expectSuccess = false
         install(ContentNegotiation) {

@@ -165,15 +165,25 @@ tasks.matching { task ->
 
 // A release package without the keystore is unusable (Play rejects it; sideloads cannot update
 // the installed signature), so fail loudly instead of emitting an unsigned artifact. Minify-only
-// tasks stay unguarded: PR CI runs R8 without secrets.
-val releaseKeystoreConfigured = !System.getenv("HAIVE_KEYSTORE_PATH").isNullOrBlank()
+// tasks stay unguarded: multiplatform.yml runs minify*ReleaseWithR8 on PRs without secrets.
+// Checked up front so a missing file, password or alias fails here, not later inside AGP.
+val releaseSigningProblem: String? = run {
+    val keyStorePath = System.getenv("HAIVE_KEYSTORE_PATH")
+    when {
+        keyStorePath.isNullOrBlank() -> "HAIVE_KEYSTORE_PATH is not set"
+        !file(keyStorePath).isFile -> "HAIVE_KEYSTORE_PATH ($keyStorePath) is not a file"
+        System.getenv("KEYSTORE_PASSWORD").isNullOrBlank() -> "KEYSTORE_PASSWORD is not set"
+        System.getenv("KEY_ALIAS").isNullOrBlank() -> "KEY_ALIAS is not set"
+        else -> null
+    }
+}
 // packagePlayRelease, packageGithubRelease, signPlayReleaseBundle; not packageXReleaseResources,
 // which R8 depends on.
 val releasePackagingTask = Regex("^(package[A-Z]\\w*Release|sign[A-Z]\\w*ReleaseBundle)$")
 tasks.matching { task -> releasePackagingTask.matches(task.name) }.configureEach {
     doFirst {
-        check(releaseKeystoreConfigured) {
-            "Release signing is not configured: set HAIVE_KEYSTORE_PATH, KEYSTORE_PASSWORD and KEY_ALIAS."
+        check(releaseSigningProblem == null) {
+            "Release signing is not configured ($releaseSigningProblem): set HAIVE_KEYSTORE_PATH to an existing keystore, KEYSTORE_PASSWORD and KEY_ALIAS."
         }
     }
 }
@@ -189,6 +199,7 @@ dependencies {
     add("playImplementation", "com.google.android.play:app-update:2.1.0")
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.kotlinx.serialization.json)

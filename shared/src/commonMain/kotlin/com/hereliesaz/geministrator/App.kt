@@ -40,6 +40,7 @@ import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LaunchProgress
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
@@ -63,6 +64,7 @@ import com.hereliesaz.geministrator.resources.app_switch_run_failed
 import com.hereliesaz.geministrator.resources.app_task_delegation_failed
 import com.hereliesaz.geministrator.resources.app_workflow_delegation_failed
 import com.hereliesaz.geministrator.resources.app_workflow_launch_failed
+import com.hereliesaz.geministrator.resources.app_launch_already_in_progress
 import org.jetbrains.compose.resources.getString
 
 @Composable
@@ -89,6 +91,7 @@ fun App(
     onDisconnectDistributedCompute: () -> Unit = {},
     distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
+    remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
@@ -97,7 +100,12 @@ fun App(
     contextChunkSources: List<com.hereliesaz.geministrator.retrieval.ContextChunkSource> = emptyList(),
     /** Workflows another app asked for, oldest first; each is launched once, then handed back. */
     externalWorkflowLaunchRequests: List<ExternalWorkflowLaunchRequest> = emptyList(),
-    onExternalWorkflowLaunchHandled: (Long) -> Unit = {},
+    /**
+     * Called once per request when its launch has finished: with null after the workflow started,
+     * or with a user-facing reason when it could not. Not called when the launch is cancelled
+     * (the UI went away), so the request stays queued and is launched again.
+     */
+    onExternalWorkflowLaunchHandled: (requestId: Long, failure: String?) -> Unit = { _, _ -> },
     /** Every runtime state, for observers outside the UI (the Android remote service). */
     onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
 ) {
@@ -172,13 +180,18 @@ fun App(
         }
     }
 
-    /** Launches [objective] the way the launch form does; ignored while a launch is in progress. */
+    /**
+     * Launches [objective] the way the launch form does; ignored while a launch is in progress.
+     * [onFinished] receives null once the workflow started, or the failure; it is not called
+     * when the launch is cancelled.
+     */
     fun launchObjective(
         projectName: String,
         objective: String,
         repository: RepositoryRef?,
         continuesWorkflowRunIds: List<WorkflowRunId>,
         existingProject: Project?,
+        onFinished: (Throwable?) -> Unit = {},
     ) {
         if (launching) {
             platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
@@ -212,6 +225,7 @@ fun App(
                         continuesWorkflowRunIds = continuesWorkflowRunIds,
                     )
                 }
+                onFinished(null)
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: Throwable) {
@@ -220,22 +234,63 @@ fun App(
                 // leaving the launch button silently doing nothing.
                 platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
                 runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_launch_failed))
+                onFinished(failure)
             } finally {
                 launching = false
             }
         }
     }
 
+    /**
+     * Runs a library or generated-workflow launch under the same [launching] guard and overlay as
+     * [launchObjective], so it never interleaves with another launch on the same runtime. Returns
+     * false, without running [block], while another launch is in progress.
+     */
+    suspend fun guardedSavedWorkflowLaunch(block: suspend (ApplicationRuntime, Project?) -> Unit): Boolean {
+        if (launching) return false
+        val activeRuntime = runtime ?: error(getString(Res.string.app_runtime_is_unavailable))
+        val existingProject = when (val state = runtimeState) {
+            is ApplicationRuntimeState.NoRun -> state.project
+            is ApplicationRuntimeState.Live -> state.presentation.project
+            else -> null
+        }
+        launching = true
+        launchSteps.clear()
+        try {
+            block(activeRuntime, existingProject)
+        } finally {
+            launching = false
+        }
+        return true
+    }
+
     LaunchedEffect(runtimeState) { onRuntimeStateChanged(runtimeState) }
+
+    // Requests whose launch finished here. The host drops them from its queue asynchronously, so
+    // this keeps a finished request from being launched twice in the meantime.
+    val handledExternalRequestIds = remember { mutableSetOf<Long>() }
+    handledExternalRequestIds.retainAll(externalWorkflowLaunchRequests.mapTo(hashSetOf()) { it.requestId })
+    val nextExternalRequest = externalWorkflowLaunchRequests.firstOrNull { it.requestId !in handledExternalRequestIds }
 
     // External requests wait for a runtime and for any launch in progress, then go through the
     // same path as the launch form, each in a new project unless one is open without a run.
-    LaunchedEffect(externalWorkflowLaunchRequests.firstOrNull()?.requestId, runtime, launching) {
-        val request = externalWorkflowLaunchRequests.firstOrNull() ?: return@LaunchedEffect
-        if (runtime == null || launching) return@LaunchedEffect
-        val existingProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
-        launchObjective(request.projectName, request.objective, request.repository, emptyList(), existingProject)
-        onExternalWorkflowLaunchHandled(request.requestId)
+    // The request is handed back only once its launch finished, with the failure if it failed.
+    LaunchedEffect(nextExternalRequest?.requestId, runtime, launching) {
+        val request = nextExternalRequest ?: return@LaunchedEffect
+        val activeRuntime = runtime ?: return@LaunchedEffect
+        if (launching) return@LaunchedEffect
+        // Read the runtime's own state: runtimeState is filled asynchronously after a (re)load and
+        // can still say Loading here, which would open a new project beside an open, empty one.
+        val loaded = activeRuntime.state.first { it !is ApplicationRuntimeState.Loading }
+        if (launching || runtime !== activeRuntime) return@LaunchedEffect
+        val existingProject = (loaded as? ApplicationRuntimeState.NoRun)?.project
+        launchObjective(request.projectName, request.objective, request.repository, emptyList(), existingProject) { failure ->
+            handledExternalRequestIds += request.requestId
+            onExternalWorkflowLaunchHandled(
+                request.requestId,
+                failure?.let { it.message ?: it::class.simpleName ?: "Launch failed" },
+            )
+        }
     }
 
     GeministratorTheme {
@@ -301,18 +356,15 @@ fun App(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
             launchWorkflow = { definition, packageRoles, objective ->
-                val activeRuntime = runtime ?: error("Runtime is unavailable")
-                val existingProject = when (val state = runtimeState) {
-                    is ApplicationRuntimeState.NoRun -> state.project
-                    is ApplicationRuntimeState.Live -> state.presentation.project
-                    else -> null
+                val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
+                    activeRuntime.launchSavedWorkflow(
+                        definition = definition,
+                        existingProject = existingProject,
+                        objective = objective ?: definition.description ?: definition.name,
+                        supplementalRoles = packageRoles,
+                    )
                 }
-                activeRuntime.launchSavedWorkflow(
-                    definition = definition,
-                    existingProject = existingProject,
-                    objective = objective ?: definition.description ?: definition.name,
-                    supplementalRoles = packageRoles,
-                )
+                if (!started) error(getString(Res.string.app_launch_already_in_progress))
             },
             onPackagesChanged = { runtimeGeneration += 1 },
             onWorkflowCreated = { authored ->
@@ -341,21 +393,20 @@ fun App(
                             roleCatalog = catalog + NodeCharacterGenerationWorkflowFactory.roles,
                             targetRoleIds = missingRoleIds,
                         )
-                        val activeRuntime = runtime ?: error("Runtime is unavailable")
-                        val existingProject = when (val state = runtimeState) {
-                            is ApplicationRuntimeState.NoRun -> state.project
-                            is ApplicationRuntimeState.Live -> state.presentation.project
-                            else -> null
+                        val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
+                            activeRuntime.launchSavedWorkflow(
+                                definition = generation,
+                                existingProject = existingProject,
+                                projectName = existingProject?.name ?: authored.name,
+                                objective = "Generate Node Creature assets for newly introduced roles in ${authored.name}.",
+                                supplementalRoles =
+                                    NodeCharacterGenerationWorkflowFactory.roles +
+                                        catalog.filter { it.id in missingRoleIds },
+                            )
                         }
-                        activeRuntime.launchSavedWorkflow(
-                            definition = generation,
-                            existingProject = existingProject,
-                            projectName = existingProject?.name ?: authored.name,
-                            objective = "Generate Node Creature assets for newly introduced roles in ${authored.name}.",
-                            supplementalRoles =
-                                NodeCharacterGenerationWorkflowFactory.roles +
-                                    catalog.filter { it.id in missingRoleIds },
-                        )
+                        if (!started) {
+                            platformDebugLog("AiveLaunch", "Node character generation skipped: a launch is already in progress")
+                        }
                     }
                 }
             },
@@ -613,6 +664,7 @@ fun App(
                         onSaveDistributedCompute = onSaveDistributedCompute,
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                         crashReportingSetting = crashReportingSetting,
+                        remoteAccessSetting = remoteAccessSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         memoryLayer = memoryLayer,

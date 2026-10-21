@@ -100,7 +100,10 @@ interface ManagedSessionGateway {
 
     suspend fun artifacts(handle: ManagedSessionHandle): List<ProviderArtifact>
 
-    /** Pending usage metrics from the last provider report, or null if not available. */
+    /**
+     * Pending usage metrics from the last provider report, or null if not available. Reading drains
+     * them: the engine polls every cycle and records each report it gets as an event.
+     */
     suspend fun usageReport(handle: ManagedSessionHandle): ManagedSessionUsage? = null
 }
 

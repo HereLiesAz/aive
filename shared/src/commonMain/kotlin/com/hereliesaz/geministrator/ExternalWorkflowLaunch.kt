@@ -4,7 +4,8 @@ import com.hereliesaz.geministrator.domain.RepositoryRef
 
 /**
  * An orchestrated workflow another app asked for (Android: through the remote service). [App]
- * launches it on its runtime the same way the launch form does, then reports the outcome.
+ * launches it on its runtime the same way the launch form does, then reports the outcome through
+ * `onExternalWorkflowLaunchHandled`: once the workflow started, or with the reason it could not.
  */
 data class ExternalWorkflowLaunchRequest(
     val requestId: Long,

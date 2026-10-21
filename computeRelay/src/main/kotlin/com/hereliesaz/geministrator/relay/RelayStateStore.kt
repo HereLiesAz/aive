@@ -14,7 +14,9 @@ import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -36,6 +38,8 @@ data class PersistedRelayLease(
     val progress: DistributedExecutionProgress? = null,
     val result: DistributedExecutionResult? = null,
     val completedAtEpochMillis: Long? = null,
+    /** Absent in files written before it existed; restored leases then count from the restore. */
+    val acceptedAtEpochMillis: Long? = null,
 )
 
 /** Persistence boundary for one relay deployment. Implementations must be crash-safe. */
@@ -64,16 +68,44 @@ class EncryptedFileRelayStateStore(
     relayToken: String,
     private val random: SecureRandom = SecureRandom(),
 ) : RelayStateStore {
+    init {
+        require(relayToken.isNotBlank()) { "relayToken must not be blank" }
+        Files.createDirectories(directory)
+    }
+
+    /**
+     * Derived with PBKDF2 from the token and a random per-directory salt kept beside the state, so
+     * state files from different deployments do not share a key and a weak token costs an offline
+     * attacker the iteration count per guess instead of one hash.
+     */
     private val key = SecretKeySpec(
+        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(
+            PBEKeySpec(relayToken.toCharArray(), loadOrCreateSalt(), PBKDF2_ITERATIONS, 256),
+        ).encoded,
+        "AES",
+    )
+
+    /** The pre-salt key: files written by earlier versions still load, and are rewritten under [key]. */
+    private val legacyKey = SecretKeySpec(
         MessageDigest.getInstance("SHA-256").digest(
             ("aive-compute-relay-state-v1\u0000" + relayToken).toByteArray(StandardCharsets.UTF_8),
         ),
         "AES",
     )
 
-    init {
-        require(relayToken.isNotBlank()) { "relayToken must not be blank" }
-        Files.createDirectories(directory)
+    private fun loadOrCreateSalt(): ByteArray {
+        val path = directory.resolve(SALT_FILE)
+        if (Files.exists(path)) {
+            return Files.readAllBytes(path).also { require(it.size == SALT_BYTES) { "Relay state salt is corrupt" } }
+        }
+        val salt = ByteArray(SALT_BYTES).also(random::nextBytes)
+        try {
+            Files.write(path, salt, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+            restrictOwnerOnly(path)
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            return Files.readAllBytes(path)
+        }
+        return salt
     }
 
     override fun load(poolId: String): List<PersistedRelayLease> {
@@ -86,7 +118,15 @@ class EncryptedFileRelayStateStore(
         }
         val nonce = bytes.copyOfRange(MAGIC.size, MAGIC.size + NONCE_BYTES)
         val ciphertext = bytes.copyOfRange(MAGIC.size + NONCE_BYTES, bytes.size)
-        val plaintext = cipher(Cipher.DECRYPT_MODE, nonce, poolId).doFinal(ciphertext)
+        val plaintext = try {
+            cipher(Cipher.DECRYPT_MODE, nonce, poolId, key).doFinal(ciphertext)
+        } catch (current: javax.crypto.AEADBadTagException) {
+            try {
+                cipher(Cipher.DECRYPT_MODE, nonce, poolId, legacyKey).doFinal(ciphertext)
+            } catch (_: javax.crypto.AEADBadTagException) {
+                throw current
+            }
+        }
         return json.decodeFromString(
             ListSerializer(PersistedRelayLease.serializer()),
             plaintext.toString(StandardCharsets.UTF_8),
@@ -104,7 +144,7 @@ class EncryptedFileRelayStateStore(
             ListSerializer(PersistedRelayLease.serializer()),
             leases,
         ).toByteArray(StandardCharsets.UTF_8)
-        val ciphertext = cipher(Cipher.ENCRYPT_MODE, nonce, poolId).doFinal(plaintext)
+        val ciphertext = cipher(Cipher.ENCRYPT_MODE, nonce, poolId, key).doFinal(plaintext)
         val payload = ByteBuffer.allocate(MAGIC.size + nonce.size + ciphertext.size)
             .put(MAGIC)
             .put(nonce)
@@ -144,7 +184,7 @@ class EncryptedFileRelayStateStore(
 
     fun stateFile(poolId: String): Path = pathFor(poolId)
 
-    private fun cipher(mode: Int, nonce: ByteArray, poolId: String): Cipher =
+    private fun cipher(mode: Int, nonce: ByteArray, poolId: String, key: SecretKeySpec): Cipher =
         Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(mode, key, GCMParameterSpec(128, nonce))
             updateAAD(("pool:" + poolId).toByteArray(StandardCharsets.UTF_8))
@@ -184,6 +224,9 @@ class EncryptedFileRelayStateStore(
     private companion object {
         val MAGIC: ByteArray = "AIVERLY1".toByteArray(StandardCharsets.US_ASCII)
         const val NONCE_BYTES: Int = 12
+        const val SALT_BYTES: Int = 16
+        const val SALT_FILE: String = "state.salt"
+        const val PBKDF2_ITERATIONS: Int = 210_000
         val json: Json = Json {
             encodeDefaults = true
             ignoreUnknownKeys = false

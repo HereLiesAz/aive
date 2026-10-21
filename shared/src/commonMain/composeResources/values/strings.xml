@@ -18,6 +18,7 @@
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
     <string name="app_import_failed">Import failed</string>
+    <string name="app_launch_already_in_progress">Another workflow is launching. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
     <string name="app_provider_message_failed">Provider message failed</string>
     <string name="app_reachable_capabilities">Reachable · %1$s capabilities</string>
@@ -582,6 +583,16 @@
     <string name="settings_reconfigure">Reconfigure</string>
     <string name="settings_refresh_detected_project_files">Refresh detected project files</string>
     <string name="settings_refresh_health">Refresh health</string>
+    <string name="settings_remote_access">Remote Access</string>
+    <string name="settings_remote_access_description">Let your own IDEaz on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
+    <string name="settings_remote_access_on">Remote access: ON</string>
+    <string name="settings_remote_access_off">Remote access: OFF</string>
+    <string name="settings_remote_access_relay_url">Relay URL</string>
+    <string name="settings_remote_access_pairing_code">Pairing code</string>
+    <string name="settings_remote_access_warning">Anyone with this code can run prompts on your linked AI providers and start workflows. Treat it like a password. Turn off to revoke.</string>
+    <string name="settings_remote_access_copy">Copy code</string>
+    <string name="settings_remote_access_share">Share code</string>
+    <string name="settings_remote_access_reset">Reset pairing</string>
     <string name="settings_relay_pool_device_identity_and_token">Relay, pool, device identity, and token are required</string>
     <string name="settings_relay_token">Relay token</string>
     <string name="settings_relay_token_leave_blank_to_keep">Relay token (leave blank to keep existing)</string>
@@ -632,6 +643,7 @@
     <string name="store_inspect_update">Inspect update</string>
     <string name="store_install_and_connect">Install and connect</string>
     <string name="store_install_despite_an_unrecognized_signing_key">Install despite an unrecognized signing key</string>
+    <string name="store_install_unsigned_package">Install this unsigned package anyway</string>
     <string name="store_install_required_dependencies_before_this_package">Install required dependencies before this package.</string>
     <string name="store_install_verified_model">Install verified model</string>
     <string name="store_install_verified_package">Install verified package</string>
@@ -829,6 +841,9 @@
 
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage workflow edit.</string>
     <string name="terrarium_draft_wiring_staged_now_depends">Draft wiring staged: %1$s now depends on %2$s.</string>
+    <string name="terrarium_reset_zoom">Reset zoom, now %1$s</string>
+    <string name="terrarium_zoom_in">Zoom in</string>
+    <string name="terrarium_zoom_out">Zoom out</string>
 
     <!-- Count-dependent text -->
     <plurals name="store_update_count">

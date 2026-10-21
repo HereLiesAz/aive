@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.workflow.ApprovalGate
 import com.hereliesaz.geministrator.workflow.ApprovalGateRepository
 import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
 import com.hereliesaz.geministrator.workflow.FailureEscalationDecisionCommit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
@@ -191,7 +192,8 @@ class SqlWorkflowPersistence(
     /**
      * Moves workflow state out of the Settings store this replaces, once. The previous store is
      * handed to [LegacySettingsMigration.backup] as an export before it is cleared, so nothing is
-     * lost if the move is ever questioned. Unreadable Settings state is left where it is.
+     * lost if the move is ever questioned. Unreadable Settings state is left where it is, and any
+     * other failure leaves the move to be retried on the next start.
      */
     private suspend fun migrateUnlocked(migration: LegacySettingsMigration) {
         if (queries.meta(MIGRATED_FROM_SETTINGS).awaitAsOneOrNull() != null) return
@@ -213,7 +215,15 @@ class SqlWorkflowPersistence(
 
     private suspend fun <T> locked(block: suspend () -> T): T = mutex.withLock {
         pendingMigration?.let { migration ->
-            migrateUnlocked(migration)
+            // Attempted once per process. A failure (backup I/O, a newer Settings schema) leaves
+            // the Settings state and the migration marker untouched, so a later start retries it;
+            // it must not make every repository call throw until then.
+            try {
+                migrateUnlocked(migration)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+            }
             pendingMigration = null
         }
         block()

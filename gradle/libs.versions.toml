@@ -1,8 +1,10 @@
 [versions]
-# 5.13 is the last JGit line that runs on Android API 26 (6.x needs Java 11 APIs).
+# Retain the 5.13 line for Android API 26; newer JGit lines need a device-tested migration.
+# JGit 7.8 reads loose refs through InputStream.readNBytes (Android API 33).
+# Java compilation targets do not backport that API; core-library desugaring is not configured.
 jgit = "5.13.4.202507202350-r"
 agp = "9.4.1"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 compose = "1.12.1"
 android-compileSdk = "37"
 android-minSdk = "26"
@@ -15,7 +17,7 @@ kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.11.0"
 ktor = "3.6.0"
 multiplatform-settings = "1.3.0"
-onnxruntime = "1.30.0"
+onnxruntime = "1.31.0"
 commons-compress = "1.28.0"
 djl = "0.38.0"
 kmp-zip = "1.0.0"

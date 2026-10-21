@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlin.coroutines.cancellation.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -123,6 +124,16 @@ import com.hereliesaz.geministrator.resources.settings_ready
 import com.hereliesaz.geministrator.resources.settings_reconfigure
 import com.hereliesaz.geministrator.resources.settings_refresh_detected_project_files
 import com.hereliesaz.geministrator.resources.settings_refresh_health
+import com.hereliesaz.geministrator.resources.settings_remote_access
+import com.hereliesaz.geministrator.resources.settings_remote_access_description
+import com.hereliesaz.geministrator.resources.settings_remote_access_on
+import com.hereliesaz.geministrator.resources.settings_remote_access_off
+import com.hereliesaz.geministrator.resources.settings_remote_access_relay_url
+import com.hereliesaz.geministrator.resources.settings_remote_access_pairing_code
+import com.hereliesaz.geministrator.resources.settings_remote_access_warning
+import com.hereliesaz.geministrator.resources.settings_remote_access_copy
+import com.hereliesaz.geministrator.resources.settings_remote_access_share
+import com.hereliesaz.geministrator.resources.settings_remote_access_reset
 import com.hereliesaz.geministrator.resources.settings_relay_pool_device_identity_and_token
 import com.hereliesaz.geministrator.resources.settings_relay_token
 import com.hereliesaz.geministrator.resources.settings_relay_token_leave_blank_to_keep
@@ -402,6 +413,7 @@ internal fun ProviderSettingsScreen(
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
+    remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     modifier: Modifier = Modifier,
@@ -516,8 +528,11 @@ internal fun ProviderSettingsScreen(
 
         if (healthChecking) {
             LaunchedEffect(Unit) {
-                healthResults = onCheckProviderHealth()
-                healthChecking = false
+                try {
+                    healthResults = settingsActionOrNull("Provider health check") { onCheckProviderHealth() }
+                } finally {
+                    healthChecking = false
+                }
             }
         }
         AzphaltPill(
@@ -546,6 +561,67 @@ internal fun ProviderSettingsScreen(
                 onClick = { setting.onEnabledChange(!setting.enabled) },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+
+        remoteAccessSetting?.let { setting ->
+            ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
+            Text(
+                stringResource(Res.string.settings_remote_access_description),
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+            )
+            AzphaltPill(
+                if (setting.enabled) stringResource(Res.string.settings_remote_access_on) else stringResource(Res.string.settings_remote_access_off),
+                "remote-access-toggle",
+                selected = setting.enabled,
+                onClick = { setting.onEnabledChange(!setting.enabled) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (!setting.enabled) {
+                OutlinedTextField(
+                    value = setting.relayUrl,
+                    onValueChange = setting.onRelayUrlChange,
+                    label = { Text(stringResource(Res.string.settings_remote_access_relay_url)) },
+                    placeholder = { Text(setting.defaultRelayUrl) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            setting.status?.let { status ->
+                Text(status, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            }
+            setting.pairingCode?.let { code ->
+                Text(
+                    stringResource(Res.string.settings_remote_access_warning),
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(Res.string.settings_remote_access_pairing_code)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AzphaltPill(
+                        stringResource(Res.string.settings_remote_access_copy),
+                        "remote-access-copy",
+                        onClick = { setting.onCopyPairingCode(code) },
+                    )
+                    AzphaltPill(
+                        stringResource(Res.string.settings_remote_access_share),
+                        "remote-access-share",
+                        onClick = { setting.onSharePairingCode(code) },
+                    )
+                }
+                AzphaltPill(
+                    stringResource(Res.string.settings_remote_access_reset),
+                    "remote-access-reset",
+                    onClick = setting.onResetPairing,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         localPlannerSetting?.let { setting ->
@@ -929,8 +1005,11 @@ internal fun ProviderSettingsScreen(
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
-                exportedJson = onExportJson()
-                exportTriggered = false
+                try {
+                    exportedJson = settingsActionOrNull("JSON export") { onExportJson() }
+                } finally {
+                    exportTriggered = false
+                }
             }
         }
         if (exportedJson == null) {
@@ -983,8 +1062,11 @@ internal fun ProviderSettingsScreen(
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
-                diagnosticBundle = onExportDiagnosticBundle()
-                diagnosticTriggered = false
+                try {
+                    diagnosticBundle = settingsActionOrNull("Diagnostic export") { onExportDiagnosticBundle() }
+                } finally {
+                    diagnosticTriggered = false
+                }
             }
         }
         if (diagnosticBundle == null) {
@@ -1044,4 +1126,17 @@ private fun RoleDefinition.providerDepartment(): String = when (id.value) {
     "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
     "release-engineer" -> "Delivery"
     else -> "Custom"
+}
+
+/**
+ * Runs a settings action started from an effect. A failure is logged and yields null, so it
+ * neither crashes the composition nor leaves the action's in-progress flag set.
+ */
+private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -> T): T? = try {
+    action()
+} catch (failure: CancellationException) {
+    throw failure
+} catch (failure: Exception) {
+    platformDebugLog("AiveSettings", "$label failed: ${failure::class.simpleName}: ${failure.message}")
+    null
 }
