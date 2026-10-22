@@ -556,7 +556,7 @@ class MainActivity : ComponentActivity() {
             if (startupReady) {
                 AndroidUpdatePrompt(
                     state = updateCoordinator.state,
-                    onInstallGithubUpdate = updateCoordinator::installDownloadedUpdate,
+                    onOpenGithubRelease = updateCoordinator::openGithubRelease,
                     onOpenPlayStore = updateCoordinator::openPlayStore,
                     onDismiss = updateCoordinator::dismiss,
                 )
@@ -582,9 +582,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AiveRemoteBridge.pruneExpired()
-        if (::updateCoordinator.isInitialized) {
-            updateCoordinator.onResume()
-        }
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
     }

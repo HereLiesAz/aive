@@ -8,7 +8,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Repository contents and history on GitHub, GitLab, and local working trees.
 - Workflow definitions, run state, artifacts, and approval decisions.
 - Data in attached role surfaces (spreadsheets, SQLite databases).
-- The user's device. This includes, on the Android GitHub release flavor, the accessibility permission granted to the Gemini bridge and the ability to install APK updates.
+- The user's device. This includes, on the Android GitHub release flavor, the accessibility permission granted to the Gemini bridge. The app only opens the GitHub release page for updates; it does not download or install APKs itself.
 
 ## Trust Boundaries
 
