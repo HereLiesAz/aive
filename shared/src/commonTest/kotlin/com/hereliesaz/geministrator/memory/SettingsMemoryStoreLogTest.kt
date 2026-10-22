@@ -1,9 +1,11 @@
 package com.hereliesaz.geministrator.memory
 
 import com.russhwolf.settings.MapSettings
+import com.russhwolf.settings.Settings
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -58,6 +60,50 @@ class SettingsMemoryStoreLogTest {
         assertTrue(store.commit(0, addEpisode(0)))
         assertEquals(false, store.commit(0, addEpisode(1)))
         assertEquals(1, SettingsMemoryStore(settings).read().episodes.size)
+    }
+
+    @Test
+    fun failedWriteDoesNotPoisonTheIdIndex() = runBlocking {
+        val backing = MapSettings()
+        var failWrites = false
+        val settings = object : Settings by backing {
+            override fun putString(key: String, value: String) {
+                if (failWrites) error("quota exceeded")
+                backing.putString(key, value)
+            }
+        }
+        val store = SettingsMemoryStore(settings, compactEvery = 100)
+        assertTrue(store.commit(0, addEpisode(0)))
+
+        failWrites = true
+        assertFailsWith<IllegalStateException> { store.commit(1, addEpisode(1)) }
+        failWrites = false
+
+        // The retry must not be refused as "episode e1 already exists".
+        assertTrue(store.commit(1, addEpisode(1)))
+        assertEquals(listOf("e0", "e1"), SettingsMemoryStore(backing, compactEvery = 100).read().episodes.map { it.id.value })
+    }
+
+    @Test
+    fun importedGraphMustBeWhole() {
+        val episode = addEpisode(0).episodesToAdd.single()
+        val dangling = MemorySnapshot(
+            episodes = listOf(episode),
+            edges = listOf(
+                MemoryEdge(
+                    id = MemoryEdgeId("edge"),
+                    from = MemoryNodeId("a"),
+                    to = MemoryNodeId("b"),
+                    relation = MemoryRelationKind.entries.first(),
+                    createdAtEpochMillis = 0,
+                ),
+            ),
+        )
+        assertFailsWith<IllegalArgumentException> { dangling.requireConsistentGraph() }
+        assertFailsWith<IllegalArgumentException> {
+            MemorySnapshot(episodes = listOf(episode, episode)).requireConsistentGraph()
+        }
+        MemorySnapshot(episodes = listOf(episode)).requireConsistentGraph()
     }
 
     private fun addEpisode(index: Int) = MemoryStoreMutation(

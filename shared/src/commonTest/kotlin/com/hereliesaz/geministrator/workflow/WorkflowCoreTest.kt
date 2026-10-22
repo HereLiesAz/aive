@@ -135,6 +135,9 @@ class WorkflowRunFactoryTest {
         val refreshed = WorkflowRunFactory.refreshReadiness(definition, completedFirst, 200L)
 
         assertEquals(TaskRunStatus.Ready, refreshed.taskRuns.getValue(second).status)
+        assertEquals(200L, refreshed.updatedAtEpochMillis)
+        // Nothing left to change: the run, and its timestamp, are left alone.
+        assertEquals(refreshed, WorkflowRunFactory.refreshReadiness(definition, refreshed, 300L))
     }
 
     private fun task(

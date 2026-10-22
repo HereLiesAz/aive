@@ -1,6 +1,12 @@
 package com.hereliesaz.aive
 
+import com.hereliesaz.aive.remote.AiveRelayHostState
 import com.hereliesaz.aive.remote.AiveRemoteBridge
+import com.hereliesaz.aive.remote.RelayProtocol
+import com.hereliesaz.aive.remote.RemoteAccessController
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.os.Bundle
 import android.os.Build
@@ -35,6 +41,7 @@ import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.ProviderCredentialSetup
+import com.hereliesaz.geministrator.RemoteAccessSetting
 import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
 import com.hereliesaz.geministrator.RepositoryCredentialSetup
 import com.hereliesaz.geministrator.RepositoryServiceCatalog
@@ -124,6 +131,9 @@ class MainActivity : ComponentActivity() {
     }
     private val memoryRuntime by memoryRuntimeDelegate
     private var crashReportNoticeVisible by mutableStateOf(false)
+    private val remoteAccessController by lazy { RemoteAccessController(this) }
+    private val notificationPermissionRequest =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Draw behind system bars on every API level; the shared Scaffold pads content by its insets.
@@ -134,6 +144,8 @@ class MainActivity : ComponentActivity() {
         CrashReporting.install(this) { crashReportNoticeVisible = true }
         // Before the queue reaches App: a request that waited too long is reported, not launched.
         AiveRemoteBridge.pruneExpired()
+        // Remote access is opt-in; this only restarts a link the user already turned on.
+        remoteAccessController.resumeIfEnabled()
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
@@ -193,6 +205,14 @@ class MainActivity : ComponentActivity() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 var crashReportingEnabled by remember { mutableStateOf(CrashReporting.isEnabled(this@MainActivity)) }
+                var remoteAccess by remember { mutableStateOf(remoteAccessController.store.snapshot()) }
+                var remoteRelayUrl by remember { mutableStateOf(remoteAccessController.store.relayUrl) }
+                var remoteAccessProblem by remember { mutableStateOf<String?>(null) }
+                val remoteLinkStatus by AiveRelayHostState.status.collectAsState()
+                LaunchedEffect(Unit) {
+                    // The notification's Stop turns Remote access off without the screen's help.
+                    AiveRelayHostState.revision.collect { remoteAccess = remoteAccessController.store.snapshot() }
+                }
                 val uiScope = rememberCoroutineScope()
                 var localOrchestrationStatus by remember {
                     mutableStateOf<LocalOrchestrationSpecialistStatus>(
@@ -486,6 +506,33 @@ class MainActivity : ComponentActivity() {
                         } else {
                             null
                         },
+                        remoteAccessSetting = RemoteAccessSetting(
+                            enabled = remoteAccess.enabled,
+                            relayUrl = remoteRelayUrl,
+                            defaultRelayUrl = RelayProtocol.DEFAULT_RELAY_URL,
+                            pairingCode = remoteAccess.pairingCode,
+                            status = remoteAccessProblem ?: if (remoteAccess.enabled) remoteLinkStatus else null,
+                            onEnabledChange = { enabled ->
+                                if (enabled) {
+                                    remoteAccessProblem = remoteAccessController.turnOn()
+                                    if (remoteAccessProblem == null) requestNotificationPermission()
+                                } else {
+                                    remoteAccessController.turnOff()
+                                    remoteAccessProblem = null
+                                }
+                                remoteAccess = remoteAccessController.store.snapshot()
+                            },
+                            onRelayUrlChange = { url ->
+                                remoteRelayUrl = url
+                                remoteAccessController.store.relayUrl = url
+                            },
+                            onResetPairing = {
+                                remoteAccessProblem = remoteAccessController.resetPairing()
+                                remoteAccess = remoteAccessController.store.snapshot()
+                            },
+                            onCopyPairingCode = remoteAccessController::copy,
+                            onSharePairingCode = remoteAccessController::share,
+                        ),
                     )
                 }
             }
@@ -509,11 +556,20 @@ class MainActivity : ComponentActivity() {
             if (startupReady) {
                 AndroidUpdatePrompt(
                     state = updateCoordinator.state,
-                    onInstallGithubUpdate = updateCoordinator::installDownloadedUpdate,
+                    onOpenGithubRelease = updateCoordinator::openGithubRelease,
                     onOpenPlayStore = updateCoordinator::openPlayStore,
                     onDismiss = updateCoordinator::dismiss,
                 )
             }
+        }
+    }
+
+    /** The foreground notification is hidden without this on Android 13+; the link works either way. */
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -526,9 +582,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AiveRemoteBridge.pruneExpired()
-        if (::updateCoordinator.isInitialized) {
-            updateCoordinator.onResume()
-        }
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
     }

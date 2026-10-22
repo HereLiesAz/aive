@@ -69,14 +69,28 @@ internal suspend fun HttpClient.postServerSentEvents(
     }
 }
 
-/** True when a refusal reads as the reasoning option itself being unsupported or not allowed. */
+/**
+ * True when a refusal reads as the reasoning option itself being unsupported or not allowed. Only
+ * request-shape refusals (400, 422) that name one of the options this client adds count: an
+ * authentication or account error (401, 403, "unrecognized API key", "verify your account") must not
+ * permanently switch reasoning or usage off for the adapter.
+ */
 internal fun StreamRejected.rejectsReasoning(): Boolean =
-    status in 400..403 && REASONING_REJECTION.containsMatchIn(body)
+    (status == 400 || status == 422) && REASONING_REJECTION.containsMatchIn(body)
 
 private val REASONING_REJECTION = Regex(
-    "thinking|reasoning|summary|thought|budget_tokens|adaptive|verif|stream_options|include_usage|not supported|unsupported|unknown (parameter|field)|extra inputs|unrecognized",
+    "thinking|reasoning|thought|budget_tokens|adaptive|stream_options|include_usage",
     RegexOption.IGNORE_CASE,
 )
+
+/**
+ * Every streaming protocol ends with an explicit terminal event. A stream that reaches EOF without
+ * one was cut off (connection reset, proxy timeout), and the partial text must not be returned as a
+ * complete answer.
+ */
+internal fun requireStreamTerminated(terminated: Boolean, providerName: String) {
+    if (!terminated) error("$providerName stream ended before the response was complete; output is incomplete")
+}
 
 internal const val STREAM_TIMEOUT_MILLIS = 15L * 60 * 1000
 

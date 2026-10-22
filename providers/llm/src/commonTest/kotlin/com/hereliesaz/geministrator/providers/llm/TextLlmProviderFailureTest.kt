@@ -46,6 +46,28 @@ class TextLlmProviderFailureTest {
     }
 
     @Test
+    fun cancelDuringGenerationDropsTheResult() = runTest {
+        lateinit var provider: TextLlmProvider
+        var runId: com.hereliesaz.geministrator.domain.ProviderRunId? = null
+        provider = TextLlmProvider(
+            AgentProviderId("slow"),
+            "Slow",
+            object : TextGenerationApi {
+                override suspend fun generate(prompt: String): TextGenerationResult {
+                    provider.cancel(runId!!)
+                    return TextGenerationResult("finished anyway")
+                }
+            },
+        )
+        runId = provider.start(request(requirePlanApproval = false)).providerRunId
+
+        val events = provider.observe(runId!!).toList()
+
+        assertTrue(events.none { it is AgentEvent.ArtifactProduced || it is AgentEvent.Completed }, events.toString())
+        assertEquals("Slow session cancelled", assertIs<AgentEvent.Failed>(events.last()).reason)
+    }
+
+    @Test
     fun draftPlanAsksForAPlanOnlyAndRaisesTheProvidersRefusal() = runTest {
         val prompts = mutableListOf<String>()
         val planner = TextLlmProvider(

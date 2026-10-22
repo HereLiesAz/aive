@@ -96,16 +96,15 @@ class ApplicationRuntimeRecoveryTest {
                 persistence = persistence,
             )
 
-            withTimeout(4_000L) {
-                while (runtime.state.value !is ApplicationRuntimeState.ResumeFailed) delay(25L)
-            }
-            assertIs<ApplicationRuntimeState.ResumeFailed>(runtime.state.value)
-
+            // A single transient failure is retried without replacing the Live view.
+            var sawFailureState = false
             withTimeout(8_000L) {
                 while ((runtime.state.value as? ApplicationRuntimeState.Live)?.presentation?.run?.status != WorkflowRunStatus.Completed) {
-                    delay(50L)
+                    if (runtime.state.value is ApplicationRuntimeState.ResumeFailed) sawFailureState = true
+                    delay(10L)
                 }
             }
+            assertEquals(false, sawFailureState)
 
             val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
             assertEquals(2, provider.startCount)

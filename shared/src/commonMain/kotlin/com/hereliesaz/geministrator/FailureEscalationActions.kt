@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.ApprovalGateCoordinator
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
@@ -22,13 +23,24 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
     note: String? = null,
     nowEpochMillis: Long,
 ) {
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
-    val presentation = live.presentation
+    // Decided under the runtime lock against the active run: a decision built from a published
+    // snapshot could commit over progress a cycle persisted after that snapshot.
+    withActiveRun { run -> decideFailureEscalationLocked(run, gateId, approved, decidedByRoleId, note, nowEpochMillis) }
+    refresh()
+}
+
+private suspend fun ApplicationRuntime.decideFailureEscalationLocked(
+    run: WorkflowRun,
+    gateId: ApprovalGateId,
+    approved: Boolean,
+    decidedByRoleId: RoleDefinitionId?,
+    note: String?,
+    nowEpochMillis: Long,
+) {
     val gate = requireNotNull(persistence.approvalGates.get(gateId)) {
         "Approval gate ${gateId.value} does not exist"
     }
-    require(gate.workflowRunId == presentation.run.id) {
+    require(gate.workflowRunId == run.id) {
         "Approval gate ${gateId.value} does not belong to the active workflow"
     }
 
@@ -42,14 +54,13 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
         failureEscalationDecisionStore = persistence,
     )
     service.decideFailureEscalation(
-        run = presentation.run,
+        run = run,
         gateId = gateId,
         approved = approved,
         decidedByRoleId = decidedByRoleId,
         note = note,
         nowEpochMillis = nowEpochMillis,
     )
-    refresh()
 }
 
 @OptIn(ExperimentalTime::class)
@@ -65,20 +76,21 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
         )
     }
 
-    val live = state.value as? ApplicationRuntimeState.Live
-        ?: error("No active workflow is loaded")
-    val taskRun = requireNotNull(live.presentation.run.taskRuns[taskDefinitionId]) {
-        "Task ${taskDefinitionId.value} has no runtime state"
+    withActiveRun { run ->
+        val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) {
+            "Task ${taskDefinitionId.value} has no runtime state"
+        }
+        require(taskRun.status == TaskRunStatus.Escalated) {
+            "Task ${taskDefinitionId.value} is not awaiting an escalation decision"
+        }
+        decideFailureEscalationLocked(
+            run = run,
+            gateId = ApprovalGateId("failure:${run.id.value}:${taskDefinitionId.value}:${taskRun.attempt}"),
+            approved = approved,
+            decidedByRoleId = null,
+            note = note,
+            nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
+        )
     }
-    require(taskRun.status == TaskRunStatus.Escalated) {
-        "Task ${taskDefinitionId.value} is not awaiting an escalation decision"
-    }
-    decideFailureEscalation(
-        gateId = ApprovalGateId(
-            "failure:${live.presentation.run.id.value}:${taskDefinitionId.value}:${taskRun.attempt}",
-        ),
-        approved = approved,
-        note = note,
-        nowEpochMillis = Clock.System.now().toEpochMilliseconds(),
-    )
+    refresh()
 }

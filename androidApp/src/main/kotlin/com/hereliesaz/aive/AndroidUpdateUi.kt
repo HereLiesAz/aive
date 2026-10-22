@@ -7,25 +7,24 @@ import com.hereliesaz.geministrator.AzphaltAlertDialog
 internal sealed interface AndroidUpdateState {
     data object Idle : AndroidUpdateState
     data object Checking : AndroidUpdateState
-    data class Downloading(val version: String) : AndroidUpdateState
-    data class ReadyToInstall(val version: String) : AndroidUpdateState
     data object PlayUpdateAvailable : AndroidUpdateState
+    data class GithubUpdateAvailable(val version: String, val pageUrl: String) : AndroidUpdateState
     data class Error(val message: String) : AndroidUpdateState
 }
 
 @Composable
 internal fun AndroidUpdatePrompt(
     state: AndroidUpdateState,
-    onInstallGithubUpdate: () -> Unit,
+    onOpenGithubRelease: () -> Unit,
     onOpenPlayStore: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     when (state) {
-        is AndroidUpdateState.ReadyToInstall -> AzphaltAlertDialog(
-            title = stringResource(R.string.update_ready_title, state.version),
-            text = stringResource(R.string.update_ready_body),
-            confirmLabel = stringResource(R.string.update_install),
-            onConfirm = onInstallGithubUpdate,
+        is AndroidUpdateState.GithubUpdateAvailable -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_github_title, state.version),
+            text = stringResource(R.string.update_github_body),
+            confirmLabel = stringResource(R.string.update_open_github),
+            onConfirm = onOpenGithubRelease,
             onDismissRequest = onDismiss,
             dismissLabel = stringResource(R.string.update_later),
         )

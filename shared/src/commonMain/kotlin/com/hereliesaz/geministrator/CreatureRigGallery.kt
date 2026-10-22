@@ -144,7 +144,7 @@ internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier
     }
 }
 
-/** Labels that resolve to every rig slug in [CreatureRigMapping] (one custom label per generic body). */
+/** Labels that resolve to every rig slug in [CreatureRigMapping] (rig-named labels for the named-only rigs, one custom label per generic body). */
 internal val creatureRigGalleryEntries: List<String> by lazy {
     val kinds = CreatureRigMapping.bySlugKind.keys.map { kind ->
         CreatureRigMapping.displayName(kind).split(' ').joinToString(" ") { w ->
@@ -155,5 +155,5 @@ internal val creatureRigGalleryEntries: List<String> by lazy {
         (0 until 10_000).asSequence().map { "Custom Role $it" }
             .first { CreatureRigMapping.slugFor(it) == slug }
     }
-    kinds + generics
+    kinds + CreatureRigMapping.NAMED_ONLY_SLUGS + generics
 }

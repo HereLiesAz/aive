@@ -99,22 +99,23 @@
     </div>
 
     <h1>Privacy Policy</h1>
-    <p class="effective">Effective date: October 15, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.aive</code></p>
+    <p class="effective">Effective date: October 22, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.aive</code></p>
     <!-- Generated from docs/PRIVACY.md; edit that file, then regenerate. -->
 <p>This policy describes the current source-available builds of <strong>The Aive</strong>, application ID <code>com.hereliesaz.aive</code>.</p>
 <p>The Aive is a workflow orchestration application. It can store workflow information locally and, when you choose to use an external executor or provider, send the information needed to perform that work to the service you selected.</p>
-<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and self-updates from GitHub Releases. The <strong>Google Play</strong> flavor contains none of these. Desktop and web builds contain none of them either.</p>
-<h2>Summary</h2>
+<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The <strong>Google Play</strong> flavor contains none of these, except that a Play-flavor copy installed from somewhere other than Google Play checks GitHub Releases for updates too. Desktop and web builds contain none of them either.</p>
+<h2 id="summary">Summary</h2>
 <ul>
 <li>The current source does <strong>not</strong> include advertising SDKs.</li>
 <li>The current source does <strong>not</strong> include third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry SDKs.</li>
 <li>The GitHub release flavor for Android has opt-in crash/ANR reporting: it is <strong>off unless you turn it on</strong> in Settings. It is first-party code that posts to a first-party relay, not a telemetry SDK. See <a href="#crash-and-anr-reports-github-release-flavor-only">Crash and ANR reports</a>.</li>
+<li>Android has an opt-in <strong>Remote access</strong> feature, <strong>off by default</strong>, that lets your own IDEaz on another device reach The Aive through a relay. The relay sees only encrypted data, a room name and your IP address. See <a href="#remote-access-android">Remote access</a>.</li>
 <li>The Aive does <strong>not</strong> sell personal information.</li>
 <li>Workflow state is stored locally by the application unless it must be sent to an external service to perform work you requested.</li>
 <li>External providers process data under their own privacy policies and retention practices.</li>
 <li>Credentials and secret values are intentionally excluded from workflow persistence.</li>
 </ul>
-<h2>Information stored locally</h2>
+<h2 id="information-stored-locally">Information stored locally</h2>
 <p>Depending on how you use the app, The Aive may store:</p>
 <ul>
 <li>project names and repository references</li>
@@ -126,7 +127,7 @@
 <li>workflow events</li>
 <li>artifacts and references to artifacts</li>
 <li>provider/executor run identifiers needed to resume work</li>
-<li>settings, such as distributed-compute configuration and whether crash reporting or the Gemini bridge is enabled</li>
+<li>settings, such as distributed-compute configuration and whether crash reporting, the Gemini bridge or Remote access is enabled</li>
 <li>on the Android GitHub release flavor, crash/ANR reports waiting to be sent (only while crash reporting is on)</li>
 </ul>
 <p>Workflow state is stored locally:</p>
@@ -140,12 +141,12 @@
 <p>Memory stages run on-device by default. If you set a memory stage to a hosted model, the text of each packet that stage processes (bounded excerpts of banked session text or memory nodes) is sent to the provider you chose for that stage.</p>
 <p>This data is used to restore workflows and continue runs after the application or browser restarts.</p>
 <p>The Android app sets <code>allowBackup="true"</code>. If Android device backup is on, the system may include workflow state, settings and the agent-memory databases in your device backup under Google's backup terms. Credentials and downloaded models are excluded from backup and device transfer (<code>data_extraction_rules.xml</code>, <code>backup_rules.xml</code>); credentials are also encrypted with an Android Keystore key that never leaves the device. You have to reconnect providers after a restore, and models download again when you reinstall them.</p>
-<h2>External providers and executors</h2>
+<h2 id="external-providers-and-executors">External providers and executors</h2>
 <p>The Aive works with external services only when you connect them and assign work to them.</p>
 <ul>
 <li><strong>Hosted LLM providers.</strong> OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud, Z.ai, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply. If you connect OpenAI, node-character image generation also sends its image prompts to OpenAI's Images API.</li>
 <li><strong>Keyless free tiers.</strong> Kilo Gateway, LLM7, and OVHcloud AI Endpoints can be linked without a key. Prompts then go to those gateways unauthenticated, and their rate limits are keyed by your IP address.</li>
-<li><strong>Companion apps on Android (IDEaz).</strong> Apps signed with The Aive's own key can ask it to run a prompt or start a workflow (<a href="https://github.com/HereLiesAz/aive/blob/main/docs/Remote-API.md">Remote API</a>). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this.</li>
+<li><strong>Companion apps on Android (IDEaz).</strong> Apps signed with The Aive's own key can ask it to run a prompt or start a workflow (<a href="https://github.com/HereLiesAz/aive/blob/main/docs/Remote-API.md">Remote API</a>). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this. With <a href="#remote-access-android">Remote access</a> on, your own IDEaz on another device can do the same through an encrypted relay.</li>
 <li><strong>Language models from the Azphalt Store.</strong> A hosted model you install from the Store becomes a provider that The Aive calls directly at the address in its signed package. Prompts go to that operator, and the Store shows what the operator does with them (for example, that a free route may log and train on prompts) before you install. A key you add stays in this device's credential store and is sent only to that address. The package's setup script is never run.</li>
 <li><strong>GitLab workspace agents</strong> (gitlab.com). A linked LLM provider receives a bounded file tree and selected file contents from your GitLab project. The Aive then uses your GitLab token to commit the model's changes to a new <code>haive/...</code> branch.</li>
 <li><strong>Local Git workspace agents</strong> (desktop only). A linked LLM provider receives a bounded snapshot of files from your local repository. Changes are committed to a new local <code>haive/...</code> branch. Nothing is pushed unless a separate repository operation pushes it.</li>
@@ -168,7 +169,7 @@
 </ul>
 <p>The external service receives that information because you asked it to perform work. Its handling of the data is governed by that service's own terms and privacy policy.</p>
 <p>GitHub Actions inputs, run names, check-run output, uploaded <code>aive-result</code> artifacts, pushed branches, and commit messages are stored by GitHub in your repository. Anyone who can read the repository's Actions runs can see them, and in a public repository that means anyone.</p>
-<h2>Installed-Gemini bridge (GitHub release flavor only)</h2>
+<h2 id="installed-gemini-bridge-github-release-flavor-only">Installed-Gemini bridge (GitHub release flavor only)</h2>
 <p>On the Android GitHub release flavor, the Gemini provider can use the Gemini app installed on your device instead of an API key. This works through an Android accessibility service named "The Aive · Gemini bridge".</p>
 <ul>
 <li><strong>Opt-in with disclosure.</strong> Before sending you to Android's Accessibility settings, The Aive shows a disclosure of what the bridge does. The bridge works only when you have both agreed in The Aive and turned the service on in Android settings.</li>
@@ -179,7 +180,7 @@
 <li><strong>Turning it off.</strong> Turn the service off in Android Accessibility settings, or disconnect Gemini in The Aive.</li>
 </ul>
 <p>Google Play builds do not include the accessibility service or its manifest entries. They use the Gemini API only.</p>
-<h2>Crash and ANR reports (GitHub release flavor only)</h2>
+<h2 id="crash-and-anr-reports-github-release-flavor-only">Crash and ANR reports (GitHub release flavor only)</h2>
 <p>The Android GitHub release flavor includes automatic crash and app-not-responding (ANR) reporting. The Google Play, desktop, and web builds have no crash reporting.</p>
 <ul>
 <li><strong>Off by default.</strong> Reporting stays off until you turn on <strong>Settings → Crash Reports</strong>. This applies to updated installs too: a setting you never changed now reads as off. While it is off, nothing is recorded or sent.</li>
@@ -198,42 +199,51 @@
 <li><strong>Turning it off.</strong> Turn off <strong>Settings → Crash Reports</strong> at any time. Turning it off also deletes any pending reports that have not been sent.</li>
 </ul>
 <p>Like any web request, a report reveals your IP address to the relay's host. The payload itself does not include it.</p>
-<h2>Updates and downloads</h2>
+<h2 id="remote-access-android">Remote access (Android)</h2>
+<p>Remote access lets IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It exists in both Android flavors and is <strong>off by default</strong>: nothing runs, connects or is created until you turn on <strong>Settings → Remote Access</strong>.</p>
 <ul>
-<li><strong>Android GitHub release flavor.</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer APK is available, the app downloads it from GitHub Releases, verifies GitHub's published SHA-256 digest when one is present, and installs it only after you confirm.</li>
-<li><strong>Android Google Play flavor.</strong> The app queries Google Play's in-app update API for available updates, even with no provider connected; updates are delivered by Google Play under its terms.</li>
+<li><strong>What turning it on does.</strong> The Aive creates a random pairing (a room name, two relay tokens and an encryption key) and runs a foreground service, shown by a persistent notification, that keeps a connection to a relay open. The relay defaults to <code>https://aive-relay.hereliesaz.workers.dev</code>, operated by the project maintainer on Cloudflare; you can enter your own relay before turning it on.</li>
+<li><strong>What the relay sees.</strong> Every message between The Aive and IDEaz is encrypted on your devices with a key that never leaves the pairing code, so the relay and Cloudflare see only ciphertext, its size and timing, the room name, and the IP addresses of the two devices. They cannot read your prompts, the replies or your workflows. The relay stores only hashes of the two tokens, and deletes a room 30 days after The Aive last connected to it.</li>
+<li><strong>What the pairing code allows.</strong> The code is what you give IDEaz. Anyone who has it can run prompts on your linked AI providers (using your credentials and quota) and queue workflows on this device, until you revoke it. Treat it like a password. The code is shown only on this screen, never sent anywhere by The Aive, and does not contain the host token; the pairing, host token included, is stored encrypted under the Android Keystore and is excluded from backup and device transfer.</li>
+<li><strong>Where your data goes.</strong> A prompt received this way goes to the provider IDEaz names or else the one you linked for planning, exactly as for the local <a href="#external-providers-and-executors">companion-app</a> path; it is never sent to an unlinked keyless gateway.</li>
+<li><strong>Revoking.</strong> Turn Remote access off (or press <strong>Turn off</strong> in the notification) to delete the room on the relay and forget the pairing at once; the old code then stops working. <strong>Reset pairing</strong> does the same and creates a new pairing, so IDEaz must be given the new code. If the relay cannot be reached when you revoke, the pairing is still forgotten on this device and the relay deletes the unused room after 30 days.</li>
+</ul>
+<h2 id="updates-and-downloads">Updates and downloads</h2>
+<ul>
+<li><strong>Android copies not installed from Google Play (the GitHub release flavor, and a Play-flavor copy installed some other way).</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer version is available, it tells you and, only if you tap <strong>Open GitHub release</strong>, opens the release page in your browser. The app does not download or install the update itself.</li>
+<li><strong>Android copies installed from Google Play.</strong> The app queries Google Play's in-app update API for available updates, even with no provider connected, and does not contact GitHub for updates. If one is available, <strong>Open Play Store</strong> opens this app's Play listing; updates are delivered by Google Play under its terms.</li>
 <li><strong>Azphalt package catalog.</strong> When you open the Store, The Aive contacts the package repository (<code>https://azphalt.store</code> by default). It searches and downloads packages, checks revocations, and sends the IDs and versions of the packages you installed from that repository to check for updates.</li>
 <li><strong>Local models.</strong> Optional on-device models, such as the local planner, local orchestration helpers and local memory models, are downloaded from GitHub Releases. Models installed from the Azphalt Store are downloaded over HTTPS from the host named in the signed package.</li>
 </ul>
-<h2>Source repositories</h2>
+<h2 id="source-repositories">Source repositories</h2>
 <p>Repository-backed work may require an external provider to access a repository or a source already connected to that provider. The Aive should request and transmit only the repository/context needed for the selected task.</p>
 <p>The Aive itself is not intended to upload an entire repository to a separate analytics or data-collection service.</p>
-<h2>Credentials and secrets</h2>
+<h2 id="credentials-and-secrets">Credentials and secrets</h2>
 <p>Provider API keys, OAuth tokens, passwords, keystore contents, service-account credentials, private signing material, and other secret values must not be stored in <code>WorkflowPersistence</code>.</p>
 <p>A workflow may store the <strong>name</strong> of a required secret, but not its value.</p>
 <p>Where credentials are stored today (a key for a provider the app no longer supports, such as Jules, is deleted the next time credentials are read):</p>
 <ul>
-<li><strong>Android.</strong> Provider, repository, and relay credentials are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.</li>
+<li><strong>Android.</strong> Provider, repository, and relay credentials, and the Remote access pairing, are encrypted with AES-GCM under a non-exportable Android Keystore key. The ciphertext is kept in app-private SharedPreferences.</li>
 <li><strong>Desktop.</strong> Credentials are kept in the macOS Keychain, the Linux Secret Service (<code>secret-tool</code>), or Windows DPAPI. If none of these is available, the credential is refused instead of being stored in plain text.</li>
 <li><strong>Web.</strong> Credentials are stored in the browser's localStorage for the site, encrypted with a non-extractable AES-GCM key kept in the site's IndexedDB. A copy of the storage alone does not reveal them, but code running on the page can still use the key. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) store them unencrypted.</li>
 </ul>
 <p>Repository secrets used by GitHub Actions remain within GitHub Actions and are not part of the app's workflow persistence.</p>
-<h2>Analytics, advertising, and tracking</h2>
+<h2 id="analytics-advertising-and-tracking">Analytics, advertising, and tracking</h2>
 <p>The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The only diagnostics are the crash/ANR reports described above (opt-in), and they exist only in the Android GitHub release flavor.</p>
 <p>The public web build may still be subject to ordinary infrastructure logging performed by its hosting platform or network intermediaries. The repository's GitHub Pages hosting and GitHub itself are governed by GitHub's own policies.</p>
 <p>If The Aive later adds other diagnostics or analytics, this policy must be updated before that behavior is treated as part of the product.</p>
-<h2>Data retention and deletion</h2>
+<h2 id="data-retention-and-deletion">Data retention and deletion</h2>
 <p>Local workflow data remains until The Aive removes it or you clear the application's data/storage. Downloaded models and installed Store packages stay in app-private storage until you remove them in the app, clear the app's data, or uninstall. Uninstalling deletes all local data, credentials and the Keystore key. On the web, clearing site data for The Aive removes the browser-local persistence and stored credentials.</p>
 <p>Deleting local data does not automatically delete data already sent to an external provider. Provider sessions, repository data, logs, or artifacts held by an external service must be managed according to that service's controls and retention policy. This includes GitHub Actions runs and artifacts, pushed branches, and crash-report issues. The workflow's <code>aive-result</code> artifacts are kept for 7 days. Issues filed from crash reports stay on the public issue tracker until a maintainer edits or deletes them.</p>
-<h2>Data sharing</h2>
-<p>The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. The current application does not sell personal data or share workflow content with advertisers.</p>
-<h2>Children's privacy</h2>
+<h2 id="data-sharing">Data sharing</h2>
+<p>The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. If you enable Remote access, encrypted messages pass through the relay you chose. The current application does not sell personal data or share workflow content with advertisers.</p>
+<h2 id="childrens-privacy">Children's privacy</h2>
 <p>The Aive is a software-development tool and is not directed to children under 13. It is not designed to knowingly collect personal information from children.</p>
-<h2>Security</h2>
+<h2 id="security">Security</h2>
 <p>The project is designed to separate durable workflow state from credentials and secret material. No software can guarantee absolute security, and users should avoid placing unnecessary secrets in task prompts, artifacts, or workflow content that may be sent to external providers. See <code>docs/THREAT_MODEL.md</code> for known threats and open gaps.</p>
-<h2>Changes to this policy</h2>
+<h2 id="changes-to-this-policy">Changes to this policy</h2>
 <p>Material changes to The Aive's data handling should be accompanied by an update to this document and its effective date.</p>
-<h2>Contact</h2>
+<h2 id="contact">Contact</h2>
 <p>The Aive is a source-available project (PolyForm Noncommercial 1.0.0) maintained by <strong>HereLiesAz</strong>. Privacy questions and reports can be raised through the repository at <code>HereLiesAz/aive</code> on GitHub.</p>
 </div>
 </body>

@@ -101,7 +101,7 @@ impl BitcosPayload {
     }
 
     pub fn dot_i8(&self, activations: &[i8]) -> Result<i64, BitcosError> {
-        if activations.len() != self.element_count as usize {
+        if activations.len() as u64 != self.element_count {
             return Err(BitcosError::ShapeMismatch {
                 expected: self.element_count,
                 actual: activations.len(),
@@ -145,7 +145,7 @@ impl<'a> BitcosTensorView<'a> {
     }
 
     pub fn dot_i8(&self, activations: &[i8]) -> Result<i64, BitcosError> {
-        if activations.len() != self.metadata.element_count as usize {
+        if activations.len() as u64 != self.metadata.element_count {
             return Err(BitcosError::ShapeMismatch {
                 expected: self.metadata.element_count,
                 actual: activations.len(),
@@ -197,8 +197,8 @@ impl<'a> BitcosContainer<'a> {
         }
         let tensor_count = read_u32(bytes, 8)? as usize;
         let directory_len = read_u32(bytes, 12)? as usize;
-        let directory_offset = read_u64(bytes, 16)? as usize;
-        let data_offset = read_u64(bytes, 24)? as usize;
+        let directory_offset = to_usize(read_u64(bytes, 16)?)?;
+        let data_offset = to_usize(read_u64(bytes, 24)?)?;
 
         if directory_offset != HEADER_LEN {
             return Err(BitcosError::InvalidContainer("unexpected directory offset"));
@@ -212,6 +212,13 @@ impl<'a> BitcosContainer<'a> {
             ));
         }
 
+        // Every entry takes at least DIRECTORY_FIXED_LEN bytes of the (bounds-checked) directory,
+        // so a count the directory cannot hold is refused before anything is allocated for it.
+        if tensor_count > directory_len / DIRECTORY_FIXED_LEN {
+            return Err(BitcosError::InvalidContainer(
+                "tensor count exceeds directory capacity",
+            ));
+        }
         let mut cursor = directory_offset;
         let mut tensors = Vec::with_capacity(tensor_count);
         for _ in 0..tensor_count {
@@ -237,12 +244,12 @@ impl<'a> BitcosContainer<'a> {
                     "nonzero count exceeds element count",
                 ));
             }
-            let presence_offset = read_u64(bytes, cursor + 28)? as usize;
-            let presence_len = read_u64(bytes, cursor + 36)? as usize;
-            let signs_offset = read_u64(bytes, cursor + 44)? as usize;
-            let signs_len = read_u64(bytes, cursor + 52)? as usize;
-            let scales_offset = read_u64(bytes, cursor + 60)? as usize;
-            let scales_len = read_u64(bytes, cursor + 68)? as usize;
+            let presence_offset = to_usize(read_u64(bytes, cursor + 28)?)?;
+            let presence_len = to_usize(read_u64(bytes, cursor + 36)?)?;
+            let signs_offset = to_usize(read_u64(bytes, cursor + 44)?)?;
+            let signs_len = to_usize(read_u64(bytes, cursor + 52)?)?;
+            let scales_offset = to_usize(read_u64(bytes, cursor + 60)?)?;
+            let scales_len = to_usize(read_u64(bytes, cursor + 68)?)?;
 
             cursor += DIRECTORY_FIXED_LEN;
             let dims_len = rank
@@ -270,12 +277,12 @@ impl<'a> BitcosContainer<'a> {
                     "shape does not match element count",
                 ));
             }
-            if presence_len != (element_count as usize).div_ceil(8) {
+            if presence_len != to_usize(element_count)?.div_ceil(8) {
                 return Err(BitcosError::InvalidContainer(
                     "presence length does not match element count",
                 ));
             }
-            if signs_len != (nonzero_count as usize).div_ceil(8) {
+            if signs_len != to_usize(nonzero_count)?.div_ceil(8) {
                 return Err(BitcosError::InvalidContainer(
                     "sign length does not match nonzero count",
                 ));
@@ -436,24 +443,14 @@ pub enum DecodeBackend {
     Avx512Bmi2 = 4,
 }
 
+/// The decode path [decode_payload_into] actually takes on this machine. `Neon`, `Avx2Bmi2` and
+/// `Avx512Bmi2` stay in the ABI for future kernels but are not reported until one exists: there is
+/// no NEON or AVX decode code today, so reporting them would misstate what runs.
 pub fn best_decode_backend() -> DecodeBackend {
     #[cfg(target_arch = "x86_64")]
     {
         if std::arch::is_x86_feature_detected!("bmi2") {
-            if std::arch::is_x86_feature_detected!("avx512f") {
-                return DecodeBackend::Avx512Bmi2;
-            }
-            if std::arch::is_x86_feature_detected!("avx2") {
-                return DecodeBackend::Avx2Bmi2;
-            }
             return DecodeBackend::Bmi2;
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    {
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            return DecodeBackend::Neon;
         }
     }
 
@@ -466,7 +463,7 @@ pub fn decode_payload(
     signs: &[u8],
 ) -> Result<Vec<i8>, BitcosError> {
     validate_payload(element_count, presence, signs)?;
-    let mut output = vec![0i8; element_count as usize];
+    let mut output = vec![0i8; to_usize(element_count)?];
     decode_payload_into(element_count, presence, signs, &mut output)?;
     Ok(output)
 }
@@ -478,7 +475,7 @@ pub fn decode_payload_into(
     output: &mut [i8],
 ) -> Result<(), BitcosError> {
     validate_payload(element_count, presence, signs)?;
-    if output.len() < element_count as usize {
+    if (output.len() as u64) < element_count {
         return Err(BitcosError::BufferTooSmall);
     }
 
@@ -500,7 +497,7 @@ pub fn dot_i8_payload(
     activations: &[i8],
 ) -> Result<i64, BitcosError> {
     validate_payload(element_count, presence, signs)?;
-    if activations.len() != element_count as usize {
+    if activations.len() as u64 != element_count {
         return Err(BitcosError::ShapeMismatch {
             expected: element_count,
             actual: activations.len(),
@@ -581,12 +578,14 @@ unsafe fn decode_payload_bmi2(
 }
 
 fn validate_payload(element_count: u64, presence: &[u8], signs: &[u8]) -> Result<(), BitcosError> {
-    let expected_presence = (element_count as usize).div_ceil(8);
+    // Checked: on a 32-bit target a truncating cast would let a payload claim 2^32+8 elements
+    // while describing 8, and decoding would then index past its output.
+    let expected_presence = to_usize(element_count)?.div_ceil(8);
     if presence.len() != expected_presence {
         return Err(BitcosError::InvalidContainer("presence length mismatch"));
     }
     let nonzero = count_bits(presence, element_count);
-    let expected_signs = (nonzero as usize).div_ceil(8);
+    let expected_signs = to_usize(nonzero)?.div_ceil(8);
     if signs.len() != expected_signs {
         return Err(BitcosError::InvalidContainer("sign length mismatch"));
     }
@@ -636,6 +635,12 @@ fn read_bits_u64(bytes: &[u8], bit_offset: u64) -> u64 {
         }
     }
     (window >> shift) as u64
+}
+
+/// A u64 read from untrusted bytes, as an in-memory size or offset on this target.
+fn to_usize(value: u64) -> Result<usize, BitcosError> {
+    usize::try_from(value)
+        .map_err(|_| BitcosError::InvalidContainer("value exceeds addressable memory"))
 }
 
 fn checked_shape_product(shape: &[u64]) -> Result<u64, BitcosError> {
@@ -849,14 +854,36 @@ mod tests {
     }
 
     #[test]
-    fn backend_detection_always_returns_a_supported_tier() {
+    fn backend_detection_reports_only_implemented_decode_paths() {
         assert!(matches!(
             best_decode_backend(),
-            DecodeBackend::Scalar
-                | DecodeBackend::Neon
-                | DecodeBackend::Bmi2
-                | DecodeBackend::Avx2Bmi2
-                | DecodeBackend::Avx512Bmi2
+            DecodeBackend::Scalar | DecodeBackend::Bmi2
         ));
+    }
+
+    #[test]
+    fn tensor_count_larger_than_the_directory_is_rejected_before_allocating() {
+        let mut header = Vec::new();
+        header.extend_from_slice(&BITCOS_MAGIC);
+        write_u16(&mut header, BITCOS_VERSION);
+        write_u16(&mut header, 0);
+        write_u32(&mut header, u32::MAX);
+        write_u32(&mut header, 0);
+        write_u64(&mut header, HEADER_LEN as u64);
+        write_u64(&mut header, HEADER_LEN as u64);
+        assert_eq!(header.len(), HEADER_LEN);
+        assert_eq!(
+            BitcosContainer::parse(&header).unwrap_err(),
+            BitcosError::InvalidContainer("tensor count exceeds directory capacity")
+        );
+    }
+
+    #[test]
+    fn sizes_beyond_this_target_are_refused_not_truncated() {
+        assert_eq!(to_usize(8).unwrap(), 8);
+        if usize::BITS < 64 {
+            assert!(to_usize(u64::MAX).is_err());
+            assert!(decode_payload((1u64 << 32) + 8, &[0u8], &[]).is_err());
+        }
     }
 }

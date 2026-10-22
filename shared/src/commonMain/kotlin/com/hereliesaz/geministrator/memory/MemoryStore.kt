@@ -86,15 +86,22 @@ class SettingsMemoryStore(
             val current = loadUnlocked()
             if (current.revision != expectedRevision) return@withLock false
             val next = current.applyMutation(mutation, requireNotNull(ids))
-            if (logSize + 1 >= compactEvery) {
-                writeCompacted(next)
-            } else {
-                settings.putString(
-                    logKey(logSize),
-                    json.encodeToString(MemoryLogEntry.serializer(), MemoryLogEntry(next.revision, mutation)),
-                )
-                logSize += 1
-                settings.putInt(logCountKey, logSize)
+            try {
+                if (logSize + 1 >= compactEvery) {
+                    writeCompacted(next)
+                } else {
+                    settings.putString(
+                        logKey(logSize),
+                        json.encodeToString(MemoryLogEntry.serializer(), MemoryLogEntry(next.revision, mutation)),
+                    )
+                    logSize += 1
+                    settings.putInt(logCountKey, logSize)
+                }
+            } catch (failure: Throwable) {
+                // The index already holds the new IDs; reload both from what was persisted on next use.
+                cached = null
+                ids = null
+                throw failure
             }
             cached = next
             true
@@ -103,7 +110,13 @@ class SettingsMemoryStore(
     override suspend fun replace(snapshot: MemorySnapshot) {
         mutex.withLock {
             loadUnlocked()
-            writeCompacted(snapshot)
+            try {
+                writeCompacted(snapshot)
+            } catch (failure: Throwable) {
+                cached = null
+                ids = null
+                throw failure
+            }
             cached = snapshot
             ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
@@ -201,6 +214,50 @@ internal class MemoryIdIndex(snapshot: MemorySnapshot, val allowExternalReferenc
     val sections: MutableSet<MemorySectionId> = snapshot.sections.mapTo(hashSetOf()) { it.id }
     val nodes: MutableSet<MemoryNodeId> = snapshot.nodes.mapTo(hashSetOf()) { it.id }
     val edges: MutableSet<MemoryEdgeId> = snapshot.edges.mapTo(hashSetOf()) { it.id }
+}
+
+/**
+ * Checks a whole graph about to replace a store's (an import): IDs unique per kind, every reference
+ * resolvable within the graph or [external] (records the store may cite but does not hold, such as a
+ * lineage's ancestors), and queue entries pointing at the graph's own episodes with unique sequences.
+ * Throws [IllegalArgumentException] naming the first problem.
+ */
+internal fun MemorySnapshot.requireConsistentGraph(external: MemoryIdIndex? = null) {
+    fun <T> requireUnique(kind: String, values: List<T>, label: (T) -> String) {
+        val seen = hashSetOf<T>()
+        values.forEach { value -> require(seen.add(value)) { "Memory $kind ${label(value)} appears more than once" } }
+    }
+    requireUnique("episode", episodes.map { it.id }) { it.value }
+    requireUnique("section", sections.map { it.id }) { it.value }
+    requireUnique("node", nodes.map { it.id }) { it.value }
+    requireUnique("edge", edges.map { it.id }) { it.value }
+    requireUnique("queue entry", queue.map { it.id }) { it.value }
+    requireUnique("queue sequence", queue.map { it.sequence }) { it.toString() }
+
+    val episodeIds = episodes.mapTo(hashSetOf()) { it.id }
+    val sectionIds = sections.mapTo(hashSetOf()) { it.id }
+    val nodeIds = nodes.mapTo(hashSetOf()) { it.id }
+    fun episodeKnown(id: MemoryEpisodeId) = id in episodeIds || external?.episodes?.contains(id) == true
+    fun sectionKnown(id: MemorySectionId) = id in sectionIds || external?.sections?.contains(id) == true
+    fun nodeKnown(id: MemoryNodeId) = id in nodeIds || external?.nodes?.contains(id) == true
+
+    sections.forEach { section ->
+        require(episodeKnown(section.episodeId)) {
+            "Memory section ${section.id.value} references missing episode ${section.episodeId.value}"
+        }
+    }
+    nodes.forEach { node ->
+        require(node.sourceEpisodeIds.all(::episodeKnown)) { "Memory node ${node.id.value} references a missing episode" }
+        require(node.sourceSectionIds.all(::sectionKnown)) { "Memory node ${node.id.value} references a missing section" }
+    }
+    edges.forEach { edge ->
+        require(nodeKnown(edge.from) && nodeKnown(edge.to)) { "Memory edge ${edge.id.value} references a missing node" }
+    }
+    queue.forEach { entry ->
+        require(entry.episodeId in episodeIds) {
+            "Memory queue entry ${entry.id.value} references missing episode ${entry.episodeId.value}"
+        }
+    }
 }
 
 private fun MemorySnapshot.applyMutation(mutation: MemoryStoreMutation): MemorySnapshot =
