@@ -44,6 +44,20 @@ class CreatureRigMappingTest {
     }
 
     @Test
+    fun aRigIsReachableByItsOwnName() {
+        CreatureRigMapping.NAMED_ONLY_SLUGS.forEach { slug ->
+            assertEquals(slug, CreatureRigMapping.slugFor(slug), slug)
+            assertEquals(slug, CreatureRigMapping.slugFor(slug.replace('-', ' ')), slug)
+            assertEquals(slug, CreatureRigMapping.slugFor(slug.replace('-', '_').uppercase()), slug)
+        }
+        assertEquals("creature", CreatureRigMapping.slugFor("Creature"))
+        // A rig that is mapped by role kind still resolves by its file name too.
+        assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("data-miner-sheet-3-variant"))
+        // The UX designer's small sample rig stays unmapped even though a rig of that name exists.
+        assertNull(CreatureRigMapping.slugFor("ux-designer"))
+    }
+
+    @Test
     fun galleryCoversEverySlug() {
         assertEquals(CreatureRigMapping.allSlugs, creatureRigGalleryEntries.mapNotNull(CreatureRigMapping::slugFor).toSet())
     }
