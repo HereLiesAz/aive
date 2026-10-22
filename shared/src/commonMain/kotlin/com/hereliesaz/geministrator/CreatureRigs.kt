@@ -46,12 +46,31 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
  *    personas into one shared body, so "Brand Strategist" is not drawn as the content strategist.
  * 4. Unknown/custom roles ([NodeCreatureRoleKind.Generic]) get one of `generic-01..06`, chosen by
  *    a stable hash of the normalized label, so the same custom role always looks the same.
- * 5. Anything else (no sheet was sliced yet: orchestrator, researcher, QA, ...; UX designer, whose
+ * 5. A label that is a rig's own name ("creature", "data-miner-sheet-1-variant-1", also written
+ *    with spaces or underscores) gets that rig, so every rig is reachable by its file name; this
+ *    covers the rigs in [NAMED_ONLY_SLUGS] that no role kind maps to.
+ * 6. Anything else (no sheet was sliced yet: orchestrator, researcher, QA, ...; UX designer, whose
  *    hand-transcribed sample rig draws much smaller than its bespoke surface) returns null and
  *    stays on the existing sprite/procedural rendering.
  */
 internal object CreatureRigMapping {
     val GENERIC_SLUGS = listOf("generic-01", "generic-02", "generic-03", "generic-04", "generic-05", "generic-06")
+
+    /**
+     * Rigs no role kind maps to (older sheets/variants superseded in [bySlugKind], and the
+     * unclassified `creature`). Their file name is the role label that selects them. `ux-designer`
+     * is deliberately absent: its hand-built sample rig draws small, so UX designers keep the
+     * bespoke surface (see step 6 above).
+     */
+    val NAMED_ONLY_SLUGS = listOf(
+        "creature",
+        "data-miner-sheet-1-variant-1",
+        "data-miner-sheet-1-variant-2",
+        "idea-catalyst-1",
+        "knowledge-keeper-sheet-1-variant",
+        "optimizer-sheet-2-variant",
+        "scheduler-sheet-2-variant",
+    )
 
     val bySlugKind: Map<NodeCreatureRoleKind, String> = mapOf(
         NodeCreatureRoleKind.Architect to "architect", // 005
@@ -113,6 +132,7 @@ internal object CreatureRigMapping {
         val normalized = roleLabel.trim().lowercase()
         if (normalized.isEmpty()) return null
         byRoleName[normalized]?.let { return it }
+        normalized.replace(Regex("[\\s_]+"), "-").takeIf { it in allSlugs }?.let { return it }
         val character = MascotCharacterCatalog.forRole(roleLabel)
         val kind = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
         if (kind == NodeCreatureRoleKind.Generic) return genericSlugFor(normalized)
@@ -135,7 +155,7 @@ internal object CreatureRigMapping {
     fun phaseOffset(seed: String): Float = stableHash(seed.trim().lowercase()).mod(997) / 997f
 
     /** All slugs the mapping can produce. */
-    val allSlugs: Set<String> get() = bySlugKind.values.toSet() + GENERIC_SLUGS
+    val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS
 
     private fun stableHash(value: String): Int {
         var hash = 0x45D9F3B
