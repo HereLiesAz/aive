@@ -2,7 +2,7 @@
 # Retain the 5.13 line for Android API 26; newer JGit lines need a device-tested migration.
 # JGit 7.8 reads loose refs through InputStream.readNBytes (Android API 33).
 # Java compilation targets do not backport that API; core-library desugaring is not configured.
-jgit = "5.13.4.202507202350-r"
+jgit = "5.13.5.202508271544-r"
 agp = "9.4.1"
 kotlin = "2.4.21"
 compose = "1.12.2"
