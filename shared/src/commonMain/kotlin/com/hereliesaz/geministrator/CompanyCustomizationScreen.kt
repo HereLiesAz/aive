@@ -301,11 +301,11 @@ internal fun CustomCompanyProviderScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.swarm_swarm), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.swarm_swarm), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             stringResource(Res.string.swarm_these_are_aive_s_semantic_orchestration),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -367,7 +367,7 @@ internal fun CustomCompanyProviderScreen(
             Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),
                 style = AzphaltType.eyebrow,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             OutlinedTextField(
                 value = roleNameDraft,
@@ -466,7 +466,7 @@ internal fun CustomCompanyProviderScreen(
                     Text(
                         stringResource(Res.string.swarm_the_role_runs_as_an_ai),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                     CompanyProviderChoiceRow(
                         selectedProviderId = roleProviderDraft,
@@ -490,7 +490,7 @@ internal fun CustomCompanyProviderScreen(
                     Text(
                         stringResource(Res.string.swarm_the_workflow_receives_the_role_task),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
                 is RoleExecutionSource.Script -> {
@@ -518,7 +518,7 @@ internal fun CustomCompanyProviderScreen(
                         Text(
                             stringResource(Res.string.swarm_python_runs_through_a_github_actions),
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                     }
 
@@ -535,7 +535,7 @@ internal fun CustomCompanyProviderScreen(
                             Text(
                                 stringResource(Res.string.swarm_local_javascript_receives_a_frozen_aive),
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                         }
                         is ScriptRunner.GitHubActions -> {
@@ -546,7 +546,7 @@ internal fun CustomCompanyProviderScreen(
                             Text(
                                 stringResource(Res.string.swarm_the_runner_receives_aive_context_aive),
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                         }
                     }
@@ -557,7 +557,7 @@ internal fun CustomCompanyProviderScreen(
                 Text(
                     stringResource(Res.string.swarm_complete_the_execution_source_fields_before),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             }
 
@@ -565,7 +565,7 @@ internal fun CustomCompanyProviderScreen(
             Text(
                 stringResource(Res.string.swarm_attach_data_and_visual_logic_without),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(
@@ -662,7 +662,7 @@ internal fun CustomCompanyProviderScreen(
                 Text(
                     stringResource(Res.string.swarm_surface_aliases_must_be_unique_and),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             }
 
@@ -756,7 +756,7 @@ internal fun CustomCompanyProviderScreen(
             Text(
                 stringResource(Res.string.swarm_no_orchestration_roles_are_active_add),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
         }
         draftRoles.forEachIndexed { index, role ->
@@ -820,7 +820,7 @@ internal fun CustomCompanyProviderScreen(
                             )
                         }
                         if (role.executionSource is RoleExecutionSource.Agent) {
-                            Text(stringResource(Res.string.swarm_provider_routing), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            Text(stringResource(Res.string.swarm_provider_routing), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                             CompanyProviderChoiceRow(
                                 selectedProviderId = assigned,
                                 connectedProviderIds = connectedProviderIds,
@@ -1131,7 +1131,7 @@ private fun CompanySpreadsheetSurfaceFields(
             Text(
                 stringResource(Res.string.swarm_public_exportable_google_sheets_are_fetched),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
         }
     }
@@ -1284,7 +1284,7 @@ private fun CompanyFlowchartSurfaceFields(
         Text(
             failure.message ?: stringResource(Res.string.swarm_flowchart_could_not_be_parsed),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
     }
 }
@@ -1454,7 +1454,7 @@ private fun RoleExecutionSource.companyExecutionLabel(providerLabel: String): St
 
 @Composable
 private fun CompanySectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }
 
 @Composable

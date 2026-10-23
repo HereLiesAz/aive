@@ -158,12 +158,12 @@ internal fun MemoryLayerScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.memory_memory), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.memory_memory), style = AzphaltType.hero, color = azphaltOnSurface())
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             return@Column
         }
@@ -187,7 +187,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         stringResource(Res.string.memory_every_finished_session_is_banked_here) +
             stringResource(Res.string.memory_summaries_categories_and_associations_that_agents),
         style = AzphaltType.body,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
     )
     // Raw history (full session context) is kept until the user says otherwise.
     val rawUsage by controller.rawUsage.collectAsState()
@@ -196,7 +196,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
             (if (rawUsage.purgedEpisodes > 0) stringResource(Res.string.memory_purged_by_your_retention_setting, rawUsage.purgedEpisodes) else "") +
             stringResource(Res.string.memory_consolidated_memory_never_depends_on_it),
         style = AzphaltType.body,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
     )
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(
@@ -220,9 +220,9 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
     val knownBanks by controller.knownBanks.collectAsState()
     val selectedBank by controller.selectedBank.collectAsState()
     if (knownBanks.isEmpty()) {
-        Text(stringResource(Res.string.memory_no_workflow_has_a_memory_bank), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.memory_no_workflow_has_a_memory_bank), style = AzphaltType.body, color = azphaltOnSurface())
     } else {
-        Text(stringResource(Res.string.memory_workflow_memory_bank), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.memory_workflow_memory_bank), style = AzphaltType.body, color = azphaltOnSurface())
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             knownBanks.forEach { bank ->
                 AzphaltPill(
@@ -332,7 +332,7 @@ private fun StageEngineEditor(
                     Text(
                         stringResource(Res.string.memory_no_on_device_memory_models_on),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
                 if (engine.kind == MemoryEngineKind.HostedModel) {
@@ -434,7 +434,7 @@ private fun TuningSection(settings: MemoryLayerSettings, onApply: (com.hereliesa
     field(stringResource(Res.string.memory_changes_per_packet), mutations) { mutations = it }
     field(stringResource(Res.string.memory_similarity_needed_to_condense_0_1), similarity) { similarity = it }
     field(stringResource(Res.string.memory_memories_condensed_together), batch) { batch = it }
-    error?.let { Text(it, style = AzphaltType.body, color = Azphalt.currentGround.onPage) }
+    error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(stringResource(Res.string.memory_apply_tuning), "memory-tuning-apply", onClick = {
             val next = runCatching {
@@ -465,7 +465,7 @@ private fun ModelsSection(controller: MemoryLayerController) {
         Text(
             stringResource(Res.string.memory_this_platform_has_no_on_device),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         return
     }
@@ -474,7 +474,7 @@ private fun ModelsSection(controller: MemoryLayerController) {
     Text(
         stringResource(Res.string.memory_needed_only_for_stages_set_to),
         style = AzphaltType.body,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
     )
     models.forEach { model ->
         AzphaltRecord(
@@ -598,7 +598,7 @@ private fun DataSection(controller: MemoryLayerController) {
         Text(
             stringResource(Res.string.memory_this_deletes_every_stored_memory_on),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(stringResource(Res.string.memory_forget_everything), "memory-clear-confirm", onClick = {
@@ -611,7 +611,7 @@ private fun DataSection(controller: MemoryLayerController) {
             AzphaltPill(stringResource(Res.string.memory_keep_it), "memory-clear-cancel", onClick = { clearConfirm = false })
         }
     }
-    message?.let { Text(it, style = AzphaltType.body, color = Azphalt.currentGround.onPage) }
+    message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
 }
 
 /** Summarizer cost, and one memory's summary-tree levels, pair summaries and explicit history. */
@@ -773,12 +773,12 @@ private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryL
 
 @Composable
 private fun MemoryBody(text: String) {
-    Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+    Text(text, style = AzphaltType.body, color = azphaltOnSurface())
 }
 
 @Composable
 private fun MemorySectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }
 
 private const val RECENT_EPISODES = 8

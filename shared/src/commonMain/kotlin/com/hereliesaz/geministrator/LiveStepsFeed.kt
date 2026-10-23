@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -137,7 +138,7 @@ fun LiveStepsFeed(
     maxRows: Int,
     modifier: Modifier = Modifier,
     rowHeight: Dp = 22.dp,
-    color: Color = Color.White,
+    color: Color = Color.Unspecified,
 ) {
     val rowHeightPx = with(LocalDensity.current) { rowHeight.toPx() }
     Box(modifier.fillMaxWidth().height(rowHeight * maxRows)) {
@@ -154,7 +155,7 @@ fun LiveStepsFeed(
                 }
                 Text(
                     text = row.text,
-                    color = color,
+                    color = if (color.isSpecified) color else azphaltOnSurface(),
                     style = AzphaltType.body,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -201,7 +202,7 @@ internal fun LaunchStepsOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(LAUNCH_SCRIM)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -212,14 +213,20 @@ internal fun LaunchStepsOverlay(
             .padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(modifier = Modifier.widthIn(max = 520.dp)) {
-            Text(
-                stringResource(Res.string.steps_starting_run),
-                style = AzphaltType.eyebrow,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 12.dp),
-            )
-            LiveStepsFeed(rows = rows, maxRows = maxRows, color = Color.White)
+        // The text sits on the scrim, so it is the exact opposite of the scrim (white), not a literal.
+        AzphaltSurface(LAUNCH_SCRIM) {
+            Column(modifier = Modifier.widthIn(max = 520.dp)) {
+                Text(
+                    stringResource(Res.string.steps_starting_run),
+                    style = AzphaltType.eyebrow,
+                    color = azphaltOnSurface(),
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                LiveStepsFeed(rows = rows, maxRows = maxRows)
+            }
         }
     }
 }
+
+/** The dim layer behind the launch overlay; the overlay text is derived from it. */
+private val LAUNCH_SCRIM = Color.Black.copy(alpha = 0.55f)

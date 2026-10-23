@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -289,8 +290,10 @@ fun ControlRoom(
                 ModalBottomSheet(
                     onDismissRequest = { onTaskSelected(taskId) },
                     containerColor = Azphalt.Ink,
-                    contentColor = Azphalt.White,
+                    contentColor = Azphalt.Ink.onOpposite(),
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
                 ) {
+                    AzphaltThemedSurface(Azphalt.Ink) {
                     TechnicalInspector(
                         selectedTaskId = taskId,
                         liveWorkflow = liveWorkflow,
@@ -302,6 +305,7 @@ fun ControlRoom(
                             .fillMaxWidth()
                             .fillMaxHeight(if (compact) 0.72f else 0.62f),
                     )
+                    }
                 }
             }
         }
@@ -321,8 +325,8 @@ private fun PillNavigation(
         modifier = modifier.padding(start = 14.dp, top = 22.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
-        Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = azphaltOnSurface())
+        Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Spacer(Modifier.height(12.dp))
         destinations.forEachIndexed { index, item ->
             AzphaltPill(
@@ -347,7 +351,7 @@ private fun PillNavigation(
         Text(
             runtimeStatusLabel(runtimeState),
             style = AzphaltType.eyebrow,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
             modifier = Modifier.azphaltLiveRegion(),
         )
     }
@@ -361,8 +365,8 @@ private fun CompactHeader() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
-            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
+            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         }
         AzphaltPill(stringResource(Res.string.nav_ground), "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
     }

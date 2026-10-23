@@ -87,7 +87,7 @@ internal fun ErrorDetailsToggle(raw: String?, seed: String, modifier: Modifier =
             Text(
                 stringResource(Res.string.error_details_label) + ": " + text,
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
         }
     }

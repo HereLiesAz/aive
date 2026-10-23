@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -277,19 +278,19 @@ internal fun AzphaltStoreScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             snapshot?.repository?.name?.let { stringResource(Res.string.store_workflows_roles_models_and_llms, it) }
                 ?: stringResource(Res.string.store_verified_workflows_roles_models_and_llms),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         if (service == null) {
             Text(
                 stringResource(Res.string.store_store_networking_is_unavailable_on_this),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             return@Column
         }
@@ -302,10 +303,10 @@ internal fun AzphaltStoreScreen(
             )
             snapshot?.let { loaded ->
                 val count = loaded.installed.size + loaded.installedModels.size + loaded.installedLlms.size
-                Text(stringResource(Res.string.store_installed, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.store_installed, count), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
-                Text(pluralStringResource(Res.plurals.store_update_count, count, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(pluralStringResource(Res.plurals.store_update_count, count, count), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             }
         }
 
@@ -357,7 +358,7 @@ internal fun AzphaltStoreScreen(
         }
 
         if (!loading && visiblePackages.isEmpty()) {
-            Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = azphaltOnSurface())
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
@@ -460,7 +461,7 @@ internal fun AzphaltStoreScreen(
                 well = if (selected) {
                     {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            Text(item.id, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                             Text(
                                 buildString {
                                     append(item.kind)
@@ -474,14 +475,14 @@ internal fun AzphaltStoreScreen(
                                     append(item.byteSize?.let(::formatByteSize) ?: stringResource(Res.string.store_size_not_published))
                                 },
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                             if (modelAsset) {
                                 if (isRevoked) {
                                     Text(
                                         stringResource(Res.string.store_a_repository_revocation_applies_to_this),
                                         style = AzphaltType.body,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                 } else {
                                     AzphaltPill(
@@ -551,7 +552,7 @@ internal fun AzphaltStoreScreen(
                                 Text(
                                     stringResource(Res.string.store_a_repository_revocation_applies_to_this_2),
                                     style = AzphaltType.body,
-                                    color = Azphalt.currentGround.onPage,
+                                    color = azphaltOnSurface(),
                                 )
                             } else {
                                 AzphaltPill(
@@ -768,7 +769,7 @@ private fun StoreLlmRecord(
         well = if (selected) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(item.id, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     endpoint?.let {
                         val target = listOfNotNull(
                             it.defaultModel?.takeIf(String::isNotBlank),
@@ -781,7 +782,7 @@ private fun StoreLlmRecord(
                                 "$target. Aive calls this endpoint directly."
                             },
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                     }
                     llm?.dataHandling?.let { handling ->
@@ -791,7 +792,7 @@ private fun StoreLlmRecord(
                         revoked -> Text(
                             stringResource(Res.string.store_a_repository_revocation_applies_to_this_3),
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                         installed == null -> AzphaltPill(
                             label = stringResource(Res.string.store_inspect_install),
@@ -852,7 +853,7 @@ private fun PreparedStoreLlmPanel(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(verification.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
                 handling?.let {
                     AzphaltNote(
                         seed = "azphalt-llm-prepared-data",
@@ -883,7 +884,7 @@ private fun PreparedStoreLlmPanel(
                 Text(
                     stringResource(Res.string.store_aive_calls_this_model_directly_the),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 if (!verification.trusted) {
                     ConfirmationRow(
@@ -923,7 +924,7 @@ private fun PreparedStoreLlmPanel(
                             stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -962,7 +963,7 @@ private fun PreparedAzphaltModelInstallPanel(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(verification.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
                 prepared.assets.forEachIndexed { index, asset ->
                     AzphaltNote(
                         seed = "azphalt-model-asset-$index",
@@ -1016,7 +1017,7 @@ private fun PreparedAzphaltModelInstallPanel(
                             stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -1051,10 +1052,10 @@ private fun PreparedAzphaltInstall(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(plan.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(plan.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
 
                 if (plan.requestedHostPermissions.isNotEmpty()) {
-                    Text(stringResource(Res.string.store_host_permission_requests), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_host_permission_requests), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     plan.requestedHostPermissions.sorted().forEach { permission ->
                         val supported = permission !in plan.unsupportedHostPermissions
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1064,11 +1065,16 @@ private fun PreparedAzphaltInstall(
                                     { checked -> onPermissionChanged(permission, checked) }
                                 } else null,
                                 enabled = supported,
+                                colors = CheckboxDefaults.colors(
+                                    disabledCheckedColor = azphaltMutedOnSurface(),
+                                    disabledUncheckedColor = azphaltMutedOnSurface(),
+                                    disabledIndeterminateColor = azphaltMutedOnSurface(),
+                                ),
                             )
                             Text(
                                 if (supported) permission else stringResource(Res.string.store_unsupported_denied, permission),
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                         }
                     }
@@ -1096,7 +1102,7 @@ private fun PreparedAzphaltInstall(
                 }
 
                 if (prepared.dependencies.isNotEmpty()) {
-                    Text(stringResource(Res.string.store_dependencies), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_dependencies), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     prepared.dependencies.forEach { dependency ->
                         AzphaltNote(
                             seed = "azphalt-dependency-${dependency.dependency.id}",
@@ -1137,7 +1143,7 @@ private fun PreparedAzphaltInstall(
                             else -> stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -1153,7 +1159,7 @@ private fun ConfirmationRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Text(text, style = AzphaltType.body, color = azphaltOnSurface())
     }
 }
 

@@ -150,8 +150,10 @@ internal fun EmptyTechnicalInspector(message: String, modifier: Modifier = Modif
         modifier = modifier.background(Azphalt.Ink).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(Res.string.runs_inspector), style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-        Text(message, style = AzphaltType.body, color = Azphalt.White)
+        AzphaltSurface(Azphalt.Ink) {
+            Text(stringResource(Res.string.runs_inspector), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+            Text(message, style = AzphaltType.body, color = azphaltOnSurface())
+        }
     }
 }
 
@@ -171,7 +173,7 @@ internal fun CompanyScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.swarm_title), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.swarm_title), style = AzphaltType.hero, color = azphaltOnSurface())
         AzphaltPill(
             label = if (showRoleForm) stringResource(Res.string.common_cancel) else stringResource(Res.string.swarm_add_role),
             seed = "add-role-toggle",
@@ -346,7 +348,7 @@ internal fun InboxScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
         // Reject plan / Stop workflow are irreversible, so each asks first: (task id, is stop).
         var confirming by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
         confirming?.let { (confirmTaskId, isStop) ->
@@ -367,7 +369,7 @@ internal fun InboxScreen(
                 it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated
             }
             if (pending.isEmpty()) {
-                Text(stringResource(Res.string.runs_no_pending_decisions), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.runs_no_pending_decisions), style = AzphaltType.body, color = azphaltOnSurface())
             } else {
                 pending.forEach { taskRun ->
                     val task = liveWorkflow.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }
@@ -411,7 +413,7 @@ internal fun InboxScreen(
                         well = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (taskRun.artifacts.isNotEmpty()) {
-                                    Text(stringResource(Res.string.runs_evidence), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                                    Text(stringResource(Res.string.runs_evidence), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                                     taskRun.artifacts.forEach { artifact ->
                                         val ref = artifact.uri
                                             ?: artifact.textContent?.take(80)?.let { if (artifact.textContent.length > 80) "$it…" else it }
@@ -478,22 +480,22 @@ internal fun RunsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.runs_runs), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.runs_runs), style = AzphaltType.hero, color = azphaltOnSurface())
         val entries = history
         if (entries == null) {
             Text(
                 stringResource(Res.string.runs_loading),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
                 modifier = Modifier.azphaltLiveRegion(),
             )
         } else if (entries.isEmpty()) {
-            Text(stringResource(Res.string.runs_no_projects_yet), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.runs_no_projects_yet), style = AzphaltType.body, color = azphaltOnSurface())
         } else {
             entries.forEach { (project, runs) ->
                 SectionLabel(project.name)
                 if (runs.isEmpty()) {
-                    Text(stringResource(Res.string.runs_no_runs), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.runs_no_runs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 } else {
                     runs.forEach { run ->
                         val isActive = run.id.value == liveRunId
@@ -606,7 +608,7 @@ internal fun WorkflowTemplateScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("WORKFLOWS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("WORKFLOWS", style = AzphaltType.hero, color = azphaltOnSurface())
         if (liveWorkflow != null) {
             val definition = liveWorkflow.definition
             val concurrency = definition.concurrencyPolicy
@@ -763,7 +765,7 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("ARTIFACTS", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("ARTIFACTS", style = AzphaltType.hero, color = azphaltOnSurface())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill("Browse", "artifact-browse", selected = true, onClick = {})
             AzphaltPill("Search", "artifact-search", onClick = {})
@@ -773,7 +775,7 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
             Text(
                 if (liveWorkflow != null) "No artifacts produced yet." else "No run is loaded.",
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
         }
         displayTree.forEachIndexed { rootIndex, entry ->
@@ -802,6 +804,8 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             entry.children.forEachIndexed { childIndex, child ->
                                 val childSelected = previewId == child.id
+                                val childBackground = if (childSelected) Azphalt.Yellow else Azphalt.hue(child.id)
+                                val childContent = childBackground.onOpposite()
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -813,20 +817,22 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
                                             selected = childSelected
                                         }
                                         .clip(RoundedCornerShape(999.dp))
-                                        .background(if (childSelected) Azphalt.Yellow else Azphalt.hue(child.id))
+                                        .background(childBackground)
                                         .clickable(role = Role.Button) { previewId = if (childSelected) null else child.id }
                                         .padding(horizontal = 14.dp, vertical = 9.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Text(child.name.uppercase(), style = AzphaltType.capsule, color = if (childSelected) Azphalt.Ink else Azphalt.hue(child.id).contrastingText)
-                                    Text(child.detail.uppercase(), style = AzphaltType.endCap, color = if (childSelected) Azphalt.Ink else Azphalt.hue(child.id).contrastingText)
+                                    Text(child.name.uppercase(), style = AzphaltType.capsule, color = childContent)
+                                    Text(child.detail.uppercase(), style = AzphaltType.endCap, color = childContent)
                                 }
                                 AzphaltChildBand(visible = childSelected) {
                                     Box(
                                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Azphalt.Ink).padding(12.dp),
                                     ) {
-                                        Text("${child.name}\n${child.detail}\nsource: ${entry.name}\nstatus: available", style = AzphaltType.body, color = Azphalt.White)
+                                        AzphaltSurface(Azphalt.Ink) {
+                                            Text("${child.name}\n${child.detail}\nsource: ${entry.name}\nstatus: available", style = AzphaltType.body, color = azphaltOnSurface())
+                                        }
                                     }
                                 }
                             }
@@ -840,7 +846,7 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
 
 @Composable
 private fun SectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }
 
 private fun RoleDefinition.department(): String = when (id.value) {

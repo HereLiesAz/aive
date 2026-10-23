@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -132,7 +131,7 @@ internal fun LaunchLineagePicker(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(Res.string.lineage_lineage), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.lineage_lineage), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LaunchLineageMode.entries.forEach { mode ->
                 AzphaltPill(
@@ -148,7 +147,7 @@ internal fun LaunchLineagePicker(
             Text(
                 stringResource(Res.string.lineage_starts_a_new_line_of_work),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             return@Column
         }
@@ -159,11 +158,11 @@ internal fun LaunchLineagePicker(
                 stringResource(Res.string.lineage_the_new_run_reads_every_chosen)
             },
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         when {
-            runs == null -> Text(stringResource(Res.string.lineage_loading_runs), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
-            runs.isEmpty() -> Text(stringResource(Res.string.lineage_no_earlier_runs_yet), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            runs == null -> Text(stringResource(Res.string.lineage_loading_runs), style = AzphaltType.body, color = azphaltOnSurface())
+            runs.isEmpty() -> Text(stringResource(Res.string.lineage_no_earlier_runs_yet), style = AzphaltType.body, color = azphaltOnSurface())
             else -> runs.forEach { run ->
                 val order = state.selected.indexOf(run.id)
                 AzphaltRecord(
@@ -202,7 +201,7 @@ internal fun ContinueRunPanel(
         Text(
             stringResource(Res.string.lineage_a_new_run_that_reads_this),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         OutlinedTextField(
             value = objective,
@@ -226,6 +225,6 @@ internal fun ContinueRunPanel(
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        error?.let { Text(it, style = AzphaltType.body, color = MaterialTheme.colorScheme.error) }
+        error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
     }
 }

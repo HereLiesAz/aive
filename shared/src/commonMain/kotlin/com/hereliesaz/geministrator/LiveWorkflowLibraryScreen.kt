@@ -266,11 +266,11 @@ internal fun LiveWorkflowLibraryScreen(
                     },
                 )
             } else if (tab == WorkflowLibraryTab.Library) {
-                Text(stringResource(Res.string.library_workflows), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.library_workflows), style = AzphaltType.hero, color = azphaltOnSurface())
                 Text(
                     stringResource(Res.string.library_installed_workflows_saved_compositions_and_reusable),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             }
 
@@ -336,7 +336,7 @@ internal fun LiveWorkflowLibraryScreen(
                     when (tab) {
                         WorkflowLibraryTab.Store -> Unit
                         WorkflowLibraryTab.Library -> when (val loaded = entries) {
-                            null -> Text(stringResource(Res.string.library_loading_workflow_library), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                            null -> Text(stringResource(Res.string.library_loading_workflow_library), style = AzphaltType.body, color = azphaltOnSurface())
                             else -> {
                                 OutlinedTextField(
                                     value = query,
@@ -366,7 +366,7 @@ internal fun LiveWorkflowLibraryScreen(
                                     Text(
                                         stringResource(Res.string.library_no_library_entries_match_this_filter),
                                         style = AzphaltType.body,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                 }
 
@@ -408,7 +408,7 @@ internal fun LiveWorkflowLibraryScreen(
                                         Text(
                                             stringResource(Res.string.library_integration_concurrency, currentDraft.integrationPolicy.name, currentDraft.concurrencyPolicy.maxConcurrentTasks),
                                             style = AzphaltType.body,
-                                            color = Azphalt.White,
+                                            color = azphaltOnSurface(),
                                         )
                                         OutlinedTextField(
                                             value = runObjective,
@@ -470,10 +470,10 @@ internal fun LiveWorkflowLibraryScreen(
                                                         ?.joinToString(prefix = stringResource(Res.string.library_depends_on)) { it.value }
                                                         ?: stringResource(Res.string.library_no_dependencies),
                                                     style = AzphaltType.body,
-                                                    color = Azphalt.White,
+                                                    color = azphaltOnSurface(),
                                                 )
                                                 if (roles.isNotEmpty()) {
-                                                    Text(stringResource(Res.string.library_reassign_role), style = AzphaltType.eyebrow, color = Azphalt.White)
+                                                    Text(stringResource(Res.string.library_reassign_role), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                                                     OutlinedTextField(
                                                         value = roleQuery,
                                                         onValueChange = { roleQuery = it },
@@ -514,7 +514,7 @@ internal fun LiveWorkflowLibraryScreen(
                                                 }
 
                                                 if (executor is TaskExecutor.RoleAgent || task.roleId != null) {
-                                                    Text(stringResource(Res.string.library_expand_role_into_workflow), style = AzphaltType.eyebrow, color = Azphalt.White)
+                                                    Text(stringResource(Res.string.library_expand_role_into_workflow), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                                                     composableWorkflows(entries.orEmpty(), currentDraft, composeQuery).take(10).forEach { candidate ->
                                                         AzphaltPill(
                                                             label = candidate.definition.name,
@@ -549,7 +549,7 @@ internal fun LiveWorkflowLibraryScreen(
                         }
 
                         WorkflowLibraryTab.Combine -> if (currentDraft != null) {
-                            Text(stringResource(Res.string.library_combine_workflows), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+                            Text(stringResource(Res.string.library_combine_workflows), style = AzphaltType.section, color = azphaltOnSurface())
                             OutlinedTextField(
                                 value = composeQuery,
                                 onValueChange = { composeQuery = it },
@@ -592,7 +592,7 @@ internal fun LiveWorkflowLibraryScreen(
                         }
 
                         WorkflowLibraryTab.Save -> if (currentDraft != null && host != null) {
-                            Text(stringResource(Res.string.library_save_composition), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+                            Text(stringResource(Res.string.library_save_composition), style = AzphaltType.section, color = azphaltOnSurface())
                             OutlinedTextField(
                                 value = saveName,
                                 onValueChange = { saveName = it },
@@ -668,8 +668,10 @@ private fun PinnedWorkflowHeader(
             modifier = Modifier.azphaltLiveRegion(),
             verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.xs),
         ) {
-            Text("$kind · $summary".uppercase(), style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-            Text(name, style = AzphaltType.lead, color = Azphalt.White)
+            AzphaltSurface(Azphalt.Ink) {
+                Text("$kind · $summary".uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                Text(name, style = AzphaltType.lead, color = azphaltOnSurface())
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
             AzphaltPill(

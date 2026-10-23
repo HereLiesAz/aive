@@ -122,6 +122,9 @@ internal fun TechnicalInspector(
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
     val identity = role?.name ?: executor.displayName()
+    // Everything in the inspector sits on Ink, so its text, hints and fields take the exact
+    // opposite of Ink from this surface rather than a colour of their own.
+    AzphaltThemedSurface(Azphalt.Ink) {
     Column(
         modifier = modifier
             .background(Azphalt.Ink)
@@ -129,9 +132,9 @@ internal fun TechnicalInspector(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-        Text(identity.uppercase(), style = AzphaltType.section, color = Azphalt.White)
-        Text(task.objective, style = AzphaltType.body, color = Azphalt.White)
+        Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
+        Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
@@ -192,7 +195,7 @@ internal fun TechnicalInspector(
             Text(
                 stringResource(if (providerPlan) Res.string.inspector_hint_approve_plan else Res.string.inspector_hint_approve_task),
                 style = AzphaltType.body,
-                color = Azphalt.White,
+                color = azphaltOnSurface(),
             )
             if (providerPlan) {
                 AzphaltPill(
@@ -212,7 +215,7 @@ internal fun TechnicalInspector(
                 onClick = { onApproveTask(selectedTaskId) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(stringResource(Res.string.inspector_hint_approve_nested), style = AzphaltType.body, color = Azphalt.White)
+            Text(stringResource(Res.string.inspector_hint_approve_nested), style = AzphaltType.body, color = azphaltOnSurface())
         }
         if (taskRun.status == TaskRunStatus.Escalated) {
             AzphaltPill(
@@ -240,6 +243,7 @@ internal fun TechnicalInspector(
                 label = { Text(stringResource(Res.string.inspector_message_agent)) },
                 minLines = 2,
                 enabled = !messageSending,
+                colors = azphaltTextFieldColors(),
                 modifier = Modifier.fillMaxWidth(),
             )
             AzphaltPill(
@@ -298,6 +302,7 @@ internal fun TechnicalInspector(
             } ?: stringResource(Res.string.inspector_any_capable_provider))
         }
     }
+    }
 }
 
 @Composable
@@ -323,7 +328,7 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
     ) {
-        Text(label, style = AzphaltType.eyebrow, color = Azphalt.Yellow)
-        Text(value, style = AzphaltType.body, color = Azphalt.White)
+        Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        Text(value, style = AzphaltType.body, color = azphaltOnSurface())
     }
 }

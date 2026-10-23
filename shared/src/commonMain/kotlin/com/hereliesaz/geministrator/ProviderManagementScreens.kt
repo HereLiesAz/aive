@@ -197,11 +197,11 @@ internal fun CompanyProviderScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text("SWARM", style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             "Assign each swarm role to the provider you want. AUTO lets Aive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         AzphaltPill(
@@ -307,7 +307,7 @@ internal fun CompanyProviderScreen(
                     endCap = if (role.id in activeRoleIds) "Working" else "Available",
                     well = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = azphaltOnSurface())
                             ProviderChoiceRow(
                                 selectedProviderId = assigned,
                                 connectedProviderIds = connectedProviderIds,
@@ -323,7 +323,7 @@ internal fun CompanyProviderScreen(
                                 Text(
                                     "Connect provider API keys in Settings before assigning roles.",
                                     style = AzphaltType.body,
-                                    color = Azphalt.currentGround.onPage,
+                                    color = azphaltOnSurface(),
                                 )
                             }
                         }
@@ -497,12 +497,12 @@ internal fun ProviderSettingsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.settings_settings), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.settings_settings), style = AzphaltType.hero, color = azphaltOnSurface())
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
         Text(
             stringResource(Res.string.settings_connect_as_many_providers_as_you),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         if (connectedProviderIds.isEmpty()) {
@@ -595,7 +595,7 @@ internal fun ProviderSettingsScreen(
                     stringResource(Res.string.settings_hereliesaz_aive_github_issue_tracker_exception) +
                     stringResource(Res.string.settings_device_model_no_workflow_content_or),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             AzphaltPill(
                 if (setting.enabled) stringResource(Res.string.settings_automatic_crash_reports_on) else stringResource(Res.string.settings_automatic_crash_reports_off),
@@ -611,7 +611,7 @@ internal fun ProviderSettingsScreen(
             Text(
                 stringResource(Res.string.settings_remote_access_description),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             AzphaltPill(
                 if (setting.enabled) stringResource(Res.string.settings_remote_access_on) else stringResource(Res.string.settings_remote_access_off),
@@ -632,7 +632,7 @@ internal fun ProviderSettingsScreen(
                     Text(
                         stringResource(Res.string.remote_access_advanced_explain),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                     AzphaltTextField(
                         value = setting.relayUrl,
@@ -646,7 +646,7 @@ internal fun ProviderSettingsScreen(
                 Text(
                     status,
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
@@ -655,12 +655,12 @@ internal fun ProviderSettingsScreen(
                 Text(
                     stringResource(Res.string.settings_remote_access_warning),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 Text(
                     stringResource(Res.string.remote_access_enter_code),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 AzphaltTextField(
                     value = code,
@@ -709,7 +709,7 @@ internal fun ProviderSettingsScreen(
                     stringResource(Res.string.settings_download_and_a_capable_machine, setting.downloadSize) +
                     stringResource(Res.string.settings_whenever_the_local_planner_is_not),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             when (val status = setting.status) {
                 LocalPlannerStatus.NotInstalled -> AzphaltPill(
@@ -759,7 +759,7 @@ internal fun ProviderSettingsScreen(
                     stringResource(Res.string.settings_of_roles_currently_have, setting.releasedRoles, setting.totalRoles) +
                     stringResource(Res.string.settings_unreleased_roles_keep_the_deterministic_implementation),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             when (val status = setting.status) {
                 LocalOrchestrationSpecialistStatus.NotInstalled -> AzphaltPill(
@@ -807,7 +807,7 @@ internal fun ProviderSettingsScreen(
             stringResource(Res.string.settings_connect_this_device_to_the_same) +
                 stringResource(Res.string.settings_every_device_connects_outbound_to_the),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         AzphaltRecord(
             seed = "distributed-compute-status",
@@ -935,7 +935,7 @@ internal fun ProviderSettingsScreen(
             }
         }
         if (distributedComputeState.onlineNodes.isNotEmpty()) {
-            Text(stringResource(Res.string.settings_online_compute_nodes), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.settings_online_compute_nodes), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             distributedComputeState.onlineNodes.sortedBy { it.displayName }.forEach { node ->
                 AzphaltRecord(
                     seed = "compute-node-" + node.nodeId,
@@ -968,7 +968,7 @@ internal fun ProviderSettingsScreen(
             Text(
                 stringResource(Res.string.settings_project_files_use_the_ive_extension),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(
@@ -1014,7 +1014,7 @@ internal fun ProviderSettingsScreen(
                 Text(
                     stringResource(Res.string.settings_no_ive_project_files_detected_yet),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             } else {
                 detectedProjectFiles.forEach { descriptor ->
@@ -1221,7 +1221,7 @@ private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
                 Text(
                     stringResource(Res.string.firstrun_connect_hint),
                     style = AzphaltType.body,
-                    color = Azphalt.White,
+                    color = azphaltOnSurface(),
                 )
             }
         },
@@ -1230,7 +1230,7 @@ private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
 
 @Composable
 private fun ProviderSectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }
 
 private fun RoleDefinition.providerDepartment(): String = when (id.value) {

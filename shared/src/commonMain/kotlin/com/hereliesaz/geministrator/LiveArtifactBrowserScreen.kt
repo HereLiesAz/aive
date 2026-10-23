@@ -82,7 +82,7 @@ internal fun LiveArtifactBrowserScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(Res.string.artifacts_artifacts), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.artifacts_artifacts), style = AzphaltType.hero, color = azphaltOnSurface())
 
         when {
             live == null -> {
@@ -96,7 +96,7 @@ internal fun LiveArtifactBrowserScreen(
                         is ApplicationRuntimeState.Live -> stringResource(Res.string.artifacts_no_live_run)
                     },
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             }
 
@@ -104,7 +104,7 @@ internal fun LiveArtifactBrowserScreen(
                 Text(
                     stringResource(Res.string.artifacts_no_artifacts_have_been_produced_by),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
             }
 
@@ -112,7 +112,7 @@ internal fun LiveArtifactBrowserScreen(
                 Text(
                     pluralStringResource(Res.plurals.artifacts_count_from_run, rows.size, rows.size, live.run.id.value.takeLast(8)),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 OutlinedTextField(
                     value = query,
@@ -126,7 +126,7 @@ internal fun LiveArtifactBrowserScreen(
                     Text(
                         stringResource(Res.string.artifacts_no_artifacts_match, query.trim()),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 } else {
                     filtered.forEach { row ->
@@ -149,13 +149,13 @@ internal fun LiveArtifactBrowserScreen(
                                         Text(
                                             stringResource(Res.string.artifacts_artifact_id, row.artifact.id.value),
                                             style = AzphaltType.eyebrow,
-                                            color = Azphalt.currentGround.onPage,
+                                            color = azphaltOnSurface(),
                                         )
                                         row.artifact.uri?.let { uri ->
-                                            Text(uri, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                                            Text(uri, style = AzphaltType.body, color = azphaltOnSurface())
                                         }
                                         row.artifact.textContent?.takeIf(String::isNotBlank)?.let { text ->
-                                            Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                                            Text(text, style = AzphaltType.body, color = azphaltOnSurface())
                                         }
                                     }
                                 }
