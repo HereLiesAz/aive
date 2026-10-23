@@ -16,16 +16,16 @@ object RepositoryServiceCatalog {
         RepositoryServiceCatalogEntry(
             id = GITHUB_ID,
             displayName = "GitHub",
-            credentialUrl = "https://github.com/settings/tokens",
-            credentialLabel = "GitHub access token",
-            description = "Repository operations and GitHub Actions for linked GitHub projects.",
+            credentialUrl = "https://github.com/settings/tokens/new?scopes=repo,workflow&description=The%20Aive",
+            credentialLabel = "GitHub personal access token",
+            description = "Repository operations and GitHub Actions for linked GitHub projects. Create a classic token with the repo and workflow scopes.",
         ),
         RepositoryServiceCatalogEntry(
             id = GITLAB_ID,
             displayName = "GitLab",
-            credentialUrl = "https://gitlab.com/-/user_settings/personal_access_tokens",
-            credentialLabel = "GitLab access token",
-            description = "Repository branches and merge requests for linked GitLab projects.",
+            credentialUrl = "https://gitlab.com/-/user_settings/personal_access_tokens?name=The+Aive&scopes=api",
+            credentialLabel = "GitLab personal access token",
+            description = "Repository branches and merge requests for linked GitLab projects. Create a token with the api scope.",
         ),
     )
 

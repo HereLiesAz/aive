@@ -126,6 +126,10 @@ import com.hereliesaz.geministrator.resources.store_verified_workflows_roles_mod
 import com.hereliesaz.geministrator.resources.store_where_prompts_go
 import com.hereliesaz.geministrator.resources.store_with_your_key
 import org.jetbrains.compose.resources.getString
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_remove_model_title
+import com.hereliesaz.geministrator.resources.confirm_remove_model_body
+import com.hereliesaz.geministrator.resources.confirm_remove_model_action
 import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.geministrator.resources.store_update_count
 import com.hereliesaz.geministrator.resources.store_plan_reusable_role_count
@@ -492,12 +496,21 @@ internal fun AzphaltStoreScreen(
                                         },
                                     )
                                     if (installedModel != null) {
+                                        var confirmRemove by remember(item.id) { mutableStateOf(false) }
                                         AzphaltPill(
                                             label = stringResource(Res.string.store_remove_model),
                                             seed = "azphalt-model-remove-${item.id}",
                                             endCap = installedModel.version,
-                                            onClick = {
-                                                if (!loading) {
+                                            onClick = { confirmRemove = true },
+                                        )
+                                        if (confirmRemove) {
+                                            AzphaltAlertDialog(
+                                                title = stringResource(Res.string.confirm_remove_model_title),
+                                                text = stringResource(Res.string.confirm_remove_model_body),
+                                                confirmLabel = stringResource(Res.string.confirm_remove_model_action),
+                                                onConfirm = {
+                                                    confirmRemove = false
+                                                    if (!loading) {
                                                     scope.launch {
                                                         loading = true
                                                         error = null
@@ -513,8 +526,11 @@ internal fun AzphaltStoreScreen(
                                                         loading = false
                                                     }
                                                 }
-                                            },
-                                        )
+                                                },
+                                                onDismissRequest = { confirmRemove = false },
+                                                dismissLabel = stringResource(Res.string.confirm_cancel),
+                                            )
+                                        }
                                     }
                                 }
                             } else if (isRevoked) {

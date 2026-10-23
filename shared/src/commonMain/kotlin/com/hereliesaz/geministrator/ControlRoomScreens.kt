@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
@@ -125,6 +131,16 @@ import com.hereliesaz.geministrator.resources.runs_workflow_cancelled
 import com.hereliesaz.geministrator.resources.runs_workflow_completed
 import com.hereliesaz.geministrator.resources.runs_workflow_created
 import com.hereliesaz.geministrator.resources.runs_workflow_failed
+import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.swarm_add_role
+import com.hereliesaz.geministrator.resources.swarm_title
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_stop_title
+import com.hereliesaz.geministrator.resources.confirm_stop_body
+import com.hereliesaz.geministrator.resources.confirm_stop_action
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_title
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_body
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_action
 import org.jetbrains.compose.resources.stringResource
 
 /** The inspector with nothing live to show: says so instead of showing sample data. */
@@ -155,9 +171,9 @@ internal fun CompanyScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("SWARM", style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.swarm_title), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         AzphaltPill(
-            label = if (showRoleForm) "Cancel" else "Add role",
+            label = if (showRoleForm) stringResource(Res.string.common_cancel) else stringResource(Res.string.swarm_add_role),
             seed = "add-role-toggle",
             onClick = {
                 showRoleForm = !showRoleForm
@@ -331,6 +347,21 @@ internal fun InboxScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        // Reject plan / Stop workflow are irreversible, so each asks first: (task id, is stop).
+        var confirming by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+        confirming?.let { (confirmTaskId, isStop) ->
+            AzphaltAlertDialog(
+                title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
+                text = stringResource(if (isStop) Res.string.confirm_stop_body else Res.string.confirm_reject_plan_body),
+                confirmLabel = stringResource(if (isStop) Res.string.confirm_stop_action else Res.string.confirm_reject_plan_action),
+                onConfirm = {
+                    confirming = null
+                    if (isStop) onResolveEscalation(confirmTaskId, false) else onRejectPlan(confirmTaskId)
+                },
+                onDismissRequest = { confirming = null },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
+            )
+        }
         if (liveWorkflow != null) {
             val pending = liveWorkflow.run.taskRuns.values.filter {
                 it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated
@@ -396,11 +427,11 @@ internal fun InboxScreen(
                                     if (isPlanApproval) {
                                         AzphaltPill(stringResource(Res.string.common_approve), "$taskId-approve", onClick = { onApproveTask(taskId) })
                                         if (taskRun.assignedProviderId != null) {
-                                            AzphaltPill(stringResource(Res.string.common_reject), "$taskId-reject", onClick = { onRejectPlan(taskId) })
+                                            AzphaltPill(stringResource(Res.string.common_reject), "$taskId-reject", onClick = { confirming = taskId to false })
                                         }
                                     } else {
                                         AzphaltPill(stringResource(Res.string.common_retry), "$taskId-retry", onClick = { onResolveEscalation(taskId, true) })
-                                        AzphaltPill(stringResource(Res.string.runs_stop), "$taskId-stop", onClick = { onResolveEscalation(taskId, false) })
+                                        AzphaltPill(stringResource(Res.string.runs_stop), "$taskId-stop", onClick = { confirming = taskId to true })
                                     }
                                 }
                             }
@@ -463,7 +494,7 @@ internal fun RunsScreen(
                         val isActive = run.id.value == liveRunId
                         AzphaltRecord(
                             seed = run.id.value,
-                            eyebrow = run.status.name,
+                            eyebrow = run.status.label(),
                             title = run.objective.take(60).let { if (run.objective.length > 60) "$it…" else it },
                             body = stringResource(Res.string.runs_run, run.id.value.takeLast(8)),
                             endCap = if (isActive) stringResource(Res.string.runs_active) else runStatusEndCap(run.status),
@@ -706,7 +737,7 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
             ArtifactEntry(
                 id = task.id.value,
                 name = task.name,
-                detail = taskRun.status.name,
+                detail = taskRun.status.label(),
                 children = taskRun.artifacts.map { artifact ->
                     ArtifactEntry(
                         id = artifact.id.value,
@@ -771,10 +802,16 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
                                         .fillMaxWidth()
                                         .azphaltEntrance(childEntrance, childIndex, entry.children.size)
                                         .azphaltSelectedTransform(childSelected)
+                                        .defaultMinSize(minHeight = AzphaltMinTouchTarget)
+                                        .semantics(mergeDescendants = true) {
+                                            role = Role.Button
+                                            selected = childSelected
+                                        }
                                         .clip(RoundedCornerShape(999.dp))
                                         .background(if (childSelected) Azphalt.Yellow else Azphalt.hue(child.id))
-                                        .clickable { previewId = if (childSelected) null else child.id }
+                                        .clickable(role = Role.Button) { previewId = if (childSelected) null else child.id }
                                         .padding(horizontal = 14.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Text(child.name.uppercase(), style = AzphaltType.capsule, color = if (childSelected) Azphalt.Ink else Azphalt.hue(child.id).contrastingText)
@@ -782,7 +819,7 @@ internal fun ArtifactFileManagerScreen(runtimeState: ApplicationRuntimeState = A
                                 }
                                 AzphaltChildBand(visible = childSelected) {
                                     Box(
-                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF0F0F0F)).padding(12.dp),
+                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Azphalt.Ink).padding(12.dp),
                                     ) {
                                         Text("${child.name}\n${child.detail}\nsource: ${entry.name}\nstatus: available", style = AzphaltType.body, color = Azphalt.White)
                                     }

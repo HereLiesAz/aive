@@ -178,9 +178,9 @@ object ProviderCatalog {
             id = CLOUDFLARE_ID,
             displayName = "Cloudflare Workers AI",
             apiKeyUrl = "https://dash.cloudflare.com/profile/api-tokens",
-            credentialLabel = "ACCOUNT_ID:API_TOKEN",
+            credentialLabel = "Cloudflare account ID and API token (ACCOUNT_ID:API_TOKEN)",
             description = "Open models on Cloudflare's edge. Free: 10,000 neurons a day. " +
-                "Enter your account ID and a Workers AI token separated by a colon.",
+                "Enter your account ID (shown on the Cloudflare dashboard home) and a Workers AI API token, separated by a colon.",
         ),
         ProviderCatalogEntry(
             id = KILO_ID,

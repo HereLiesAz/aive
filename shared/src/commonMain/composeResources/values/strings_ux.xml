@@ -66,4 +66,14 @@
     <string name="credential_keyless_warning_body">Free gateways without a key may log your prompts and limit requests per IP address. Keep confidential data out of workflows that use it.</string>
     <string name="credential_keyless_warning_confirm">Connect without a key</string>
     <string name="credential_keyless_hint">Without a key, prompts may be logged by the free gateway.</string>
+    <string name="swarm_title">Swarm</string>
+    <string name="creature_rig_gallery_title">Puppet-rig creatures</string>
+    <string name="inspector_hint_approve_plan">Approving lets the agent start making the changes in its plan. It may use your provider quota and change the repository.</string>
+    <string name="inspector_hint_approve_task">Approving lets this task go ahead. It may use your provider quota or change files or services.</string>
+    <string name="inspector_hint_approve_nested">Approving lets this step of the sub-workflow continue. It may use your provider quota or change files.</string>
+    <string name="semantics_selected">Selected</string>
+    <string name="semantics_move_node_left">Move left</string>
+    <string name="semantics_move_node_right">Move right</string>
+    <string name="semantics_move_node_up">Move up</string>
+    <string name="semantics_move_node_down">Move down</string>
 </resources>
