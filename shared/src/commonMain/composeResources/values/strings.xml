@@ -209,6 +209,7 @@
     <string name="library_workflow_library_could_not_be_loaded">Workflow library could not be loaded.</string>
     <string name="library_workflow_name">Workflow name</string>
     <string name="library_workflows">WORKFLOWS</string>
+    <string name="tab_position">Tab %1$d of %2$d</string>
 
     <string name="lineage_a_new_run_that_reads_this">A new run that reads this run's memory and adds to its own.</string>
     <string name="lineage_cancel_continue">Cancel continue</string>
