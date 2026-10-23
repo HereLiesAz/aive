@@ -60,9 +60,7 @@ internal object CreatureRigMapping {
 
     /**
      * Rigs no role kind maps to (older sheets/variants superseded in [bySlugKind], and the
-     * unclassified `creature`). Their file name is the role label that selects them. `ux-designer`
-     * is deliberately absent: its hand-built sample rig draws small, so UX designers keep the
-     * bespoke surface (see step 6 above).
+     * unclassified `creature`). Their file name is the role label that selects them.
      */
     val NAMED_ONLY_SLUGS = listOf(
         "creature",
@@ -75,6 +73,21 @@ internal object CreatureRigMapping {
     )
 
     val bySlugKind: Map<NodeCreatureRoleKind, String> = mapOf(
+        // Core roles 001-015, rigged from their composed character art (tools/puppet-rig/slice/build_composed_rigs.py).
+        NodeCreatureRoleKind.Orchestrator to "orchestrator", // 001
+        NodeCreatureRoleKind.UxDesigner to "ux-designer", // 002
+        NodeCreatureRoleKind.Researcher to "researcher", // 003
+        NodeCreatureRoleKind.ImplementationEngineer to "implementation-engineer", // 004
+        NodeCreatureRoleKind.EpaRepresentative to "epa-representative", // 006
+        NodeCreatureRoleKind.AdversarialReviewer to "adversarial-reviewer", // 007
+        NodeCreatureRoleKind.QaEngineer to "qa-engineer", // 008
+        NodeCreatureRoleKind.ReleaseEngineer to "release-engineer", // 009
+        NodeCreatureRoleKind.Antagonist to "antagonist", // 010
+        NodeCreatureRoleKind.ProductManager to "product-manager", // 011
+        NodeCreatureRoleKind.CrashTestDummy to "crash-test-dummy", // 012
+        NodeCreatureRoleKind.RecoveryEngineer to "recovery-engineer", // 013
+        NodeCreatureRoleKind.CodeReviewer to "code-reviewer", // 014
+        NodeCreatureRoleKind.HallMonitor to "hall-monitor", // 015
         NodeCreatureRoleKind.Architect to "architect", // 005
         NodeCreatureRoleKind.DataMiner to "data-miner-sheet-3-variant", // 036 (newer than 016)
         NodeCreatureRoleKind.KnowledgeKeeper to "knowledge-keeper-sheet-2-variant", // 022 (newer than 017)

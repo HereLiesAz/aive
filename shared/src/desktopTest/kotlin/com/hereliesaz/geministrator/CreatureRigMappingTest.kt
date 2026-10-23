@@ -37,6 +37,20 @@ class CreatureRigMappingTest {
      * passes whatever the table says.
      */
     private val expectedRigForRole = mapOf(
+        "orchestrator" to "orchestrator",
+        "ux designer" to "ux-designer",
+        "researcher" to "researcher",
+        "implementation engineer" to "implementation-engineer",
+        "epa representative" to "epa-representative",
+        "adversarial reviewer" to "adversarial-reviewer",
+        "qa engineer" to "qa-engineer",
+        "release engineer" to "release-engineer",
+        "antagonist" to "antagonist",
+        "product manager" to "product-manager",
+        "crash test dummy" to "crash-test-dummy",
+        "recovery engineer" to "recovery-engineer",
+        "code reviewer" to "code-reviewer",
+        "hall monitor" to "hall-monitor",
         "architect" to "architect",
         "data miner" to "data-miner-sheet-3-variant",
         "knowledge keeper" to "knowledge-keeper-sheet-2-variant",
@@ -93,16 +107,16 @@ class CreatureRigMappingTest {
         }
         assertEquals(expectedRigForRole.size, CreatureRigMapping.bySlugKind.size, "every mapped role is in the expected table")
         assertEquals("simulator", CreatureRigMapping.slugFor("Simulator"))
-        assertNull(CreatureRigMapping.slugFor("UX Designer")) // hand-built sample rig is tiny; bespoke surface stays
+        assertEquals("ux-designer", CreatureRigMapping.slugFor("UX Designer"))
         assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("Data Miner"))
         assertEquals("idea-catalyst-2", CreatureRigMapping.slugFor("Idea Catalyst"))
     }
 
     @Test
-    fun everyRigFileIsReachableExceptTheDeliberatelyUnmappedOne() {
+    fun everyRigFileIsReachable() {
         val onDisk = dir.listFiles { f -> f.name.endsWith(".rig.json") }
             .orEmpty().map { it.name.removeSuffix(".rig.json") }.toSet()
-        assertEquals(onDisk - "ux-designer", CreatureRigMapping.allSlugs, "rig files and reachable slugs must match")
+        assertEquals(onDisk, CreatureRigMapping.allSlugs, "rig files and reachable slugs must match")
     }
 
     @Test
@@ -112,7 +126,7 @@ class CreatureRigMappingTest {
 
     @Test
     fun rolesWithoutASlicedSheetKeepTheOldRendering() {
-        listOf("Orchestrator", "Researcher", "QA Engineer", "Release Engineer", "Python").forEach {
+        listOf("Python").forEach {
             assertNull(CreatureRigMapping.slugFor(it), it)
         }
         // Distinct Store personas are not collapsed onto a shared rig body.

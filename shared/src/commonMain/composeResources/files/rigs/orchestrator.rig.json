@@ -1,0 +1,481 @@
+{
+ "format": "aive-puppet-rig",
+ "version": 1,
+ "role": "orchestrator",
+ "canvas": {
+  "width": 506,
+  "height": 516
+ },
+ "atlas": {
+  "image": "orchestrator_rig_atlas.png",
+  "width": 506,
+  "height": 516
+ },
+ "parts": [
+  {
+   "id": "body",
+   "parent": null,
+   "z": 0,
+   "size": {
+    "w": 0,
+    "h": 0
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "rest": {
+    "x": 269.0,
+    "y": 245.0,
+    "rotation": 0,
+    "scaleX": 1,
+    "scaleY": 1,
+    "alpha": 1
+   }
+  },
+  {
+   "id": "main",
+   "parent": "body",
+   "z": 1,
+   "kind": "body",
+   "rect": {
+    "x": 0,
+    "y": 0,
+    "w": 506,
+    "h": 516
+   },
+   "size": {
+    "w": 506,
+    "h": 516
+   },
+   "pivot": {
+    "x": 0.53,
+    "y": 0.47
+   },
+   "rest": {
+    "x": 0,
+    "y": 0,
+    "rotation": 0,
+    "scaleX": 1,
+    "scaleY": 1,
+    "alpha": 1
+   }
+  }
+ ],
+ "attachments": [
+  {
+   "id": "arm.socket.left",
+   "part": "main",
+   "x": 0.39,
+   "y": 0.51,
+   "kind": "arm-socket"
+  },
+  {
+   "id": "arm.socket.right",
+   "part": "main",
+   "x": 0.67,
+   "y": 0.51,
+   "kind": "arm-socket"
+  },
+  {
+   "id": "arm.socket.top",
+   "part": "main",
+   "x": 0.53,
+   "y": 0.34,
+   "kind": "arm-socket"
+  },
+  {
+   "id": "arm.socket.bottom",
+   "part": "main",
+   "x": 0.53,
+   "y": 0.61,
+   "kind": "arm-socket"
+  }
+ ],
+ "states": {
+  "Pending": {
+   "parts": {
+    "body": {
+     "keys": {},
+     "sine": {
+      "y": {
+       "amplitude": 1.29,
+       "frequency": 1,
+       "phase": 0.0
+      },
+      "rotation": {
+       "amplitude": 0.8,
+       "frequency": 1,
+       "phase": 0.25
+      }
+     }
+    },
+    "main": {
+     "keys": {},
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "rotation": {
+       "amplitude": 0.5,
+       "frequency": 1,
+       "phase": 0.6
+      }
+     }
+    }
+   }
+  },
+  "Ready": {
+   "parts": {
+    "body": {
+     "keys": {},
+     "sine": {
+      "y": {
+       "amplitude": 1.98,
+       "frequency": 1,
+       "phase": 0.0
+      },
+      "rotation": {
+       "amplitude": 1.2,
+       "frequency": 1,
+       "phase": 0.25
+      }
+     }
+    },
+    "main": {
+     "keys": {},
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.02,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "rotation": {
+       "amplitude": 0.9,
+       "frequency": 1,
+       "phase": 0.6
+      }
+     }
+    }
+   }
+  },
+  "Active": {
+   "parts": {
+    "body": {
+     "keys": {},
+     "sine": {
+      "y": {
+       "amplitude": 3.87,
+       "frequency": 2,
+       "phase": 0.0
+      },
+      "rotation": {
+       "amplitude": 2.2,
+       "frequency": 1,
+       "phase": 0.25
+      }
+     }
+    },
+    "main": {
+     "keys": {},
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.04,
+       "frequency": 2,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.02,
+       "frequency": 2,
+       "phase": 0.25
+      },
+      "rotation": {
+       "amplitude": 1.6,
+       "frequency": 1,
+       "phase": 0.6
+      }
+     }
+    }
+   }
+  },
+  "Gate": {
+   "parts": {
+    "body": {
+     "keys": {},
+     "sine": {
+      "y": {
+       "amplitude": 0.55,
+       "frequency": 1,
+       "phase": 0.0
+      },
+      "rotation": {
+       "amplitude": 0.4,
+       "frequency": 1,
+       "phase": 0.25
+      }
+     }
+    },
+    "main": {
+     "keys": {
+      "scaleX": [
+       {
+        "t": 0,
+        "v": 1.02,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "rotation": {
+       "amplitude": 0.3,
+       "frequency": 1,
+       "phase": 0.6
+      }
+     }
+    }
+   }
+  },
+  "Blocked": {
+   "parts": {
+    "body": {
+     "keys": {
+      "y": [
+       {
+        "t": 0,
+        "v": 4.37,
+        "ease": "linear"
+       }
+      ],
+      "rotation": [
+       {
+        "t": 0,
+        "v": -5,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {
+      "y": {
+       "amplitude": 1.09,
+       "frequency": 1,
+       "phase": 0.0
+      }
+     }
+    },
+    "main": {
+     "keys": {
+      "scaleY": [
+       {
+        "t": 0,
+        "v": 0.965,
+        "ease": "linear"
+       }
+      ],
+      "scaleX": [
+       {
+        "t": 0,
+        "v": 1.02,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "rotation": {
+       "amplitude": 0.3,
+       "frequency": 1,
+       "phase": 0.6
+      }
+     }
+    }
+   }
+  },
+  "Complete": {
+   "parts": {
+    "body": {
+     "keys": {
+      "y": [
+       {
+        "t": 0,
+        "v": 0,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.12,
+        "v": -10.92,
+        "ease": "easeIn"
+       },
+       {
+        "t": 0.26,
+        "v": 0,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.34,
+        "v": -3.87,
+        "ease": "easeIn"
+       },
+       {
+        "t": 0.42,
+        "v": 0,
+        "ease": "linear"
+       }
+      ],
+      "scaleY": [
+       {
+        "t": 0,
+        "v": 1,
+        "ease": "linear"
+       },
+       {
+        "t": 0.26,
+        "v": 1,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.3,
+        "v": 0.93,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.38,
+        "v": 1,
+        "ease": "linear"
+       }
+      ],
+      "scaleX": [
+       {
+        "t": 0,
+        "v": 1,
+        "ease": "linear"
+       },
+       {
+        "t": 0.26,
+        "v": 1,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.3,
+        "v": 1.05,
+        "ease": "easeOut"
+       },
+       {
+        "t": 0.38,
+        "v": 1,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {}
+    },
+    "main": {
+     "keys": {},
+     "sine": {
+      "scaleY": {
+       "amplitude": 0.01,
+       "frequency": 1,
+       "phase": 0.25
+      },
+      "scaleX": {
+       "amplitude": -0.01,
+       "frequency": 1,
+       "phase": 0.25
+      }
+     }
+    }
+   }
+  },
+  "Failed": {
+   "parts": {
+    "body": {
+     "keys": {
+      "y": [
+       {
+        "t": 0,
+        "v": 9.92,
+        "ease": "linear"
+       }
+      ],
+      "rotation": [
+       {
+        "t": 0,
+        "v": -7,
+        "ease": "linear"
+       }
+      ],
+      "alpha": [
+       {
+        "t": 0,
+        "v": 0.92,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {
+      "y": {
+       "amplitude": 0.65,
+       "frequency": 1,
+       "phase": 0.0
+      },
+      "x": {
+       "amplitude": 1.09,
+       "frequency": 13,
+       "phase": 0.0
+      }
+     }
+    },
+    "main": {
+     "keys": {
+      "scaleY": [
+       {
+        "t": 0,
+        "v": 0.93,
+        "ease": "linear"
+       }
+      ],
+      "scaleX": [
+       {
+        "t": 0,
+        "v": 1.04,
+        "ease": "linear"
+       }
+      ]
+     },
+     "sine": {}
+    }
+   }
+  }
+ },
+ "fallbackState": "Pending"
+}
