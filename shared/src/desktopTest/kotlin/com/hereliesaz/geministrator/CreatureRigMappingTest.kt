@@ -31,12 +31,67 @@ class CreatureRigMappingTest {
         }
     }
 
+    /**
+     * The expected mapping, written out by hand. It is deliberately not derived from
+     * [CreatureRigMapping.bySlugKind]: a test that reads its expectations from the table it checks
+     * passes whatever the table says.
+     */
+    private val expectedRigForRole = mapOf(
+        "architect" to "architect",
+        "data miner" to "data-miner-sheet-3-variant",
+        "knowledge keeper" to "knowledge-keeper-sheet-2-variant",
+        "pattern seeker" to "pattern-seeker-sheet-1-variant",
+        "translator" to "translator-sheet-1-variant",
+        "connector" to "connector-sheet-1-variant",
+        "scheduler" to "scheduler-sheet-3-variant",
+        "optimizer" to "optimizer-sheet-3-variant",
+        "simulator" to "simulator",
+        "documenter" to "documenter",
+        "guardian" to "guardian",
+        "creative synthesizer" to "creative-synthesizer",
+        "resource manager" to "resource-manager-sheet-3-variant",
+        "feedback listener" to "feedback-listener",
+        "decision helper" to "decision-helper",
+        "flow director" to "flow-director",
+        "pattern seer" to "pattern-seer",
+        "communicator" to "communicator",
+        "integrator" to "integrator",
+        "security analyst" to "security-analyst",
+        "quality guardian" to "quality-guardian",
+        "documentation specialist" to "documentation-specialist",
+        "test explorer" to "test-explorer",
+        "deployment pilot" to "deployment-pilot",
+        "monitoring sentinel" to "monitoring-sentinel",
+        "feedback collector" to "feedback-collector",
+        "idea catalyst" to "idea-catalyst-2",
+        "process mapper" to "process-mapper",
+        "strategy scout" to "strategy-scout",
+        "system maintainer" to "system-maintainer",
+        "sustainability advocate" to "sustainability-advocate",
+        "systems analyst" to "systems-analyst",
+        "database administrator" to "database-administrator",
+        "network engineer" to "network-engineer",
+        "site reliability engineer" to "site-reliability-engineer",
+        "build engineer" to "build-engineer",
+        "test automation engineer" to "test-automation-engineer",
+        "threat modeler" to "threat-modeler",
+        "compliance officer" to "compliance-officer",
+        "migration engineer" to "migration-engineer",
+        "observability engineer" to "observability-engineer",
+        "business analyst" to "business-analyst",
+        "content strategist" to "content-strategist",
+        "support agent" to "support-agent",
+        "data scientist" to "data-scientist",
+        "ml engineer" to "ml-engineer",
+        "legal counsel" to "legal-counsel",
+    )
+
     @Test
     fun builtInRoleNamesResolveToTheirRig() {
-        CreatureRigMapping.bySlugKind.forEach { (kind, slug) ->
-            val label = CreatureRigMapping.displayName(kind)
-            assertEquals(slug, CreatureRigMapping.slugFor(label), "label '$label' ($kind)")
+        expectedRigForRole.forEach { (label, slug) ->
+            assertEquals(slug, CreatureRigMapping.slugFor(label), "label '$label'")
         }
+        assertEquals(expectedRigForRole.size, CreatureRigMapping.bySlugKind.size, "every mapped role is in the expected table")
         assertEquals("simulator", CreatureRigMapping.slugFor("Simulator"))
         assertNull(CreatureRigMapping.slugFor("UX Designer")) // hand-built sample rig is tiny; bespoke surface stays
         assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("Data Miner"))
@@ -44,17 +99,10 @@ class CreatureRigMappingTest {
     }
 
     @Test
-    fun aRigIsReachableByItsOwnName() {
-        CreatureRigMapping.NAMED_ONLY_SLUGS.forEach { slug ->
-            assertEquals(slug, CreatureRigMapping.slugFor(slug), slug)
-            assertEquals(slug, CreatureRigMapping.slugFor(slug.replace('-', ' ')), slug)
-            assertEquals(slug, CreatureRigMapping.slugFor(slug.replace('-', '_').uppercase()), slug)
-        }
-        assertEquals("creature", CreatureRigMapping.slugFor("Creature"))
-        // A rig that is mapped by role kind still resolves by its file name too.
-        assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("data-miner-sheet-3-variant"))
-        // The UX designer's small sample rig stays unmapped even though a rig of that name exists.
-        assertNull(CreatureRigMapping.slugFor("ux-designer"))
+    fun everyRigFileIsReachableExceptTheDeliberatelyUnmappedOne() {
+        val onDisk = dir.listFiles { f -> f.name.endsWith(".rig.json") }
+            .orEmpty().map { it.name.removeSuffix(".rig.json") }.toSet()
+        assertEquals(onDisk - "ux-designer", CreatureRigMapping.allSlugs, "rig files and reachable slugs must match")
     }
 
     @Test
