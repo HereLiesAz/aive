@@ -72,6 +72,10 @@ fun main() {
     // File choosers are Swing; without this they draw in Swing's own Metal theme instead of the
     // operating system's, which clashes with both the app and the desktop.
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
+    AzphaltMotion.reduceMotion = shouldReduceMotion(
+        animatorDurationScale = null,
+        systemPrefersReduced = desktopPrefersReducedMotion(),
+    )
     val providerCredentialStore = DesktopProviderCredentialStore()
     val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
@@ -608,6 +612,18 @@ private fun environmentProviderCredentials(): Map<String, String> = buildMap {
             ?.takeIf(String::isNotEmpty)
             ?.let { put(providerId, it) }
     }
+}
+
+/**
+ * The JVM exposes no portable OS reduced-motion preference, so desktop honours an explicit
+ * switch instead: the `AIVE_REDUCE_MOTION` environment variable or the `aive.reduceMotion`
+ * system property, set to `1` or `true`.
+ */
+private fun desktopPrefersReducedMotion(): Boolean {
+    val value = (System.getenv("AIVE_REDUCE_MOTION") ?: System.getProperty("aive.reduceMotion"))
+        ?.trim()
+        ?.lowercase()
+    return value == "1" || value == "true"
 }
 
 private fun environmentRepositoryCredentials(): Map<String, String> = buildMap {

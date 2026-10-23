@@ -7,7 +7,8 @@ import androidx.compose.runtime.setValue
 /**
  * Process-wide reduced-motion switch. Each platform entry point sets it from its own signal
  * (Android: `Settings.Global.ANIMATOR_DURATION_SCALE == 0`; web: `prefers-reduced-motion`;
- * desktop: no OS signal is read, so it stays off). Looping decorative animations (the mascot
+ * desktop: the JVM has no portable OS signal, so it follows the `AIVE_REDUCE_MOTION` environment
+ * variable or `aive.reduceMotion` system property, and is otherwise off). Looping decorative animations (the mascot
  * terrarium clocks, the creature gallery) freeze on a still frame while it is on.
  */
 object AzphaltMotion {
