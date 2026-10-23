@@ -29,6 +29,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.creature_rig_gallery_title
+import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationship
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
@@ -52,7 +55,7 @@ fun CreatureRigGalleryScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Puppet-rig creatures", style = AzphaltType.endCap, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.creature_rig_gallery_title), style = AzphaltType.endCap, color = Azphalt.currentGround.onPage)
             Switch(checked = CreatureRigSettings.enabled, onCheckedChange = { CreatureRigSettings.enabled = it })
         }
         CreatureRigTerrariumDemo(Modifier.fillMaxWidth().height(620.dp))

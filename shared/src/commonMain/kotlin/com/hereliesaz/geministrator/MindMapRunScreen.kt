@@ -26,6 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -572,7 +575,10 @@ internal fun MindMapRunScreen(
             style = AzphaltType.eyebrow,
             color = Azphalt.currentGround.onPage,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
             AzphaltPill(
                 run.status.label(),
                 "run-status",
@@ -702,6 +708,7 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
         title,
         style = if (compact) AzphaltType.section else AzphaltType.hero,
         color = Azphalt.currentGround.onPage,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
     AzphaltRecord(
         seed = "runtime-state-$title",
