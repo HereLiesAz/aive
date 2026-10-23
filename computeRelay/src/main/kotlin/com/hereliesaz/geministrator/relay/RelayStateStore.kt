@@ -229,7 +229,7 @@ class EncryptedFileRelayStateStore(
         const val PBKDF2_ITERATIONS: Int = 210_000
         val json: Json = Json {
             encodeDefaults = true
-            ignoreUnknownKeys = false
+            ignoreUnknownKeys = true
             classDiscriminator = "type"
             // WorkflowRun.taskRuns is keyed by TaskDefinitionId, a structured (non-primitive) key.
             allowStructuredMapKeys = true

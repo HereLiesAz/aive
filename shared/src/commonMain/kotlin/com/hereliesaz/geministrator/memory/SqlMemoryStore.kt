@@ -4,6 +4,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.db.SqlDriver
 import com.hereliesaz.geministrator.memory.db.MemoryDatabase
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -102,6 +103,9 @@ class SqlMemoryStore(
                 queue = queries.allQueue().awaitAsList().map { json.decodeFromString(MemoryQueueEntry.serializer(), it) },
                 declinedCondensations = queries.allDeclined().awaitAsList(),
             )
+        } catch (cancelled: CancellationException) {
+            // A cancelled read says nothing about the database; it must not read as corruption.
+            throw cancelled
         } catch (failure: Exception) {
             throw MemoryStoreCorruptionException("Memory database is unreadable and must be repaired or cleared.", failure)
         }

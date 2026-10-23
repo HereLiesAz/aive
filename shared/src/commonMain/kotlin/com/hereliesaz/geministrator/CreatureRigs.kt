@@ -134,7 +134,7 @@ internal object CreatureRigMapping {
         val normalized = roleLabel.trim().lowercase()
         if (normalized.isEmpty()) return null
         byRoleName[normalized]?.let { return it }
-        normalized.replace(Regex("[\\s_]+"), "-").takeIf { it in allSlugs }?.let { return it }
+        normalized.replace(LABEL_SEPARATORS, "-").takeIf { it in allSlugs }?.let { return it }
         val character = MascotCharacterCatalog.forRole(roleLabel)
         val kind = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
         if (kind == NodeCreatureRoleKind.Generic) return genericSlugFor(normalized)
@@ -155,6 +155,8 @@ internal object CreatureRigMapping {
 
     /** Stable small per-node phase offset (0..1) so neighbouring creatures don't move in lockstep. */
     fun phaseOffset(seed: String): Float = stableHash(seed.trim().lowercase()).mod(997) / 997f
+
+    private val LABEL_SEPARATORS = Regex("[\\s_]+")
 
     /** All slugs the mapping can produce. */
     val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS
