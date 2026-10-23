@@ -64,8 +64,9 @@ internal class AndroidUpdateCoordinator(
         // Only a completed check starts the quiet period: an offline launch or a rate-limited
         // answer must not hide updates for hours.
         if (result.isSuccess) preferences.edit().putLong(KEY_LAST_CHECK, now).apply()
+        // Only a check the user asked for reports a failure; the launch check stays silent offline.
         state = result.getOrElse { failure ->
-            AndroidUpdateState.Error(failure.message ?: "Update check failed")
+            if (force) AndroidUpdateState.Error(failure.message ?: "Update check failed") else AndroidUpdateState.Idle
         }
     }
 
