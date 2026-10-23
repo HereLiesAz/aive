@@ -103,7 +103,7 @@
     <!-- Generated from docs/PRIVACY.md; edit that file, then regenerate. -->
 <p>This policy describes the current source-available builds of <strong>The Aive</strong>, application ID <code>com.hereliesaz.aive</code>.</p>
 <p>The Aive is a workflow orchestration application. It can store workflow information locally and, when you choose to use an external executor or provider, send the information needed to perform that work to the service you selected.</p>
-<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The <strong>Google Play</strong> flavor contains none of these, except that a Play-flavor copy installed from somewhere other than Google Play checks GitHub Releases for updates too. Desktop and web builds contain none of them either.</p>
+<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The <strong>Google Play</strong> flavor contains none of these. Desktop and web builds contain none of them either.</p>
 <h2 id="summary">Summary</h2>
 <ul>
 <li>The current source does <strong>not</strong> include advertising SDKs.</li>
@@ -210,8 +210,8 @@
 </ul>
 <h2 id="updates-and-downloads">Updates and downloads</h2>
 <ul>
-<li><strong>Android copies not installed from Google Play (the GitHub release flavor, and a Play-flavor copy installed some other way).</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer version is available, it tells you and, only if you tap <strong>Open GitHub release</strong>, opens the release page in your browser. The app does not download or install the update itself.</li>
-<li><strong>Android copies installed from Google Play.</strong> The app queries Google Play's in-app update API for available updates, even with no provider connected, and does not contact GitHub for updates. If one is available, <strong>Open Play Store</strong> opens this app's Play listing; updates are delivered by Google Play under its terms.</li>
+<li><strong>Android GitHub release flavor.</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer version is available, it tells you and, only if you tap <strong>Open GitHub release</strong>, opens the release page in your browser. The app does not download or install the update itself.</li>
+<li><strong>Android Google Play flavor.</strong> When Google Play installed the app, it queries Google Play's in-app update API for available updates, even with no provider connected, and does not contact GitHub for updates. A Play-flavor copy installed any other way makes no update check. If an update is available, <strong>Open Play Store</strong> opens this app's Play listing; updates are delivered by Google Play under its terms.</li>
 <li><strong>Azphalt package catalog.</strong> When you open the Store, The Aive contacts the package repository (<code>https://azphalt.store</code> by default). It searches and downloads packages, checks revocations, and sends the IDs and versions of the packages you installed from that repository to check for updates.</li>
 <li><strong>Local models.</strong> Optional on-device models, such as the local planner, local orchestration helpers and local memory models, are downloaded from GitHub Releases. Models installed from the Azphalt Store are downloaded over HTTPS from the host named in the signed package.</li>
 </ul>

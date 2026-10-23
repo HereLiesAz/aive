@@ -24,6 +24,21 @@ internal fun installSource(context: Context): InstallSource {
     return installSourceOf(installer)
 }
 
+/** The one channel an update can come from for this copy of the app. */
+internal enum class UpdateChannel { Play, Github, None }
+
+/**
+ * The Play build and the GitHub build are different packages, so each only ever updates from its
+ * own channel. A Play build asks Play, and only when Play installed it (the Play API answers for
+ * nothing else); a Play build installed any other way (adb, internal sharing) has no update source
+ * and must not be offered the GitHub APK, which would install as a second app.
+ */
+internal fun updateChannel(isPlayBuild: Boolean, source: InstallSource): UpdateChannel = when {
+    !isPlayBuild -> UpdateChannel.Github
+    source == InstallSource.Play -> UpdateChannel.Play
+    else -> UpdateChannel.None
+}
+
 /** Asks Google Play whether a newer version of this app exists. Only the Play build can provide one. */
 internal interface PlayUpdateCheck {
     suspend fun isUpdateAvailable(): Boolean

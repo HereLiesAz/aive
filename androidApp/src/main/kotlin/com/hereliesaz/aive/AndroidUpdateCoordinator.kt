@@ -8,14 +8,15 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Finds out whether a newer version exists and sends the user to the channel this copy came from:
- * a Play install asks the Play API and opens the Play Store listing; any other install reads the
- * GitHub release feed and opens the release page. The two channels ship different packages, so an
- * update is never offered from the other channel.
+ * Finds out whether a newer version exists and sends the user to this build's own channel (see
+ * [updateChannel]): the Play build asks the Play API and opens the Play Store listing; the GitHub
+ * build reads the GitHub release feed and opens the release page. The two channels ship different
+ * packages, so an update is never offered from the other channel.
  */
 internal class AndroidUpdateCoordinator(
     private val activity: ComponentActivity,
@@ -28,29 +29,41 @@ internal class AndroidUpdateCoordinator(
         private set
 
     suspend fun checkForUpdates(force: Boolean = false) {
-        val fromPlay = installSource(context) == InstallSource.Play && playCheck != null
+        val channel = updateChannel(isPlayBuild = playCheck != null, source = installSource(context))
+        if (channel == UpdateChannel.None) return
         // A debug build is installed over adb, so it has no channel to compare against.
-        if (!fromPlay && (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) return
+        if (channel == UpdateChannel.Github && (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) return
 
         val now = System.currentTimeMillis()
         val lastCheck = preferences.getLong(KEY_LAST_CHECK, 0L)
         if (!force && now - lastCheck < CHECK_INTERVAL_MILLIS) return
 
         state = AndroidUpdateState.Checking
-        val result = runCatching {
-            if (fromPlay) {
-                if (playCheck!!.isUpdateAvailable()) AndroidUpdateState.PlayUpdateAvailable
-                else AndroidUpdateState.Idle
-            } else {
-                val release = withContext(Dispatchers.IO) { GithubReleaseFeed.latestAndroidRelease() }
-                if (release != null && isNewerVersion(release.version, currentVersion())) {
-                    AndroidUpdateState.GithubUpdateAvailable(release.version, release.pageUrl)
-                } else {
-                    AndroidUpdateState.Idle
-                }
-            }
+        val result: Result<AndroidUpdateState> = try {
+            Result.success(
+                when (channel) {
+                    UpdateChannel.Play ->
+                        if (playCheck!!.isUpdateAvailable()) AndroidUpdateState.PlayUpdateAvailable
+                        else AndroidUpdateState.Idle
+                    else -> {
+                        val release = withContext(Dispatchers.IO) { GithubReleaseFeed.latestAndroidRelease() }
+                        if (release != null && isNewerVersion(release.version, currentVersion())) {
+                            AndroidUpdateState.GithubUpdateAvailable(release.version, release.pageUrl)
+                        } else {
+                            AndroidUpdateState.Idle
+                        }
+                    }
+                },
+            )
+        } catch (cancelled: CancellationException) {
+            state = AndroidUpdateState.Idle
+            throw cancelled
+        } catch (failure: Exception) {
+            Result.failure(failure)
         }
-        preferences.edit().putLong(KEY_LAST_CHECK, now).commit()
+        // Only a completed check starts the quiet period: an offline launch or a rate-limited
+        // answer must not hide updates for hours.
+        if (result.isSuccess) preferences.edit().putLong(KEY_LAST_CHECK, now).apply()
         state = result.getOrElse { failure ->
             AndroidUpdateState.Error(failure.message ?: "Update check failed")
         }
