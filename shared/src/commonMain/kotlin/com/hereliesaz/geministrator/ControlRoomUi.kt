@@ -109,6 +109,7 @@ fun ControlRoom(
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     onExportCurrentProjectFile: suspend () -> IveProjectExport? = { null },
     onImportProjectFile: suspend (String) -> String? = { null },
+    setupFileActions: SetupFileActions? = null,
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>> = { emptyList() },
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
@@ -181,6 +182,7 @@ fun ControlRoom(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     onExportCurrentProjectFile = onExportCurrentProjectFile,
                     onImportProjectFile = onImportProjectFile,
+                    setupFileActions = setupFileActions,
                     onLoadRunHistory = onLoadRunHistory,
                     onSwitchRun = onSwitchRun,
                     onLoadRunTimeline = onLoadRunTimeline,
@@ -247,6 +249,7 @@ fun ControlRoom(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     onExportCurrentProjectFile = onExportCurrentProjectFile,
                     onImportProjectFile = onImportProjectFile,
+                    setupFileActions = setupFileActions,
                     onLoadRunHistory = onLoadRunHistory,
                     onSwitchRun = onSwitchRun,
                     onLoadRunTimeline = onLoadRunTimeline,
@@ -344,7 +347,12 @@ private fun PillNavigation(
             onClick = { Azphalt.rerollGround() },
             modifier = Modifier.fillMaxWidth(0.9f),
         )
-        Text(runtimeStatusLabel(runtimeState), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(
+            runtimeStatusLabel(runtimeState),
+            style = AzphaltType.eyebrow,
+            color = Azphalt.currentGround.onPage,
+            modifier = Modifier.azphaltLiveRegion(),
+        )
     }
 }
 
@@ -407,6 +415,7 @@ private fun MainDestination(
     roleSurfaceFilePicker: RoleSurfaceFilePicker?,
     onExportCurrentProjectFile: suspend () -> IveProjectExport?,
     onImportProjectFile: suspend (String) -> String?,
+    setupFileActions: SetupFileActions?,
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>>,
     onSwitchRun: (String) -> Unit,
     onLoadRunTimeline: suspend () -> List<WorkflowEvent>,
@@ -526,6 +535,7 @@ private fun MainDestination(
                 projectFileService = projectFileService,
                 onExportCurrentProjectFile = onExportCurrentProjectFile,
                 onImportProjectFile = onImportProjectFile,
+                setupFileActions = setupFileActions,
                 onExportDiagnosticBundle = onExportDiagnosticBundle,
                 onConfigureProvider = onReconfigureProvider,
                 onDisconnectProvider = onDisconnectProvider,

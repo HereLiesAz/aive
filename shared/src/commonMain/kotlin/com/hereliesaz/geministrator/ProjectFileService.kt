@@ -36,6 +36,15 @@ interface ProjectFileService {
     suspend fun saveAs(fileName: String, content: String): ProjectFileDescriptor?
     suspend fun read(descriptor: ProjectFileDescriptor): ProjectFileReadResult?
     suspend fun chooseAndRead(): ProjectFileReadResult?
+
+    /**
+     * Save picker for a `.aivesetup` file ([SETUP_FILE_MIME_TYPE]). Null when the user cancelled or
+     * the platform has no save picker. Setup files are not remembered as project files.
+     */
+    suspend fun saveSetupFileAs(fileName: String, content: String): ProjectFileDescriptor? = null
+
+    /** Open picker for a setup file; also not remembered as a project file. */
+    suspend fun chooseAndReadSetupFile(): ProjectFileReadResult? = null
 }
 
 fun String.asIveFileName(): String {

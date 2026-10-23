@@ -481,7 +481,12 @@ internal fun RunsScreen(
         Text(stringResource(Res.string.runs_runs), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
         val entries = history
         if (entries == null) {
-            Text(stringResource(Res.string.runs_loading), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(
+                stringResource(Res.string.runs_loading),
+                style = AzphaltType.body,
+                color = Azphalt.currentGround.onPage,
+                modifier = Modifier.azphaltLiveRegion(),
+            )
         } else if (entries.isEmpty()) {
             Text(stringResource(Res.string.runs_no_projects_yet), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
         } else {

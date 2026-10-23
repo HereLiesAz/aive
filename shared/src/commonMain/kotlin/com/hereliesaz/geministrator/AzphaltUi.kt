@@ -4,6 +4,9 @@ import com.russhwolf.settings.Settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,10 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -36,6 +42,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.tab_position
+import org.jetbrains.compose.resources.stringResource
+
+/**
+ * Marks text that changes while the screen is open (progress, status, errors) so screen readers
+ * announce the new text without moving focus. Descendants are merged so a note or record reads as
+ * one message.
+ */
+internal fun Modifier.azphaltLiveRegion(): Modifier =
+    semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
 
 internal object Azphalt {
     val Ink = Color(0xFF1E1A17)
@@ -87,6 +104,13 @@ internal object Azphalt {
         val currentIndex = grounds.indexOf(currentGround)
         currentGround = grounds[(currentIndex + 1) % grounds.size]
         settings.putString(GROUND_STORAGE_KEY, currentGround.name)
+    }
+
+    /** Re-reads the saved ground, after something other than [rerollGround] wrote it (a setup import). */
+    fun reloadGround() {
+        settings.getStringOrNull(GROUND_STORAGE_KEY)
+            ?.let { saved -> grounds.firstOrNull { it.name == saved } }
+            ?.let { currentGround = it }
     }
 
     fun hueIndex(seed: String): Int = seed.hashCode().mod(hues.size)
@@ -209,15 +233,19 @@ internal fun AzphaltPill(
     endCap: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    role: Role = Role.Button,
+    stateDescription: String? = null,
 ) {
     val hue = if (selected) Azphalt.Ink else Azphalt.hue(seed)
     val content = if (selected) Azphalt.Yellow else hue.contrastingText
+    val pillRole = role
     Row(
         modifier = modifier
             .semantics {
-                role = Role.Button
+                this.role = pillRole
                 this.selected = selected
                 contentDescription = if (endCap != null) "$label: $endCap" else label
+                if (stateDescription != null) this.stateDescription = stateDescription
             }
             .azphaltSelectedTransform(selected)
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
@@ -243,6 +271,47 @@ internal fun AzphaltPill(
                     color = if (selected) Azphalt.Ink else cap.contrastingText,
                 )
             }
+        }
+    }
+}
+
+/** One tab of an [AzphaltTabs] row. [key] must be unique within the row. */
+internal data class AzphaltTabItem(
+    val key: String,
+    val label: String,
+    val endCap: String? = null,
+)
+
+/**
+ * A single row of tabs built from [AzphaltPill], so tabs keep the pill colours, type and 48dp
+ * targets. Each tab reports `Role.Tab`, its selected state and its position ("Tab 2 of 5") to
+ * screen readers, and the row is one selectable group that scrolls sideways when it overflows.
+ */
+@Composable
+internal fun AzphaltTabs(
+    tabs: List<AzphaltTabItem>,
+    selectedKey: String,
+    onSelected: (String) -> Unit,
+    seedPrefix: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
+    ) {
+        tabs.forEachIndexed { index, tab ->
+            AzphaltPill(
+                label = tab.label,
+                seed = "$seedPrefix-${tab.key}",
+                selected = tab.key == selectedKey,
+                endCap = tab.endCap,
+                onClick = { onSelected(tab.key) },
+                role = Role.Tab,
+                stateDescription = stringResource(Res.string.tab_position, index + 1, tabs.size),
+            )
         }
     }
 }
