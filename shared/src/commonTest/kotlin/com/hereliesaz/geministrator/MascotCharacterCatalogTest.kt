@@ -6,7 +6,7 @@ import kotlin.test.assertNotNull
 
 class MascotCharacterCatalogTest {
     @Test
-    fun everyCurrentAzphaltPersonaOwnsADistinctCharacter() {
+    fun everyCurrentAzphaltPersonaIsRegistered() {
         val expectedRoles = setOf(
             "AI Evaluation Scientist",
             "Accessibility Auditor",
@@ -108,12 +108,6 @@ class MascotCharacterCatalogTest {
         assertEquals(expectedRoles, characters.map { it.roleLabel }.toSet())
         assertEquals(expectedRoles.size, characters.size)
         assertEquals(characters.size, characters.map { it.id }.toSet().size)
-        assertEquals(characters.size, characters.map { it.phenotypeIndex }.toSet().size)
-        assertEquals(
-            characters.size,
-            characters.map { it.designFingerprint }.toSet().size,
-            "Store roles must remain one-character-per-role rather than collapsing into mascot families",
-        )
 
         expectedRoles.forEach { roleName ->
             assertNotNull(
@@ -124,13 +118,13 @@ class MascotCharacterCatalogTest {
     }
 
     @Test
-    fun unrelatedCustomRolesReceiveTheirOwnStableCharacterInsteadOfGenericVisualIdentity() {
-        val first = assertNotNull(MascotCharacterCatalog.forRole("Ceramics Kiln Wrangler"))
-        val again = assertNotNull(MascotCharacterCatalog.forRole("Ceramics Kiln Wrangler"))
-        val other = assertNotNull(MascotCharacterCatalog.forRole("Archive Cartographer"))
-
-        assertEquals(first, again)
-        kotlin.test.assertNotEquals(first.id, other.id)
-        kotlin.test.assertNotEquals(first.phenotypeIndex, other.phenotypeIndex)
+    fun everyPersonaWearsTheCreatureOfItsRigKind() {
+        MascotCharacterCatalog.explicitCharacters.forEach { persona ->
+            val slug = assertNotNull(
+                CreatureRigMapping.bySlugKind[persona.rigKind],
+                "${persona.roleLabel}: rigKind ${persona.rigKind} has no creature",
+            )
+            assertEquals(slug, CreatureRigMapping.slugFor(persona.roleLabel), persona.roleLabel)
+        }
     }
 }
