@@ -87,6 +87,8 @@ def sheet_time(d: str, f: str) -> float:
 
 def references(d: str):
     """Assembled references for a role; generic redesigns deliberately use no legacy node renders."""
+    if not d:
+        return []  # shared sheets directly in characters/ have no assembled reference
     if sp.role_slug(d) == "generic":
         # The six 000_generic sheets are the redesigned node creatures themselves.  Using the old
         # node_01/11/21/31/41/43 contact-sheet renders as pose references reintroduces those retired
@@ -841,7 +843,7 @@ def plan_slugs(sheets, ov_all):
         by_dir.setdefault(d, []).append((d, f, pdir))
     plan = []
     for d, lst in by_dir.items():
-        role = sp.role_slug(d)
+        role = sp.role_slug(d) if d else ""
         lst.sort(key=lambda t: sheet_time(t[0], t[1]))
         newest = lst[-1][1]
         for i, (dd, f, pdir) in enumerate(lst):
@@ -851,7 +853,7 @@ def plan_slugs(sheets, ov_all):
                 slug = f"{role}-{i + 1}"
             else:
                 slug = role
-            slug = ov_all.get(f"{dd}/{f}", {}).get("slug", slug)
+            slug = ov_all.get(sp.sheet_key(dd, f), {}).get("slug", slug)
             plan.append(dict(dir=dd, file=f, pdir=pdir, slug=slug, newest=(f == newest), n_in_role=len(lst)))
     return plan
 
@@ -864,7 +866,7 @@ def main():
     ov_all = sp.load_overrides()
     plan = plan_slugs(all_sheets(), ov_all)
     if a.only:
-        plan = [it for it in plan if a.only in f"{it['dir']}/{it['file']}" or a.only in it["slug"]]
+        plan = [it for it in plan if a.only in sp.sheet_key(it["dir"], it["file"]) or a.only in it["slug"]]
     os.makedirs(RIG_OUT, exist_ok=True)
     # reference assignment per dir (Hungarian over soma colour similarity when a dir has several sheets/refs)
     refs_cache = {}
@@ -893,7 +895,7 @@ def main():
         for i, j in zip(ri, cj):
             items[i]["ref"] = loaded[j][0]
     for it in plan:
-        key = f"{it['dir']}/{it['file']}"
+        key = sp.sheet_key(it["dir"], it["file"])
         ov = ov_all.get(key, {})
         if a.only and a.only not in key and a.only not in it["slug"]:
             continue

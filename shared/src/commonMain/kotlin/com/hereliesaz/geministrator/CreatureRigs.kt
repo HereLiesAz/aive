@@ -65,6 +65,7 @@ internal object CreatureRigMapping {
         "creature",
         "data-miner-sheet-1-variant-1",
         "data-miner-sheet-1-variant-2",
+        "disassembled-glossy-slime",
         "idea-catalyst-1",
         "knowledge-keeper-sheet-1-variant",
         "optimizer-sheet-2-variant",
