@@ -16,12 +16,15 @@ import com.hereliesaz.aive.R
  * What the Remote access settings do. Turning it on creates a pairing and starts
  * [AiveRelayHostService]; turning it off, or resetting the pairing, deletes the old room on the
  * relay so the old code stops working at once. Each returns a user-facing problem, or null.
+ *
+ * Stubbed out while [AVAILABLE] is false: the setting is hidden, nothing starts the service, and
+ * the manifest declares neither the service nor its foreground-service permissions.
  */
 internal class RemoteAccessController(context: Context) {
     private val context = context.applicationContext
     val store = RemoteRelayStore(context)
 
-    fun turnOn(): String? = attempt("Could not turn on Remote access") {
+    fun turnOn(): String? = if (!AVAILABLE) "Remote access is not available yet" else attempt("Could not turn on Remote access") {
         store.enable()
         AiveRelayHostService.start(context)
     }
@@ -31,7 +34,7 @@ internal class RemoteAccessController(context: Context) {
         RemoteRelayAdmin.deleteRoom(store.disable())
     }
 
-    fun resetPairing(): String? = attempt("Could not reset the pairing") {
+    fun resetPairing(): String? = if (!AVAILABLE) "Remote access is not available yet" else attempt("Could not reset the pairing") {
         AiveRelayHostService.stop(context)
         val (old, _) = store.reset()
         RemoteRelayAdmin.deleteRoom(old)
@@ -40,7 +43,7 @@ internal class RemoteAccessController(context: Context) {
 
     /** Resumes the link after the app process was recreated while Remote access is on. */
     fun resumeIfEnabled() {
-        if (store.enabled) AiveRelayHostService.start(context)
+        if (AVAILABLE && store.enabled) AiveRelayHostService.start(context)
     }
 
     fun copy(code: String) {
@@ -79,7 +82,9 @@ internal class RemoteAccessController(context: Context) {
             problem.message ?: fallback
         }
 
-    private companion object {
-        const val CLIPBOARD_CLEAR_MILLIS = 60_000L
+    companion object {
+        /** Off until IDEaz is released. Flipping it also needs the manifest entries restored. */
+        const val AVAILABLE = false
+        private const val CLIPBOARD_CLEAR_MILLIS = 60_000L
     }
 }
