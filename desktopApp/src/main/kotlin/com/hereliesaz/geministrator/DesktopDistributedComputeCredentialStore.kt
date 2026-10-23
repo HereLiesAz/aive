@@ -115,13 +115,7 @@ internal class DesktopDistributedComputeCredentialStore {
                         "-s", KEYCHAIN_SERVICE,
                         "-a", ACCOUNT,
                     ).start().waitFor()
-                    ProcessBuilder(
-                        "security", "add-generic-password",
-                        "-s", KEYCHAIN_SERVICE,
-                        "-a", ACCOUNT,
-                        "-w", token,
-                        "-U",
-                    ).start().waitFor() == 0
+                    MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, ACCOUNT, token)
                 }
                 os.contains("win") -> {
                     val process = windowsPowerShell(WINDOWS_WRITE_SCRIPT, windowsTokenFile()).start()

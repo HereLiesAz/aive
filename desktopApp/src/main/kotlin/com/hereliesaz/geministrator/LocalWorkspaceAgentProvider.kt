@@ -717,10 +717,10 @@ internal class LocalWorkspaceAgentProvider(
                 require(parts.size >= 4) { "Generated diff contains an invalid file header" }
                 listOf(parts[2].removePrefix("a/"), parts[3].removePrefix("b/")).forEach { path ->
                     require(path.isNotBlank()) { "Generated diff contains an empty path" }
-                    require(!path.startsWith('/') && !path.startsWith(".git/") && ".." !in path.split('/')) {
+                    require(!path.startsWith('/') && ".." !in path.split('/') && ".git" !in path.split('/')) {
                         "Generated diff attempts to write outside the repository: $path"
                     }
-                    require(path !in setOf(".gitattributes", ".gitmodules")) {
+                    require(path.substringAfterLast('/') !in setOf(".gitattributes", ".gitmodules")) {
                         "Generated diff may not modify Git execution-control file: $path"
                     }
                 }

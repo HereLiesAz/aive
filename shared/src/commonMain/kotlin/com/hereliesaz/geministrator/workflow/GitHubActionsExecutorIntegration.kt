@@ -87,7 +87,7 @@ class GitHubRestActionsClient(
         val token = requireToken()
         val repository = request.repository
         val responseBody = httpClient.post(
-            "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}/actions/workflows/${request.workflow.encodeURLPathPart()}/dispatches",
+            "$baseUrl/repos/${repository.owner.pathSegment()}/${repository.name.pathSegment()}/actions/workflows/${request.workflow.pathSegment()}/dispatches",
         ) {
             githubHeaders(token)
             contentType(ContentType.Application.Json)
@@ -114,12 +114,12 @@ class GitHubRestActionsClient(
 
     override suspend fun getRun(repository: RepositoryRef, runId: String): GitHubWorkflowRun {
         val token = requireToken()
-        val baseRepositoryUrl = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
-        val runBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.encodeURLPathPart()}") {
+        val baseRepositoryUrl = "$baseUrl/repos/${repository.owner.pathSegment()}/${repository.name.pathSegment()}"
+        val runBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.pathSegment()}") {
             githubHeaders(token)
         }.requireSuccessBody("read GitHub Actions run $runId")
         val run = json.decodeFromString<RunResponse>(runBody)
-        val artifactsBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.encodeURLPathPart()}/artifacts") {
+        val artifactsBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.pathSegment()}/artifacts") {
             githubHeaders(token)
         }.requireSuccessBody("read artifacts for GitHub Actions run $runId")
         val artifacts = json.decodeFromString<ArtifactsResponse>(artifactsBody).artifacts
@@ -131,7 +131,7 @@ class GitHubRestActionsClient(
                     artifact.archiveDownloadUrl,
                 )
             }
-        val jobsBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.encodeURLPathPart()}/jobs") {
+        val jobsBody = httpClient.get("$baseRepositoryUrl/actions/runs/${runId.pathSegment()}/jobs") {
             githubHeaders(token)
         }.requireSuccessBody("read jobs for GitHub Actions run $runId")
         val jobs = json.decodeFromString<JobsResponse>(jobsBody).jobs.map { job ->
@@ -184,7 +184,7 @@ class GitHubRestActionsClient(
     ): ByteArray {
         val token = requireToken()
         val response = httpClient.get(
-            "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}/actions/artifacts/${artifactId.encodeURLPathPart()}/zip",
+            "$baseUrl/repos/${repository.owner.pathSegment()}/${repository.name.pathSegment()}/actions/artifacts/${artifactId.pathSegment()}/zip",
         ) {
             githubHeaders(token)
         }
@@ -504,4 +504,10 @@ class GitHubActionsExecutorIntegration(
         const val MAX_RESULT_JSON_BYTES = 1024 * 1024
     }
 
+}
+
+/** A URL path segment from caller data: `.` and `..` are rejected, since servers resolve them. */
+private fun String.pathSegment(): String {
+    require(isNotEmpty() && this != "." && this != "..") { "Invalid GitHub path segment: '$this'" }
+    return encodeURLPathPart()
 }

@@ -341,6 +341,13 @@ class GeminiGenerateContentApi(
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
 
+    init {
+        // The model id becomes a URL path segment, so it may not carry '/', '?', '#' or '..'.
+        require(model.matches(Regex("[A-Za-z0-9._-]+")) && model != "." && model != "..") {
+            "Gemini model id contains characters that are not allowed"
+        }
+    }
+
     override suspend fun generate(prompt: String): TextGenerationResult {
         val response = client.post("$baseUrl/models/$model:generateContent") {
             header("x-goog-api-key", apiKeyProvider.requireKey("Gemini"))

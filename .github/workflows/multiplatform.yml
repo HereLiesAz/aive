@@ -283,7 +283,7 @@ jobs:
             exit 1
           fi
           if printf '%s\n' "$MATCHES" | xargs grep -IlE 'REQUEST_INSTALL_PACKAGES|androidx\.core\.content\.FileProvider|\.updates' | grep -q .; then
-            echo "::error::Play manifest contains GitHub self-update/sideload components"
+            echo "::error::Play manifest contains install-permission or update FileProvider components"
             exit 1
           fi
 
@@ -305,12 +305,9 @@ jobs:
             echo "::error::GitHub manifest is missing the installed-Gemini accessibility bridge"
             exit 1
           fi
-          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'REQUEST_INSTALL_PACKAGES' | grep -q .; then
-            echo "::error::GitHub manifest is missing package-install permission for self-update"
-            exit 1
-          fi
-          if ! printf '%s\n' "$MATCHES" | xargs grep -Il 'androidx.core.content.FileProvider' | grep -q .; then
-            echo "::error::GitHub manifest is missing update FileProvider"
+          # The app opens the release page in a browser; it never installs an APK itself.
+          if printf '%s\n' "$MATCHES" | xargs grep -IlE 'REQUEST_INSTALL_PACKAGES|androidx\.core\.content\.FileProvider' | grep -q .; then
+            echo "::error::GitHub manifest declares the package-install permission or an update FileProvider, which the update flow no longer uses"
             exit 1
           fi
 
