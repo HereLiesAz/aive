@@ -691,6 +691,12 @@
     <string name="store_size_not_published">size not published</string>
     <string name="store_store">STORE</string>
     <string name="store_store_error">STORE ERROR</string>
+    <string name="store_failed_while">Failed while %1$s.</string>
+    <string name="store_step_index">reading the catalogue index</string>
+    <string name="store_step_installed">reading installed packages</string>
+    <string name="store_step_revocations">checking for withdrawn packages</string>
+    <string name="store_step_search">searching the catalogue</string>
+    <string name="store_step_updates">checking for updates</string>
     <string name="store_store_networking_is_unavailable_on_this">The Store can't connect on this device.</string>
     <string name="store_terms"> Terms: %1$s</string>
     <string name="store_the_package_signature_is_valid_but">The signature is genuine, but you haven't trusted this publisher before. Approve below to install anyway.</string>

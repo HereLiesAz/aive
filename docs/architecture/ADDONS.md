@@ -76,6 +76,19 @@ A failed repository request must surface as an error. A legitimately empty compa
 reported separately from transport/server failure; the UI must not quietly translate a failed refresh
 into "0 installed" or "no packages."
 
+Store failures are observable. `AzphaltStoreService.snapshot()` runs each phase (catalogue index, search,
+installed packages, updates, withdrawn-package check) under `storeStep`, which logs the exception class,
+message and stack through `platformDebugLog` and rethrows an `AzphaltStoreStepException` that names the
+phase and keeps the original cause. The Store screen shows a plain-language message that names the step
+and always offers a Details toggle (`ErrorDetailsToggle`) with the exception class, message and causes, so
+a failure with no message of its own is never shown as a bare generic. Cancellation is never reported as a
+failure. The repository publishes package size as `bytes`; `AzphaltPackageSummary.sizeInBytes` reads
+`bytes` or the older `byteSize`.
+
+On Android the Store and model downloads use Ktor's OkHttp engine (the platform TLS stack and system
+trust), not CIO's own TLS implementation, and `androidApp/proguard-rules.pro` keeps the
+kotlinx.serialization serializers, Ktor, and the `azphalt` models that release builds decode from JSON.
+
 ## NEVER EXPOSE
 
 The following internal platform capabilities MUST NEVER be exposed to the add-on layer:
