@@ -185,8 +185,6 @@
     <string name="library_installed_workflows_saved_compositions_and_reusable">Installed workflows, saved compositions, and reusable roles share one graph library.</string>
     <string name="library_integration_concurrency">Integration · %1$s · Concurrency %2$s</string>
     <string name="library_library_error">LIBRARY ERROR</string>
-    <string name="library_load">Load</string>
-    <string name="library_loaded_workflow">LOADED WORKFLOW</string>
     <string name="library_loading_workflow_library">Loading workflow library…</string>
     <string name="library_no_dependencies">No dependencies</string>
     <string name="library_no_library_entries_match_this_filter">No library entries match this filter.</string>
@@ -209,6 +207,15 @@
     <string name="library_workflow_library_could_not_be_loaded">Workflow library could not be loaded.</string>
     <string name="library_workflow_name">Workflow name</string>
     <string name="library_workflows">WORKFLOWS</string>
+    <string name="library_tab_library">My library</string>
+    <string name="library_tab_store">Azphalt Store</string>
+    <string name="library_tab_overview">Overview</string>
+    <string name="library_tab_tasks">Tasks</string>
+    <string name="library_tab_combine">Combine</string>
+    <string name="library_tab_save">Save</string>
+    <string name="library_pinned_change">Change</string>
+    <string name="library_pinned_clear">Clear</string>
+    <string name="tab_position">Tab %1$d of %2$d</string>
 
     <string name="lineage_a_new_run_that_reads_this">A new run that reads this run's memory and adds to its own.</string>
     <string name="lineage_cancel_continue">Cancel continue</string>
