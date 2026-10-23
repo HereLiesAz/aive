@@ -154,12 +154,12 @@ const shot = process.argv[3] || path.join(os.tmpdir(), 'puppet-rig.png');
   const editedErrors = validateRig(edited);
   if (editedErrors.length) throw new Error(`edited export invalid: ${editedErrors.join('; ')}`);
 
-  // Round-trip: import the transcribed UX Designer reference rig (JSON + atlas) and preview it.
+  // Round-trip: import the layered UX Designer rig (JSON + atlas) and preview it.
   const rigs = path.join(__dirname, '..', '..', '..', 'shared', 'src', 'commonMain', 'composeResources', 'files', 'rigs');
   await page.setInputFiles('#import', [path.join(rigs, 'ux-designer.rig.json'), path.join(rigs, 'ux_designer_rig_atlas.png')]);
   await page.waitForFunction(() => window.puppetRig.doc.role === 'ux-designer');
   const n = await page.evaluate(() => window.puppetRig.doc.parts.length);
-  if (n !== 15) throw new Error(`ux-designer import: ${n} parts`);
+  if (n !== 20) throw new Error(`ux-designer import: ${n} parts`);
   const reexport = await page.evaluate(() => window.puppetRig.buildExport().json);
   const reErrs = validateRig(reexport);
   if (reErrs.length) throw new Error(`re-export invalid: ${reErrs.join('; ')}`);
