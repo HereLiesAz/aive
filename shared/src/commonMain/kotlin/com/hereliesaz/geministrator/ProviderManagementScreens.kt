@@ -73,6 +73,7 @@ import com.hereliesaz.geministrator.resources.settings_compute_pool_id
 import com.hereliesaz.geministrator.resources.settings_connect_as_many_providers_as_you
 import com.hereliesaz.geministrator.resources.settings_connect_this_device_to_the_same
 import com.hereliesaz.geministrator.resources.settings_crash_reports
+import com.hereliesaz.geministrator.resources.settings_crash_reports_intro
 import com.hereliesaz.geministrator.resources.settings_credential_configured
 import com.hereliesaz.geministrator.resources.settings_data
 import com.hereliesaz.geministrator.resources.settings_delete_all_workflow_data
@@ -120,7 +121,6 @@ import com.hereliesaz.geministrator.resources.settings_not_configured
 import com.hereliesaz.geministrator.resources.settings_not_connected
 import com.hereliesaz.geministrator.resources.settings_observe_only
 import com.hereliesaz.geministrator.resources.settings_ok
-import com.hereliesaz.geministrator.resources.settings_on_by_default_while_the_aive
 import com.hereliesaz.geministrator.resources.settings_online
 import com.hereliesaz.geministrator.resources.settings_online_2
 import com.hereliesaz.geministrator.resources.settings_online_compute_nodes
@@ -591,7 +591,7 @@ internal fun ProviderSettingsScreen(
         crashReportingSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_crash_reports))
             Text(
-                stringResource(Res.string.settings_on_by_default_while_the_aive) +
+                stringResource(Res.string.settings_crash_reports_intro) +
                     stringResource(Res.string.settings_hereliesaz_aive_github_issue_tracker_exception) +
                     stringResource(Res.string.settings_device_model_no_workflow_content_or),
                 style = AzphaltType.body,

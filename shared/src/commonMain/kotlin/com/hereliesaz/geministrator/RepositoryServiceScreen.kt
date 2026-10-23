@@ -10,12 +10,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_connect
 import com.hereliesaz.geministrator.resources.common_connected
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_disconnect_action
+import com.hereliesaz.geministrator.resources.confirm_disconnect_repository_body
+import com.hereliesaz.geministrator.resources.confirm_disconnect_title
 import com.hereliesaz.geministrator.resources.repositories_connect_the_repository_hosts_aive_may
 import com.hereliesaz.geministrator.resources.repositories_credential_configured
 import com.hereliesaz.geministrator.resources.repositories_desktop_repository_service
@@ -39,6 +47,7 @@ internal fun RepositoryServiceScreen(
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
+    var disconnectServiceId by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -81,7 +90,7 @@ internal fun RepositoryServiceScreen(
                                 AzphaltPill(
                                     label = stringResource(Res.string.repositories_disconnect),
                                     seed = "repository-service-disconnect-${entry.id}",
-                                    onClick = { onDisconnectService(entry.id) },
+                                    onClick = { disconnectServiceId = entry.id },
                                 )
                             }
                         }
@@ -93,6 +102,23 @@ internal fun RepositoryServiceScreen(
                         )
                     }
                 },
+            )
+        }
+
+        disconnectServiceId?.let { id ->
+            AzphaltAlertDialog(
+                title = stringResource(
+                    Res.string.confirm_disconnect_title,
+                    RepositoryServiceCatalog.entries.firstOrNull { it.id == id }?.displayName ?: id,
+                ),
+                text = stringResource(Res.string.confirm_disconnect_repository_body),
+                confirmLabel = stringResource(Res.string.confirm_disconnect_action),
+                onConfirm = {
+                    disconnectServiceId = null
+                    onDisconnectService(id)
+                },
+                onDismissRequest = { disconnectServiceId = null },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
             )
         }
 

@@ -13,6 +13,11 @@
     <string name="confirm_disconnect_title">Disconnect %1$s?</string>
     <string name="confirm_disconnect_body">This removes the saved key from this device. To use the provider again you will need to paste a key again.</string>
     <string name="confirm_disconnect_action">Disconnect</string>
+    <string name="confirm_disconnect_repository_body">This removes the saved access token from this device. To use the service again you will need to paste a token again.</string>
+    <string name="confirm_remove_llm_title">Remove %1$s?</string>
+    <string name="confirm_remove_llm_body">The language model is removed from this device.</string>
+    <string name="confirm_remove_llm_connected_body">The language model is removed from this device, and its saved key is deleted. To use it again you will need to install it and paste a key again.</string>
+    <string name="confirm_remove_llm_action">Remove</string>
     <string name="confirm_recover_title">Delete all projects and runs?</string>
     <string name="confirm_recover_body">The saved workflow data is unreadable. Recovering deletes every project, run and event stored on this device. This cannot be undone.</string>
     <string name="confirm_recover_action">Delete everything</string>
