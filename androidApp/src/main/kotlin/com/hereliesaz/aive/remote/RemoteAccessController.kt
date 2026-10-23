@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PersistableBundle
 import android.widget.Toast
 import com.hereliesaz.aive.R
@@ -47,8 +49,18 @@ internal class RemoteAccessController(context: Context) {
             // Keeps the code out of the clipboard preview.
             clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
         }
-        context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(clip)
         Toast.makeText(context, R.string.remote_access_copied, Toast.LENGTH_SHORT).show()
+        // The code is a bearer secret, so it does not stay on the clipboard: it is cleared after a
+        // minute unless something else has been copied since.
+        Handler(Looper.getMainLooper()).postDelayed({
+            val current = runCatching { clipboard.primaryClip?.getItemAt(0)?.text?.toString() }.getOrNull()
+            if (current == code) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) clipboard.clearPrimaryClip()
+                else clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+            }
+        }, CLIPBOARD_CLEAR_MILLIS)
     }
 
     fun share(code: String) {
@@ -66,4 +78,8 @@ internal class RemoteAccessController(context: Context) {
         } catch (problem: Exception) {
             problem.message ?: fallback
         }
+
+    private companion object {
+        const val CLIPBOARD_CLEAR_MILLIS = 60_000L
+    }
 }

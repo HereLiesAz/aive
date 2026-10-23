@@ -12,6 +12,7 @@ import com.hereliesaz.aive.crash.CrashReport
 import com.hereliesaz.aive.crash.CrashReportKeyValueStore
 import com.hereliesaz.aive.crash.CrashReportPolicy
 import com.hereliesaz.aive.crash.CrashSignatures
+import com.hereliesaz.aive.crash.redactCrashTrace
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -178,7 +179,7 @@ internal object CrashReporting {
         return CrashReport(
             kind = kind,
             signature = signature,
-            stackTrace = trace.take(CrashReport.MAX_STACK_CHARS),
+            stackTrace = redactCrashTrace(trace).take(CrashReport.MAX_STACK_CHARS),
             appVersionName = (info.versionName ?: "unknown").replace('_', '-'),
             appVersionCode = code,
             packageName = context.packageName,
