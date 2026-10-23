@@ -87,6 +87,44 @@ internal class DesktopProjectFileService : ProjectFileService {
         )
     }
 
+    override suspend fun saveSetupFileAs(fileName: String, content: String): ProjectFileDescriptor? {
+        val chooser = setupChooser().apply {
+            dialogTitle = "Save The Aive setup file"
+            selectedFile = setupDirectory().resolve(fileName.asSetupFileName()).toFile()
+        }
+        if (chooser.showSaveDialog(null) != JFileChooser.APPROVE_OPTION) return null
+        var selected = chooser.selectedFile.toPath().toAbsolutePath().normalize()
+        if (!selected.fileName.toString().endsWith(SETUP_FILE_EXTENSION, ignoreCase = true)) {
+            selected = selected.resolveSibling(selected.fileName.toString().asSetupFileName())
+        }
+        selected.parent?.let(Files::createDirectories)
+        writeAtomically(selected, content)
+        return requireNotNull(descriptor(selected))
+    }
+
+    override suspend fun chooseAndReadSetupFile(): ProjectFileReadResult? {
+        val chooser = setupChooser().apply {
+            dialogTitle = "Open The Aive setup file"
+            currentDirectory = setupDirectory().toFile()
+        }
+        if (chooser.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) return null
+        val path = chooser.selectedFile.toPath().toAbsolutePath().normalize()
+        if (!Files.isRegularFile(path)) return null
+        return ProjectFileReadResult(
+            descriptor = requireNotNull(descriptor(path)),
+            content = Files.readString(path),
+        )
+    }
+
+    private fun setupChooser(): JFileChooser = JFileChooser().apply {
+        isAcceptAllFileFilterUsed = true
+        fileSelectionMode = JFileChooser.FILES_ONLY
+        fileFilter = FileNameExtensionFilter("The Aive setup (*$SETUP_FILE_EXTENSION)", SETUP_FILE_EXTENSION.removePrefix("."))
+    }
+
+    private fun setupDirectory(): Path =
+        Path.of(System.getProperty("user.home"), "Documents", "The Aive")
+
     private fun projectChooser(): JFileChooser = JFileChooser().apply {
         isAcceptAllFileFilterUsed = true
         fileSelectionMode = JFileChooser.FILES_ONLY
