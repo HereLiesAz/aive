@@ -724,6 +724,7 @@ internal fun ProviderSettingsScreen(
                     title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
+                    modifier = Modifier.azphaltLiveRegion(),
                 )
                 LocalPlannerStatus.Installed -> AzphaltPill(
                     stringResource(Res.string.settings_local_planner_installed_remove),
@@ -739,6 +740,7 @@ internal fun ProviderSettingsScreen(
                         title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
                         endCap = stringResource(Res.string.common_retry),
+                        modifier = Modifier.azphaltLiveRegion(),
                     )
                     AzphaltPill(
                         stringResource(Res.string.settings_retry_install, setting.downloadSize),
@@ -772,6 +774,7 @@ internal fun ProviderSettingsScreen(
                     title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
+                    modifier = Modifier.azphaltLiveRegion(),
                 )
                 LocalOrchestrationSpecialistStatus.Installed -> AzphaltPill(
                     stringResource(Res.string.settings_local_specialists_installed_remove),
@@ -787,6 +790,7 @@ internal fun ProviderSettingsScreen(
                         title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
                         endCap = stringResource(Res.string.common_retry),
+                        modifier = Modifier.azphaltLiveRegion(),
                     )
                     AzphaltPill(
                         stringResource(Res.string.settings_retry_specialist_install),
@@ -807,6 +811,7 @@ internal fun ProviderSettingsScreen(
         )
         AzphaltRecord(
             seed = "distributed-compute-status",
+            modifier = Modifier.azphaltLiveRegion(),
             eyebrow = stringResource(Res.string.settings_distributed_compute),
             title = if (distributedComputeState.connected) stringResource(Res.string.common_connected) else stringResource(Res.string.settings_not_connected),
             body = buildString {

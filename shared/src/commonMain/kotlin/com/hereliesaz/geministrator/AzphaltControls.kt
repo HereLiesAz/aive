@@ -113,7 +113,7 @@ internal fun AzphaltTextField(
             null
         },
         isError = errorMessage != null,
-        supportingText = errorMessage?.let { message -> { Text(message) } },
+        supportingText = errorMessage?.let { message -> { Text(message, modifier = Modifier.azphaltLiveRegion()) } },
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = onGround,
             unfocusedTextColor = onGround,

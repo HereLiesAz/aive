@@ -24,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -36,6 +38,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+
+/**
+ * Marks text that changes while the screen is open (progress, status, errors) so screen readers
+ * announce the new text without moving focus. Descendants are merged so a note or record reads as
+ * one message.
+ */
+internal fun Modifier.azphaltLiveRegion(): Modifier =
+    semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
 
 internal object Azphalt {
     val Ink = Color(0xFF1E1A17)

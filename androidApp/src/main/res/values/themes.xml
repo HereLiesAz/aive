@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base app theme -->
+    <!-- Base app theme. Parent left as the framework Material theme: every screen is Compose, but its dark window background and light system-bar icons come from this parent, and the change cannot be checked without a device build. -->
     <style name="Theme.Haive" parent="@android:style/Theme.Material.NoActionBar" />
 
     <!-- Splash theme for API 26–30: uses window background drawable -->

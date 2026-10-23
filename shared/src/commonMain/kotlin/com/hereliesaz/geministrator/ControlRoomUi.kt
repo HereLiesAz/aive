@@ -344,7 +344,12 @@ private fun PillNavigation(
             onClick = { Azphalt.rerollGround() },
             modifier = Modifier.fillMaxWidth(0.9f),
         )
-        Text(runtimeStatusLabel(runtimeState), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(
+            runtimeStatusLabel(runtimeState),
+            style = AzphaltType.eyebrow,
+            color = Azphalt.currentGround.onPage,
+            modifier = Modifier.azphaltLiveRegion(),
+        )
     }
 }
 
