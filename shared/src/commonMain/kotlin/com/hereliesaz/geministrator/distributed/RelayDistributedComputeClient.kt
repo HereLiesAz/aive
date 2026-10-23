@@ -8,6 +8,9 @@ import io.ktor.http.HttpHeaders
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -54,9 +57,9 @@ class RelayDistributedComputeClient(
         loopJob = scope.launch {
             var backoffMillis = 1_000L
             while (isActive) {
+                val connectedAt = TimeSource.Monotonic.markNow()
                 try {
                     connectOnce(this)
-                    backoffMillis = 1_000L
                 } catch (_: Throwable) {
                     _connected.value = false
                 } finally {
@@ -66,8 +69,11 @@ class RelayDistributedComputeClient(
                     }
                     _connected.value = false
                 }
-                delay(backoffMillis)
-                backoffMillis = (backoffMillis * 2).coerceAtMost(15_000L)
+                // Only a connection that held for a while resets the backoff: a relay that accepts the
+                // socket and then drops it must not be hammered once a second forever.
+                backoffMillis = if (connectedAt.elapsedNow() >= STABLE_CONNECTION) 1_000L
+                else (backoffMillis * 2).coerceAtMost(15_000L)
+                delay(backoffMillis + Random.nextLong(backoffMillis / 4 + 1))
             }
         }
     }
@@ -275,6 +281,8 @@ class RelayDistributedComputeClient(
             ignoreUnknownKeys = true
             classDiscriminator = "type"
         }
+
+        private val STABLE_CONNECTION = 30.seconds
     }
 }
 

@@ -38,25 +38,37 @@ internal fun AndroidUpdatePrompt(
             dismissLabel = stringResource(R.string.update_later),
         )
 
+        is AndroidUpdateState.Error -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_error_title),
+            text = stringResource(R.string.update_error_body),
+            confirmLabel = stringResource(R.string.update_dismiss),
+            onConfirm = onDismiss,
+            onDismissRequest = onDismiss,
+        )
+
         else -> Unit
     }
 }
 
+/**
+ * True when [candidate] is a later version than [current]. Dotted numeric parts compare in order;
+ * a non-numeric or oversized part counts as 0. At equal numbers a final release is newer than a
+ * pre-release of it (`1.0.0` > `1.0.0-rc1`), and a pre-release is never newer than the final.
+ */
 internal fun isNewerVersion(candidate: String, current: String): Boolean {
-    fun parts(value: String): List<Int> = value
-        .trim()
-        .removePrefix("v")
-        .substringBefore('-')
-        .split('.')
-        .map { it.toIntOrNull() ?: 0 }
+    fun split(value: String): Pair<List<Long>, Boolean> {
+        val trimmed = value.trim().removePrefix("v")
+        val numbers = trimmed.substringBefore('-').split('.').map { it.toLongOrNull() ?: 0L }
+        return numbers to trimmed.contains('-')
+    }
 
-    val left = parts(candidate)
-    val right = parts(current)
+    val (left, leftPre) = split(candidate)
+    val (right, rightPre) = split(current)
     val size = maxOf(left.size, right.size)
     for (index in 0 until size) {
-        val a = left.getOrElse(index) { 0 }
-        val b = right.getOrElse(index) { 0 }
+        val a = left.getOrElse(index) { 0L }
+        val b = right.getOrElse(index) { 0L }
         if (a != b) return a > b
     }
-    return false
+    return rightPre && !leftPre
 }

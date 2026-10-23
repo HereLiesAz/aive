@@ -88,14 +88,7 @@ internal class DesktopRepositoryCredentialStore {
                         "-s", KEYCHAIN_SERVICE,
                         "-a", serviceId,
                     ).start().waitFor()
-                    val result = ProcessBuilder(
-                        "security", "add-generic-password",
-                        "-s", KEYCHAIN_SERVICE,
-                        "-a", serviceId,
-                        "-w", credential,
-                        "-U",
-                    ).start()
-                    result.waitFor() == 0
+                    MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, serviceId, credential)
                 }
                 os.contains("win") -> false
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {

@@ -33,6 +33,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/WORKFLOW_COMPOSITION.md`](architecture/WORKFLOW_COMPOSITION.md) defines recursive composition: a role is the smallest workflow, and any role-task or workflow node may be replaced by another workflow graph, with shared workflow/role libraries.
 
+### Vector stores
+
+[`architecture/VECTOR_STORES.md`](architecture/VECTOR_STORES.md) describes the vector-store boundary used by agent memory.
+
 ### Compound inference
 
 [`architecture/COMPOUND_INFERENCE.md`](architecture/COMPOUND_INFERENCE.md) defines the forward compound-inference architecture: centralized mixture-of-agents as governed DAG subgraphs, genealogy-based governance, Blueprint-style inference infrastructure, the local specialist/LoRA model library, DSPy optimization, governed Skeleton-of-Thought execution, and later ternary-model experiments. It preserves the existing human-like memory/reconsolidation authority boundary.

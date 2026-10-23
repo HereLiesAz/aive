@@ -40,7 +40,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +67,10 @@ import kotlin.math.roundToInt
 import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.semantics_move_node_down
+import com.hereliesaz.geministrator.resources.semantics_move_node_left
+import com.hereliesaz.geministrator.resources.semantics_move_node_right
+import com.hereliesaz.geministrator.resources.semantics_move_node_up
 import com.hereliesaz.geministrator.resources.terrarium_reset_zoom
 import com.hereliesaz.geministrator.resources.terrarium_zoom_in
 import com.hereliesaz.geministrator.resources.terrarium_zoom_out
@@ -155,7 +163,7 @@ private fun MascotNodeTerrarium(
     )
 
     val clock = rememberInfiniteTransition(label = "node-mascot-clock")
-    val motionPhase by clock.animateFloat(
+    val animatedMotionPhase by clock.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -164,7 +172,7 @@ private fun MascotNodeTerrarium(
         ),
         label = "node-mascot-motion",
     )
-    val linkPulse by clock.animateFloat(
+    val animatedLinkPulse by clock.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -173,6 +181,14 @@ private fun MascotNodeTerrarium(
         ),
         label = "node-mascot-link-pulse",
     )
+    // Reduced motion (system animator scale 0 / prefers-reduced-motion) freezes both clocks.
+    val reduceMotion = AzphaltMotion.reduceMotion
+    val moveLeftLabel = stringResource(Res.string.semantics_move_node_left)
+    val moveRightLabel = stringResource(Res.string.semantics_move_node_right)
+    val moveUpLabel = stringResource(Res.string.semantics_move_node_up)
+    val moveDownLabel = stringResource(Res.string.semantics_move_node_down)
+    fun motionPhase(): Float = if (reduceMotion) 0f else animatedMotionPhase
+    fun linkPulse(): Float = if (reduceMotion) 0.5f else animatedLinkPulse
 
     BoxWithConstraints(modifier = modifier) {
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
@@ -210,7 +226,7 @@ private fun MascotNodeTerrarium(
                     ?: compiled.newBuffer().also { rigBuffers[subject.node.id] = it }
                 compiled.evaluate(
                     compiled.stateIndex(subject.node.state.name),
-                    creatureRigPhase(motionPhase, subject.identitySeed),
+                    creatureRigPhase(motionPhase(), subject.identitySeed),
                     buffer,
                 )
                 rigPoses[subject.node.id] = loaded to buffer
@@ -293,7 +309,7 @@ private fun MascotNodeTerrarium(
                     cap = StrokeCap.Round,
                 )
                 if (active) {
-                    val pulse = start + (end - start) * linkPulse
+                    val pulse = start + (end - start) * linkPulse()
                     drawCircle(
                         color = onGround.copy(alpha = 0.72f),
                         radius = 3.dp.toPx(),
@@ -320,7 +336,7 @@ private fun MascotNodeTerrarium(
                 toRoleLabel = toSubject.node.label,
                 start = start,
                 end = end,
-                pulse = linkPulse,
+                pulse = linkPulse(),
                 active = active,
                 blocked = blocked,
                 zoom = zoom,
@@ -350,12 +366,31 @@ private fun MascotNodeTerrarium(
                         scaleX = zoom
                         scaleY = zoom
                     }
-                    .semantics {
+                    .semantics(mergeDescendants = true) {
                         contentDescription = buildString {
                             append(node.label)
                             append(", ")
                             append(action.lowercase())
                             if (taskLabel.isNotEmpty()) append(", $taskLabel")
+                        }
+                        role = Role.Button
+                        selected = isSelected
+                        // Non-drag alternative to moving a node: nudge it with assistive actions.
+                        if (editable) {
+                            val step = 0.04f
+                            fun nudge(dx: Float, dy: Float): Boolean {
+                                val current = workingPositions[node.id] ?: subject.position
+                                val next = H2g2TerrariumPosition(current.x + dx, current.y + dy).clamped()
+                                workingPositions = workingPositions + (node.id to next)
+                                onNodeMoved(node.id, next)
+                                return true
+                            }
+                            customActions = listOf(
+                                CustomAccessibilityAction(moveLeftLabel) { nudge(-step, 0f) },
+                                CustomAccessibilityAction(moveRightLabel) { nudge(step, 0f) },
+                                CustomAccessibilityAction(moveUpLabel) { nudge(0f, -step) },
+                                CustomAccessibilityAction(moveDownLabel) { nudge(0f, step) },
+                            )
                         }
                     }
                     .pointerInput(editable, node.id, widthPx, heightPx, subjects, zoom) {
@@ -400,7 +435,7 @@ private fun MascotNodeTerrarium(
                                 ?.first
                         }
                     }
-                    .clickable { onNodeSelected(node) },
+                    .clickable(role = Role.Button) { onNodeSelected(node) },
                 contentAlignment = Alignment.Center,
             ) {
                 if (isSelected || isDropTarget) {
@@ -422,7 +457,7 @@ private fun MascotNodeTerrarium(
                     roleLabel = node.label,
                     hueSeed = subject.identitySeed,
                     state = node.state,
-                    motionPhase = motionPhase,
+                    motionPhase = { motionPhase() },
                     modifier = Modifier.fillMaxSize(),
                 )
                 H2g2SwarmAdornmentLayer(

@@ -1,10 +1,10 @@
 /* Monochrome, minimal, dark. */
 :root {
-  --bg: #0b0b0b;
-  --panel: #141414;
-  --line: #2a2a2a;
+  --bg: #1E1A17; /* Azphalt Ink, the single dark background token */
+  --panel: #2A2420;
+  --line: #4A423B;
   --fg: #e8e8e8;
-  --dim: #8a8a8a;
+  --dim: #A8A29B;
   --hi: #ffffff;
   color-scheme: dark;
 }
@@ -62,3 +62,13 @@ button, input, select { font: inherit; color: inherit; }
 .stage-tools select { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
 #layer-list { margin-bottom: 10px; }
 #layer-list li .meta { font-variant-numeric: tabular-nums; }
+
+/* Accessibility: visible keyboard focus, keyboard-reachable file input, reduced motion. */
+:focus-visible { outline: 2px solid #F0D42A; outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.file-btn { position: relative; }
+.file-btn:focus-within { outline: 2px solid #F0D42A; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

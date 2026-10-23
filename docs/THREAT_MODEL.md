@@ -259,7 +259,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - Reporting happens without consent.
 
 **Mitigations in place**
-- Reporting exists only in the GitHub flavor and is disclosed in `docs/PRIVACY.md`. It is on by default until the production release (`CrashReportPolicy.DEFAULT_ENABLED`), then becomes opt-in. It can be turned off in Settings, which deletes pending reports.
+- Reporting exists only in the GitHub flavor and is disclosed in `docs/PRIVACY.md`. It is opt-in and off by default (`CrashReportPolicy.DEFAULT_ENABLED = false`); turning it off in Settings deletes pending reports.
 - The payload is fixed: device and app metadata, plus a stack trace truncated to 38,000 characters. No workflow content or credentials are added.
 - Historic ANRs are not backfilled on first enable.
 - The app holds no GitHub credential. The relay files issues with its own server-side token. The shipped relay key is only a spam filter.
@@ -290,12 +290,42 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 ### Updates and packages
 
 **Mitigations in place**
-- The GitHub-flavor updater verifies GitHub's published SHA-256 asset digest when one is present, and installs only after the user confirms. Android itself rejects an update signed with a different key.
-- Play updates go through Play's in-app update API.
+- The app never downloads or installs an APK itself. The GitHub-flavor check reads the public GitHub releases feed and, on request, opens the release page in the browser; Android's own installer then enforces that an update is signed with the same key. The GitHub build declares neither `REQUEST_INSTALL_PACKAGES` nor an update `FileProvider`, and CI fails if either appears in a manifest.
+- Each build updates only from its own channel (the Play build and the GitHub build are different packages). A Play build asks Play's in-app update API, and only when Play installed it; a Play build installed any other way makes no update check.
+- The release page URL comes from the feed but is opened only if it is on `https://github.com/`; anything else falls back to the releases list.
 - Azphalt packages require HTTPS repositories, Ed25519 signatures against repository signing keys, SHA-256 checksums for model assets, and a revocation check. If revocation status is unavailable, installation requires explicit offline/untrusted approval.
 
 **Remaining gaps**
-- If a GitHub release asset has no digest, the APK is installed on Android's signature check alone.
+- Azphalt trust keys come from the repository's own index, so a malicious custom repository can vouch for its own packages; revocations match package id plus version rather than key or digest. Installing from a custom repository is an explicit user action.
+- The GitHub release feed is unauthenticated and rate-limited; a failed check is shown as no update, not as an error.
+
+### Remote access and relay (Android)
+
+The Aive can be driven from IDEaz on another device through a relay Worker (`relay/`), or by IDEaz on the same device through the bound service. Protocol: `docs/Remote-API.md`.
+
+**Assets**
+- The pairing code (`aive1:...`). It carries the relay room, the client token and the 256-bit end-to-end key, so it is a bearer secret: whoever holds it can run prompts on the user's linked provider keys and queue workflows.
+- The room host token (never leaves the device) and the linked provider/GitHub credentials.
+
+**Threats**
+- A relay operator or network observer reads or alters traffic. Frames are sealed end to end (AES-256-GCM, room-bound AAD, per-session sequence numbers and timestamps), so the relay sees only sizes, timing and IP addresses and cannot forge a frame. It can drop frames or disconnect clients.
+- A captured sealed frame is replayed. The host keeps one replay guard for the life of the link, shared across reconnects, and rejects any sequence number it has seen and any timestamp more than 10 minutes from its clock.
+- The pairing code leaks (share sheet, clipboard, screenshot).
+- Someone floods the relay with rooms or frames.
+- A different app binds the local service or impersonates a client.
+
+**Mitigations in place**
+- The bound service is protected by a signature-level permission; both builds must be signed by the same key. IDEaz additionally checks that the Aive package's signing certificate matches its own before sending anything.
+- The relay stores only SHA-256 hashes of the host and client tokens; a client token never authenticates as host; a room expires after 30 days without its host; at most 8 clients per room.
+- The relay meters room creation per client address, closes any socket that exceeds a frame-rate token bucket, and caps a frame at 1 MB.
+- Reset pairing, or turning Remote access off, deletes the room and makes the old code useless. The copied pairing code is cleared from the clipboard after 60 seconds. The pairing credentials are excluded from backups.
+- Pairing and relay use are opt-in; the host runs as a foreground service with a visible notification.
+
+**Residual risks**
+- Anyone with the pairing code is a full client until the pairing is reset: there is no per-client enrolment, spend cap or revocation of a single device.
+- The replay guard is in memory, so a frame captured shortly before the app restarts can be replayed once after it within the 10-minute window.
+- A relay operator can drop or delay frames (denial of service) and sees connection metadata.
+- The relay's shared client-token model means a leaked code cannot be told apart from its owner.
 
 ### Persistence
 

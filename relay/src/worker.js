@@ -16,6 +16,8 @@
  */
 
 import {
+  TokenBucket,
+  countCreate,
   MAX_CLIENTS_PER_ROOM,
   MAX_FRAME_BYTES,
   ROOM_ID,
@@ -41,14 +43,34 @@ export default {
     } else if (request.method !== "POST" && request.method !== "DELETE") {
       return new Response("Method not allowed", { status: 405 });
     }
+    if (request.method === "POST" && env.LIMITER) {
+      // Anyone may create a room, so creation is metered per client address.
+      const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+      const verdict = await env.LIMITER.get(env.LIMITER.idFromName(ip)).fetch("https://limiter/create");
+      if (verdict.status === 429) return new Response("Too many rooms created; try again later", { status: 429 });
+    }
     const room = env.ROOMS.get(env.ROOMS.idFromName(match[1]));
     return room.fetch(request);
   },
 };
 
+/** One instance per client address: counts room creations in a fixed window. */
+export class CreateLimiter {
+  constructor(state) {
+    this.state = state;
+  }
+
+  async fetch() {
+    const { window, allowed } = countCreate(await this.state.storage.get("window"), Date.now());
+    await this.state.storage.put("window", window);
+    return new Response(null, { status: allowed ? 204 : 429 });
+  }
+}
+
 export class RemoteRoom {
   constructor(state) {
     this.state = state;
+    this.buckets = new WeakMap();
   }
 
   async fetch(request) {
@@ -120,6 +142,12 @@ export class RemoteRoom {
   async webSocketMessage(ws, message) {
     if (typeof message !== "string" || utf8Length(message) > MAX_FRAME_BYTES) {
       ws.close(1009, "Frame too large or not text");
+      return;
+    }
+    let bucket = this.buckets.get(ws);
+    if (!bucket) this.buckets.set(ws, (bucket = new TokenBucket()));
+    if (!bucket.take()) {
+      ws.close(1008, "Sending too fast");
       return;
     }
     const routed = routeFrame(this.state.getTags(ws), message);

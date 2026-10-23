@@ -15,6 +15,9 @@ data class MeshRoomCredentials(
         require(relayBaseUrl.startsWith("https://") || relayBaseUrl.startsWith("http://")) {
             "Mesh relay URL must be HTTP(S)"
         }
+        require(com.hereliesaz.geministrator.net.CleartextPolicy.allowsSecret(relayBaseUrl)) {
+            "Mesh relay URL must use https unless it is a local or private address"
+        }
         require(roomId.isNotBlank())
         require(encryptionKey.size == 32) { "Mesh room key must be 256 bits" }
         require(relayAuthToken.isNotBlank())

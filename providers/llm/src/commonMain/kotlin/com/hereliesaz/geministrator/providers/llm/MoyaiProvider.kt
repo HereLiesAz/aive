@@ -30,6 +30,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -38,6 +39,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.time.TimeSource
 
 /**
  * Native adapter for an Azphalt `moyai-session` LLM endpoint.
@@ -53,6 +55,8 @@ class MoyaiProvider(
     workspacePassword: String? = null,
     client: HttpClient = moyaiClient(),
     private val pollIntervalMillis: Long = 1_000L,
+    /** A session still unfinished after this long is reported as failed instead of being polled forever. */
+    private val maxObserveMillis: Long = 6L * 60L * 60L * 1_000L,
 ) : AgentProvider {
     private val api = MoyaiApi(baseUrl, workspacePassword, client)
     private val sessionsMutex = Mutex()
@@ -60,6 +64,7 @@ class MoyaiProvider(
 
     init {
         require(pollIntervalMillis >= 250L) { "pollIntervalMillis must be at least 250ms" }
+        require(maxObserveMillis >= pollIntervalMillis) { "maxObserveMillis must be at least pollIntervalMillis" }
     }
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
@@ -143,8 +148,33 @@ class MoyaiProvider(
         // "idle" is where a chat-enabled run rests once it has answered, but also where a run can
         // sit before it starts: it only means done after the run has visibly worked.
         var sawWork = false
+        val startedAt = TimeSource.Monotonic.markNow()
+        var consecutiveFailures = 0
+        // The same reply can arrive in one snapshot as a "chat" event and as an assistant message;
+        // say it once. Only within a snapshot: a later turn may legitimately repeat the words.
+        val repliesInSnapshot = HashSet<String>()
+        fun firstTimeSeen(text: String): Boolean = repliesInSnapshot.add(text)
         while (true) {
-            val snapshot = api.getRun(runId.value)
+            if (startedAt.elapsedNow().inWholeMilliseconds > maxObserveMillis) {
+                emit(AgentEvent.Failed(runId, "Moyai session ${runId.value.take(8)} did not finish in time"))
+                sessionsMutex.withLock { sessions.remove(runId) }
+                return@flow
+            }
+            val snapshot = try {
+                api.getRun(runId.value).also { consecutiveFailures = 0 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                // One failed poll (a dropped connection, a 5xx) does not end a long-running session.
+                if (++consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+                    emit(AgentEvent.Failed(runId, "Lost contact with Moyai: ${failure.message ?: "poll failed"}"))
+                    sessionsMutex.withLock { sessions.remove(runId) }
+                    return@flow
+                }
+                delay(pollIntervalMillis)
+                continue
+            }
+            repliesInSnapshot.clear()
             val status = snapshot.status.lowercase()
             sawWork = sawWork ||
                 status !in setOf("idle", "queued", "pending") ||
@@ -158,7 +188,7 @@ class MoyaiProvider(
                 snapshot.events.filter { it.id > lastEventId }.forEach { event ->
                     lastEventId = maxOf(lastEventId, event.id)
                     when (event.kind) {
-                        "chat" -> emit(AgentEvent.Message(runId, event.message))
+                        "chat" -> if (firstTimeSeen(event.message)) emit(AgentEvent.Message(runId, event.message))
                         "error" -> emit(AgentEvent.Progress(runId, event.message))
                         else -> emit(AgentEvent.Progress(runId, event.message))
                     }
@@ -167,7 +197,7 @@ class MoyaiProvider(
                     .filter { it.id > lastMessageId && it.role == "assistant" && it.content.isNotBlank() }
                     .forEach { message ->
                         lastMessageId = maxOf(lastMessageId, message.id)
-                        emit(AgentEvent.Message(runId, message.content))
+                        if (firstTimeSeen(message.content)) emit(AgentEvent.Message(runId, message.content))
                     }
             }
 
@@ -402,7 +432,9 @@ private class MoyaiApi(
 
     private fun io.ktor.client.request.HttpRequestBuilder.mutate() {
         header("Origin", origin)
-        header("X-CSRF-Token", requireNotNull(csrf))
+        // A concurrent call may have reset the session between ensureSession and here; report that
+        // as an expired session so withSession re-establishes it and retries.
+        header("X-CSRF-Token", csrf ?: throw MoyaiSessionExpired("Moyai session was reset; retrying"))
     }
 
     private suspend fun HttpResponse.requireSuccess(operation: String): HttpResponse {
@@ -415,6 +447,9 @@ private class MoyaiApi(
 }
 
 private class MoyaiSessionExpired(message: String) : IllegalStateException(message)
+
+/** Polls that may fail in a row (dropped connection, 5xx) before the session is reported lost. */
+private const val MAX_CONSECUTIVE_POLL_FAILURES = 5
 
 private fun moyaiClient(): HttpClient = HttpClient {
     expectSuccess = false

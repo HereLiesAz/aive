@@ -31,7 +31,8 @@ const ui = {
   view: { s: 1, ox: 0, oy: 0 },
   fitted: { cut: false, rig: false },
   polyDraft: null,
-  playing: true,
+  // Respect prefers-reduced-motion: start paused (Play still works on request).
+  playing: !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
   phase: 0,
   state: 'Active',
   loopSeconds: 2.4,
@@ -838,7 +839,10 @@ function finishPoly() {
 
 function setMode(mode) {
   ui.mode = mode;
-  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+  document.querySelectorAll('.tabs button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  });
   $('#transport').hidden = mode !== 'animate';
   ui.fitted[mode === 'cut' ? 'cut' : 'rig'] = false;
   renderPanel();
@@ -1118,6 +1122,7 @@ function syncInspector() {
 const stateSel = $('#state');
 stateSel.innerHTML = core.STATE_NAMES.map((s) => `<option ${s === ui.state ? 'selected' : ''}>${s}</option>`).join('');
 stateSel.addEventListener('change', () => { ui.state = stateSel.value; renderPanel(); draw(); });
+$('#play').textContent = ui.playing ? 'Pause' : 'Play';
 $('#play').addEventListener('click', () => {
   ui.playing = !ui.playing;
   $('#play').textContent = ui.playing ? 'Pause' : 'Play';

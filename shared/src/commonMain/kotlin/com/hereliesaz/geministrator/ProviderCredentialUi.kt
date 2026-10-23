@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,10 +18,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.credential_show
+import com.hereliesaz.geministrator.resources.credential_keyless_warning_title
+import com.hereliesaz.geministrator.resources.credential_keyless_warning_confirm
+import com.hereliesaz.geministrator.resources.credential_keyless_warning_body
+import com.hereliesaz.geministrator.resources.credential_keyless_hint
+import com.hereliesaz.geministrator.resources.credential_hide
+import com.hereliesaz.geministrator.resources.credential_field_required
 import com.hereliesaz.geministrator.resources.provider_credential_ai_provider
 import com.hereliesaz.geministrator.resources.provider_credential_connect
 import com.hereliesaz.geministrator.resources.provider_credential_credential
@@ -44,6 +49,8 @@ fun ProviderCredentialSetup(
     val uriHandler = LocalUriHandler.current
     var apiKey by remember(providerId) { mutableStateOf("") }
     var errorMessage by remember(providerId) { mutableStateOf<String?>(null) }
+    var keylessConfirm by remember(providerId) { mutableStateOf(false) }
+    val requiredMessage = stringResource(Res.string.credential_field_required, entry.credentialLabel)
 
     MaterialTheme(colorScheme = GeministratorColors) {
         Surface(
@@ -88,27 +95,44 @@ fun ProviderCredentialSetup(
                     style = AzphaltType.eyebrow,
                     color = Azphalt.currentGround.onPage,
                 )
-                OutlinedTextField(
+                AzphaltTextField(
                     value = apiKey,
                     onValueChange = {
                         apiKey = it
                         errorMessage = null
                     },
-                    label = { Text(entry.credentialLabel) },
+                    label = entry.credentialLabel,
                     placeholder = if (entry.keyOptional) {
-                        { Text(stringResource(Res.string.provider_credential_leave_blank_to_use_the_free)) }
+                        stringResource(Res.string.provider_credential_leave_blank_to_use_the_free)
                     } else {
                         null
                     },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = errorMessage != null,
-                    supportingText = errorMessage?.let { message ->
-                        { Text(message) }
-                    },
+                    secret = true,
+                    showLabel = stringResource(Res.string.credential_show),
+                    hideLabel = stringResource(Res.string.credential_hide),
+                    errorMessage = errorMessage,
                 )
+                if (entry.keyOptional) {
+                    Text(
+                        stringResource(Res.string.credential_keyless_hint),
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                }
 
+                if (keylessConfirm) {
+                    AzphaltAlertDialog(
+                        title = stringResource(Res.string.credential_keyless_warning_title),
+                        text = stringResource(Res.string.credential_keyless_warning_body),
+                        confirmLabel = stringResource(Res.string.credential_keyless_warning_confirm),
+                        onConfirm = {
+                            keylessConfirm = false
+                            onSave(ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                        },
+                        onDismissRequest = { keylessConfirm = false },
+                        dismissLabel = stringResource(Res.string.common_cancel),
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     AzphaltPill(
                         label = stringResource(Res.string.provider_credential_save),
@@ -117,9 +141,9 @@ fun ProviderCredentialSetup(
                         onClick = {
                             val clean = apiKey.trim()
                             if (clean.isEmpty() && entry.keyOptional) {
-                                onSave(ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                                keylessConfirm = true
                             } else if (clean.isEmpty()) {
-                                errorMessage = "${entry.credentialLabel} is required"
+                                errorMessage = requiredMessage
                             } else {
                                 onSave(clean)
                             }

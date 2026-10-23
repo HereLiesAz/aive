@@ -56,6 +56,19 @@ jobs:
           cache-read-only: false
           dependency-graph: disabled
 
+      # Plain Node, no install step: the relay Worker and the puppet-rig editor have tests that
+      # no Gradle task runs, so a weakened relay gate or a broken rig validator would merge green.
+      - name: Relay Worker tests
+        run: |
+          npm --prefix relay run check
+          npm --prefix relay test
+
+      - name: Puppet-rig editor tests
+        run: |
+          node --check tools/puppet-rig/app.js
+          node --check tools/puppet-rig/rig-core.js
+          node tools/puppet-rig/test/rig-core.mjs
+
       - name: Clear compose-resource build cache entries
         run: rm -rf ~/.gradle/caches/build-cache/ || true
 

@@ -31,7 +31,7 @@ fun AzphaltAlertDialog(
             containerColor = Azphalt.Ink,
             titleContentColor = Azphalt.White,
             textContentColor = Azphalt.White.copy(alpha = 0.86f),
-            shape = RoundedCornerShape(DIALOG_CORNER.dp),
+            shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
             title = { Text(title, fontWeight = FontWeight.Black) },
             text = { Text(text) },
             confirmButton = {
@@ -51,5 +51,3 @@ fun AzphaltAlertDialog(
         )
     }
 }
-
-private const val DIALOG_CORNER = 28

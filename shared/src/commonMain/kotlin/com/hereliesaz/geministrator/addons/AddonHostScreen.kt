@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import com.hereliesaz.geministrator.AzphaltButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
@@ -87,7 +87,9 @@ fun AddonHostScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${installation.id} · ${installation.version}")
                     Text(if (installation.enabled) stringResource(Res.string.addons_enabled) else stringResource(Res.string.addons_disabled))
-                    Button(onClick = {
+                    AzphaltButton(
+                        label = if (installation.enabled) stringResource(Res.string.addons_disable) else stringResource(Res.string.addons_enable),
+                        onClick = {
                         val enabled = !installation.enabled
                         scope.launch {
                             runCatching {
@@ -99,10 +101,10 @@ fun AddonHostScreen(
                                 storageFailure = failure.message ?: getString(Res.string.addons_add_on_state_could_not_be)
                             }
                         }
-                    }) {
-                        Text(if (installation.enabled) stringResource(Res.string.addons_disable) else stringResource(Res.string.addons_enable))
-                    }
-                    Button(onClick = {
+                    })
+                    AzphaltButton(
+                        label = stringResource(Res.string.common_remove),
+                        onClick = {
                         scope.launch {
                             runCatching { persistence.removeInstallation(installation.id) }
                                 .onSuccess {
@@ -113,13 +115,12 @@ fun AddonHostScreen(
                                     storageFailure = failure.message ?: getString(Res.string.addons_add_on_could_not_be_removed)
                                 }
                         }
-                    }) {
-                        Text(stringResource(Res.string.common_remove))
-                    }
+                    })
                     if (enableCompanyContribution) {
-                        Button(onClick = { onAddAgentsToCompany(installation.id) }) {
-                            Text(stringResource(Res.string.addons_add_agents_to_swarm))
-                        }
+                        AzphaltButton(
+                            label = stringResource(Res.string.addons_add_agents_to_swarm),
+                            onClick = { onAddAgentsToCompany(installation.id) },
+                        )
                     }
                 }
             }
@@ -152,11 +153,10 @@ fun AddonScreenRenderer(
                             is AddonScreenItem.Text -> Text(item.content)
                             is AddonScreenItem.Record -> Row { Text(item.key); Text(": "); Text(item.value) }
                             is AddonScreenItem.Status -> Row { Text(item.label); Text(": "); Text(item.status) }
-                            is AddonScreenItem.Button -> Button(
+                            is AddonScreenItem.Button -> AzphaltButton(
+                                label = item.label,
                                 onClick = { actionDispatcher(item.actionId) },
-                            ) {
-                                Text(item.label)
-                            }
+                            )
                             is AddonScreenItem.TextInput -> {
                                 OutlinedTextField(
                                     value = bindingProvider(item.bindingId),
@@ -168,15 +168,11 @@ fun AddonScreenRenderer(
                                 var expanded by remember(item.bindingId) { mutableStateOf(false) }
                                 val selected = bindingProvider(item.bindingId)
                                 Column {
-                                    Button(
+                                    AzphaltButton(
+                                        label = if (selected.isBlank()) item.label else "${item.label}: $selected",
                                         onClick = { expanded = true },
                                         enabled = item.options.isNotEmpty(),
-                                    ) {
-                                        Text(
-                                            if (selected.isBlank()) item.label
-                                            else "${item.label}: $selected",
-                                        )
-                                    }
+                                    )
                                     DropdownMenu(
                                         expanded = expanded,
                                         onDismissRequest = { expanded = false },

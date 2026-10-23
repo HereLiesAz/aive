@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0D1026" />
+    <meta name="theme-color" content="#1E1A17" />
     <title>Privacy Policy — The Aive</title>
     <style>
         :root {
-            --ink: #0D1026;
-            --white: #F4F4F2;
-            --yellow: #F5C842;
-            --dim: #7A7E9A;
-            --surface: #161B38;
+            /* Azphalt tokens (AzphaltUi.kt): Ink, White, Yellow. Dim and surface are derived from Ink;
+               --dim is at least 4.5:1 on both --ink and --surface. */
+            --ink: #1E1A17;
+            --white: #FFFFFF;
+            --yellow: #F0D42A;
+            --dim: #B5AEA6;
+            --surface: #2A2420;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -56,7 +58,7 @@
             margin-bottom: 40px;
         }
         h2 {
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.12em;
             text-transform: uppercase;
@@ -90,20 +92,25 @@
             border-radius: 0 4px 4px 0;
         }
         .summary-block ul { margin-bottom: 0; }
+        a:focus-visible, :focus-visible {
+            outline: 3px solid var(--yellow);
+            outline-offset: 3px;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
-<div class="page">
-    <div class="brand">
+<main class="page">
+    <nav class="brand" aria-label="Site">
         <a href="../">← The Aive</a>
-    </div>
+    </nav>
 
     <h1>Privacy Policy</h1>
     <p class="effective">Effective date: October 22, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.aive</code></p>
     <!-- Generated from docs/PRIVACY.md; edit that file, then regenerate. -->
 <p>This policy describes the current source-available builds of <strong>The Aive</strong>, application ID <code>com.hereliesaz.aive</code>.</p>
 <p>The Aive is a workflow orchestration application. It can store workflow information locally and, when you choose to use an external executor or provider, send the information needed to perform that work to the service you selected.</p>
-<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The <strong>Google Play</strong> flavor contains none of these, except that a Play-flavor copy installed from somewhere other than Google Play checks GitHub Releases for updates too. Desktop and web builds contain none of them either.</p>
+<p>Android ships in two flavors. The <strong>GitHub release</strong> flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The <strong>Google Play</strong> flavor contains none of these. Desktop and web builds contain none of them either.</p>
 <h2 id="summary">Summary</h2>
 <ul>
 <li>The current source does <strong>not</strong> include advertising SDKs.</li>
@@ -137,7 +144,7 @@
 <li>Web: browser localStorage</li>
 </ul>
 <p>When an Android or desktop install first opens the SQLite store, workflow state saved by an earlier version (SharedPreferences or Java Preferences) is moved into it. A JSON copy of that earlier state is kept beside it (<code>workflows-settings-backup-&lt;time&gt;.json</code>, in the app's private files on Android, in <code>~/.aive</code> on desktop) until you delete it, clear the app's data or uninstall.</p>
-<p>Agent memory (banked session text and the graph derived from it) is kept in SQLite databases, one memory bank per workflow run: on Android, <code>aive-memory-&lt;run&gt;.db</code> (and the pre-split <code>aive-memory.db</code>, kept as a backup) in the app's private database directory; on desktop, <code>~/.aive/memory/memory.db</code>. On the web it is a SQLite database in the browser's Origin Private File System for this site (browsers without it keep browser localStorage), and a memory log stored by an earlier version in localStorage is moved into it the first time it opens. The Memory screen can export a run's memory, forget individual episodes, or clear the selected run's memory bank; other runs' banks are not affected. To remove all memory, clear the app's data/storage. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.</p>
+<p>Agent memory (banked session text and the graph derived from it) is kept in SQLite databases, one memory bank per workflow run: on Android, <code>aive-memory-&lt;run&gt;.db</code> (and the pre-split <code>aive-memory.db</code>, kept as a backup) in the app's private database directory; on desktop, <code>~/.aive/memory/banks/&lt;run&gt;.db</code> (and the pre-split <code>~/.aive/memory/memory.db</code>, kept as a backup). On the web it is a SQLite database in the browser's Origin Private File System for this site (browsers without it keep browser localStorage), and a memory log stored by an earlier version in localStorage is moved into it the first time it opens. The Memory screen can export a run's memory, forget individual episodes, or clear the selected run's memory bank; other runs' banks are not affected. To remove all memory, clear the app's data/storage. On Android, a memory graph stored by an earlier version in SharedPreferences is moved into the database the first time it opens.</p>
 <p>Memory stages run on-device by default. If you set a memory stage to a hosted model, the text of each packet that stage processes (bounded excerpts of banked session text or memory nodes) is sent to the provider you chose for that stage.</p>
 <p>This data is used to restore workflows and continue runs after the application or browser restarts.</p>
 <p>The Android app sets <code>allowBackup="true"</code>. If Android device backup is on, the system may include workflow state, settings and the agent-memory databases in your device backup under Google's backup terms. Credentials and downloaded models are excluded from backup and device transfer (<code>data_extraction_rules.xml</code>, <code>backup_rules.xml</code>); credentials are also encrypted with an Android Keystore key that never leaves the device. You have to reconnect providers after a restore, and models download again when you reinstall them.</p>
@@ -194,7 +201,7 @@
 <li>stack trace, truncated to 38,000 characters</li>
 <li>report kind (crash or ANR) and a 16-character hash that identifies the failure</li>
 <li><strong>Stack traces.</strong> For a crash, this is the Java/Kotlin stack trace of the uncaught exception, including its causes. On Android 11 (API 30) and later, ANRs are also reported, using the ANR trace that Android recorded for the previous run. That trace covers the app's threads. ANRs from before you enabled reporting are not reported. Android versions before 11 get crash reports only.</li>
-<li><strong>What is not sent.</strong> The app adds no workflow content, prompts, artifacts, credentials, account identifiers, or device identifiers. However, exception messages are part of a stack trace, so a message can contain a fragment of whatever data the app was handling when it failed.</li>
+<li><strong>What is not sent.</strong> The app adds no workflow content, prompts, artifacts, credentials, account identifiers, or device identifiers. However, exception messages are part of a stack trace, so a message can contain a fragment of whatever data the app was handling when it failed. Before a report is stored, the app removes credential-shaped text (bearer tokens, API keys, token and password values), credentials and query strings in URLs, e-mail addresses and pairing codes; other text in a message is kept.</li>
 <li><strong>When.</strong> A crash is written to app-private storage and sent on the next launch. Each distinct failure is sent at most once per app version. Reports that cannot be delivered are deleted after 7 days. After the first report is sent, the app tells you once and shows where to turn reporting off.</li>
 <li><strong>Turning it off.</strong> Turn off <strong>Settings → Crash Reports</strong> at any time. Turning it off also deletes any pending reports that have not been sent.</li>
 </ul>
@@ -210,8 +217,8 @@
 </ul>
 <h2 id="updates-and-downloads">Updates and downloads</h2>
 <ul>
-<li><strong>Android copies not installed from Google Play (the GitHub release flavor, and a Play-flavor copy installed some other way).</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer version is available, it tells you and, only if you tap <strong>Open GitHub release</strong>, opens the release page in your browser. The app does not download or install the update itself.</li>
-<li><strong>Android copies installed from Google Play.</strong> The app queries Google Play's in-app update API for available updates, even with no provider connected, and does not contact GitHub for updates. If one is available, <strong>Open Play Store</strong> opens this app's Play listing; updates are delivered by Google Play under its terms.</li>
+<li><strong>Android GitHub release flavor.</strong> The app periodically checks the public GitHub Releases API for <code>HereLiesAz/aive</code>, without authentication. When a newer version is available, it tells you and, only if you tap <strong>Open GitHub release</strong>, opens the release page in your browser. The app does not download or install the update itself.</li>
+<li><strong>Android Google Play flavor.</strong> When Google Play installed the app, it queries Google Play's in-app update API for available updates, even with no provider connected, and does not contact GitHub for updates. A Play-flavor copy installed any other way makes no update check. If an update is available, <strong>Open Play Store</strong> opens this app's Play listing; updates are delivered by Google Play under its terms.</li>
 <li><strong>Azphalt package catalog.</strong> When you open the Store, The Aive contacts the package repository (<code>https://azphalt.store</code> by default). It searches and downloads packages, checks revocations, and sends the IDs and versions of the packages you installed from that repository to check for updates.</li>
 <li><strong>Local models.</strong> Optional on-device models, such as the local planner, local orchestration helpers and local memory models, are downloaded from GitHub Releases. Models installed from the Azphalt Store are downloaded over HTTPS from the host named in the signed package.</li>
 </ul>
@@ -245,6 +252,6 @@
 <p>Material changes to The Aive's data handling should be accompanied by an update to this document and its effective date.</p>
 <h2 id="contact">Contact</h2>
 <p>The Aive is a source-available project (PolyForm Noncommercial 1.0.0) maintained by <strong>HereLiesAz</strong>. Privacy questions and reports can be raised through the repository at <code>HereLiesAz/aive</code> on GitHub.</p>
-</div>
+</main>
 </body>
 </html>

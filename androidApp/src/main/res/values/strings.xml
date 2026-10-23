@@ -8,7 +8,7 @@
 
     <!-- Crash report notice (MainActivity) -->
     <string name="crash_report_sent_title">Crash report sent</string>
-    <string name="crash_report_sent_body">Aive crashed or stopped responding earlier, and a report (stack trace, app version, Android version, device model) was sent automatically to the HereLiesAz/aive GitHub issue tracker. You can turn automatic crash reports off any time in Settings → Crash Reports.</string>
+    <string name="crash_report_sent_body">The Aive crashed or stopped responding earlier, and a report (stack trace, app version, Android version, device model) was sent automatically to the HereLiesAz/aive GitHub issue tracker. You can turn automatic crash reports off any time in Settings → Crash Reports.</string>
 
     <!-- Remote access (AiveRelayHostService) -->
     <string name="remote_access_channel_name">Remote access</string>
@@ -20,10 +20,10 @@
 
     <!-- In-app update prompt (AndroidUpdateUi) -->
     <string name="update_github_title">The Aive %1$s is available</string>
-    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page to download it; installing over this copy keeps your projects, settings, credentials, roles, and workflows.</string>
+    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page, download the APK, then tap it to install; Android may ask you to allow installs from your browser. Installing over this copy keeps your projects, settings, credentials, roles, and workflows.</string>
     <string name="update_open_github">Open GitHub release</string>
     <string name="update_later">Later</string>
-    <string name="update_play_title">A The Aive update is available</string>
+    <string name="update_play_title">An update for The Aive is available</string>
     <string name="update_play_body">An update is available through Google Play.</string>
     <string name="update_open_play_store">Open Play Store</string>
 
@@ -31,9 +31,23 @@
     <string name="gemini_setup_title">Connect Gemini</string>
     <string name="gemini_setup_bridge_unsupported">Google Play builds connect to Gemini through the official API. The installed-app bridge is available in GitHub releases.</string>
     <string name="gemini_setup_app_not_detected">The Gemini app was not detected. You can still connect Gemini with an API key.</string>
-    <string name="gemini_setup_bridge_ready">The installed Gemini app is ready. Aive can open it in a bounded window and use it as the Gemini transport.</string>
+    <string name="gemini_setup_bridge_ready">The installed Gemini app is ready. The Aive can open it in a bounded window and use it as the Gemini transport.</string>
     <string name="gemini_setup_enable_bridge_hint">The Gemini app is installed. Enable The Aive · Gemini bridge in Android Accessibility settings to use the signed-in app without an API key.</string>
     <string name="gemini_setup_use_installed">Use installed Gemini</string>
     <string name="gemini_setup_enable_bridge">Enable installed Gemini bridge</string>
     <string name="gemini_setup_use_api_key">Use Gemini API key</string>
+    <string name="gemini_setup_open_accessibility">Open Accessibility settings</string>
+    <string name="gemini_setup_api_key_hint">No Gemini app? Use an API key instead: you can create one for free at Google AI Studio (aistudio.google.com).</string>
+    <string name="gemini_setup_bridge_enabled_toast">Gemini bridge is on.</string>
+    <string name="gemini_setup_bridge_still_off">The Gemini bridge is still off. Open Accessibility settings and turn on The Aive · Gemini bridge, or use an API key.</string>
+    <string name="notification_permission_denied">Notifications are blocked, so you will not see the Remote access status. You can allow them in Android Settings → Apps → The Aive → Notifications.</string>
+    <string name="update_error_title">Update check failed</string>
+    <string name="update_error_body">The Aive could not check for updates. Try again later.</string>
+    <string name="update_dismiss">Dismiss</string>
+    <string name="remote_problem_key_rejected">Key rejected. Check the relay address and reconnect.</string>
+    <string name="remote_problem_rate_limited">The relay is rate limiting you. Wait a minute and try again.</string>
+    <string name="remote_problem_offline">Can\'t reach the relay. Check your internet connection and try again.</string>
+    <string name="remote_problem_timed_out">The relay took too long to answer. Try again.</string>
+    <string name="remote_problem_other">Remote access could not be changed. Try again, or check the relay address under Advanced.</string>
+    <string name="splash_logo_description">The Aive logo</string>
 </resources>

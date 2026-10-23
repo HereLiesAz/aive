@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,10 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_cancel
+import com.hereliesaz.geministrator.resources.credential_show
+import com.hereliesaz.geministrator.resources.credential_hide
+import com.hereliesaz.geministrator.resources.credential_field_required
 import com.hereliesaz.geministrator.resources.repository_credential_connect
 import com.hereliesaz.geministrator.resources.repository_credential_credential
 import com.hereliesaz.geministrator.resources.repository_credential_credential_required
@@ -42,6 +43,7 @@ fun RepositoryCredentialSetup(
     val uriHandler = LocalUriHandler.current
     var credential by remember(serviceId) { mutableStateOf("") }
     var errorMessage by remember(serviceId) { mutableStateOf<String?>(null) }
+    val requiredMessage = stringResource(Res.string.credential_field_required, entry.credentialLabel)
 
     MaterialTheme(colorScheme = GeministratorColors) {
         Surface(
@@ -74,18 +76,17 @@ fun RepositoryCredentialSetup(
                 )
 
                 Text(stringResource(Res.string.repository_credential_credential), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
-                OutlinedTextField(
+                AzphaltTextField(
                     value = credential,
                     onValueChange = {
                         credential = it
                         errorMessage = null
                     },
-                    label = { Text(entry.credentialLabel) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = errorMessage != null,
-                    supportingText = errorMessage?.let { message -> { Text(message) } },
+                    label = entry.credentialLabel,
+                    secret = true,
+                    showLabel = stringResource(Res.string.credential_show),
+                    hideLabel = stringResource(Res.string.credential_hide),
+                    errorMessage = errorMessage,
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -96,7 +97,7 @@ fun RepositoryCredentialSetup(
                         onClick = {
                             val clean = credential.trim()
                             if (clean.isEmpty()) {
-                                errorMessage = "${entry.credentialLabel} is required"
+                                errorMessage = requiredMessage
                             } else {
                                 onSave(clean)
                             }

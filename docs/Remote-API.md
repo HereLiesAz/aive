@@ -137,6 +137,14 @@ Android 13 and later ask for the notification permission when Remote access is t
 - **Cloudflare.** Deploy `relay/` (`cd relay && npx wrangler@4 deploy`) under the account whose workers.dev subdomain matches the default relay URL, or change `RelayProtocol.DEFAULT_RELAY_URL` to match.
 - **Privacy.** `docs/PRIVACY.md` describes Remote access; keep it, the published page and the Play data-safety form in step.
 
+### Limits
+
+- A frame is at most 1,000,000 UTF-8 bytes; a larger one closes the socket with `1009`.
+- Each socket may send a burst of 40 frames and then 10 per second; a sender over that is closed with `1008`.
+- One client address may create (or re-key) at most 20 rooms per hour; more get `429`.
+- A room admits 8 clients at once (`429` beyond that).
+- The host's replay guard lives for the life of the host link, not of one connection, so a reconnect does not reset what it has already seen. It is held in memory: after the app restarts, a frame captured before the restart can still be replayed once within the 10-minute clock window.
+
 ### Lifetime
 
 A room is deleted, with its stored hashes, 30 days after its host last connected or disconnected. A connected host keeps the room alive. Clients are closed with `4001` when the client token is rotated and `4002` when the room is deleted or expires.

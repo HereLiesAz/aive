@@ -31,6 +31,14 @@ import kotlinx.coroutines.runBlocking
 
 class RelayPoolTest {
     @Test
+    fun aPoolWithUnreadableSavedStateStartsEmptyInsteadOfFailing() {
+        val store = UnreadableRelayStateStore()
+        // State sealed under another token (a rotation), or damaged, must not make the pool unusable.
+        RelayPool("pool", stateStore = store, nowEpochMillis = { 1_000L })
+        assertTrue(store.deleted, "the unreadable file is dropped")
+    }
+
+    @Test
     fun onlyEligibleWorkersReceiveOffersAndFirstClaimWins() = runBlocking {
         var now = 1_000L
         val pool = RelayPool("pool", nowEpochMillis = { now })
@@ -460,6 +468,16 @@ class RelayPoolTest {
             submittedAtEpochMillis = 1,
             leaseDurationMillis = leaseDurationMillis,
         )
+    }
+
+    private class UnreadableRelayStateStore : RelayStateStore {
+        var deleted = false
+        override fun load(poolId: String): List<PersistedRelayLease> =
+            throw javax.crypto.AEADBadTagException("sealed under another token")
+        override fun save(poolId: String, leases: List<PersistedRelayLease>) = Unit
+        override fun delete(poolId: String) {
+            deleted = true
+        }
     }
 
     private class FailingRelayStateStore : RelayStateStore {

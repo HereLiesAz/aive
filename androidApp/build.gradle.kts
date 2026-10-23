@@ -34,6 +34,7 @@ fun registerAndroidRustLibrary(
     this.description = description
     val crate = rootProject.layout.projectDirectory.dir(crateDir)
     inputs.file(crate.file("Cargo.toml"))
+    inputs.file(crate.file("Cargo.lock"))
     inputs.dir(crate.dir("src"))
     outputs.dir(outputDir)
     workingDir(crate.asFile)
@@ -53,6 +54,8 @@ fun registerAndroidRustLibrary(
             "-o", output.absolutePath,
             "build",
             "--release",
+            // Build exactly what Cargo.lock pins; fail rather than re-resolve dependencies.
+            "--locked",
         )
     }
 }

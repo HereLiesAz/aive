@@ -45,7 +45,7 @@ private fun createDesktopSplash(): JWindow? {
     var result: JWindow? = null
     SwingUtilities.invokeAndWait {
         result = JWindow().apply {
-            background = java.awt.Color(0x0D, 0x10, 0x26)
+            background = java.awt.Color(0x1E, 0x1A, 0x17) // Azphalt.Ink
             contentPane.background = background
             contentPane.add(label)
             pack()

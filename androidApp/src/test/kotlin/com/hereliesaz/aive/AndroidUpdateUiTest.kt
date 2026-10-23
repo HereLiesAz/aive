@@ -52,4 +52,34 @@ class AndroidUpdateUiTest {
         """.trimIndent()
         assertEquals(GithubReleaseFeed.RELEASES_PAGE_URL, GithubReleaseFeed.parseLatest(feed)?.pageUrl)
     }
+
+    @Test
+    fun theNewestApkInOneReleaseWinsNotTheFirstListed() {
+        // The rolling release holds one APK per build, oldest first in the API's asset order.
+        val assets = listOf("0.9.6.1725", "0.9.6.2200", "0.9.6.1999")
+            .joinToString(",") { """{"name": "TheAive-$it-android.apk"}""" }
+        val feed = """
+            [{"draft": false, "html_url": "https://github.com/HereLiesAz/aive/releases/tag/0.9.6", "assets": [$assets]}]
+        """.trimIndent()
+        assertEquals("0.9.6.2200", GithubReleaseFeed.parseLatest(feed)?.version)
+    }
+
+    @Test
+    fun aFinalReleaseIsNewerThanItsPrereleaseNeverTheOtherWayRound() {
+        assertTrue(isNewerVersion("1.0.0", "1.0.0-rc1"))
+        assertFalse(isNewerVersion("1.0.0-rc1", "1.0.0"))
+        assertFalse(isNewerVersion("1.0.0-rc2", "1.0.0-rc1"))
+        assertTrue(isNewerVersion("1.0.1-rc1", "1.0.0"))
+        assertTrue(isNewerVersion("0.9.6.10", "0.9.6.9"))
+        assertFalse(isNewerVersion("0.9.6.2147483648", "0.9.6.2147483649"))
+    }
+
+    @Test
+    fun eachBuildOnlyUpdatesFromItsOwnChannel() {
+        assertEquals(UpdateChannel.Play, updateChannel(isPlayBuild = true, source = InstallSource.Play))
+        // A Play build installed any other way has no update source; the GitHub APK is a different package.
+        assertEquals(UpdateChannel.None, updateChannel(isPlayBuild = true, source = InstallSource.Other))
+        assertEquals(UpdateChannel.Github, updateChannel(isPlayBuild = false, source = InstallSource.Other))
+        assertEquals(UpdateChannel.Github, updateChannel(isPlayBuild = false, source = InstallSource.Play))
+    }
 }

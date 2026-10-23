@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -25,10 +27,12 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -90,8 +94,29 @@ internal object Azphalt {
     fun cap(seed: String): Color = caps[hueIndex(seed)]
 }
 
+/** WCAG 2.x contrast ratio between two colours (1 to 21), from relative luminance. */
+internal fun contrastRatio(first: Color, second: Color): Float {
+    val a = first.luminance()
+    val b = second.luminance()
+    val lighter = if (a > b) a else b
+    val darker = if (a > b) b else a
+    return (lighter + 0.05f) / (darker + 0.05f)
+}
+
+/** Ink or White, whichever has the higher WCAG contrast ratio against [background]. */
+internal fun bestTextOn(background: Color): Color =
+    if (contrastRatio(Azphalt.Ink, background) >= contrastRatio(Azphalt.White, background)) Azphalt.Ink else Azphalt.White
+
 internal val Color.contrastingText: Color
-    get() = if (luminance() > 0.35f) Azphalt.Ink else Azphalt.White
+    get() = bestTextOn(this)
+
+/**
+ * Accent for text and glyphs drawn directly on the page ground: Yellow where it stays legible
+ * (at least 3:1), otherwise the ground's own readable text colour. Yellow on the default Mustard
+ * ground is only 1.11:1, so it must never be used there as a foreground.
+ */
+internal val Azphalt.Ground.accent: Color
+    get() = if (contrastRatio(Azphalt.Yellow, page) >= 3f) Azphalt.Yellow else onPage
 
 internal val Azphalt.Ground.onPage: Color
     get() = page.contrastingText
@@ -109,19 +134,36 @@ internal val GeministratorColors
         onError = Azphalt.White,
     )
 
+/** Spacing scale in dp. Prefer these over new literals in the screens that touch them. */
+internal object AzphaltSpacing {
+    val xs: Dp = 4.dp
+    val s: Dp = 8.dp
+    val m: Dp = 12.dp
+    val l: Dp = 16.dp
+    val xl: Dp = 24.dp
+}
+
+/** Shape tokens shared by Azphalt surfaces. */
+internal object AzphaltShapes {
+    val dialogCorner: Dp = 28.dp
+}
+
+/** Smallest touch target (dp) for anything clickable. */
+internal val AzphaltMinTouchTarget: Dp = 48.dp
+
 internal object AzphaltType {
     val hero = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Black,
         fontSize = 46.sp,
-        lineHeight = 42.sp,
+        lineHeight = 56.sp,
         letterSpacing = (-0.03).em,
     )
     val section = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Black,
         fontSize = 28.sp,
-        lineHeight = 28.sp,
+        lineHeight = 34.sp,
         letterSpacing = (-0.02).em,
     )
     val lead = TextStyle(
@@ -140,21 +182,21 @@ internal object AzphaltType {
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 13.sp,
-        lineHeight = 13.sp,
+        lineHeight = 16.sp,
         letterSpacing = 0.09.em,
     )
     val eyebrow = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 10.sp,
-        lineHeight = 10.sp,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
         letterSpacing = 0.22.em,
     )
     val endCap = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.ExtraBold,
-        fontSize = 9.sp,
-        lineHeight = 9.sp,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
         letterSpacing = 0.10.em,
     )
 }
@@ -174,9 +216,11 @@ internal fun AzphaltPill(
         modifier = modifier
             .semantics {
                 role = Role.Button
+                this.selected = selected
                 contentDescription = if (endCap != null) "$label: $endCap" else label
             }
             .azphaltSelectedTransform(selected)
+            .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
             .background(hue)
             .clickable(onClick = onClick)
@@ -226,6 +270,7 @@ internal fun AzphaltRecord(
     val semanticsMod = if (onClick != null) {
         modifier.semantics(mergeDescendants = true) {
             role = Role.Button
+            this.selected = selected
             contentDescription = description
         }
     } else {
@@ -233,7 +278,11 @@ internal fun AzphaltRecord(
             contentDescription = description
         }
     }
-    val interactive = if (onClick == null) semanticsMod else semanticsMod.clickable(onClick = onClick)
+    val interactive = if (onClick == null) {
+        semanticsMod
+    } else {
+        semanticsMod.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(onClick = onClick)
+    }
     Column(
         modifier = interactive
             .azphaltSelectedTransform(selected)

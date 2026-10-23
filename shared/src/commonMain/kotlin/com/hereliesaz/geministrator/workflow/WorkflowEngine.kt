@@ -40,6 +40,7 @@ import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
+import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -289,49 +290,52 @@ class WorkflowEngine(
             val rollbackHandles = withContext(NonCancellable) {
                 createdHandlesMutex.withLock { createdHandles.map { it.second } }
             }
-            withContext(NonCancellable) {
-                rollbackHandles.forEach { handle ->
-                    runCatching { sessionGateway.cancel(handle) }
-                }
-            }
+            cancelSessions(rollbackHandles, failure)
             throw failure
         }
 
-        // Phase 3: apply state mutations sequentially.
-        for ((pending, handle) in createdHandles) {
-            handles[pending.task.id] = handle
-            val startedStatus = if (pending.request.requirePlanApproval) {
-                TaskRunStatus.Planning
-            } else {
-                TaskRunStatus.Running
-            }
-            TaskRunTransitions.requireAllowed(pending.taskRun.status, startedStatus)
-            nextRun = nextRun.copy(
-                status = if (nextRun.status == WorkflowRunStatus.AwaitingHuman) {
-                    nextRun.status
+        // Phase 3: apply state mutations sequentially. The sessions exist by now, so a failure here
+        // (an illegal transition, the event sink) cancels them all before it escapes: nothing else
+        // knows about them yet.
+        try {
+            for ((pending, handle) in createdHandles) {
+                handles[pending.task.id] = handle
+                val startedStatus = if (pending.request.requirePlanApproval) {
+                    TaskRunStatus.Planning
                 } else {
-                    WorkflowRunStatus.Running
-                },
-                taskRuns = nextRun.taskRuns + (
-                    pending.task.id to pending.taskRun.copy(
-                        status = startedStatus,
-                        assignedRoleId = pending.task.roleId ?: pending.role.id,
-                        executor = pending.executor,
-                        assignedProviderId = handle.providerId,
-                        providerRunId = handle.providerRunId,
-                        externalRunId = null,
-                        blockingReason = null,
-                        progress = null,
-                        progressMessage = null,
-                        // An engine-approved plan stays visible on the task it is being executed for.
-                        providerPlan = pending.taskRun.approvedEnginePlan(),
-                    )
-                ),
-                updatedAtEpochMillis = nowEpochMillis,
-            )
-            eventSink.append(AgentAssigned(nextRun.id, pending.task.id, pending.role.id, nowEpochMillis))
-            eventSink.append(ExecutorAssigned(nextRun.id, pending.task.id, pending.executor, pending.task.roleId, nowEpochMillis))
-            eventSink.append(TaskStarted(nextRun.id, pending.task.id, pending.taskRun.attempt, nowEpochMillis))
+                    TaskRunStatus.Running
+                }
+                TaskRunTransitions.requireAllowed(pending.taskRun.status, startedStatus)
+                nextRun = nextRun.copy(
+                    status = if (nextRun.status == WorkflowRunStatus.AwaitingHuman) {
+                        nextRun.status
+                    } else {
+                        WorkflowRunStatus.Running
+                    },
+                    taskRuns = nextRun.taskRuns + (
+                        pending.task.id to pending.taskRun.copy(
+                            status = startedStatus,
+                            assignedRoleId = pending.task.roleId ?: pending.role.id,
+                            executor = pending.executor,
+                            assignedProviderId = handle.providerId,
+                            providerRunId = handle.providerRunId,
+                            externalRunId = null,
+                            blockingReason = null,
+                            progress = null,
+                            progressMessage = null,
+                            // An engine-approved plan stays visible on the task it is being executed for.
+                            providerPlan = pending.taskRun.approvedEnginePlan(),
+                        )
+                    ),
+                    updatedAtEpochMillis = nowEpochMillis,
+                )
+                eventSink.append(AgentAssigned(nextRun.id, pending.task.id, pending.role.id, nowEpochMillis))
+                eventSink.append(ExecutorAssigned(nextRun.id, pending.task.id, pending.executor, pending.task.roleId, nowEpochMillis))
+                eventSink.append(TaskStarted(nextRun.id, pending.task.id, pending.taskRun.attempt, nowEpochMillis))
+            }
+        } catch (failure: Throwable) {
+            cancelSessions(createdHandles.map { it.second }, failure)
+            throw failure
         }
 
         val hasHumanWaiting = nextRun.taskRuns.values.any {
@@ -742,4 +746,21 @@ class WorkflowEngine(
         TaskRunStatus.Running,
         TaskRunStatus.Verifying,
     )
+
+    /**
+     * Cancels [handles] after [failure]. A cancel that throws or comes back rejected cannot be
+     * retried here, so it is attached to [failure] as a suppressed error instead of being lost.
+     */
+    private suspend fun cancelSessions(handles: List<ManagedSessionHandle>, failure: Throwable) {
+        withContext(NonCancellable) {
+            handles.forEach { handle ->
+                val outcome = runCatching { sessionGateway.cancel(handle) }
+                val problem = outcome.exceptionOrNull()
+                    ?: (outcome.getOrNull() as? ProviderActionResult.Rejected)?.let {
+                        IllegalStateException("Could not cancel session ${handle.providerRunId}: ${it.reason}")
+                    }
+                if (problem != null && problem !== failure) failure.addSuppressed(problem)
+            }
+        }
+    }
 }

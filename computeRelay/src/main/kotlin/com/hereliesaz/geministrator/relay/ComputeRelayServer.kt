@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
 import com.hereliesaz.geministrator.distributed.DISTRIBUTED_COMPUTE_PROTOCOL_VERSION
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -26,6 +27,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -106,6 +108,7 @@ fun Application.computeRelayModule(
     }
 
     val sweepScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    monitor.subscribe(ApplicationStopped) { sweepScope.cancel() }
     sweepScope.launch {
         while (isActive) {
             delay(5_000)
@@ -162,16 +165,16 @@ fun Application.computeRelayModule(
                 close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Node ID in use"))
                 return@webSocket
             }
-            peer.send(
-                ComputeRelayServerMessage.Registered(
-                    protocolVersion = DISTRIBUTED_COMPUTE_PROTOCOL_VERSION,
-                    nodeId = nodeId,
-                    onlineNodes = online,
-                ),
-            )
-            pool.replayOriginLeases(nodeId, peer)
-
             try {
+                peer.send(
+                    ComputeRelayServerMessage.Registered(
+                        protocolVersion = DISTRIBUTED_COMPUTE_PROTOCOL_VERSION,
+                        nodeId = nodeId,
+                        onlineNodes = online,
+                    ),
+                )
+                pool.replayOriginLeases(nodeId, peer)
+
                 for (frame in incoming) {
                     if (frame !is Frame.Text) continue
                     val message = runCatching {
@@ -255,6 +258,10 @@ fun main() {
             ?: System.getenv("HAIVE_RELAY_PORT")
             ?: "8080"
         ).toInt()
+    // Binds all interfaces by default because the relay normally runs in a container behind a
+    // TLS-terminating proxy; set AIVE_RELAY_HOST=127.0.0.1 to keep it off the network. The relay
+    // speaks plain ws, so never expose it directly: terminate TLS in front of it.
+    val host = System.getenv("AIVE_RELAY_HOST")?.takeIf(String::isNotBlank) ?: "0.0.0.0"
     val stateDirectory = System.getenv("AIVE_RELAY_STATE_DIR")
         ?.takeIf(String::isNotBlank)
         ?: System.getenv("HAIVE_RELAY_STATE_DIR")
@@ -265,7 +272,7 @@ fun main() {
     val hub = ComputeRelayHub(stateStore = stateStore)
     embeddedServer(
         factory = CIO,
-        host = "0.0.0.0",
+        host = host,
         port = port,
     ) {
         computeRelayModule(token, hub)

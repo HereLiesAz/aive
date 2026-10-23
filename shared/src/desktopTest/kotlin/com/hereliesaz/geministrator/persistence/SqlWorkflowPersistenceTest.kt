@@ -226,4 +226,30 @@ class SqlWorkflowPersistenceTest {
         assertEquals(setOf(project.id, ProjectId("new")), reopened.projects.all().map { it.id }.toSet())
         assertEquals(1, backups.size)
     }
+
+    @Test
+    fun aFailureAfterTheMoveDoesNotImportTheOldCopyAgainOrDuplicateEvents() = runBlocking {
+        val backing = MapSettings()
+        val inner = SettingsWorkflowPersistence(backing)
+        val run = run("run")
+        inner.projects.put(project)
+        inner.runs.put(run)
+        inner.events.append(TaskStarted(run.id, TaskDefinitionId("task"), 1, 3L))
+        // The old store cannot be cleared, so its copy stays behind after the data has moved.
+        val failingSettings = object : com.russhwolf.settings.Settings by backing {
+            override fun remove(key: String) {
+                error("settings write failed")
+            }
+        }
+        val previous = SettingsWorkflowPersistence(failingSettings)
+        val file = tempDatabase()
+
+        val first = desktopSqlWorkflowPersistence(file, LegacySettingsMigration(previous) { })
+        assertEquals(1, first.events.forRun(run.id).size)
+
+        val backups = mutableListOf<String>()
+        val reopened = desktopSqlWorkflowPersistence(file, LegacySettingsMigration(previous) { backups += it })
+        assertEquals(1, reopened.events.forRun(run.id).size, "events are not imported a second time")
+        assertTrue(backups.isEmpty(), "the migration does not run again")
+    }
 }

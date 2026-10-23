@@ -56,8 +56,13 @@ private const val XAI_API_KEY_STORAGE_KEY = "haive.xaiApiKey"
 private const val GITHUB_TOKEN_STORAGE_KEY = "haive.githubToken"
 private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
 
+/** True when the browser reports `prefers-reduced-motion: reduce`. */
+private fun prefersReducedMotion(): Boolean =
+    js("typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches")
+
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
+    AzphaltMotion.reduceMotion = shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = prefersReducedMotion())
     // Memory in SQLite persisted in OPFS (opened in a worker; the old Settings log is imported once).
     // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)

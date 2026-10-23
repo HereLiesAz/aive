@@ -19,4 +19,4 @@ User-facing product name: **The Aive**
 
 Technical/project shorthand: **Aive** / `aive`
 
-Android application ID and namespace: `com.hereliesaz.aive`
+Android application ID and namespace: `com.hereliesaz.aive` (Google Play). The GitHub-release flavor keeps the application ID `com.hereliesaz.haive` permanently so existing installs upgrade in place; the namespace is `com.hereliesaz.aive` for both.

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.CleartextPolicy
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -48,6 +49,9 @@ class OpenAiCompatibleChatApi(
     override suspend fun generate(prompt: String): TextGenerationResult {
         val apiKey = apiKeyProvider.getApiKey().trim()
         require(apiKey.isNotEmpty() || !requireApiKey) { "API key is not configured" }
+        require(apiKey.isEmpty() || CleartextPolicy.allowsSecret(baseUrl)) {
+            "Refusing to send an API key over plain HTTP to a public host; use an https:// base URL"
+        }
 
         val response = client.post("$baseUrl/chat/completions") {
             if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")

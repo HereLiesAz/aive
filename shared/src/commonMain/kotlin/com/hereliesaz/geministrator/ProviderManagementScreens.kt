@@ -21,6 +21,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.IntegrationPolicy
@@ -36,6 +39,20 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_disconnect_action
+import com.hereliesaz.geministrator.resources.confirm_disconnect_body
+import com.hereliesaz.geministrator.resources.confirm_disconnect_title
+import com.hereliesaz.geministrator.resources.confirm_reset_pairing_action
+import com.hereliesaz.geministrator.resources.confirm_reset_pairing_body
+import com.hereliesaz.geministrator.resources.confirm_reset_pairing_title
+import com.hereliesaz.geministrator.resources.firstrun_body
+import com.hereliesaz.geministrator.resources.firstrun_connect
+import com.hereliesaz.geministrator.resources.firstrun_connect_hint
+import com.hereliesaz.geministrator.resources.firstrun_title
+import com.hereliesaz.geministrator.resources.remote_access_advanced
+import com.hereliesaz.geministrator.resources.remote_access_advanced_explain
+import com.hereliesaz.geministrator.resources.remote_access_enter_code
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_connect
 import com.hereliesaz.geministrator.resources.common_connected
@@ -425,6 +442,9 @@ internal fun ProviderSettingsScreen(
     var importDraft by rememberDurableStringState("settings.import-json.draft")
     var importMode by rememberDurableBooleanState("settings.import-json.open")
     var clearConfirm by remember { mutableStateOf(false) }
+    var disconnectProviderId by remember { mutableStateOf<String?>(null) }
+    var resetPairingConfirm by remember { mutableStateOf(false) }
+    var relayAdvancedOpen by remember { mutableStateOf(false) }
     var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
     var healthChecking by remember { mutableStateOf(false) }
     var exportTriggered by remember { mutableStateOf(false) }
@@ -485,9 +505,15 @@ internal fun ProviderSettingsScreen(
             color = Azphalt.currentGround.onPage,
         )
 
+        if (connectedProviderIds.isEmpty()) {
+            FirstRunFreeProvidersCard(onConnect = onConfigureProvider)
+        }
+
         ProviderCatalog.entries.forEach { entry ->
             val connected = entry.id in connectedProviderIds
-            val health = healthResults?.get(entry.id)
+            val healthRaw = healthResults?.get(entry.id)
+            val health = healthRaw?.substringBefore('\n')
+            val healthDetails = healthRaw?.substringAfter('\n', "")
             AzphaltRecord(
                 seed = "provider-catalog-${entry.id}",
                 eyebrow = stringResource(Res.string.settings_provider),
@@ -513,7 +539,7 @@ internal fun ProviderSettingsScreen(
                             AzphaltPill(
                                 stringResource(Res.string.settings_disconnect),
                                 "disconnect-provider-${entry.id}",
-                                onClick = { onDisconnectProvider(entry.id) },
+                                onClick = { disconnectProviderId = entry.id },
                             )
                         }
                         AzphaltPill(
@@ -523,6 +549,23 @@ internal fun ProviderSettingsScreen(
                         )
                     }
                 },
+            )
+            if (connected && !healthDetails.isNullOrBlank()) {
+                ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
+            }
+        }
+
+        disconnectProviderId?.let { id ->
+            AzphaltAlertDialog(
+                title = stringResource(Res.string.confirm_disconnect_title, ProviderCatalog.entry(id)?.displayName ?: id),
+                text = stringResource(Res.string.confirm_disconnect_body),
+                confirmLabel = stringResource(Res.string.confirm_disconnect_action),
+                onConfirm = {
+                    disconnectProviderId = null
+                    onDisconnectProvider(id)
+                },
+                onDismissRequest = { disconnectProviderId = null },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
             )
         }
 
@@ -578,30 +621,52 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (!setting.enabled) {
-                OutlinedTextField(
-                    value = setting.relayUrl,
-                    onValueChange = setting.onRelayUrlChange,
-                    label = { Text(stringResource(Res.string.settings_remote_access_relay_url)) },
-                    placeholder = { Text(setting.defaultRelayUrl) },
-                    singleLine = true,
+                AzphaltPill(
+                    stringResource(Res.string.remote_access_advanced),
+                    "remote-access-advanced",
+                    selected = relayAdvancedOpen,
+                    onClick = { relayAdvancedOpen = !relayAdvancedOpen },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (relayAdvancedOpen) {
+                    Text(
+                        stringResource(Res.string.remote_access_advanced_explain),
+                        style = AzphaltType.body,
+                        color = Azphalt.currentGround.onPage,
+                    )
+                    AzphaltTextField(
+                        value = setting.relayUrl,
+                        onValueChange = setting.onRelayUrlChange,
+                        label = stringResource(Res.string.settings_remote_access_relay_url),
+                        placeholder = setting.defaultRelayUrl,
+                    )
+                }
             }
             setting.status?.let { status ->
-                Text(status, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(
+                    status,
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
             }
+            ErrorDetailsToggle(setting.statusDetails, seed = "remote-access")
             setting.pairingCode?.let { code ->
                 Text(
                     stringResource(Res.string.settings_remote_access_warning),
                     style = AzphaltType.body,
                     color = Azphalt.currentGround.onPage,
                 )
-                OutlinedTextField(
+                Text(
+                    stringResource(Res.string.remote_access_enter_code),
+                    style = AzphaltType.body,
+                    color = Azphalt.currentGround.onPage,
+                )
+                AzphaltTextField(
                     value = code,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(stringResource(Res.string.settings_remote_access_pairing_code)) },
-                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(Res.string.settings_remote_access_pairing_code),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltPill(
@@ -618,9 +683,22 @@ internal fun ProviderSettingsScreen(
                 AzphaltPill(
                     stringResource(Res.string.settings_remote_access_reset),
                     "remote-access-reset",
-                    onClick = setting.onResetPairing,
+                    onClick = { resetPairingConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (resetPairingConfirm) {
+                    AzphaltAlertDialog(
+                        title = stringResource(Res.string.confirm_reset_pairing_title),
+                        text = stringResource(Res.string.confirm_reset_pairing_body),
+                        confirmLabel = stringResource(Res.string.confirm_reset_pairing_action),
+                        onConfirm = {
+                            resetPairingConfirm = false
+                            setting.onResetPairing()
+                        },
+                        onDismissRequest = { resetPairingConfirm = false },
+                        dismissLabel = stringResource(Res.string.confirm_cancel),
+                    )
+                }
             }
         }
 
@@ -1112,6 +1190,37 @@ internal fun ProviderSettingsScreen(
             }
         }
     }
+}
+
+/** New-user shortcut: the keyless providers, each one tap from its connect screen. */
+@Composable
+private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
+    val keyless = ProviderCatalog.builtInEntries.filter { it.keyOptional }
+    if (keyless.isEmpty()) return
+    AzphaltRecord(
+        seed = "first-run-free",
+        eyebrow = stringResource(Res.string.firstrun_title),
+        title = stringResource(Res.string.firstrun_title),
+        body = stringResource(Res.string.firstrun_body),
+        endCap = null,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
+                keyless.forEach { entry ->
+                    AzphaltPill(
+                        label = stringResource(Res.string.firstrun_connect, entry.displayName),
+                        seed = "first-run-${entry.id}",
+                        onClick = { onConnect(entry.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Text(
+                    stringResource(Res.string.firstrun_connect_hint),
+                    style = AzphaltType.body,
+                    color = Azphalt.White,
+                )
+            }
+        },
+    )
 }
 
 @Composable

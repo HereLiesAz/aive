@@ -29,13 +29,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
+import com.hereliesaz.geministrator.AzphaltMotion
+import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
@@ -133,7 +135,13 @@ class MainActivity : ComponentActivity() {
     private var crashReportNoticeVisible by mutableStateOf(false)
     private val remoteAccessController by lazy { RemoteAccessController(this) }
     private val notificationPermissionRequest =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                android.widget.Toast.makeText(this, R.string.notification_permission_denied, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    /** True while the user is in system Accessibility settings enabling the Gemini bridge. */
+    private var awaitingGeminiBridge = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Draw behind system bars on every API level; the shared Scaffold pads content by its insets.
@@ -173,6 +181,7 @@ class MainActivity : ComponentActivity() {
         azphaltHost.handleIntent(intent)
         removeRetiredOnDevicePlannerFiles()
 
+        refreshReducedMotion()
         setContent {
             var startupReady by remember { mutableStateOf(false) }
 
@@ -418,8 +427,13 @@ class MainActivity : ComponentActivity() {
                             installedGeminiReady = InstalledGeminiTextGenerationApi.isAvailable(this)
                             configuringProviderId = null
                             if (!installedGeminiReady) {
+                                awaitingGeminiBridge = true
                                 InstalledGeminiPreference.requestEnable(this)
                             }
+                        },
+                        onOpenAccessibilitySettings = {
+                            awaitingGeminiBridge = true
+                            InstalledGeminiPreference.requestEnable(this)
                         },
                         onUseApiKey = { configuringGeminiApiKey = true },
                         onCancel = {
@@ -511,7 +525,8 @@ class MainActivity : ComponentActivity() {
                             relayUrl = remoteRelayUrl,
                             defaultRelayUrl = RelayProtocol.DEFAULT_RELAY_URL,
                             pairingCode = remoteAccess.pairingCode,
-                            status = remoteAccessProblem ?: if (remoteAccess.enabled) remoteLinkStatus else null,
+                            status = remoteAccessProblem?.let(::remoteProblemSummary) ?: if (remoteAccess.enabled) remoteLinkStatus else null,
+                            statusDetails = remoteAccessProblem,
                             onEnabledChange = { enabled ->
                                 if (enabled) {
                                     remoteAccessProblem = remoteAccessController.turnOn()
@@ -582,8 +597,39 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AiveRemoteBridge.pruneExpired()
+        refreshReducedMotion()
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
+        if (awaitingGeminiBridge) {
+            awaitingGeminiBridge = false
+            android.widget.Toast.makeText(
+                this,
+                if (installedGeminiReady) R.string.gemini_setup_bridge_enabled_toast else R.string.gemini_setup_bridge_still_off,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    /** Short plain message with a next step for a raw Remote access problem. */
+    private fun remoteProblemSummary(raw: String): String = getString(
+        when (com.hereliesaz.geministrator.classifyError(raw)) {
+            com.hereliesaz.geministrator.ErrorKind.KeyRejected -> R.string.remote_problem_key_rejected
+            com.hereliesaz.geministrator.ErrorKind.RateLimited -> R.string.remote_problem_rate_limited
+            com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
+            com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out
+            com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
+        },
+    )
+
+    /** Freezes looping mascot animation when the user set Android's animator scale to 0. */
+    private fun refreshReducedMotion() {
+        val scale = runCatching {
+            android.provider.Settings.Global.getFloat(
+                contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            )
+        }.getOrNull()
+        AzphaltMotion.reduceMotion = shouldReduceMotion(animatorDurationScale = scale, systemPrefersReduced = false)
     }
 
     /**
@@ -618,12 +664,12 @@ fun HaiveSplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D1026)),
+            .background(colorResource(R.color.haive_icon_background)), // Azphalt Ink (colors.xml)
         contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(R.drawable.haive_splash_logo),
-            contentDescription = null,
+            contentDescription = stringResource(R.string.splash_logo_description),
             modifier = Modifier.size(280.dp),
             contentScale = ContentScale.Fit,
         )

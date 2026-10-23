@@ -15,6 +15,14 @@ export const MAX_FRAME_BYTES = 1_000_000;
 /** IDEaz instances that may be connected to one room at once. */
 export const MAX_CLIENTS_PER_ROOM = 8;
 
+/** Rooms one IP address may create (or re-key) per [CREATE_WINDOW_MILLIS]. */
+export const MAX_ROOM_CREATES_PER_WINDOW = 20;
+export const CREATE_WINDOW_MILLIS = 60 * 60 * 1000;
+
+/** Frames one socket may send: a burst, then a sustained rate. A sender over it is disconnected. */
+export const FRAME_BURST = 40;
+export const FRAME_REFILL_PER_SECOND = 10;
+
 /** A room whose host has not connected for this long is deleted. */
 export const ROOM_TTL_MILLIS = 30 * 24 * 60 * 60 * 1000;
 
@@ -75,4 +83,34 @@ export function routeFrame(senderTags, text) {
     return { to: "host", frame: { from: senderTags[1], data: frame.data } };
   }
   return null;
+}
+
+/** Token bucket for per-socket frame rate; [take] is false when the sender is over its limit. */
+export class TokenBucket {
+  constructor(capacity = FRAME_BURST, refillPerSecond = FRAME_REFILL_PER_SECOND, now = Date.now) {
+    this.capacity = capacity;
+    this.refillPerSecond = refillPerSecond;
+    this.now = now;
+    this.tokens = capacity;
+    this.last = now();
+  }
+
+  take() {
+    const t = this.now();
+    this.tokens = Math.min(this.capacity, this.tokens + ((t - this.last) / 1000) * this.refillPerSecond);
+    this.last = t;
+    if (this.tokens < 1) return false;
+    this.tokens -= 1;
+    return true;
+  }
+}
+
+/**
+ * Fixed-window counter for room creation. [window] is the stored {start, count} (or undefined);
+ * returns the window to store and whether this creation is allowed.
+ */
+export function countCreate(window, now, max = MAX_ROOM_CREATES_PER_WINDOW, span = CREATE_WINDOW_MILLIS) {
+  const current = window && now - window.start < span ? window : { start: now, count: 0 };
+  if (current.count >= max) return { window: current, allowed: false };
+  return { window: { start: current.start, count: current.count + 1 }, allowed: true };
 }

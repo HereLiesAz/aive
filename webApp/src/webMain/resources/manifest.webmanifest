@@ -4,8 +4,8 @@
   "description": "A governed workflow control room for people, agents, and automated executors.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0D1026",
-  "theme_color": "#0D1026",
+  "background_color": "#1E1A17",
+  "theme_color": "#1E1A17",
   "icons": [
     { "src": "haive-icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "haive-icon-512.png", "sizes": "512x512", "type": "image/png" }

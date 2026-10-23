@@ -385,6 +385,11 @@ internal class AndroidRoleSurfaceIntegration(
         }
         is SqlDatabaseSource.DocumentUri -> {
             require(!writable) { "Document-URI SQLite databases are read-only" }
+            // Each open copies the whole database into the cache. The copy has to outlive this call
+            // (the connection reads it lazily), so stale copies from earlier opens are swept here.
+            val staleBefore = System.currentTimeMillis() - STALE_SQL_COPY_MILLIS
+            appContext.cacheDir.listFiles { f -> f.name.startsWith("aive-sql-") && f.lastModified() < staleBefore }
+                ?.forEach { runCatching { it.delete() } }
             val temp = File.createTempFile("aive-sql-", ".db", appContext.cacheDir)
             appContext.contentResolver.openInputStream(Uri.parse(source.uri)).use { input ->
                 requireNotNull(input) { "Unable to open SQLite document URI" }
@@ -428,5 +433,6 @@ internal class AndroidRoleSurfaceIntegration(
         const val MAX_STORED_ROWS = 10_000
         const val MAX_MUTATION_ROWS = 2_000
         const val MAX_SQL_MUTATION_CHARS = 100_000
+        const val STALE_SQL_COPY_MILLIS = 10L * 60L * 1000L
     }
 }

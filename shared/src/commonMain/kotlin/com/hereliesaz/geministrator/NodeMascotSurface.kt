@@ -30,7 +30,8 @@ internal fun NodeMascotSurface(
     roleLabel: String,
     hueSeed: String,
     state: H2g2WorkflowState,
-    motionPhase: Float,
+    /** The shared animation clock. Read in the draw scope on the rig path (no per-frame recomposition). */
+    motionPhase: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     // Puppet rigs (files/rigs) take precedence when one is mapped for the role and has loaded.
@@ -41,16 +42,18 @@ internal fun NodeMascotSurface(
             RiggedCreatureSurface(
                 loaded = rig,
                 state = state,
-                phase = creatureRigPhase(motionPhase, hueSeed),
+                phase = { creatureRigPhase(motionPhase(), hueSeed) },
                 modifier = modifier,
             )
             return
         }
     }
+    // The pre-rig renderers take the phase as a value, so they do recompose with the clock.
+    val phase = motionPhase()
     if (roleLabel.trim().equals("Orchestrator", ignoreCase = true)) {
         OrchestratorSpritePuppetSurface(
             state = state,
-            motionPhase = motionPhase,
+            motionPhase = phase,
             modifier = modifier,
         )
         return
@@ -58,7 +61,7 @@ internal fun NodeMascotSurface(
     if (roleLabel.trim().equals("UX Designer", ignoreCase = true)) {
         UxDesignerSpritePuppetSurface(
             state = state,
-            motionPhase = motionPhase,
+            motionPhase = phase,
             modifier = modifier,
         )
         return
@@ -68,7 +71,7 @@ internal fun NodeMascotSurface(
     if (motionArchetype == NodeCreatureRoleKind.LegalCounsel) {
         LegalCounselSpritePuppetSurface(
             state = state,
-            motionPhase = motionPhase,
+            motionPhase = phase,
             modifier = modifier,
         )
         return
@@ -76,7 +79,7 @@ internal fun NodeMascotSurface(
     if (motionArchetype == NodeCreatureRoleKind.AutomatedProcess) {
         AutomatedProcessMascotSurface(
             state = state,
-            motionPhase = motionPhase,
+            motionPhase = phase,
             modifier = modifier,
         )
         return
@@ -85,7 +88,7 @@ internal fun NodeMascotSurface(
         SpriteMascotSurface(
             role = motionArchetype,
             state = state,
-            motionPhase = motionPhase,
+            motionPhase = phase,
             modifier = modifier,
         )
         return
@@ -96,7 +99,7 @@ internal fun NodeMascotSurface(
             character = character,
             hueSeed = hueSeed,
             state = state,
-            phase = motionPhase,
+            phase = phase,
         )
     }
 }

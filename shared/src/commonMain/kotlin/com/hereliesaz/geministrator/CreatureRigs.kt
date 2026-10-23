@@ -19,9 +19,11 @@ import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import com.hereliesaz.geministrator.puppet.PuppetRig
 import com.hereliesaz.geministrator.puppet.PuppetRigResources
 import com.hereliesaz.geministrator.resources.Res
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -132,7 +134,7 @@ internal object CreatureRigMapping {
         val normalized = roleLabel.trim().lowercase()
         if (normalized.isEmpty()) return null
         byRoleName[normalized]?.let { return it }
-        normalized.replace(Regex("[\\s_]+"), "-").takeIf { it in allSlugs }?.let { return it }
+        normalized.replace(LABEL_SEPARATORS, "-").takeIf { it in allSlugs }?.let { return it }
         val character = MascotCharacterCatalog.forRole(roleLabel)
         val kind = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
         if (kind == NodeCreatureRoleKind.Generic) return genericSlugFor(normalized)
@@ -153,6 +155,8 @@ internal object CreatureRigMapping {
 
     /** Stable small per-node phase offset (0..1) so neighbouring creatures don't move in lockstep. */
     fun phaseOffset(seed: String): Float = stableHash(seed.trim().lowercase()).mod(997) / 997f
+
+    private val LABEL_SEPARATORS = Regex("[\\s_]+")
 
     /** All slugs the mapping can produce. */
     val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS
@@ -177,18 +181,31 @@ class LoadedCreatureRig(val slug: String, val compiled: CompiledPuppetRig, val a
 /**
  * Process-wide rig cache. Each slug is read, parsed, compiled and decoded at most once (on
  * [Dispatchers.Default]); failures are remembered as misses so a broken rig is not retried every
- * frame and the node keeps its old rendering. [peek] is snapshot state, so composables reading it
- * recompose when a rig finishes loading.
+ * frame and the node keeps its old rendering. A load that is cancelled (its composable left
+ * composition) is not a failure: it is forgotten so the next request retries. At most [MAX_RIGS]
+ * decoded atlases stay resident (about 0.7 MB each); the least recently used one is dropped and
+ * reloads on demand. [peek] is snapshot state, so composables reading it recompose when a rig
+ * finishes loading.
  */
 object CreatureRigCache {
+    internal const val MAX_RIGS = 40
+
     private val ready = mutableStateMapOf<String, LoadedCreatureRig>()
     private val inFlight = HashMap<String, Deferred<LoadedCreatureRig?>>()
     private val lock = Mutex()
+    // Use order is touched only from the composition/caller thread (peek and the code after load
+    // returns in get), so it needs no lock; commonMain also has no `synchronized`.
+    private val lastUsed = HashMap<String, Long>()
+    private var useCounter = 0L
 
-    fun peek(slug: String): LoadedCreatureRig? = ready[slug]
+    fun peek(slug: String): LoadedCreatureRig? {
+        val rig = ready[slug] ?: return null
+        lastUsed[slug] = ++useCounter
+        return rig
+    }
 
     suspend fun get(slug: String): LoadedCreatureRig? {
-        ready[slug]?.let { return it }
+        peek(slug)?.let { return it }
         var owner = false
         val deferred = lock.withLock {
             inFlight.getOrPut(slug) {
@@ -197,11 +214,41 @@ object CreatureRigCache {
             }
         }
         if (owner) {
-            val result = runCatching { load(slug) }.getOrNull()
-            if (result != null) ready[slug] = result
-            (deferred as CompletableDeferred).complete(result)
+            val completable = deferred as CompletableDeferred<LoadedCreatureRig?>
+            try {
+                val result = try {
+                    load(slug)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                if (result != null) {
+                    ready[slug] = result
+                    trim(keep = slug)
+                }
+                completable.complete(result)
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) { lock.withLock { inFlight.remove(slug) } }
+                completable.complete(null)
+                throw cancelled
+            }
         }
         return deferred.await()
+    }
+
+    /** Drops least recently used rigs beyond [MAX_RIGS], never [keep]; they reload when next needed. */
+    private suspend fun trim(keep: String) {
+        val evicted = ArrayList<String>()
+        while (ready.size - evicted.size > MAX_RIGS) {
+            val victim = ready.keys.filter { it != keep && it !in evicted }
+                .minByOrNull { lastUsed[it] ?: 0L } ?: break
+            evicted += victim
+        }
+        evicted.forEach { lastUsed.remove(it) }
+        if (evicted.isEmpty()) return
+        evicted.forEach { ready.remove(it) }
+        lock.withLock { evicted.forEach { inFlight.remove(it) } }
     }
 
     @OptIn(ExperimentalResourceApi::class)
@@ -235,7 +282,8 @@ internal fun creatureRigPhase(motionPhase: Float, seed: String): Float =
 internal fun RiggedCreatureSurface(
     loaded: LoadedCreatureRig,
     state: H2g2WorkflowState,
-    phase: Float,
+    /** Read inside the draw scope, so a ticking clock invalidates drawing only, not composition. */
+    phase: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     val compiled = loaded.compiled
@@ -243,7 +291,7 @@ internal fun RiggedCreatureSurface(
     val matrix = remember { Matrix() }
     val stateIndex = remember(compiled, state) { compiled.stateIndex(state.name) }
     Canvas(modifier) {
-        compiled.evaluate(stateIndex, phase, buffer)
+        compiled.evaluate(stateIndex, phase(), buffer)
         val fit = PuppetFit.of(compiled.rig.canvas, size.width, size.height, CREATURE_RIG_CONTENT_SCALE)
         compiled.draw(this, loaded.atlas, buffer, fit, matrix)
     }

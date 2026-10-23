@@ -70,6 +70,16 @@ import com.hereliesaz.geministrator.resources.inspector_state
 import com.hereliesaz.geministrator.resources.inspector_stop_workflow
 import com.hereliesaz.geministrator.resources.inspector_stored_evidence
 import com.hereliesaz.geministrator.resources.inspector_task_is_not_part_of
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_stop_title
+import com.hereliesaz.geministrator.resources.confirm_stop_body
+import com.hereliesaz.geministrator.resources.confirm_stop_action
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_title
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_body
+import com.hereliesaz.geministrator.resources.confirm_reject_plan_action
+import com.hereliesaz.geministrator.resources.inspector_hint_approve_plan
+import com.hereliesaz.geministrator.resources.inspector_hint_approve_task
+import com.hereliesaz.geministrator.resources.inspector_hint_approve_nested
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.geministrator.resources.inspector_acceptance_criteria_count
@@ -104,6 +114,8 @@ internal fun TechnicalInspector(
     )
     var messageStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     var messageSending by remember(selectedTaskId) { mutableStateOf(false) }
+    // Reject plan and Stop workflow cannot be undone, so each asks first: true = stop.
+    var confirmingStop by remember(selectedTaskId) { mutableStateOf<Boolean?>(null) }
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
     val identity = role?.name ?: executor.displayName()
@@ -117,7 +129,20 @@ internal fun TechnicalInspector(
         Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = Azphalt.Yellow)
         Text(identity.uppercase(), style = AzphaltType.section, color = Azphalt.White)
         Text(task.objective, style = AzphaltType.body, color = Azphalt.White)
-        LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.name)
+        confirmingStop?.let { isStop ->
+            AzphaltAlertDialog(
+                title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
+                text = stringResource(if (isStop) Res.string.confirm_stop_body else Res.string.confirm_reject_plan_body),
+                confirmLabel = stringResource(if (isStop) Res.string.confirm_stop_action else Res.string.confirm_reject_plan_action),
+                onConfirm = {
+                    confirmingStop = null
+                    if (isStop) onResolveEscalation(selectedTaskId, false) else onRejectPlan(selectedTaskId)
+                },
+                onDismissRequest = { confirmingStop = null },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
+            )
+        }
+        LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
         LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
         LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference())
         LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), taskRun.assignedRoleId?.value ?: task.roleId?.value ?: "—")
@@ -161,12 +186,17 @@ internal fun TechnicalInspector(
                 onClick = { onApproveTask(selectedTaskId) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                stringResource(if (providerPlan) Res.string.inspector_hint_approve_plan else Res.string.inspector_hint_approve_task),
+                style = AzphaltType.body,
+                color = Azphalt.White,
+            )
             if (providerPlan) {
                 AzphaltPill(
                     label = stringResource(Res.string.inspector_reject_plan),
                     seed = "reject-plan-$selectedTaskId",
                     endCap = stringResource(Res.string.common_reject),
-                    onClick = { onRejectPlan(selectedTaskId) },
+                    onClick = { confirmingStop = false },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -179,6 +209,7 @@ internal fun TechnicalInspector(
                 onClick = { onApproveTask(selectedTaskId) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(stringResource(Res.string.inspector_hint_approve_nested), style = AzphaltType.body, color = Azphalt.White)
         }
         if (taskRun.status == TaskRunStatus.Escalated) {
             AzphaltPill(
@@ -192,7 +223,7 @@ internal fun TechnicalInspector(
                 label = stringResource(Res.string.inspector_stop_workflow),
                 seed = "escalation-reject-$selectedTaskId",
                 endCap = stringResource(Res.string.common_reject),
-                onClick = { onResolveEscalation(selectedTaskId, false) },
+                onClick = { confirmingStop = true },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

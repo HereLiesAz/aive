@@ -39,6 +39,13 @@ internal class RelayHostLink(
     private val httpClient: HttpClient,
     private val onStatus: (String) -> Unit,
 ) {
+    /**
+     * One guard for the life of the link, shared by every connection's router. A router per
+     * connection with its own guard let a relay operator drop the socket and replay a captured
+     * sealed frame to the fresh router inside the clock-skew window.
+     */
+    private val replayGuard = RelayReplayGuard()
+
     suspend fun run() {
         var backoff = INITIAL_BACKOFF_MILLIS
         // Creating a room that exists rotates its client token and drops every client, so it is
@@ -106,6 +113,7 @@ internal class RelayHostLink(
                 send = { clientId, data -> socket.outgoing.send(Frame.Text(relayFrameJson(clientId, data))) },
                 runStatus = AiveRemoteBridge.runStatus,
                 outcomes = AiveRemoteBridge.outcomes,
+                guard = replayGuard,
             )
             router.start()
             for (frame in socket.incoming) {

@@ -268,6 +268,98 @@ class MoyaiProviderTest {
         }
     }
 
+    private fun observingProvider(client: HttpClient) = MoyaiProvider(
+        id = AgentProviderId("azphalt:moyai"),
+        displayName = "Moyai",
+        baseUrl = "https://moyai.example",
+        client = client,
+        pollIntervalMillis = 250,
+    )
+
+    @Test
+    fun oneFailedPollDoesNotEndTheSession() = runTest {
+        var polls = 0
+        val client = jsonClient(MockEngine { call ->
+            when (call.url.encodedPath) {
+                "/api/session" -> json("""{"authenticated":true,"csrf":"csrf"}""")
+                "/api/runs/run-1" -> {
+                    polls += 1
+                    when (polls) {
+                        1 -> json("""{"id":"run-1","status":"running"}""")
+                        2 -> json("""{"error":"boom"}""", HttpStatusCode.InternalServerError)
+                        else -> json("""{"id":"run-1","status":"completed"}""")
+                    }
+                }
+                else -> error("Unexpected request ${call.method.value} ${call.url}")
+            }
+        })
+        try {
+            val provider = observingProvider(client)
+            val runId = com.hereliesaz.geministrator.domain.ProviderRunId("run-1")
+            provider.reconnect(runId, request.copy(requirePlanApproval = false), planGenerated = true, planApproved = true, planPreview = null)
+
+            assertIs<AgentEvent.Completed>(provider.observe(runId).toList().last())
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun aSessionThatKeepsFailingToPollIsReportedLost() = runTest {
+        var polls = 0
+        val client = jsonClient(MockEngine { call ->
+            when (call.url.encodedPath) {
+                "/api/session" -> json("""{"authenticated":true,"csrf":"csrf"}""")
+                "/api/runs/run-1" -> {
+                    polls += 1
+                    if (polls == 1) json("""{"id":"run-1","status":"running"}""")
+                    else json("""{"error":"down"}""", HttpStatusCode.BadGateway)
+                }
+                else -> error("Unexpected request ${call.method.value} ${call.url}")
+            }
+        })
+        try {
+            val provider = observingProvider(client)
+            val runId = com.hereliesaz.geministrator.domain.ProviderRunId("run-1")
+            provider.reconnect(runId, request.copy(requirePlanApproval = false), planGenerated = true, planApproved = true, planPreview = null)
+
+            val failed = assertIs<AgentEvent.Failed>(provider.observe(runId).toList().last())
+            assertContains(failed.reason, "Lost contact with Moyai")
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun aReplySeenAsAChatEventAndAsAMessageIsEmittedOnce() = runTest {
+        var polls = 0
+        val client = jsonClient(MockEngine { call ->
+            when (call.url.encodedPath) {
+                "/api/session" -> json("""{"authenticated":true,"csrf":"csrf"}""")
+                "/api/runs/run-1" -> {
+                    polls += 1
+                    if (polls <= 2) json("""{"id":"run-1","status":"running"}""")
+                    else json(
+                        """{"id":"run-1","status":"completed",
+                            "events":[{"id":1,"kind":"chat","message":"All done"}],
+                            "messages":[{"id":1,"role":"assistant","content":"All done"}]}""",
+                    )
+                }
+                else -> error("Unexpected request ${call.method.value} ${call.url}")
+            }
+        })
+        try {
+            val provider = observingProvider(client)
+            val runId = com.hereliesaz.geministrator.domain.ProviderRunId("run-1")
+            provider.reconnect(runId, request.copy(requirePlanApproval = false), planGenerated = true, planApproved = true, planPreview = null)
+
+            val replies = provider.observe(runId).toList().filterIsInstance<AgentEvent.Message>()
+            assertEquals(1, replies.size)
+        } finally {
+            client.close()
+        }
+    }
+
     private fun jsonClient(engine: MockEngine) = HttpClient(engine) {
         expectSuccess = false
         install(ContentNegotiation) {

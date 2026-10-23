@@ -192,8 +192,9 @@ class SqlWorkflowPersistence(
     /**
      * Moves workflow state out of the Settings store this replaces, once. The previous store is
      * handed to [LegacySettingsMigration.backup] as an export before it is cleared, so nothing is
-     * lost if the move is ever questioned. Unreadable Settings state is left where it is, and any
-     * other failure leaves the move to be retried on the next start.
+     * lost if the move is ever questioned. Unreadable Settings state is left where it is. A failure
+     * before the data commits leaves the move to be retried on the next start; once it has
+     * committed the move is final, and failing to clear the old copy is ignored.
      */
     private suspend fun migrateUnlocked(migration: LegacySettingsMigration) {
         if (queries.meta(MIGRATED_FROM_SETTINGS).awaitAsOneOrNull() != null) return
@@ -202,15 +203,25 @@ class SqlWorkflowPersistence(
         } catch (failure: PersistenceCorruptionException) {
             null
         }
-        if (exported != null) {
-            val snapshot = decodeImportSnapshot(exported, json)
-            if (snapshot.hasContent()) {
-                migration.backup(exported)
-                database.transaction { writeSnapshot(snapshot) }
-            }
-            migration.previous.clearWorkflowData()
+        if (exported == null) {
+            queries.putMeta(MIGRATED_FROM_SETTINGS, "skipped-unreadable")
+            return
         }
-        queries.putMeta(MIGRATED_FROM_SETTINGS, if (exported != null) "done" else "skipped-unreadable")
+        val snapshot = decodeImportSnapshot(exported, json)
+        if (snapshot.hasContent()) migration.backup(exported)
+        // The marker commits with the data, so a later failure can never make the next start import
+        // the stale Settings copy over newer rows and duplicate its events.
+        database.transaction {
+            if (snapshot.hasContent()) writeSnapshot(snapshot)
+            queries.putMeta(MIGRATED_FROM_SETTINGS, "done")
+        }
+        try {
+            migration.previous.clearWorkflowData()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // The data has moved and is marked as moved; a leftover Settings copy is never read again.
+        }
     }
 
     private suspend fun <T> locked(block: suspend () -> T): T = mutex.withLock {

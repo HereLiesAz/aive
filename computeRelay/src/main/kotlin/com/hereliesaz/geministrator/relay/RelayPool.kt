@@ -34,7 +34,15 @@ class RelayPool(
 
     private val mutex = Mutex()
     private val nodes = linkedMapOf<String, NodeSession>()
-    private val restoredLeases = stateStore.load(poolId)
+    // State written under another token (after a rotation), by a newer relay, or damaged on disk
+    // cannot be recovered; the pool starts empty and the unreadable file is dropped, instead of
+    // the pool refusing to exist until someone deletes the file by hand.
+    private val restoredLeases = try {
+        stateStore.load(poolId)
+    } catch (_: Exception) {
+        runCatching { stateStore.delete(poolId) }
+        emptyList()
+    }
     private val leases = linkedMapOf<String, LeaseRecord>().apply {
         restoredLeases
             .filterNot { persisted ->
@@ -482,7 +490,12 @@ class RelayPool(
                 acceptedAtEpochMillis = lease.acceptedAtEpochMillis,
             )
         }
-        if (persisted.isEmpty()) stateStore.delete(poolId) else stateStore.save(poolId, persisted)
+        // A full disk or a permissions problem must not end the node's session: the leases stay
+        // live in memory and the next change tries to persist again.
+        try {
+            if (persisted.isEmpty()) stateStore.delete(poolId) else stateStore.save(poolId, persisted)
+        } catch (_: java.io.IOException) {
+        }
     }
 
     private suspend fun sendAll(outbound: List<Pair<RelayPeer, ComputeRelayServerMessage>>) {

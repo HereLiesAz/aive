@@ -58,12 +58,14 @@ val buildDesktopBitcosNative = tasks.register<Exec>("buildDesktopBitcosNative") 
     group = "build"
     description = "Builds and stages the Rust BITCOS runtime for the current desktop OS."
     inputs.file(bitcosManifest)
+    inputs.file(bitcosManifest.asFile.resolveSibling("Cargo.lock"))
     inputs.dir(bitcosSources)
     outputs.file(generatedDesktopBitcosNativeDir.map { it.file("bitcos/$bitcosNativeLibraryName") })
     commandLine(
         "cargo",
         "build",
         "--release",
+        "--locked",
         "--manifest-path", bitcosManifest.asFile.absolutePath,
     )
     doLast {

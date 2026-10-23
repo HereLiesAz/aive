@@ -26,6 +26,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -72,7 +75,6 @@ import com.hereliesaz.geministrator.resources.overview_project_load_failed
 import com.hereliesaz.geministrator.resources.overview_project_name
 import com.hereliesaz.geministrator.resources.overview_provider_settings
 import com.hereliesaz.geministrator.resources.overview_reading_persisted_workflow_state
-import com.hereliesaz.geministrator.resources.overview_recover_clear_corrupted_data
 import com.hereliesaz.geministrator.resources.overview_repository_search_unavailable
 import com.hereliesaz.geministrator.resources.overview_required
 import com.hereliesaz.geministrator.resources.overview_resume_failed
@@ -90,6 +92,16 @@ import com.hereliesaz.geministrator.resources.overview_this_runtime_can_link_the
 import com.hereliesaz.geministrator.resources.overview_workflow_definition_error
 import com.hereliesaz.geministrator.resources.overview_workflow_errors
 import com.hereliesaz.geministrator.resources.overview_yours
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_recover_action
+import com.hereliesaz.geministrator.resources.confirm_recover_body
+import com.hereliesaz.geministrator.resources.confirm_recover_title
+import com.hereliesaz.geministrator.resources.overview_enter_name
+import com.hereliesaz.geministrator.resources.overview_enter_name_and_objective
+import com.hereliesaz.geministrator.resources.overview_enter_objective
+import com.hereliesaz.geministrator.resources.overview_invalid_repository_location
+import com.hereliesaz.geministrator.resources.overview_options
+import com.hereliesaz.geministrator.resources.overview_recover_delete_all_data
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
@@ -149,6 +161,15 @@ internal fun MindMapRunScreen(
         key = "overview.$draftScope.default-branch",
         initialValue = existingRepository?.defaultBranch.orEmpty(),
     )
+    var recoverConfirm by remember { mutableStateOf(false) }
+    val missingBothMessage = stringResource(Res.string.overview_enter_name_and_objective)
+    val missingNameMessage = stringResource(Res.string.overview_enter_name)
+    val missingObjectiveMessage = stringResource(Res.string.overview_enter_objective)
+    val invalidRepositoryMessage = stringResource(Res.string.overview_invalid_repository_location)
+    var optionsOpen by rememberDurableBooleanState(
+        key = "overview.$draftScope.options-open",
+        initialValue = existingRepository != null,
+    )
     var launchFieldsError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySearchError by remember(runtimeState) { mutableStateOf<String?>(null) }
@@ -202,11 +223,24 @@ internal fun MindMapRunScreen(
             val corrupted = (runtimeState as? ApplicationRuntimeState.ResumeFailed)?.isCorrupted == true
             if (corrupted) {
                 AzphaltPill(
-                    stringResource(Res.string.overview_recover_clear_corrupted_data),
+                    stringResource(Res.string.overview_recover_delete_all_data),
                     "recover-corruption",
-                    onClick = onRecoverFromCorruption,
+                    onClick = { recoverConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (recoverConfirm) {
+                    AzphaltAlertDialog(
+                        title = stringResource(Res.string.confirm_recover_title),
+                        text = stringResource(Res.string.confirm_recover_body),
+                        confirmLabel = stringResource(Res.string.confirm_recover_action),
+                        onConfirm = {
+                            recoverConfirm = false
+                            onRecoverFromCorruption()
+                        },
+                        onDismissRequest = { recoverConfirm = false },
+                        dismissLabel = stringResource(Res.string.confirm_cancel),
+                    )
+                }
             }
             val recoverableRuntimeFailure =
                 (runtimeState is ApplicationRuntimeState.ResumeFailed && !corrupted) ||
@@ -285,6 +319,21 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                OutlinedTextField(
+                    value = objective,
+                    onValueChange = { objective = it },
+                    label = { Text(stringResource(Res.string.overview_objective)) },
+                    minLines = if (compact) 2 else 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = stringResource(Res.string.overview_options),
+                    seed = "launch-options",
+                    selected = optionsOpen,
+                    onClick = { optionsOpen = !optionsOpen },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (optionsOpen) {
                 Text(
                     stringResource(Res.string.overview_link_repository),
                     style = AzphaltType.eyebrow,
@@ -448,13 +497,7 @@ internal fun MindMapRunScreen(
                         launchFieldsError = null
                     },
                 )
-                OutlinedTextField(
-                    value = objective,
-                    onValueChange = { objective = it },
-                    label = { Text(stringResource(Res.string.overview_objective)) },
-                    minLines = if (compact) 2 else 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                }
                 AzphaltPill(
                     label = if (runtimeState is ApplicationRuntimeState.NoRun) stringResource(Res.string.overview_start_run) else stringResource(Res.string.overview_create_project_start_run),
                     seed = "project-start-run",
@@ -471,9 +514,9 @@ internal fun MindMapRunScreen(
                         if (projectName.isBlank() || objective.isBlank()) {
                             // Previously a silent no-op: the only cue was the pill's unselected colour.
                             launchFieldsError = when {
-                                projectName.isBlank() && objective.isBlank() -> "Enter a project name and an objective to start a run."
-                                projectName.isBlank() -> "Enter a project name to start a run."
-                                else -> "Enter an objective to start a run."
+                                projectName.isBlank() && objective.isBlank() -> missingBothMessage
+                                projectName.isBlank() -> missingNameMessage
+                                else -> missingObjectiveMessage
                             }
                             platformDebugLog("AiveLaunch", "Launch blocked: $launchFieldsError")
                             return@AzphaltPill
@@ -501,7 +544,8 @@ internal fun MindMapRunScreen(
                                     onLaunchWorkflow(projectName.trim(), objective.trim(), repository, parents)
                                 },
                                 onFailure = { failure ->
-                                    repositoryError = failure.message ?: "Invalid repository location"
+                                    repositoryError = failure.message ?: invalidRepositoryMessage
+                                    optionsOpen = true
                                     platformDebugLog("AiveLaunch", "Launch blocked: invalid repository: $repositoryError")
                                 },
                             )
@@ -531,9 +575,12 @@ internal fun MindMapRunScreen(
             style = AzphaltType.eyebrow,
             color = Azphalt.currentGround.onPage,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        ) {
             AzphaltPill(
-                run.status.name,
+                run.status.label(),
                 "run-status",
                 endCap = "$completed/$total",
                 onClick = {},
@@ -625,7 +672,7 @@ internal fun MindMapRunScreen(
             .take(8)
         recentTasks.forEachIndexed { index, (task, taskRun) ->
             val detail = buildString {
-                append(taskRun.status.name)
+                append(taskRun.status.label())
                 taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
                     append(" · ")
                     append(it)
@@ -652,14 +699,16 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
         ApplicationRuntimeState.Loading -> stringResource(Res.string.overview_loading_runtime) to stringResource(Res.string.overview_reading_persisted_workflow_state)
         is ApplicationRuntimeState.NoProject -> stringResource(Res.string.overview_no_project) to stringResource(Res.string.overview_create_a_project_and_define_its)
         is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_no_active_run) to stringResource(Res.string.overview_has_no_persisted_workflow_run, state.project.name)
-        is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.overview_runtime_disconnected) to state.message
-        is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.overview_resume_failed) to state.message
+        is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.overview_runtime_disconnected) to friendlyErrorMessage(state.message)
+        is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.overview_resume_failed) to
+            if (state.isCorrupted) state.message else friendlyErrorMessage(state.message)
         is ApplicationRuntimeState.Live -> return
     }
     Text(
         title,
         style = if (compact) AzphaltType.section else AzphaltType.hero,
         color = Azphalt.currentGround.onPage,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
     AzphaltRecord(
         seed = "runtime-state-$title",
@@ -668,6 +717,12 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
         body = body,
         endCap = null,
     )
+    val rawDetails = when {
+        state is ApplicationRuntimeState.Disconnected -> state.message
+        state is ApplicationRuntimeState.ResumeFailed && !state.isCorrupted -> state.message
+        else -> null
+    }
+    ErrorDetailsToggle(rawDetails, seed = "runtime-state")
 }
 
 private fun TaskRunStatus.activityRank(): Int = when (this) {
