@@ -163,7 +163,7 @@ internal fun RepositoryProgressRecord(
                     Text(
                         stringResource(Res.string.repository_progress_repository_activity),
                         style = AzphaltType.eyebrow,
-                        color = Azphalt.White,
+                        color = azphaltOnSurface(),
                     )
                     repositoryUrl?.let { url ->
                         AzphaltPill(

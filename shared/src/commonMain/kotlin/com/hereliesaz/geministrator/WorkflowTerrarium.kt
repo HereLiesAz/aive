@@ -159,7 +159,7 @@ internal fun GeministratorWorkflowTerrarium(
             Text(
                 text = message,
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
                 modifier = Modifier.padding(top = 8.dp),
             )
         }

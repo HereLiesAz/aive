@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +30,8 @@ import com.hereliesaz.geministrator.azphalt.AzphaltPreparedInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedLlmInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltPreparedModelInstall
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
+import com.hereliesaz.geministrator.azphalt.AzphaltStoreStep
+import com.hereliesaz.geministrator.azphalt.AzphaltStoreStepException
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
@@ -36,6 +39,9 @@ import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.describePromptHandling
 import com.hereliesaz.geministrator.azphalt.isDirectLlmPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
+import com.hereliesaz.geministrator.azphalt.storeFailureDetails
+import com.hereliesaz.geministrator.azphalt.storeStep
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -108,6 +114,13 @@ import com.hereliesaz.geministrator.resources.store_search_workflows_roles_model
 import com.hereliesaz.geministrator.resources.store_size_not_published
 import com.hereliesaz.geministrator.resources.store_store
 import com.hereliesaz.geministrator.resources.store_store_error
+import com.hereliesaz.geministrator.resources.store_failed_while
+import com.hereliesaz.geministrator.resources.store_step_index
+import com.hereliesaz.geministrator.resources.store_step_installed
+import com.hereliesaz.geministrator.resources.store_step_revocations
+import com.hereliesaz.geministrator.resources.store_step_search
+import com.hereliesaz.geministrator.resources.store_step_updates
+import org.jetbrains.compose.resources.StringResource
 import com.hereliesaz.geministrator.resources.store_store_networking_is_unavailable_on_this
 import com.hereliesaz.geministrator.resources.store_terms
 import com.hereliesaz.geministrator.resources.store_the_package_signature_is_valid_but
@@ -148,6 +161,39 @@ private enum class AzphaltStoreCategory(val label: String) {
     Llms("LLMs"),
 }
 
+private fun AzphaltStoreStep.labelResource(): StringResource = when (this) {
+    AzphaltStoreStep.Index -> Res.string.store_step_index
+    AzphaltStoreStep.Search -> Res.string.store_step_search
+    AzphaltStoreStep.Installed -> Res.string.store_step_installed
+    AzphaltStoreStep.Updates -> Res.string.store_step_updates
+    AzphaltStoreStep.Revocations -> Res.string.store_step_revocations
+}
+
+/**
+ * Plain-language text for a failed Store load or search: what went wrong in words the user can act
+ * on, plus the step that failed. The exception class, message and causes go in the Details toggle.
+ * Cancellation is rethrown, never shown as an error.
+ */
+private suspend fun storeLoadFailureMessage(failure: Throwable, fallback: StringResource): String {
+    if (failure is CancellationException) throw failure
+    val kind = classifyError(storeFailureDetails(failure))
+    val summary = when (kind) {
+        ErrorKind.Offline, ErrorKind.TimedOut, ErrorKind.RateLimited -> getString(kind.messageResource())
+        else -> getString(fallback)
+    }
+    val step = (failure as? AzphaltStoreStepException)?.step ?: return summary
+    return summary + " " + getString(Res.string.store_failed_while, getString(step.labelResource()))
+}
+
+/**
+ * Text for a failed Store action: the failure's own message when it has one, otherwise the plain
+ * [fallback], never blank. Cancellation is rethrown, never shown as an error.
+ */
+private fun storeFailureMessage(failure: Throwable, fallback: String): String {
+    if (failure is CancellationException) throw failure
+    return failure.message?.takeIf(String::isNotBlank) ?: fallback
+}
+
 @OptIn(ExperimentalTime::class)
 @Composable
 internal fun AzphaltStoreScreen(
@@ -177,34 +223,49 @@ internal fun AzphaltStoreScreen(
     var allowPublisherChange by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Exception class, message and causes for the Details toggle under the error.
+    var errorDetails by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var refreshGeneration by remember { mutableStateOf(0) }
 
     LaunchedEffect(service, refreshGeneration) {
         if (service == null) return@LaunchedEffect
         loading = true
-        runCatching { service.snapshot() }
-            .onSuccess { loaded ->
-                snapshot = loaded
-                packages = loaded.packages
-                error = null
-            }
-            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_azphalt_store_could_not_be_loaded) }
-        loading = false
+        try {
+            val loaded = service.snapshot()
+            snapshot = loaded
+            packages = loaded.packages
+            error = null
+            errorDetails = null
+        } catch (cancelled: CancellationException) {
+            // A refresh or leaving the screen cancels the load; that is not a Store failure.
+            throw cancelled
+        } catch (failure: Throwable) {
+            error = storeLoadFailureMessage(failure, Res.string.store_azphalt_store_could_not_be_loaded)
+            errorDetails = storeFailureDetails(failure)
+        } finally {
+            loading = false
+        }
     }
 
     LaunchedEffect(service, query, refreshGeneration) {
         if (service == null || snapshot == null) return@LaunchedEffect
         delay(250)
-        runCatching { service.search(query).packages }
-            .onSuccess { packages = it }
-            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_azphalt_store_search_failed) }
+        try {
+            packages = storeStep(AzphaltStoreStep.Search) { service.search(query).packages }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            error = storeLoadFailureMessage(failure, Res.string.store_azphalt_store_search_failed)
+            errorDetails = storeFailureDetails(failure)
+        }
     }
 
     LaunchedEffect(service, importRequest?.requestId) {
         val request = importRequest ?: return@LaunchedEffect
         if (service == null) {
             error = getString(Res.string.store_azphalt_package_import_is_unavailable_on)
+            errorDetails = null
             onImportHandled(request.requestId)
             return@LaunchedEffect
         }
@@ -252,8 +313,11 @@ internal fun AzphaltStoreScreen(
                     }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
-            error = failure.message ?: getString(Res.string.store_imported_azphalt_package_could_not_be)
+            error = storeFailureMessage(failure, getString(Res.string.store_imported_azphalt_package_could_not_be))
+            errorDetails = storeFailureDetails(failure)
         } finally {
             loading = false
             onImportHandled(request.requestId)
@@ -277,19 +341,19 @@ internal fun AzphaltStoreScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             snapshot?.repository?.name?.let { stringResource(Res.string.store_workflows_roles_models_and_llms, it) }
                 ?: stringResource(Res.string.store_verified_workflows_roles_models_and_llms),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         if (service == null) {
             Text(
                 stringResource(Res.string.store_store_networking_is_unavailable_on_this),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
             return@Column
         }
@@ -302,10 +366,10 @@ internal fun AzphaltStoreScreen(
             )
             snapshot?.let { loaded ->
                 val count = loaded.installed.size + loaded.installedModels.size + loaded.installedLlms.size
-                Text(stringResource(Res.string.store_installed, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.store_installed, count), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             }
             snapshot?.updates?.count { it.updateAvailable == true }?.takeIf { it > 0 }?.let { count ->
-                Text(pluralStringResource(Res.plurals.store_update_count, count, count), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(pluralStringResource(Res.plurals.store_update_count, count, count), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             }
         }
 
@@ -316,6 +380,7 @@ internal fun AzphaltStoreScreen(
                 value = message,
                 modifier = Modifier.azphaltLiveRegion(),
             )
+            ErrorDetailsToggle(errorDetails, seed = "azphalt-store-error")
         }
         status?.let { message ->
             AzphaltNote(
@@ -357,7 +422,7 @@ internal fun AzphaltStoreScreen(
         }
 
         if (!loading && visiblePackages.isEmpty()) {
-            Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = azphaltOnSurface())
         }
 
         val installedById = snapshot?.installed.orEmpty().associateBy(InstalledAzphaltWorkflowPackage::packageId)
@@ -399,7 +464,10 @@ internal fun AzphaltStoreScreen(
                                         allowUntrustedSigner = false
                                         allowPublisherChange = false
                                     }
-                                    .onFailure { failure -> error = failure.message ?: getString(Res.string.store_language_model_package_preparation_failed) }
+                                    .onFailure { failure ->
+                                        error = storeFailureMessage(failure, getString(Res.string.store_language_model_package_preparation_failed))
+                                        errorDetails = storeFailureDetails(failure)
+                                    }
                                 loading = false
                             }
                         }
@@ -460,7 +528,7 @@ internal fun AzphaltStoreScreen(
                 well = if (selected) {
                     {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                            Text(item.id, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                             Text(
                                 buildString {
                                     append(item.kind)
@@ -471,17 +539,17 @@ internal fun AzphaltStoreScreen(
                                     append(" · ")
                                     append(item.priceStatus)
                                     append(" · ")
-                                    append(item.byteSize?.let(::formatByteSize) ?: stringResource(Res.string.store_size_not_published))
+                                    append(item.sizeInBytes?.let(::formatByteSize) ?: stringResource(Res.string.store_size_not_published))
                                 },
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                             if (modelAsset) {
                                 if (isRevoked) {
                                     Text(
                                         stringResource(Res.string.store_a_repository_revocation_applies_to_this),
                                         style = AzphaltType.body,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                 } else {
                                     AzphaltPill(
@@ -502,7 +570,8 @@ internal fun AzphaltStoreScreen(
                                                             allowPublisherChange = false
                                                         }
                                                         .onFailure { failure ->
-                                                            error = failure.message ?: getString(Res.string.store_model_package_preparation_failed)
+                                                            error = storeFailureMessage(failure, getString(Res.string.store_model_package_preparation_failed))
+                                                            errorDetails = storeFailureDetails(failure)
                                                         }
                                                     loading = false
                                                 }
@@ -535,7 +604,8 @@ internal fun AzphaltStoreScreen(
                                                                 refreshGeneration += 1
                                                             }
                                                             .onFailure { failure ->
-                                                                error = failure.message ?: getString(Res.string.store_model_removal_failed)
+                                                                error = storeFailureMessage(failure, getString(Res.string.store_model_removal_failed))
+                                                                errorDetails = storeFailureDetails(failure)
                                                             }
                                                         loading = false
                                                     }
@@ -551,7 +621,7 @@ internal fun AzphaltStoreScreen(
                                 Text(
                                     stringResource(Res.string.store_a_repository_revocation_applies_to_this_2),
                                     style = AzphaltType.body,
-                                    color = Azphalt.currentGround.onPage,
+                                    color = azphaltOnSurface(),
                                 )
                             } else {
                                 AzphaltPill(
@@ -572,7 +642,8 @@ internal fun AzphaltStoreScreen(
                                                         allowPublisherChange = false
                                                     }
                                                     .onFailure { failure ->
-                                                        error = failure.message ?: getString(Res.string.store_package_preparation_failed)
+                                                        error = storeFailureMessage(failure, getString(Res.string.store_package_preparation_failed))
+                                                        errorDetails = storeFailureDetails(failure)
                                                     }
                                                 loading = false
                                             }
@@ -610,7 +681,8 @@ internal fun AzphaltStoreScreen(
                             preparedModel = null
                             refreshGeneration += 1
                         }.onFailure { failure ->
-                            error = failure.message ?: getString(Res.string.store_model_installation_failed)
+                            error = storeFailureMessage(failure, getString(Res.string.store_model_installation_failed))
+                            errorDetails = storeFailureDetails(failure)
                         }
                         loading = false
                     }
@@ -648,7 +720,8 @@ internal fun AzphaltStoreScreen(
                             refreshGeneration += 1
                             onConnectProvider(installed.providerId)
                         }.onFailure { failure ->
-                            error = failure.message ?: getString(Res.string.store_language_model_installation_failed)
+                            error = storeFailureMessage(failure, getString(Res.string.store_language_model_installation_failed))
+                            errorDetails = storeFailureDetails(failure)
                         }
                         loading = false
                     }
@@ -684,7 +757,10 @@ internal fun AzphaltStoreScreen(
                                 allowUntrustedSigner = false
                                 allowPublisherChange = false
                             }
-                            .onFailure { failure -> error = failure.message ?: getString(Res.string.store_dependency_preparation_failed) }
+                            .onFailure { failure ->
+                                error = storeFailureMessage(failure, getString(Res.string.store_dependency_preparation_failed))
+                                errorDetails = storeFailureDetails(failure)
+                            }
                         loading = false
                     }
                 },
@@ -707,7 +783,8 @@ internal fun AzphaltStoreScreen(
                             refreshGeneration += 1
                             workflowLibraryHost?.packagesChanged()
                         }.onFailure { failure ->
-                            error = failure.message ?: getString(Res.string.store_package_installation_failed)
+                            error = storeFailureMessage(failure, getString(Res.string.store_package_installation_failed))
+                            errorDetails = storeFailureDetails(failure)
                         }
                         loading = false
                     }
@@ -768,7 +845,7 @@ private fun StoreLlmRecord(
         well = if (selected) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(item.id, style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(item.id, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     endpoint?.let {
                         val target = listOfNotNull(
                             it.defaultModel?.takeIf(String::isNotBlank),
@@ -781,7 +858,7 @@ private fun StoreLlmRecord(
                                 "$target. Aive calls this endpoint directly."
                             },
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                     }
                     llm?.dataHandling?.let { handling ->
@@ -791,7 +868,7 @@ private fun StoreLlmRecord(
                         revoked -> Text(
                             stringResource(Res.string.store_a_repository_revocation_applies_to_this_3),
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                         installed == null -> AzphaltPill(
                             label = stringResource(Res.string.store_inspect_install),
@@ -852,7 +929,7 @@ private fun PreparedStoreLlmPanel(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(verification.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
                 handling?.let {
                     AzphaltNote(
                         seed = "azphalt-llm-prepared-data",
@@ -883,7 +960,7 @@ private fun PreparedStoreLlmPanel(
                 Text(
                     stringResource(Res.string.store_aive_calls_this_model_directly_the),
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 if (!verification.trusted) {
                     ConfirmationRow(
@@ -923,7 +1000,7 @@ private fun PreparedStoreLlmPanel(
                             stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -962,7 +1039,7 @@ private fun PreparedAzphaltModelInstallPanel(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(verification.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(verification.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
                 prepared.assets.forEachIndexed { index, asset ->
                     AzphaltNote(
                         seed = "azphalt-model-asset-$index",
@@ -1016,7 +1093,7 @@ private fun PreparedAzphaltModelInstallPanel(
                             stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -1051,10 +1128,10 @@ private fun PreparedAzphaltInstall(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(plan.trustReason, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+                Text(plan.trustReason, style = AzphaltType.body, color = azphaltOnSurface())
 
                 if (plan.requestedHostPermissions.isNotEmpty()) {
-                    Text(stringResource(Res.string.store_host_permission_requests), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_host_permission_requests), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     plan.requestedHostPermissions.sorted().forEach { permission ->
                         val supported = permission !in plan.unsupportedHostPermissions
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1064,11 +1141,16 @@ private fun PreparedAzphaltInstall(
                                     { checked -> onPermissionChanged(permission, checked) }
                                 } else null,
                                 enabled = supported,
+                                colors = CheckboxDefaults.colors(
+                                    disabledCheckedColor = azphaltMutedOnSurface(),
+                                    disabledUncheckedColor = azphaltMutedOnSurface(),
+                                    disabledIndeterminateColor = azphaltMutedOnSurface(),
+                                ),
                             )
                             Text(
                                 if (supported) permission else stringResource(Res.string.store_unsupported_denied, permission),
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                         }
                     }
@@ -1096,7 +1178,7 @@ private fun PreparedAzphaltInstall(
                 }
 
                 if (prepared.dependencies.isNotEmpty()) {
-                    Text(stringResource(Res.string.store_dependencies), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                    Text(stringResource(Res.string.store_dependencies), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     prepared.dependencies.forEach { dependency ->
                         AzphaltNote(
                             seed = "azphalt-dependency-${dependency.dependency.id}",
@@ -1137,7 +1219,7 @@ private fun PreparedAzphaltInstall(
                             else -> stringResource(Res.string.store_the_package_signature_is_valid_but)
                         },
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
             }
@@ -1153,7 +1235,7 @@ private fun ConfirmationRow(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+        Text(text, style = AzphaltType.body, color = azphaltOnSurface())
     }
 }
 

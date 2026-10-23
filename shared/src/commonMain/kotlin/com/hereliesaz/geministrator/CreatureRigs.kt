@@ -3,11 +3,8 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
@@ -32,37 +29,37 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
 
 /**
  * Role -> puppet-rig mapping for node creatures. This is the ONE place that decides which rig in
- * `composeResources/files/rigs/` draws which node.
+ * `composeResources/files/rigs/` draws which node, and it always decides: [slugFor] never returns
+ * null, so every node is drawn with one of the current creature designs.
  *
- * Slugs come from the character directories in `docs/swarm-terrarium/characters/<NNN_role>/` as
- * sliced by `tools/puppet-rig/slice/` (see its `rigs-report.json`). Where a role has several sheets
- * the newest one wins: the higher-numbered `sheet_3` directory over `sheet_1`/`sheet_2`, and the
- * last variant of a sheet (`idea-catalyst-2`). Resolution of a node label:
+ * Slugs come from the character directories in `docs/swarm-terrarium/characters/<NNN_role>/`
+ * (parts-sheet rigs sliced by `tools/puppet-rig/slice/`, core roles 001-015 built from their
+ * composed art by `build_composed_rigs.py`). Where a role has several sheets the newest one wins:
+ * the higher-numbered `sheet_3` directory over `sheet_1`/`sheet_2`, and the last variant of a sheet
+ * (`idea-catalyst-2`). Resolution of a node label, first match wins:
  *
- * 1. A label that is exactly a rigged character's name ("Creative Synthesizer", "ML Engineer")
- *    gets that rig, even where the fuzzy classifier would file it under a neighbouring kind.
- * 2. Otherwise the label is resolved exactly as the old renderer does it ([MascotCharacterCatalog]
- *    then [classifyNodeCreatureRole]) and a role kind listed in [bySlugKind] gets its rig.
- * 3. A Store persona (explicit catalog entry) keeps its bespoke phenotype unless its label *is*
- *    the rigged role's name (e.g. "Content Strategist"); the catalog forbids collapsing distinct
- *    personas into one shared body, so "Brand Strategist" is not drawn as the content strategist.
- * 4. Unknown/custom roles ([NodeCreatureRoleKind.Generic]) get one of `generic-01..06`, chosen by
- *    a stable hash of the normalized label, so the same custom role always looks the same.
- * 5. A label that is a rig's own name ("creature", "data-miner-sheet-1-variant-1", also written
+ * 1. A label that is exactly a rigged character's name ("Creative Synthesizer", "ML Engineer",
+ *    "Orchestrator") gets that rig.
+ * 2. A label that is a rig's own name ("creature", "data-miner-sheet-1-variant-1", also written
  *    with spaces or underscores) gets that rig, so every rig is reachable by its file name; this
  *    covers the rigs in [NAMED_ONLY_SLUGS] that no role kind maps to.
- * 6. Anything else (no sheet was sliced yet: orchestrator, researcher, QA, ...; UX designer, whose
- *    hand-transcribed sample rig draws much smaller than its bespoke surface) returns null and
- *    stays on the existing sprite/procedural rendering.
+ * 3. A Store persona ([MascotCharacterCatalog], 94 of them) wears the creature of its catalog
+ *    `rigKind`; that explicit table is the persona -> creature mapping.
+ * 4. Any other label is classified ([classifyNodeCreatureRole]); a kind listed in [bySlugKind]
+ *    gets its rig.
+ * 5. Classifier kinds with no creature of their own use [KIND_FALLBACKS] (data engineer ->
+ *    database administrator, storyteller -> communicator, ...), and the deterministic executors
+ *    (Python, JavaScript, Test Runner, Deployment, Repository Operation, Nested Workflow) use
+ *    [AUTOMATED_PROCESS_RIGS].
+ * 6. Unknown/custom roles ([NodeCreatureRoleKind.Generic]) get one of `generic-01..06`, chosen by
+ *    a stable hash of the normalized label, so the same custom role always looks the same.
  */
 internal object CreatureRigMapping {
     val GENERIC_SLUGS = listOf("generic-01", "generic-02", "generic-03", "generic-04", "generic-05", "generic-06")
 
     /**
      * Rigs no role kind maps to (older sheets/variants superseded in [bySlugKind], and the
-     * unclassified `creature`). Their file name is the role label that selects them. `ux-designer`
-     * is deliberately absent: its hand-built sample rig draws small, so UX designers keep the
-     * bespoke surface (see step 6 above).
+     * unclassified `creature`). Their file name is the role label that selects them.
      */
     val NAMED_ONLY_SLUGS = listOf(
         "creature",
@@ -74,7 +71,44 @@ internal object CreatureRigMapping {
         "scheduler-sheet-2-variant",
     )
 
+    /** Classifier kinds that have no creature of their own, and the closest creature to draw. */
+    val KIND_FALLBACKS: Map<NodeCreatureRoleKind, String> = mapOf(
+        NodeCreatureRoleKind.DataEngineer to "database-administrator",
+        NodeCreatureRoleKind.ContentCreator to "creative-synthesizer",
+        NodeCreatureRoleKind.TechnicalAuthor to "documentation-specialist",
+        NodeCreatureRoleKind.BugReporter to "test-explorer",
+        NodeCreatureRoleKind.WorldBuilder to "architect",
+        NodeCreatureRoleKind.Storyteller to "communicator",
+        NodeCreatureRoleKind.Pathfinder to "strategy-scout",
+    )
+
+    /** The deterministic executors (normalized label -> creature). Anything else automated uses [DEFAULT_AUTOMATED_RIG]. */
+    val AUTOMATED_PROCESS_RIGS: Map<String, String> = mapOf(
+        "javascript" to "process-mapper",
+        "python" to "process-mapper",
+        "test runner" to "test-automation-engineer",
+        "deployment" to "deployment-pilot",
+        "repository operation" to "build-engineer",
+        "nested workflow" to "flow-director",
+    )
+    const val DEFAULT_AUTOMATED_RIG = "process-mapper"
+
     val bySlugKind: Map<NodeCreatureRoleKind, String> = mapOf(
+        // Core roles 001-015, rigged from their composed character art (tools/puppet-rig/slice/build_composed_rigs.py).
+        NodeCreatureRoleKind.Orchestrator to "orchestrator", // 001
+        NodeCreatureRoleKind.UxDesigner to "ux-designer", // 002
+        NodeCreatureRoleKind.Researcher to "researcher", // 003
+        NodeCreatureRoleKind.ImplementationEngineer to "implementation-engineer", // 004
+        NodeCreatureRoleKind.EpaRepresentative to "epa-representative", // 006
+        NodeCreatureRoleKind.AdversarialReviewer to "adversarial-reviewer", // 007
+        NodeCreatureRoleKind.QaEngineer to "qa-engineer", // 008
+        NodeCreatureRoleKind.ReleaseEngineer to "release-engineer", // 009
+        NodeCreatureRoleKind.Antagonist to "antagonist", // 010
+        NodeCreatureRoleKind.ProductManager to "product-manager", // 011
+        NodeCreatureRoleKind.CrashTestDummy to "crash-test-dummy", // 012
+        NodeCreatureRoleKind.RecoveryEngineer to "recovery-engineer", // 013
+        NodeCreatureRoleKind.CodeReviewer to "code-reviewer", // 014
+        NodeCreatureRoleKind.HallMonitor to "hall-monitor", // 015
         NodeCreatureRoleKind.Architect to "architect", // 005
         NodeCreatureRoleKind.DataMiner to "data-miner-sheet-3-variant", // 036 (newer than 016)
         NodeCreatureRoleKind.KnowledgeKeeper to "knowledge-keeper-sheet-2-variant", // 022 (newer than 017)
@@ -129,18 +163,19 @@ internal object CreatureRigMapping {
         bySlugKind.entries.associate { (kind, slug) -> displayName(kind) to slug }
     }
 
-    /** Rig slug for a node's role label, or null to keep the pre-rig rendering. */
-    fun slugFor(roleLabel: String): String? {
+    /** Rig slug for a node's role label. Never null: every label resolves to one of the creature designs. */
+    fun slugFor(roleLabel: String): String {
         val normalized = roleLabel.trim().lowercase()
-        if (normalized.isEmpty()) return null
         byRoleName[normalized]?.let { return it }
         normalized.replace(LABEL_SEPARATORS, "-").takeIf { it in allSlugs }?.let { return it }
-        val character = MascotCharacterCatalog.forRole(roleLabel)
-        val kind = character?.motionArchetype ?: classifyNodeCreatureRole(roleLabel)
-        if (kind == NodeCreatureRoleKind.Generic) return genericSlugFor(normalized)
-        val slug = bySlugKind[kind] ?: return null
-        val isPersona = character != null && MascotCharacterCatalog.explicitForRole(roleLabel) != null
-        return if (isPersona) null else slug
+        val kind = MascotCharacterCatalog.explicitForRole(roleLabel)?.rigKind ?: classifyNodeCreatureRole(roleLabel)
+        return slugForKind(kind, normalized)
+    }
+
+    private fun slugForKind(kind: NodeCreatureRoleKind, normalizedLabel: String): String = when (kind) {
+        NodeCreatureRoleKind.Generic -> genericSlugFor(normalizedLabel)
+        NodeCreatureRoleKind.AutomatedProcess -> AUTOMATED_PROCESS_RIGS[normalizedLabel] ?: DEFAULT_AUTOMATED_RIG
+        else -> bySlugKind[kind] ?: KIND_FALLBACKS[kind] ?: genericSlugFor(normalizedLabel)
     }
 
     /** Deterministic generic body for an unknown role id/label. */
@@ -168,11 +203,6 @@ internal object CreatureRigMapping {
     }
 }
 
-/** User-facing switch (debug/settings) that forces the pre-rig node rendering. */
-object CreatureRigSettings {
-    var enabled: Boolean by mutableStateOf(true)
-}
-
 /** A rig ready for live drawing: compiled once, atlas decoded once, shared by every node using it. */
 class LoadedCreatureRig(val slug: String, val compiled: CompiledPuppetRig, val atlas: ImageBitmap) {
     val rig: PuppetRig get() = compiled.rig
@@ -180,8 +210,8 @@ class LoadedCreatureRig(val slug: String, val compiled: CompiledPuppetRig, val a
 
 /**
  * Process-wide rig cache. Each slug is read, parsed, compiled and decoded at most once (on
- * [Dispatchers.Default]); failures are remembered as misses so a broken rig is not retried every
- * frame and the node keeps its old rendering. A load that is cancelled (its composable left
+ * [Dispatchers.Default]); failures are remembered as misses ([hasFailed]) so a broken rig is not retried every
+ * frame and the node keeps its quiet placeholder. A load that is cancelled (its composable left
  * composition) is not a failure: it is forgotten so the next request retries. At most [MAX_RIGS]
  * decoded atlases stay resident (about 0.7 MB each); the least recently used one is dropped and
  * reloads on demand. [peek] is snapshot state, so composables reading it recompose when a rig
@@ -191,6 +221,7 @@ object CreatureRigCache {
     internal const val MAX_RIGS = 40
 
     private val ready = mutableStateMapOf<String, LoadedCreatureRig>()
+    private val failed = mutableStateMapOf<String, Boolean>()
     private val inFlight = HashMap<String, Deferred<LoadedCreatureRig?>>()
     private val lock = Mutex()
     // Use order is touched only from the composition/caller thread (peek and the code after load
@@ -203,6 +234,9 @@ object CreatureRigCache {
         lastUsed[slug] = ++useCounter
         return rig
     }
+
+    /** True once loading [slug] failed (snapshot state, so a placeholder reading it recomposes). */
+    fun hasFailed(slug: String): Boolean = failed[slug] == true
 
     suspend fun get(slug: String): LoadedCreatureRig? {
         peek(slug)?.let { return it }
@@ -226,6 +260,8 @@ object CreatureRigCache {
                 if (result != null) {
                     ready[slug] = result
                     trim(keep = slug)
+                } else {
+                    failed[slug] = true
                 }
                 completable.complete(result)
             } catch (cancelled: CancellationException) {
@@ -261,8 +297,7 @@ object CreatureRigCache {
 
 /** Starts loading [slug] (once) and returns it when ready; null while loading or on failure. */
 @Composable
-internal fun rememberCreatureRig(slug: String?): LoadedCreatureRig? {
-    if (slug == null) return null
+internal fun rememberCreatureRig(slug: String): LoadedCreatureRig? {
     LaunchedEffect(slug) { CreatureRigCache.get(slug) }
     return CreatureRigCache.peek(slug)
 }

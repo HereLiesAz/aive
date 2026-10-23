@@ -94,12 +94,12 @@ internal fun ComputeDelegationScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.compute_compute), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.compute_compute), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             stringResource(Res.string.compute_coordinate_where_work_runs_assign_the) +
                 stringResource(Res.string.compute_assignments_are_enforced_by_the_relay),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         ComputeSectionLabel(stringResource(Res.string.compute_fleet))
@@ -175,7 +175,7 @@ internal fun ComputeDelegationScreen(
             Text(
                 stringResource(Res.string.compute_this_workflow_has_no_role_backed),
                 style = AzphaltType.body,
-                color = Azphalt.currentGround.onPage,
+                color = azphaltOnSurface(),
             )
         } else {
             roleIds.forEach { roleId ->
@@ -337,5 +337,5 @@ private fun formatMemory(memoryMiB: Long): String =
 
 @Composable
 private fun ComputeSectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }

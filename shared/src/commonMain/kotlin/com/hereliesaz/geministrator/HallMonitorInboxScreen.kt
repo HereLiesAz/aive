@@ -61,7 +61,7 @@ internal fun HallMonitorPauseInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
         AzphaltRecord(
             seed = "hall-monitor-global-pause",
             eyebrow = stringResource(Res.string.hall_monitor_global_pause),
@@ -78,36 +78,36 @@ internal fun HallMonitorPauseInboxScreen(
                             reportResult.exceptionOrNull()?.message
                                 ?: stringResource(Res.string.hall_monitor_the_hall_monitor_report_cannot_be),
                             style = AzphaltType.body,
-                            color = Azphalt.currentGround.onPage,
+                            color = azphaltOnSurface(),
                         )
                     } else {
                         report.findings.forEach { finding ->
                             Text(
                                 "${finding.scope.name.uppercase()} · ${finding.subject}",
                                 style = AzphaltType.eyebrow,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                             Text(
                                 finding.observation,
                                 style = AzphaltType.body,
-                                color = Azphalt.currentGround.onPage,
+                                color = azphaltOnSurface(),
                             )
                             finding.solutions.forEachIndexed { solutionIndex, solution ->
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(
                                         solution.title,
                                         style = AzphaltType.lead,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                     Text(
                                         "${solution.action.name.uppercase()} · ${solution.target}",
                                         style = AzphaltType.eyebrow,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                     Text(
                                         solution.rationale,
                                         style = AzphaltType.body,
-                                        color = Azphalt.currentGround.onPage,
+                                        color = azphaltOnSurface(),
                                     )
                                     AzphaltNote(
                                         seed = "hall-monitor-tests-${finding.id}-$solutionIndex",
@@ -128,7 +128,7 @@ internal fun HallMonitorPauseInboxScreen(
                     }
 
                     if (pause.solutionTrials.isNotEmpty()) {
-                        Text(stringResource(Res.string.hall_monitor_trial_history), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                        Text(stringResource(Res.string.hall_monitor_trial_history), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                         pause.solutionTrials.forEach { trial ->
                             AzphaltNote(
                                 seed = "hall-monitor-trial-${trial.id}",
@@ -162,7 +162,7 @@ internal fun HallMonitorTrialInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.hall_monitor_test_solution), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.hall_monitor_test_solution), style = AzphaltType.hero, color = azphaltOnSurface())
         AzphaltRecord(
             seed = presentation.run.id.value,
             eyebrow = stringResource(Res.string.hall_monitor_isolated_counterfactual),

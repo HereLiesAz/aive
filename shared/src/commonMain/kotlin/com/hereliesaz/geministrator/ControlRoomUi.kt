@@ -18,10 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,8 +50,6 @@ import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.nav_ground
-import com.hereliesaz.geministrator.resources.nav_reroll
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -58,6 +58,7 @@ import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
 import com.hereliesaz.geministrator.resources.nav_swarm_os
 import com.hereliesaz.geministrator.resources.nav_the_aive
+import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
 
 internal object ControlRoomBreakpoints {
@@ -146,6 +147,15 @@ fun ControlRoom(
     connectedProviderIds: Set<String> = emptySet(),
 ) {
     val ground = Azphalt.currentGround
+    // Unread Inbox items: pending decisions, and the Hall Monitor pause. Opening the Inbox marks
+    // everything it lists as read.
+    val inboxReadLog = remember { InboxReadLog(Settings()) }
+    val inboxKeys = remember(runtimeState) { inboxItemKeys(runtimeState) }
+    val unreadInbox = unreadInboxCount(inboxKeys, inboxReadLog.read)
+    LaunchedEffect(destination, inboxKeys) {
+        if (destination == ControlRoomDestination.Inbox) inboxReadLog.markRead(inboxKeys)
+    }
+    val openInbox = { onDestinationSelected(ControlRoomDestination.Inbox) }
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
@@ -159,7 +169,7 @@ fun ControlRoom(
     ) {
         if (compact) {
             Column(Modifier.fillMaxSize()) {
-                CompactHeader()
+                CompactHeader(unreadInbox = unreadInbox, onOpenInbox = openInbox)
                 CompactNavigation(destination, onDestinationSelected, destinations)
                 MainDestination(
                     destination = destination,
@@ -226,6 +236,8 @@ fun ControlRoom(
                     onDestinationSelected = onDestinationSelected,
                     destinations = destinations,
                     runtimeState = runtimeState,
+                    unreadInbox = unreadInbox,
+                    onOpenInbox = openInbox,
                     modifier = Modifier.width(220.dp).fillMaxHeight(),
                 )
                 MainDestination(
@@ -292,8 +304,10 @@ fun ControlRoom(
                 ModalBottomSheet(
                     onDismissRequest = { onTaskSelected(taskId) },
                     containerColor = Azphalt.Ink,
-                    contentColor = Azphalt.White,
+                    contentColor = Azphalt.Ink.onOpposite(),
+                    dragHandle = { BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
                 ) {
+                    AzphaltThemedSurface(Azphalt.Ink) {
                     TechnicalInspector(
                         selectedTaskId = taskId,
                         liveWorkflow = liveWorkflow,
@@ -305,6 +319,7 @@ fun ControlRoom(
                             .fillMaxWidth()
                             .fillMaxHeight(if (compact) 0.72f else 0.62f),
                     )
+                    }
                 }
             }
         }
@@ -317,6 +332,8 @@ private fun PillNavigation(
     onDestinationSelected: (ControlRoomDestination) -> Unit,
     destinations: List<ControlRoomDestination>,
     runtimeState: ApplicationRuntimeState,
+    unreadInbox: Int,
+    onOpenInbox: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val entrance = remember { AzphaltEntrance.roll() }
@@ -324,8 +341,20 @@ private fun PillNavigation(
         modifier = modifier.padding(start = 14.dp, top = 22.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
-        Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = azphaltOnSurface())
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(Res.string.nav_swarm_os),
+                style = AzphaltType.eyebrow,
+                color = azphaltOnSurface(),
+                modifier = Modifier.weight(1f),
+            )
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
+        }
         Spacer(Modifier.height(12.dp))
         destinations.forEachIndexed { index, item ->
             AzphaltPill(
@@ -340,34 +369,27 @@ private fun PillNavigation(
             )
         }
         Spacer(Modifier.weight(1f))
-        AzphaltPill(
-            label = Azphalt.currentGround.name,
-            seed = "ground",
-            endCap = stringResource(Res.string.nav_reroll),
-            onClick = { Azphalt.rerollGround() },
-            modifier = Modifier.fillMaxWidth(0.9f),
-        )
         Text(
             runtimeStatusLabel(runtimeState),
             style = AzphaltType.eyebrow,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
             modifier = Modifier.azphaltLiveRegion(),
         )
     }
 }
 
 @Composable
-private fun CompactHeader() {
+private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
-            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = Azphalt.currentGround.onPage)
-            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
+            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         }
-        AzphaltPill(stringResource(Res.string.nav_ground), "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
+        InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
     }
 }
 

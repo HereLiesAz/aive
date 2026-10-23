@@ -56,6 +56,7 @@ fun ProviderCredentialSetup(
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Azphalt.currentGround.page,
+            contentColor = Azphalt.currentGround.page.onOpposite(),
         ) {
             Column(
                 modifier = Modifier
@@ -67,12 +68,12 @@ fun ProviderCredentialSetup(
                 Text(
                     stringResource(Res.string.provider_credential_connect),
                     style = AzphaltType.hero,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 Text(
                     entry.displayName.uppercase(),
                     style = AzphaltType.section,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
 
                 AzphaltRecord(
@@ -93,7 +94,7 @@ fun ProviderCredentialSetup(
                 Text(
                     stringResource(Res.string.provider_credential_credential),
                     style = AzphaltType.eyebrow,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 AzphaltTextField(
                     value = apiKey,
@@ -116,7 +117,7 @@ fun ProviderCredentialSetup(
                     Text(
                         stringResource(Res.string.credential_keyless_hint),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
 

@@ -1,589 +1,491 @@
 package com.hereliesaz.geministrator
 
 /**
- * Character registry for Azphalt workflow/role personas.
+ * Registry of the Azphalt Store workflow/role personas.
  *
- * Every listed Store persona owns a distinct node-creature identity.
- *
- * [motionArchetype] is ONLY an animation vocabulary (how a character tends to move/express effort).
- * It is not a species/family mapping and must never be used to collapse multiple Store roles into
- * one visible character. [phenotypeIndex] identifies the character's own morphology.
+ * A persona is an identity (stable [id] and [roleLabel]); it is drawn with one of the creature
+ * designs in `files/rigs/`. [rigKind] names the closest design by role: it is the explicit
+ * persona -> creature table that [CreatureRigMapping.slugFor] resolves through [bySlugKind]
+ * (`CreatureRigs.kt`), so "Brand Strategist" and "Content Strategist" both wear the content
+ * strategist creature while "Film Showrunner" wears the orchestrator.
  */
 internal data class MascotCharacterIdentity(
     val id: String,
     val roleLabel: String,
-    val motionArchetype: NodeCreatureRoleKind,
-    val phenotypeIndex: Int,
-) {
-    val designFingerprint: String
-        get() = "$id#$phenotypeIndex"
-}
+    val rigKind: NodeCreatureRoleKind,
+)
 
 internal object MascotCharacterCatalog {
     private val storeCharacters = listOf(
         MascotCharacterIdentity(
             id = "azphalt-ai-evaluation-scientist",
             roleLabel = "AI Evaluation Scientist",
-            motionArchetype = NodeCreatureRoleKind.MlEngineer,
-            phenotypeIndex = 0,
+            rigKind = NodeCreatureRoleKind.MlEngineer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-accessibility-auditor",
             roleLabel = "Accessibility Auditor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 1,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-agent-red-teamer",
             roleLabel = "Agent Red Teamer",
-            motionArchetype = NodeCreatureRoleKind.ThreatModeler,
-            phenotypeIndex = 2,
+            rigKind = NodeCreatureRoleKind.ThreatModeler,
         ),
         MascotCharacterIdentity(
             id = "azphalt-agent-security-architect",
             roleLabel = "Agent Security Architect",
-            motionArchetype = NodeCreatureRoleKind.SecurityAnalyst,
-            phenotypeIndex = 3,
+            rigKind = NodeCreatureRoleKind.SecurityAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-book-editor",
             roleLabel = "Book Editor",
-            motionArchetype = NodeCreatureRoleKind.DocumentationSpecialist,
-            phenotypeIndex = 4,
+            rigKind = NodeCreatureRoleKind.DocumentationSpecialist,
         ),
         MascotCharacterIdentity(
             id = "azphalt-brand-strategist",
             roleLabel = "Brand Strategist",
-            motionArchetype = NodeCreatureRoleKind.ContentStrategist,
-            phenotypeIndex = 5,
+            rigKind = NodeCreatureRoleKind.ContentStrategist,
         ),
         MascotCharacterIdentity(
             id = "azphalt-campaign-strategist",
             roleLabel = "Campaign Strategist",
-            motionArchetype = NodeCreatureRoleKind.StrategyScout,
-            phenotypeIndex = 6,
+            rigKind = NodeCreatureRoleKind.StrategyScout,
         ),
         MascotCharacterIdentity(
             id = "azphalt-competitive-analyst",
             roleLabel = "Competitive Analyst",
-            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
-            phenotypeIndex = 7,
+            rigKind = NodeCreatureRoleKind.BusinessAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-content-strategist",
             roleLabel = "Content Strategist",
-            motionArchetype = NodeCreatureRoleKind.ContentStrategist,
-            phenotypeIndex = 8,
+            rigKind = NodeCreatureRoleKind.ContentStrategist,
         ),
         MascotCharacterIdentity(
             id = "azphalt-continuity-supervisor",
             roleLabel = "Continuity Supervisor",
-            motionArchetype = NodeCreatureRoleKind.Guardian,
-            phenotypeIndex = 9,
+            rigKind = NodeCreatureRoleKind.Guardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-contract-reviewer",
             roleLabel = "Contract Reviewer",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 10,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-corporate-investigator",
             roleLabel = "Corporate Investigator",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 11,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-crisis-communicator",
             roleLabel = "Crisis Communicator",
-            motionArchetype = NodeCreatureRoleKind.Communicator,
-            phenotypeIndex = 12,
+            rigKind = NodeCreatureRoleKind.Communicator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-curriculum-architect",
             roleLabel = "Curriculum Architect",
-            motionArchetype = NodeCreatureRoleKind.Architect,
-            phenotypeIndex = 13,
+            rigKind = NodeCreatureRoleKind.Architect,
         ),
         MascotCharacterIdentity(
             id = "azphalt-data-investigator",
             roleLabel = "Data Investigator",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 14,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-data-story-editor",
             roleLabel = "Data Story Editor",
-            motionArchetype = NodeCreatureRoleKind.Documenter,
-            phenotypeIndex = 15,
+            rigKind = NodeCreatureRoleKind.Documenter,
         ),
         MascotCharacterIdentity(
             id = "azphalt-decision-analyst",
             roleLabel = "Decision Analyst",
-            motionArchetype = NodeCreatureRoleKind.DecisionHelper,
-            phenotypeIndex = 16,
+            rigKind = NodeCreatureRoleKind.DecisionHelper,
         ),
         MascotCharacterIdentity(
             id = "azphalt-deep-research-lead",
             roleLabel = "Deep Research Lead",
-            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
-            phenotypeIndex = 17,
+            rigKind = NodeCreatureRoleKind.KnowledgeKeeper,
         ),
         MascotCharacterIdentity(
             id = "azphalt-deep-researcher",
             roleLabel = "Deep Researcher",
-            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
-            phenotypeIndex = 18,
+            rigKind = NodeCreatureRoleKind.KnowledgeKeeper,
         ),
         MascotCharacterIdentity(
             id = "azphalt-documentary-producer",
             roleLabel = "Documentary Producer",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 19,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-event-producer",
             roleLabel = "Event Producer",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 20,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-evidence-skeptic",
             roleLabel = "Evidence Skeptic",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 21,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-evidence-synthesis-lead",
             roleLabel = "Evidence Synthesis Lead",
-            motionArchetype = NodeCreatureRoleKind.CreativeSynthesizer,
-            phenotypeIndex = 22,
+            rigKind = NodeCreatureRoleKind.CreativeSynthesizer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-execution-secretary",
             roleLabel = "Execution Secretary",
-            motionArchetype = NodeCreatureRoleKind.Scheduler,
-            phenotypeIndex = 23,
+            rigKind = NodeCreatureRoleKind.Scheduler,
         ),
         MascotCharacterIdentity(
             id = "azphalt-exhibition-producer",
             roleLabel = "Exhibition Producer",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 24,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-experimental-methodologist",
             roleLabel = "Experimental Methodologist",
-            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
-            phenotypeIndex = 25,
+            rigKind = NodeCreatureRoleKind.PatternSeeker,
         ),
         MascotCharacterIdentity(
             id = "azphalt-failure-diagnostician",
             roleLabel = "Failure Diagnostician",
-            motionArchetype = NodeCreatureRoleKind.SystemMaintainer,
-            phenotypeIndex = 26,
+            rigKind = NodeCreatureRoleKind.SystemMaintainer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-feature-engineer",
             roleLabel = "Feature Engineer",
-            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
-            phenotypeIndex = 27,
+            rigKind = NodeCreatureRoleKind.BuildEngineer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-feature-reviewer",
             roleLabel = "Feature Reviewer",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 28,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-film-continuity-supervisor",
             roleLabel = "Film Continuity Supervisor",
-            motionArchetype = NodeCreatureRoleKind.Guardian,
-            phenotypeIndex = 29,
+            rigKind = NodeCreatureRoleKind.Guardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-film-showrunner",
             roleLabel = "Film Showrunner",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 30,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-financial-model-auditor",
             roleLabel = "Financial Model Auditor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 31,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-game-director",
             roleLabel = "Game Director",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 32,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-geolocation-analyst",
             roleLabel = "Geolocation Analyst",
-            motionArchetype = NodeCreatureRoleKind.PatternSeer,
-            phenotypeIndex = 33,
+            rigKind = NodeCreatureRoleKind.PatternSeer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-grant-strategist",
             roleLabel = "Grant Strategist",
-            motionArchetype = NodeCreatureRoleKind.StrategyScout,
-            phenotypeIndex = 34,
+            rigKind = NodeCreatureRoleKind.StrategyScout,
         ),
         MascotCharacterIdentity(
             id = "azphalt-graphic-novel-continuity-editor",
             roleLabel = "Graphic Novel Continuity Editor",
-            motionArchetype = NodeCreatureRoleKind.Guardian,
-            phenotypeIndex = 35,
+            rigKind = NodeCreatureRoleKind.Guardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-graphic-novel-director",
             roleLabel = "Graphic Novel Director",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 36,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-identity-director",
             roleLabel = "Identity Director",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 37,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-incident-commander",
             roleLabel = "Incident Commander",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 38,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-incident-investigator",
             roleLabel = "Incident Investigator",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 39,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-interaction-designer",
             roleLabel = "Interaction Designer",
-            motionArchetype = NodeCreatureRoleKind.UxDesigner,
-            phenotypeIndex = 40,
+            rigKind = NodeCreatureRoleKind.UxDesigner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-investigative-reporter",
             roleLabel = "Investigative Reporter",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 41,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-knowledge-system-evaluator",
             roleLabel = "Knowledge System Evaluator",
-            motionArchetype = NodeCreatureRoleKind.KnowledgeKeeper,
-            phenotypeIndex = 42,
+            rigKind = NodeCreatureRoleKind.KnowledgeKeeper,
         ),
         MascotCharacterIdentity(
             id = "azphalt-launch-strategist",
             roleLabel = "Launch Strategist",
-            motionArchetype = NodeCreatureRoleKind.DeploymentPilot,
-            phenotypeIndex = 43,
+            rigKind = NodeCreatureRoleKind.DeploymentPilot,
         ),
         MascotCharacterIdentity(
             id = "azphalt-learning-coach",
             roleLabel = "Learning Coach",
-            motionArchetype = NodeCreatureRoleKind.Communicator,
-            phenotypeIndex = 44,
+            rigKind = NodeCreatureRoleKind.Communicator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-localization-lead",
             roleLabel = "Localization Lead",
-            motionArchetype = NodeCreatureRoleKind.Translator,
-            phenotypeIndex = 45,
+            rigKind = NodeCreatureRoleKind.Translator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-manuscript-continuity-editor",
             roleLabel = "Manuscript Continuity Editor",
-            motionArchetype = NodeCreatureRoleKind.Guardian,
-            phenotypeIndex = 46,
+            rigKind = NodeCreatureRoleKind.Guardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-methods-reviewer",
             roleLabel = "Methods Reviewer",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 47,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-negotiation-planner",
             roleLabel = "Negotiation Planner",
-            motionArchetype = NodeCreatureRoleKind.Scheduler,
-            phenotypeIndex = 48,
+            rigKind = NodeCreatureRoleKind.Scheduler,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-attribution-skeptic",
             roleLabel = "OSINT Attribution Skeptic",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 49,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-change-auditor",
             roleLabel = "OSINT Change Auditor",
-            motionArchetype = NodeCreatureRoleKind.MonitoringSentinel,
-            phenotypeIndex = 50,
+            rigKind = NodeCreatureRoleKind.MonitoringSentinel,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-chronology-auditor",
             roleLabel = "OSINT Chronology Auditor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 51,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-corporate-investigator",
             roleLabel = "OSINT Corporate Investigator",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 52,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-earth-observation-analyst",
             roleLabel = "OSINT Earth Observation Analyst",
-            motionArchetype = NodeCreatureRoleKind.PatternSeer,
-            phenotypeIndex = 53,
+            rigKind = NodeCreatureRoleKind.PatternSeer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-entity-resolution-auditor",
             roleLabel = "OSINT Entity Resolution Auditor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 54,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-geolocation-analyst",
             roleLabel = "OSINT Geolocation Analyst",
-            motionArchetype = NodeCreatureRoleKind.PatternSeer,
-            phenotypeIndex = 55,
+            rigKind = NodeCreatureRoleKind.PatternSeer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-infrastructure-analyst",
             roleLabel = "OSINT Infrastructure Analyst",
-            motionArchetype = NodeCreatureRoleKind.SystemsAnalyst,
-            phenotypeIndex = 56,
+            rigKind = NodeCreatureRoleKind.SystemsAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-location-skeptic",
             roleLabel = "OSINT Location Skeptic",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 57,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-mobility-analyst",
             roleLabel = "OSINT Mobility Analyst",
-            motionArchetype = NodeCreatureRoleKind.PatternSeer,
-            phenotypeIndex = 58,
+            rigKind = NodeCreatureRoleKind.PatternSeer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-provenance-analyst",
             roleLabel = "OSINT Provenance Analyst",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 59,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-risk-researcher",
             roleLabel = "OSINT Risk Researcher",
-            motionArchetype = NodeCreatureRoleKind.ThreatModeler,
-            phenotypeIndex = 60,
+            rigKind = NodeCreatureRoleKind.ThreatModeler,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-screening-auditor",
             roleLabel = "OSINT Screening Auditor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 61,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-timeline-analyst",
             roleLabel = "OSINT Timeline Analyst",
-            motionArchetype = NodeCreatureRoleKind.PatternSeer,
-            phenotypeIndex = 62,
+            rigKind = NodeCreatureRoleKind.PatternSeer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-track-auditor",
             roleLabel = "OSINT Track Auditor",
-            motionArchetype = NodeCreatureRoleKind.MonitoringSentinel,
-            phenotypeIndex = 63,
+            rigKind = NodeCreatureRoleKind.MonitoringSentinel,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-verification-editor",
             roleLabel = "OSINT Verification Editor",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 64,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-osint-verifier",
             roleLabel = "OSINT Verifier",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 65,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-operations-designer",
             roleLabel = "Operations Designer",
-            motionArchetype = NodeCreatureRoleKind.UxDesigner,
-            phenotypeIndex = 66,
+            rigKind = NodeCreatureRoleKind.UxDesigner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-geometry-engineer",
             roleLabel = "PaperPlanes Geometry Engineer",
-            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
-            phenotypeIndex = 67,
+            rigKind = NodeCreatureRoleKind.BuildEngineer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-layer-engineer",
             roleLabel = "PaperPlanes Layer Engineer",
-            motionArchetype = NodeCreatureRoleKind.BuildEngineer,
-            phenotypeIndex = 68,
+            rigKind = NodeCreatureRoleKind.BuildEngineer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-occlusion-architect",
             roleLabel = "PaperPlanes Occlusion Architect",
-            motionArchetype = NodeCreatureRoleKind.Architect,
-            phenotypeIndex = 69,
+            rigKind = NodeCreatureRoleKind.Architect,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-scene-director",
             roleLabel = "PaperPlanes Scene Director",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 70,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-paperplanes-visual-qc",
             roleLabel = "PaperPlanes Visual QC",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 71,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
         MascotCharacterIdentity(
             id = "azphalt-playtest-analyst",
             roleLabel = "Playtest Analyst",
-            motionArchetype = NodeCreatureRoleKind.CrashTestDummy,
-            phenotypeIndex = 72,
+            rigKind = NodeCreatureRoleKind.CrashTestDummy,
         ),
         MascotCharacterIdentity(
             id = "azphalt-podcast-fact-editor",
             roleLabel = "Podcast Fact Editor",
-            motionArchetype = NodeCreatureRoleKind.DataMiner,
-            phenotypeIndex = 73,
+            rigKind = NodeCreatureRoleKind.DataMiner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-podcast-producer",
             roleLabel = "Podcast Producer",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 74,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-presentation-editor",
             roleLabel = "Presentation Editor",
-            motionArchetype = NodeCreatureRoleKind.Documenter,
-            phenotypeIndex = 75,
+            rigKind = NodeCreatureRoleKind.Documenter,
         ),
         MascotCharacterIdentity(
             id = "azphalt-pricing-researcher",
             roleLabel = "Pricing Researcher",
-            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
-            phenotypeIndex = 76,
+            rigKind = NodeCreatureRoleKind.BusinessAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-privacy-risk-analyst",
             roleLabel = "Privacy Risk Analyst",
-            motionArchetype = NodeCreatureRoleKind.SecurityAnalyst,
-            phenotypeIndex = 77,
+            rigKind = NodeCreatureRoleKind.SecurityAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-process-engineer",
             roleLabel = "Process Engineer",
-            motionArchetype = NodeCreatureRoleKind.ProcessMapper,
-            phenotypeIndex = 78,
+            rigKind = NodeCreatureRoleKind.ProcessMapper,
         ),
         MascotCharacterIdentity(
             id = "azphalt-proposal-lead",
             roleLabel = "Proposal Lead",
-            motionArchetype = NodeCreatureRoleKind.Orchestrator,
-            phenotypeIndex = 79,
+            rigKind = NodeCreatureRoleKind.Orchestrator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-qualitative-synthesist",
             roleLabel = "Qualitative Synthesist",
-            motionArchetype = NodeCreatureRoleKind.CreativeSynthesizer,
-            phenotypeIndex = 80,
+            rigKind = NodeCreatureRoleKind.CreativeSynthesizer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-release-producer",
             roleLabel = "Release Producer",
-            motionArchetype = NodeCreatureRoleKind.ReleaseEngineer,
-            phenotypeIndex = 81,
+            rigKind = NodeCreatureRoleKind.ReleaseEngineer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-repair-verifier",
             roleLabel = "Repair Verifier",
-            motionArchetype = NodeCreatureRoleKind.SystemMaintainer,
-            phenotypeIndex = 82,
+            rigKind = NodeCreatureRoleKind.SystemMaintainer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-review-scientist",
             roleLabel = "Review Scientist",
-            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
-            phenotypeIndex = 83,
+            rigKind = NodeCreatureRoleKind.PatternSeeker,
         ),
         MascotCharacterIdentity(
             id = "azphalt-scenario-planner",
             roleLabel = "Scenario Planner",
-            motionArchetype = NodeCreatureRoleKind.Simulator,
-            phenotypeIndex = 84,
+            rigKind = NodeCreatureRoleKind.Simulator,
         ),
         MascotCharacterIdentity(
             id = "azphalt-search-strategist",
             roleLabel = "Search Strategist",
-            motionArchetype = NodeCreatureRoleKind.StrategyScout,
-            phenotypeIndex = 85,
+            rigKind = NodeCreatureRoleKind.StrategyScout,
         ),
         MascotCharacterIdentity(
             id = "azphalt-selection-designer",
             roleLabel = "Selection Designer",
-            motionArchetype = NodeCreatureRoleKind.UxDesigner,
-            phenotypeIndex = 86,
+            rigKind = NodeCreatureRoleKind.UxDesigner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-statistical-skeptic",
             roleLabel = "Statistical Skeptic",
-            motionArchetype = NodeCreatureRoleKind.AdversarialReviewer,
-            phenotypeIndex = 87,
+            rigKind = NodeCreatureRoleKind.AdversarialReviewer,
         ),
         MascotCharacterIdentity(
             id = "azphalt-supplier-analyst",
             roleLabel = "Supplier Analyst",
-            motionArchetype = NodeCreatureRoleKind.BusinessAnalyst,
-            phenotypeIndex = 88,
+            rigKind = NodeCreatureRoleKind.BusinessAnalyst,
         ),
         MascotCharacterIdentity(
             id = "azphalt-support-escalation-lead",
             roleLabel = "Support Escalation Lead",
-            motionArchetype = NodeCreatureRoleKind.SupportAgent,
-            phenotypeIndex = 89,
+            rigKind = NodeCreatureRoleKind.SupportAgent,
         ),
         MascotCharacterIdentity(
             id = "azphalt-survey-methodologist",
             roleLabel = "Survey Methodologist",
-            motionArchetype = NodeCreatureRoleKind.PatternSeeker,
-            phenotypeIndex = 90,
+            rigKind = NodeCreatureRoleKind.PatternSeeker,
         ),
         MascotCharacterIdentity(
             id = "azphalt-technical-writer",
             roleLabel = "Technical Writer",
-            motionArchetype = NodeCreatureRoleKind.DocumentationSpecialist,
-            phenotypeIndex = 91,
+            rigKind = NodeCreatureRoleKind.DocumentationSpecialist,
         ),
         MascotCharacterIdentity(
             id = "azphalt-ux-researcher",
             roleLabel = "UX Researcher",
-            motionArchetype = NodeCreatureRoleKind.UxDesigner,
-            phenotypeIndex = 92,
+            rigKind = NodeCreatureRoleKind.UxDesigner,
         ),
         MascotCharacterIdentity(
             id = "azphalt-vendor-evaluator",
             roleLabel = "Vendor Evaluator",
-            motionArchetype = NodeCreatureRoleKind.QualityGuardian,
-            phenotypeIndex = 93,
+            rigKind = NodeCreatureRoleKind.QualityGuardian,
         ),
     )
 
@@ -594,30 +496,5 @@ internal object MascotCharacterCatalog {
 
     fun explicitForRole(roleLabel: String): MascotCharacterIdentity? = byRole[normalize(roleLabel)]
 
-    /**
-     * Custom/user-created roles also get a stable, distinct phenotype instead of falling back to one
-     * anonymous "generic" creature.
-     */
-    fun forRole(roleLabel: String): MascotCharacterIdentity? {
-        explicitForRole(roleLabel)?.let { return it }
-        val normalized = normalize(roleLabel)
-        if (normalized.isBlank()) return null
-        val builtIn = classifyNodeCreatureRole(roleLabel)
-        if (builtIn != NodeCreatureRoleKind.Generic) return null
-        val hash = stableHash(normalized)
-        return MascotCharacterIdentity(
-            id = "custom-" + normalized.replace(Regex("[^a-z0-9]+"), "-").trim('-'),
-            roleLabel = roleLabel,
-            motionArchetype = NodeCreatureRoleKind.Generic,
-            phenotypeIndex = hash and Int.MAX_VALUE,
-        )
-    }
-
     private fun normalize(value: String): String = value.trim().lowercase()
-
-    private fun stableHash(value: String): Int {
-        var hash = 0x45D9F3B
-        value.forEach { char -> hash = (hash * 31) xor char.code }
-        return hash
-    }
 }

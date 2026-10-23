@@ -49,6 +49,7 @@ fun RepositoryCredentialSetup(
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Azphalt.currentGround.page,
+            contentColor = Azphalt.currentGround.page.onOpposite(),
         ) {
             Column(
                 modifier = Modifier
@@ -57,8 +58,8 @@ fun RepositoryCredentialSetup(
                     .padding(26.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text(stringResource(Res.string.repository_credential_connect), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
-                Text(entry.displayName.uppercase(), style = AzphaltType.section, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.repository_credential_connect), style = AzphaltType.hero, color = azphaltOnSurface())
+                Text(entry.displayName.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
 
                 AzphaltRecord(
                     seed = "repository-credential-${entry.id}",
@@ -75,7 +76,7 @@ fun RepositoryCredentialSetup(
                     },
                 )
 
-                Text(stringResource(Res.string.repository_credential_credential), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+                Text(stringResource(Res.string.repository_credential_credential), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 AzphaltTextField(
                     value = credential,
                     onValueChange = {

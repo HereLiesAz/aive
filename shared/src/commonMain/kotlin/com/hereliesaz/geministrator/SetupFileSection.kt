@@ -87,7 +87,7 @@ internal fun SetupFileSection(
         stringResource(Res.string.settings_setup_file_intro) +
             if (actions.credentialsIncluded) "" else " " + stringResource(Res.string.settings_setup_no_credentials_here),
         style = AzphaltType.body,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
     )
     when (mode) {
         SetupFileMode.Closed -> {
@@ -124,7 +124,7 @@ internal fun SetupFileSection(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            validation?.let { Text(it, style = AzphaltType.body, color = Azphalt.currentGround.onPage) }
+            validation?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(
                     when {

@@ -2,7 +2,6 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -26,9 +25,11 @@ internal fun MermaidFlowchartPreview(
     graph: AiveFlowchartGraph,
     modifier: Modifier = Modifier,
 ) {
-    val lineColor = MaterialTheme.colorScheme.onSurface
-    val fillColor = MaterialTheme.colorScheme.surfaceVariant
-    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    // Edges and their labels are drawn on the surface; node text is drawn on the node fill. Each
+    // is the exact opposite of what it sits on.
+    val lineColor = azphaltOnSurface()
+    val fillColor = Azphalt.Ink
+    val textColor = fillColor.onOpposite()
     val textMeasurer = rememberTextMeasurer()
     val layout = remember(graph) { graph.previewLayout() }
 

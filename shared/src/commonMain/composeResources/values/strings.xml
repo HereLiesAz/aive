@@ -116,6 +116,9 @@
     <string name="hall_monitor_trial_history">TRIAL HISTORY</string>
     <string name="hall_monitor_validation">VALIDATION</string>
 
+    <string name="inbox_badge_none">Inbox, nothing unread</string>
+    <string name="inbox_badge_unread">Inbox, %1$d unread</string>
+    <string name="inbox_badge_unread_many">Inbox, more than %1$d unread</string>
     <string name="inbox_loading_runtime">Loading runtime…</string>
     <string name="inbox_no_active_run_there_are_no">No active run. There are no workflow decisions to review.</string>
     <string name="inbox_no_pending_decisions">No pending decisions.</string>
@@ -331,8 +334,6 @@
     <string name="memory_workflow_memory_bank">Workflow memory bank</string>
     <string name="memory_workflows_to_it_expansions_are_permanent">workflows to it; expansions are permanent. Raw history can be kept per project; otherwise the global setting applies.</string>
 
-    <string name="nav_ground">Ground</string>
-    <string name="nav_reroll">Reroll</string>
     <string name="nav_runtime">RUNTIME · %1$s</string>
     <string name="nav_runtime_disconnected">RUNTIME · DISCONNECTED</string>
     <string name="nav_runtime_loading">RUNTIME · LOADING</string>
@@ -511,6 +512,9 @@
     <string name="settings_download_and_a_capable_machine">%1$s download and a capable machine. The linked LLM still plans </string>
     <string name="settings_of_roles_currently_have">%1$s of %2$s judgement calls have a released model; </string>
     <string name="settings_ai_providers">AI Providers</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_ground">Ground</string>
+    <string name="settings_ground_explain">The page colour behind everything. Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>
@@ -710,6 +714,12 @@
     <string name="store_size_not_published">size not published</string>
     <string name="store_store">STORE</string>
     <string name="store_store_error">STORE ERROR</string>
+    <string name="store_failed_while">Failed while %1$s.</string>
+    <string name="store_step_index">reading the catalogue index</string>
+    <string name="store_step_installed">reading installed packages</string>
+    <string name="store_step_revocations">checking for withdrawn packages</string>
+    <string name="store_step_search">searching the catalogue</string>
+    <string name="store_step_updates">checking for updates</string>
     <string name="store_store_networking_is_unavailable_on_this">The Store can't connect on this device.</string>
     <string name="store_terms"> Terms: %1$s</string>
     <string name="store_the_package_signature_is_valid_but">The signature is genuine, but you haven't trusted this publisher before. Approve below to install anyway.</string>

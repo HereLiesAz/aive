@@ -86,7 +86,7 @@ import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -97,8 +97,10 @@ import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var updateCoordinator: AndroidUpdateCoordinator
+    // OkHttp, not CIO: the Azphalt Store (https://azphalt.store) and model downloads should use the
+    // platform TLS stack and system trust, which CIO's own TLS implementation does not.
     private val repositoryHttpClient by lazy {
-        HttpClient(CIO) {
+        HttpClient(OkHttp) {
             install(HttpTimeout) {
                 // Model archives can be hundreds of megabytes on mobile networks. Individual
                 // socket stalls still fail quickly enough to resume from the retained partial.

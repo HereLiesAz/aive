@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -159,16 +160,29 @@ class AzphaltStoreService(
 
     suspend fun revocations(): List<AzphaltRevocation> = repository.revocations()
 
+    /**
+     * Loads everything the Store screen shows. Each phase runs under [storeStep], so a failure is
+     * logged with its class and stack and surfaces as an [AzphaltStoreStepException] that names the
+     * phase (index, search, installed, revocations) and keeps the original cause.
+     */
     suspend fun snapshot(query: String = ""): AzphaltStoreSnapshot {
-        val index = repositoryIndex()
-        val search = search(query)
-        val installed = installed()
-        val installedModels = installedModels()
-        val updates = runCatching { updates() }.getOrDefault(emptyList())
+        val index = storeStep(AzphaltStoreStep.Index) { repositoryIndex() }
+        val search = storeStep(AzphaltStoreStep.Search) { search(query) }
+        val (localWorkflows, localModels, localLlms) = storeStep(AzphaltStoreStep.Installed) {
+            Triple(installed(), installedModels(), installedLlms())
+        }
+        // Update hints are decoration: a failure is logged by storeStep and the list stays empty.
+        val updates = try {
+            storeStep(AzphaltStoreStep.Updates) { updates() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (ignored: AzphaltStoreStepException) {
+            emptyList()
+        }
         // Revocations are security state, not optional decoration. Propagate lookup failures instead
         // of rendering a dangerously reassuring empty list.
-        val revocations = revocations()
-        return AzphaltStoreSnapshot(index, search.packages, installed, installedModels, updates, revocations, installedLlms())
+        val revocations = storeStep(AzphaltStoreStep.Revocations) { revocations() }
+        return AzphaltStoreSnapshot(index, search.packages, localWorkflows, localModels, updates, revocations, localLlms)
     }
 
     suspend fun prepareModelInstall(

@@ -1,23 +1,9 @@
 {
  "_comment": "Per-sheet corrections after visual review of preview.png. classes: component index -> class; drop: indices to discard; tail_chain: indices of a segmented tail from soma end to egg; no_rig: reason to skip rigging.",
- "_skip_sheets": [
-  "072_programmatic_neuron/node_automated_tendrils.png"
- ],
  "000_generic/ChatGPT Image Oct 6, 2026, 01_19_38 AM-3.png": {
   "classes": {
    "8": "lid.upper.right"
   }
- },
- "001_orchestrator/ChatGPT Image Sep 21, 2026, 08_00_02 PM (1).png": {
-  "classes": {
-   "16": "eye.left",
-   "17": "eye.right",
-   "18": "pupil.left",
-   "19": "pupil.right",
-   "21": "lid.upper.left",
-   "22": "lid.upper.right"
-  },
-  "no_rig": "segmented kit (stalks, bulbs and pupils are separate pieces, music-note props); needs hand assembly in the editor"
  },
  "005_architect/ChatGPT Image Oct 5, 2026, 10_41_02 PM.png": {
   "classes": {

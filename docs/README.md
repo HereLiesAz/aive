@@ -121,7 +121,7 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 ### Swarm terrarium
 
-[`swarm-terrarium/README.md`](swarm-terrarium/README.md) is the terrarium design brief for the 2D workflow-node mascots. [`swarm-terrarium/all_prompts.md`](swarm-terrarium/all_prompts.md) holds the role-specific rigging prompts, and [`swarm-terrarium/characters/001_orchestrator/rig/README.md`](swarm-terrarium/characters/001_orchestrator/rig/README.md) describes the first-pass Orchestrator puppet rig.
+[`swarm-terrarium/README.md`](swarm-terrarium/README.md) is the terrarium design brief for the node creatures: their anatomy, the core roles, the role-to-rig mapping and how to add a creature. The rigs themselves are described in [`architecture/PUPPET_RIG_FORMAT.md`](architecture/PUPPET_RIG_FORMAT.md).
 
 ### Branding
 

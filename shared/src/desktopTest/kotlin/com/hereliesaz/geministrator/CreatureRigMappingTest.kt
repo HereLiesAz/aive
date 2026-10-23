@@ -14,7 +14,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CreatureRigMappingTest {
@@ -37,6 +36,20 @@ class CreatureRigMappingTest {
      * passes whatever the table says.
      */
     private val expectedRigForRole = mapOf(
+        "orchestrator" to "orchestrator",
+        "ux designer" to "ux-designer",
+        "researcher" to "researcher",
+        "implementation engineer" to "implementation-engineer",
+        "epa representative" to "epa-representative",
+        "adversarial reviewer" to "adversarial-reviewer",
+        "qa engineer" to "qa-engineer",
+        "release engineer" to "release-engineer",
+        "antagonist" to "antagonist",
+        "product manager" to "product-manager",
+        "crash test dummy" to "crash-test-dummy",
+        "recovery engineer" to "recovery-engineer",
+        "code reviewer" to "code-reviewer",
+        "hall monitor" to "hall-monitor",
         "architect" to "architect",
         "data miner" to "data-miner-sheet-3-variant",
         "knowledge keeper" to "knowledge-keeper-sheet-2-variant",
@@ -93,16 +106,16 @@ class CreatureRigMappingTest {
         }
         assertEquals(expectedRigForRole.size, CreatureRigMapping.bySlugKind.size, "every mapped role is in the expected table")
         assertEquals("simulator", CreatureRigMapping.slugFor("Simulator"))
-        assertNull(CreatureRigMapping.slugFor("UX Designer")) // hand-built sample rig is tiny; bespoke surface stays
+        assertEquals("ux-designer", CreatureRigMapping.slugFor("UX Designer"))
         assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("Data Miner"))
         assertEquals("idea-catalyst-2", CreatureRigMapping.slugFor("Idea Catalyst"))
     }
 
     @Test
-    fun everyRigFileIsReachableExceptTheDeliberatelyUnmappedOne() {
+    fun everyRigFileIsReachable() {
         val onDisk = dir.listFiles { f -> f.name.endsWith(".rig.json") }
             .orEmpty().map { it.name.removeSuffix(".rig.json") }.toSet()
-        assertEquals(onDisk - "ux-designer", CreatureRigMapping.allSlugs, "rig files and reachable slugs must match")
+        assertEquals(onDisk, CreatureRigMapping.allSlugs, "rig files and reachable slugs must match")
     }
 
     @Test
@@ -111,13 +124,49 @@ class CreatureRigMappingTest {
     }
 
     @Test
-    fun rolesWithoutASlicedSheetKeepTheOldRendering() {
-        listOf("Orchestrator", "Researcher", "QA Engineer", "Release Engineer", "Python").forEach {
-            assertNull(CreatureRigMapping.slugFor(it), it)
+    fun everyLabelResolvesToAnExistingRig() {
+        val labels = buildList {
+            addAll(MascotCharacterCatalog.explicitCharacters.map { it.roleLabel })
+            addAll(CreatureRigMapping.bySlugKind.keys.map(CreatureRigMapping::displayName))
+            addAll(CreatureRigMapping.AUTOMATED_PROCESS_RIGS.keys)
+            addAll(listOf("Python", "JavaScript", "Test Runner", "Deployment", "Repository Operation", "Nested Workflow"))
+            addAll(listOf("Data Engineer", "Content Creator", "Technical Author", "Bug Reporter", "World Builder", "Storyteller", "Pathfinder"))
+            addAll(listOf("", "   ", "Orchestrator", "UX Designer", "Weather Oracle", "creature", "Zorblax"))
+            addAll((0 until 200).map { "Custom Role $it" })
         }
-        // Distinct Store personas are not collapsed onto a shared rig body.
-        assertNull(CreatureRigMapping.slugFor("Brand Strategist"))
-        assertNull(CreatureRigMapping.slugFor(""))
+        labels.forEach { label ->
+            val slug = CreatureRigMapping.slugFor(label)
+            assertTrue(slug in CreatureRigMapping.allSlugs, "label '$label' -> $slug")
+            assertTrue(File(dir, "$slug.rig.json").isFile, "label '$label' -> $slug has no rig file")
+        }
+        assertTrue(CreatureRigMapping.slugFor("") in CreatureRigMapping.GENERIC_SLUGS)
+    }
+
+    @Test
+    fun everyRoleKindHasACreature() {
+        val own = CreatureRigMapping.bySlugKind.keys + CreatureRigMapping.KIND_FALLBACKS.keys
+        val missing = NodeCreatureRoleKind.entries - own - NodeCreatureRoleKind.Generic - NodeCreatureRoleKind.AutomatedProcess
+        assertEquals(emptyList(), missing, "role kinds without a creature or fallback")
+        (CreatureRigMapping.KIND_FALLBACKS.values + CreatureRigMapping.AUTOMATED_PROCESS_RIGS.values +
+            CreatureRigMapping.DEFAULT_AUTOMATED_RIG).forEach {
+            assertTrue(it in CreatureRigMapping.allSlugs, "fallback creature $it is not a mapped rig")
+        }
+    }
+
+    @Test
+    fun personasExecutorsAndUnclassifiedRolesMapExplicitly() {
+        assertEquals("orchestrator", CreatureRigMapping.slugFor("Film Showrunner"))
+        assertEquals("content-strategist", CreatureRigMapping.slugFor("Brand Strategist"))
+        assertEquals("adversarial-reviewer", CreatureRigMapping.slugFor("Contract Reviewer"))
+        assertEquals("process-mapper", CreatureRigMapping.slugFor("Python"))
+        assertEquals("process-mapper", CreatureRigMapping.slugFor("JavaScript"))
+        assertEquals("test-automation-engineer", CreatureRigMapping.slugFor("Test Runner"))
+        assertEquals("deployment-pilot", CreatureRigMapping.slugFor("Deployment"))
+        assertEquals("build-engineer", CreatureRigMapping.slugFor("Repository Operation"))
+        assertEquals("flow-director", CreatureRigMapping.slugFor("Nested Workflow"))
+        assertEquals("database-administrator", CreatureRigMapping.slugFor("Data Engineer"))
+        assertEquals("communicator", CreatureRigMapping.slugFor("Storyteller"))
+        assertEquals("strategy-scout", CreatureRigMapping.slugFor("Pathfinder"))
     }
 
     @Test

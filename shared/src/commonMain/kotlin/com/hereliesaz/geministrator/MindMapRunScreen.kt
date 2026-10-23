@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -269,12 +268,12 @@ internal fun MindMapRunScreen(
                     Text(
                         stringResource(Res.string.overview_project),
                         style = AzphaltType.eyebrow,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                     Text(
                         stringResource(Res.string.overview_aive_automatically_reopens_the_last_saved),
                         style = AzphaltType.body,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                     AzphaltPill(
                         label = stringResource(Res.string.overview_open_a_different_saved_project),
@@ -307,7 +306,7 @@ internal fun MindMapRunScreen(
                     Text(
                         stringResource(Res.string.overview_or_create_a_new_project),
                         style = AzphaltType.eyebrow,
-                        color = Azphalt.currentGround.onPage,
+                        color = azphaltOnSurface(),
                     )
                 }
 
@@ -337,7 +336,7 @@ internal fun MindMapRunScreen(
                 Text(
                     stringResource(Res.string.overview_link_repository),
                     style = AzphaltType.eyebrow,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -487,7 +486,7 @@ internal fun MindMapRunScreen(
                             stringResource(Res.string.overview_paste_the_repository_url_or_shorthand)
                     },
                     style = AzphaltType.body,
-                    color = Azphalt.currentGround.onPage,
+                    color = azphaltOnSurface(),
                 )
                 LaunchLineagePicker(
                     state = lineage,
@@ -557,7 +556,7 @@ internal fun MindMapRunScreen(
                     Text(
                         message,
                         style = AzphaltType.body,
-                        color = MaterialTheme.colorScheme.error,
+                        color = azphaltOnSurface(),
                         modifier = Modifier.azphaltLiveRegion(),
                     )
                 }
@@ -573,12 +572,12 @@ internal fun MindMapRunScreen(
         Text(
             run.objective.uppercase(),
             style = if (compact) AzphaltType.section else AzphaltType.hero,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         Text(
             liveWorkflow.definition.name.uppercase(),
             style = AzphaltType.eyebrow,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -623,7 +622,7 @@ internal fun MindMapRunScreen(
 
         val validationErrors = remember(liveWorkflow.definition) { onValidateWorkflow() }
         if (validationErrors.isNotEmpty()) {
-            Text(stringResource(Res.string.overview_workflow_errors), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+            Text(stringResource(Res.string.overview_workflow_errors), style = AzphaltType.eyebrow, color = azphaltOnSurface())
             validationErrors.forEachIndexed { index, error ->
                 AzphaltRecord(
                     seed = "validation-error-$index",
@@ -645,7 +644,7 @@ internal fun MindMapRunScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(Res.string.overview_swarm_execution), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage, modifier = Modifier.weight(1f))
+            Text(stringResource(Res.string.overview_swarm_execution), style = AzphaltType.eyebrow, color = azphaltOnSurface(), modifier = Modifier.weight(1f))
             if (activeTaskId != null) {
                 AzphaltPill(
                     label = stringResource(Res.string.overview_jump_to_active),
@@ -670,7 +669,7 @@ internal fun MindMapRunScreen(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Text(stringResource(Res.string.overview_swarm_activity), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.overview_swarm_activity), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         val recentTasks = liveWorkflow.definition.tasks
             .mapNotNull { task -> run.taskRuns[task.id]?.let { taskRun -> task to taskRun } }
             .sortedByDescending { (_, taskRun) -> taskRun.status.activityRank() }
@@ -714,7 +713,7 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
     Text(
         title,
         style = if (compact) AzphaltType.section else AzphaltType.hero,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
     AzphaltRecord(

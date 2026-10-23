@@ -47,7 +47,7 @@ kotlin {
     sourceSets {
         // The Compose Resources plugin wires commonResClass/commonMainResourceCollectors into
         // commonMain automatically but not commonMainResourceAccessors, leaving every
-        // Res.drawable.* reference unresolved. Wire it explicitly.
+        // Res.* reference unresolved. Wire it explicitly.
         getByName("commonMain").kotlin.srcDir(tasks.named("generateResourceAccessorsForCommonMain"))
         commonMain.dependencies {
             implementation(compose.runtime)

@@ -55,11 +55,11 @@ internal fun RepositoryServiceScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.repositories_repository_services), style = AzphaltType.hero, color = Azphalt.currentGround.onPage)
+        Text(stringResource(Res.string.repositories_repository_services), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             stringResource(Res.string.repositories_connect_the_repository_hosts_aive_may),
             style = AzphaltType.body,
-            color = Azphalt.currentGround.onPage,
+            color = azphaltOnSurface(),
         )
 
         RepositoryServiceCatalog.entries.forEach { entry ->

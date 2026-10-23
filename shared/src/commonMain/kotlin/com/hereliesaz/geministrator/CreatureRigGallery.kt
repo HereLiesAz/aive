@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,9 +39,8 @@ import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 
 /**
- * Creature-rig gallery (web: `?creatureRigs=1`). Shows a small live terrarium with rigged,
- * generic-fallback and pre-rig roles connected by arms, then every rigged role in every state.
- * The switch forces the pre-rig rendering for comparison ([CreatureRigSettings.enabled]).
+ * Creature-rig gallery (web: `?creatureRigs=1`). Shows a small live terrarium with core-role and
+ * generic-body creatures joined by links, then every creature design in every state.
  */
 @Composable
 fun CreatureRigGalleryScreen(modifier: Modifier = Modifier) {
@@ -54,16 +52,13 @@ fun CreatureRigGalleryScreen(modifier: Modifier = Modifier) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(Res.string.creature_rig_gallery_title), style = AzphaltType.endCap, color = Azphalt.currentGround.onPage)
-            Switch(checked = CreatureRigSettings.enabled, onCheckedChange = { CreatureRigSettings.enabled = it })
-        }
+        Text(stringResource(Res.string.creature_rig_gallery_title), style = AzphaltType.endCap, color = Azphalt.currentGround.onPage)
         CreatureRigTerrariumDemo(Modifier.fillMaxWidth().height(620.dp))
         CreatureRigGrid(columns = 6)
     }
 }
 
-/** Fixture terrarium: a few rigged roles, two custom (generic rig) roles and one pre-rig role. */
+/** Fixture terrarium: a few core roles and two custom roles (generic bodies). */
 @Composable
 internal fun CreatureRigTerrariumDemo(modifier: Modifier = Modifier) {
     PlatformNodeTerrarium(
@@ -105,7 +100,7 @@ internal val creatureRigDemoRelationships = listOf(
     H2g2TerrariumRelationship("arch", "custom", H2g2TerrariumRelationshipKind.Dependency),
 )
 
-/** Every rigged role kind plus the six generic bodies, each in a different workflow state. */
+/** Every creature design (role kinds, named-only rigs, the six generic bodies), each in a different workflow state. */
 @Composable
 internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier = Modifier) {
     val clock = rememberInfiniteTransition(label = "creature-rig-gallery")

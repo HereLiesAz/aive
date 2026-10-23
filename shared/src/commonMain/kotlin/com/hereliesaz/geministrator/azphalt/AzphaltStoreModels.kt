@@ -62,7 +62,12 @@ data class AzphaltPackageSummary(
     val nameLocalized: Map<String, String> = emptyMap(),
     val descriptionLocalized: Map<String, String> = emptyMap(),
     val llm: AzphaltLlm? = null,
-)
+    /** Archive size as the repository publishes it (`bytes`); [byteSize] is the older spelling. */
+    val bytes: Long? = null,
+) {
+    /** The package size from whichever field the repository sent, or null when it published none. */
+    val sizeInBytes: Long? get() = byteSize ?: bytes
+}
 
 /**
  * The `llm` block of a `kind: "llm"` package (azphalt spec/llm.md): an off-device language model.
