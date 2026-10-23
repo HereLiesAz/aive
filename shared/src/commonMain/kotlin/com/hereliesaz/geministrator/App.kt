@@ -109,6 +109,8 @@ fun App(
     onExternalWorkflowLaunchHandled: (requestId: Long, failure: String?) -> Unit = { _, _ -> },
     /** Every runtime state, for observers outside the UI (the Android remote service). */
     onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
+    /** Credential stores for the setup file; null leaves credentials out of it. */
+    setupSecretStore: SetupSecretStore? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -587,6 +589,22 @@ fun App(
                             }
                             imported?.name
                         },
+                        setupFileActions = SetupFileActions(
+                            credentialsIncluded = setupSecretStore != null,
+                            export = { passphrase ->
+                                exportSetupFile(workflowPersistence, setupSecretStore, crashReportingSetting?.enabled, passphrase)
+                            },
+                            import = { encoded, passphrase ->
+                                importSetupFile(
+                                    persistence = workflowPersistence,
+                                    secretStore = setupSecretStore,
+                                    encoded = encoded,
+                                    passphrase = passphrase,
+                                    onCrashReportingChange = crashReportingSetting?.onEnabledChange,
+                                    memoryLayer = memoryLayer,
+                                ).also { runtimeGeneration += 1 }
+                            },
+                        ),
                         onLoadRunHistory = { runtime?.loadRunHistory() ?: emptyList() },
                         onSwitchRun = { runId ->
                             scope.launch {

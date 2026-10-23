@@ -230,7 +230,7 @@ class AzphaltStoreService(
         } else {
             verified.copy(
                 trusted = false,
-                trustReason = "${verified.trustReason}; repository revocation status unavailable",
+                trustReason = "${verified.trustReason}; could not check whether the Store has withdrawn this version",
             )
         }
 
@@ -486,7 +486,7 @@ class AzphaltStoreService(
         } else {
             verified.copy(
                 trusted = false,
-                trustReason = "${verified.trustReason}; repository revocation status unavailable",
+                trustReason = "${verified.trustReason}; could not check whether the Store has withdrawn this version",
             )
         }
         require(manifest.kind == "workflow" || manifest.kind == "role") {

@@ -310,10 +310,20 @@ internal fun AzphaltStoreScreen(
         }
 
         error?.let { message ->
-            AzphaltNote(seed = "azphalt-error", label = stringResource(Res.string.store_store_error), value = message)
+            AzphaltNote(
+                seed = "azphalt-error",
+                label = stringResource(Res.string.store_store_error),
+                value = message,
+                modifier = Modifier.azphaltLiveRegion(),
+            )
         }
         status?.let { message ->
-            AzphaltNote(seed = "azphalt-status", label = stringResource(Res.string.store_store), value = message)
+            AzphaltNote(
+                seed = "azphalt-status",
+                label = stringResource(Res.string.store_store),
+                value = message,
+                modifier = Modifier.azphaltLiveRegion(),
+            )
         }
 
         OutlinedTextField(

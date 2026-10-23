@@ -423,6 +423,7 @@ internal fun ProviderSettingsScreen(
     projectFileService: ProjectFileService? = null,
     onExportCurrentProjectFile: suspend () -> IveProjectExport? = { null },
     onImportProjectFile: suspend (String) -> String? = { null },
+    setupFileActions: SetupFileActions? = null,
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onConfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
@@ -724,6 +725,7 @@ internal fun ProviderSettingsScreen(
                     title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
+                    modifier = Modifier.azphaltLiveRegion(),
                 )
                 LocalPlannerStatus.Installed -> AzphaltPill(
                     stringResource(Res.string.settings_local_planner_installed_remove),
@@ -739,6 +741,7 @@ internal fun ProviderSettingsScreen(
                         title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
                         endCap = stringResource(Res.string.common_retry),
+                        modifier = Modifier.azphaltLiveRegion(),
                     )
                     AzphaltPill(
                         stringResource(Res.string.settings_retry_install, setting.downloadSize),
@@ -772,6 +775,7 @@ internal fun ProviderSettingsScreen(
                     title = stringResource(Res.string.settings_installing),
                     body = status.progress,
                     endCap = "…",
+                    modifier = Modifier.azphaltLiveRegion(),
                 )
                 LocalOrchestrationSpecialistStatus.Installed -> AzphaltPill(
                     stringResource(Res.string.settings_local_specialists_installed_remove),
@@ -787,6 +791,7 @@ internal fun ProviderSettingsScreen(
                         title = stringResource(Res.string.settings_install_failed),
                         body = status.message,
                         endCap = stringResource(Res.string.common_retry),
+                        modifier = Modifier.azphaltLiveRegion(),
                     )
                     AzphaltPill(
                         stringResource(Res.string.settings_retry_specialist_install),
@@ -807,6 +812,7 @@ internal fun ProviderSettingsScreen(
         )
         AzphaltRecord(
             seed = "distributed-compute-status",
+            modifier = Modifier.azphaltLiveRegion(),
             eyebrow = stringResource(Res.string.settings_distributed_compute),
             title = if (distributedComputeState.connected) stringResource(Res.string.common_connected) else stringResource(Res.string.settings_not_connected),
             body = buildString {
@@ -1080,6 +1086,10 @@ internal fun ProviderSettingsScreen(
             }
         }
 
+        if (projectFileService != null && setupFileActions != null) {
+            SetupFileSection(projectFileService, setupFileActions)
+        }
+
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
@@ -1224,7 +1234,7 @@ private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
 }
 
 @Composable
-private fun ProviderSectionLabel(label: String) {
+internal fun ProviderSectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
 }
 

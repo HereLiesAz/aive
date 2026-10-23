@@ -132,7 +132,7 @@ class AzphaltPackageVerifier(
         val signed = signature != null
         val signerKey = signature?.publicKey
         val trust = if (signature == null) {
-            TrustVerdict(false, "unsigned: no signer to trust")
+            TrustVerdict(false, "This add-on is not signed, so there is no publisher to trust")
         } else {
             require(signature.alg.equals("ed25519", ignoreCase = true)) { "signature algorithm must be ed25519" }
             val publicKey = Base64.decode(signature.publicKey)
@@ -166,7 +166,7 @@ class AzphaltPackageVerifier(
         signature: AzphaltSignature,
         trustedKeys: Set<String>,
     ): TrustVerdict {
-        if (signature.publicKey in trustedKeys) return TrustVerdict(true, "signer key is directly trusted")
+        if (signature.publicKey in trustedKeys) return TrustVerdict(true, "Signed by a publisher the Store trusts")
         var vouchedKey = signature.publicKey
         var counter = signature.countersignature
         var depth = 0
@@ -182,13 +182,13 @@ class AzphaltPackageVerifier(
             if (counter.publicKey in trustedKeys) {
                 return TrustVerdict(
                     true,
-                    if (depth == 1) "signer counter-signed by trusted repository" else "signer trusted through $depth counter-signature hops",
+                    if (depth == 1) "Signed by a publisher the Store vouches for" else "Signed by a publisher the Store vouches for, through $depth steps",
                 )
             }
             vouchedKey = counter.publicKey
             counter = counter.countersignature
         }
-        return TrustVerdict(false, "signer key is not trusted by this repository")
+        return TrustVerdict(false, "The signature is genuine, but the Store does not vouch for this publisher")
     }
 
     private data class TrustVerdict(val trusted: Boolean, val reason: String)
