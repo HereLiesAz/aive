@@ -79,7 +79,7 @@ internal class AndroidAzphaltHost(
                 )
             } catch (failure: Exception) {
                 val message = failure.message?.takeIf(String::isNotBlank)
-                    ?: "The Azphalt package could not be opened."
+                    ?: "The add-on file could not be opened."
                 Toast.makeText(appContext, message, Toast.LENGTH_LONG).show()
             }
         }

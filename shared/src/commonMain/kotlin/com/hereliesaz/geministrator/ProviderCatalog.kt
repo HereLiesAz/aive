@@ -227,7 +227,7 @@ object ProviderCatalog {
         description = listOfNotNull(
             llm.description?.takeIf(String::isNotBlank),
             llm.promptHandling,
-            "From the Azphalt store (${llm.packageId} ${llm.version}).",
+            "Installed from the Azphalt Store (${llm.packageId} ${llm.version}).",
         ).joinToString(" "),
         keyOptional = llm.keyOptional,
     )
