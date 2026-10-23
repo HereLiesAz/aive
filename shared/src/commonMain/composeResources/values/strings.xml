@@ -562,7 +562,7 @@
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_observe_only">Observe only</string>
     <string name="settings_ok">OK</string>
-    <string name="settings_on_by_default_while_the_aive">Off unless you turn it on. When enabled, crashes and app-not-responding events are sent automatically to the </string>
+    <string name="settings_crash_reports_intro">Off unless you turn it on. When enabled, crashes and app-not-responding events are sent automatically to the </string>
     <string name="settings_online"> online</string>
     <string name="settings_online_2">Online</string>
     <string name="settings_online_compute_nodes">ONLINE COMPUTE NODES</string>
