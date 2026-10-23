@@ -36,6 +36,20 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `memory_and_orchestration_layers.ipynb` — Colab/Kaggle notebook for training the memory-clerk specialist models
 - `branding/` — locked source brand and icon assets
 
+## Building
+
+Requirements: JDK 21, the Android SDK (the project reads `local.properties` or `ANDROID_HOME`), and for the Android and desktop builds a Rust toolchain with `cargo-ndk` (Android targets `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`) because `native/` is compiled during the build. Clone `conveyance-h2g2` and Conveyance under `vendor/` first (see the `vendor/` note above).
+
+~~~
+./gradlew test                              # unit tests, all targets that run on the host
+./gradlew :androidApp:assemblePlayDebug     # or assembleGithubDebug
+./gradlew :desktopApp:run                   # desktop app
+npm --prefix relay test                     # relay Worker tests (Node 20+, no install step)
+node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
+~~~
+
+Release signing needs `HAIVE_KEYSTORE_PATH`, `KEYSTORE_PASSWORD` and `KEY_ALIAS`; without them release packaging fails on purpose.
+
 ## Documentation
 
 Start with [`docs/README.md`](docs/README.md).

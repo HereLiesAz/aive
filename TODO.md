@@ -17,9 +17,11 @@ Release blockers, in order:
 1. Android on-device acceptance run (see "Make one complete workflow actually work end-to-end").
 2. Live GitHub dispatch through the app (P1 — Provider system).
 3. Memory store split verified on Android (P1 — Persistence and recovery).
-4. Crash/ANR reporting opt-in and privacy policy aligned (P2 — Security and privacy hardening).
-5. Themed Android icon validated (P2 — Brand and release polish).
-6. Distributed compute hidden from the 1.0 Android build.
+4. Themed Android icon validated (P2 — Brand and release polish).
+5. Distributed compute hidden from the 1.0 Android build.
+6. Remote access relay Worker deployed (`relay/`, `cd relay && npx wrangler@4 deploy`), or the Remote access screen hidden: the default relay URL has no Worker behind it yet.
+
+Crash/ANR reporting is opt-in (off by default) and disclosed in `docs/PRIVACY.md`; that item is done.
 
 A checked box means implemented and covered by automated tests. It does not mean verified live on a device or runtime: that evidence comes only from a successful centralized Live Runtime Verification run ([`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)) and is tracked by the unchecked on-runtime verification item and the "Make one complete workflow actually work end-to-end" section below.
 

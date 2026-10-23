@@ -18,4 +18,8 @@ cd relay
 npx wrangler@4 deploy
 ~~~
 
-This serves the relay at `https://aive-relay.<account>.workers.dev`.
+This serves the relay at `https://aive-relay.<account>.workers.dev`. The first deploy applies two Durable Object migrations (`RemoteRoom`, then `CreateLimiter`, which counts room creations per client address); deploy with `wrangler deploy`, not `versions upload`, so migrations are applied. A Cloudflare Workers Builds project for this repository must use `relay` as its root directory.
+
+## Limits
+
+Frames are capped at 1,000,000 bytes, each socket may send a burst of 40 frames then 10 per second, one client address may create 20 rooms per hour, and a room admits 8 clients. See the Limits section of [`docs/Remote-API.md`](../docs/Remote-API.md#limits).
