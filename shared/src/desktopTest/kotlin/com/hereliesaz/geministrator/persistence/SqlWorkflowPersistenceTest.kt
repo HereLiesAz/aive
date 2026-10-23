@@ -229,15 +229,19 @@ class SqlWorkflowPersistenceTest {
 
     @Test
     fun aFailureAfterTheMoveDoesNotImportTheOldCopyAgainOrDuplicateEvents() = runBlocking {
-        val inner = SettingsWorkflowPersistence(MapSettings())
+        val backing = MapSettings()
+        val inner = SettingsWorkflowPersistence(backing)
         val run = run("run")
         inner.projects.put(project)
         inner.runs.put(run)
         inner.events.append(TaskStarted(run.id, TaskDefinitionId("task"), 1, 3L))
         // The old store cannot be cleared, so its copy stays behind after the data has moved.
-        val previous = object : WorkflowPersistence by inner {
-            override suspend fun clearWorkflowData() = error("settings write failed")
+        val failingSettings = object : com.russhwolf.settings.Settings by backing {
+            override fun remove(key: String) {
+                error("settings write failed")
+            }
         }
+        val previous = SettingsWorkflowPersistence(failingSettings)
         val file = tempDatabase()
 
         val first = desktopSqlWorkflowPersistence(file, LegacySettingsMigration(previous) { })
