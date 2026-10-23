@@ -42,6 +42,8 @@ import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.SetupSecretStore
+import com.hereliesaz.geministrator.SetupSecrets
 import com.hereliesaz.geministrator.ProviderCredentialSetup
 import com.hereliesaz.geministrator.RemoteAccessSetting
 import com.hereliesaz.geministrator.RemoteRepositoryDiscoveryClient
@@ -470,6 +472,36 @@ class MainActivity : ComponentActivity() {
                         externalWorkflowLaunchRequests = remoteLaunchRequests,
                         onExternalWorkflowLaunchHandled = AiveRemoteBridge::complete,
                         onRuntimeStateChanged = AiveRemoteBridge::publish,
+                        setupSecretStore = object : SetupSecretStore {
+                            override fun read(): SetupSecrets = SetupSecrets(
+                                providerCredentials = providerCredentialStore.readAll(),
+                                repositoryCredentials = repositoryCredentialStore.readAll(),
+                                distributedComputeToken = computeCredentialStore.readToken(),
+                                remoteRelayUrl = remoteAccessController.store.relayUrl,
+                                remoteRelayPairing = remoteAccessController.store.pairing()?.toStorage(),
+                            )
+
+                            override fun write(secrets: SetupSecrets) {
+                                // Ids this build does not know are skipped, not fatal.
+                                secrets.providerCredentials
+                                    .filterKeys { ProviderCatalog.entry(it) != null }
+                                    .forEach { (id, key) -> providerCredentialStore.write(id, key) }
+                                secrets.repositoryCredentials
+                                    .filterKeys { RepositoryServiceCatalog.entry(it) != null }
+                                    .forEach { (id, token) -> repositoryCredentialStore.write(id, token) }
+                                secrets.distributedComputeToken?.let(computeCredentialStore::writeToken)
+                                secrets.remoteRelayPairing?.let { pairing ->
+                                    remoteAccessController.store.restore(secrets.remoteRelayUrl, pairing)
+                                }
+                                // New state rebuilds configuredAndroidProviders and the integrations.
+                                credentials = providerCredentialStore.readAll()
+                                repositoryCredentials = repositoryCredentialStore.readAll()
+                                computeConfiguration = computeConfigurationStore.read()
+                                computeToken = computeCredentialStore.readToken()
+                                remoteRelayUrl = remoteAccessController.store.relayUrl
+                                remoteAccess = remoteAccessController.store.snapshot()
+                            }
+                        },
                         connectedRepositoryServiceIds = repositoryCredentials.keys,
                         contextChunkSources = contextChunkSources,
                         availableRepositorySources = com.hereliesaz.geministrator.domain.RepositorySource.entries.toSet(),

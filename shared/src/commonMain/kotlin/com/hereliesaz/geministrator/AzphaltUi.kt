@@ -104,6 +104,13 @@ internal object Azphalt {
         settings.putString(GROUND_STORAGE_KEY, currentGround.name)
     }
 
+    /** Re-reads the saved ground, after something other than [rerollGround] wrote it (a setup import). */
+    fun reloadGround() {
+        settings.getStringOrNull(GROUND_STORAGE_KEY)
+            ?.let { saved -> grounds.firstOrNull { it.name == saved } }
+            ?.let { currentGround = it }
+    }
+
     fun hueIndex(seed: String): Int = seed.hashCode().mod(hues.size)
     fun hue(seed: String): Color = hues[hueIndex(seed)]
     fun cap(seed: String): Color = caps[hueIndex(seed)]
