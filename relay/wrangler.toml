@@ -8,6 +8,14 @@ compatibility_date = "2026-09-01"
 name = "ROOMS"
 class_name = "RemoteRoom"
 
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "CreateLimiter"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["RemoteRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CreateLimiter"]

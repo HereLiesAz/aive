@@ -3,8 +3,17 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { test } from "node:test";
 
-import { MAX_CLIENTS_PER_ROOM, ROOM_TTL_MILLIS, isStrongToken, routeFrame } from "../src/protocol.js";
-import worker, { RemoteRoom } from "../src/worker.js";
+import {
+  FRAME_BURST,
+  MAX_CLIENTS_PER_ROOM,
+  MAX_ROOM_CREATES_PER_WINDOW,
+  ROOM_TTL_MILLIS,
+  TokenBucket,
+  countCreate,
+  isStrongToken,
+  routeFrame,
+} from "../src/protocol.js";
+import worker, { CreateLimiter, RemoteRoom } from "../src/worker.js";
 
 // Node's Response rejects status 101, which the Workers runtime uses for upgrades.
 globalThis.Response = class {
@@ -186,4 +195,46 @@ test("rotating the client token disconnects old clients", async () => {
   assert.equal((await room.fetch(request("POST", hostToken, { body: { clientToken: newClientToken } }))).status, 204);
   assert.equal(state.getWebSockets("client")[0].closed.code, 4001);
   assert.equal((await room.fetch(request("GET", clientToken, { role: "client" }))).status, 401);
+});
+
+test("room creation is counted per window and refused over the limit", () => {
+  let window;
+  for (let i = 0; i < MAX_ROOM_CREATES_PER_WINDOW; i++) {
+    const verdict = countCreate(window, 1000);
+    assert.ok(verdict.allowed, `creation ${i + 1} is allowed`);
+    window = verdict.window;
+  }
+  assert.equal(countCreate(window, 1000).allowed, false);
+  assert.ok(countCreate(window, 1000 + 60 * 60 * 1000).allowed, "a new window starts after the span");
+});
+
+test("the worker refuses room creation once an address is over its limit", async () => {
+  const storage = new FakeState().storage;
+  const limiter = new CreateLimiter({ storage });
+  const env = {
+    LIMITER: { idFromName: (name) => name, get: () => ({ fetch: (url) => limiter.fetch(url) }) },
+    ROOMS: { idFromName: (name) => name, get: () => ({ fetch: async () => new Response(null, { status: 201 }) }) },
+  };
+  const create = () => worker.fetch(request("POST", token(), { body: { clientToken: token() } }), env);
+  for (let i = 0; i < MAX_ROOM_CREATES_PER_WINDOW; i++) assert.equal((await create()).status, 201);
+  assert.equal((await create()).status, 429);
+});
+
+test("a socket that floods frames is disconnected", async () => {
+  const { state, room, hostToken, clientToken } = await pairedRoom();
+  await room.fetch(request("GET", hostToken, { role: "host" }));
+  await room.fetch(request("GET", clientToken, { role: "client" }));
+  const client = state.getWebSockets("client")[0];
+  const frame = JSON.stringify({ data: "x" });
+  for (let i = 0; i < FRAME_BURST + 5; i++) await room.webSocketMessage(client, frame);
+  assert.equal(client.closed?.code, 1008);
+});
+
+test("the frame bucket refills over time", () => {
+  let now = 0;
+  const bucket = new TokenBucket(2, 1, () => now);
+  assert.ok(bucket.take() && bucket.take());
+  assert.equal(bucket.take(), false);
+  now = 1000;
+  assert.ok(bucket.take());
 });

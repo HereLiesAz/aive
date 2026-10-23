@@ -70,6 +70,23 @@ class RelayHostRouterTest {
     }
 
     @Test
+    fun aCapturedFrameIsRefusedByTheNextRouterThatSharesTheGuard() = runBlocking<Unit> {
+        // The host link builds a router per connection but keeps one guard, so a reconnect cannot
+        // reopen the replay window.
+        val guard = RelayReplayGuard(clock = { now })
+        fun newRouter() = RelayHostRouter(
+            room = room, key = key, actions = actions, scope = scope,
+            send = { clientId, data -> sent.send(clientId to data) },
+            runStatus = status, outcomes = outcomes, clock = { now }, guard = guard,
+        )
+        val captured = client.frame { put("t", "ping"); put("id", 21) }
+        newRouter().onFrame("c1", captured)
+        assertEquals("pong", nextMessage().second.str("t"))
+        newRouter().onFrame("c1", captured)
+        assertTrue(sent.tryReceive().isFailure, "a replayed frame must get no reply")
+    }
+
+    @Test
     fun aPromptRunsThroughTheSharedActionsAndRepliesWithTheRequestId() = runBlocking<Unit> {
         router.onFrame("c1", client.frame { put("t", "prompt"); put("id", 5); put("prompt", "hi"); put("providerId", "kilo"); put("model", "m1") })
         val (_, result) = nextMessage()
