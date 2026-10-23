@@ -8,24 +8,24 @@ import kotlin.test.assertTrue
 
 class AzphaltAccessibilityTest {
     @Test
-    fun bestTextPicksTheHigherContrastOfInkAndWhite() {
+    fun onOppositePicksTheHigherContrastOfBlackAndWhite() {
         // Mid-tones where the old luminance threshold chose White at under 3.4:1.
         val midTones = listOf(
             Color(0xFF2FA9C4), Color(0xFF5AAE34), Color(0xFF1F9E86),
             Color(0xFFD9762A), Color(0xFF8A9296), Color(0xFFD4728F),
         )
         midTones.forEach { background ->
-            val chosen = bestTextOn(background)
-            val other = if (chosen == Azphalt.Ink) Azphalt.White else Azphalt.Ink
+            val chosen = background.onOpposite()
+            val other = if (chosen == Color.Black) Color.White else Color.Black
             assertTrue(
                 contrastRatio(chosen, background) >= contrastRatio(other, background),
                 "wrong text colour for $background",
             )
             assertTrue(contrastRatio(chosen, background) >= 4.5f, "below 4.5:1 on $background")
         }
-        assertEquals(Azphalt.Ink, bestTextOn(Color(0xFF2FA9C4)))
-        assertEquals(Azphalt.White, bestTextOn(Color(0xFF4B3489)))
-        assertEquals(Azphalt.White, bestTextOn(Azphalt.Ink))
+        assertEquals(Color.Black, Color(0xFF2FA9C4).onOpposite())
+        assertEquals(Color.White, Color(0xFF4B3489).onOpposite())
+        assertEquals(Color.White, Azphalt.Ink.onOpposite())
     }
 
     @Test

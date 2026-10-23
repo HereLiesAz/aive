@@ -26,7 +26,11 @@ import androidx.compose.ui.semantics.semantics
 @Composable
 fun AzphaltScreen(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     MaterialTheme(colorScheme = GeministratorColors) {
-        Surface(modifier = modifier.fillMaxSize(), color = Azphalt.currentGround.page) {
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = Azphalt.currentGround.page,
+            contentColor = Azphalt.currentGround.page.onOpposite(),
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -45,14 +49,14 @@ fun AzphaltHeading(text: String) {
     Text(
         text,
         style = AzphaltType.section,
-        color = Azphalt.currentGround.onPage,
+        color = azphaltOnSurface(),
         modifier = Modifier.semantics { heading() },
     )
 }
 
 @Composable
 fun AzphaltParagraph(text: String) {
-    Text(text, style = AzphaltType.body, color = Azphalt.currentGround.onPage)
+    Text(text, style = AzphaltType.body, color = azphaltOnSurface())
 }
 
 @Composable

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -111,45 +109,21 @@ internal object Azphalt {
     fun cap(seed: String): Color = caps[hueIndex(seed)]
 }
 
-/** WCAG 2.x contrast ratio between two colours (1 to 21), from relative luminance. */
-internal fun contrastRatio(first: Color, second: Color): Float {
-    val a = first.luminance()
-    val b = second.luminance()
-    val lighter = if (a > b) a else b
-    val darker = if (a > b) b else a
-    return (lighter + 0.05f) / (darker + 0.05f)
-}
-
-/** Ink or White, whichever has the higher WCAG contrast ratio against [background]. */
-internal fun bestTextOn(background: Color): Color =
-    if (contrastRatio(Azphalt.Ink, background) >= contrastRatio(Azphalt.White, background)) Azphalt.Ink else Azphalt.White
-
-internal val Color.contrastingText: Color
-    get() = bestTextOn(this)
-
 /**
- * Accent for text and glyphs drawn directly on the page ground: Yellow where it stays legible
- * (at least 3:1), otherwise the ground's own readable text colour. Yellow on the default Mustard
- * ground is only 1.11:1, so it must never be used there as a foreground.
+ * Accent for text and glyphs drawn directly on the page ground. Content is always the exact
+ * opposite of its surface ([oppositeOf]); Yellow is only kept where it clears 3:1 on the page, so
+ * it is never used as a foreground on Mustard (1.11:1).
  */
 internal val Azphalt.Ground.accent: Color
-    get() = if (contrastRatio(Azphalt.Yellow, page) >= 3f) Azphalt.Yellow else onPage
+    get() = if (contrastRatio(Azphalt.Yellow, page) >= AZPHALT_MIN_LARGE_CONTRAST) Azphalt.Yellow else onPage
 
+/** The exact opposite of the ground's page colour: what text on the bare page is drawn in. */
 internal val Azphalt.Ground.onPage: Color
-    get() = page.contrastingText
+    get() = page.onOpposite()
 
+/** The app-wide Material scheme: every role derived from the current ground's page colour. */
 internal val GeministratorColors
-    get() = darkColorScheme(
-        primary = Azphalt.Yellow,
-        onPrimary = Azphalt.Ink,
-        surface = Azphalt.currentGround.page,
-        onSurface = Azphalt.currentGround.onPage,
-        surfaceVariant = Azphalt.Ink,
-        onSurfaceVariant = Azphalt.White,
-        outline = Azphalt.currentGround.onPage.copy(alpha = 0.42f),
-        error = Color(0xFFC6392F),
-        onError = Azphalt.White,
-    )
+    get() = azphaltColorScheme(Azphalt.currentGround.page)
 
 /** Spacing scale in dp. Prefer these over new literals in the screens that touch them. */
 internal object AzphaltSpacing {
@@ -230,7 +204,7 @@ internal fun AzphaltPill(
     stateDescription: String? = null,
 ) {
     val hue = if (selected) Azphalt.Ink else Azphalt.hue(seed)
-    val content = if (selected) Azphalt.Yellow else hue.contrastingText
+    val content = hue.onOpposite()
     val pillRole = role
     Row(
         modifier = modifier
@@ -252,17 +226,14 @@ internal fun AzphaltPill(
         Text(label.uppercase(), style = AzphaltType.capsule, color = content)
         if (endCap != null) {
             val cap = if (selected) Azphalt.Yellow else Azphalt.cap(seed)
+            val capContent = cap.onOpposite()
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
                     .background(cap)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(
-                    endCap.uppercase(),
-                    style = AzphaltType.endCap,
-                    color = if (selected) Azphalt.Ink else cap.contrastingText,
-                )
+                Text(endCap.uppercase(), style = AzphaltType.endCap, color = capContent)
             }
         }
     }
@@ -322,7 +293,7 @@ internal fun AzphaltRecord(
     well: (@Composable () -> Unit)? = null,
 ) {
     val hue = if (selected) Azphalt.Ink else Azphalt.hue(seed)
-    val content = if (selected) Azphalt.Yellow else hue.contrastingText
+    val content = hue.onOpposite()
     val radius = animatedRecordRadius(selected)
     val description = buildString {
         append(title)
@@ -354,32 +325,41 @@ internal fun AzphaltRecord(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = content)
-            if (endCap != null) {
-                val cap = if (selected) Azphalt.Yellow else Azphalt.cap(seed)
-                Box(
-                    modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(cap).padding(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(endCap.uppercase(), style = AzphaltType.endCap, color = if (selected) Azphalt.Ink else cap.contrastingText)
+        AzphaltSurface(hue) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = content)
+                if (endCap != null) {
+                    val cap = if (selected) Azphalt.Yellow else Azphalt.cap(seed)
+                    Box(
+                        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(cap).padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
+                    }
                 }
             }
         }
+        // Body text is the full opposite of the record, not a faded copy of it: a translucent
+        // tint of the content colour would drop below 4.5:1 on the mid-tone hues.
         Text(title, style = AzphaltType.lead, color = content)
-        if (body != null) Text(body, style = AzphaltType.body, color = content.copy(alpha = 0.86f))
+        if (body != null) Text(body, style = AzphaltType.body, color = content)
         AzphaltChildBand(visible = well != null) {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Azphalt.Ink).padding(14.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(WELL_SURFACE).padding(14.dp),
             ) {
-                well?.invoke()
+                // The well is its own dark surface: everything in it takes the opposite of the
+                // well, never the page ground's text colour (dark-on-dark on Mustard and Pink).
+                AzphaltThemedSurface(WELL_SURFACE) { well?.invoke() }
             }
         }
     }
 }
+
+/** The dark panel a record's [AzphaltRecord] `well` sits on. */
+private val WELL_SURFACE = Azphalt.Ink
 
 @Composable
 internal fun AzphaltNote(
@@ -396,7 +376,7 @@ internal fun AzphaltNote(
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(label.uppercase(), style = AzphaltType.eyebrow, color = hue.contrastingText)
-        Text(value, style = AzphaltType.body, color = hue.contrastingText)
+        Text(label.uppercase(), style = AzphaltType.eyebrow, color = hue.onOpposite())
+        Text(value, style = AzphaltType.body, color = hue.onOpposite())
     }
 }
