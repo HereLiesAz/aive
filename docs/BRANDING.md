@@ -20,3 +20,29 @@ User-facing product name: **The Aive**
 Technical/project shorthand: **Aive** / `aive`
 
 Android application ID and namespace: `com.hereliesaz.aive` (Google Play). The GitHub-release flavor keeps the application ID `com.hereliesaz.haive` permanently so existing installs upgrade in place; the namespace is `com.hereliesaz.aive` for both.
+
+## Colour rule: content colour is derived from its surface
+
+Every piece of text, icon or glyph is drawn in the exact opposite of the surface it sits on: pure
+black on a light surface, pure white on a dark one, whichever has the higher WCAG contrast. That
+holds for every ground, pill, card, button, chip, well, sheet, dialog and text field, including
+nested and translucent surfaces. Nothing hard-codes a text colour, and nothing relies on a theme
+default that might not match the surface it lands on.
+
+- One helper owns the rule: `oppositeOf(background)` / `Color.onOpposite()` in
+  `shared/.../AzphaltContrast.kt`. It returns black or white, never the background or a near match,
+  and is at least 4.58:1 for any opaque surface (so 4.5:1 for text and 3:1 for large or bold text,
+  icons and glyphs). A translucent background is composited over the surface beneath it first.
+- Disabled, placeholder and other de-emphasised content uses `mutedOnOpposite()`: the opposite
+  blended toward the surface as far as it can go while staying at 3:1 or better.
+- Every container that paints a background publishes it with `AzphaltSurface(background)`
+  (`AzphaltThemedSurface` when Material components such as text fields, menus and checkboxes sit
+  inside, which also swaps in a Material colour scheme built from that surface). Content then reads
+  `azphaltOnSurface()` or `LocalContentColor`. A record's well is its own Ink surface, so text in it
+  is white on every ground; it never takes the page's text colour.
+- Where a Material component sets its own container colour, it must also be given the matching
+  content colour (`contentColor`, or `azphaltTextFieldColors()` for text fields).
+- Yellow is an accent for fills, never a foreground on a light surface (1.11:1 on Mustard); the
+  label on a Yellow fill is black.
+- `AzphaltContrastTest` enumerates every palette token (ground pages and folds, hues, caps, Ink,
+  Yellow, White) and fails if any surface yields an on-colour below the thresholds.
