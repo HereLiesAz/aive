@@ -422,7 +422,7 @@ private fun MascotNodeTerrarium(
                     roleLabel = node.label,
                     hueSeed = subject.identitySeed,
                     state = node.state,
-                    motionPhase = motionPhase,
+                    motionPhase = { motionPhase },
                     modifier = Modifier.fillMaxSize(),
                 )
                 H2g2SwarmAdornmentLayer(

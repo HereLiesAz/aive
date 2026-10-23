@@ -125,7 +125,7 @@ internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier
                                 roleLabel = label,
                                 hueSeed = label,
                                 state = state,
-                                motionPhase = phase,
+                                motionPhase = { phase },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
