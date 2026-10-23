@@ -21,11 +21,6 @@ import com.hereliesaz.aive.R
  * the manifest declares neither the service nor its foreground-service permissions.
  */
 internal class RemoteAccessController(context: Context) {
-    companion object {
-        /** Off until IDEaz is released. Flipping it also needs the manifest entries restored. */
-        const val AVAILABLE = false
-    }
-
     private val context = context.applicationContext
     val store = RemoteRelayStore(context)
 
@@ -87,7 +82,9 @@ internal class RemoteAccessController(context: Context) {
             problem.message ?: fallback
         }
 
-    private companion object {
-        const val CLIPBOARD_CLEAR_MILLIS = 60_000L
+    companion object {
+        /** Off until IDEaz is released. Flipping it also needs the manifest entries restored. */
+        const val AVAILABLE = false
+        private const val CLIPBOARD_CLEAR_MILLIS = 60_000L
     }
 }
