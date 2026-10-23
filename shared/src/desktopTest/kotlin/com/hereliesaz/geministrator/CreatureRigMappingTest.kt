@@ -36,20 +36,20 @@ class CreatureRigMappingTest {
      * passes whatever the table says.
      */
     private val expectedRigForRole = mapOf(
-        "orchestrator" to "orchestrator",
+        "orchestrator" to "creature",
         "ux designer" to "ux-designer",
-        "researcher" to "researcher",
-        "implementation engineer" to "implementation-engineer",
-        "epa representative" to "epa-representative",
-        "adversarial reviewer" to "adversarial-reviewer",
-        "qa engineer" to "qa-engineer",
-        "release engineer" to "release-engineer",
-        "antagonist" to "antagonist",
-        "product manager" to "product-manager",
-        "crash test dummy" to "crash-test-dummy",
-        "recovery engineer" to "recovery-engineer",
-        "code reviewer" to "code-reviewer",
-        "hall monitor" to "hall-monitor",
+        "researcher" to "data-scientist",
+        "implementation engineer" to "data-miner-sheet-1-variant-2",
+        "epa representative" to "optimizer-sheet-2-variant",
+        "adversarial reviewer" to "idea-catalyst-1",
+        "qa engineer" to "ml-engineer",
+        "release engineer" to "compliance-officer",
+        "antagonist" to "threat-modeler",
+        "product manager" to "knowledge-keeper-sheet-1-variant",
+        "crash test dummy" to "scheduler-sheet-2-variant",
+        "recovery engineer" to "sustainability-advocate",
+        "code reviewer" to "migration-engineer",
+        "hall monitor" to "disassembled-glossy-slime",
         "architect" to "architect",
         "data miner" to "data-miner-sheet-3-variant",
         "knowledge keeper" to "knowledge-keeper-sheet-2-variant",
@@ -155,9 +155,9 @@ class CreatureRigMappingTest {
 
     @Test
     fun personasExecutorsAndUnclassifiedRolesMapExplicitly() {
-        assertEquals("orchestrator", CreatureRigMapping.slugFor("Film Showrunner"))
+        assertEquals("creature", CreatureRigMapping.slugFor("Film Showrunner"))
         assertEquals("content-strategist", CreatureRigMapping.slugFor("Brand Strategist"))
-        assertEquals("adversarial-reviewer", CreatureRigMapping.slugFor("Contract Reviewer"))
+        assertEquals("idea-catalyst-1", CreatureRigMapping.slugFor("Contract Reviewer"))
         assertEquals("process-mapper", CreatureRigMapping.slugFor("Python"))
         assertEquals("process-mapper", CreatureRigMapping.slugFor("JavaScript"))
         assertEquals("test-automation-engineer", CreatureRigMapping.slugFor("Test Runner"))

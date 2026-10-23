@@ -229,5 +229,5 @@ than the Kotlin parser: it also rejects unknown state names, unknown channels an
 
 `tools/puppet-rig/slice/` slices the node-creature parts sheets in `docs/swarm-terrarium/characters/` into parts.
 It then assembles them into starter rigs in `files/rigs/` (one per sheet, for example `simulator.rig.json` and `generic-01.rig.json`), checked against each role's `node_XX.png`.
-The core roles (`orchestrator`, `researcher`, `qa-engineer`, ...) have one composed painting each and are built by
-`tools/puppet-rig/slice/build_composed_rigs.py` as single-part rigs (the UX designer is layered). Treat all of them as starting points for the editor. See `tools/puppet-rig/slice/README.md`.
+The core roles (`orchestrator`, `researcher`, `qa-engineer`, ...) have only a composed painting and no parts sheet, so
+`CreatureRigs.kt` maps them to creatures rigged for other roles (the UX designer has its own layered rig). Treat all rigs as starting points for the editor. See `tools/puppet-rig/slice/README.md`.

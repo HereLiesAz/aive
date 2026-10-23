@@ -33,8 +33,8 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
  * null, so every node is drawn with one of the current creature designs.
  *
  * Slugs come from the character directories in `docs/swarm-terrarium/characters/<NNN_role>/`
- * (parts-sheet rigs sliced by `tools/puppet-rig/slice/`, core roles 001-015 built from their
- * composed art by `build_composed_rigs.py`). Where a role has several sheets the newest one wins:
+ * (parts-sheet rigs sliced by `tools/puppet-rig/slice/`; core roles without a parts sheet reuse
+ * another role's rig, see [bySlugKind]). Where a role has several sheets the newest one wins:
  * the higher-numbered `sheet_3` directory over `sheet_1`/`sheet_2`, and the last variant of a sheet
  * (`idea-catalyst-2`). Resolution of a node label, first match wins:
  *
@@ -62,14 +62,7 @@ internal object CreatureRigMapping {
      * unclassified `creature`). Their file name is the role label that selects them.
      */
     val NAMED_ONLY_SLUGS = listOf(
-        "creature",
         "data-miner-sheet-1-variant-1",
-        "data-miner-sheet-1-variant-2",
-        "disassembled-glossy-slime",
-        "idea-catalyst-1",
-        "knowledge-keeper-sheet-1-variant",
-        "optimizer-sheet-2-variant",
-        "scheduler-sheet-2-variant",
     )
 
     /** Classifier kinds that have no creature of their own, and the closest creature to draw. */
@@ -95,21 +88,22 @@ internal object CreatureRigMapping {
     const val DEFAULT_AUTOMATED_RIG = "process-mapper"
 
     val bySlugKind: Map<NodeCreatureRoleKind, String> = mapOf(
-        // Core roles 001-015, rigged from their composed character art (tools/puppet-rig/slice/build_composed_rigs.py).
-        NodeCreatureRoleKind.Orchestrator to "orchestrator", // 001
+        // Core roles 001-015 without a parts sheet (all but UX designer and architect) wear a creature already
+        // rigged for another role, matched to the role's colour; the unused variants first, then rarer roles' rigs.
+        NodeCreatureRoleKind.Orchestrator to "creature", // 001
         NodeCreatureRoleKind.UxDesigner to "ux-designer", // 002
-        NodeCreatureRoleKind.Researcher to "researcher", // 003
-        NodeCreatureRoleKind.ImplementationEngineer to "implementation-engineer", // 004
-        NodeCreatureRoleKind.EpaRepresentative to "epa-representative", // 006
-        NodeCreatureRoleKind.AdversarialReviewer to "adversarial-reviewer", // 007
-        NodeCreatureRoleKind.QaEngineer to "qa-engineer", // 008
-        NodeCreatureRoleKind.ReleaseEngineer to "release-engineer", // 009
-        NodeCreatureRoleKind.Antagonist to "antagonist", // 010
-        NodeCreatureRoleKind.ProductManager to "product-manager", // 011
-        NodeCreatureRoleKind.CrashTestDummy to "crash-test-dummy", // 012
-        NodeCreatureRoleKind.RecoveryEngineer to "recovery-engineer", // 013
-        NodeCreatureRoleKind.CodeReviewer to "code-reviewer", // 014
-        NodeCreatureRoleKind.HallMonitor to "hall-monitor", // 015
+        NodeCreatureRoleKind.Researcher to "data-scientist", // 003
+        NodeCreatureRoleKind.ImplementationEngineer to "data-miner-sheet-1-variant-2", // 004
+        NodeCreatureRoleKind.EpaRepresentative to "optimizer-sheet-2-variant", // 006
+        NodeCreatureRoleKind.AdversarialReviewer to "idea-catalyst-1", // 007
+        NodeCreatureRoleKind.QaEngineer to "ml-engineer", // 008
+        NodeCreatureRoleKind.ReleaseEngineer to "compliance-officer", // 009
+        NodeCreatureRoleKind.Antagonist to "threat-modeler", // 010
+        NodeCreatureRoleKind.ProductManager to "knowledge-keeper-sheet-1-variant", // 011
+        NodeCreatureRoleKind.CrashTestDummy to "scheduler-sheet-2-variant", // 012
+        NodeCreatureRoleKind.RecoveryEngineer to "sustainability-advocate", // 013
+        NodeCreatureRoleKind.CodeReviewer to "migration-engineer", // 014
+        NodeCreatureRoleKind.HallMonitor to "disassembled-glossy-slime", // 015
         NodeCreatureRoleKind.Architect to "architect", // 005
         NodeCreatureRoleKind.DataMiner to "data-miner-sheet-3-variant", // 036 (newer than 016)
         NodeCreatureRoleKind.KnowledgeKeeper to "knowledge-keeper-sheet-2-variant", // 022 (newer than 017)
@@ -219,7 +213,7 @@ class LoadedCreatureRig(val slug: String, val compiled: CompiledPuppetRig, val a
  * finishes loading.
  */
 object CreatureRigCache {
-    internal const val MAX_RIGS = 40
+    internal const val MAX_RIGS = 64
 
     private val ready = mutableStateMapOf<String, LoadedCreatureRig>()
     private val failed = mutableStateMapOf<String, Boolean>()
