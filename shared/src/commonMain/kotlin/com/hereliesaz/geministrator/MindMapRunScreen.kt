@@ -408,7 +408,7 @@ internal fun MindMapRunScreen(
                                 },
                             isError = repositoryError != null,
                             supportingText = (repositoryError ?: repositorySearchError)?.let { message ->
-                                { Text(message) }
+                                { Text(message, modifier = Modifier.azphaltLiveRegion()) }
                             },
                         )
                         DropdownMenu(
@@ -466,7 +466,7 @@ internal fun MindMapRunScreen(
                         modifier = Modifier.fillMaxWidth(),
                         isError = repositoryError != null,
                         supportingText = repositoryError?.let { message ->
-                            { Text(message) }
+                            { Text(message, modifier = Modifier.azphaltLiveRegion()) }
                         },
                     )
                 }
@@ -554,7 +554,12 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 launchFieldsError?.let { message ->
-                    Text(message, style = AzphaltType.body, color = MaterialTheme.colorScheme.error)
+                    Text(
+                        message,
+                        style = AzphaltType.body,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.azphaltLiveRegion(),
+                    )
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -686,7 +691,9 @@ internal fun MindMapRunScreen(
                 seed = "task-activity-${task.id.value}",
                 label = task.name,
                 value = detail,
-                modifier = Modifier.azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
+                modifier = Modifier
+                    .azphaltLiveRegion()
+                    .azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
             )
         }
         Spacer(Modifier.height(24.dp))

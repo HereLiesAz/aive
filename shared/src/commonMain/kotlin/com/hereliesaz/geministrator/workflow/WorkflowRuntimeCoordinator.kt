@@ -497,7 +497,6 @@ class WorkflowRuntimeCoordinator(
         for ((taskId, taskRun) in run.taskRuns) {
             if (taskRun.status != TaskRunStatus.AwaitingApproval) continue
             val task = tasks[taskId] ?: continue
-            if (task.approvalPolicy == ApprovalPolicy.None) continue
 
             val gateId = ApprovalGateId("plan:${run.id.value}:${taskId.value}:${taskRun.attempt}")
             if (persistence.approvalGates.get(gateId) != null) continue
@@ -508,7 +507,10 @@ class WorkflowRuntimeCoordinator(
                 taskDefinitionId = taskId,
                 kind = ApprovalGateKind.PlanApproval,
                 reason = "Plan approval required for '${task.name}'",
-                requiresHuman = task.approvalPolicy is ApprovalPolicy.HumanApproval,
+                // A task with no approval policy only stops here when its provider insists on one
+                // (e.g. committing a workflow file to the default branch), which is a person's call.
+                requiresHuman = task.approvalPolicy is ApprovalPolicy.HumanApproval ||
+                    task.approvalPolicy == ApprovalPolicy.None,
                 nowEpochMillis = now,
             )
         }
@@ -545,8 +547,7 @@ class WorkflowRuntimeCoordinator(
                 }
 
                 TaskRunStatus.AwaitingApproval -> {
-                    val task = tasks[taskId] ?: continue
-                    if (task.approvalPolicy == ApprovalPolicy.None) continue
+                    if (tasks[taskId] == null) continue
                     val gateId = ApprovalGateId(
                         "plan:${nextRun.id.value}:${taskId.value}:${taskRun.attempt}",
                     )

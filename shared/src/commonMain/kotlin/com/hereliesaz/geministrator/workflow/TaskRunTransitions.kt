@@ -44,6 +44,9 @@ object TaskRunTransitions {
         ),
         TaskRunStatus.Running to setOf(
             TaskRunStatus.Blocked,
+            // A provider may stop mid-run for a person's approval, e.g. before committing a
+            // workflow file to the default branch.
+            TaskRunStatus.AwaitingApproval,
             TaskRunStatus.Verifying,
             TaskRunStatus.Completed,
             TaskRunStatus.Failed,
