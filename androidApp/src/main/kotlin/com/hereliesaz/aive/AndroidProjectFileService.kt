@@ -13,6 +13,8 @@ import com.hereliesaz.geministrator.ProjectFileDescriptor
 import com.hereliesaz.geministrator.ProjectFileReadResult
 import com.hereliesaz.geministrator.ProjectFileService
 import com.hereliesaz.geministrator.RoleSurfaceFilePicker
+import com.hereliesaz.geministrator.SETUP_FILE_MIME_TYPE
+import com.hereliesaz.geministrator.asSetupFileName
 import com.hereliesaz.geministrator.asIveFileName
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
@@ -28,6 +30,7 @@ internal class AndroidProjectFileService(
 
     private var pendingOpen: CompletableDeferred<Uri?>? = null
     private var pendingCreate: CompletableDeferred<Uri?>? = null
+    private var pendingSetupCreate: CompletableDeferred<Uri?>? = null
 
     private val openLauncher = activity.registerForActivityResult(
         ActivityResultContracts.OpenDocument(),
@@ -41,6 +44,13 @@ internal class AndroidProjectFileService(
     ) { uri ->
         pendingCreate?.complete(uri)
         pendingCreate = null
+    }
+
+    private val createSetupLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.CreateDocument(SETUP_FILE_MIME_TYPE),
+    ) { uri ->
+        pendingSetupCreate?.complete(uri)
+        pendingSetupCreate = null
     }
 
     override suspend fun detected(): List<ProjectFileDescriptor> = withContext(Dispatchers.IO) {
@@ -122,6 +132,37 @@ internal class AndroidProjectFileService(
                 descriptor = descriptorForUri(uri),
                 content = content,
             )
+        }
+    }
+
+    override suspend fun saveSetupFileAs(fileName: String, content: String): ProjectFileDescriptor? {
+        check(pendingSetupCreate == null) { "A setup file save picker is already open" }
+        val deferred = CompletableDeferred<Uri?>()
+        pendingSetupCreate = deferred
+        withContext(Dispatchers.Main.immediate) {
+            createSetupLauncher.launch(fileName.asSetupFileName())
+        }
+        val uri = deferred.await() ?: return null
+        return withContext(Dispatchers.IO) {
+            resolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(content) }
+                ?: error("Could not open selected setup file for writing")
+            descriptorForUri(uri)
+        }
+    }
+
+    override suspend fun chooseAndReadSetupFile(): ProjectFileReadResult? {
+        // No persistable permission and no recents: a setup file holds sealed credentials and is
+        // read once.
+        check(pendingOpen == null) { "A document picker is already open" }
+        val deferred = CompletableDeferred<Uri?>()
+        pendingOpen = deferred
+        withContext(Dispatchers.Main.immediate) {
+            openLauncher.launch(arrayOf(SETUP_FILE_MIME_TYPE, "application/json", "application/octet-stream", "*/*"))
+        }
+        val uri = deferred.await() ?: return null
+        return withContext(Dispatchers.IO) {
+            val content = readUri(uri) ?: return@withContext null
+            ProjectFileReadResult(descriptor = descriptorForUri(uri), content = content)
         }
     }
 

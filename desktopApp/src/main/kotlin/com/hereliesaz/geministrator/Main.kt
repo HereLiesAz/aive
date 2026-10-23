@@ -389,6 +389,31 @@ fun main() {
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
                         memoryLayer = memoryLayer,
+                        setupSecretStore = object : SetupSecretStore {
+                            // Only stored credentials: keys from environment variables stay there.
+                            override fun read(): SetupSecrets = SetupSecrets(
+                                providerCredentials = providerCredentialStore.readAll(),
+                                repositoryCredentials = repositoryCredentialStore.readAll(),
+                                distributedComputeToken = computeCredentialStore.readToken(),
+                            )
+
+                            override fun write(secrets: SetupSecrets) {
+                                secrets.providerCredentials
+                                    .filterKeys { ProviderCatalog.entry(it) != null }
+                                    .forEach { (id, key) -> providerCredentialStore.write(id, key) }
+                                secrets.repositoryCredentials
+                                    .filterKeys { RepositoryServiceCatalog.entry(it) != null }
+                                    .forEach { (id, token) -> repositoryCredentialStore.write(id, token) }
+                                secrets.distributedComputeToken?.let(computeCredentialStore::writeToken)
+                                credentials = readDesktopProviderCredentials(providerCredentialStore)
+                                repositoryCredentials = readDesktopRepositoryCredentials(
+                                    repositoryCredentialStore,
+                                    suppressedEnvironmentRepositoryServiceIds,
+                                )
+                                computeConfiguration = computeConfigurationStore.read()
+                                computeToken = computeCredentialStore.readToken()
+                            }
+                        },
                     )
                 }
             }

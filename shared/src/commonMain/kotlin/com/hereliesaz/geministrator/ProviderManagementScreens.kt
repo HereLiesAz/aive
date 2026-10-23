@@ -423,6 +423,7 @@ internal fun ProviderSettingsScreen(
     projectFileService: ProjectFileService? = null,
     onExportCurrentProjectFile: suspend () -> IveProjectExport? = { null },
     onImportProjectFile: suspend (String) -> String? = { null },
+    setupFileActions: SetupFileActions? = null,
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onConfigureProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
@@ -1085,6 +1086,10 @@ internal fun ProviderSettingsScreen(
             }
         }
 
+        if (projectFileService != null && setupFileActions != null) {
+            SetupFileSection(projectFileService, setupFileActions)
+        }
+
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
@@ -1229,7 +1234,7 @@ private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
 }
 
 @Composable
-private fun ProviderSectionLabel(label: String) {
+internal fun ProviderSectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = Azphalt.currentGround.onPage)
 }
 

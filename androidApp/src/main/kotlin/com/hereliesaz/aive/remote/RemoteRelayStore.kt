@@ -66,6 +66,16 @@ internal class RemoteRelayStore(context: Context) {
         return old to fresh
     }
 
+    /**
+     * Restores a pairing from a setup file without turning Remote access on; [enable] then reuses
+     * it because it is for the same relay. Throws [IllegalArgumentException] when it is unreadable.
+     */
+    fun restore(relayUrl: String?, storedPairing: String) {
+        val pairing = requireNotNull(RemoteRelayPairing.fromStorage(storedPairing)) { "Remote access pairing is unreadable" }
+        relayUrl?.takeIf(String::isNotBlank)?.let { this.relayUrl = it }
+        secrets.writeToken(pairing.toStorage())
+    }
+
     /** Turns Remote access off and forgets the pairing; returns it so its room can be deleted. */
     fun disable(): RemoteRelayPairing? {
         val old = pairing()
