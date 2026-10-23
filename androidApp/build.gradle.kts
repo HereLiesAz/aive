@@ -202,6 +202,8 @@ dependencies {
     add("playImplementation", "com.google.android.play:app-update:2.1.0")
     implementation(compose.material3)
     implementation(libs.ktor.client.cio)
+    // The Store and model downloads use the platform TLS stack (OkHttp), not CIO's own.
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.websockets)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.guava)

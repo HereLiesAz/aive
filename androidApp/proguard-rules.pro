@@ -27,3 +27,31 @@
 -dontwarn com.googlecode.javaewah.**
 -keep class org.eclipse.jgit.internal.JGitText { *; }
 -keep class org.eclipse.jgit.lib.CoreConfig$* { *; }
+
+# kotlinx.serialization: generated serializers are found by name (Foo.Companion.serializer() and
+# Foo$$serializer). Without these keeps, release builds can fail at runtime decoding the Azphalt
+# Store's JSON, settings and persisted workflow state, with errors that carry no message.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** { kotlinx.serialization.KSerializer serializer(...); }
+-keep,includedescriptorclasses class com.hereliesaz.**$$serializer { *; }
+-keepclassmembers class com.hereliesaz.** { *** Companion; }
+-keepclasseswithmembers class com.hereliesaz.** { kotlinx.serialization.KSerializer serializer(...); }
+
+# Azphalt Store models: decoded from azphalt.store JSON by the generated serializers above; keep the
+# whole package so no model class or member the decoder reaches is shrunk or renamed.
+-keep class com.hereliesaz.geministrator.azphalt.** { *; }
+
+# Ktor discovers HTTP client engines and plugins through ServiceLoader and reflection.
+-keep class io.ktor.** { *; }
+-keepclassmembers class io.ktor.** { volatile <fields>; }
+-dontwarn io.ktor.**
+
+# OkHttp (Ktor's Android engine for the Store and model downloads) and Okio: optional TLS providers
+# and platform classes they probe for are absent on Android.
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
