@@ -16,6 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -151,7 +154,7 @@ internal fun TechnicalInspector(
         LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
         LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
         taskRun.progress?.let { progress ->
-            LiveInspectorLine(stringResource(Res.string.inspector_progress), "${(progress * 100f).toInt()}%")
+            LiveInspectorLine(stringResource(Res.string.inspector_progress), "${(progress * 100f).toInt()}%", live = true)
         }
         taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
             val label = if (
@@ -162,10 +165,10 @@ internal fun TechnicalInspector(
             } else {
                 stringResource(Res.string.inspector_now)
             }
-            LiveInspectorLine(label, it)
+            LiveInspectorLine(label, it, live = true)
         }
         taskRun.blockingReason?.let {
-            LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}")
+            LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
         }
         LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
         taskRun.artifacts.forEachIndexed { index, artifact ->
@@ -262,7 +265,7 @@ internal fun TechnicalInspector(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it) }
+            messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
         }
         val roleForPayload = role
             ?: task.roleId?.let { rid -> liveWorkflow.roles.firstOrNull { it.id == rid } }
@@ -315,8 +318,11 @@ private fun TaskExecutor.reference(): String = when (this) {
 }
 
 @Composable
-private fun LiveInspectorLine(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+private fun LiveInspectorLine(label: String, value: String, live: Boolean = false) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+        modifier = if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
+    ) {
         Text(label, style = AzphaltType.eyebrow, color = Azphalt.Yellow)
         Text(value, style = AzphaltType.body, color = Azphalt.White)
     }
