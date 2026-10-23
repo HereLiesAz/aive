@@ -116,6 +116,9 @@
     <string name="hall_monitor_trial_history">TRIAL HISTORY</string>
     <string name="hall_monitor_validation">VALIDATION</string>
 
+    <string name="inbox_badge_none">Inbox, nothing unread</string>
+    <string name="inbox_badge_unread">Inbox, %1$d unread</string>
+    <string name="inbox_badge_unread_many">Inbox, more than %1$d unread</string>
     <string name="inbox_loading_runtime">Loading runtime…</string>
     <string name="inbox_no_active_run_there_are_no">No active run. There are no workflow decisions to review.</string>
     <string name="inbox_no_pending_decisions">No pending decisions.</string>

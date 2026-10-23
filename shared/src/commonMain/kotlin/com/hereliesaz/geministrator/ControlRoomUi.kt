@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
 import com.hereliesaz.geministrator.resources.nav_swarm_os
 import com.hereliesaz.geministrator.resources.nav_the_aive
+import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
 
 internal object ControlRoomBreakpoints {
@@ -144,6 +146,15 @@ fun ControlRoom(
     connectedProviderIds: Set<String> = emptySet(),
 ) {
     val ground = Azphalt.currentGround
+    // Unread Inbox items: pending decisions, and the Hall Monitor pause. Opening the Inbox marks
+    // everything it lists as read.
+    val inboxReadLog = remember { InboxReadLog(Settings()) }
+    val inboxKeys = remember(runtimeState) { inboxItemKeys(runtimeState) }
+    val unreadInbox = unreadInboxCount(inboxKeys, inboxReadLog.read)
+    LaunchedEffect(destination, inboxKeys) {
+        if (destination == ControlRoomDestination.Inbox) inboxReadLog.markRead(inboxKeys)
+    }
+    val openInbox = { onDestinationSelected(ControlRoomDestination.Inbox) }
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
@@ -157,7 +168,7 @@ fun ControlRoom(
     ) {
         if (compact) {
             Column(Modifier.fillMaxSize()) {
-                CompactHeader()
+                CompactHeader(unreadInbox = unreadInbox, onOpenInbox = openInbox)
                 CompactNavigation(destination, onDestinationSelected, destinations)
                 MainDestination(
                     destination = destination,
@@ -223,6 +234,8 @@ fun ControlRoom(
                     onDestinationSelected = onDestinationSelected,
                     destinations = destinations,
                     runtimeState = runtimeState,
+                    unreadInbox = unreadInbox,
+                    onOpenInbox = openInbox,
                     modifier = Modifier.width(220.dp).fillMaxHeight(),
                 )
                 MainDestination(
@@ -316,6 +329,8 @@ private fun PillNavigation(
     onDestinationSelected: (ControlRoomDestination) -> Unit,
     destinations: List<ControlRoomDestination>,
     runtimeState: ApplicationRuntimeState,
+    unreadInbox: Int,
+    onOpenInbox: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val entrance = remember { AzphaltEntrance.roll() }
@@ -324,7 +339,19 @@ private fun PillNavigation(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = azphaltOnSurface())
-        Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(Res.string.nav_swarm_os),
+                style = AzphaltType.eyebrow,
+                color = azphaltOnSurface(),
+                modifier = Modifier.weight(1f),
+            )
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
+        }
         Spacer(Modifier.height(12.dp))
         destinations.forEachIndexed { index, item ->
             AzphaltPill(
@@ -349,7 +376,7 @@ private fun PillNavigation(
 }
 
 @Composable
-private fun CompactHeader() {
+private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -359,6 +386,7 @@ private fun CompactHeader() {
             Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
             Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         }
+        InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
     }
 }
 

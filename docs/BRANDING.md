@@ -46,3 +46,16 @@ default that might not match the surface it lands on.
   label on a Yellow fill is black.
 - `AzphaltContrastTest` enumerates every palette token (ground pages and folds, hues, caps, Ink,
   Yellow, White) and fails if any surface yields an on-colour below the thresholds.
+
+## Ground and the shell header
+
+The page colour (the "ground": Mustard, Maroon, Navy, Cerulean, Teal, Pink) is chosen in
+**Settings > Appearance > Ground**, on every platform. It is persisted on the device and cycles to
+the next ground on each press. The header and sidebar carry no ground control.
+
+In its place the header (compact layout) and the top of the sidebar (wide layout) carry the inbox
+button. At zero unread it is only the inbox glyph on the page, drawn in the page's opposite colour.
+With unread items it is an Ink pill: white glyph and a Yellow count capsule with black text, capped
+at "99+". Its accessible name is "Inbox, N unread" and it is a live region. "Unread" means a
+pending plan approval, a failure escalation, or a Hall Monitor pause that the Inbox has not yet been
+open for; opening the Inbox marks what it lists as read (`InboxReadLog`, persisted per device).
