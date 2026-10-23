@@ -3,13 +3,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
-      Remote access (opt-in, off by default): AiveRelayHostService keeps an encrypted link to the
-      user's own IDEaz open as a foreground service. Shipping this needs the Play Console
+      Remote access over the relay is stubbed out until IDEaz ships (RemoteAccessController.AVAILABLE).
+      Re-enabling it restores FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE and
+      POST_NOTIFICATIONS here, the AiveRelayHostService entry below, and the Play Console
       foreground-service (specialUse) declaration; see docs/Remote-API.md.
     -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
       Remote API (docs/Remote-API.md): only apps signed with The Aive's key (IDEaz) may bind
@@ -70,14 +68,6 @@
             </intent-filter>
         </service>
 
-        <service
-            android:name=".remote.AiveRelayHostService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps an end-to-end encrypted link to the user's own IDEaz app open through a relay, only while the user has turned on Remote access in Settings, so IDEaz on another device can run prompts and start workflows on this device." />
-        </service>
 
     </application>
 </manifest>

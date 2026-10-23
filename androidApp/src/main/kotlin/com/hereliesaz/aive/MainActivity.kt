@@ -554,7 +554,8 @@ class MainActivity : ComponentActivity() {
                         } else {
                             null
                         },
-                        remoteAccessSetting = RemoteAccessSetting(
+                        // Hidden until IDEaz ships; see RemoteAccessController.AVAILABLE.
+                        remoteAccessSetting = if (!RemoteAccessController.AVAILABLE) null else RemoteAccessSetting(
                             enabled = remoteAccess.enabled,
                             relayUrl = remoteRelayUrl,
                             defaultRelayUrl = RelayProtocol.DEFAULT_RELAY_URL,
