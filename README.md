@@ -32,7 +32,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned SHAs; to build locally, clone them there at the SHAs in `.github/workflows/multiplatform.yml` (the JitPack fallback has no desktop variant).
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt workflow/role packages packed by `tools/azp`
-- `docs/swarm-terrarium/` — terrarium node-creature design brief, character manifests, role prompts, and source sheets
+- `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
 - `memory_and_orchestration_layers.ipynb` — Colab/Kaggle notebook for training the memory-clerk specialist models
 - `branding/` — locked source brand and icon assets
 

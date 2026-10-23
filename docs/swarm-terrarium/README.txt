@@ -8,8 +8,6 @@ Contents
 - characters_manifest.json    index including full prompt text
 - complete_character_list.txt all 70 entries in order
 - unique_role_names.txt        deduplicated role-name list
-- all_prompts.md               every prompt in one file
-- aive_node_creature_role_prompts.docx
 - source_sheets/               the four source character sheets
 - characters/NNN_role.../
     character_crop.png

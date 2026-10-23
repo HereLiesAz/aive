@@ -49,3 +49,16 @@ Both stages take `--only <substring>` (directory, sheet name or rig slug). `slic
   - `<dir>/rig/<slug>.compare.png`: reference | rest | Active ×3 | Blocked | Failed. A small Python renderer draws these with the format's transform math.
   - `rigs-report.json`: which reference each rig used, eye and limb match counts, and the newest sheet per role.
 - **Slugs.** Rig slugs are the kebab-case role. 000_generic gives `generic-01`…`generic-06`. Roles with several sheets get `-1`, `-2` suffixes, ordered oldest to newest.
+
+## Core roles: `build_composed_rigs.py`
+
+The core roles `001`-`004` and `006`-`015` have no parts sheet, only one composed transparent painting each. `build_composed_rigs.py` builds their rigs and atlases straight from that painting:
+
+```sh
+python3 tools/puppet-rig/slice/build_composed_rigs.py [--only <slug>] [--preview]
+```
+
+- **Alpha.** The 1-5 alpha haze left by background removal is dropped and near-opaque pixels snap to 255. Soft edges are kept; resizing is done in premultiplied space so edges get no halo.
+- **Single-part rigs.** The painting is cropped, scaled to at most 512 px and written as one `main` part under an invisible `body` bone at the soma centre (the thickest blob). All seven states move the whole body: bob, tilt, squash/stretch, a droop for Blocked and Failed, a hop for Complete. There is no blink, because the painting has no hidden layers behind the eyes and limbs. Four `arm-socket` attachments sit on the soma rim.
+- **Layered rigs** (`LAYERED`): the UX Designer uses the registered hand-cut layers in `002_ux_designer/rig/bodyparts/`. They are packed as separate parts (soma, eyes with upper/lower lids, six dendrites, a four-segment tail with two pods). Pivots are found automatically where each layer meets its parent. Lids rest collapsed and sweep shut to blink; tendrils and the tail sway.
+- To upgrade a single-part role, supply a parts sheet and use the sheet pipeline above.
