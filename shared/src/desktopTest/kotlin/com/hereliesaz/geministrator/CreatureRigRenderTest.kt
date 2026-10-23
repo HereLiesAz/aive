@@ -43,15 +43,8 @@ class CreatureRigRenderTest {
     @Test
     fun rendersRiggedTerrariumAndGallery() {
         preload()
-        CreatureRigSettings.enabled = true
         shoot("wired-terrarium", 1500, 1000) { CreatureRigTerrariumDemo(Modifier.fillMaxSize()) }
         shoot("wired-gallery", 1500, 2300) { CreatureRigGrid(columns = 7, cell = 128.dp) }
-        CreatureRigSettings.enabled = false
-        try {
-            shoot("wired-terrarium-legacy", 1500, 1000) { CreatureRigTerrariumDemo(Modifier.fillMaxSize()) }
-        } finally {
-            CreatureRigSettings.enabled = true
-        }
     }
 }
 
