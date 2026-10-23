@@ -64,7 +64,7 @@ if (loaded != null) RiggedPuppetSurface(loaded.rig, loaded.atlas, state.name, mo
 | `sw.js`, `manifest.webmanifest`, `icons/` | PWA shell. Icons come from `branding/haive_monochrome.png`. Bump `VERSION` in `sw.js` whenever a shell file changes. |
 | `validate-rig.mjs` | `node tools/puppet-rig/validate-rig.mjs file.rig.json` validates a rig and checks the atlas size. |
 | `test/smoke.cjs` | Headless Playwright smoke test (see below). |
-| `slice/` | Builds starter rigs from the character art: parts sheets (`slice_parts.py`, `build_rigs.py`) and the composed core-role paintings (`build_composed_rigs.py`). See `slice/README.md`. |
+| `slice/` | Builds starter rigs from the character art: parts sheets (`slice_parts.py`, `build_rigs.py`). See `slice/README.md`. |
 
 ## Validation and smoke tests
 

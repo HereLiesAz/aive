@@ -56,12 +56,30 @@ Where a role has several sheets the newest wins. The rig is driven by the node's
 How the rigs are made:
 
 - Characters with a parts sheet (`016`-`071`, `000_generic`) are sliced and assembled by `tools/puppet-rig/slice/` (`slice_parts.py`, `build_rigs.py`).
-- The core roles `001`-`004` and `006`-`015` have only one composed, transparent painting each, so `tools/puppet-rig/slice/build_composed_rigs.py` builds their rigs from it. They are single-part rigs: the painting is one sprite moved as a whole (bob, tilt, squash, droop, hop) and does not blink. The UX Designer is layered from its registered hand-cut layers (`002_ux_designer/rig/bodyparts/`), so it blinks and its tendrils and tail sway. The Architect (`005`) is sliced from its parts sheet.
-- To upgrade a single-part creature, supply a parts sheet (the soma, eyes, eyelids, tendrils and tail separated, on a transparent background) and cut it with the editor in `tools/puppet-rig/`.
+- The core roles `001`-`004` and `006`-`015` have no parts sheet, only one composed painting each, so they reuse creatures already rigged for other roles, matched to the role's colour. The unused variants go first, then rigs from rarer roles (so a few creatures are shared by two roles):
+
+  | Role | Creature |
+  |---|---|
+  | Orchestrator | `creature` |
+  | Researcher | `data-scientist` |
+  | Implementation Engineer | `data-miner-sheet-1-variant-2` |
+  | EPA Representative | `optimizer-sheet-2-variant` |
+  | Adversarial Reviewer | `idea-catalyst-1` |
+  | QA Engineer | `ml-engineer` |
+  | Release Engineer | `compliance-officer` |
+  | Antagonist | `threat-modeler` |
+  | Product Manager | `knowledge-keeper-sheet-1-variant` |
+  | Crash Test Dummy | `scheduler-sheet-2-variant` |
+  | Recovery Engineer | `sustainability-advocate` |
+  | Code Reviewer | `migration-engineer` |
+  | Hall Monitor | `disassembled-glossy-slime` |
+
+  The UX Designer is layered from its registered hand-cut layers (`002_ux_designer/rig/bodyparts/`). The Architect (`005`) is sliced from its parts sheet.
+- To give a reused core role its own creature, supply a parts sheet (the soma, eyes, eyelids, tendrils and tail separated, on a transparent background) and cut it with the editor in `tools/puppet-rig/`.
 
 ## How to add a creature
 
 1. Put the creature's composed painting (transparent background) in `characters/<NNN_role>/`, with its `prompt.txt` and `metadata.json`.
-2. Make the rig. For a parts sheet, run `slice_parts.py` then `build_rigs.py`. For a composed painting, add the slug to `COMPOSED` in `build_composed_rigs.py` and run it. Or cut and rig it by hand in `tools/puppet-rig/` and export `<role>.rig.json` plus its atlas into `files/rigs/`. Rig and atlas names are `<slug>.rig.json` and `<slug_underscored>_rig_atlas.png`.
+2. Make the rig. For a parts sheet, run `slice_parts.py` then `build_rigs.py`. Or cut and rig it by hand in `tools/puppet-rig/` and export `<role>.rig.json` plus its atlas into `files/rigs/`. Rig and atlas names are `<slug>.rig.json` and `<slug_underscored>_rig_atlas.png`.
 3. Check it: `node tools/puppet-rig/validate-rig.mjs <file>`, and look at it in the gallery.
 4. Map it: add the role kind to `bySlugKind` in `CreatureRigs.kt` (a new role kind also needs a classifier rule in `NodeCreatureRoleClassifier.kt`), or point a Store persona at it through its `rigKind` in `MascotCharacterCatalog.kt`. Add the expected row to `CreatureRigMappingTest`.

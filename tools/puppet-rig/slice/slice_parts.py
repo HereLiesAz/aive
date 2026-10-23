@@ -58,6 +58,11 @@ def sheet_slug(file_name: str) -> str:
     return slugify(base)
 
 
+def sheet_key(d: str, f: str) -> str:
+    """Key of a sheet in overrides.json: `<dir>/<file>`, or the bare file name for a sheet directly in `characters/`."""
+    return f"{d}/{f}" if d else f
+
+
 def is_composed_name(f: str) -> bool:
     low = f.lower()
     return (low.startswith("node_") or "node_" in low or low.startswith("approved_character")
@@ -82,8 +87,13 @@ def alpha_stats(path: str):
 
 
 def discover():
-    """Yield (dir, file, stats, verdict) for every PNG directly in a character dir."""
-    for d in sorted(os.listdir(CHAR_ROOT)):
+    """Yield (dir, file, stats, verdict) for every PNG directly in a character dir.
+
+    PNGs sitting directly in `characters/` (not in a numbered role directory) are reported with
+    dir "" so shared sheets such as `Disassembled Glossy Slime Sprite Sheet.png` can be sliced too.
+    Their overrides are keyed by the bare file name and their outputs go to `characters/rig/`.
+    """
+    for d in [""] + sorted(os.listdir(CHAR_ROOT)):
         p = os.path.join(CHAR_ROOT, d)
         if not os.path.isdir(p):
             continue
@@ -383,7 +393,7 @@ def preview(img: Image.Image, parts: list[Part], out: str, title: str):
 
 
 def process_sheet(d: str, f: str, ov_all: dict, out_root: str | None = None):
-    key = f"{d}/{f}"
+    key = sheet_key(d, f)
     ov = ov_all.get(key, {})
     path = os.path.join(CHAR_ROOT, d, f)
     img = Image.open(path).convert("RGBA")
@@ -436,7 +446,7 @@ def parts_sheets():
     skip = set(ov.get("_skip_sheets", []))
     res = []
     for d, f, st, verdict in discover():
-        if verdict == "candidate" and f"{d}/{f}" not in skip:
+        if verdict == "candidate" and sheet_key(d, f) not in skip:
             res.append((d, f))
     return res
 
@@ -452,7 +462,7 @@ def main():
             print(f"{v:22s} {d} | {f} {st}")
         return
     for d, f in parts_sheets():
-        if a.only and a.only not in f"{d}/{f}":
+        if a.only and a.only not in sheet_key(d, f):
             continue
         m = process_sheet(d, f, ov)
         cls = [r["id"] for r in m["parts"]]

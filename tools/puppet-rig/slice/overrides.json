@@ -182,5 +182,15 @@
   "classes": {
    "5": "tendril"
   }
+ },
+ "Disassembled Glossy Slime Sprite Sheet.png": {
+  "slug": "disassembled-glossy-slime",
+  "classes": {
+   "6": "tailseg"
+  },
+  "tail_chain": [
+   6,
+   9
+  ]
  }
 }

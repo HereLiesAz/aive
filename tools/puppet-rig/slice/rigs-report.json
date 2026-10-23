@@ -1119,5 +1119,24 @@
   "eyes_matched": true,
   "tendrils_matched": 6,
   "tendrils": 6
+ },
+ {
+  "slug": "disassembled-glossy-slime",
+  "key": "Disassembled Glossy Slime Sprite Sheet.png",
+  "ref": null,
+  "newest": true,
+  "sheets_in_role": 1,
+  "canvas": [
+   334.36,
+   479.87
+  ],
+  "atlas": [
+   374,
+   437
+  ],
+  "used_ref": false,
+  "eyes_matched": false,
+  "tendrils_matched": 0,
+  "tendrils": 5
  }
 ]
