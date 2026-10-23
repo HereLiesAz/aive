@@ -127,6 +127,10 @@ import com.hereliesaz.geministrator.resources.store_where_prompts_go
 import com.hereliesaz.geministrator.resources.store_with_your_key
 import org.jetbrains.compose.resources.getString
 import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.confirm_remove_llm_action
+import com.hereliesaz.geministrator.resources.confirm_remove_llm_body
+import com.hereliesaz.geministrator.resources.confirm_remove_llm_connected_body
+import com.hereliesaz.geministrator.resources.confirm_remove_llm_title
 import com.hereliesaz.geministrator.resources.confirm_remove_model_title
 import com.hereliesaz.geministrator.resources.confirm_remove_model_body
 import com.hereliesaz.geministrator.resources.confirm_remove_model_action
@@ -718,6 +722,22 @@ private fun StoreLlmRecord(
     val llm = item.llm
     val endpoint = llm?.endpoint
     val keyless = endpoint?.auth != "required-bearer"
+    var confirmRemove by remember(item.id) { mutableStateOf(false) }
+    if (confirmRemove) {
+        AzphaltAlertDialog(
+            title = stringResource(Res.string.confirm_remove_llm_title, item.name),
+            text = stringResource(
+                if (connected) Res.string.confirm_remove_llm_connected_body else Res.string.confirm_remove_llm_body,
+            ),
+            confirmLabel = stringResource(Res.string.confirm_remove_llm_action),
+            onConfirm = {
+                confirmRemove = false
+                onRemove()
+            },
+            onDismissRequest = { confirmRemove = false },
+            dismissLabel = stringResource(Res.string.confirm_cancel),
+        )
+    }
     AzphaltRecord(
         seed = "azphalt-llm-${item.id}",
         eyebrow = listOfNotNull(
@@ -779,7 +799,7 @@ private fun StoreLlmRecord(
                                 label = stringResource(Res.string.common_remove),
                                 seed = "azphalt-llm-remove-${item.id}",
                                 endCap = installed.version,
-                                onClick = onRemove,
+                                onClick = { confirmRemove = true },
                             )
                         }
                     }
