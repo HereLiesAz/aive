@@ -49,8 +49,6 @@ import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.nav_ground
-import com.hereliesaz.geministrator.resources.nav_reroll
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -341,13 +339,6 @@ private fun PillNavigation(
             )
         }
         Spacer(Modifier.weight(1f))
-        AzphaltPill(
-            label = Azphalt.currentGround.name,
-            seed = "ground",
-            endCap = stringResource(Res.string.nav_reroll),
-            onClick = { Azphalt.rerollGround() },
-            modifier = Modifier.fillMaxWidth(0.9f),
-        )
         Text(
             runtimeStatusLabel(runtimeState),
             style = AzphaltType.eyebrow,
@@ -368,7 +359,6 @@ private fun CompactHeader() {
             Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
             Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         }
-        AzphaltPill(stringResource(Res.string.nav_ground), "compact-ground", endCap = Azphalt.currentGround.name, onClick = { Azphalt.rerollGround() })
     }
 }
 

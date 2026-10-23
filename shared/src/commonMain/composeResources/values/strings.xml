@@ -331,8 +331,6 @@
     <string name="memory_workflow_memory_bank">Workflow memory bank</string>
     <string name="memory_workflows_to_it_expansions_are_permanent">workflows to it; expansions are permanent. Raw history can be kept per project; otherwise the global setting applies.</string>
 
-    <string name="nav_ground">Ground</string>
-    <string name="nav_reroll">Reroll</string>
     <string name="nav_runtime">RUNTIME · %1$s</string>
     <string name="nav_runtime_disconnected">RUNTIME · DISCONNECTED</string>
     <string name="nav_runtime_loading">RUNTIME · LOADING</string>
@@ -511,6 +509,9 @@
     <string name="settings_download_and_a_capable_machine">%1$s download and a capable machine. The linked LLM still plans </string>
     <string name="settings_of_roles_currently_have">%1$s of %2$s judgement calls have a released model; </string>
     <string name="settings_ai_providers">AI Providers</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_ground">Ground</string>
+    <string name="settings_ground_explain">The page colour behind everything. Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>
