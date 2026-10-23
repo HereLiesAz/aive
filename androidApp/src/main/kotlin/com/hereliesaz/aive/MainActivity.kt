@@ -135,7 +135,13 @@ class MainActivity : ComponentActivity() {
     private var crashReportNoticeVisible by mutableStateOf(false)
     private val remoteAccessController by lazy { RemoteAccessController(this) }
     private val notificationPermissionRequest =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                android.widget.Toast.makeText(this, R.string.notification_permission_denied, android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+    /** True while the user is in system Accessibility settings enabling the Gemini bridge. */
+    private var awaitingGeminiBridge = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Draw behind system bars on every API level; the shared Scaffold pads content by its insets.
@@ -421,8 +427,13 @@ class MainActivity : ComponentActivity() {
                             installedGeminiReady = InstalledGeminiTextGenerationApi.isAvailable(this)
                             configuringProviderId = null
                             if (!installedGeminiReady) {
+                                awaitingGeminiBridge = true
                                 InstalledGeminiPreference.requestEnable(this)
                             }
+                        },
+                        onOpenAccessibilitySettings = {
+                            awaitingGeminiBridge = true
+                            InstalledGeminiPreference.requestEnable(this)
                         },
                         onUseApiKey = { configuringGeminiApiKey = true },
                         onCancel = {
@@ -514,7 +525,8 @@ class MainActivity : ComponentActivity() {
                             relayUrl = remoteRelayUrl,
                             defaultRelayUrl = RelayProtocol.DEFAULT_RELAY_URL,
                             pairingCode = remoteAccess.pairingCode,
-                            status = remoteAccessProblem ?: if (remoteAccess.enabled) remoteLinkStatus else null,
+                            status = remoteAccessProblem?.let(::remoteProblemSummary) ?: if (remoteAccess.enabled) remoteLinkStatus else null,
+                            statusDetails = remoteAccessProblem,
                             onEnabledChange = { enabled ->
                                 if (enabled) {
                                     remoteAccessProblem = remoteAccessController.turnOn()
@@ -588,7 +600,26 @@ class MainActivity : ComponentActivity() {
         refreshReducedMotion()
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
+        if (awaitingGeminiBridge) {
+            awaitingGeminiBridge = false
+            android.widget.Toast.makeText(
+                this,
+                if (installedGeminiReady) R.string.gemini_setup_bridge_enabled_toast else R.string.gemini_setup_bridge_still_off,
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
     }
+
+    /** Short plain message with a next step for a raw Remote access problem. */
+    private fun remoteProblemSummary(raw: String): String = getString(
+        when (com.hereliesaz.geministrator.classifyError(raw)) {
+            com.hereliesaz.geministrator.ErrorKind.KeyRejected -> R.string.remote_problem_key_rejected
+            com.hereliesaz.geministrator.ErrorKind.RateLimited -> R.string.remote_problem_rate_limited
+            com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
+            com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out
+            com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
+        },
+    )
 
     /** Freezes looping mascot animation when the user set Android's animator scale to 0. */
     private fun refreshReducedMotion() {
@@ -638,7 +669,7 @@ fun HaiveSplashScreen() {
     ) {
         Image(
             painter = painterResource(R.drawable.haive_splash_logo),
-            contentDescription = null,
+            contentDescription = stringResource(R.string.splash_logo_description),
             modifier = Modifier.size(280.dp),
             contentScale = ContentScale.Fit,
         )

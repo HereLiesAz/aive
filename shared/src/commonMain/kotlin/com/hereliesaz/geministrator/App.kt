@@ -47,6 +47,7 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.app_approval_failed
+import com.hereliesaz.geministrator.resources.app_unreachable
 import com.hereliesaz.geministrator.resources.app_clear_failed
 import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
@@ -539,7 +540,12 @@ fun App(
                                 result.fold(
                                     onSuccess = { caps -> getString(Res.string.app_reachable_capabilities, caps.supported.size) },
                                     onFailure = { failure ->
-                                        "Unreachable · ${failure.message?.take(60) ?: "unknown error"}"
+                                        // First line: short summary with a next step. Anything after
+                                        // the newline is the raw text, shown behind a Details toggle.
+                                        val raw = failure.message?.trim().orEmpty()
+                                        val summary = "${getString(Res.string.app_unreachable)} · " +
+                                            friendlyErrorMessageOutsideComposition(raw)
+                                        if (raw.isEmpty()) summary else summary + "\n" + raw.take(300)
                                     },
                                 )
                             } ?: emptyMap()

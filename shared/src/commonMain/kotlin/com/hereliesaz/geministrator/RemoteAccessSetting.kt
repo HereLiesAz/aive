@@ -15,6 +15,8 @@ data class RemoteAccessSetting(
     val pairingCode: String?,
     /** One line on the link ("Connected", "Offline: ..."), or a problem turning it on. */
     val status: String?,
+    /** Raw technical text behind [status], shown under a Details toggle; null when none. */
+    val statusDetails: String? = null,
     val onEnabledChange: (Boolean) -> Unit,
     val onRelayUrlChange: (String) -> Unit,
     /** Replaces the room, tokens and key; IDEaz must be paired again. */

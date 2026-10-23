@@ -11,7 +11,7 @@
     <string name="addons_enable">Enable</string>
     <string name="addons_enabled">Enabled</string>
     <string name="addons_no_verified_package_source_is_connected">No verified package source is connected. Haive will not install unverified manifest text as a package.</string>
-    <string name="addons_no_workflow_add_ons_are_installed">No workflow add-ons are installed.</string>
+    <string name="addons_no_workflow_add_ons_are_installed">No workflow add-ons are installed. Open the Store to find and install one.</string>
     <string name="addons_storage_error">Storage error: %1$s</string>
 
     <string name="app_approval_failed">Approval failed</string>
@@ -125,7 +125,7 @@
 
     <string name="inspector_excluded_by_redaction_policy">, %1$s excluded by redaction policy</string>
     <string name="inspector_any_capable_provider">any capable provider</string>
-    <string name="inspector_approve_nested_gate">Approve nested gate</string>
+    <string name="inspector_approve_nested_gate">Approve this step of the sub-workflow</string>
     <string name="inspector_approve_plan">Approve plan</string>
     <string name="inspector_approve_task">Approve task</string>
     <string name="inspector_artifact">ARTIFACT %1$s · %2$s</string>
@@ -135,8 +135,8 @@
     <string name="inspector_context_artifacts_sent">\nContext artifacts: %1$s sent</string>
     <string name="inspector_default_runner">default runner</string>
     <string name="inspector_executor">EXECUTOR</string>
-    <string name="inspector_executor_ref">EXECUTOR REF</string>
-    <string name="inspector_external_run">EXTERNAL RUN</string>
+    <string name="inspector_executor_ref">RUNS WITH</string>
+    <string name="inspector_external_run">EXTERNAL RUN ID</string>
     <string name="inspector_github_actions">GitHub Actions</string>
     <string name="inspector_inline_evidence">inline evidence</string>
     <string name="inspector_inspector">INSPECTOR</string>
@@ -150,7 +150,7 @@
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
     <string name="inspector_provider">PROVIDER</string>
-    <string name="inspector_provider_run">PROVIDER RUN</string>
+    <string name="inspector_provider_run">PROVIDER'S RUN ID</string>
     <string name="inspector_provider_target">PROVIDER TARGET</string>
     <string name="inspector_reject_plan">Reject plan</string>
     <string name="inspector_remote">Remote · </string>
@@ -337,7 +337,7 @@
 
     <string name="overview_has_no_persisted_workflow_run">%1$s has no persisted workflow run. Define an objective below to start one.</string>
     <string name="overview_a_workflow_gate_is_waiting_for">A workflow gate is waiting for human input.</string>
-    <string name="overview_aive_automatically_reopens_the_last_saved">Aive automatically reopens the last saved project it knows about.</string>
+    <string name="overview_aive_automatically_reopens_the_last_saved">The Aive automatically reopens the last saved project it knows about.</string>
     <string name="overview_blocked">Blocked</string>
     <string name="overview_branch">Branch</string>
     <string name="overview_branch_1">Branch: %1$s</string>
@@ -362,7 +362,7 @@
     <string name="overview_open_a_different_saved_project">Open a different saved project…</string>
     <string name="overview_or_create_a_new_project">OR CREATE A NEW PROJECT</string>
     <string name="overview_owner_attention">Owner attention</string>
-    <string name="overview_paste_the_repository_url_or_shorthand">Paste the repository URL or shorthand. Connect this repository service from Repositories to enable search and autocomplete. Leave this blank only for a repoless orchestration.</string>
+    <string name="overview_paste_the_repository_url_or_shorthand">Paste the repository URL or owner/repo shorthand. Connect this repository service from Repositories to enable search and autocomplete. Leave this blank to run without a repository.</string>
     <string name="overview_project">PROJECT</string>
     <string name="overview_project_load_failed">Project load failed</string>
     <string name="overview_project_name">Project name</string>
@@ -396,7 +396,7 @@
     <string name="provider_credential_leave_blank_to_use_the_free">Leave blank to use the free tier</string>
     <string name="provider_credential_save">Save</string>
 
-    <string name="repositories_connect_the_repository_hosts_aive_may">Connect the repository hosts Aive may operate while workflows run. Project repository links stay separate from AI-provider credentials and role routing.</string>
+    <string name="repositories_connect_the_repository_hosts_aive_may">Connect the repository hosts The Aive may operate while workflows run. Project repository links stay separate from AI-provider credentials and role routing.</string>
     <string name="repositories_credential_configured">Credential configured</string>
     <string name="repositories_desktop_repository_service">Desktop repository service</string>
     <string name="repositories_disconnect">Disconnect</string>
@@ -471,8 +471,8 @@
     <string name="runs_marketplace_security">Marketplace · Security</string>
     <string name="runs_needs_you">Needs you</string>
     <string name="runs_no_pending_decisions">No pending decisions.</string>
-    <string name="runs_no_projects_yet">No projects yet.</string>
-    <string name="runs_no_runs">No runs.</string>
+    <string name="runs_no_projects_yet">No projects yet. Open Overview and start a run to create one.</string>
+    <string name="runs_no_runs">No runs yet. Open Overview, enter an objective and start a run.</string>
     <string name="runs_plan_approval">Plan Approval</string>
     <string name="runs_reject_reassigns_to"> · Reject reassigns to %1$s</string>
     <string name="runs_reject_stops_the_workflow"> · Reject stops the workflow</string>
@@ -512,8 +512,8 @@
     <string name="settings_choose_ive_file_from_another_location">Choose .ive file from another location…</string>
     <string name="settings_compute_pool">Compute Pool</string>
     <string name="settings_compute_pool_id">Compute pool ID</string>
-    <string name="settings_connect_as_many_providers_as_you">Connect as many providers as you have access to. Every swarm role can be routed independently from the Swarm screen.</string>
-    <string name="settings_connect_this_device_to_the_same">Connect this device to the same Aive compute pool as your other phones and desktops. </string>
+    <string name="settings_connect_as_many_providers_as_you">Connect any AI provider you have access to. If you have none yet, start with a free one below. A swarm is the team of AI roles The Aive runs for you; each role can use a different provider from the Swarm screen.</string>
+    <string name="settings_connect_this_device_to_the_same">Connect this device to the same compute pool of The Aive as your other phones and desktops. </string>
     <string name="settings_crash_reports">Crash Reports</string>
     <string name="settings_credential_configured">Credential configured</string>
     <string name="settings_data">Data</string>
@@ -574,7 +574,7 @@
     <string name="settings_privacy">Privacy</string>
     <string name="settings_project_file">Project file</string>
     <string name="settings_project_files">Project files</string>
-    <string name="settings_project_files_use_the_ive_extension">Project files use the .ive extension. The detected list includes Aive's project folder and files you previously selected elsewhere.</string>
+    <string name="settings_project_files_use_the_ive_extension">Project files use the .ive extension. The detected list includes The Aive's project folder and files you previously selected elsewhere.</string>
     <string name="settings_project_load_failed">Project load failed</string>
     <string name="settings_project_save_failed">Project save failed</string>
     <string name="settings_projects">Projects</string>
@@ -584,7 +584,7 @@
     <string name="settings_refresh_detected_project_files">Refresh detected project files</string>
     <string name="settings_refresh_health">Refresh health</string>
     <string name="settings_remote_access">Remote Access</string>
-    <string name="settings_remote_access_description">Let your own IDEaz on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
+    <string name="settings_remote_access_description">Let your own IDEaz (the companion Android coding app from the same developer) on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
     <string name="settings_remote_access_on">Remote access: ON</string>
     <string name="settings_remote_access_off">Remote access: OFF</string>
     <string name="settings_remote_access_relay_url">Relay URL</string>
@@ -625,7 +625,7 @@
     <string name="store_a_repository_revocation_applies_to_this">A repository revocation applies to this model package/version. Installation is blocked.</string>
     <string name="store_a_repository_revocation_applies_to_this_2">A repository revocation applies to this package/version. Installation is blocked until a non-revoked version is selected.</string>
     <string name="store_a_repository_revocation_applies_to_this_3">A repository revocation applies to this package/version. Installation is blocked.</string>
-    <string name="store_aive_calls_this_model_directly_the">Aive calls this model directly. The package's GitHub setup script is not run, and no GitHub access is needed.</string>
+    <string name="store_aive_calls_this_model_directly_the">The Aive calls this model directly. The package's GitHub setup script is not run, and no GitHub access is needed.</string>
     <string name="store_approve_publisher_key_change_for_this">Approve publisher-key change for this package id</string>
     <string name="store_azphalt">Azphalt %1$s</string>
     <string name="store_azphalt_package_import_is_unavailable_on">Azphalt package import is unavailable on this host.</string>
@@ -710,7 +710,7 @@
     <string name="swarm_add_to_swarm">Add to swarm</string>
     <string name="swarm_agent">Agent / %1$s</string>
     <string name="swarm_agent_provider">Agent / provider</string>
-    <string name="swarm_aive_context_input">Aive context input</string>
+    <string name="swarm_aive_context_input">The Aive context input</string>
     <string name="swarm_allow_script_sql_mutations">Allow script SQL mutations</string>
     <string name="swarm_allow_script_writes">Allow script writes</string>
     <string name="swarm_app_spreadsheet">App spreadsheet</string>
@@ -787,7 +787,7 @@
     <string name="swarm_public_google_sheet">Public Google Sheet</string>
     <string name="swarm_python">Python</string>
     <string name="swarm_python_github_actions">Python / GitHub Actions / %1$s</string>
-    <string name="swarm_python_runs_through_a_github_actions">Python runs through a GitHub Actions runner, using the same Aive task envelope as other execution sources.</string>
+    <string name="swarm_python_runs_through_a_github_actions">Python runs through a GitHub Actions runner, using the same task envelope as other execution sources.</string>
     <string name="swarm_python_unsupported_local_runner">Python / unsupported local runner</string>
     <string name="swarm_read_only">Read only</string>
     <string name="swarm_read_only_database_source">Read-only database source</string>
@@ -799,7 +799,7 @@
     <string name="swarm_required_capabilities">Required capabilities</string>
     <string name="swarm_requires">\nRequires: </string>
     <string name="swarm_reset">Reset</string>
-    <string name="swarm_reset_to_aive_defaults">Reset to Aive defaults</string>
+    <string name="swarm_reset_to_aive_defaults">Reset to The Aive defaults</string>
     <string name="swarm_restore_the_default_swarm">Restore the default swarm?</string>
     <string name="swarm_role_arrangement">Role arrangement</string>
     <string name="swarm_role_id_slug">Role ID (slug)</string>
@@ -828,9 +828,9 @@
     <string name="swarm_the_role_runs_as_an_ai">The role runs as an AI agent. Choose a provider or leave it on Auto.</string>
     <string name="swarm_the_runner_receives_aive_context_aive">The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.</string>
     <string name="swarm_the_workflow_receives_the_role_task">The workflow receives the role/task payload as JSON in the configured context input.</string>
-    <string name="swarm_these_are_aive_s_semantic_orchestration">These are Aive's semantic orchestration roles. Each role can run through an AI provider, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.</string>
+    <string name="swarm_these_are_aive_s_semantic_orchestration">These are The Aive's semantic orchestration roles. Each role can run through an AI provider, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.</string>
     <string name="swarm_this_id_is_reserved_by_the">This ID is reserved by The Aive.</string>
-    <string name="swarm_this_restores_aive_s_default_role">This restores Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.</string>
+    <string name="swarm_this_restores_aive_s_default_role">This restores The Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical workflow compatibility.</string>
     <string name="swarm_unnamed_surface">Unnamed surface</string>
     <string name="swarm_unsaved">Unsaved</string>
     <string name="swarm_uses_project_default_branch">Uses project default branch</string>

@@ -38,6 +38,14 @@ internal fun AndroidUpdatePrompt(
             dismissLabel = stringResource(R.string.update_later),
         )
 
+        is AndroidUpdateState.Error -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_error_title),
+            text = stringResource(R.string.update_error_body),
+            confirmLabel = stringResource(R.string.update_dismiss),
+            onConfirm = onDismiss,
+            onDismissRequest = onDismiss,
+        )
+
         else -> Unit
     }
 }

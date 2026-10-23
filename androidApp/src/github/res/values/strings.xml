@@ -4,8 +4,9 @@
 
     <!-- Installed Gemini bridge disclosure (InstalledGeminiBridgeDisclosure) -->
     <string name="gemini_bridge_disclosure_title">Before you enable the Gemini bridge</string>
-    <string name="gemini_bridge_disclosure_body">The bridge is an Android accessibility service. While The Aive hands a task to the installed Gemini app, it types the task into Gemini and reads Gemini\'s reply from the screen. It only watches the Gemini app, and only while a handoff is running; it does not read other apps. The task text goes to Google through your signed-in Gemini app under Google\'s terms.</string>
+    <string name="gemini_bridge_disclosure_body">The bridge is an Android accessibility service. While The Aive hands a task to the installed Gemini app, it types the task into Gemini, taps Gemini\'s Copy button, reads the clipboard to get the reply, and reads the reply from the screen. If copying fails it overwrites the clipboard with the prompt as a fallback. Android sends the service events from the Gemini app and from the whole Google app (com.google.android.googlequicksearchbox, which includes Google Search), because Gemini can run inside either; the service ignores every other app, acts only on the one Gemini screen it was handed, and only while a handoff is running. The task text goes to Google through your signed-in Gemini app under Google\'s terms.</string>
     <string name="gemini_bridge_disclosure_settings">Android will open Accessibility settings, where you turn on \"The Aive · Gemini bridge\". You can turn it off there, or disconnect Gemini in The Aive, at any time. This bridge exists only in GitHub releases; Google Play builds use the Gemini API instead.</string>
     <string name="gemini_bridge_disclosure_agree">I understand, enable the bridge</string>
     <string name="gemini_bridge_disclosure_back">Back</string>
+    <string name="installed_gemini_service_label">The Aive · Gemini bridge</string>
 </resources>

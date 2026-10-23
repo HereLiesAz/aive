@@ -1,21 +1,16 @@
 package com.hereliesaz.aive
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.AzphaltHeading
+import com.hereliesaz.geministrator.AzphaltParagraph
+import com.hereliesaz.geministrator.AzphaltPrimaryButton
+import com.hereliesaz.geministrator.AzphaltScreen
+import com.hereliesaz.geministrator.AzphaltSecondaryButton
 
 @Composable
 internal fun AndroidGeminiProviderSetup(
@@ -23,6 +18,7 @@ internal fun AndroidGeminiProviderSetup(
     installedAppDetected: Boolean,
     accessibilityEnabled: Boolean,
     onUseInstalledGemini: () -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
     onUseApiKey: () -> Unit,
     onCancel: () -> Unit,
 ) {
@@ -38,12 +34,9 @@ internal fun AndroidGeminiProviderSetup(
         )
         return
     }
-    Column(
-        modifier = Modifier.fillMaxSize().padding(28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(R.string.gemini_setup_title))
-        Text(
+    AzphaltScreen {
+        AzphaltHeading(stringResource(R.string.gemini_setup_title))
+        AzphaltParagraph(
             when {
                 !installedBridgeSupported ->
                     stringResource(R.string.gemini_setup_bridge_unsupported)
@@ -56,24 +49,18 @@ internal fun AndroidGeminiProviderSetup(
             },
         )
         if (installedBridgeSupported && installedAppDetected) {
-            Button(
-                onClick = { disclosing = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (accessibilityEnabled) stringResource(R.string.gemini_setup_use_installed) else stringResource(R.string.gemini_setup_enable_bridge))
+            AzphaltPrimaryButton(
+                if (accessibilityEnabled) stringResource(R.string.gemini_setup_use_installed) else stringResource(R.string.gemini_setup_enable_bridge),
+            ) { disclosing = true }
+            if (!accessibilityEnabled) {
+                AzphaltSecondaryButton(
+                    stringResource(R.string.gemini_setup_open_accessibility),
+                    onOpenAccessibilitySettings,
+                )
             }
         }
-        Button(
-            onClick = onUseApiKey,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.gemini_setup_use_api_key))
-        }
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.common_cancel))
-        }
+        AzphaltParagraph(stringResource(R.string.gemini_setup_api_key_hint))
+        AzphaltSecondaryButton(stringResource(R.string.gemini_setup_use_api_key), onUseApiKey)
+        AzphaltSecondaryButton(stringResource(R.string.common_cancel), onCancel)
     }
 }
