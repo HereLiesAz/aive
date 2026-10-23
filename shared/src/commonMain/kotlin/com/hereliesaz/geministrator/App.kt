@@ -297,11 +297,13 @@ fun App(
     GeministratorTheme {
         var destinationName by remember {
             mutableStateOf(
-                startupControlRoomDestination(
-                    hasConfiguredProvider = providers.isNotEmpty(),
-                ).name,
+                ControlRoomSession.destinationName
+                    ?: startupControlRoomDestination(
+                        hasConfiguredProvider = providers.isNotEmpty(),
+                    ).name,
             )
         }
+        LaunchedEffect(destinationName) { ControlRoomSession.destinationName = destinationName }
         val destinations = ControlRoomDestination.available(distributedComputeAvailable)
         val destination = destinations
             .firstOrNull { it.name == destinationName }
@@ -706,6 +708,17 @@ private fun GeministratorTheme(content: @Composable () -> Unit) {
     )
 }
 
+
+/**
+ * Process-lifetime memory of the visible control-room destination. A platform shell can swap [App]
+ * out for a full-screen credential form (Android: connecting a provider) and then bring it back,
+ * which rebuilds [App]'s own state; restoring from here keeps the user on the screen they left
+ * (Settings) instead of bouncing to the startup destination. Deliberately not persisted, so a
+ * fresh launch still opens on [startupControlRoomDestination].
+ */
+internal object ControlRoomSession {
+    var destinationName: String? = null
+}
 
 internal fun startupControlRoomDestination(
     hasConfiguredProvider: Boolean,
