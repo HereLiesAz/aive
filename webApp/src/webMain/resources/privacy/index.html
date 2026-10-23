@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0D1026" />
+    <meta name="theme-color" content="#1E1A17" />
     <title>Privacy Policy — The Aive</title>
     <style>
         :root {
-            --ink: #0D1026;
-            --white: #F4F4F2;
-            --yellow: #F5C842;
-            --dim: #7A7E9A;
-            --surface: #161B38;
+            /* Azphalt tokens (AzphaltUi.kt): Ink, White, Yellow. Dim and surface are derived from Ink;
+               --dim is at least 4.5:1 on both --ink and --surface. */
+            --ink: #1E1A17;
+            --white: #FFFFFF;
+            --yellow: #F0D42A;
+            --dim: #B5AEA6;
+            --surface: #2A2420;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -56,7 +58,7 @@
             margin-bottom: 40px;
         }
         h2 {
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.12em;
             text-transform: uppercase;
@@ -90,13 +92,18 @@
             border-radius: 0 4px 4px 0;
         }
         .summary-block ul { margin-bottom: 0; }
+        a:focus-visible, :focus-visible {
+            outline: 3px solid var(--yellow);
+            outline-offset: 3px;
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
-<div class="page">
-    <div class="brand">
+<main class="page">
+    <nav class="brand" aria-label="Site">
         <a href="../">← The Aive</a>
-    </div>
+    </nav>
 
     <h1>Privacy Policy</h1>
     <p class="effective">Effective date: October 22, 2026 &nbsp;·&nbsp; App ID: <code>com.hereliesaz.aive</code></p>
@@ -245,6 +252,6 @@
 <p>Material changes to The Aive's data handling should be accompanied by an update to this document and its effective date.</p>
 <h2 id="contact">Contact</h2>
 <p>The Aive is a source-available project (PolyForm Noncommercial 1.0.0) maintained by <strong>HereLiesAz</strong>. Privacy questions and reports can be raised through the repository at <code>HereLiesAz/aive</code> on GitHub.</p>
-</div>
+</main>
 </body>
 </html>

@@ -155,7 +155,7 @@ private fun MascotNodeTerrarium(
     )
 
     val clock = rememberInfiniteTransition(label = "node-mascot-clock")
-    val motionPhase by clock.animateFloat(
+    val animatedMotionPhase by clock.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -164,7 +164,7 @@ private fun MascotNodeTerrarium(
         ),
         label = "node-mascot-motion",
     )
-    val linkPulse by clock.animateFloat(
+    val animatedLinkPulse by clock.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
@@ -173,6 +173,10 @@ private fun MascotNodeTerrarium(
         ),
         label = "node-mascot-link-pulse",
     )
+    // Reduced motion (system animator scale 0 / prefers-reduced-motion) freezes both clocks.
+    val reduceMotion = AzphaltMotion.reduceMotion
+    fun motionPhase(): Float = if (reduceMotion) 0f else animatedMotionPhase
+    fun linkPulse(): Float = if (reduceMotion) 0.5f else animatedLinkPulse
 
     BoxWithConstraints(modifier = modifier) {
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
@@ -210,7 +214,7 @@ private fun MascotNodeTerrarium(
                     ?: compiled.newBuffer().also { rigBuffers[subject.node.id] = it }
                 compiled.evaluate(
                     compiled.stateIndex(subject.node.state.name),
-                    creatureRigPhase(motionPhase, subject.identitySeed),
+                    creatureRigPhase(motionPhase(), subject.identitySeed),
                     buffer,
                 )
                 rigPoses[subject.node.id] = loaded to buffer
@@ -293,7 +297,7 @@ private fun MascotNodeTerrarium(
                     cap = StrokeCap.Round,
                 )
                 if (active) {
-                    val pulse = start + (end - start) * linkPulse
+                    val pulse = start + (end - start) * linkPulse()
                     drawCircle(
                         color = onGround.copy(alpha = 0.72f),
                         radius = 3.dp.toPx(),
@@ -320,7 +324,7 @@ private fun MascotNodeTerrarium(
                 toRoleLabel = toSubject.node.label,
                 start = start,
                 end = end,
-                pulse = linkPulse,
+                pulse = linkPulse(),
                 active = active,
                 blocked = blocked,
                 zoom = zoom,
@@ -422,7 +426,7 @@ private fun MascotNodeTerrarium(
                     roleLabel = node.label,
                     hueSeed = subject.identitySeed,
                     state = node.state,
-                    motionPhase = { motionPhase },
+                    motionPhase = { motionPhase() },
                     modifier = Modifier.fillMaxSize(),
                 )
                 H2g2SwarmAdornmentLayer(

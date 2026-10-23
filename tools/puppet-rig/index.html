@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0b">
+  <meta name="theme-color" content="#1E1A17">
   <title>aive puppet rig</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
@@ -13,13 +13,13 @@
 <body>
   <header class="bar">
     <strong class="brand">puppet rig</strong>
-    <nav class="tabs" role="tablist">
-      <button data-mode="cut" class="on">Cut</button>
-      <button data-mode="rig">Rig</button>
-      <button data-mode="animate">Animate</button>
+    <nav class="tabs" aria-label="Editor mode">
+      <button data-mode="cut" class="on" aria-pressed="true">Cut</button>
+      <button data-mode="rig" aria-pressed="false">Rig</button>
+      <button data-mode="animate" aria-pressed="false">Animate</button>
     </nav>
     <span class="grow"></span>
-    <label class="btn">Import<input id="import" type="file" accept="image/png,application/json,.json" multiple hidden></label>
+    <label class="btn file-btn">Import<input id="import" class="sr-only" type="file" accept="image/png,application/json,.json" multiple></label>
     <button id="export" class="btn">Export</button>
     <button id="new" class="btn ghost" title="Start a new rig">New</button>
   </header>
@@ -27,7 +27,7 @@
   <main class="layout">
     <section class="stage-wrap">
       <div class="stage-tools" id="stage-tools"></div>
-      <canvas id="stage"></canvas>
+      <canvas id="stage" role="img" aria-label="Rig editing canvas. Pointer-driven; use the panel on the right for numeric edits."></canvas>
       <div class="transport" id="transport" hidden>
         <select id="state" aria-label="Workflow state"></select>
         <button id="play" class="btn">Pause</button>

@@ -29,13 +29,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
+import com.hereliesaz.geministrator.AzphaltMotion
+import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
@@ -173,6 +175,7 @@ class MainActivity : ComponentActivity() {
         azphaltHost.handleIntent(intent)
         removeRetiredOnDevicePlannerFiles()
 
+        refreshReducedMotion()
         setContent {
             var startupReady by remember { mutableStateOf(false) }
 
@@ -582,8 +585,20 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AiveRemoteBridge.pruneExpired()
+        refreshReducedMotion()
         installedGeminiReady = InstalledGeminiPreference.isEnabled(this) &&
             InstalledGeminiTextGenerationApi.isAvailable(this)
+    }
+
+    /** Freezes looping mascot animation when the user set Android's animator scale to 0. */
+    private fun refreshReducedMotion() {
+        val scale = runCatching {
+            android.provider.Settings.Global.getFloat(
+                contentResolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            )
+        }.getOrNull()
+        AzphaltMotion.reduceMotion = shouldReduceMotion(animatorDurationScale = scale, systemPrefersReduced = false)
     }
 
     /**
@@ -618,7 +633,7 @@ fun HaiveSplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0D1026)),
+            .background(colorResource(R.color.haive_icon_background)), // Azphalt Ink (colors.xml)
         contentAlignment = Alignment.Center,
     ) {
         Image(

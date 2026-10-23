@@ -106,12 +106,13 @@ internal val creatureRigDemoRelationships = listOf(
 @Composable
 internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier = Modifier) {
     val clock = rememberInfiniteTransition(label = "creature-rig-gallery")
-    val phase by clock.animateFloat(
+    val animatedPhase by clock.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(2_400, easing = LinearEasing), RepeatMode.Restart),
         label = "creature-rig-gallery-phase",
     )
+    val reduceMotion = AzphaltMotion.reduceMotion
     val entries = creatureRigGalleryEntries
     val states = H2g2WorkflowState.entries
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,7 +126,7 @@ internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier
                                 roleLabel = label,
                                 hueSeed = label,
                                 state = state,
-                                motionPhase = { phase },
+                                motionPhase = { if (reduceMotion) 0f else animatedPhase },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
