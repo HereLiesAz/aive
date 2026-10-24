@@ -1,0 +1,2993 @@
+{
+ "creatures": [
+  {
+   "id": "067_content_strategist",
+   "name": "Content Strategist",
+   "genes": {
+    "Pigment": "green",
+    "Accent": "none",
+    "Spectrum": "Monotone",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 2,
+   "rarity": "Mythic",
+   "breeding": "Near impossible",
+   "kin": [
+    {
+     "id": "013_recovery_engineer",
+     "name": "Recovery Engineer",
+     "similarity": 64
+    },
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 62
+    },
+    {
+     "id": "041_resource_manager_sheet_3_variant",
+     "name": "Resource Manager (3)",
+     "similarity": 54
+    }
+   ],
+   "order": 0,
+   "genus": "Viridia"
+  },
+  {
+   "id": "071_legal_counsel",
+   "name": "Legal Counsel",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "yellow",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Glass",
+    "Arbor": "Branching"
+   },
+   "family": 1,
+   "rarity": "Rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "035_flow_director",
+     "name": "Flow Director",
+     "similarity": 87
+    },
+    {
+     "id": "039_optimizer_sheet_3_variant",
+     "name": "Optimizer (3)",
+     "similarity": 86
+    },
+    {
+     "id": "055_sustainability_advocate",
+     "name": "Sustainability Advocate",
+     "similarity": 84
+    }
+   ],
+   "order": 1,
+   "genus": "Succina"
+  },
+  {
+   "id": "039_optimizer_sheet_3_variant",
+   "name": "Optimizer (3)",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "yellow",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Glass",
+    "Arbor": "Branching"
+   },
+   "family": 1,
+   "rarity": "Very rare",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "055_sustainability_advocate",
+     "name": "Sustainability Advocate",
+     "similarity": 90
+    },
+    {
+     "id": "035_flow_director",
+     "name": "Flow Director",
+     "similarity": 89
+    },
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 86
+    }
+   ],
+   "order": 2,
+   "genus": "Succina"
+  },
+  {
+   "id": "035_flow_director",
+   "name": "Flow Director",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "none",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 1,
+   "rarity": "Rare",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "055_sustainability_advocate",
+     "name": "Sustainability Advocate",
+     "similarity": 95
+    },
+    {
+     "id": "039_optimizer_sheet_3_variant",
+     "name": "Optimizer (3)",
+     "similarity": 89
+    },
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 87
+    }
+   ],
+   "order": 3,
+   "genus": "Succina"
+  },
+  {
+   "id": "055_sustainability_advocate",
+   "name": "Sustainability Advocate",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "yellow",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 1,
+   "rarity": "Very rare",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "035_flow_director",
+     "name": "Flow Director",
+     "similarity": 95
+    },
+    {
+     "id": "039_optimizer_sheet_3_variant",
+     "name": "Optimizer (3)",
+     "similarity": 90
+    },
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 84
+    }
+   ],
+   "order": 4,
+   "genus": "Succina"
+  },
+  {
+   "id": "027_optimizer_sheet_2_variant",
+   "name": "Optimizer (2)",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "orange",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 1,
+   "rarity": "Common",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 78
+    },
+    {
+     "id": "006_epa_representative",
+     "name": "Epa Representative",
+     "similarity": 76
+    },
+    {
+     "id": "015_hall_monitor",
+     "name": "Hall Monitor",
+     "similarity": 75
+    }
+   ],
+   "order": 5,
+   "genus": "Succina"
+  },
+  {
+   "id": "006_epa_representative",
+   "name": "Epa Representative",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "green",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 1,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "015_hall_monitor",
+     "name": "Hall Monitor",
+     "similarity": 89
+    },
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 80
+    },
+    {
+     "id": "027_optimizer_sheet_2_variant",
+     "name": "Optimizer (2)",
+     "similarity": 76
+    }
+   ],
+   "order": 6,
+   "genus": "Succina"
+  },
+  {
+   "id": "015_hall_monitor",
+   "name": "Hall Monitor",
+   "genes": {
+    "Pigment": "amber",
+    "Accent": "lime",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 1,
+   "rarity": "Rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "006_epa_representative",
+     "name": "Epa Representative",
+     "similarity": 89
+    },
+    {
+     "id": "071_legal_counsel",
+     "name": "Legal Counsel",
+     "similarity": 82
+    },
+    {
+     "id": "027_optimizer_sheet_2_variant",
+     "name": "Optimizer (2)",
+     "similarity": 75
+    }
+   ],
+   "order": 7,
+   "genus": "Succina"
+  },
+  {
+   "id": "019_translator_sheet_1_variant",
+   "name": "Translator (1)",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "034_decision_helper",
+     "name": "Decision Helper",
+     "similarity": 78
+    },
+    {
+     "id": "012_crash_test_dummy",
+     "name": "Crash Test Dummy",
+     "similarity": 76
+    },
+    {
+     "id": "026_scheduler_sheet_2_variant",
+     "name": "Scheduler (2)",
+     "similarity": 72
+    }
+   ],
+   "order": 8,
+   "genus": "Favilla"
+  },
+  {
+   "id": "012_crash_test_dummy",
+   "name": "Crash Test Dummy",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "040_scheduler_sheet_3_variant",
+     "name": "Scheduler (3)",
+     "similarity": 89
+    },
+    {
+     "id": "068_support_agent",
+     "name": "Support Agent",
+     "similarity": 88
+    },
+    {
+     "id": "026_scheduler_sheet_2_variant",
+     "name": "Scheduler (2)",
+     "similarity": 86
+    }
+   ],
+   "order": 9,
+   "genus": "Favilla"
+  },
+  {
+   "id": "040_scheduler_sheet_3_variant",
+   "name": "Scheduler (3)",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "068_support_agent",
+     "name": "Support Agent",
+     "similarity": 91
+    },
+    {
+     "id": "012_crash_test_dummy",
+     "name": "Crash Test Dummy",
+     "similarity": 89
+    },
+    {
+     "id": "026_scheduler_sheet_2_variant",
+     "name": "Scheduler (2)",
+     "similarity": 85
+    }
+   ],
+   "order": 10,
+   "genus": "Favilla"
+  },
+  {
+   "id": "068_support_agent",
+   "name": "Support Agent",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "040_scheduler_sheet_3_variant",
+     "name": "Scheduler (3)",
+     "similarity": 91
+    },
+    {
+     "id": "012_crash_test_dummy",
+     "name": "Crash Test Dummy",
+     "similarity": 88
+    },
+    {
+     "id": "029_documenter",
+     "name": "Documenter",
+     "similarity": 87
+    }
+   ],
+   "order": 11,
+   "genus": "Favilla"
+  },
+  {
+   "id": "034_decision_helper",
+   "name": "Decision Helper",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "026_scheduler_sheet_2_variant",
+     "name": "Scheduler (2)",
+     "similarity": 89
+    },
+    {
+     "id": "029_documenter",
+     "name": "Documenter",
+     "similarity": 86
+    },
+    {
+     "id": "012_crash_test_dummy",
+     "name": "Crash Test Dummy",
+     "similarity": 83
+    }
+   ],
+   "order": 12,
+   "genus": "Favilla"
+  },
+  {
+   "id": "026_scheduler_sheet_2_variant",
+   "name": "Scheduler (2)",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "029_documenter",
+     "name": "Documenter",
+     "similarity": 90
+    },
+    {
+     "id": "034_decision_helper",
+     "name": "Decision Helper",
+     "similarity": 89
+    },
+    {
+     "id": "068_support_agent",
+     "name": "Support Agent",
+     "similarity": 87
+    }
+   ],
+   "order": 13,
+   "genus": "Favilla"
+  },
+  {
+   "id": "029_documenter",
+   "name": "Documenter",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "026_scheduler_sheet_2_variant",
+     "name": "Scheduler (2)",
+     "similarity": 90
+    },
+    {
+     "id": "068_support_agent",
+     "name": "Support Agent",
+     "similarity": 87
+    },
+    {
+     "id": "034_decision_helper",
+     "name": "Decision Helper",
+     "similarity": 86
+    }
+   ],
+   "order": 14,
+   "genus": "Favilla"
+  },
+  {
+   "id": "053_strategy_scout",
+   "name": "Strategy Scout",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "blue",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "059_site_reliability_engineer",
+     "name": "Site Reliability Engineer",
+     "similarity": 82
+    },
+    {
+     "id": "048_deployment_pilot",
+     "name": "Deployment Pilot",
+     "similarity": 80
+    },
+    {
+     "id": "029_documenter",
+     "name": "Documenter",
+     "similarity": 79
+    }
+   ],
+   "order": 15,
+   "genus": "Favilla"
+  },
+  {
+   "id": "059_site_reliability_engineer",
+   "name": "Site Reliability Engineer",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Duotone",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "057_database_administrator",
+     "name": "Database Administrator",
+     "similarity": 89
+    },
+    {
+     "id": "016_data_miner_sheet_1_variant",
+     "name": "Data Miner (1)",
+     "similarity": 87
+    },
+    {
+     "id": "029_documenter",
+     "name": "Documenter",
+     "similarity": 85
+    }
+   ],
+   "order": 16,
+   "genus": "Favilla"
+  },
+  {
+   "id": "016_data_miner_sheet_1_variant",
+   "name": "Data Miner (1)",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "057_database_administrator",
+     "name": "Database Administrator",
+     "similarity": 90
+    },
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 88
+    },
+    {
+     "id": "059_site_reliability_engineer",
+     "name": "Site Reliability Engineer",
+     "similarity": 87
+    }
+   ],
+   "order": 17,
+   "genus": "Favilla"
+  },
+  {
+   "id": "057_database_administrator",
+   "name": "Database Administrator",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "orange",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Sparse"
+   },
+   "family": 3,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "016_data_miner_sheet_1_variant",
+     "name": "Data Miner (1)",
+     "similarity": 90
+    },
+    {
+     "id": "059_site_reliability_engineer",
+     "name": "Site Reliability Engineer",
+     "similarity": 89
+    },
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 86
+    }
+   ],
+   "order": 18,
+   "genus": "Favilla"
+  },
+  {
+   "id": "001_orchestrator",
+   "name": "Orchestrator",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 4,
+   "rarity": "Uncommon",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "054_system_maintainer",
+     "name": "System Maintainer",
+     "similarity": 88
+    },
+    {
+     "id": "034_decision_helper",
+     "name": "Decision Helper",
+     "similarity": 79
+    },
+    {
+     "id": "002_ux_designer",
+     "name": "Ux Designer",
+     "similarity": 73
+    }
+   ],
+   "order": 19,
+   "genus": "Coronata"
+  },
+  {
+   "id": "054_system_maintainer",
+   "name": "System Maintainer",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 4,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "001_orchestrator",
+     "name": "Orchestrator",
+     "similarity": 88
+    },
+    {
+     "id": "034_decision_helper",
+     "name": "Decision Helper",
+     "similarity": 79
+    },
+    {
+     "id": "004_implementation_engineer",
+     "name": "Implementation Engineer",
+     "similarity": 76
+    }
+   ],
+   "order": 20,
+   "genus": "Coronata"
+  },
+  {
+   "id": "043_integrator",
+   "name": "Integrator",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "062_threat_modeler",
+     "name": "Threat Modeler",
+     "similarity": 97
+    },
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 88
+    },
+    {
+     "id": "048_deployment_pilot",
+     "name": "Deployment Pilot",
+     "similarity": 88
+    }
+   ],
+   "order": 21,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "062_threat_modeler",
+   "name": "Threat Modeler",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "043_integrator",
+     "name": "Integrator",
+     "similarity": 97
+    },
+    {
+     "id": "048_deployment_pilot",
+     "name": "Deployment Pilot",
+     "similarity": 90
+    },
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 89
+    }
+   ],
+   "order": 22,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "066_business_analyst",
+   "name": "Business Analyst",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Speckled",
+    "Skin": "Glass",
+    "Arbor": "Branching"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 92
+    },
+    {
+     "id": "048_deployment_pilot",
+     "name": "Deployment Pilot",
+     "similarity": 90
+    },
+    {
+     "id": "043_integrator",
+     "name": "Integrator",
+     "similarity": 88
+    }
+   ],
+   "order": 23,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "044_security_analyst",
+   "name": "Security Analyst",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "048_deployment_pilot",
+     "name": "Deployment Pilot",
+     "similarity": 94
+    },
+    {
+     "id": "066_business_analyst",
+     "name": "Business Analyst",
+     "similarity": 92
+    },
+    {
+     "id": "062_threat_modeler",
+     "name": "Threat Modeler",
+     "similarity": 89
+    }
+   ],
+   "order": 24,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "048_deployment_pilot",
+   "name": "Deployment Pilot",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "044_security_analyst",
+     "name": "Security Analyst",
+     "similarity": 94
+    },
+    {
+     "id": "066_business_analyst",
+     "name": "Business Analyst",
+     "similarity": 90
+    },
+    {
+     "id": "062_threat_modeler",
+     "name": "Threat Modeler",
+     "similarity": 90
+    }
+   ],
+   "order": 25,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "010_antagonist",
+   "name": "Antagonist",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 89
+    },
+    {
+     "id": "004_implementation_engineer",
+     "name": "Implementation Engineer",
+     "similarity": 86
+    },
+    {
+     "id": "007_adversarial_reviewer",
+     "name": "Adversarial Reviewer",
+     "similarity": 86
+    }
+   ],
+   "order": 26,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "004_implementation_engineer",
+   "name": "Implementation Engineer",
+   "genes": {
+    "Pigment": "red",
+    "Accent": "magenta",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 98
+    },
+    {
+     "id": "062_threat_modeler",
+     "name": "Threat Modeler",
+     "similarity": 89
+    },
+    {
+     "id": "043_integrator",
+     "name": "Integrator",
+     "similarity": 87
+    }
+   ],
+   "order": 27,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "032_resource_manager_sheet_2_variant",
+   "name": "Resource Manager (2)",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "004_implementation_engineer",
+     "name": "Implementation Engineer",
+     "similarity": 98
+    },
+    {
+     "id": "062_threat_modeler",
+     "name": "Threat Modeler",
+     "similarity": 89
+    },
+    {
+     "id": "010_antagonist",
+     "name": "Antagonist",
+     "similarity": 89
+    }
+   ],
+   "order": 28,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "002_ux_designer",
+   "name": "Ux Designer",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "red",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "011_product_manager",
+     "name": "Product Manager",
+     "similarity": 87
+    },
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 80
+    },
+    {
+     "id": "037_pattern_seer",
+     "name": "Pattern Seer",
+     "similarity": 79
+    }
+   ],
+   "order": 29,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "011_product_manager",
+   "name": "Product Manager",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "red",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 5,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "002_ux_designer",
+     "name": "Ux Designer",
+     "similarity": 87
+    },
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 75
+    },
+    {
+     "id": "037_pattern_seer",
+     "name": "Pattern Seer",
+     "similarity": 74
+    }
+   ],
+   "order": 30,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "007_adversarial_reviewer",
+   "name": "Adversarial Reviewer",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "none",
+    "Spectrum": "Monotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Very rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "010_antagonist",
+     "name": "Antagonist",
+     "similarity": 86
+    },
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 80
+    },
+    {
+     "id": "037_pattern_seer",
+     "name": "Pattern Seer",
+     "similarity": 78
+    }
+   ],
+   "order": 31,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "037_pattern_seer",
+   "name": "Pattern Seer",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Speckled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Uncommon",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "051_idea_catalyst",
+     "name": "Idea Catalyst",
+     "similarity": 80
+    },
+    {
+     "id": "002_ux_designer",
+     "name": "Ux Designer",
+     "similarity": 79
+    },
+    {
+     "id": "010_antagonist",
+     "name": "Antagonist",
+     "similarity": 78
+    }
+   ],
+   "order": 32,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "051_idea_catalyst",
+   "name": "Idea Catalyst",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "red",
+    "Spectrum": "Duotone",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 5,
+   "rarity": "Uncommon",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "010_antagonist",
+     "name": "Antagonist",
+     "similarity": 80
+    },
+    {
+     "id": "037_pattern_seer",
+     "name": "Pattern Seer",
+     "similarity": 80
+    },
+    {
+     "id": "032_resource_manager_sheet_2_variant",
+     "name": "Resource Manager (2)",
+     "similarity": 77
+    }
+   ],
+   "order": 33,
+   "genus": "Sanguina"
+  },
+  {
+   "id": "028_simulator",
+   "name": "Simulator",
+   "genes": {
+    "Pigment": "orange",
+    "Accent": "none",
+    "Spectrum": "Monotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 7,
+   "rarity": "Mythic",
+   "breeding": "Near impossible",
+   "kin": [
+    {
+     "id": "040_scheduler_sheet_3_variant",
+     "name": "Scheduler (3)",
+     "similarity": 74
+    },
+    {
+     "id": "068_support_agent",
+     "name": "Support Agent",
+     "similarity": 69
+    },
+    {
+     "id": "012_crash_test_dummy",
+     "name": "Crash Test Dummy",
+     "similarity": 63
+    }
+   ],
+   "order": 34,
+   "genus": "Phosphora"
+  },
+  {
+   "id": "009_release_engineer",
+   "name": "Release Engineer",
+   "genes": {
+    "Pigment": "blue",
+    "Accent": "orange",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 6,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "022_knowledge_keeper_sheet_2_variant",
+     "name": "Knowledge Keeper (2)",
+     "similarity": 85
+    },
+    {
+     "id": "050_feedback_collector",
+     "name": "Feedback Collector",
+     "similarity": 68
+    },
+    {
+     "id": "040_scheduler_sheet_3_variant",
+     "name": "Scheduler (3)",
+     "similarity": 61
+    }
+   ],
+   "order": 35,
+   "genus": "Crepuscula"
+  },
+  {
+   "id": "022_knowledge_keeper_sheet_2_variant",
+   "name": "Knowledge Keeper (2)",
+   "genes": {
+    "Pigment": "blue",
+    "Accent": "orange",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Sparse"
+   },
+   "family": 6,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "009_release_engineer",
+     "name": "Release Engineer",
+     "similarity": 85
+    },
+    {
+     "id": "053_strategy_scout",
+     "name": "Strategy Scout",
+     "similarity": 66
+    },
+    {
+     "id": "019_translator_sheet_1_variant",
+     "name": "Translator (1)",
+     "similarity": 66
+    }
+   ],
+   "order": 36,
+   "genus": "Crepuscula"
+  },
+  {
+   "id": "031_creative_synthesizer",
+   "name": "Creative Synthesizer",
+   "genes": {
+    "Pigment": "magenta",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 10,
+   "rarity": "Uncommon",
+   "breeding": "Near impossible",
+   "kin": [
+    {
+     "id": "037_pattern_seer",
+     "name": "Pattern Seer",
+     "similarity": 70
+    },
+    {
+     "id": "065_observability_engineer",
+     "name": "Observability Engineer",
+     "similarity": 69
+    },
+    {
+     "id": "046_documentation_specialist",
+     "name": "Documentation Specialist",
+     "similarity": 67
+    }
+   ],
+   "order": 37,
+   "genus": "Iridia"
+  },
+  {
+   "id": "042_communicator",
+   "name": "Communicator",
+   "genes": {
+    "Pigment": "indigo",
+    "Accent": "blue",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 9,
+   "rarity": "Rare",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "050_feedback_collector",
+     "name": "Feedback Collector",
+     "similarity": 74
+    },
+    {
+     "id": "052_process_mapper",
+     "name": "Process Mapper",
+     "similarity": 71
+    },
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 70
+    }
+   ],
+   "order": 38,
+   "genus": "Noctua"
+  },
+  {
+   "id": "036_data_miner_sheet_3_variant",
+   "name": "Data Miner (3)",
+   "genes": {
+    "Pigment": "violet",
+    "Accent": "indigo",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 8,
+   "rarity": "Rare",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "060_build_engineer",
+     "name": "Build Engineer",
+     "similarity": 80
+    },
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 77
+    },
+    {
+     "id": "047_test_explorer",
+     "name": "Test Explorer",
+     "similarity": 76
+    }
+   ],
+   "order": 39,
+   "genus": "Violacea"
+  },
+  {
+   "id": "052_process_mapper",
+   "name": "Process Mapper",
+   "genes": {
+    "Pigment": "indigo",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 8,
+   "rarity": "Rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "065_observability_engineer",
+     "name": "Observability Engineer",
+     "similarity": 85
+    },
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 82
+    },
+    {
+     "id": "050_feedback_collector",
+     "name": "Feedback Collector",
+     "similarity": 82
+    }
+   ],
+   "order": 40,
+   "genus": "Violacea"
+  },
+  {
+   "id": "065_observability_engineer",
+   "name": "Observability Engineer",
+   "genes": {
+    "Pigment": "violet",
+    "Accent": "indigo",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Glass",
+    "Arbor": "Overgrown"
+   },
+   "family": 8,
+   "rarity": "Very rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "052_process_mapper",
+     "name": "Process Mapper",
+     "similarity": 85
+    },
+    {
+     "id": "060_build_engineer",
+     "name": "Build Engineer",
+     "similarity": 80
+    },
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 77
+    }
+   ],
+   "order": 41,
+   "genus": "Violacea"
+  },
+  {
+   "id": "047_test_explorer",
+   "name": "Test Explorer",
+   "genes": {
+    "Pigment": "violet",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 8,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "060_build_engineer",
+     "name": "Build Engineer",
+     "similarity": 93
+    },
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 84
+    },
+    {
+     "id": "050_feedback_collector",
+     "name": "Feedback Collector",
+     "similarity": 79
+    }
+   ],
+   "order": 42,
+   "genus": "Violacea"
+  },
+  {
+   "id": "060_build_engineer",
+   "name": "Build Engineer",
+   "genes": {
+    "Pigment": "violet",
+    "Accent": "magenta",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 8,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "047_test_explorer",
+     "name": "Test Explorer",
+     "similarity": 93
+    },
+    {
+     "id": "036_data_miner_sheet_3_variant",
+     "name": "Data Miner (3)",
+     "similarity": 80
+    },
+    {
+     "id": "065_observability_engineer",
+     "name": "Observability Engineer",
+     "similarity": 80
+    }
+   ],
+   "order": 43,
+   "genus": "Violacea"
+  },
+  {
+   "id": "017_knowledge_keeper_sheet_1_variant",
+   "name": "Knowledge Keeper (1)",
+   "genes": {
+    "Pigment": "indigo",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 8,
+   "rarity": "Rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "047_test_explorer",
+     "name": "Test Explorer",
+     "similarity": 84
+    },
+    {
+     "id": "050_feedback_collector",
+     "name": "Feedback Collector",
+     "similarity": 83
+    },
+    {
+     "id": "052_process_mapper",
+     "name": "Process Mapper",
+     "similarity": 82
+    }
+   ],
+   "order": 44,
+   "genus": "Violacea"
+  },
+  {
+   "id": "050_feedback_collector",
+   "name": "Feedback Collector",
+   "genes": {
+    "Pigment": "indigo",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 8,
+   "rarity": "Uncommon",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "017_knowledge_keeper_sheet_1_variant",
+     "name": "Knowledge Keeper (1)",
+     "similarity": 83
+    },
+    {
+     "id": "052_process_mapper",
+     "name": "Process Mapper",
+     "similarity": 82
+    },
+    {
+     "id": "060_build_engineer",
+     "name": "Build Engineer",
+     "similarity": 79
+    }
+   ],
+   "order": 45,
+   "genus": "Violacea"
+  },
+  {
+   "id": "030_guardian",
+   "name": "Guardian",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "teal",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 11,
+   "rarity": "Uncommon",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "058_network_engineer",
+     "name": "Network Engineer",
+     "similarity": 81
+    },
+    {
+     "id": "014_code_reviewer",
+     "name": "Code Reviewer",
+     "similarity": 78
+    },
+    {
+     "id": "064_migration_engineer",
+     "name": "Migration Engineer",
+     "similarity": 78
+    }
+   ],
+   "order": 46,
+   "genus": "Glacia"
+  },
+  {
+   "id": "058_network_engineer",
+   "name": "Network Engineer",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "none",
+    "Spectrum": "Monotone",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 11,
+   "rarity": "Very rare",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "030_guardian",
+     "name": "Guardian",
+     "similarity": 81
+    },
+    {
+     "id": "014_code_reviewer",
+     "name": "Code Reviewer",
+     "similarity": 79
+    },
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 74
+    }
+   ],
+   "order": 47,
+   "genus": "Glacia"
+  },
+  {
+   "id": "005_architect",
+   "name": "Architect",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "blue",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 12,
+   "rarity": "Uncommon",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 78
+    },
+    {
+     "id": "030_guardian",
+     "name": "Guardian",
+     "similarity": 74
+    },
+    {
+     "id": "070_ml_engineer",
+     "name": "Ml Engineer",
+     "similarity": 72
+    }
+   ],
+   "order": 48,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "063_compliance_officer",
+   "name": "Compliance Officer",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "blue",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 12,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "064_migration_engineer",
+     "name": "Migration Engineer",
+     "similarity": 86
+    },
+    {
+     "id": "070_ml_engineer",
+     "name": "Ml Engineer",
+     "similarity": 86
+    },
+    {
+     "id": "033_feedback_listener",
+     "name": "Feedback Listener",
+     "similarity": 79
+    }
+   ],
+   "order": 49,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "070_ml_engineer",
+   "name": "Ml Engineer",
+   "genes": {
+    "Pigment": "blue",
+    "Accent": "cyan",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 12,
+   "rarity": "Rare",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 86
+    },
+    {
+     "id": "033_feedback_listener",
+     "name": "Feedback Listener",
+     "similarity": 73
+    },
+    {
+     "id": "005_architect",
+     "name": "Architect",
+     "similarity": 72
+    }
+   ],
+   "order": 50,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "049_monitoring_sentinel",
+   "name": "Monitoring Sentinel",
+   "genes": {
+    "Pigment": "blue",
+    "Accent": "indigo",
+    "Spectrum": "Prismatic",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Sparse"
+   },
+   "family": 12,
+   "rarity": "Rare",
+   "breeding": "Hard",
+   "kin": [
+    {
+     "id": "033_feedback_listener",
+     "name": "Feedback Listener",
+     "similarity": 81
+    },
+    {
+     "id": "064_migration_engineer",
+     "name": "Migration Engineer",
+     "similarity": 79
+    },
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 79
+    }
+   ],
+   "order": 51,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "033_feedback_listener",
+   "name": "Feedback Listener",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "blue",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 12,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "064_migration_engineer",
+     "name": "Migration Engineer",
+     "similarity": 92
+    },
+    {
+     "id": "049_monitoring_sentinel",
+     "name": "Monitoring Sentinel",
+     "similarity": 81
+    },
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 79
+    }
+   ],
+   "order": 52,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "064_migration_engineer",
+   "name": "Migration Engineer",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "teal",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 12,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "033_feedback_listener",
+     "name": "Feedback Listener",
+     "similarity": 92
+    },
+    {
+     "id": "063_compliance_officer",
+     "name": "Compliance Officer",
+     "similarity": 86
+    },
+    {
+     "id": "049_monitoring_sentinel",
+     "name": "Monitoring Sentinel",
+     "similarity": 79
+    }
+   ],
+   "order": 53,
+   "genus": "Caerulea"
+  },
+  {
+   "id": "041_resource_manager_sheet_3_variant",
+   "name": "Resource Manager (3)",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "red",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Sparse"
+   },
+   "family": 14,
+   "rarity": "Common",
+   "breeding": "Near impossible",
+   "kin": [
+    {
+     "id": "046_documentation_specialist",
+     "name": "Documentation Specialist",
+     "similarity": 74
+    },
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 69
+    },
+    {
+     "id": "018_pattern_seeker_sheet_1_variant",
+     "name": "Pattern Seeker (1)",
+     "similarity": 67
+    }
+   ],
+   "order": 54,
+   "genus": "Discordia"
+  },
+  {
+   "id": "008_qa_engineer",
+   "name": "Qa Engineer",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "cyan",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "014_code_reviewer",
+     "name": "Code Reviewer",
+     "similarity": 92
+    },
+    {
+     "id": "020_connector_sheet_1_variant",
+     "name": "Connector (1)",
+     "similarity": 91
+    },
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 90
+    }
+   ],
+   "order": 55,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "014_code_reviewer",
+   "name": "Code Reviewer",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "teal",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "020_connector_sheet_1_variant",
+     "name": "Connector (1)",
+     "similarity": 93
+    },
+    {
+     "id": "008_qa_engineer",
+     "name": "Qa Engineer",
+     "similarity": 92
+    },
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 84
+    }
+   ],
+   "order": 56,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "020_connector_sheet_1_variant",
+   "name": "Connector (1)",
+   "genes": {
+    "Pigment": "cyan",
+    "Accent": "teal",
+    "Spectrum": "Duotone",
+    "Core": "Bright",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Rare",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "014_code_reviewer",
+     "name": "Code Reviewer",
+     "similarity": 93
+    },
+    {
+     "id": "008_qa_engineer",
+     "name": "Qa Engineer",
+     "similarity": 91
+    },
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 87
+    }
+   ],
+   "order": 57,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "003_researcher",
+   "name": "Researcher",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "cyan",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Sheen",
+    "Arbor": "Overgrown"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "008_qa_engineer",
+     "name": "Qa Engineer",
+     "similarity": 90
+    },
+    {
+     "id": "056_systems_analyst",
+     "name": "Systems Analyst",
+     "similarity": 90
+    },
+    {
+     "id": "020_connector_sheet_1_variant",
+     "name": "Connector (1)",
+     "similarity": 87
+    }
+   ],
+   "order": 58,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "056_systems_analyst",
+   "name": "Systems Analyst",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "cyan",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Glass",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 90
+    },
+    {
+     "id": "008_qa_engineer",
+     "name": "Qa Engineer",
+     "similarity": 86
+    },
+    {
+     "id": "020_connector_sheet_1_variant",
+     "name": "Connector (1)",
+     "similarity": 83
+    }
+   ],
+   "order": 59,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "045_quality_guardian",
+   "name": "Quality Guardian",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "orange",
+    "Spectrum": "Duotone",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Sparse"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "069_data_scientist",
+     "name": "Data Scientist",
+     "similarity": 91
+    },
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 83
+    },
+    {
+     "id": "018_pattern_seeker_sheet_1_variant",
+     "name": "Pattern Seeker (1)",
+     "similarity": 76
+    }
+   ],
+   "order": 60,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "069_data_scientist",
+   "name": "Data Scientist",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "cyan",
+    "Spectrum": "Duotone",
+    "Core": "Bright",
+    "Pattern": "Plain",
+    "Skin": "Opaque",
+    "Arbor": "Sparse"
+   },
+   "family": 13,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "045_quality_guardian",
+     "name": "Quality Guardian",
+     "similarity": 91
+    },
+    {
+     "id": "020_connector_sheet_1_variant",
+     "name": "Connector (1)",
+     "similarity": 84
+    },
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 79
+    }
+   ],
+   "order": 61,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "046_documentation_specialist",
+   "name": "Documentation Specialist",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "violet",
+    "Spectrum": "Prismatic",
+    "Core": "Dark",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Tricky",
+   "kin": [
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 82
+    },
+    {
+     "id": "056_systems_analyst",
+     "name": "Systems Analyst",
+     "similarity": 82
+    },
+    {
+     "id": "018_pattern_seeker_sheet_1_variant",
+     "name": "Pattern Seeker (1)",
+     "similarity": 81
+    }
+   ],
+   "order": 62,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "018_pattern_seeker_sheet_1_variant",
+   "name": "Pattern Seeker (1)",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "green",
+    "Spectrum": "Prismatic",
+    "Core": "Dusk",
+    "Pattern": "Mottled",
+    "Skin": "Opaque",
+    "Arbor": "Overgrown"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "013_recovery_engineer",
+     "name": "Recovery Engineer",
+     "similarity": 89
+    },
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 89
+    },
+    {
+     "id": "003_researcher",
+     "name": "Researcher",
+     "similarity": 86
+    }
+   ],
+   "order": 63,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "013_recovery_engineer",
+   "name": "Recovery Engineer",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "green",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Speckled",
+    "Skin": "Opaque",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Uncommon",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "061_test_automation_engineer",
+     "name": "Test Automation Engineer",
+     "similarity": 91
+    },
+    {
+     "id": "018_pattern_seeker_sheet_1_variant",
+     "name": "Pattern Seeker (1)",
+     "similarity": 89
+    },
+    {
+     "id": "046_documentation_specialist",
+     "name": "Documentation Specialist",
+     "similarity": 76
+    }
+   ],
+   "order": 64,
+   "genus": "Thalassa"
+  },
+  {
+   "id": "061_test_automation_engineer",
+   "name": "Test Automation Engineer",
+   "genes": {
+    "Pigment": "teal",
+    "Accent": "green",
+    "Spectrum": "Duotone",
+    "Core": "Dusk",
+    "Pattern": "Plain",
+    "Skin": "Sheen",
+    "Arbor": "Branching"
+   },
+   "family": 13,
+   "rarity": "Common",
+   "breeding": "Easy",
+   "kin": [
+    {
+     "id": "013_recovery_engineer",
+     "name": "Recovery Engineer",
+     "similarity": 91
+    },
+    {
+     "id": "018_pattern_seeker_sheet_1_variant",
+     "name": "Pattern Seeker (1)",
+     "similarity": 89
+    },
+    {
+     "id": "045_quality_guardian",
+     "name": "Quality Guardian",
+     "similarity": 83
+    }
+   ],
+   "order": 65,
+   "genus": "Thalassa"
+  }
+ ],
+ "families": [
+  {
+   "id": 2,
+   "name": "Green dark-cores",
+   "members": [
+    "067_content_strategist"
+   ],
+   "genus": "Viridia"
+  },
+  {
+   "id": 1,
+   "name": "Amber dark-cores",
+   "members": [
+    "071_legal_counsel",
+    "039_optimizer_sheet_3_variant",
+    "035_flow_director",
+    "055_sustainability_advocate",
+    "027_optimizer_sheet_2_variant",
+    "006_epa_representative",
+    "015_hall_monitor"
+   ],
+   "genus": "Succina"
+  },
+  {
+   "id": 3,
+   "name": "Red dusk-cores",
+   "members": [
+    "019_translator_sheet_1_variant",
+    "012_crash_test_dummy",
+    "040_scheduler_sheet_3_variant",
+    "068_support_agent",
+    "034_decision_helper",
+    "026_scheduler_sheet_2_variant",
+    "029_documenter",
+    "053_strategy_scout",
+    "059_site_reliability_engineer",
+    "016_data_miner_sheet_1_variant",
+    "057_database_administrator"
+   ],
+   "genus": "Favilla"
+  },
+  {
+   "id": 4,
+   "name": "Orange bright-cores",
+   "members": [
+    "001_orchestrator",
+    "054_system_maintainer"
+   ],
+   "genus": "Coronata"
+  },
+  {
+   "id": 5,
+   "name": "Magenta dark-cores",
+   "members": [
+    "043_integrator",
+    "062_threat_modeler",
+    "066_business_analyst",
+    "044_security_analyst",
+    "048_deployment_pilot",
+    "010_antagonist",
+    "004_implementation_engineer",
+    "032_resource_manager_sheet_2_variant",
+    "002_ux_designer",
+    "011_product_manager",
+    "007_adversarial_reviewer",
+    "037_pattern_seer",
+    "051_idea_catalyst"
+   ],
+   "genus": "Sanguina"
+  },
+  {
+   "id": 7,
+   "name": "Orange dusk-cores",
+   "members": [
+    "028_simulator"
+   ],
+   "genus": "Phosphora"
+  },
+  {
+   "id": 6,
+   "name": "Blue dusk-cores",
+   "members": [
+    "009_release_engineer",
+    "022_knowledge_keeper_sheet_2_variant"
+   ],
+   "genus": "Crepuscula"
+  },
+  {
+   "id": 10,
+   "name": "Magenta dark-cores",
+   "members": [
+    "031_creative_synthesizer"
+   ],
+   "genus": "Iridia"
+  },
+  {
+   "id": 9,
+   "name": "Indigo dark-cores",
+   "members": [
+    "042_communicator"
+   ],
+   "genus": "Noctua"
+  },
+  {
+   "id": 8,
+   "name": "Violet dusk-cores",
+   "members": [
+    "036_data_miner_sheet_3_variant",
+    "052_process_mapper",
+    "065_observability_engineer",
+    "047_test_explorer",
+    "060_build_engineer",
+    "017_knowledge_keeper_sheet_1_variant",
+    "050_feedback_collector"
+   ],
+   "genus": "Violacea"
+  },
+  {
+   "id": 11,
+   "name": "Cyan bright-cores",
+   "members": [
+    "030_guardian",
+    "058_network_engineer"
+   ],
+   "genus": "Glacia"
+  },
+  {
+   "id": 12,
+   "name": "Cyan dusk-cores",
+   "members": [
+    "005_architect",
+    "063_compliance_officer",
+    "070_ml_engineer",
+    "049_monitoring_sentinel",
+    "033_feedback_listener",
+    "064_migration_engineer"
+   ],
+   "genus": "Caerulea"
+  },
+  {
+   "id": 14,
+   "name": "Teal dark-cores",
+   "members": [
+    "041_resource_manager_sheet_3_variant"
+   ],
+   "genus": "Discordia"
+  },
+  {
+   "id": 13,
+   "name": "Teal dusk-cores",
+   "members": [
+    "008_qa_engineer",
+    "014_code_reviewer",
+    "020_connector_sheet_1_variant",
+    "003_researcher",
+    "056_systems_analyst",
+    "045_quality_guardian",
+    "069_data_scientist",
+    "046_documentation_specialist",
+    "018_pattern_seeker_sheet_1_variant",
+    "013_recovery_engineer",
+    "061_test_automation_engineer"
+   ],
+   "genus": "Thalassa"
+  }
+ ],
+ "linkage": [
+  [
+   3,
+   27,
+   0.024,
+   2
+  ],
+  [
+   37,
+   56,
+   0.0281,
+   2
+  ],
+  [
+   30,
+   49,
+   0.0547,
+   2
+  ],
+  [
+   38,
+   42,
+   0.0635,
+   2
+  ],
+  [
+   41,
+   54,
+   0.0716,
+   2
+  ],
+  [
+   13,
+   19,
+   0.0735,
+   2
+  ],
+  [
+   28,
+   58,
+   0.081,
+   2
+  ],
+  [
+   7,
+   71,
+   0.0835,
+   3
+  ],
+  [
+   34,
+   62,
+   0.0871,
+   2
+  ],
+  [
+   60,
+   69,
+   0.0912,
+   3
+  ],
+  [
+   39,
+   63,
+   0.0935,
+   2
+  ],
+  [
+   12,
+   55,
+   0.0937,
+   2
+  ],
+  [
+   2,
+   50,
+   0.0965,
+   2
+  ],
+  [
+   15,
+   51,
+   0.0968,
+   2
+  ],
+  [
+   21,
+   24,
+   0.097,
+   2
+  ],
+  [
+   33,
+   68,
+   0.1043,
+   3
+  ],
+  [
+   17,
+   77,
+   0.1093,
+   3
+  ],
+  [
+   5,
+   14,
+   0.1129,
+   2
+  ],
+  [
+   67,
+   75,
+   0.1156,
+   5
+  ],
+  [
+   11,
+   74,
+   0.1172,
+   3
+  ],
+  [
+   29,
+   80,
+   0.1228,
+   3
+  ],
+  [
+   53,
+   79,
+   0.1229,
+   3
+  ],
+  [
+   0,
+   48,
+   0.1237,
+   2
+  ],
+  [
+   1,
+   10,
+   0.1262,
+   2
+  ],
+  [
+   9,
+   66,
+   0.1274,
+   3
+  ],
+  [
+   57,
+   64,
+   0.1383,
+   2
+  ],
+  [
+   65,
+   81,
+   0.1406,
+   4
+  ],
+  [
+   73,
+   78,
+   0.1436,
+   5
+  ],
+  [
+   46,
+   59,
+   0.1505,
+   2
+  ],
+  [
+   85,
+   86,
+   0.1515,
+   6
+  ],
+  [
+   8,
+   20,
+   0.1538,
+   2
+  ],
+  [
+   16,
+   44,
+   0.1743,
+   2
+  ],
+  [
+   25,
+   52,
+   0.192,
+   2
+  ],
+  [
+   70,
+   97,
+   0.1975,
+   4
+  ],
+  [
+   43,
+   72,
+   0.1982,
+   3
+  ],
+  [
+   84,
+   90,
+   0.1985,
+   8
+  ],
+  [
+   40,
+   82,
+   0.2017,
+   4
+  ],
+  [
+   32,
+   45,
+   0.2035,
+   2
+  ],
+  [
+   47,
+   87,
+   0.2126,
+   4
+  ],
+  [
+   94,
+   99,
+   0.2158,
+   6
+  ],
+  [
+   91,
+   100,
+   0.2333,
+   5
+  ],
+  [
+   6,
+   103,
+   0.2421,
+   3
+  ],
+  [
+   22,
+   83,
+   0.2445,
+   3
+  ],
+  [
+   31,
+   105,
+   0.2486,
+   7
+  ],
+  [
+   76,
+   102,
+   0.2503,
+   6
+  ],
+  [
+   95,
+   104,
+   0.2505,
+   10
+  ],
+  [
+   89,
+   107,
+   0.2642,
+   5
+  ],
+  [
+   93,
+   110,
+   0.2742,
+   11
+  ],
+  [
+   4,
+   106,
+   0.2909,
+   6
+  ],
+  [
+   18,
+   111,
+   0.2952,
+   11
+  ],
+  [
+   92,
+   108,
+   0.3033,
+   7
+  ],
+  [
+   101,
+   112,
+   0.3057,
+   13
+  ],
+  [
+   98,
+   114,
+   0.3319,
+   8
+  ],
+  [
+   36,
+   109,
+   0.3383,
+   8
+  ],
+  [
+   88,
+   117,
+   0.3403,
+   15
+  ],
+  [
+   35,
+   113,
+   0.411,
+   12
+  ],
+  [
+   115,
+   120,
+   0.4305,
+   26
+  ],
+  [
+   26,
+   119,
+   0.4564,
+   9
+  ],
+  [
+   118,
+   121,
+   0.479,
+   20
+  ],
+  [
+   23,
+   96,
+   0.5316,
+   3
+  ],
+  [
+   122,
+   125,
+   0.5695,
+   29
+  ],
+  [
+   61,
+   116,
+   0.5718,
+   8
+  ],
+  [
+   123,
+   124,
+   0.6623,
+   29
+  ],
+  [
+   126,
+   128,
+   0.702,
+   58
+  ],
+  [
+   127,
+   129,
+   0.7383,
+   66
+  ]
+ ],
+ "leaves": [
+  "067_content_strategist",
+  "071_legal_counsel",
+  "039_optimizer_sheet_3_variant",
+  "035_flow_director",
+  "055_sustainability_advocate",
+  "027_optimizer_sheet_2_variant",
+  "006_epa_representative",
+  "015_hall_monitor",
+  "019_translator_sheet_1_variant",
+  "012_crash_test_dummy",
+  "040_scheduler_sheet_3_variant",
+  "068_support_agent",
+  "034_decision_helper",
+  "026_scheduler_sheet_2_variant",
+  "029_documenter",
+  "053_strategy_scout",
+  "059_site_reliability_engineer",
+  "016_data_miner_sheet_1_variant",
+  "057_database_administrator",
+  "001_orchestrator",
+  "054_system_maintainer",
+  "043_integrator",
+  "062_threat_modeler",
+  "066_business_analyst",
+  "044_security_analyst",
+  "048_deployment_pilot",
+  "010_antagonist",
+  "004_implementation_engineer",
+  "032_resource_manager_sheet_2_variant",
+  "002_ux_designer",
+  "011_product_manager",
+  "007_adversarial_reviewer",
+  "037_pattern_seer",
+  "051_idea_catalyst",
+  "028_simulator",
+  "009_release_engineer",
+  "022_knowledge_keeper_sheet_2_variant",
+  "031_creative_synthesizer",
+  "042_communicator",
+  "036_data_miner_sheet_3_variant",
+  "052_process_mapper",
+  "065_observability_engineer",
+  "047_test_explorer",
+  "060_build_engineer",
+  "017_knowledge_keeper_sheet_1_variant",
+  "050_feedback_collector",
+  "030_guardian",
+  "058_network_engineer",
+  "005_architect",
+  "063_compliance_officer",
+  "070_ml_engineer",
+  "049_monitoring_sentinel",
+  "033_feedback_listener",
+  "064_migration_engineer",
+  "041_resource_manager_sheet_3_variant",
+  "008_qa_engineer",
+  "014_code_reviewer",
+  "020_connector_sheet_1_variant",
+  "003_researcher",
+  "056_systems_analyst",
+  "045_quality_guardian",
+  "069_data_scientist",
+  "046_documentation_specialist",
+  "018_pattern_seeker_sheet_1_variant",
+  "013_recovery_engineer",
+  "061_test_automation_engineer"
+ ],
+ "alleleFrequencies": {
+  "Pigment": {
+   "orange": 6,
+   "magenta": 8,
+   "teal": 11,
+   "red": 14,
+   "cyan": 7,
+   "amber": 7,
+   "blue": 4,
+   "indigo": 4,
+   "violet": 4,
+   "green": 1
+  },
+  "Accent": {
+   "magenta": 10,
+   "red": 10,
+   "cyan": 5,
+   "blue": 5,
+   "green": 4,
+   "none": 5,
+   "orange": 10,
+   "teal": 4,
+   "lime": 1,
+   "violet": 6,
+   "indigo": 3,
+   "yellow": 3
+  },
+  "Spectrum": {
+   "Prismatic": 37,
+   "Duotone": 25,
+   "Monotone": 4
+  },
+  "Core": {
+   "Bright": 16,
+   "Dusk": 29,
+   "Dark": 21
+  },
+  "Pattern": {
+   "Speckled": 22,
+   "Mottled": 22,
+   "Plain": 22
+  },
+  "Skin": {
+   "Opaque": 25,
+   "Sheen": 29,
+   "Glass": 12
+  },
+  "Arbor": {
+   "Overgrown": 22,
+   "Branching": 22,
+   "Sparse": 22
+  }
+ }
+}
