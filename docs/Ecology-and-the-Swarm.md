@@ -86,6 +86,19 @@ The keeper's job and the operator's job are the same job:
 
 Nobody has to be told any of this. A person who keeps the creatures healthy is running a sound swarm, and a person whose creatures are sick can see exactly where and why, because the sickness is the problem.
 
+## Starting from one creature
+
+A new keeper begins with a single creature: one provider, one model, one agent. It can only clone itself, and clone lines go septic. Diversity has to come from **outside the line**, and every outside source is a real one. In the order a new keeper meets them:
+
+1. **The keeper is the first stranger.** The person is the most different voice the bowl will ever have. Every message, approval, rejection and edit counts as challenge from far outside the creature's kin, so a creature the keeper actually talks to stays grounded. In the first days, the person is the second creature.
+2. **The world talks back.** Reflex creatures (tests, scripts, builds, linters, deployments: deterministic executors with no model at all) aren't kin to anything. Wiring one in front of an agent gives it challenge it can't argue with: the test passed or it didn't. This also changes how a creature mutates: under real challenge, mutation is **adaptive** (the shifts that survived the check persist); without it, mutation is erratic.
+3. **Separate the clones.** A clone raised in a different bowl (a different repository, a different memory, different tasks) hears a different world and drifts away from its twin. Bring them back together after they've diverged below 95% kinship and they're no longer echoes; they can breed something new. Speciation by separation is slow but needs nothing the keeper doesn't already have.
+4. **Open a second vein.** Connecting another provider or model is the fastest, truest diversity: new blood carries **wild** creatures native to it. They drift in along the new capillary, and they're already strangers to everything in the bowl. Each provider has its own native strains, so the setup step of connecting providers is also how a keeper stocks the bowl.
+5. **Directed mutation.** When the keeper rewrites a creature's instructions or swaps its tools (forking its role), that change comes from outside the line, so it counts as genuine variation, not Echo. The keeper can breed by hand.
+6. **Trade.** The trading post (the Azphalt Store) brings in other keepers' lineages as packages, and a setup file carries a keeper's whole roster to someone else's bowl. Immigrants are the rarest stock and the widest crosses.
+
+The lesson the bowl teaches without a word: the cheapest diversity is to listen to the person, the next cheapest is to let the world check the work, and the strongest is a second model.
+
 ## What this changes in the build
 
 - **Provenance** is recorded for every input and every review: provider, model, role, instruction lineage. Echo, kinship and trophic support are computed from it.
