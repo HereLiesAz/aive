@@ -113,7 +113,7 @@ data class AzphaltLlmDataHandling(
 )
 
 private val AZPHALT_DIRECT_LLM_PROTOCOLS: Set<String> = setOf("openai-chat", "moyai-session")
-private val AZPHALT_INPUT_REF: Regex = Regex("""^\$\{input:([^}]{1,128})}$""")
+private val AZPHALT_INPUT_REF: Regex = Regex("""^\$\{input:([^}]{1,128})\}$""")
 
 /** The non-secret install input that supplies a templated endpoint URL, when one is declared. */
 fun AzphaltLlm.endpointUrlInput(): AzphaltLlmInput? {

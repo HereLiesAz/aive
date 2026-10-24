@@ -239,7 +239,7 @@ object MermaidFlowchartParser {
         val patterns = listOf(
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\(\[([^]]+)]\)$"""), "stadium", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\[([^]]+)]$"""), "rectangle", 2),
-            Triple(Regex("""^([A-Za-z0-9_.:-]+)\{([^}]+)}$"""), "decision", 2),
+            Triple(Regex("""^([A-Za-z0-9_.:-]+)\{([^}]+)\}$"""), "decision", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\(\((.+)\)\)$"""), "circle", 2),
             Triple(Regex("""^([A-Za-z0-9_.:-]+)\((.+)\)$"""), "rounded", 2),
         )
