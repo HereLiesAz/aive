@@ -92,6 +92,7 @@ Neurons live on feedback, and feedback loops are either very constructive or ver
 Every creature carries **Echo** (0–100): how much of what it hears is itself.
 
 - **Echo builds** from any input that is effectively its own voice: its own spikes looping back, and spikes from **near-clones** (kinship 95% or more). A near-clone's voice counts as self, and it counts **in full for both of them**: two near-clones wired together each take the other's feedback as their own, so each builds Echo at double the rate one would build alone.
+- **Echo travels through memory.** The bowl's memory is shared water. A memory read by a creature counts as feedback from whoever wrote it: written by itself or a near-clone, it's Echo, however far away the writer is. Written by a stranger, it's challenge. A line that fills the water with its own memories builds Echo everywhere it lives.
 - **Echo falls** only through **challenge**:
   - input from creatures that are genuinely different (kinship under 85%): the more different, the more it falls.
   - losing a contest, being inhibited by a non-kin rival, or being bitten.
