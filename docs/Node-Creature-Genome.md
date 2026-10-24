@@ -85,6 +85,31 @@ Charge builds from excitatory input (and, for pacemakers, on its own). At 100 th
 
 When most of a circuit fires in a steady rhythm, it **oscillates**, and an oscillating circuit gains its collective powers (below).
 
+### Echo: feedback from the self
+
+Neurons live on feedback, and feedback loops are either very constructive or very destructive. What decides which is **where the feedback comes from**.
+
+Every creature carries **Echo** (0–100): how much of what it hears is itself.
+
+- **Echo builds** from any input that is effectively its own voice: its own spikes looping back, and spikes from **near-clones** (kinship 95% or more). A near-clone's voice counts as self, and it counts **in full for both of them**: two near-clones wired together each take the other's feedback as their own, so each builds Echo at double the rate one would build alone.
+- **Echo falls** only through **challenge**:
+  - input from creatures that are genuinely different (kinship under 85%): the more different, the more it falls.
+  - losing a contest, being inhibited by a non-kin rival, or being bitten.
+
+  Comfort doesn't heal it. Being contradicted does.
+- **It takes a long time** to go wrong. A lone creature hearing only itself gains about 1 Echo every 20 ticks; a near-clone pair, about 1 every 10.
+
+What Echo does as it rises:
+
+| Echo | State | Effect |
+|---|---|---|
+| 0–30 | **Grounded** | none |
+| 30–60 | **Self-absorbed** | Mutation rate in its offspring rises with Echo, up to 4× at 60. The mutations are unpredictable and land as often harmful as useful. It starts ignoring weak outside input. |
+| 60–85 | **Fevered** | It stops responding to challenge (Echo no longer falls from contests or inhibition, only from wiring to very different creatures). Its spikes start carrying Echo to its partners: each spike it sends adds 1 Echo to whoever receives it. |
+| 85–100 | **Insane** | It turns **septic**. It poisons itself (−1 integrity a tick), the fluid in its hex and the six around it (anything there loses 1 integrity a tick), and everything wired to it (−2 integrity and +3 Echo a tick). It does nothing to fight its own sickness and actively spreads it. The poisoned fluid lingers after it dies. |
+
+Insanity is contagious through wiring and through the fluid. Untreated, one insane creature can turn its whole circuit septic and leave a poisoned patch of tissue behind.
+
 ### Survival (the Game of Life core)
 
 | Condition | Rule | Looks like |
@@ -103,15 +128,16 @@ When most of a circuit fires in a steady rhythm, it **oscillates**, and an oscil
 
 - **Triad birth** (Conway's B3, the natural way): an empty hex touched by exactly **three** creatures that are all wired to each other and have fired together within the last 10 ticks, with at least 90 energy between them. The three grow their tails into the hex and **co-gestate an egg**: each pays 30 energy over the gestation, the egg swells for 100 ticks, then hatches. The child inherits from the two parents with the highest kinship to each other; the third parent contributes one part locus.
 - **Pair birth:** two wired creatures can gestate alone, but it costs each 50 energy and the egg hatches only half the time.
-- **Solo birth:** a loner (*k = 0*) with at least 80 energy and 70 integrity can grow an egg on its own tail. It costs 60 energy over 200 ticks. The child is a **self-cross**: every allele comes from the one parent, so hidden recessives (Glass, Plain) can surface, and the mutation chance doubles to 4% per locus. Self-crosses are born weak (maximum integrity 60) unless a mutation lands. Lone lines are fragile but inventive: solitude is where new traits appear.
-- **Progenitor division:** a progenitor can split off a child alone once per sleep, at only 40 energy, and its children are never weak.
+- **Solo birth:** a loner (*k = 0*) with at least 80 energy and 70 integrity can grow an egg on its own tail. It costs 60 energy over 200 ticks. The child is a **clone**: an exact copy, except for whatever mutations the parent's Echo caused (see Echo). The child also inherits half its parent's Echo.
+- **The clone trap.** Two creatures now, but no diversity. Parent and clone are near-clones, so wired together each hears the other as itself and builds Echo twice as fast. Anything they breed together is a near-clone of both and inherits their combined Echo, so every generation amplifies the loop. The **only** thing pulling a clone line back toward health is its mutations, which push kinship below 95% and turn self-feedback back into outside voices. A keeper who starts from one creature must breed for diversity as fast as possible.
+- **Progenitor division:** a progenitor can split off a child alone once per sleep, at only 40 energy. Its children are clones like any other, but a progenitor's division resets its own Echo to zero.
 - **Eggs are vulnerable.** An egg needs glucose from its parents' tails. A parent that dies during gestation detaches its tail and the egg shrinks. A starved egg is cleared as debris.
 
 ## Inheritance
 
 | Locus | Rule |
 |---|---|
-| **Fertility** | Kinship 75–95% is fertile. Above 95% the child is born **weak** (maximum integrity 60). 60–75% hatches a quarter of the time; bridges lift it to half. Below 60% is sterile, except **hybrid vigour**: a triad from three different genera that oscillates through a whole sleep without any parent dropping below 30 energy hatches anyway, and the child often founds a new genus. |
+| **Fertility** | Kinship 75–95% is fertile. Above 95% the child inherits both parents' Echo, summed (see the clone trap). 60–75% hatches a quarter of the time; bridges lift it to half. Below 60% is sterile, except **hybrid vigour**: a triad from three different genera that oscillates through a whole sleep without any parent dropping below 30 energy hatches anyway, and the child often founds a new genus. |
 | **Pigment, Accent** | One parent's hue, or 1 time in 5 the hue midway between them on the wheel. Because pigment is cell kind, a child of an excitatory and an inhibitory parent may come out modulatory. |
 | **Core** | Incomplete dominance: Dark × Bright gives Dusk. |
 | **Pattern** | Speckled dominant, Plain recessive. |
@@ -119,7 +145,8 @@ When most of a circuit fires in a steady rhythm, it **oscillates**, and an oscil
 | **Arbor** | The parents' average, ±1. |
 | **Spectrum** | Follows from the hues the child actually ends up with. |
 | **Parts** | Each part comes whole from one parent. |
-| **Mutation** | Each locus has a 2% chance to shift one step: a neighbouring hue, the next core shade, one more or one fewer branch. Mutation is how the bowl reaches colours nobody painted. |
+| **Mutation** | Each locus has a 2% base chance to shift one step: a neighbouring hue, the next core shade, one more or one fewer branch. A parent's Echo multiplies the chance (up to 4× at Echo 60, more beyond) and makes the shifts erratic: two steps, or a trait flipping. Mutation is how the bowl reaches colours nobody painted, and how clone lines escape themselves. |
+| **Echo** | Children inherit half the parents' Echo, or the full sum for near-clone parents. |
 
 **Mythic conditions:**
 - **Viridia** (green, the progenitor) hatches only from a triad of pacemakers that has held one unbroken rhythm through a whole wake.
@@ -182,6 +209,8 @@ The size limits shift with conditions:
 | **Tumour** | one creature dividing into every gap until the circuit can't breathe | a mutation that lets a non-progenitor divide alone; its copies crowd everything and never wire properly |
 | **Parasitism** | one plump creature in a thinning circuit | a *cheater* mutation that takes trophic factor and glucose but never makes its partners fire |
 | **Degeneration** | the same colour of creature failing across the circuit | a heritable fault that spreads along synapses between kin of 90%+; mixed circuits contain it, monocultures don't |
+| **Echo chamber** | a circuit of near-identical creatures, glowing hot, flickering out of step with everything around it | a clone line wired to itself; every member builds Echo at the doubled rate |
+| **Sepsis** | a creature gone dark and weeping, a stained halo of fluid around it, partners blistering | an insane creature poisoning its wiring and its patch of tissue; it spreads through contact and lingers after death |
 
 ## Solitary survival
 
@@ -194,7 +223,7 @@ A creature can live alone only if it can keep itself alive without trophic facto
 | **Dark cores** | Burn so little they can last a long time as their reserve drains. |
 | **Quiescent creatures** | Anything can go quiescent and wait, unfiring and barely burning, to be wired in. |
 
-Every other kind of loner is slowly dying: no partner feeds its trophic reserve, so it reaches toward neighbours until it wires in or apoptoses. A loner that is well fed can still breed by **solo birth** (above), seeding the company it lacks, and its self-crossed children are where hidden and mutant traits most often appear. Loners never gain circuit powers.
+Every other kind of loner is slowly dying: no partner feeds its trophic reserve, so it reaches toward neighbours until it wires in or apoptoses. A loner hears only itself, so its Echo always climbs. It can breed by **solo birth** (above), but its company is a clone: the loneliness doubles instead of ending, unless the mutations are enough. A loner's real way out is to wire to someone different. Loners never gain circuit powers.
 
 ## The dead
 
@@ -234,4 +263,9 @@ The person tends the tissue, never commands the creatures:
 - **Move:** place a creature somewhere new.
 - **Separate:** cut a circuit apart.
 
-Care has consequences: over-perfusion breeds overcrowding, over-stimulation causes seizures, and constant separation stops circuits from ever learning.
+- **Introduce:** bring a stranger into a circuit. Competition is medicine: a challenger lowers everyone's Echo.
+- **Quarantine:** isolate a septic creature before it spreads, knowing that isolation alone makes its Echo worse.
+
+The keeper's real job is **diversity and challenge**: breed across lines as fast as possible, and keep enough competition in every circuit that nothing is only listening to itself.
+
+Care has consequences: over-perfusion breeds overcrowding, over-stimulation causes seizures, constant separation stops circuits from ever learning, and protecting creatures from all competition breeds echo chambers.
