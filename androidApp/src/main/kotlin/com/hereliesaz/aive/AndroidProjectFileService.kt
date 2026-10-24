@@ -102,8 +102,7 @@ internal class AndroidProjectFileService(
     override suspend fun saveAs(fileName: String, content: String): ProjectFileDescriptor? {
         val uri = chooseCreateUri(fileName.asIveFileName()) ?: return null
         withContext(Dispatchers.IO) {
-            resolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(content) }
-                ?: error("Could not open selected project file for writing")
+            writeNewDocument(uri, content, "project file")
             rememberUri(uri)
         }
         return withContext(Dispatchers.IO) { descriptorForUri(uri) }
@@ -144,8 +143,7 @@ internal class AndroidProjectFileService(
         }
         val uri = deferred.await() ?: return null
         return withContext(Dispatchers.IO) {
-            resolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(content) }
-                ?: error("Could not open selected setup file for writing")
+            writeNewDocument(uri, content, "setup file")
             descriptorForUri(uri)
         }
     }
@@ -268,6 +266,23 @@ internal class AndroidProjectFileService(
             locationLabel = uri.toString(),
             modifiedAtEpochMillis = null,
         )
+    }
+
+    /**
+     * Writes [content] to a document the save picker just created. Mode "w", not "wt": the file is
+     * new, and some providers (cloud ones especially) accept "wt" yet keep an empty file. Reads the
+     * document back so an empty save is reported instead of discovered at import.
+     */
+    private fun writeNewDocument(uri: Uri, content: String, label: String) {
+        val bytes = content.encodeToByteArray()
+        (resolver.openOutputStream(uri, "w") ?: error("Could not open the selected $label for writing")).use { output ->
+            output.write(bytes)
+            output.flush()
+        }
+        val written = runCatching { resolver.openInputStream(uri)?.use { it.readBytes().size } }.getOrNull()
+        check(written == null || written > 0) {
+            "The selected location kept an empty $label. Save it to on-device storage (Downloads) instead."
+        }
     }
 
     private fun readUri(uri: Uri): String? = when (uri.scheme) {

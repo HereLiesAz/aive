@@ -152,6 +152,9 @@ object SetupFileCodec {
 
     /** Validates and decrypts a setup file; throws [SetupFileException] without side effects. */
     suspend fun decode(encoded: String, passphrase: String): DecodedSetupFile {
+        if (encoded.isBlank()) {
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "The file is empty; it was not saved completely")
+        }
         val document = try {
             json.decodeFromString(SetupFileDocument.serializer(), encoded)
         } catch (failure: CancellationException) {
