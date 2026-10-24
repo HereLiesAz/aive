@@ -90,6 +90,9 @@ enum class ControlRoomDestination(val label: String) {
          */
         val OverviewSections: List<ControlRoomDestination> = listOf(Runs, Workflows, Company)
 
+        /** Left out of the main navigation: Overview's sections, and Inbox (its header badge opens it). */
+        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + Inbox
+
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
             entries.filter { distributedComputeAvailable || it != Compute }
@@ -368,7 +371,7 @@ private fun PillNavigation(
             InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
         }
         Spacer(Modifier.height(12.dp))
-        val items = destinations.filterNot { it in ControlRoomDestination.OverviewSections }
+        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation }
         items.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
@@ -417,7 +420,7 @@ private fun CompactNavigation(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val items = destinations.filterNot { it in ControlRoomDestination.OverviewSections }
+        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation }
         items.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,

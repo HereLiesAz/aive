@@ -60,9 +60,10 @@ Overview → **Workflows**. The library list stays, and every entry gets **Open 
 
 Each phase can ship on its own.
 
-## Open questions
+## Decisions
 
-- **Shared roles:** when tuning one creature changes a role other bowls use, should it fork into a bowl-local role instead?
-- **Multiples:** can several creatures of the same species live in one bowl, as parallel tasks with one role? The domain allows it.
-- **Phone layout:** on compact screens, does the care panel slide over the bowl or take the full screen?
-- **Sandbox:** should the bowl simulate before **Run**, with creatures acting out a dry run without calling providers?
+- **Roles fork.** Tuning a creature whose role other bowls use copies the role into a bowl-local one; the original stays untouched.
+- **Duplicates allowed.** Several creatures of one species can share a bowl (parallel tasks, one role each).
+- **Care panel slides over the bowl** on every screen size; the bowl stays visible and live behind it.
+- **Dry run.** A **Rehearse** action plays the bowl without calling providers: creatures act out the order, gates and gestations so the shape can be checked before **Run**.
+- **Gestation.** Every block and bottleneck is shown as a gestation: a creature that holds work back (a gate, an approval, a dependency many tasks wait on, a blocked or slow task) swells as the work behind it accumulates, and when it clears, it gives birth to the next phase: the downstream creatures emerge from it. The projection already records a `birthParentId` per creature (`WorkflowTerrariumProjection.kt`), which is the hook for whom each creature is born from. In **Rehearse** the same births play out in order.
