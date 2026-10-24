@@ -1,6 +1,6 @@
 # Fish Bowl Builder (design draft)
 
-Status: proposal, not built. Approve or redirect before code.
+Status: approved design, not built.
 
 ## The idea
 
