@@ -26,6 +26,7 @@ class WorkflowLibraryTabStateTest {
                 WorkflowLibraryTab.Library,
                 WorkflowLibraryTab.Store,
                 WorkflowLibraryTab.Overview,
+                WorkflowLibraryTab.Bowl,
                 WorkflowLibraryTab.Tasks,
                 WorkflowLibraryTab.Combine,
                 WorkflowLibraryTab.Save,

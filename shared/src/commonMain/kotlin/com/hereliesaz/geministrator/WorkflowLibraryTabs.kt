@@ -8,6 +8,8 @@ internal enum class WorkflowLibraryTab(val needsSelection: Boolean) {
     Library(needsSelection = false),
     Store(needsSelection = false),
     Overview(needsSelection = true),
+    /** The workflow as a fish bowl: its creatures at rest, no run. docs/Fishbowl-Builder.md */
+    Bowl(needsSelection = true),
     Tasks(needsSelection = true),
     Combine(needsSelection = true),
     Save(needsSelection = true),
