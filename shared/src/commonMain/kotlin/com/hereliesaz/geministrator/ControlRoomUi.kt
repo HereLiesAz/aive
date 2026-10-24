@@ -79,7 +79,17 @@ enum class ControlRoomDestination(val label: String) {
     Settings("Settings"),
     ;
 
+    /** The main-navigation entry that is highlighted while this destination is open. */
+    val navigationItem: ControlRoomDestination
+        get() = if (this in OverviewSections) Overview else this
+
     companion object {
+        /**
+         * Opened from the section row at the top of [Overview], not from the main navigation.
+         * Overview itself shows the run mind map until one of these is tapped.
+         */
+        val OverviewSections: List<ControlRoomDestination> = listOf(Runs, Workflows, Company)
+
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
             entries.filter { distributedComputeAvailable || it != Compute }
@@ -174,6 +184,7 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                    onDestinationSelected = onDestinationSelected,
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
@@ -243,6 +254,7 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                    onDestinationSelected = onDestinationSelected,
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
                     onLaunchWorkflow = onLaunchWorkflow,
@@ -356,16 +368,17 @@ private fun PillNavigation(
             InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
         }
         Spacer(Modifier.height(12.dp))
-        destinations.forEachIndexed { index, item ->
+        val items = destinations.filterNot { it in ControlRoomDestination.OverviewSections }
+        items.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
                 seed = "nav-$index-${item.name}",
-                selected = item == destination,
+                selected = item == destination.navigationItem,
                 endCap = null,
                 onClick = { onDestinationSelected(item) },
                 modifier = Modifier
-                    .fillMaxWidth(if (item == destination) 0.96f else 0.84f - (index % 3) * 0.03f)
-                    .azphaltEntrance(entrance, index, destinations.size),
+                    .fillMaxWidth(if (item == destination.navigationItem) 0.96f else 0.84f - (index % 3) * 0.03f)
+                    .azphaltEntrance(entrance, index, items.size),
             )
         }
         Spacer(Modifier.weight(1f))
@@ -404,13 +417,40 @@ private fun CompactNavigation(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        destinations.forEachIndexed { index, item ->
+        val items = destinations.filterNot { it in ControlRoomDestination.OverviewSections }
+        items.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
                 seed = "compact-$index-${item.name}",
-                selected = item == destination,
+                selected = item == destination.navigationItem,
                 onClick = { onDestinationSelected(item) },
-                modifier = Modifier.azphaltEntrance(entrance, index, destinations.size),
+                modifier = Modifier.azphaltEntrance(entrance, index, items.size),
+            )
+        }
+    }
+}
+
+/**
+ * Runs, Workflows and Swarm across the top of Overview. Tapping the open one returns to the
+ * Overview mind map.
+ */
+@Composable
+private fun OverviewSectionTabs(
+    destination: ControlRoomDestination,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
+            AzphaltPill(
+                label = section.label,
+                seed = "overview-section-$index-${section.name}",
+                selected = section == destination,
+                onClick = {
+                    onDestinationSelected(if (section == destination) ControlRoomDestination.Overview else section)
+                },
             )
         }
     }
@@ -473,103 +513,109 @@ private fun MainDestination(
     compact: Boolean = false,
     runtimeState: ApplicationRuntimeState,
     onOpenSettings: () -> Unit = {},
+    onDestinationSelected: (ControlRoomDestination) -> Unit = {},
 ) {
-    AzphaltPlaceTransition(target = destination, modifier = modifier.fillMaxSize()) { place ->
-        when (place) {
-            ControlRoomDestination.Overview -> MindMapRunScreen(
-                modifier = Modifier.fillMaxSize(),
-                selectedTaskId = selectedTaskId,
-                onTaskSelected = onTaskSelected,
-                onLaunchWorkflow = onLaunchWorkflow,
-                onLoadLaunchableRuns = onLoadLaunchableRuns,
-                projectFileService = projectFileService,
-                onImportProjectFile = onImportProjectFile,
-                onRecoverFromCorruption = onRecoverFromCorruption,
-                onRetryRuntime = onRetryRuntime,
-                onOpenSettings = onOpenSettings,
-                onValidateWorkflow = onValidateWorkflow,
-                availableRepositorySources = availableRepositorySources,
-                onPickLocalRepository = onPickLocalRepository,
-                connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                onSearchRepositories = onSearchRepositories,
-                compact = compact,
-                runtimeState = runtimeState,
-            )
-            ControlRoomDestination.Runs -> RunsScreen(
-                runtimeState = runtimeState,
-                onLoadRunHistory = onLoadRunHistory,
-                onSwitchRun = onSwitchRun,
-                onLoadRunTimeline = onLoadRunTimeline,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Workflows -> LiveWorkflowLibraryScreen(
-                runtimeState = runtimeState,
-                onLoadDefinitions = onLoadWorkflowDefinitions,
-                azphaltStoreService = azphaltStoreService,
-                azphaltPackageImportRequest = azphaltPackageImportRequest,
-                onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Company -> CustomCompanyProviderScreen(
-                runtimeState = runtimeState,
-                connectedProviderIds = connectedProviderIds,
-                onSaveRoleCollection = onSaveRoleCollection,
-                onResetRoleCollection = onResetRoleCollection,
-                roleSurfaceFilePicker = roleSurfaceFilePicker,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
-            ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
-            ControlRoomDestination.Repositories -> RepositoryServiceScreen(
-                connectedServiceIds = connectedRepositoryServiceIds,
-                onConfigureService = onConfigureRepositoryService,
-                onDisconnectService = onDisconnectRepositoryService,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Compute -> ComputeDelegationScreen(
-                runtimeState = runtimeState,
-                distributedComputeState = distributedComputeState,
-                onAssignWorkflow = onAssignWorkflowCompute,
-                onAssignRole = onAssignRoleCompute,
-                onAssignTask = onAssignTaskCompute,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Memory -> MemoryLayerScreen(
-                controller = memoryLayer,
-                connectedProviderIds = connectedProviderIds,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.AddOns -> AzphaltStoreScreen(
-                service = azphaltStoreService,
-                importRequest = azphaltPackageImportRequest,
-                onImportHandled = onAzphaltPackageImportHandled,
-                connectedProviderIds = connectedProviderIds,
-                onConnectProvider = onReconfigureProvider,
-                onDisconnectProvider = onDisconnectProvider,
-                modifier = Modifier.fillMaxSize(),
-            )
-            ControlRoomDestination.Settings -> ProviderSettingsScreen(
-                connectedProviderIds = connectedProviderIds,
-                onCheckProviderHealth = onCheckProviderHealth,
-                onClearWorkflowData = onClearWorkflowData,
-                onExportJson = onExportJson,
-                onImportJson = onImportJson,
-                projectFileService = projectFileService,
-                onExportCurrentProjectFile = onExportCurrentProjectFile,
-                onImportProjectFile = onImportProjectFile,
-                setupFileActions = setupFileActions,
-                onExportDiagnosticBundle = onExportDiagnosticBundle,
-                onConfigureProvider = onReconfigureProvider,
-                onDisconnectProvider = onDisconnectProvider,
-                distributedComputeState = distributedComputeState,
-                onSaveDistributedCompute = onSaveDistributedCompute,
-                onDisconnectDistributedCompute = onDisconnectDistributedCompute,
-                crashReportingSetting = crashReportingSetting,
-                remoteAccessSetting = remoteAccessSetting,
-                localPlannerSetting = localPlannerSetting,
-                localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
-                modifier = Modifier.fillMaxSize(),
-            )
+    Column(modifier.fillMaxSize()) {
+        if (destination.navigationItem == ControlRoomDestination.Overview) {
+            OverviewSectionTabs(destination, onDestinationSelected)
+        }
+        AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
+            when (place) {
+                ControlRoomDestination.Overview -> MindMapRunScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    selectedTaskId = selectedTaskId,
+                    onTaskSelected = onTaskSelected,
+                    onLaunchWorkflow = onLaunchWorkflow,
+                    onLoadLaunchableRuns = onLoadLaunchableRuns,
+                    projectFileService = projectFileService,
+                    onImportProjectFile = onImportProjectFile,
+                    onRecoverFromCorruption = onRecoverFromCorruption,
+                    onRetryRuntime = onRetryRuntime,
+                    onOpenSettings = onOpenSettings,
+                    onValidateWorkflow = onValidateWorkflow,
+                    availableRepositorySources = availableRepositorySources,
+                    onPickLocalRepository = onPickLocalRepository,
+                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                    onSearchRepositories = onSearchRepositories,
+                    compact = compact,
+                    runtimeState = runtimeState,
+                )
+                ControlRoomDestination.Runs -> RunsScreen(
+                    runtimeState = runtimeState,
+                    onLoadRunHistory = onLoadRunHistory,
+                    onSwitchRun = onSwitchRun,
+                    onLoadRunTimeline = onLoadRunTimeline,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Workflows -> LiveWorkflowLibraryScreen(
+                    runtimeState = runtimeState,
+                    onLoadDefinitions = onLoadWorkflowDefinitions,
+                    azphaltStoreService = azphaltStoreService,
+                    azphaltPackageImportRequest = azphaltPackageImportRequest,
+                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Company -> CustomCompanyProviderScreen(
+                    runtimeState = runtimeState,
+                    connectedProviderIds = connectedProviderIds,
+                    onSaveRoleCollection = onSaveRoleCollection,
+                    onResetRoleCollection = onResetRoleCollection,
+                    roleSurfaceFilePicker = roleSurfaceFilePicker,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
+                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+                ControlRoomDestination.Repositories -> RepositoryServiceScreen(
+                    connectedServiceIds = connectedRepositoryServiceIds,
+                    onConfigureService = onConfigureRepositoryService,
+                    onDisconnectService = onDisconnectRepositoryService,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Compute -> ComputeDelegationScreen(
+                    runtimeState = runtimeState,
+                    distributedComputeState = distributedComputeState,
+                    onAssignWorkflow = onAssignWorkflowCompute,
+                    onAssignRole = onAssignRoleCompute,
+                    onAssignTask = onAssignTaskCompute,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Memory -> MemoryLayerScreen(
+                    controller = memoryLayer,
+                    connectedProviderIds = connectedProviderIds,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.AddOns -> AzphaltStoreScreen(
+                    service = azphaltStoreService,
+                    importRequest = azphaltPackageImportRequest,
+                    onImportHandled = onAzphaltPackageImportHandled,
+                    connectedProviderIds = connectedProviderIds,
+                    onConnectProvider = onReconfigureProvider,
+                    onDisconnectProvider = onDisconnectProvider,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                ControlRoomDestination.Settings -> ProviderSettingsScreen(
+                    connectedProviderIds = connectedProviderIds,
+                    onCheckProviderHealth = onCheckProviderHealth,
+                    onClearWorkflowData = onClearWorkflowData,
+                    onExportJson = onExportJson,
+                    onImportJson = onImportJson,
+                    projectFileService = projectFileService,
+                    onExportCurrentProjectFile = onExportCurrentProjectFile,
+                    onImportProjectFile = onImportProjectFile,
+                    setupFileActions = setupFileActions,
+                    onExportDiagnosticBundle = onExportDiagnosticBundle,
+                    onConfigureProvider = onReconfigureProvider,
+                    onDisconnectProvider = onDisconnectProvider,
+                    distributedComputeState = distributedComputeState,
+                    onSaveDistributedCompute = onSaveDistributedCompute,
+                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                    crashReportingSetting = crashReportingSetting,
+                    remoteAccessSetting = remoteAccessSetting,
+                    localPlannerSetting = localPlannerSetting,
+                    localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
