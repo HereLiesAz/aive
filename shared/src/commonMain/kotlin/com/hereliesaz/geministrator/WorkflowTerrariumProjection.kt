@@ -410,3 +410,18 @@ private fun terrariumJitter(seed: String): Pair<Float, Float> {
     val y = (((hash ushr 16) and 0xFF) / 255f - .5f) * .055f
     return x to y
 }
+
+/**
+ * A stand-in run for showing a workflow with no run behind it (the fish bowl): no task has a run,
+ * so every creature is at rest. Never persisted.
+ */
+internal fun restingWorkflowRun(definition: WorkflowDefinition): WorkflowRun = WorkflowRun(
+    id = com.hereliesaz.geministrator.domain.WorkflowRunId("bowl--${definition.id.value}"),
+    projectId = com.hereliesaz.geministrator.domain.ProjectId("bowl"),
+    workflowDefinitionId = definition.id,
+    objective = definition.description ?: definition.name,
+    status = com.hereliesaz.geministrator.domain.WorkflowRunStatus.Created,
+    taskRuns = emptyMap(),
+    createdAtEpochMillis = 0,
+    updatedAtEpochMillis = 0,
+)

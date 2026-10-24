@@ -52,7 +52,7 @@ Overview → **Workflows**. The library list stays, and every entry gets **Open 
 
 ## Phases
 
-1. **Read-only bowl:** open any saved workflow in the bowl with no run.
+1. **Read-only bowl:** open any saved workflow in the bowl with no run. *Built: Workflows → pick a workflow → **Bowl** tab.*
 2. **Interactions:** drag a creature to add or remove a dependency, with live health. It reuses the authoring functions.
 3. **Species tray and Release:** add and remove creatures.
 4. **Care panel:** task fields, then role fields.

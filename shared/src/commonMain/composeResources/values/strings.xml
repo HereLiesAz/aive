@@ -213,6 +213,7 @@
     <string name="library_tab_library">My library</string>
     <string name="library_tab_store">Azphalt Store</string>
     <string name="library_tab_overview">Overview</string>
+    <string name="library_tab_bowl">Bowl</string>
     <string name="library_tab_tasks">Tasks</string>
     <string name="library_tab_combine">Combine</string>
     <string name="library_tab_save">Save</string>
