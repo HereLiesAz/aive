@@ -89,7 +89,7 @@ class SetupFileTransfer(
         val importedSettings = contents.settings.filterKeys(::isSetupSettingsKey)
         val importedInference = contents.inferenceRegistrations?.let { raw ->
             runCatching { inferenceRegistrationsOf(json.parseToJsonElement(raw).jsonObject) }.getOrElse { failure ->
-                throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file is damaged", failure)
+                throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file inference data is unreadable: ${failure.detail()}", failure)
             }
         }
 

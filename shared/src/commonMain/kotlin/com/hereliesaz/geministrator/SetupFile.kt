@@ -152,12 +152,15 @@ object SetupFileCodec {
 
     /** Validates and decrypts a setup file; throws [SetupFileException] without side effects. */
     suspend fun decode(encoded: String, passphrase: String): DecodedSetupFile {
+        if (encoded.isBlank()) {
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "The file is empty; it was not saved completely")
+        }
         val document = try {
             json.decodeFromString(SetupFileDocument.serializer(), encoded)
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Exception) {
-            throw SetupFileException(SetupFileFailure.NotASetupFile, "Not a The Aive setup file", failure)
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "Not a The Aive setup file: ${failure.detail()}", failure)
         }
         if (document.format != SETUP_FILE_FORMAT) {
             throw SetupFileException(SetupFileFailure.NotASetupFile, "Not a The Aive setup file (format=${document.format})")
@@ -175,14 +178,14 @@ object SetupFileCodec {
         val (salt, iv, ciphertext) = try {
             Triple(Base64.decode(sealed.salt), Base64.decode(sealed.iv), Base64.decode(sealed.ciphertext))
         } catch (failure: IllegalArgumentException) {
-            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file is damaged", failure)
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file encoding is damaged", failure)
         }
         val contents = try {
             json.decodeFromString(SetupFileContents.serializer(), document.setupJson)
         } catch (failure: CancellationException) {
             throw failure
         } catch (failure: Exception) {
-            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file is damaged", failure)
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file settings are unreadable: ${failure.detail()}", failure)
         }
         val cipher = crypto { aesGcm(passphrase, salt, sealed.iterations) }
         val plaintext = run {
@@ -198,7 +201,7 @@ object SetupFileCodec {
         val secrets = try {
             json.decodeFromString(SetupSecrets.serializer(), plaintext.decodeToString())
         } catch (failure: Exception) {
-            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file is damaged", failure)
+            throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file credentials are unreadable", failure)
         }
         return DecodedSetupFile(document.createdAtEpochMillis, contents, secrets)
     }
@@ -223,6 +226,12 @@ object SetupFileCodec {
         throw SetupFileException(SetupFileFailure.CryptoUnavailable, "Setup file encryption is not available here", failure)
     }
 }
+
+/**
+ * The parser's own reason, shortened, for the import error's details. Only for the plain part of a
+ * file: a message about decrypted credentials could quote them.
+ */
+internal fun Throwable.detail(): String = (message ?: this::class.simpleName ?: "unknown").take(300)
 
 fun String.asSetupFileName(): String {
     val clean = trim()

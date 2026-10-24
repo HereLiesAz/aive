@@ -164,7 +164,8 @@ internal fun SetupFileSection(
                             } catch (failure: CancellationException) {
                                 throw failure
                             } catch (failure: SetupFileException) {
-                                message = setupFailureText(failure.failure) to null
+                                // The exception's own text says which check failed; it never carries credential values.
+                                message = setupFailureText(failure.failure) to failure.message
                             } catch (failure: Exception) {
                                 // Messages from the stores never contain credential values.
                                 message = getString(
