@@ -2,7 +2,6 @@
 
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.geministrator.azphalt.platformAzphaltCryptographyProvider
 import dev.whyoleg.cryptography.BinarySize.Companion.bits
 import dev.whyoleg.cryptography.CryptographySystem
 import dev.whyoleg.cryptography.DelicateCryptographyApi
@@ -207,7 +206,7 @@ object SetupFileCodec {
     }
 
     private suspend fun aesGcm(passphrase: String, salt: ByteArray, iterations: Int) = run {
-        val provider = platformAzphaltCryptographyProvider()
+        val provider = setupFileCryptographyProvider()
         val keyBytes = provider.get(PBKDF2)
             .secretDerivation(SHA256, iterations, 256.bits, salt)
             .deriveSecretToByteArray(passphrase.encodeToByteArray())
@@ -241,3 +240,9 @@ fun String.asSetupFileName(): String {
         .ifEmpty { "aive-setup" }
     return if (clean.endsWith(SETUP_FILE_EXTENSION, ignoreCase = true)) clean else clean + SETUP_FILE_EXTENSION
 }
+
+/**
+ * Crypto for setup files. Android needs the bundled BouncyCastle instance itself: looking it up by
+ * name ("BC") finds the platform's stripped copy, which has no PBKDF2WithHmacSHA256.
+ */
+internal expect fun setupFileCryptographyProvider(): dev.whyoleg.cryptography.CryptographyProvider
