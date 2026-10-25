@@ -2,6 +2,52 @@
 
 `Node-Creature-Genome.md` describes the creatures as living things. This document says what that life **is**: every creature is an agent, every rule is something real agents do, and keeping the bowl healthy is the same act as running a good swarm. The facade isn't decoration over the work; it's the work, made legible.
 
+## The binding rule
+
+**Nothing happens in the creatures' world unless something happened in the swarm, and nothing happens in the swarm without the creatures showing it.** The life layer is not a simulation running beside the work; it's the work's telemetry given a body. No dice: no random strokes, no random hatch rolls, no drift for its own sake. Ambient animation (breathing, idle sway) is allowed only because it changes nothing and means nothing; every change of state, position, health, wiring, birth or death has a recorded cause in a run.
+
+The full ledger:
+
+| Life event | Backed by | Source |
+|---|---|---|
+| **Tick** | A run event: any task changing state, any agent step finishing | the run's event stream |
+| **Spike** | One agent step completing (a model turn, a tool call, a commit) | provider responses, tool results |
+| **Charge** | Work waiting for the agent: inputs arrived, task ready | task queue |
+| **Synapse forms** | A dependency edge between two agents' tasks, or one agent consuming another's artifact | workflow definition, artifact reads |
+| **Synapse strengthens** | An artifact passed across it and the consumer succeeded with it | artifact handoff + consumer result |
+| **Synapse prunes** | The dependency was removed, or no artifact crossed it for N runs | workflow edits, run history |
+| **Kinship** | Similarity of the two agents' configurations: provider, model, instruction lineage, tools | roster |
+| **Trophic support** | The agent's output was consumed and accepted downstream | review outcomes, consumer success |
+| **Energy (glucose)** | Token budget remaining for this agent; burn is tokens spent | provider usage |
+| **Blood, capillaries** | Connected providers; distance to a capillary is that provider's current latency and availability for this agent | provider health |
+| **Crowding** | More concurrent tasks than slots, or more inputs than the agent's context window holds | concurrency policy, measured context fill |
+| **Excitotoxicity** | Retrying or re-firing too fast: a tight loop | retry timestamps |
+| **Runaway excitation** | Many producers triggering the agent with no reviewer gating any of them | graph shape + review assignments |
+| **Integrity** | The agent's reliability: recent success, failure and rejection | task outcomes |
+| **Echo** | Share of the agent's inputs, reviews and memory reads produced by its own kind | provenance |
+| **Septic, poisoned tissue** | Artifacts never challenged by a different agent, and everything that consumed them | provenance graph |
+| **Phagocyte bite** | A recovery or clean-up agent rejecting or retiring a failing agent's output | recovery tasks |
+| **Apoptosis** | The agent retired for disuse (nothing consumed its output) or for spent budget | roster, usage |
+| **Necrosis, corpse** | A task that failed terminally, left in the graph breaking its dependents, until recovered | task status |
+| **Egg** | A block of work several agents are completing together (a milestone, a gate, a shared dependency) | workflow structure |
+| **Hatching** | The block cleared. The child is a new agent configuration recombined from the contributors, added to the roster | block result |
+| **Failed egg** | The block failed, or the recombined configuration is invalid (incompatible model and tools) | block result, config validation |
+| **Solo clone** | An agent's configuration duplicated: by the person, or a planner spawning same-config agents | roster, planner |
+| **Mutation** | The variation actually written into the child's configuration (model tier, instruction wording, tool set) | the child config itself |
+| **Wake, sleep** | Runs active vs. idle; sleep is when memory consolidates | run status, memory layer |
+| **Stroke** | A provider outage | provider health |
+| **Low glucose** | Budget running out across the swarm | usage vs. budget |
+| **Fever** | Higher sampling temperature, or an unstable provider | run settings, error rates |
+| **Position, movement** | Graph layout: creatures move only when their wiring, cluster or provider changes | layout of the real graph |
+| **Keeper: Talk** | The person messaging, approving, rejecting or editing an agent | user actions |
+| **Keeper: Perfuse** | Raising budget | settings |
+| **Keeper: Introduce** | Connecting a provider or model, or importing an agent | settings, Store |
+| **Keeper: Quarantine** | Holding an agent's artifacts from consumers | real control |
+| **Keeper: Separate** | Detaching an agent from its workflow edges | workflow edit |
+| **Keeper: Sleep now** | Running memory consolidation | memory layer |
+
+The test bench obeys the same rule: it doesn't roll dice for life events; it replays a stream of **synthetic workflow events** (steps, handoffs, reviews, failures, outages), and the creatures react to that stream exactly as they would to a real one.
+
 ## The central truth: Echo is real
 
 The most dangerous failure in a multi-agent system is an agent listening only to itself: a model reviewing its own output, agents with the same model and the same prompt checking each other, a pipeline whose every step is one model's voice repeated. Errors aren't caught; they're **agreed with**. Confidence rises while accuracy falls, and a hallucination that nobody different ever challenges travels downstream as fact.
