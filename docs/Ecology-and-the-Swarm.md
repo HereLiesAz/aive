@@ -48,6 +48,39 @@ The full ledger:
 
 The test bench obeys the same rule: it doesn't roll dice for life events; it replays a stream of **synthetic workflow events** (steps, handoffs, reviews, failures, outages), and the creatures react to that stream exactly as they would to a real one.
 
+### The bench
+
+The bench runs every workflow offered in the Azphalt Store (64 at the time of writing, 427 tasks), launched in turn, with their real tasks, roles and dependencies. A seeded generator stands in for the providers. It makes only three kinds of draw, and each is tied to a run event: whether a finished step's output carries a flaw, whether a reviewer catches it, and which variation a new config gets. Outages come from a provider status feed fixed when the session starts.
+
+| Run event | What the creature shows |
+|---|---|
+| A step finishes | Spike; budget spent (1, 1.5 or 2.5 tokens by Core); one write to shared memory |
+| A step's memory write | Echo +0.06 × share of memory written by configs ≥ 80% alike, −0.04 × the rest |
+| A task reads its own earlier output | Echo +0.6 |
+| A task reads another agent's output | Synapse formed or strengthened; producer's trophic +4; echo +0.4 from a near-clone, −4 × (0.9 − kinship) from a stranger |
+| A task reads contaminated output | Echo +3, integrity −2, stain |
+| Three or more unreviewed inputs drive one task | Runaway excitation: integrity −4 |
+| A retry starts within 5 ticks of a rejection | Excitotoxicity: integrity −1.5 |
+| A review passes clean work | Producer's trophic +8, echo −5 × (0.9 − kinship) |
+| A review rejects a flaw | Producer's integrity −5 (−8 from a phagocyte), echo −15 × (0.9 − kinship); the task reruns |
+| A review misses a flaw | The output is contaminated; both sides' echo +3 when they're ≥ 95% alike |
+| A task is rejected three times, or delivery finds a flaw nobody caught | Run fails: the egg withers; the worker loses 20 integrity; a corpse stays in the graph until a phagocyte recovers it |
+| A run clears | Its egg hatches a recombined config from every contributor, or a clone when there was only one |
+| A task waits 15 ticks with no free agent | The planner copies an existing config, or a progenitor divides |
+| The output goes unused | Trophic decays 0.08 per tick; at zero, apoptosis |
+| The agent's budget stays empty for 600 ticks | Retired |
+| Provider outage | Calls stall; every 10 stalled ticks costs 0.5 integrity |
+| Echo reaches 85 | Septic: every output is flawed and contaminated; integrity −0.3 per tick |
+| No runs in flight outside working hours | Sleep: memory and stains fade faster |
+
+Measured over 5,000 ticks from one agent:
+
+| | Left alone | With a keeper |
+|---|---|---|
+| Mean echo | ~30, with septic agents recurring | ~5 |
+| Runs failed | ~28% | ~12% |
+| Diversity | 10–20% | 35–50% |
+
 ## The central truth: Echo is real
 
 The most dangerous failure in a multi-agent system is an agent listening only to itself: a model reviewing its own output, agents with the same model and the same prompt checking each other, a pipeline whose every step is one model's voice repeated. Errors aren't caught; they're **agreed with**. Confidence rises while accuracy falls, and a hallucination that nobody different ever challenges travels downstream as fact.
