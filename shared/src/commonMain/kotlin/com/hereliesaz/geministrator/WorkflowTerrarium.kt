@@ -74,6 +74,9 @@ internal fun GeministratorWorkflowTerrarium(
             persistedPositions = positions,
         )
     }
+    val tissue = remember(projection, stagedDefinition, run) {
+        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position })
+    }
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
             if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
@@ -113,6 +116,7 @@ internal fun GeministratorWorkflowTerrarium(
                 serviceVisits = projection.serviceVisits,
                 editable = true,
                 compact = compact,
+                tissue = tissue,
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {

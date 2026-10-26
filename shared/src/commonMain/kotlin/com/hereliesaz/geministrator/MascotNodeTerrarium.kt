@@ -92,6 +92,7 @@ internal fun PlatformNodeTerrarium(
     modifier: Modifier = Modifier,
     editable: Boolean = true,
     compact: Boolean = false,
+    tissue: TissueScene? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -105,6 +106,7 @@ internal fun PlatformNodeTerrarium(
         modifier = modifier,
         editable = editable,
         compact = compact,
+        tissue = tissue,
     )
 }
 
@@ -121,6 +123,7 @@ private fun MascotNodeTerrarium(
     modifier: Modifier,
     editable: Boolean,
     compact: Boolean,
+    tissue: TissueScene?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -258,6 +261,9 @@ private fun MascotNodeTerrarium(
         }
 
         Canvas(Modifier.fillMaxSize()) {
+            if (tissue != null) {
+                drawTissueGround(tissue) { screenCenter(it) }
+            } else {
             drawRect(Azphalt.Ink.copy(alpha = 0.025f))
             val grid = 48.dp.toPx() * zoom
             val worldOriginX = size.width * 0.5f - focusX * widthPx * zoom
@@ -272,7 +278,10 @@ private fun MascotNodeTerrarium(
                 drawLine(onGround.copy(alpha = 0.055f), Offset(0f, y), Offset(size.width, y), 1f)
                 y += grid
             }
+            }
 
+            // On the dark tissue, synapses are light; on the plain ground they take the ground's ink.
+            val linkInk = if (tissue != null) Azphalt.White else onGround
             relationships.forEach { relationship ->
                 val toSubject = subjectById[relationship.to] ?: return@forEach
                 val (start, end) = relationshipEndpoints(relationship) ?: return@forEach
@@ -282,8 +291,8 @@ private fun MascotNodeTerrarium(
                 val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
                 val color = when {
                     blocked -> GeministratorColors.error.copy(alpha = 0.40f)
-                    active -> onGround.copy(alpha = 0.42f)
-                    else -> onGround.copy(alpha = 0.28f)
+                    active -> linkInk.copy(alpha = 0.42f)
+                    else -> linkInk.copy(alpha = 0.28f)
                 }
                 val stroke = (if (active) 2.dp else 1.5.dp).toPx()
 
@@ -305,11 +314,14 @@ private fun MascotNodeTerrarium(
                 if (active) {
                     val pulse = start + (end - start) * linkPulse()
                     drawCircle(
-                        color = onGround.copy(alpha = 0.72f),
+                        color = linkInk.copy(alpha = 0.72f),
                         radius = 3.dp.toPx(),
                         center = pulse,
                     )
                 }
+            }
+            tissue?.egg?.let { egg ->
+                drawTissueEgg(egg, zoom, toScreen = { screenCenter(it) }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             }
         }
 
