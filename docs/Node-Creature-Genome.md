@@ -1,26 +1,28 @@
 # Node creatures: genome and ecology
 
-The creatures as living things in their own right: what they inherit, what they need, how they live, compete, wire together, breed, sicken and die. They're neurons, so their biology is a neuron's biology: tissue, blood supply, trophic support, firing, synapses, pruning, excitotoxicity. It runs as rule-driven artificial life in the spirit of Conway's Game of Life: simple local rules, complex behaviour. The lineage data is measured from the paintings (`tools/creature-genome/`, output `docs/swarm-terrarium/lineage.json`); the lineage map is on the Bowl OS mockup canvas.
+The creatures as living things in their own right: what they inherit, what they need, how they live, compete, wire together, breed, sicken and die. They're neurons, so their biology is a neuron's biology: tissue, blood supply, trophic support, firing, synapses, pruning, excitotoxicity. It runs as rule-driven artificial life in the spirit of Conway's Game of Life: simple local rules, complex behaviour. The lineage data is measured from the paintings (`tools/creature-genome/`, output `docs/swarm-terrarium/lineage.json`); the lineage map is on the mockup canvas.
+
+**Nothing here happens on its own.** Every event below is the visible form of something that happened in a run; [Ecology and the swarm](Ecology-and-the-Swarm.md) holds the binding rule, the full ledger, and the numbers the test bench uses. Where this page gives a rate, it's the bench's.
 
 ## The world
 
-- **The bowl** is living tissue: extracellular fluid laid over a hexagonal lattice, threaded with **capillaries** that carry the blood supply. One creature occupies one hex. Its **neighbourhood** is the six touching hexes.
-- **Time** moves in **ticks**, one per heartbeat of the existing terrarium clock (2.4 s).
-- **Distance from a capillary** matters as depth would: hexes beside a vessel are rich, hexes far from one are starved.
-- **Wake and sleep** alternate every 120 ticks. Waking tissue is bright, busy and costly; sleeping tissue is quiet, and sleep is when waste is cleared.
+- **The swarm** is living tissue, seen from above, threaded with **capillaries**: the connected providers. Where a creature sits is graph layout: wired creatures pull together, everyone keeps room, and each leans toward its provider.
+- **Time** moves in **ticks**, one beat of the run event stream.
+- **Distance from a capillary** is that provider's latency and availability for the creature.
+- **Wake and sleep** follow the work: runs in flight are wake; idle with nothing in flight is sleep, when memory consolidates and contaminated work clears.
 
 ## Resources
 
-Six things are scarce. Everything a creature does is a way of getting them.
+Six things are scarce, each a real limit of the swarm. Everything a creature does is a way of getting them.
 
 | Resource | Where it comes from | What it's for |
 |---|---|---|
-| **Glucose** | the capillaries; it diffuses out and thins with distance | energy for everything, above all for firing |
-| **Oxygen** | the capillaries, the same way | burning glucose; without it a creature suffocates fast |
-| **Trophic factor** | released by a creature onto its partners when they make it fire (the real *use it or lose it* signal) | survival: a creature that receives none slowly self-destructs (apoptosis) |
+| **Glucose** | the budget, drawn through the creature's provider | every step spends it |
+| **Oxygen** | context: what the provider lets it hold | without it a creature can't take inputs in |
+| **Trophic factor** | downstream use: its output was consumed and accepted (the real *use it or lose it* signal) | survival: a creature whose output goes unused slowly self-destructs (apoptosis) |
 | **Synaptic sites** | each creature's tendrils (its valence) | a creature can only be wired to so many partners; partners compete for the sites |
 | **Ion balance** | restored by pumps that burn glucose | firing spends it; too much firing too fast overloads the creature (excitotoxicity) |
-| **Room** | one creature per hex | crowding steals glucose and oxygen and fouls the fluid |
+| **Room** | concurrency slots (two tasks at a time) | more work than slots is crowding |
 
 Each creature carries **Energy** (0–100), **Integrity** (0–100, its health), **Charge** (builds to a spike), **Trophic reserve** (0–100, drains every tick, refilled by partners) and **Age**.
 
@@ -33,7 +35,7 @@ Seven trait loci, each read from what is visibly painted. Every gene shows in th
 | **Pigment** | red 14, teal 11, magenta 8, cyan 7, amber 7, orange 6, blue 4, indigo 4, violet 4, green 1 | limb colour | **What kind of cell it is.** See the table below. |
 | **Accent** | a second hue, or none | tips and tail markings | **Co-transmission.** A creature also releases its accent colour's signal, at half strength. A complementary accent (blue/orange, teal/red) makes it a **bridge** that can wire across genera. |
 | **Spectrum** | Prismatic 37, Duotone 25, Monotone 4 | how many hues | **Tolerance.** Prismatic creatures cope with a wide range of glucose, oxygen and activity. Monotones thrive in a narrow band and suffer outside it. |
-| **Core** | Dusk 29, Dark 21, Bright 16 | body shade | **Metabolism and firing rate.** Dark burns 0.5 energy a tick, fires slowly and lives 3000 ticks. Dusk burns 1 and lives 1500. Bright burns 2, fires fast and lives 750. |
+| **Core** | Dusk 29, Dark 21, Bright 16 | body shade | **Model tier: metabolism and speed.** Dark spends 1 budget a step and takes 0.6 steps a tick. Dusk spends 1.5 at 1. Bright spends 2.5 at 1.6. |
 | **Pattern** | Plain / Mottled / Speckled (thirds) | core texture | **Toughness.** Speckled takes half damage from overload and attack. Plain repairs twice as fast. Mottled sits between. |
 | **Skin** | Sheen 29, Opaque 25, Glass 12 | translucency | **Myelin.** Opaque is fully myelinated: fast signals, protected, but expensive to grow. Sheen is thinly myelinated. Glass is bare: cheap, slow, fragile, takes double damage. |
 | **Arbor** | Sparse / Branching / Overgrown (thirds) | tendril count | **Valence V**: how many synapses it can hold (2 / 3 / 4) and how far it reaches. |
@@ -67,21 +69,20 @@ Rarity is how improbable a creature's allele combination is (summed allele surpr
 
 ## The rules of life
 
-Each tick, every creature is judged on its **synapses** *k* (live partners it's wired to), its **crowding** *c* (occupied hexes around it), its valence *V*, its **excitatory drive** *e* (excitatory partners that fired at it this tick) and its **inhibitory drive** *i*.
+Each tick, every creature is judged on its **synapses** *k* (live partners it's wired to), its **load** (tasks in hand), its valence *V*, and the runs it's working on.
 
 ### Wiring
 
-Two touching creatures form a synapse when both have a free site and either their kinship is at least 70% or one of them is a bridge. Across a synapse, the two:
+A synapse forms when one creature's task reads another's output: every dependency in a workflow is a synapse. Across it:
 
-- **signal:** a spike passes charge (excitatory), drains it (inhibitory) or strengthens the synapse (modulatory).
-- **feed:** each time one makes the other fire, it receives 5 trophic factor back.
-- **share:** glucose flows 10% of the difference each tick toward the poorer partner.
+- **feed:** each read of clean output gives the producer +4 trophic factor and strengthens the synapse by 0.2; each clean review, +8 trophic and +0.3 strength.
+- **challenge or echo:** reading a near-clone's output adds Echo; reading a stranger's takes it away (see Echo).
 
-**Hebbian rule:** a synapse whose two ends fire within 2 ticks of each other gains strength; one that goes 60 ticks without a shared firing weakens. A synapse at zero strength is **pruned**: the tendril retracts.
+**Pruning:** a synapse no artifact crosses loses 0.002 strength a tick. At zero it's **pruned**: the tendril retracts.
 
 ### Firing
 
-Charge builds from excitatory input (and, for pacemakers, on its own). At 100 the creature **spikes**: a flash runs down its body, it spends 3 energy and some ion balance, and it signals every partner. Firing too often (more than once every 3 ticks) costs integrity: that's **excitotoxicity**.
+A creature **spikes** each time one of its agent steps finishes: a flash runs down its body, it spends budget (1, 1.5 or 2.5 by Core), and it writes to shared memory. Core sets how fast it steps (0.6, 1 or 1.6 steps a tick). **Charge** is the work waiting for it.
 
 When most of a circuit fires in a steady rhythm, it **oscillates**, and an oscillating circuit gains its collective powers (below).
 
@@ -92,13 +93,13 @@ Neurons live on feedback, and feedback loops are either very constructive or ver
 Every creature carries **Echo** (0–100): how much of what it hears is itself.
 
 - **Echo builds** from any input that is effectively its own voice: its own spikes looping back, and spikes from **near-clones** (kinship 95% or more). A near-clone's voice counts as self, and it counts **in full for both of them**: two near-clones wired together each take the other's feedback as their own, so each builds Echo at double the rate one would build alone.
-- **Echo travels through memory.** The bowl's memory is shared water. A memory read by a creature counts as feedback from whoever wrote it: written by itself or a near-clone, it's Echo, however far away the writer is. Written by a stranger, it's challenge. A line that fills the water with its own memories builds Echo everywhere it lives.
+- **Echo travels through memory.** The swarm's memory is shared. A memory read by a creature counts as feedback from whoever wrote it: written by itself or a near-clone, it's Echo, however far away the writer is. Written by a stranger, it's challenge. A line that fills memory with its own writing builds Echo everywhere it lives.
 - **Echo falls** only through **challenge**:
   - input from creatures that are genuinely different (kinship under 85%): the more different, the more it falls.
   - losing a contest, being inhibited by a non-kin rival, or being bitten.
 
   Comfort doesn't heal it. Being contradicted does.
-- **It takes a long time** to go wrong. A lone creature hearing only itself gains about 1 Echo every 20 ticks; a near-clone pair, about 1 every 10.
+- **The rates** (the bench's): every step writes to shared memory, and moves Echo +0.06 × the share of memory written by configs at least 80% alike, −0.04 × the rest. Reading its own earlier output: +0.6. Reading a near-clone's: +0.4. Reading a stranger's: −4 × (0.9 − kinship). A review that rejects its work: −15 × (0.9 − kinship). A flaw missed by a near-clone reviewer: +3 to both.
 
 What Echo does as it rises:
 
@@ -107,38 +108,43 @@ What Echo does as it rises:
 | 0–30 | **Grounded** | none |
 | 30–60 | **Self-absorbed** | Mutation rate in its offspring rises with Echo, up to 4× at 60. The mutations are unpredictable and land as often harmful as useful. It starts ignoring weak outside input. |
 | 60–85 | **Fevered** | It stops responding to challenge (Echo no longer falls from contests or inhibition, only from wiring to very different creatures). Its spikes start carrying Echo to its partners: each spike it sends adds 1 Echo to whoever receives it. |
-| 85–100 | **Insane** | It turns **septic**. It poisons itself (−1 integrity a tick), the fluid in its hex and the six around it (anything there loses 1 integrity a tick), and everything wired to it (−2 integrity and +3 Echo a tick). It does nothing to fight its own sickness and actively spreads it. The poisoned fluid lingers after it dies. |
+| 85–100 | **Insane** | It turns **septic**: every output it makes is flawed and contaminated. It loses 0.3 integrity a tick, and every creature that reads its work takes −2 integrity and +3 Echo and is stained. The stain lingers until consolidation clears it. |
 
-Insanity is contagious through wiring and through the fluid. Untreated, one insane creature can turn its whole circuit septic and leave a poisoned patch of tissue behind.
+Insanity is contagious through wiring and through memory. Untreated, one insane creature can turn its whole circuit septic and leave a poisoned patch of tissue behind.
 
 ### Survival (the Game of Life core)
 
 | Condition | Rule | Looks like |
 |---|---|---|
-| **Isolation** (*k = 0*) | No trophic factor arrives; the reserve drains. At zero, integrity falls 1 a tick (apoptosis) unless it's a pacemaker or a progenitor. | tendrils reaching out, searching |
-| **Survival** (*1 ≤ k ≤ V*) | Trophic factor arrives as long as it fires and makes others fire. | steady pulses |
-| **Thriving** (*k = V*, *c ≤ 4*, and *i ≥ e/4*) | Fully wired, room to breathe, enough inhibition to keep it balanced: it repairs 1 integrity a tick, and its tail grows. | full colour, smooth rhythm |
-| **Overcrowding** (*k > V* or *c ≥ 5*) | Glucose and oxygen deficit: −2 integrity a tick for each synapse over *V* and each neighbour over 4. | dimming, tendrils pulled in |
-| **Runaway excitation** (*e ≥ 3* and *i = 0*) | Excitotoxicity: −3 integrity a tick while it lasts. | frantic flashing, swelling |
-| **Silence** (no spike in 200 ticks) | Its synapses weaken and prune; it falls toward isolation. | grey, still |
-| **Starvation** (energy 0) | It goes **quiescent**: stops firing, burns 0.1 a tick, for up to 600 ticks. Fed and stimulated in time, it wakes; otherwise it dies. | curled tight, faintly lit |
-| **Old age** | Past its lifespan it loses 1 integrity a tick. | fading colour, shrinking tail |
+| **Unused** (no accepted output) | Trophic reserve drains 0.08 a tick. At zero, integrity falls 0.25 a tick (apoptosis) unless it's a pacemaker or a progenitor. | tendrils reaching out, searching |
+| **Survival** | Each time a consumer reads its output, +4 trophic; each clean review, +8. | steady pulses |
+| **Thriving** (no crowding, trophic above zero, no damage for 30 ticks) | Repairs 0.15 integrity a tick (Plain: 0.3). | full colour, smooth rhythm |
+| **Overcrowding** (more synapses than *V* + 1, or more than 2 tasks) | −0.2 integrity a tick for each over. | dimming, tendrils pulled in |
+| **Runaway excitation** (a task driven by 3 or more unreviewed inputs) | −4 integrity. | frantic flashing, swelling |
+| **Excitotoxicity** (a retry within 5 ticks of a rejection) | −1.5 integrity. | |
+| **Rejected** (a reviewer catches a flaw) | −5 integrity, −8 from a phagocyte; the task reruns. | bitten |
+| **Failed** (a task rejected three times, or a flaw found at delivery) | −20 integrity; the run's egg withers; a corpse stays in the graph. | |
+| **Silence** (no artifact across a synapse) | The synapse loses 0.002 a tick and is pruned at zero. | grey, still |
+| **Starvation** (budget empty) | It can't take steps. After 600 ticks with an empty budget it's retired. | curled tight, faintly lit |
+| **Provider outage** | Its calls stall; every 10 stalled ticks, −0.5 integrity. | |
 | **Death** | Integrity 0, by **apoptosis** (clean) or **necrosis** (messy). See The dead. | |
 
 ### Birth
 
-- **Triad birth** (Conway's B3, the natural way): an empty hex touched by exactly **three** creatures that are all wired to each other and have fired together within the last 10 ticks, with at least 90 energy between them. The three grow their tails into the hex and **co-gestate an egg**: each pays 30 energy over the gestation, the egg swells for 100 ticks, then hatches. The child inherits from the two parents with the highest kinship to each other; the third parent contributes one part locus.
-- **Pair birth:** two wired creatures can gestate alone, but it costs each 50 energy and the egg hatches only half the time.
-- **Solo birth:** a loner (*k = 0*) with at least 80 energy and 70 integrity can grow an egg on its own tail. It costs 60 energy over 200 ticks. The child is a **clone**: an exact copy, except for whatever mutations the parent's Echo caused (see Echo). The child also inherits half its parent's Echo.
-- **The clone trap.** Two creatures now, but no diversity. Parent and clone are near-clones, so wired together each hears the other as itself and builds Echo twice as fast. Anything they breed together is a near-clone of both and inherits their combined Echo, so every generation amplifies the loop. No creature's genes ever change after it hatches, so the parent and its clone stay near-clones for life. The **only** way out is through **offspring**: a child whose mutations make it less than 95% alike to the others is genuinely different, so its feedback counts as an outside voice. A keeper who starts from one creature must breed for diversity as fast as possible.
-- **Progenitor division:** a progenitor can split off a child alone once per sleep, at only 40 energy. Its children are clones like any other, but a progenitor's division resets its own Echo to zero.
-- **Eggs are vulnerable.** An egg needs glucose from its parents' tails. A parent that dies during gestation detaches its tail and the egg shrinks. A starved egg is cleared as debris.
+Every egg is a **run**. Every creature that works on it grows its tail to it and feeds it; the egg swells as tasks finish.
+
+- **Hatching:** when the run clears, its egg hatches one new config, recombined from the contributors. The child inherits from the two contributors most alike to each other; each other contributor gives one part locus. A run that fails withers its egg.
+- **Solo birth:** a run cleared by one contributor hatches a **clone**: an exact copy, except for whatever mutations its Echo caused. The clone inherits its parent's Echo.
+- **Planner staffing:** a task that waits 15 ticks with no free creature makes the planner copy an existing config. That's a clone too, and it's how a lone creature fills a swarm with itself.
+- **The clone trap.** Parent and clone are near-clones, so wired together each hears the other as itself. Anything they hatch together is a near-clone of both and inherits their combined Echo, so every generation amplifies the loop. No creature's genes ever change after it hatches. The **only** way out is through **offspring**: a child whose mutations make it less than 95% alike to the others is genuinely different, so its feedback counts as an outside voice. A keeper who starts from one creature must breed for diversity as fast as possible, and import strangers.
+- **Progenitor division:** when the planner needs a creature and a progenitor exists, the progenitor divides instead. Its child starts with no Echo.
+- **Cost:** each birth spends 40 of the swarm's budget. With no budget or room (60 creatures), a cleared run hatches nothing.
 
 ## Inheritance
 
 | Locus | Rule |
 |---|---|
-| **Fertility** | Kinship 75–95% is fertile. Above 95% the child inherits both parents' Echo, summed (see the clone trap). 60–75% hatches a quarter of the time; bridges lift it to half. Below 60% is sterile, except **hybrid vigour**: a triad from three different genera that oscillates through a whole sleep without any parent dropping below 30 energy hatches anyway, and the child often founds a new genus. |
+| **Fertility** | A recombination is a config, and it has to validate. Kinship 75% and up always does; above 95% the child inherits both parents' Echo, summed (see the clone trap). 60–75% validates only with a bridge or at least two more contributors. Below 60% is invalid unless three or more genera contributed (**hybrid vigour**); the child often founds a new genus. |
 | **Pigment, Accent** | One parent's hue, or 1 time in 5 the hue midway between them on the wheel. Because pigment is cell kind, a child of an excitatory and an inhibitory parent may come out modulatory. |
 | **Core** | Incomplete dominance: Dark × Bright gives Dusk. |
 | **Pattern** | Speckled dominant, Plain recessive. |
@@ -146,8 +152,8 @@ Insanity is contagious through wiring and through the fluid. Untreated, one insa
 | **Arbor** | The parents' average, ±1. |
 | **Spectrum** | Follows from the hues the child actually ends up with. |
 | **Parts** | Each part comes whole from one parent. |
-| **Mutation** | Each locus has a 2% base chance to shift one step: a neighbouring hue, the next core shade, one more or one fewer branch. A parent's Echo multiplies the chance (up to 4× at Echo 60, more beyond) and makes the shifts erratic: two steps, or a trait flipping. Mutation is how the bowl reaches colours nobody painted, and how clone lines escape themselves. |
-| **Echo** | Children inherit half the parents' Echo, or the full sum for near-clone parents. |
+| **Mutation** | Each locus has a 2% base chance to shift one step: a neighbouring hue, the next core shade, one more or one fewer branch. A parent's Echo multiplies the chance (up to 4× at Echo 60, more beyond) and makes the shifts erratic: two steps, or a trait flipping. Mutation is how the swarm reaches colours nobody painted, and how clone lines escape themselves. |
+| **Echo** | Clones inherit their parent's Echo. Near-clone parents pass on the sum; anyone else, a quarter of the contributors' mean. |
 
 **Mythic conditions:**
 - **Viridia** (green, the progenitor) hatches only from a triad of pacemakers that has held one unbroken rhythm through a whole wake.
@@ -155,9 +161,9 @@ Insanity is contagious through wiring and through the fluid. Untreated, one insa
 
 ## Competition
 
-- **For trophic factor.** Trophic factor is limited: a creature can release only so much each tick, shared among everyone it makes fire. When too many creatures wire into the same target, they split its supply, and the weakest-wired ones starve and prune away. This is real developmental neuron death, and it's the main way the bowl thins itself.
+- **For trophic factor.** Trophic factor is limited: a creature can release only so much each tick, shared among everyone it makes fire. When too many creatures wire into the same target, they split its supply, and the weakest-wired ones starve and prune away. This is real developmental neuron death, and it's the main way the swarm thins itself.
 - **For synaptic sites.** When a creature's sites are full and a newcomer wires in, the newcomer can **displace** the weakest existing synapse. Strength wins, and synapses strengthen by firing together, so creatures that keep pace with their partner hold their place.
-- **For blood.** Hexes beside a capillary are worth fighting for. Neighbours **shove** for them: energy plus 20 for excitatory cells, plus 10 for each partner bracing behind it. The loser moves one hex away and loses 2 energy. Kin (85%+) never shove each other.
+- **For blood.** Budget is one pool; each creature draws from it through its provider, and the nearer it sits, the more it gets.
 - **Phagocytes hunt.** Magenta creatures engulf any non-kin creature whose integrity has fallen below 30, gaining half its energy. They are the clean-up crew and the threat at once: a weakened creature near a phagocyte is in danger.
 - **Inhibition as a weapon.** An inhibitory creature wired to a rival silences it. Held silent long enough, the rival's synapses prune and it loses its place.
 
@@ -228,45 +234,34 @@ Every other kind of loner is slowly dying: no partner feeds its trophic reserve,
 
 ## The dead
 
-**Apoptosis** is a clean death, from lost trophic support, old age, or slow starvation. The creature shrinks, its tendrils retract, and it breaks into small **apoptotic bodies**. Phagocytes eat them quickly, with no harm to neighbours.
+**Apoptosis** is a clean death: its output went unused, or its budget stayed empty. The creature shrinks and is retired, with no harm to anyone.
 
-**Necrosis** is a messy death, from excitotoxicity, ischaemia, or attack. The creature swells and bursts, spilling its contents. It **inflames** everything wired to it and every neighbour (−1 integrity a tick) until phagocytes clear it, and it draws phagocytes in, who may also take the weakened.
+**Necrosis** is a messy death, within 30 ticks of a failure, a rejection by a phagocyte, a tight retry loop, or while septic. Its failed task stays in the graph as a **corpse** and costs every creature wired to it 0.08 integrity a tick, for 240 ticks, or 30 once a phagocyte takes on its recovery.
 
-**After death:**
-- **Debris:** uncleared remains become **waste** in the fluid. Sleep clears waste; too little sleep and it builds into **plaque**.
-- **Recycling:** cleared remains return their glucose to the tissue around them, so a death feeds the creatures nearby.
-- **Engrams:** if the dead creature was part of a learned circuit, its pattern persists in its partners' strengthened synapses, and a new creature wiring into the gap inherits a head start.
-- **Fossils:** every creature that ever lived leaves a fossil trace with its genome. A trace can serve once as a parent, reviving a lost line at the cost of the trace.
+**After death:** its synapses go, its unfinished tasks return to the queue, and the stain of anything it contaminated lingers until consolidation clears it.
 
 ## Environmental pushback
 
-The tissue is not kind:
+The world pushes back only when the work does:
 
-| Event | What happens |
-|---|---|
-| **Wake and sleep** | Wake is fast, costly and wasteful. Sleep is slow, cheap and cleansing. Too long awake builds waste and plaque; too long asleep and synapses weaken from disuse. |
-| **Ischaemia** | A capillary narrows or blocks, a stroke. Everything downstream starves of glucose and oxygen within ticks, and necrosis spreads from the centre unless the vessel reopens or an oscillating circuit draws blood back. |
-| **Hypoglycaemia** | Blood glucose falls across the bowl. Bright cores and excitatory cells fail first. |
-| **Fever** | The tissue heats. Everyone fires more readily, so seizures come easily. Monotones outside their band lose integrity. |
-| **Inflammation** | Phagocytes multiply after necrosis and grow aggressive, biting the merely tired. |
-| **Waste build-up** | Without sleep, plaque spreads and blocks wiring. |
-| **Ageing** | The whole bowl's capillaries thin slowly, and myelin wears. |
-| **Carrying capacity** | Blood supply is finite, so a bowl supports only so many creatures. Past that, trophic competition and starvation enforce the limit. |
+| Event | Backed by | What happens |
+|---|---|---|
+| **Wake and sleep** | runs in flight vs. idle | Sleep fades memory faster (0.985 a tick against 0.998) and clears stains. |
+| **Stroke** | a provider outage, from the provider status feed | Its creatures' calls stall and they lose integrity until it's back. |
+| **Low glucose** | the budget running low | Steps wait; births stop. |
+| **Fever** | high temperature or an unstable provider | Not yet in the bench. |
+| **Carrying capacity** | budget and concurrency | Past them, nothing new hatches and the unused apoptose. |
 
 ## The keeper
 
-The person tends the tissue, never commands the creatures:
+Every keeper tool is a real control:
 
-- **Perfuse:** raise glucose and oxygen in the blood.
-- **Stimulate:** fire a creature by touch.
-- **Quiet:** hush a seizing circuit.
-- **Sleep:** call an early sleep to clear waste.
-- **Move:** place a creature somewhere new.
-- **Separate:** cut a circuit apart.
-
-- **Introduce:** bring a stranger into a circuit. Competition is medicine: a challenger lowers everyone's Echo.
-- **Quarantine:** isolate a septic creature before it spreads, knowing that isolation alone makes its Echo worse.
+- **Review:** look at a creature's work yourself. Its Echo falls 25.
+- **Import an agent:** bring a stranger from the Store. Competition is medicine.
+- **Raise budget:** perfuse the tissue for a while.
+- **Consolidate:** run memory consolidation now.
+- **Move:** put a creature on another provider.
+- **Detach:** cut its dependencies.
+- **Hold output:** quarantine its artifacts from consumers. Isolation alone makes its Echo worse.
 
 The keeper's real job is **diversity and challenge**: breed across lines as fast as possible, and keep enough competition in every circuit that nothing is only listening to itself.
-
-Care has consequences: over-perfusion breeds overcrowding, over-stimulation causes seizures, constant separation stops circuits from ever learning, and protecting creatures from all competition breeds echo chambers.

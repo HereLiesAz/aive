@@ -1,6 +1,6 @@
 # Fish Bowl Builder (design draft)
 
-Status: approved design, not built.
+Status: approved design; its decisions carry into `Swarm-OS.md`, which replaces the bowl framing.
 
 ## The idea
 
