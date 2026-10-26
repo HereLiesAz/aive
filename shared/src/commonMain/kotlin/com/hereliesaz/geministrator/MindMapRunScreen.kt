@@ -123,6 +123,7 @@ internal fun MindMapRunScreen(
     connectedRepositoryServiceIds: Set<String> = emptySet(),
     onSearchRepositories: suspend (RepositorySource, String) -> List<RepositorySuggestion> = { _, _ -> emptyList() },
     compact: Boolean,
+    onSurface: (() -> Unit)? = null,
     runtimeState: ApplicationRuntimeState,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -667,6 +668,7 @@ internal fun MindMapRunScreen(
             onTaskSelected = onTaskSelected,
             branchIsolation = branchIsolation,
             modifier = Modifier.fillMaxWidth(),
+            onSurface = onSurface,
         )
 
         Text(stringResource(Res.string.overview_swarm_activity), style = AzphaltType.eyebrow, color = azphaltOnSurface())

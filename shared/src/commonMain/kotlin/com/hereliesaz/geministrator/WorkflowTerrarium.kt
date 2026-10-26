@@ -46,6 +46,7 @@ internal fun GeministratorWorkflowTerrarium(
     onStageDefinition: (suspend (WorkflowDefinition) -> WorkflowDefinition)? = null,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onSurface: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -167,6 +168,7 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 // Bodies only arrange (docs/Swarm-OS.md): wiring changes through the connections below.
                 onNodeDroppedOn = null,
+                onSurface = onSurface,
                 // In Build, a strand drawn from a feeder's tail to another creature feeds it; a swipe
                 // across a strand cuts it.
                 onTetherDrawn = if (building) {

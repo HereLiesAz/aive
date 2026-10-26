@@ -583,6 +583,7 @@ private fun MainDestination(
                             connectedRepositoryServiceIds = connectedRepositoryServiceIds,
                             onSearchRepositories = onSearchRepositories,
                             compact = compact,
+                            onSurface = { inDistrict = true },
                             runtimeState = runtimeState,
                         )
                         }
