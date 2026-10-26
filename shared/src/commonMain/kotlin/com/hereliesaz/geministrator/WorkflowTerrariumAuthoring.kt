@@ -181,3 +181,13 @@ internal fun budTerrariumCreature(definition: WorkflowDefinition, taskId: TaskDe
     if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
     return TerrariumDependencyEditResult.Applied(candidate)
 }
+
+/** Hold output: withhold the creature's artifacts from every consumer, or release them again. */
+internal fun setTerrariumHold(definition: WorkflowDefinition, taskId: TaskDefinitionId, hold: Boolean): TerrariumDependencyEditResult {
+    val task = definition.tasks.firstOrNull { it.id == taskId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    if (task.holdOutput == hold) return TerrariumDependencyEditResult.NoChange
+    return TerrariumDependencyEditResult.Applied(
+        definition.copy(tasks = definition.tasks.map { if (it.id == taskId) it.copy(holdOutput = hold) else it }),
+    )
+}

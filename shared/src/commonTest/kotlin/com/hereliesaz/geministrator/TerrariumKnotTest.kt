@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.releasedDependencies
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -77,5 +78,24 @@ class TerrariumDetachAndBudTest {
         assertEquals("b-2", bud.id.value)
         assertEquals(setOf(TaskDefinitionId("a")), bud.dependsOn)
         assertEquals(0, edit.definition.tasks.count { bud.id in it.dependsOn })
+    }
+}
+
+class TerrariumHoldTest {
+    private fun task(id: String, vararg deps: String) = TaskDefinition(
+        id = TaskDefinitionId(id),
+        name = id,
+        objective = "Do $id",
+        roleId = BuiltInRoles.ImplementationEngineer.id,
+        dependsOn = deps.map(::TaskDefinitionId).toSet(),
+        executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id),
+    )
+
+    @Test
+    fun aHeldCreaturesOutputNoLongerReachesItsConsumers() {
+        val definition = WorkflowDefinition(id = WorkflowDefinitionId("h"), name = "h", tasks = listOf(task("a"), task("b"), task("c", "a", "b")))
+        val held = assertIs<TerrariumDependencyEditResult.Applied>(setTerrariumHold(definition, TaskDefinitionId("a"), true)).definition
+        assertEquals(listOf(TaskDefinitionId("b")), held.releasedDependencies(held.tasks.last()))
+        assertEquals(TerrariumDependencyEditResult.NoChange, setTerrariumHold(held, TaskDefinitionId("a"), true))
     }
 }

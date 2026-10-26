@@ -26,6 +26,8 @@ internal data class TissueScene(
     val atSurface: Set<String> = emptySet(),
     /** Each creature's Echo state, from the needs (docs/Swarm-OS.md); grounded creatures are left out. */
     val echo: Map<String, EchoState> = emptyMap(),
+    /** Creatures whose output is held from consumers: quarantined, ringed in white. */
+    val held: Set<String> = emptySet(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */
@@ -119,6 +121,7 @@ internal fun projectTissue(
         egg = egg,
         conditional = conditional,
         atSurface = atSurface,
+        held = definition.tasks.filter { it.holdOutput }.mapTo(mutableSetOf()) { it.id.value },
         echo = definition.tasks.mapNotNull { task ->
             creatureNeeds(task.id, definition, run, roles)
                 ?.echoState

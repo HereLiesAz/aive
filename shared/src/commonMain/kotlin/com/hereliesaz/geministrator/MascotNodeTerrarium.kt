@@ -515,6 +515,11 @@ private fun MascotNodeTerrarium(
                     }
                     else -> Unit
                 }
+                if (tissue?.held?.contains(node.id) == true) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Azphalt.White, radius = min(size.width, size.height) * 0.46f, style = Stroke(width = 2.dp.toPx()))
+                    }
+                }
                 if (tissue?.atSurface?.contains(node.id) == true) {
                     // At the surface: it needs you. A warm glow behind it, like the gate in the mockups.
                     Canvas(Modifier.fillMaxSize()) {

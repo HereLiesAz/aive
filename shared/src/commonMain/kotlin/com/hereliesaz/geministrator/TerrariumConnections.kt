@@ -19,6 +19,8 @@ import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_bud
 import com.hereliesaz.geministrator.resources.build_cut
 import com.hereliesaz.geministrator.resources.build_detach
+import com.hereliesaz.geministrator.resources.build_hold_output
+import com.hereliesaz.geministrator.resources.build_release_output
 import com.hereliesaz.geministrator.resources.build_fed_by
 import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
 import com.hereliesaz.geministrator.resources.build_knot_on_failure
@@ -86,6 +88,12 @@ internal fun TerrariumConnections(
                 label = stringResource(Res.string.build_detach),
                 seed = "detach-${selected.id.value}",
                 onClick = { onEdit(detachTerrariumCreature(definition, selected.id)) },
+            )
+            AzphaltPill(
+                label = stringResource(if (selected.holdOutput) Res.string.build_release_output else Res.string.build_hold_output),
+                seed = "hold-${selected.id.value}",
+                selected = selected.holdOutput,
+                onClick = { onEdit(setTerrariumHold(definition, selected.id, !selected.holdOutput)) },
             )
             AzphaltPill(
                 label = stringResource(Res.string.build_bud),
