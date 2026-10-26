@@ -50,6 +50,7 @@ import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.district_surface
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -524,25 +525,53 @@ private fun MainDestination(
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
-                ControlRoomDestination.Overview -> MindMapRunScreen(
-                    modifier = Modifier.fillMaxSize(),
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
-                    onLaunchWorkflow = onLaunchWorkflow,
-                    onLoadLaunchableRuns = onLoadLaunchableRuns,
-                    projectFileService = projectFileService,
-                    onImportProjectFile = onImportProjectFile,
-                    onRecoverFromCorruption = onRecoverFromCorruption,
-                    onRetryRuntime = onRetryRuntime,
-                    onOpenSettings = onOpenSettings,
-                    onValidateWorkflow = onValidateWorkflow,
-                    availableRepositorySources = availableRepositorySources,
-                    onPickLocalRepository = onPickLocalRepository,
-                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                    onSearchRepositories = onSearchRepositories,
-                    compact = compact,
-                    runtimeState = runtimeState,
-                )
+                ControlRoomDestination.Overview -> {
+                    // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
+                    var inDistrict by rememberDurableBooleanState("overview.zoom.district")
+                    if (inDistrict) {
+                        DistrictScreen(
+                            onLoadDefinitions = onLoadWorkflowDefinitions,
+                            onLoadRuns = { onLoadRunHistory().flatMap { it.second } },
+                            onEnterNeighbourhood = { neighbourhood ->
+                                val runId = neighbourhood.latestRunId
+                                if (runId != null) {
+                                    onSwitchRun(runId)
+                                    inDistrict = false
+                                } else {
+                                    onDestinationSelected(ControlRoomDestination.Workflows)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        Column(Modifier.fillMaxSize()) {
+                            AzphaltPill(
+                                label = stringResource(Res.string.district_surface),
+                                seed = "zoom-out-district",
+                                onClick = { inDistrict = true },
+                            )
+        MindMapRunScreen(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            selectedTaskId = selectedTaskId,
+                            onTaskSelected = onTaskSelected,
+                            onLaunchWorkflow = onLaunchWorkflow,
+                            onLoadLaunchableRuns = onLoadLaunchableRuns,
+                            projectFileService = projectFileService,
+                            onImportProjectFile = onImportProjectFile,
+                            onRecoverFromCorruption = onRecoverFromCorruption,
+                            onRetryRuntime = onRetryRuntime,
+                            onOpenSettings = onOpenSettings,
+                            onValidateWorkflow = onValidateWorkflow,
+                            availableRepositorySources = availableRepositorySources,
+                            onPickLocalRepository = onPickLocalRepository,
+                            connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                            onSearchRepositories = onSearchRepositories,
+                            compact = compact,
+                            runtimeState = runtimeState,
+                        )
+                        }
+                    }
+                }
                 ControlRoomDestination.Runs -> RunsScreen(
                     runtimeState = runtimeState,
                     onLoadRunHistory = onLoadRunHistory,

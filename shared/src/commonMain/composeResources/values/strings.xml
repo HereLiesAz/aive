@@ -166,6 +166,14 @@
     <string name="inspector_sending">Sending…</string>
     <string name="inspector_sent">Sent</string>
     <string name="needs_needs">NEEDS</string>
+    <string name="district_your_swarm">YOUR SWARM</string>
+    <string name="district_empty">No workflows yet. Import one from the Azphalt Store or build one.</string>
+    <string name="district_needs_you">needs you</string>
+    <string name="district_state_idle">resting</string>
+    <string name="district_state_gestating">gestating</string>
+    <string name="district_state_hatched">hatched</string>
+    <string name="district_state_withered">withered</string>
+    <string name="district_surface">Your swarm</string>
     <string name="build_live">Live</string>
     <string name="build_build">Build</string>
     <string name="build_undo">Undo</string>
@@ -915,6 +923,14 @@
     <string name="terrarium_zoom_out">Zoom out</string>
 
     <!-- Count-dependent text -->
+    <plurals name="district_creatures">
+        <item quantity="one">%1$d creature</item>
+        <item quantity="other">%1$d creatures</item>
+    </plurals>
+    <plurals name="district_scars">
+        <item quantity="one">%1$d scar</item>
+        <item quantity="other">%1$d scars</item>
+    </plurals>
     <plurals name="store_update_count">
         <item quantity="one">%1$d update</item>
         <item quantity="other">%1$d updates</item>
