@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -19,6 +20,8 @@ internal data class TissueScene(
     val providerOf: Map<String, String>,
     /** Null when nothing has run yet (a resting or build-mode workflow has no egg). */
     val egg: TissueEgg?,
+    /** Tethers (from, to) carrying a knot other than on-success; drawn dashed. */
+    val conditional: Set<Pair<String, String>> = emptySet(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */
@@ -95,5 +98,12 @@ internal fun projectTissue(
             },
         )
     }
-    return TissueScene(capillaries = capillaries, providerOf = providerOf, egg = egg)
+    val conditional = definition.tasks.mapNotNullTo(mutableSetOf()) { task ->
+        when (val condition = task.condition) {
+            is TaskCondition.OnAnyOutcome -> condition.ofTask.value to task.id.value
+            is TaskCondition.OnFailure -> condition.ofTask.value to task.id.value
+            TaskCondition.Always -> null
+        }
+    }
+    return TissueScene(capillaries = capillaries, providerOf = providerOf, egg = egg, conditional = conditional)
 }

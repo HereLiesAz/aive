@@ -94,3 +94,47 @@ internal data class TerrariumTide(
     fun redo(): TerrariumTide =
         if (!canRedo) this else TerrariumTide(past + present, future.first(), future.drop(1))
 }
+
+/** A tether's knot (docs/Bowl-OS.md): when the fed task runs, relative to this feeder. */
+internal enum class TerrariumKnot { OnSuccess, OnAnyOutcome, OnFailure }
+
+/** The knot on the tether from [upstreamId] into [downstreamId], read from the task's condition. */
+internal fun terrariumKnot(definition: WorkflowDefinition, downstreamId: TaskDefinitionId, upstreamId: TaskDefinitionId): TerrariumKnot {
+    val condition = definition.tasks.firstOrNull { it.id == downstreamId }?.condition
+    return when {
+        condition is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome && condition.ofTask == upstreamId -> TerrariumKnot.OnAnyOutcome
+        condition is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure && condition.ofTask == upstreamId -> TerrariumKnot.OnFailure
+        else -> TerrariumKnot.OnSuccess
+    }
+}
+
+/**
+ * Ties [knot] on an existing tether. A task carries one condition, so knotting a second feeder
+ * replaces the first feeder's knot; tying OnSuccess clears the condition only if this feeder held it.
+ */
+internal fun setTerrariumKnot(
+    definition: WorkflowDefinition,
+    downstreamId: TaskDefinitionId,
+    upstreamId: TaskDefinitionId,
+    knot: TerrariumKnot,
+): TerrariumDependencyEditResult {
+    val downstream = definition.tasks.firstOrNull { it.id == downstreamId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${downstreamId.value}'")
+    if (upstreamId !in downstream.dependsOn) {
+        return TerrariumDependencyEditResult.Rejected("'${upstreamId.value}' does not feed '${downstreamId.value}'")
+    }
+    if (terrariumKnot(definition, downstreamId, upstreamId) == knot) return TerrariumDependencyEditResult.NoChange
+    val condition = when (knot) {
+        TerrariumKnot.OnSuccess -> com.hereliesaz.geministrator.domain.TaskCondition.Always
+        TerrariumKnot.OnAnyOutcome -> com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome(upstreamId)
+        TerrariumKnot.OnFailure -> com.hereliesaz.geministrator.domain.TaskCondition.OnFailure(upstreamId)
+    }
+    val candidate = definition.copy(
+        tasks = definition.tasks.map { if (it.id == downstreamId) it.copy(condition = condition) else it },
+    )
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) {
+        return TerrariumDependencyEditResult.Rejected(errors.joinToString(separator = "\n") { it.humanReadable() })
+    }
+    return TerrariumDependencyEditResult.Applied(candidate)
+}

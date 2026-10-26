@@ -18,6 +18,9 @@ import com.hereliesaz.geministrator.resources.build_add_connection
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_cut
 import com.hereliesaz.geministrator.resources.build_fed_by
+import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
+import com.hereliesaz.geministrator.resources.build_knot_on_failure
+import com.hereliesaz.geministrator.resources.build_knot_on_success
 import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_pick_a_creature
 import com.hereliesaz.geministrator.resources.build_redo
@@ -84,6 +87,22 @@ internal fun TerrariumConnections(
                     seed = "fed-by-${upstream.value}",
                     endCap = stringResource(Res.string.build_cut),
                     onClick = { onEdit(removeTerrariumDependency(definition, selected.id, upstream)) },
+                )
+                // The knot: tapping ties the next one in turn.
+                val knot = terrariumKnot(definition, selected.id, upstream)
+                AzphaltPill(
+                    label = stringResource(
+                        when (knot) {
+                            TerrariumKnot.OnSuccess -> Res.string.build_knot_on_success
+                            TerrariumKnot.OnAnyOutcome -> Res.string.build_knot_on_any_outcome
+                            TerrariumKnot.OnFailure -> Res.string.build_knot_on_failure
+                        },
+                    ),
+                    seed = "knot-${upstream.value}",
+                    onClick = {
+                        val next = TerrariumKnot.entries[(knot.ordinal + 1) % TerrariumKnot.entries.size]
+                        onEdit(setTerrariumKnot(definition, selected.id, upstream, next))
+                    },
                 )
             }
         }

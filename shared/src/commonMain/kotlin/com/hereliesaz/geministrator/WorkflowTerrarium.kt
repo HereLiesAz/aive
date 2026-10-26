@@ -104,6 +104,23 @@ internal fun GeministratorWorkflowTerrarium(
         }
     }
 
+    fun applyEdit(edit: TerrariumDependencyEditResult) {
+        when (edit) {
+            is TerrariumDependencyEditResult.Applied -> scope.launch {
+                runCatching { stageDefinition(edit.definition) }
+                    .onSuccess { persisted ->
+                        tide = tide.record(persisted)
+                        authoringMessage = null
+                    }
+                    .onFailure { failure ->
+                        authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
+                    }
+            }
+            TerrariumDependencyEditResult.NoChange -> Unit
+            is TerrariumDependencyEditResult.Rejected -> authoringMessage = edit.reason
+        }
+    }
+
     // Live watches the run; Build holds the field still and opens the wiring to edits.
     var building by remember(definition.id) { mutableStateOf(false) }
 
@@ -134,6 +151,18 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 // Bodies only arrange (docs/Swarm-OS.md): wiring changes through the connections below.
                 onNodeDroppedOn = null,
+                // In Build, a strand drawn from a feeder's tail to another creature feeds it; a swipe
+                // across a strand cuts it.
+                onTetherDrawn = if (building) {
+                    { from, to -> applyEdit(addTerrariumDependency(stagedDefinition, TaskDefinitionId(to), TaskDefinitionId(from))) }
+                } else {
+                    null
+                },
+                onTetherSliced = if (building) {
+                    { from, to -> applyEdit(removeTerrariumDependency(stagedDefinition, TaskDefinitionId(to), TaskDefinitionId(from))) }
+                } else {
+                    null
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -144,22 +173,7 @@ internal fun GeministratorWorkflowTerrarium(
                 selectedTaskId = selectedTaskId,
                 canUndo = tide.canUndo,
                 canRedo = tide.canRedo,
-                onEdit = { edit ->
-                    when (edit) {
-                        is TerrariumDependencyEditResult.Applied -> scope.launch {
-                            runCatching { stageDefinition(edit.definition) }
-                                .onSuccess { persisted ->
-                                    tide = tide.record(persisted)
-                                    authoringMessage = null
-                                }
-                                .onFailure { failure ->
-                                    authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
-                                }
-                        }
-                        TerrariumDependencyEditResult.NoChange -> Unit
-                        is TerrariumDependencyEditResult.Rejected -> authoringMessage = edit.reason
-                    }
-                },
+                onEdit = ::applyEdit,
                 onUndo = {
                     val back = tide.undo()
                     scope.launch {
