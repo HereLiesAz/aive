@@ -448,8 +448,10 @@ class WorkflowEngine(
             val status = sessionGateway.status(handle)
             val providerProgress = sessionGateway.progress(handle)
             // Usage is best effort, but cancellation of the cycle must still propagate.
+            var usageTotal = taskRun.usage
             try {
                 sessionGateway.usageReport(handle)?.let { usage ->
+                    usageTotal = usageTotal.plus(usage)
                     eventSink.append(
                         ProviderUsageRecorded(
                             workflowRunId = nextRun.id,
@@ -516,6 +518,7 @@ class WorkflowEngine(
                             providerProgress?.fraction ?: taskRun.progress
                         },
                         progressMessage = providerProgress?.message ?: taskRun.progressMessage,
+                        usage = usageTotal,
                         providerPlan = if (
                             safeStatus == TaskRunStatus.AwaitingApproval &&
                             !providerProgress?.message.isNullOrBlank()

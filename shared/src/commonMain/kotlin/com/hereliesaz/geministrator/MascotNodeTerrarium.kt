@@ -88,10 +88,11 @@ internal fun PlatformNodeTerrarium(
     selectedId: String?,
     onNodeSelected: (H2g2WorkflowNode) -> Unit,
     onNodeMoved: (String, H2g2TerrariumPosition) -> Unit,
-    onNodeDroppedOn: (String, String) -> Unit,
+    onNodeDroppedOn: ((String, String) -> Unit)?,
     modifier: Modifier = Modifier,
     editable: Boolean = true,
     compact: Boolean = false,
+    tissue: TissueScene? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -105,6 +106,7 @@ internal fun PlatformNodeTerrarium(
         modifier = modifier,
         editable = editable,
         compact = compact,
+        tissue = tissue,
     )
 }
 
@@ -117,10 +119,11 @@ private fun MascotNodeTerrarium(
     selectedId: String?,
     onNodeSelected: (H2g2WorkflowNode) -> Unit,
     onNodeMoved: (String, H2g2TerrariumPosition) -> Unit,
-    onNodeDroppedOn: (String, String) -> Unit,
+    onNodeDroppedOn: ((String, String) -> Unit)?,
     modifier: Modifier,
     editable: Boolean,
     compact: Boolean,
+    tissue: TissueScene?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -258,21 +261,27 @@ private fun MascotNodeTerrarium(
         }
 
         Canvas(Modifier.fillMaxSize()) {
-            drawRect(Azphalt.Ink.copy(alpha = 0.025f))
-            val grid = 48.dp.toPx() * zoom
-            val worldOriginX = size.width * 0.5f - focusX * widthPx * zoom
-            val worldOriginY = size.height * 0.5f - focusY * heightPx * zoom
-            var x = ((worldOriginX % grid) + grid) % grid
-            while (x <= size.width) {
-                drawLine(onGround.copy(alpha = 0.055f), Offset(x, 0f), Offset(x, size.height), 1f)
-                x += grid
-            }
-            var y = ((worldOriginY % grid) + grid) % grid
-            while (y <= size.height) {
-                drawLine(onGround.copy(alpha = 0.055f), Offset(0f, y), Offset(size.width, y), 1f)
-                y += grid
+            if (tissue != null) {
+                drawTissueGround(tissue) { screenCenter(it) }
+            } else {
+                drawRect(Azphalt.Ink.copy(alpha = 0.025f))
+                val grid = 48.dp.toPx() * zoom
+                val worldOriginX = size.width * 0.5f - focusX * widthPx * zoom
+                val worldOriginY = size.height * 0.5f - focusY * heightPx * zoom
+                var x = ((worldOriginX % grid) + grid) % grid
+                while (x <= size.width) {
+                    drawLine(onGround.copy(alpha = 0.055f), Offset(x, 0f), Offset(x, size.height), 1f)
+                    x += grid
+                }
+                var y = ((worldOriginY % grid) + grid) % grid
+                while (y <= size.height) {
+                    drawLine(onGround.copy(alpha = 0.055f), Offset(0f, y), Offset(size.width, y), 1f)
+                    y += grid
+                }
             }
 
+            // On the dark tissue, synapses are light; on the plain ground they take the ground's ink.
+            val linkInk = if (tissue != null) Azphalt.White else onGround
             relationships.forEach { relationship ->
                 val toSubject = subjectById[relationship.to] ?: return@forEach
                 val (start, end) = relationshipEndpoints(relationship) ?: return@forEach
@@ -282,8 +291,8 @@ private fun MascotNodeTerrarium(
                 val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
                 val color = when {
                     blocked -> GeministratorColors.error.copy(alpha = 0.40f)
-                    active -> onGround.copy(alpha = 0.42f)
-                    else -> onGround.copy(alpha = 0.28f)
+                    active -> linkInk.copy(alpha = 0.42f)
+                    else -> linkInk.copy(alpha = 0.28f)
                 }
                 val stroke = (if (active) 2.dp else 1.5.dp).toPx()
 
@@ -305,11 +314,14 @@ private fun MascotNodeTerrarium(
                 if (active) {
                     val pulse = start + (end - start) * linkPulse()
                     drawCircle(
-                        color = onGround.copy(alpha = 0.72f),
+                        color = linkInk.copy(alpha = 0.72f),
                         radius = 3.dp.toPx(),
                         center = pulse,
                     )
                 }
+            }
+            tissue?.egg?.let { egg ->
+                drawTissueEgg(egg, zoom, toScreen = { screenCenter(it) }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             }
         }
 
@@ -377,7 +389,7 @@ private fun MascotNodeTerrarium(
                             onDragEnd = {
                                 onNodeMoved(node.id, workingPositions[node.id] ?: subject.position)
                                 val target = dropTargetId
-                                if (target != null && target != node.id) onNodeDroppedOn(node.id, target)
+                                if (target != null && target != node.id) onNodeDroppedOn?.invoke(node.id, target)
                                 draggingId = null
                                 dropTargetId = null
                             },
@@ -390,6 +402,8 @@ private fun MascotNodeTerrarium(
                             ).clamped()
                             workingPositions = workingPositions + (node.id to next)
                             val nextPx = screenCenter(next)
+                            // Without a drop handler, bodies only arrange: no creature is ever a drop target.
+                            if (onNodeDroppedOn == null) return@detectDragGestures
                             dropTargetId = subjects.asSequence()
                                 .filter { it.node.id != node.id }
                                 .map { candidate ->

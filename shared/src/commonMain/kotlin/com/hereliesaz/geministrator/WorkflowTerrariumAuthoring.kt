@@ -71,3 +71,26 @@ internal fun removeTerrariumDependency(
     }
     return TerrariumDependencyEditResult.Applied(candidate)
 }
+
+/**
+ * The tide (docs/Swarm-OS.md): every build edit to a workflow's wiring, undoable and redoable.
+ * It holds definitions, not diffs, so undo restores exactly what was there. Run history is not in it.
+ */
+internal data class TerrariumTide(
+    val past: List<WorkflowDefinition> = emptyList(),
+    val present: WorkflowDefinition,
+    val future: List<WorkflowDefinition> = emptyList(),
+) {
+    val canUndo: Boolean get() = past.isNotEmpty()
+    val canRedo: Boolean get() = future.isNotEmpty()
+
+    /** Records [next] as the new present; a fresh edit clears what could have been redone. */
+    fun record(next: WorkflowDefinition): TerrariumTide =
+        if (next == present) this else TerrariumTide(past + present, next, emptyList())
+
+    fun undo(): TerrariumTide =
+        if (!canUndo) this else TerrariumTide(past.dropLast(1), past.last(), listOf(present) + future)
+
+    fun redo(): TerrariumTide =
+        if (!canRedo) this else TerrariumTide(past + present, future.first(), future.drop(1))
+}

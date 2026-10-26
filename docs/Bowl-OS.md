@@ -1,6 +1,6 @@
 # Bowl OS: The Aive, rethought from the bowl out
 
-Status: proposal. This replaces the tabbed app with one place: the bowl. `Fishbowl-Builder.md` stays as the record of decisions already made (gestation, eggs on tails, mean adversaries, forked roles, duplicates, slide-over care panel, rehearsal). This document moves the ground under them.
+Status: superseded by `Swarm-OS.md`, which keeps these decisions and drops the water. Original proposal follows. This replaces the tabbed app with one place: the bowl. `Fishbowl-Builder.md` stays as the record of decisions already made (gestation, eggs on tails, mean adversaries, forked roles, duplicates, slide-over care panel, rehearsal). This document moves the ground under them.
 
 ## First principle
 

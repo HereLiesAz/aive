@@ -114,3 +114,19 @@ data class ManagedSessionUsage(
     val cacheHitFraction: Float? = null,
     val latencyMillis: Long? = null,
 )
+
+/** Adds one drained report to a task's running total. A report with no token or cost data changes nothing. */
+internal fun com.hereliesaz.geministrator.domain.TaskUsage?.plus(
+    report: ManagedSessionUsage,
+): com.hereliesaz.geministrator.domain.TaskUsage? {
+    if (report.inputTokens == null && report.outputTokens == null && report.costUsd == null) return this
+    val base = this ?: com.hereliesaz.geministrator.domain.TaskUsage()
+    return base.copy(
+        inputTokens = base.inputTokens + (report.inputTokens ?: 0),
+        outputTokens = base.outputTokens + (report.outputTokens ?: 0),
+        costUsd = when {
+            report.costUsd == null -> base.costUsd
+            else -> (base.costUsd ?: 0.0) + report.costUsd
+        },
+    )
+}

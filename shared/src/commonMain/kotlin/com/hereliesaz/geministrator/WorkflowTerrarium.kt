@@ -25,15 +25,14 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
-import com.hereliesaz.geministrator.resources.terrarium_draft_wiring_staged_now_depends
 import org.jetbrains.compose.resources.getString
 
 /**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
  *
- * Habitat movement is presentation-only and persisted independently. Dropping one real task-creature
- * onto another means "dragged depends on target". The resulting definition is staged as a draft;
- * the currently executing run remains immutable.
+ * Habitat movement is presentation-only and persisted independently; bodies never edit the
+ * workflow. Wiring changes only through [TerrariumConnections], recorded on the [TerrariumTide] and
+ * staged as a draft; the currently executing run remains immutable.
  */
 @Composable
 internal fun GeministratorWorkflowTerrarium(
@@ -53,7 +52,9 @@ internal fun GeministratorWorkflowTerrarium(
     var positions by remember(layoutDefinitionId) {
         mutableStateOf(layoutStore.load(layoutDefinitionId))
     }
-    var stagedDefinition by remember(definition) { mutableStateOf(definition) }
+    // The tide holds every wiring edit; its present is the staged definition shown in the field.
+    var tide by remember(definition) { mutableStateOf(TerrariumTide(present = definition)) }
+    val stagedDefinition = tide.present
     var authoringMessage by remember(definition.id) { mutableStateOf<String?>(null) }
 
     val stageDefinition: suspend (WorkflowDefinition) -> WorkflowDefinition = onStageDefinition ?: { candidate ->
@@ -73,6 +74,9 @@ internal fun GeministratorWorkflowTerrarium(
             roles = roles,
             persistedPositions = positions,
         )
+    }
+    val tissue = remember(projection, stagedDefinition, run) {
+        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position })
     }
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
@@ -100,7 +104,11 @@ internal fun GeministratorWorkflowTerrarium(
         }
     }
 
+    // Live watches the run; Build holds the field still and opens the wiring to edits.
+    var building by remember(definition.id) { mutableStateOf(false) }
+
     Column(modifier = modifier.fillMaxWidth()) {
+        TerrariumModeToggle(building = building, onBuildingChange = { building = it })
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -113,6 +121,7 @@ internal fun GeministratorWorkflowTerrarium(
                 serviceVisits = projection.serviceVisits,
                 editable = true,
                 compact = compact,
+                tissue = if (building) tissue.copy(egg = null) else tissue,
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
@@ -123,35 +132,51 @@ internal fun GeministratorWorkflowTerrarium(
                     layoutStore.put(layoutDefinitionId, subjectId, position)
                     positions = positions + (subjectId to position)
                 },
-                onNodeDroppedOn = { downstreamRaw, upstreamRaw ->
-                    if (downstreamRaw == TERRARIUM_ORCHESTRATOR_ID || upstreamRaw == TERRARIUM_ORCHESTRATOR_ID) {
-                        authoringMessage = "The orchestrator is the workflow root node and cannot be rewired as a task dependency."
-                        return@PlatformNodeTerrarium
-                    }
-                    val downstreamId = TaskDefinitionId(downstreamRaw)
-                    val upstreamId = TaskDefinitionId(upstreamRaw)
-                    when (val edit = addTerrariumDependency(stagedDefinition, downstreamId, upstreamId)) {
-                        is TerrariumDependencyEditResult.Applied -> {
-                            scope.launch {
-                                runCatching { stageDefinition(edit.definition) }
-                                    .onSuccess { persisted ->
-                                        stagedDefinition = persisted
-                                        authoringMessage = getString(Res.string.terrarium_draft_wiring_staged_now_depends, downstreamRaw, upstreamRaw)
-                                    }
-                                    .onFailure { failure ->
-                                        authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
-                                    }
-                            }
+                // Bodies only arrange (docs/Swarm-OS.md): wiring changes through the connections below.
+                onNodeDroppedOn = null,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (building) {
+            TerrariumConnections(
+                definition = stagedDefinition,
+                selectedTaskId = selectedTaskId,
+                canUndo = tide.canUndo,
+                canRedo = tide.canRedo,
+                onEdit = { edit ->
+                    when (edit) {
+                        is TerrariumDependencyEditResult.Applied -> scope.launch {
+                            runCatching { stageDefinition(edit.definition) }
+                                .onSuccess { persisted ->
+                                    tide = tide.record(persisted)
+                                    authoringMessage = null
+                                }
+                                .onFailure { failure ->
+                                    authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
+                                }
                         }
-                        TerrariumDependencyEditResult.NoChange -> {
-                            authoringMessage = "$downstreamRaw already depends on $upstreamRaw."
-                        }
-                        is TerrariumDependencyEditResult.Rejected -> {
-                            authoringMessage = edit.reason
-                        }
+                        TerrariumDependencyEditResult.NoChange -> Unit
+                        is TerrariumDependencyEditResult.Rejected -> authoringMessage = edit.reason
                     }
                 },
-                modifier = Modifier.fillMaxSize(),
+                onUndo = {
+                    val back = tide.undo()
+                    scope.launch {
+                        runCatching { stageDefinition(back.present) }
+                            .onSuccess { persisted -> tide = back.copy(present = persisted) }
+                            .onFailure { failure -> authoringMessage = failure.message }
+                    }
+                },
+                onRedo = {
+                    val forward = tide.redo()
+                    scope.launch {
+                        runCatching { stageDefinition(forward.present) }
+                            .onSuccess { persisted -> tide = forward.copy(present = persisted) }
+                            .onFailure { failure -> authoringMessage = failure.message }
+                    }
+                },
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
 

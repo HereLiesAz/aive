@@ -188,6 +188,16 @@ data class BlockingReason(
     val message: String,
 )
 
+/** Provider-reported usage for one task, accumulated across every report its sessions sent. */
+@Serializable
+data class TaskUsage(
+    val inputTokens: Long = 0,
+    val outputTokens: Long = 0,
+    val costUsd: Double? = null,
+) {
+    val totalTokens: Long get() = inputTokens + outputTokens
+}
+
 @Serializable
 data class TaskRun(
     val id: TaskRunId,
@@ -205,6 +215,8 @@ data class TaskRun(
     val providerPlan: String? = null,
     val executor: TaskExecutor? = null,
     val externalRunId: String? = null,
+    /** Tokens and cost the task's provider has reported so far, summed across reports; null if none. */
+    val usage: TaskUsage? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

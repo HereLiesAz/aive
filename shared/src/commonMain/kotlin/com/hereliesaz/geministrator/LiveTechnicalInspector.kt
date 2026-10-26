@@ -135,6 +135,8 @@ internal fun TechnicalInspector(
         Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
+        creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+            ?.let { CreatureNeedsPanel(it) }
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),

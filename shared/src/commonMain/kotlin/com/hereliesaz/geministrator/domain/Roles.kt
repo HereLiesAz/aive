@@ -165,6 +165,8 @@ data class RoleDefinition(
     val surfaces: List<RoleSurface> = emptyList(),
     val capabilitiesRequired: Set<AgentCapability> = emptySet(),
     val authorities: Set<RoleAuthority> = emptySet(),
+    /** Tokens this agent may spend in one run, set by the user; null means no budget. */
+    val tokenBudget: Long? = null,
 )
 
 object BuiltInRoles {
