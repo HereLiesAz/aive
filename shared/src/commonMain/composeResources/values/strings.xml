@@ -166,6 +166,8 @@
     <string name="inspector_sending">Sending…</string>
     <string name="inspector_sent">Sent</string>
     <string name="needs_needs">NEEDS</string>
+    <string name="swarm_token_budget">Token budget per run</string>
+    <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
     <string name="needs_echo_grounded">GROUNDED</string>
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>

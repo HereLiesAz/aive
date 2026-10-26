@@ -21,7 +21,7 @@ internal data class CreatureNeeds(
     val echoState: EchoState,
     /** 0..100: its reliability in this run; retries and failures cost it. */
     val integrity: Int,
-    /** 0..100 of a set budget remaining; null while no token budget exists to measure against. */
+    /** 0..100 of its agent's token budget left in this run; null when the user set no budget. */
     val budget: Int?,
     /** Tokens its provider has reported spending on it; null when none were reported. */
     val tokensSpent: Long?,
@@ -97,6 +97,13 @@ internal fun creatureNeeds(
     val failed = taskRun?.status == TaskRunStatus.Failed || taskRun?.status == TaskRunStatus.Escalated
     val integrity = (100 - 15 * (attempt - 1) - if (failed) 40 else 0).coerceIn(0, 100)
 
+    // The budget belongs to the agent (its role) and covers everything it spends in this run.
+    val roleId = taskRun?.assignedRoleId ?: task.roleId
+    val budgetLeft = roleId?.let(rolesById::get)?.tokenBudget?.let { cap ->
+        val spent = run.taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0 }
+        (100 - spent * 100 / cap).coerceIn(0, 100).toInt()
+    }
+
     val outputUsed = if (dependents.isEmpty()) {
         null
     } else {
@@ -110,7 +117,7 @@ internal fun creatureNeeds(
         echo = echo,
         echoState = echoStateOf(echo),
         integrity = integrity,
-        budget = null,
+        budget = budgetLeft,
         tokensSpent = taskRun?.usage?.totalTokens,
         outputUsed = outputUsed,
         nearClone = nearClone,

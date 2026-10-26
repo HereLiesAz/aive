@@ -103,6 +103,25 @@ class CreatureNeedsTest {
     }
 
     @Test
+    fun budgetIsWhatTheAgentHasLeftAcrossTheRun() {
+        val budgeted = engineer.copy(tokenBudget = 1_000)
+        val spent = run(
+            Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Running, "a" to 1),
+        ).let { r ->
+            r.copy(
+                taskRuns = r.taskRuns.mapValues { (_, t) ->
+                    t.copy(usage = com.hereliesaz.geministrator.domain.TaskUsage(inputTokens = 200, outputTokens = 50))
+                },
+            )
+        }
+        val needs = assertNotNull(creatureNeeds(TaskDefinitionId("build"), definition, spent, listOf(budgeted, qa)))
+        // plan and build are the same agent: 500 of 1000 spent
+        assertEquals(50, needs.budget)
+        assertEquals(250, needs.tokensSpent)
+    }
+
+    @Test
     fun budgetIsNotReportedAndTheLastTaskHasNoDownstream() {
         val needs = assertNotNull(creatureNeeds(TaskDefinitionId("review"), definition, run(), roles))
         assertNull(needs.budget)
