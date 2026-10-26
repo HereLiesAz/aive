@@ -84,6 +84,10 @@ import com.hereliesaz.geministrator.resources.inspector_hint_approve_plan
 import com.hereliesaz.geministrator.resources.inspector_hint_approve_task
 import com.hereliesaz.geministrator.resources.inspector_hint_approve_nested
 import org.jetbrains.compose.resources.getString
+import com.hereliesaz.geministrator.resources.mind_budget
+import com.hereliesaz.geministrator.resources.mind_instructions
+import com.hereliesaz.geministrator.resources.mind_no_budget
+import com.hereliesaz.geministrator.resources.mind_tools
 import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.geministrator.resources.inspector_acceptance_criteria_count
 import org.jetbrains.compose.resources.pluralStringResource
@@ -137,6 +141,18 @@ internal fun TechnicalInspector(
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
             ?.let { CreatureNeedsPanel(it) }
+        // Inside the creature (docs/Swarm-OS.md): its config. Its genes never change; editing them in
+        // the Swarm hatches a new config rather than altering this one.
+        role?.let { mind ->
+            LiveInspectorLine(stringResource(Res.string.mind_instructions), mind.instructions.ifBlank { "—" })
+            if (mind.capabilitiesRequired.isNotEmpty()) {
+                LiveInspectorLine(stringResource(Res.string.mind_tools), mind.capabilitiesRequired.joinToString { it.name })
+            }
+            LiveInspectorLine(
+                stringResource(Res.string.mind_budget),
+                mind.tokenBudget?.toString() ?: stringResource(Res.string.mind_no_budget),
+            )
+        }
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),

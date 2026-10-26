@@ -95,6 +95,16 @@ class TissueProjectionTest {
         )
     }
 
+    @Test
+    fun aCreatureWaitingOnAPersonRisesToTheSurface() {
+        val scene = projectTissue(
+            definition,
+            run(WorkflowRunStatus.AwaitingHuman, "review" to (TaskRunStatus.AwaitingApproval to "a"), "implement" to (TaskRunStatus.Completed to "a")),
+            positions,
+        )
+        assertEquals(setOf("review"), scene.atSurface)
+    }
+
     private fun run(status: WorkflowRunStatus, vararg tasks: Pair<String, Pair<TaskRunStatus, String>>) = WorkflowRun(
         id = WorkflowRunId("run"),
         projectId = ProjectId("project"),

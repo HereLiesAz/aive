@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -93,6 +95,8 @@ internal fun PlatformNodeTerrarium(
     editable: Boolean = true,
     compact: Boolean = false,
     tissue: TissueScene? = null,
+    onTetherDrawn: ((String, String) -> Unit)? = null,
+    onTetherSliced: ((String, String) -> Unit)? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -107,6 +111,8 @@ internal fun PlatformNodeTerrarium(
         editable = editable,
         compact = compact,
         tissue = tissue,
+        onTetherDrawn = onTetherDrawn,
+        onTetherSliced = onTetherSliced,
     )
 }
 
@@ -124,6 +130,8 @@ private fun MascotNodeTerrarium(
     editable: Boolean,
     compact: Boolean,
     tissue: TissueScene?,
+    onTetherDrawn: ((String, String) -> Unit)?,
+    onTetherSliced: ((String, String) -> Unit)?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -131,6 +139,10 @@ private fun MascotNodeTerrarium(
     var workingPositions by remember(subjectPositions) { mutableStateOf(subjectPositions) }
     var draggingId by remember { mutableStateOf<String?>(null) }
     var dropTargetId by remember { mutableStateOf<String?>(null) }
+    // A tether being drawn from a creature's tail, and a slice being swiped across the field (screen px).
+    var tetherFromId by remember { mutableStateOf<String?>(null) }
+    var tetherEnd by remember { mutableStateOf(Offset.Zero) }
+    var sliceTrail by remember { mutableStateOf<List<Offset>>(emptyList()) }
     var zoomTarget by remember { mutableStateOf(1f) }
     var focusTarget by remember { mutableStateOf(Offset(0.5f, 0.5f)) }
 
@@ -260,7 +272,39 @@ private fun MascotNodeTerrarium(
             return start to end
         }
 
-        Canvas(Modifier.fillMaxSize()) {
+        fun creatureAt(point: Offset, except: String?): String? = subjects.asSequence()
+            .filter { it.node.id != except }
+            .map { it.node.id to (screenCenter(workingPositions[it.node.id] ?: it.position) - point).getDistance() }
+            .filter { (_, distance) -> distance <= creatureSizePx * zoom * 0.45f }
+            .minByOrNull { it.second }
+            ?.first
+
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(onTetherSliced, relationships, zoom, focusX, focusY) {
+                    // Slice: a swipe across open tissue cuts every tether it crosses.
+                    if (onTetherSliced == null) return@pointerInput
+                    detectDragGestures(
+                        onDragStart = { sliceTrail = listOf(it) },
+                        onDragCancel = { sliceTrail = emptyList() },
+                        onDragEnd = {
+                            val trail = sliceTrail
+                            sliceTrail = emptyList()
+                            relationships
+                                .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
+                                .filter { relationship ->
+                                    val (a, b) = relationshipEndpoints(relationship) ?: return@filter false
+                                    trail.zipWithNext().any { (p, q) -> segmentsCross(a, b, p, q) }
+                                }
+                                .forEach { onTetherSliced(it.from, it.to) }
+                        },
+                    ) { change, _ ->
+                        change.consume()
+                        sliceTrail = sliceTrail + change.position
+                    }
+                },
+        ) {
             if (tissue != null) {
                 drawTissueGround(tissue) { screenCenter(it) }
             } else {
@@ -310,6 +354,12 @@ private fun MascotNodeTerrarium(
                     end = end,
                     strokeWidth = stroke,
                     cap = StrokeCap.Round,
+                    // A knotted (conditional) tether is dashed.
+                    pathEffect = if (tissue?.conditional?.contains(relationship.from to relationship.to) == true) {
+                        PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))
+                    } else {
+                        null
+                    },
                 )
                 if (active) {
                     val pulse = start + (end - start) * linkPulse()
@@ -319,6 +369,14 @@ private fun MascotNodeTerrarium(
                         center = pulse,
                     )
                 }
+            }
+            tetherFromId?.let { from ->
+                val start = screenCenter(workingPositions[from] ?: subjectById[from]?.position ?: return@let)
+                drawLine(Azphalt.White.copy(alpha = 0.9f), start, tetherEnd, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(Azphalt.White, radius = 6.dp.toPx(), center = tetherEnd, style = Stroke(width = 2.dp.toPx()))
+            }
+            sliceTrail.zipWithNext().forEach { (p, q) ->
+                drawLine(Azphalt.Yellow.copy(alpha = 0.8f), p, q, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             }
             tissue?.egg?.let { egg ->
                 drawTissueEgg(egg, zoom, toScreen = { screenCenter(it) }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
@@ -378,15 +436,28 @@ private fun MascotNodeTerrarium(
                     .pointerInput(editable, node.id, widthPx, heightPx, subjects, zoom) {
                         if (!editable) return@pointerInput
                         detectDragGestures(
-                            onDragStart = {
-                                draggingId = node.id
+                            onDragStart = { start ->
+                                // A drag that starts on the tail (the lower part of the body) draws a tether.
+                                if (onTetherDrawn != null && start.y > size.height * 0.62f) {
+                                    tetherFromId = node.id
+                                    tetherEnd = screenCenter(workingPositions[node.id] ?: subject.position) +
+                                        (start - Offset(size.width / 2f, size.height / 2f)) * zoom
+                                } else {
+                                    draggingId = node.id
+                                }
                                 dropTargetId = null
                             },
                             onDragCancel = {
                                 draggingId = null
                                 dropTargetId = null
+                                tetherFromId = null
                             },
                             onDragEnd = {
+                                tetherFromId?.let { from ->
+                                    tetherFromId = null
+                                    creatureAt(tetherEnd, except = from)?.let { to -> onTetherDrawn?.invoke(from, to) }
+                                    return@detectDragGestures
+                                }
                                 onNodeMoved(node.id, workingPositions[node.id] ?: subject.position)
                                 val target = dropTargetId
                                 if (target != null && target != node.id) onNodeDroppedOn?.invoke(node.id, target)
@@ -395,6 +466,10 @@ private fun MascotNodeTerrarium(
                             },
                         ) { change, dragAmount ->
                             change.consume()
+                            if (tetherFromId == node.id) {
+                                tetherEnd += dragAmount * zoom
+                                return@detectDragGestures
+                            }
                             val current = workingPositions[node.id] ?: subject.position
                             val next = H2g2TerrariumPosition(
                                 x = current.x + dragAmount.x / (widthPx * zoom),
@@ -422,6 +497,38 @@ private fun MascotNodeTerrarium(
                     .clickable(role = Role.Button) { onNodeSelected(node) },
                 contentAlignment = Alignment.Center,
             ) {
+                when (tissue?.echo?.get(node.id)) {
+                    // Insane: septic. A sick green halo it spreads to whatever reads its work.
+                    EchoState.Insane -> Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Color(0xFF7FA34A).copy(alpha = 0.35f), radius = min(size.width, size.height) * 0.48f)
+                    }
+                    // Fevered: a dashed warm ring; it has stopped listening.
+                    EchoState.Fevered -> Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            Color(0xFFD9762A),
+                            radius = min(size.width, size.height) * 0.42f,
+                            style = Stroke(
+                                width = 2.5.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+                            ),
+                        )
+                    }
+                    else -> Unit
+                }
+                if (tissue?.atSurface?.contains(node.id) == true) {
+                    // At the surface: it needs you. A warm glow behind it, like the gate in the mockups.
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                listOf(Azphalt.Yellow.copy(alpha = 0.6f), Azphalt.Yellow.copy(alpha = 0f)),
+                                center = Offset(size.width * 0.5f, size.height * 0.5f),
+                                radius = min(size.width, size.height) * 0.5f,
+                            ),
+                            radius = min(size.width, size.height) * 0.5f,
+                            center = Offset(size.width * 0.5f, size.height * 0.5f),
+                        )
+                    }
+                }
                 if (isSelected || isDropTarget) {
                     Canvas(Modifier.fillMaxSize()) {
                         drawCircle(
@@ -570,3 +677,13 @@ internal fun mascotActivityLabel(roleLabel: String, state: H2g2WorkflowState): S
     return classifyNodeCreatureRole(roleLabel).activeLabel()
 }
 
+
+/** Whether segment [a]–[b] crosses segment [p]–[q]. */
+private fun segmentsCross(a: Offset, b: Offset, p: Offset, q: Offset): Boolean {
+    fun side(o: Offset, x: Offset, y: Offset) = (x.x - o.x) * (y.y - o.y) - (x.y - o.y) * (y.x - o.x)
+    val d1 = side(p, q, a)
+    val d2 = side(p, q, b)
+    val d3 = side(a, b, p)
+    val d4 = side(a, b, q)
+    return (d1 > 0f) != (d2 > 0f) && (d3 > 0f) != (d4 > 0f)
+}

@@ -167,6 +167,10 @@ data class RoleDefinition(
     val authorities: Set<RoleAuthority> = emptySet(),
     /** Tokens this agent may spend in one run, set by the user; null means no budget. */
     val tokenBudget: Long? = null,
+    /** The configs it was hatched from (docs/Node-Creature-Genome.md); empty for founders. */
+    val parents: List<RoleDefinitionId> = emptyList(),
+    /** The run whose clearing hatched it; null for founders. */
+    val hatchedFromRunId: String? = null,
 )
 
 object BuiltInRoles {

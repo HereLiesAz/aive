@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -19,6 +20,12 @@ internal data class TissueScene(
     val providerOf: Map<String, String>,
     /** Null when nothing has run yet (a resting or build-mode workflow has no egg). */
     val egg: TissueEgg?,
+    /** Tethers (from, to) carrying a knot other than on-success; drawn dashed. */
+    val conditional: Set<Pair<String, String>> = emptySet(),
+    /** Creatures waiting on a person (approval or escalation): they rise to the surface. */
+    val atSurface: Set<String> = emptySet(),
+    /** Each creature's Echo state, from the needs (docs/Swarm-OS.md); grounded creatures are left out. */
+    val echo: Map<String, EchoState> = emptyMap(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */
@@ -50,6 +57,7 @@ internal fun projectTissue(
     definition: WorkflowDefinition,
     run: WorkflowRun,
     positions: Map<String, H2g2TerrariumPosition>,
+    roles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
 ): TissueScene {
     val taskIds = definition.tasks.map { it.id.value }
     val providerOf = run.taskRuns.entries
@@ -95,5 +103,27 @@ internal fun projectTissue(
             },
         )
     }
-    return TissueScene(capillaries = capillaries, providerOf = providerOf, egg = egg)
+    val conditional = definition.tasks.mapNotNullTo(mutableSetOf()) { task ->
+        when (val condition = task.condition) {
+            is TaskCondition.OnAnyOutcome -> condition.ofTask.value to task.id.value
+            is TaskCondition.OnFailure -> condition.ofTask.value to task.id.value
+            TaskCondition.Always -> null
+        }
+    }
+    val atSurface = run.taskRuns.entries
+        .filter { (_, taskRun) -> taskRun.status == TaskRunStatus.AwaitingApproval || taskRun.status == TaskRunStatus.Escalated }
+        .mapTo(mutableSetOf()) { (id, _) -> id.value }
+    return TissueScene(
+        capillaries = capillaries,
+        providerOf = providerOf,
+        egg = egg,
+        conditional = conditional,
+        atSurface = atSurface,
+        echo = definition.tasks.mapNotNull { task ->
+            creatureNeeds(task.id, definition, run, roles)
+                ?.echoState
+                ?.takeIf { it != EchoState.Grounded }
+                ?.let { task.id.value to it }
+        }.toMap(),
+    )
 }
