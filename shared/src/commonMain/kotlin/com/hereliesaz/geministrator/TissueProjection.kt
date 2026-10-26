@@ -24,6 +24,8 @@ internal data class TissueScene(
     val conditional: Set<Pair<String, String>> = emptySet(),
     /** Creatures waiting on a person (approval or escalation): they rise to the surface. */
     val atSurface: Set<String> = emptySet(),
+    /** Each creature's Echo state, from the needs (docs/Swarm-OS.md); grounded creatures are left out. */
+    val echo: Map<String, EchoState> = emptyMap(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */
@@ -55,6 +57,7 @@ internal fun projectTissue(
     definition: WorkflowDefinition,
     run: WorkflowRun,
     positions: Map<String, H2g2TerrariumPosition>,
+    roles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
 ): TissueScene {
     val taskIds = definition.tasks.map { it.id.value }
     val providerOf = run.taskRuns.entries
@@ -116,5 +119,11 @@ internal fun projectTissue(
         egg = egg,
         conditional = conditional,
         atSurface = atSurface,
+        echo = definition.tasks.mapNotNull { task ->
+            creatureNeeds(task.id, definition, run, roles)
+                ?.echoState
+                ?.takeIf { it != EchoState.Grounded }
+                ?.let { task.id.value to it }
+        }.toMap(),
     )
 }

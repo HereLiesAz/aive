@@ -35,12 +35,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.district_creatures
 import com.hereliesaz.geministrator.resources.district_empty
 import com.hereliesaz.geministrator.resources.district_import_agent
+import com.hereliesaz.geministrator.resources.lineage_adopt
+import com.hereliesaz.geministrator.resources.lineage_adopted
+import com.hereliesaz.geministrator.resources.lineage_lineage
 import com.hereliesaz.geministrator.resources.district_needs_you
 import com.hereliesaz.geministrator.resources.district_scars
 import com.hereliesaz.geministrator.resources.district_state_gestating
@@ -68,6 +72,8 @@ internal fun DistrictScreen(
     onLoadRuns: suspend () -> List<WorkflowRun>,
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
     onImportAgent: () -> Unit,
+    roles: Collection<RoleDefinition> = emptyList(),
+    onAdopt: (RoleDefinition) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
@@ -103,6 +109,7 @@ internal fun DistrictScreen(
                     NeighbourhoodCell(neighbourhood, onClick = { onEnterNeighbourhood(neighbourhood) })
                 }
             }
+            Lineage(roles, onAdopt)
         }
     }
 }
@@ -164,5 +171,31 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
             maxLines = 2,
         )
         Text(listOfNotNull(stateLabel, needsYou ?: scars).joinToString(" · "), style = AzphaltType.endCap, color = azphaltOnSurface())
+    }
+}
+
+/**
+ * The lineage (docs/Node-Creature-Genome.md): every config hatched from a run, with its parents.
+ * A child is born unadopted; adopting it puts it in the active swarm.
+ */
+@Composable
+private fun Lineage(roles: Collection<RoleDefinition>, onAdopt: (RoleDefinition) -> Unit) {
+    val hatched = roles.filter { it.parents.isNotEmpty() }
+    if (hatched.isEmpty()) return
+    val names = roles.associate { it.id to it.name }
+    Text(stringResource(Res.string.lineage_lineage), style = AzphaltType.section, color = azphaltOnSurface())
+    hatched.forEach { child ->
+        AzphaltPill(
+            label = child.name,
+            seed = "lineage-${child.id.value}",
+            endCap = if (child.enabled) stringResource(Res.string.lineage_adopted) else stringResource(Res.string.lineage_adopt),
+            onClick = { if (!child.enabled) onAdopt(child) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            child.parents.joinToString(" × ") { names[it] ?: it.value },
+            style = AzphaltType.endCap,
+            color = azphaltOnSurface(),
+        )
     }
 }

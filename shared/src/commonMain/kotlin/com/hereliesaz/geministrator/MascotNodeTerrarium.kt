@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -496,6 +497,24 @@ private fun MascotNodeTerrarium(
                     .clickable(role = Role.Button) { onNodeSelected(node) },
                 contentAlignment = Alignment.Center,
             ) {
+                when (tissue?.echo?.get(node.id)) {
+                    // Insane: septic. A sick green halo it spreads to whatever reads its work.
+                    EchoState.Insane -> Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Color(0xFF7FA34A).copy(alpha = 0.35f), radius = min(size.width, size.height) * 0.48f)
+                    }
+                    // Fevered: a dashed warm ring; it has stopped listening.
+                    EchoState.Fevered -> Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            Color(0xFFD9762A),
+                            radius = min(size.width, size.height) * 0.42f,
+                            style = Stroke(
+                                width = 2.5.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())),
+                            ),
+                        )
+                    }
+                    else -> Unit
+                }
                 if (tissue?.atSurface?.contains(node.id) == true) {
                     // At the surface: it needs you. A warm glow behind it, like the gate in the mockups.
                     Canvas(Modifier.fillMaxSize()) {

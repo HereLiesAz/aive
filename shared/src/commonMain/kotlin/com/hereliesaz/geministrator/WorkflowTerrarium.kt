@@ -76,7 +76,7 @@ internal fun GeministratorWorkflowTerrarium(
         )
     }
     val tissue = remember(projection, stagedDefinition, run) {
-        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position })
+        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles)
     }
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->

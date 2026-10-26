@@ -49,6 +49,7 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.district_surface
 import com.hereliesaz.geministrator.resources.nav_runtime
@@ -542,6 +543,13 @@ private fun MainDestination(
                                 }
                             },
                             onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
+                            roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty(),
+                            onAdopt = { child ->
+                                val roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty()
+                                onSaveRoleCollection(
+                                    roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID } + child.copy(enabled = true),
+                                )
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

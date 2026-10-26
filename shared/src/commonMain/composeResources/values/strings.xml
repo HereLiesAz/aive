@@ -179,6 +179,8 @@
     <string name="district_state_withered">withered</string>
     <string name="district_surface">Your swarm</string>
     <string name="district_import_agent">Import an agent</string>
+    <string name="lineage_adopt">Adopt</string>
+    <string name="lineage_adopted">In the swarm</string>
     <string name="scar_hatched">Hatched</string>
     <string name="scar_withered">Withered</string>
     <string name="build_live">Live</string>

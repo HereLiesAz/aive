@@ -183,6 +183,23 @@ fun App(
         }
     }
 
+    // Breeding (docs/Swarm-OS.md step 6): when the live run clears, it hatches one config from the
+    // agents that did its work, kept unadopted in the roster. The child's id is the run's, so a
+    // run hatches once however often this effect runs.
+    val liveRun = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    LaunchedEffect(liveRun?.run?.id, liveRun?.run?.status) {
+        val presentation = liveRun ?: return@LaunchedEffect
+        val child = hatchFromRun(presentation.run, presentation.roles) ?: return@LaunchedEffect
+        val target = runtime ?: return@LaunchedEffect
+        try {
+            if (target.persistence.roles.all().none { it.id == child.id }) target.saveRole(child)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Hatching is best effort; a failed hatch never disturbs the run.
+        }
+    }
+
     /**
      * Launches [objective] the way the launch form does; ignored while a launch is in progress.
      * [onFinished] receives null once the workflow started, or the failure; it is not called
