@@ -32,6 +32,7 @@ import com.hereliesaz.geministrator.resources.needs_nothing_downstream
 import com.hereliesaz.geministrator.resources.needs_output_used
 import com.hereliesaz.geministrator.resources.needs_reviewed_by_itself
 import com.hereliesaz.geministrator.resources.needs_reviews_of
+import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
 private val NeedTrack = Color(0xFF4A4139)
@@ -59,7 +60,13 @@ internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modif
             color = if (needs.echoState == EchoState.Insane) EchoSeptic else EchoWarm,
         )
         NeedMeter(stringResource(Res.string.needs_integrity), needs.integrity, IntegrityGreen)
-        NeedMeter(stringResource(Res.string.needs_budget), needs.budget, Azphalt.Yellow, stringResource(Res.string.needs_not_reported))
+        NeedMeter(
+            label = stringResource(Res.string.needs_budget),
+            value = needs.budget,
+            color = Azphalt.Yellow,
+            missing = needs.tokensSpent?.let { stringResource(Res.string.needs_tokens_spent, it.toString()) }
+                ?: stringResource(Res.string.needs_not_reported),
+        )
         NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal, stringResource(Res.string.needs_nothing_downstream))
         needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_clone), it) }
         if (needs.selfReviews > 0) {

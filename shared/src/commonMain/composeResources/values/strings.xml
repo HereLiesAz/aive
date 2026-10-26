@@ -175,6 +175,7 @@
     <string name="needs_budget">BUDGET</string>
     <string name="needs_output_used">OUTPUT USED</string>
     <string name="needs_not_reported">not reported</string>
+    <string name="needs_tokens_spent">%1$s tokens · no budget set</string>
     <string name="needs_nothing_downstream">nothing downstream</string>
     <string name="needs_near_clone">NEAR-CLONE</string>
     <string name="needs_reviewed_by_itself">REVIEWED BY ITS OWN CONFIG</string>

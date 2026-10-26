@@ -21,8 +21,10 @@ internal data class CreatureNeeds(
     val echoState: EchoState,
     /** 0..100: its reliability in this run; retries and failures cost it. */
     val integrity: Int,
-    /** 0..100, or null when no token usage is reported for the task. */
+    /** 0..100 of a set budget remaining; null while no token budget exists to measure against. */
     val budget: Int?,
+    /** Tokens its provider has reported spending on it; null when none were reported. */
+    val tokensSpent: Long?,
     /** 0..100: how much of its downstream has taken its output; null when nothing depends on it. */
     val outputUsed: Int?,
     /** The other task with the same config, if any. */
@@ -109,6 +111,7 @@ internal fun creatureNeeds(
         echoState = echoStateOf(echo),
         integrity = integrity,
         budget = null,
+        tokensSpent = taskRun?.usage?.totalTokens,
         outputUsed = outputUsed,
         nearClone = nearClone,
         selfReviews = selfReviews,

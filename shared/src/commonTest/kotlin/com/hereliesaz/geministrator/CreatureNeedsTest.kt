@@ -106,6 +106,7 @@ class CreatureNeedsTest {
     fun budgetIsNotReportedAndTheLastTaskHasNoDownstream() {
         val needs = assertNotNull(creatureNeeds(TaskDefinitionId("review"), definition, run(), roles))
         assertNull(needs.budget)
+        assertNull(needs.tokensSpent)
         assertNull(needs.outputUsed)
         assertEquals(0, needs.echo)
     }
