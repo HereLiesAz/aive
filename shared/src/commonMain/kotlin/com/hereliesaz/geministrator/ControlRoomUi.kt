@@ -541,6 +541,7 @@ private fun MainDestination(
                                     onDestinationSelected(ControlRoomDestination.Workflows)
                                 }
                             },
+                            onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -550,6 +551,13 @@ private fun MainDestination(
                                 seed = "zoom-out-district",
                                 onClick = { inDistrict = true },
                             )
+                            (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.let { live ->
+                                RunScars(
+                                    currentRun = live.run,
+                                    onLoadRuns = { onLoadRunHistory().flatMap { it.second } },
+                                    onReplay = onSwitchRun,
+                                )
+                            }
         MindMapRunScreen(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             selectedTaskId = selectedTaskId,

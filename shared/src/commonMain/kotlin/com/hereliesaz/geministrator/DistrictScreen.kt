@@ -40,6 +40,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.district_creatures
 import com.hereliesaz.geministrator.resources.district_empty
+import com.hereliesaz.geministrator.resources.district_import_agent
 import com.hereliesaz.geministrator.resources.district_needs_you
 import com.hereliesaz.geministrator.resources.district_scars
 import com.hereliesaz.geministrator.resources.district_state_gestating
@@ -66,6 +67,7 @@ internal fun DistrictScreen(
     onLoadDefinitions: suspend () -> List<WorkflowDefinition>,
     onLoadRuns: suspend () -> List<WorkflowRun>,
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
+    onImportAgent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
@@ -82,6 +84,12 @@ internal fun DistrictScreen(
     ) {
         AzphaltThemedSurface(Azphalt.Ink) {
             Text(stringResource(Res.string.district_your_swarm), style = AzphaltType.section, color = azphaltOnSurface())
+            // Strangers come from the Store: the cure for the clone trap.
+            AzphaltPill(
+                label = stringResource(Res.string.district_import_agent),
+                seed = "district-import",
+                onClick = onImportAgent,
+            )
             val neighbourhoods = district ?: return@AzphaltThemedSurface
             if (neighbourhoods.isEmpty()) {
                 Text(stringResource(Res.string.district_empty), style = AzphaltType.body, color = azphaltOnSurface())

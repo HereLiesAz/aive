@@ -64,4 +64,20 @@ class DistrictProjectionTest {
         assertNull(quiet.latestRunId)
         assertEquals(NeighbourhoodState.Idle, quiet.state)
     }
+
+    @Test
+    fun scarsAreThisWorkflowsFinishedRunsNewestFirst() {
+        val current = run("now", "ship", WorkflowRunStatus.Running, 9)
+        val scars = runScars(
+            current,
+            listOf(
+                current,
+                run("a", "ship", WorkflowRunStatus.Completed, 1),
+                run("b", "ship", WorkflowRunStatus.Failed, 5),
+                run("c", "other", WorkflowRunStatus.Completed, 7),
+                run("d", "ship", WorkflowRunStatus.Running, 3),
+            ),
+        )
+        assertEquals(listOf("b", "a"), scars.map { it.id.value })
+    }
 }

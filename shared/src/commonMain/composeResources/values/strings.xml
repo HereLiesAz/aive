@@ -166,6 +166,10 @@
     <string name="inspector_sending">Sending…</string>
     <string name="inspector_sent">Sent</string>
     <string name="needs_needs">NEEDS</string>
+    <string name="mind_instructions">ITS MIND · INSTRUCTIONS</string>
+    <string name="mind_tools">TOOLS</string>
+    <string name="mind_budget">TOKEN BUDGET PER RUN</string>
+    <string name="mind_no_budget">none</string>
     <string name="district_your_swarm">YOUR SWARM</string>
     <string name="district_empty">No workflows yet. Import one from the Azphalt Store or build one.</string>
     <string name="district_needs_you">needs you</string>
@@ -174,6 +178,9 @@
     <string name="district_state_hatched">hatched</string>
     <string name="district_state_withered">withered</string>
     <string name="district_surface">Your swarm</string>
+    <string name="district_import_agent">Import an agent</string>
+    <string name="scar_hatched">Hatched</string>
+    <string name="scar_withered">Withered</string>
     <string name="build_live">Live</string>
     <string name="build_build">Build</string>
     <string name="build_undo">Undo</string>

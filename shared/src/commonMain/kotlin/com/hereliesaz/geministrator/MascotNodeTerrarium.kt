@@ -496,6 +496,20 @@ private fun MascotNodeTerrarium(
                     .clickable(role = Role.Button) { onNodeSelected(node) },
                 contentAlignment = Alignment.Center,
             ) {
+                if (tissue?.atSurface?.contains(node.id) == true) {
+                    // At the surface: it needs you. A warm glow behind it, like the gate in the mockups.
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(
+                            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                listOf(Azphalt.Yellow.copy(alpha = 0.6f), Azphalt.Yellow.copy(alpha = 0f)),
+                                center = Offset(size.width * 0.5f, size.height * 0.5f),
+                                radius = min(size.width, size.height) * 0.5f,
+                            ),
+                            radius = min(size.width, size.height) * 0.5f,
+                            center = Offset(size.width * 0.5f, size.height * 0.5f),
+                        )
+                    }
+                }
                 if (isSelected || isDropTarget) {
                     Canvas(Modifier.fillMaxSize()) {
                         drawCircle(

@@ -22,6 +22,8 @@ internal data class TissueScene(
     val egg: TissueEgg?,
     /** Tethers (from, to) carrying a knot other than on-success; drawn dashed. */
     val conditional: Set<Pair<String, String>> = emptySet(),
+    /** Creatures waiting on a person (approval or escalation): they rise to the surface. */
+    val atSurface: Set<String> = emptySet(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */
@@ -105,5 +107,14 @@ internal fun projectTissue(
             TaskCondition.Always -> null
         }
     }
-    return TissueScene(capillaries = capillaries, providerOf = providerOf, egg = egg, conditional = conditional)
+    val atSurface = run.taskRuns.entries
+        .filter { (_, taskRun) -> taskRun.status == TaskRunStatus.AwaitingApproval || taskRun.status == TaskRunStatus.Escalated }
+        .mapTo(mutableSetOf()) { (id, _) -> id.value }
+    return TissueScene(
+        capillaries = capillaries,
+        providerOf = providerOf,
+        egg = egg,
+        conditional = conditional,
+        atSurface = atSurface,
+    )
 }
