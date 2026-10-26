@@ -19,13 +19,19 @@ import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_bud
 import com.hereliesaz.geministrator.resources.build_cut
 import com.hereliesaz.geministrator.resources.build_detach
+import com.hereliesaz.geministrator.resources.build_hold_output
+import com.hereliesaz.geministrator.resources.build_release_output
 import com.hereliesaz.geministrator.resources.build_fed_by
+import com.hereliesaz.geministrator.resources.build_fold
+import com.hereliesaz.geministrator.resources.build_group
+import com.hereliesaz.geministrator.resources.build_group_hint
 import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
 import com.hereliesaz.geministrator.resources.build_knot_on_failure
 import com.hereliesaz.geministrator.resources.build_knot_on_success
 import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_pick_a_creature
 import com.hereliesaz.geministrator.resources.build_redo
+import com.hereliesaz.geministrator.resources.build_rehearse
 import com.hereliesaz.geministrator.resources.build_undo
 import org.jetbrains.compose.resources.stringResource
 
@@ -68,12 +74,35 @@ internal fun TerrariumConnections(
     onEdit: (TerrariumDependencyEditResult) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onRehearse: () -> Unit = {},
+    grouping: Set<String>? = null,
+    onGroupingChange: (Set<String>?) -> Unit = {},
+    onFold: (Set<String>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(label = stringResource(Res.string.build_rehearse), seed = "rehearse", onClick = onRehearse)
+            // Group: while on, taps collect creatures; Fold makes them one circuit.
+            AzphaltPill(
+                label = stringResource(Res.string.build_group),
+                seed = "group",
+                selected = grouping != null,
+                onClick = { onGroupingChange(if (grouping == null) emptySet() else null) },
+            )
+            if (grouping != null && grouping.size >= 2) {
+                AzphaltPill(
+                    label = stringResource(Res.string.build_fold, grouping.size),
+                    seed = "fold",
+                    onClick = { onFold(grouping) },
+                )
+            }
             if (canUndo) AzphaltPill(label = stringResource(Res.string.build_undo), seed = "tide-undo", onClick = onUndo)
             if (canRedo) AzphaltPill(label = stringResource(Res.string.build_redo), seed = "tide-redo", onClick = onRedo)
+        }
+        if (grouping != null) {
+            Text(stringResource(Res.string.build_group_hint), style = AzphaltType.body, color = azphaltOnSurface())
+            return@Column
         }
         val selected = definition.tasks.firstOrNull { it.id.value == selectedTaskId }
         if (selected == null) {
@@ -86,6 +115,12 @@ internal fun TerrariumConnections(
                 label = stringResource(Res.string.build_detach),
                 seed = "detach-${selected.id.value}",
                 onClick = { onEdit(detachTerrariumCreature(definition, selected.id)) },
+            )
+            AzphaltPill(
+                label = stringResource(if (selected.holdOutput) Res.string.build_release_output else Res.string.build_hold_output),
+                seed = "hold-${selected.id.value}",
+                selected = selected.holdOutput,
+                onClick = { onEdit(setTerrariumHold(definition, selected.id, !selected.holdOutput)) },
             )
             AzphaltPill(
                 label = stringResource(Res.string.build_bud),

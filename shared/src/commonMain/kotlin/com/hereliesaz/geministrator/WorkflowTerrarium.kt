@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
@@ -37,18 +39,19 @@ import org.jetbrains.compose.resources.getString
 @Composable
 internal fun GeministratorWorkflowTerrarium(
     definition: WorkflowDefinition,
-    run: WorkflowRun,
+    liveRun: WorkflowRun,
     roles: Collection<RoleDefinition>,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
     onStageDefinition: (suspend (WorkflowDefinition) -> WorkflowDefinition)? = null,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onSurface: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
     val fallbackDraftPersistence = remember { com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
-    val layoutDefinitionId = run.workflowDefinitionId
+    val layoutDefinitionId = liveRun.workflowDefinitionId
     var positions by remember(layoutDefinitionId) {
         mutableStateOf(layoutStore.load(layoutDefinitionId))
     }
@@ -66,6 +69,20 @@ internal fun GeministratorWorkflowTerrarium(
         fallbackDraftPersistence.definitions.put(persisted)
         persisted
     }
+
+    // Rehearse: frames of a dry run replace the live run while they play; nothing is persisted.
+    var rehearsal by remember(definition.id) { mutableStateOf<List<WorkflowRun>?>(null) }
+    var rehearsalFrame by remember(definition.id) { mutableStateOf(0) }
+    LaunchedEffect(rehearsal) {
+        val frames = rehearsal ?: return@LaunchedEffect
+        for (index in frames.indices) {
+            rehearsalFrame = index
+            delay(900)
+        }
+        delay(1_500)
+        rehearsal = null
+    }
+    val run = rehearsal?.getOrNull(rehearsalFrame) ?: liveRun
 
     val projection = remember(stagedDefinition, run, roles, positions) {
         projectWorkflowTerrarium(
@@ -123,6 +140,8 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
     var building by remember(definition.id) { mutableStateOf(false) }
+    // While grouping, taps gather creatures instead of selecting one.
+    var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         TerrariumModeToggle(building = building, onBuildingChange = { building = it })
@@ -138,9 +157,16 @@ internal fun GeministratorWorkflowTerrarium(
                 serviceVisits = projection.serviceVisits,
                 editable = true,
                 compact = compact,
-                tissue = if (building) tissue.copy(egg = null) else tissue,
+                tissue = (if (building && rehearsal == null) tissue.copy(egg = null) else tissue)
+                    .copy(gathered = grouping.orEmpty()),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
+                    grouping?.let { gathered ->
+                        if (stagedDefinition.tasks.any { it.id.value == node.id }) {
+                            grouping = if (node.id in gathered) gathered - node.id else gathered + node.id
+                        }
+                        return@PlatformNodeTerrarium
+                    }
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
                         onTaskSelected(node.id)
                     }
@@ -151,6 +177,7 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 // Bodies only arrange (docs/Swarm-OS.md): wiring changes through the connections below.
                 onNodeDroppedOn = null,
+                onSurface = onSurface,
                 // In Build, a strand drawn from a feeder's tail to another creature feeds it; a swipe
                 // across a strand cuts it.
                 onTetherDrawn = if (building) {
@@ -173,6 +200,23 @@ internal fun GeministratorWorkflowTerrarium(
                 selectedTaskId = selectedTaskId,
                 canUndo = tide.canUndo,
                 canRedo = tide.canRedo,
+                onRehearse = { rehearsal = rehearsalFrames(stagedDefinition, liveRun) },
+                grouping = grouping,
+                onGroupingChange = { grouping = it },
+                onFold = { members ->
+                    when (val fold = foldTerrariumCircuit(stagedDefinition, members.mapTo(mutableSetOf(), ::TaskDefinitionId))) {
+                        is TerrariumFoldResult.Rejected -> authoringMessage = fold.reason
+                        is TerrariumFoldResult.Folded -> scope.launch {
+                            // The circuit is its own workflow: saved first, so the parent's nested creature can find it.
+                            runCatching { fallbackDraftPersistence.definitions.put(fold.circuit) }
+                                .onSuccess {
+                                    grouping = null
+                                    applyEdit(TerrariumDependencyEditResult.Applied(fold.parent))
+                                }
+                                .onFailure { failure -> authoringMessage = failure.message }
+                        }
+                    }
+                },
                 onEdit = ::applyEdit,
                 onUndo = {
                     val back = tide.undo()

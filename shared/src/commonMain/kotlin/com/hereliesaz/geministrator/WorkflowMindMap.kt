@@ -22,14 +22,16 @@ internal fun GeministratorWorkflowMindMap(
     onTaskSelected: (String) -> Unit,
     branchIsolation: Boolean = false,
     modifier: Modifier = Modifier,
+    onSurface: (() -> Unit)? = null,
 ) {
     GeministratorWorkflowTerrarium(
         definition = definition,
-        run = run,
+        liveRun = run,
         roles = roles,
         selectedTaskId = selectedTaskId,
         onTaskSelected = onTaskSelected,
         modifier = modifier,
         compact = branchIsolation,
+        onSurface = onSurface,
     )
 }

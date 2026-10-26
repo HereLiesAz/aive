@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.releasedDependencies
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -48,7 +49,7 @@ internal fun buildProviderTaskRequest(
     } else {
         "$swarmInstructions\n\n${role.instructions}"
     }
-    val dependencyArtifacts = task.dependsOn
+    val dependencyArtifacts = definition.releasedDependencies(task)
         .mapNotNull(run.taskRuns::get)
         .flatMap(TaskRun::artifacts)
         .filter { it.kind !in redaction.excludedArtifactKinds }

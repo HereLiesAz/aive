@@ -154,6 +154,8 @@ data class TaskDefinition(
     val compoundInferencePolicy: CompoundInferencePolicy = CompoundInferencePolicy.Single,
     val computePlacement: ComputePlacementPolicy = ComputePlacementPolicy.LocalOnly,
     val executor: TaskExecutor? = null,
+    /** Hold output (docs/Swarm-OS.md, keeper tools): its artifacts are withheld from every consumer. */
+    val holdOutput: Boolean = false,
 )
 
 @Serializable
@@ -252,4 +254,10 @@ data class WorkflowRun(
             }
         }
     }
+}
+
+/** [task]'s dependencies whose output reaches it: everything it depends on, minus tasks holding their output. */
+fun WorkflowDefinition.releasedDependencies(task: TaskDefinition): List<TaskDefinitionId> {
+    val held = tasks.filter(TaskDefinition::holdOutput).mapTo(mutableSetOf(), TaskDefinition::id)
+    return task.dependsOn.filterNot { it in held }
 }

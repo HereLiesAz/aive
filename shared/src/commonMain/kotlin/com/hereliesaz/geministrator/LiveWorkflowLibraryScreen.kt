@@ -456,7 +456,7 @@ internal fun LiveWorkflowLibraryScreen(
                             // creature on another edits the unsaved draft; Save persists it.
                             GeministratorWorkflowTerrarium(
                                 definition = currentDraft,
-                                run = remember(currentDraft.id) { restingWorkflowRun(currentDraft) },
+                                liveRun = remember(currentDraft.id) { restingWorkflowRun(currentDraft) },
                                 roles = roles,
                                 selectedTaskId = selectedTaskId,
                                 onTaskSelected = { taskId -> selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId },

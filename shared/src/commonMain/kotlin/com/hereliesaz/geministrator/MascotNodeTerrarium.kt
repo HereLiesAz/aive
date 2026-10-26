@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -97,6 +99,7 @@ internal fun PlatformNodeTerrarium(
     tissue: TissueScene? = null,
     onTetherDrawn: ((String, String) -> Unit)? = null,
     onTetherSliced: ((String, String) -> Unit)? = null,
+    onSurface: (() -> Unit)? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -113,6 +116,7 @@ internal fun PlatformNodeTerrarium(
         tissue = tissue,
         onTetherDrawn = onTetherDrawn,
         onTetherSliced = onTetherSliced,
+        onSurface = onSurface,
     )
 }
 
@@ -132,6 +136,7 @@ private fun MascotNodeTerrarium(
     tissue: TissueScene?,
     onTetherDrawn: ((String, String) -> Unit)?,
     onTetherSliced: ((String, String) -> Unit)?,
+    onSurface: (() -> Unit)?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -282,6 +287,36 @@ private fun MascotNodeTerrarium(
         Canvas(
             Modifier
                 .fillMaxSize()
+                .pointerInput(onSurface) {
+                    // Pinch: two fingers zoom the field; pinching out past the widest view surfaces to the district.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var previous: Float? = null
+                        var surfaced = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            if (pressed.size < 2) {
+                                previous = null
+                                continue
+                            }
+                            val spread = (pressed[0].position - pressed[1].position).getDistance()
+                            previous?.let { last ->
+                                if (last > 0f) {
+                                    val next = zoomTarget * (spread / last)
+                                    if (next < 0.6f && !surfaced && onSurface != null) {
+                                        surfaced = true
+                                        onSurface()
+                                    }
+                                    zoomTarget = next.coerceIn(0.70f, 2.4f)
+                                }
+                            }
+                            previous = spread
+                            pressed.forEach { it.consume() }
+                        }
+                    }
+                }
                 .pointerInput(onTetherSliced, relationships, zoom, focusX, focusY) {
                     // Slice: a swipe across open tissue cuts every tether it crosses.
                     if (onTetherSliced == null) return@pointerInput
@@ -515,6 +550,16 @@ private fun MascotNodeTerrarium(
                     }
                     else -> Unit
                 }
+                if (tissue?.gathered?.contains(node.id) == true) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Azphalt.Yellow, radius = min(size.width, size.height) * 0.47f, style = Stroke(width = 3.dp.toPx()))
+                    }
+                }
+                if (tissue?.held?.contains(node.id) == true) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Azphalt.White, radius = min(size.width, size.height) * 0.46f, style = Stroke(width = 2.dp.toPx()))
+                    }
+                }
                 if (tissue?.atSurface?.contains(node.id) == true) {
                     // At the surface: it needs you. A warm glow behind it, like the gate in the mockups.
                     Canvas(Modifier.fillMaxSize()) {
@@ -589,7 +634,10 @@ private fun MascotNodeTerrarium(
         TerrariumZoomControls(
             zoom = zoomTarget,
             onZoomIn = { zoomTarget = (zoomTarget + 0.20f).coerceAtMost(2.4f) },
-            onZoomOut = { zoomTarget = (zoomTarget - 0.20f).coerceAtLeast(0.70f) },
+            // Zooming out from the widest view surfaces, the rim-button equivalent of pinching out.
+            onZoomOut = {
+                if (zoomTarget <= 0.70f && onSurface != null) onSurface() else zoomTarget = (zoomTarget - 0.20f).coerceAtLeast(0.70f)
+            },
             onReset = {
                 zoomTarget = 1f
                 focusTarget = Offset(0.5f, 0.5f)
