@@ -166,6 +166,14 @@
     <string name="inspector_sending">Sending…</string>
     <string name="inspector_sent">Sent</string>
     <string name="needs_needs">NEEDS</string>
+    <string name="build_live">Live</string>
+    <string name="build_build">Build</string>
+    <string name="build_undo">Undo</string>
+    <string name="build_redo">Redo</string>
+    <string name="build_cut">Cut</string>
+    <string name="build_fed_by">%1$s IS FED BY</string>
+    <string name="build_add_connection">FEED IT FROM</string>
+    <string name="build_pick_a_creature">Tap a creature to wire it.</string>
     <string name="swarm_token_budget">Token budget per run</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>

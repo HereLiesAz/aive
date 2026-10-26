@@ -88,7 +88,7 @@ internal fun PlatformNodeTerrarium(
     selectedId: String?,
     onNodeSelected: (H2g2WorkflowNode) -> Unit,
     onNodeMoved: (String, H2g2TerrariumPosition) -> Unit,
-    onNodeDroppedOn: (String, String) -> Unit,
+    onNodeDroppedOn: ((String, String) -> Unit)?,
     modifier: Modifier = Modifier,
     editable: Boolean = true,
     compact: Boolean = false,
@@ -119,7 +119,7 @@ private fun MascotNodeTerrarium(
     selectedId: String?,
     onNodeSelected: (H2g2WorkflowNode) -> Unit,
     onNodeMoved: (String, H2g2TerrariumPosition) -> Unit,
-    onNodeDroppedOn: (String, String) -> Unit,
+    onNodeDroppedOn: ((String, String) -> Unit)?,
     modifier: Modifier,
     editable: Boolean,
     compact: Boolean,
@@ -389,7 +389,7 @@ private fun MascotNodeTerrarium(
                             onDragEnd = {
                                 onNodeMoved(node.id, workingPositions[node.id] ?: subject.position)
                                 val target = dropTargetId
-                                if (target != null && target != node.id) onNodeDroppedOn(node.id, target)
+                                if (target != null && target != node.id) onNodeDroppedOn?.invoke(node.id, target)
                                 draggingId = null
                                 dropTargetId = null
                             },
@@ -402,6 +402,8 @@ private fun MascotNodeTerrarium(
                             ).clamped()
                             workingPositions = workingPositions + (node.id to next)
                             val nextPx = screenCenter(next)
+                            // Without a drop handler, bodies only arrange: no creature is ever a drop target.
+                            if (onNodeDroppedOn == null) return@detectDragGestures
                             dropTargetId = subjects.asSequence()
                                 .filter { it.node.id != node.id }
                                 .map { candidate ->
