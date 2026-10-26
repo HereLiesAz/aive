@@ -118,7 +118,7 @@ class CreatureNeedsTest {
         val needs = assertNotNull(creatureNeeds(TaskDefinitionId("build"), definition, spent, listOf(budgeted, qa)))
         // plan and build are the same agent: 500 of 1000 spent
         assertEquals(50, needs.budget)
-        assertEquals(250, needs.tokensSpent)
+        assertEquals(250L, needs.tokensSpent)
     }
 
     @Test

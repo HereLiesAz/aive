@@ -11,7 +11,7 @@ class TaskUsageTest {
         val first = (null as TaskUsage?).plus(ManagedSessionUsage(inputTokens = 100, outputTokens = 20, costUsd = 0.01))
         val second = first.plus(ManagedSessionUsage(inputTokens = 50, outputTokens = 5))
         assertEquals(TaskUsage(inputTokens = 150, outputTokens = 25, costUsd = 0.01), second)
-        assertEquals(175, second?.totalTokens)
+        assertEquals(175L, second?.totalTokens)
     }
 
     @Test
