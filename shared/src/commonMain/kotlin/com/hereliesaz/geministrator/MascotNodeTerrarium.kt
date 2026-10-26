@@ -550,6 +550,11 @@ private fun MascotNodeTerrarium(
                     }
                     else -> Unit
                 }
+                if (tissue?.gathered?.contains(node.id) == true) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        drawCircle(Azphalt.Yellow, radius = min(size.width, size.height) * 0.47f, style = Stroke(width = 3.dp.toPx()))
+                    }
+                }
                 if (tissue?.held?.contains(node.id) == true) {
                     Canvas(Modifier.fillMaxSize()) {
                         drawCircle(Azphalt.White, radius = min(size.width, size.height) * 0.46f, style = Stroke(width = 2.dp.toPx()))

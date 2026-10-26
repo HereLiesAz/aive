@@ -28,6 +28,8 @@ internal data class TissueScene(
     val echo: Map<String, EchoState> = emptyMap(),
     /** Creatures whose output is held from consumers: quarantined, ringed in white. */
     val held: Set<String> = emptySet(),
+    /** Creatures gathered for a circuit while grouping in Build. */
+    val gathered: Set<String> = emptySet(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */

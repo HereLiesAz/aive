@@ -140,6 +140,8 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
     var building by remember(definition.id) { mutableStateOf(false) }
+    // While grouping, taps gather creatures instead of selecting one.
+    var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
 
     Column(modifier = modifier.fillMaxWidth()) {
         TerrariumModeToggle(building = building, onBuildingChange = { building = it })
@@ -155,9 +157,16 @@ internal fun GeministratorWorkflowTerrarium(
                 serviceVisits = projection.serviceVisits,
                 editable = true,
                 compact = compact,
-                tissue = if (building && rehearsal == null) tissue.copy(egg = null) else tissue,
+                tissue = (if (building && rehearsal == null) tissue.copy(egg = null) else tissue)
+                    .copy(gathered = grouping.orEmpty()),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
+                    grouping?.let { gathered ->
+                        if (stagedDefinition.tasks.any { it.id.value == node.id }) {
+                            grouping = if (node.id in gathered) gathered - node.id else gathered + node.id
+                        }
+                        return@PlatformNodeTerrarium
+                    }
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
                         onTaskSelected(node.id)
                     }
@@ -192,6 +201,22 @@ internal fun GeministratorWorkflowTerrarium(
                 canUndo = tide.canUndo,
                 canRedo = tide.canRedo,
                 onRehearse = { rehearsal = rehearsalFrames(stagedDefinition, liveRun) },
+                grouping = grouping,
+                onGroupingChange = { grouping = it },
+                onFold = { members ->
+                    when (val fold = foldTerrariumCircuit(stagedDefinition, members.mapTo(mutableSetOf(), ::TaskDefinitionId))) {
+                        is TerrariumFoldResult.Rejected -> authoringMessage = fold.reason
+                        is TerrariumFoldResult.Folded -> scope.launch {
+                            // The circuit is its own workflow: saved first, so the parent's nested creature can find it.
+                            runCatching { fallbackDraftPersistence.definitions.put(fold.circuit) }
+                                .onSuccess {
+                                    grouping = null
+                                    applyEdit(TerrariumDependencyEditResult.Applied(fold.parent))
+                                }
+                                .onFailure { failure -> authoringMessage = failure.message }
+                        }
+                    }
+                },
                 onEdit = ::applyEdit,
                 onUndo = {
                     val back = tide.undo()

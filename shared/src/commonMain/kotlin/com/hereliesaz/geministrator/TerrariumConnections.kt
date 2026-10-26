@@ -22,6 +22,9 @@ import com.hereliesaz.geministrator.resources.build_detach
 import com.hereliesaz.geministrator.resources.build_hold_output
 import com.hereliesaz.geministrator.resources.build_release_output
 import com.hereliesaz.geministrator.resources.build_fed_by
+import com.hereliesaz.geministrator.resources.build_fold
+import com.hereliesaz.geministrator.resources.build_group
+import com.hereliesaz.geministrator.resources.build_group_hint
 import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
 import com.hereliesaz.geministrator.resources.build_knot_on_failure
 import com.hereliesaz.geministrator.resources.build_knot_on_success
@@ -72,13 +75,34 @@ internal fun TerrariumConnections(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onRehearse: () -> Unit = {},
+    grouping: Set<String>? = null,
+    onGroupingChange: (Set<String>?) -> Unit = {},
+    onFold: (Set<String>) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(label = stringResource(Res.string.build_rehearse), seed = "rehearse", onClick = onRehearse)
+            // Group: while on, taps collect creatures; Fold makes them one circuit.
+            AzphaltPill(
+                label = stringResource(Res.string.build_group),
+                seed = "group",
+                selected = grouping != null,
+                onClick = { onGroupingChange(if (grouping == null) emptySet() else null) },
+            )
+            if (grouping != null && grouping.size >= 2) {
+                AzphaltPill(
+                    label = stringResource(Res.string.build_fold, grouping.size),
+                    seed = "fold",
+                    onClick = { onFold(grouping) },
+                )
+            }
             if (canUndo) AzphaltPill(label = stringResource(Res.string.build_undo), seed = "tide-undo", onClick = onUndo)
             if (canRedo) AzphaltPill(label = stringResource(Res.string.build_redo), seed = "tide-redo", onClick = onRedo)
+        }
+        if (grouping != null) {
+            Text(stringResource(Res.string.build_group_hint), style = AzphaltType.body, color = azphaltOnSurface())
+            return@Column
         }
         val selected = definition.tasks.firstOrNull { it.id.value == selectedTaskId }
         if (selected == null) {

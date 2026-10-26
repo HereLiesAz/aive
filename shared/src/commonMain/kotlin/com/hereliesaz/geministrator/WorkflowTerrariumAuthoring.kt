@@ -191,3 +191,65 @@ internal fun setTerrariumHold(definition: WorkflowDefinition, taskId: TaskDefini
         definition.copy(tasks = definition.tasks.map { if (it.id == taskId) it.copy(holdOutput = hold) else it }),
     )
 }
+
+/** A circuit fold: the parent with one nested-workflow creature in place of the group, and the group itself. */
+internal sealed interface TerrariumFoldResult {
+    data class Folded(val parent: WorkflowDefinition, val circuit: WorkflowDefinition) : TerrariumFoldResult
+    data class Rejected(val reason: String) : TerrariumFoldResult
+}
+
+/**
+ * Groups (docs/Swarm-OS.md): fold [members] into a circuit, a nested workflow that runs as one
+ * creature. Strands inside the group stay inside; strands into it feed the circuit; strands out of
+ * it come from the circuit; knots naming a member now name the circuit.
+ */
+internal fun foldTerrariumCircuit(definition: WorkflowDefinition, members: Set<TaskDefinitionId>): TerrariumFoldResult {
+    if (members.size < 2) return TerrariumFoldResult.Rejected("A circuit needs at least two creatures")
+    val inside = definition.tasks.filter { it.id in members }
+    if (inside.size != members.size) return TerrariumFoldResult.Rejected("Unknown task in the group")
+    val taken = definition.tasks.mapTo(mutableSetOf()) { it.id.value }
+    val circuitTaskId = TaskDefinitionId(generateSequence(1) { it + 1 }.map { "circuit-$it" }.first { it !in taken })
+    val circuitId = com.hereliesaz.geministrator.domain.WorkflowDefinitionId("${definition.id.value}--${circuitTaskId.value}")
+    val always = com.hereliesaz.geministrator.domain.TaskCondition.Always
+
+    val circuit = WorkflowDefinition(
+        id = circuitId,
+        name = "${definition.name}: ${inside.joinToString(", ") { it.name }}",
+        tasks = inside.map { task ->
+            task.copy(
+                dependsOn = task.dependsOn.filterTo(mutableSetOf()) { it in members },
+                condition = if (task.condition.refersOutside(members)) always else task.condition,
+            )
+        },
+    )
+    val circuitTask = com.hereliesaz.geministrator.domain.TaskDefinition(
+        id = circuitTaskId,
+        name = "Circuit: ${inside.joinToString(", ") { it.name }}",
+        objective = inside.joinToString("\n") { it.objective },
+        roleId = null,
+        dependsOn = inside.flatMap { it.dependsOn }.filterTo(mutableSetOf()) { it !in members },
+        executor = com.hereliesaz.geministrator.domain.TaskExecutor.NestedWorkflow(circuitId),
+    )
+    fun TaskDefinitionId.outer() = if (this in members) circuitTaskId else this
+    val parent = definition.copy(
+        tasks = definition.tasks.filterNot { it.id in members }.map { task ->
+            task.copy(
+                dependsOn = task.dependsOn.mapTo(mutableSetOf()) { it.outer() },
+                condition = when (val c = task.condition) {
+                    is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome -> c.copy(ofTask = c.ofTask.outer())
+                    is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> c.copy(ofTask = c.ofTask.outer())
+                    com.hereliesaz.geministrator.domain.TaskCondition.Always -> c
+                },
+            )
+        } + circuitTask,
+    )
+    val errors = WorkflowGraphValidator.validate(parent) + WorkflowGraphValidator.validate(circuit)
+    if (errors.isNotEmpty()) return TerrariumFoldResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumFoldResult.Folded(parent, circuit)
+}
+
+private fun com.hereliesaz.geministrator.domain.TaskCondition.refersOutside(members: Set<TaskDefinitionId>): Boolean = when (this) {
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome -> ofTask !in members
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> ofTask !in members
+    com.hereliesaz.geministrator.domain.TaskCondition.Always -> false
+}
