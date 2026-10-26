@@ -264,20 +264,20 @@ private fun MascotNodeTerrarium(
             if (tissue != null) {
                 drawTissueGround(tissue) { screenCenter(it) }
             } else {
-            drawRect(Azphalt.Ink.copy(alpha = 0.025f))
-            val grid = 48.dp.toPx() * zoom
-            val worldOriginX = size.width * 0.5f - focusX * widthPx * zoom
-            val worldOriginY = size.height * 0.5f - focusY * heightPx * zoom
-            var x = ((worldOriginX % grid) + grid) % grid
-            while (x <= size.width) {
-                drawLine(onGround.copy(alpha = 0.055f), Offset(x, 0f), Offset(x, size.height), 1f)
-                x += grid
-            }
-            var y = ((worldOriginY % grid) + grid) % grid
-            while (y <= size.height) {
-                drawLine(onGround.copy(alpha = 0.055f), Offset(0f, y), Offset(size.width, y), 1f)
-                y += grid
-            }
+                drawRect(Azphalt.Ink.copy(alpha = 0.025f))
+                val grid = 48.dp.toPx() * zoom
+                val worldOriginX = size.width * 0.5f - focusX * widthPx * zoom
+                val worldOriginY = size.height * 0.5f - focusY * heightPx * zoom
+                var x = ((worldOriginX % grid) + grid) % grid
+                while (x <= size.width) {
+                    drawLine(onGround.copy(alpha = 0.055f), Offset(x, 0f), Offset(x, size.height), 1f)
+                    x += grid
+                }
+                var y = ((worldOriginY % grid) + grid) % grid
+                while (y <= size.height) {
+                    drawLine(onGround.copy(alpha = 0.055f), Offset(0f, y), Offset(size.width, y), 1f)
+                    y += grid
+                }
             }
 
             // On the dark tissue, synapses are light; on the plain ground they take the ground's ink.
