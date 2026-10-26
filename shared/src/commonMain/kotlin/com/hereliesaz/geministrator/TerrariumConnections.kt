@@ -16,7 +16,9 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_add_connection
 import com.hereliesaz.geministrator.resources.build_build
+import com.hereliesaz.geministrator.resources.build_bud
 import com.hereliesaz.geministrator.resources.build_cut
+import com.hereliesaz.geministrator.resources.build_detach
 import com.hereliesaz.geministrator.resources.build_fed_by
 import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
 import com.hereliesaz.geministrator.resources.build_knot_on_failure
@@ -79,6 +81,18 @@ internal fun TerrariumConnections(
             return@Column
         }
         val names = definition.tasks.associate { it.id to it.name }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(
+                label = stringResource(Res.string.build_detach),
+                seed = "detach-${selected.id.value}",
+                onClick = { onEdit(detachTerrariumCreature(definition, selected.id)) },
+            )
+            AzphaltPill(
+                label = stringResource(Res.string.build_bud),
+                seed = "bud-${selected.id.value}",
+                onClick = { onEdit(budTerrariumCreature(definition, selected.id)) },
+            )
+        }
         Text(stringResource(Res.string.build_fed_by, selected.name), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             selected.dependsOn.sortedBy { it.value }.forEach { upstream ->

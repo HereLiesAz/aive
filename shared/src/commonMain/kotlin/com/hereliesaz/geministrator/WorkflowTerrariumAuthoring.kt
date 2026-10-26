@@ -138,3 +138,46 @@ internal fun setTerrariumKnot(
     }
     return TerrariumDependencyEditResult.Applied(candidate)
 }
+
+/** Detach (docs/Swarm-OS.md, keeper tools): cut every strand into and out of [taskId]. */
+internal fun detachTerrariumCreature(definition: WorkflowDefinition, taskId: TaskDefinitionId): TerrariumDependencyEditResult {
+    if (definition.tasks.none { it.id == taskId }) return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    val candidate = definition.copy(
+        tasks = definition.tasks.map { task ->
+            when {
+                task.id == taskId -> task.copy(dependsOn = emptySet(), condition = com.hereliesaz.geministrator.domain.TaskCondition.Always)
+                taskId in task.dependsOn -> task.copy(
+                    dependsOn = task.dependsOn - taskId,
+                    condition = task.condition.takeUnless { it.refersTo(taskId) } ?: com.hereliesaz.geministrator.domain.TaskCondition.Always,
+                )
+                else -> task
+            }
+        },
+    )
+    if (candidate == definition) return TerrariumDependencyEditResult.NoChange
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumDependencyEditResult.Applied(candidate)
+}
+
+private fun com.hereliesaz.geministrator.domain.TaskCondition.refersTo(taskId: TaskDefinitionId): Boolean = when (this) {
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome -> ofTask == taskId
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> ofTask == taskId
+    com.hereliesaz.geministrator.domain.TaskCondition.Always -> false
+}
+
+/**
+ * Duplicate by budding: a second creature of the same config with its own task, fed by the same
+ * strands. Nothing depends on the bud until it is wired. That's a clone, and the needs panel says so.
+ */
+internal fun budTerrariumCreature(definition: WorkflowDefinition, taskId: TaskDefinitionId): TerrariumDependencyEditResult {
+    val source = definition.tasks.firstOrNull { it.id == taskId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    val taken = definition.tasks.mapTo(mutableSetOf()) { it.id.value }
+    val budId = generateSequence(2) { it + 1 }.map { "${taskId.value}-$it" }.first { it !in taken }
+    val bud = source.copy(id = TaskDefinitionId(budId), name = "${source.name} (bud)")
+    val candidate = definition.copy(tasks = definition.tasks + bud)
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumDependencyEditResult.Applied(candidate)
+}

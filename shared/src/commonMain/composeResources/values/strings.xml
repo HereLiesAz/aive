@@ -188,6 +188,8 @@
     <string name="build_undo">Undo</string>
     <string name="build_redo">Redo</string>
     <string name="build_cut">Cut</string>
+    <string name="build_detach">Detach</string>
+    <string name="build_bud">Duplicate</string>
     <string name="build_knot_on_success">On success</string>
     <string name="build_knot_on_any_outcome">On any outcome</string>
     <string name="build_knot_on_failure">Only on failure</string>
