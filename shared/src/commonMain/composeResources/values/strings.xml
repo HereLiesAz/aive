@@ -186,6 +186,7 @@
     <string name="build_live">Live</string>
     <string name="build_build">Build</string>
     <string name="build_undo">Undo</string>
+    <string name="build_rehearse">Rehearse</string>
     <string name="build_redo">Redo</string>
     <string name="build_cut">Cut</string>
     <string name="build_detach">Detach</string>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
@@ -37,7 +39,7 @@ import org.jetbrains.compose.resources.getString
 @Composable
 internal fun GeministratorWorkflowTerrarium(
     definition: WorkflowDefinition,
-    run: WorkflowRun,
+    liveRun: WorkflowRun,
     roles: Collection<RoleDefinition>,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
@@ -48,7 +50,7 @@ internal fun GeministratorWorkflowTerrarium(
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
     val fallbackDraftPersistence = remember { com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
-    val layoutDefinitionId = run.workflowDefinitionId
+    val layoutDefinitionId = liveRun.workflowDefinitionId
     var positions by remember(layoutDefinitionId) {
         mutableStateOf(layoutStore.load(layoutDefinitionId))
     }
@@ -66,6 +68,20 @@ internal fun GeministratorWorkflowTerrarium(
         fallbackDraftPersistence.definitions.put(persisted)
         persisted
     }
+
+    // Rehearse: frames of a dry run replace the live run while they play; nothing is persisted.
+    var rehearsal by remember(definition.id) { mutableStateOf<List<WorkflowRun>?>(null) }
+    var rehearsalFrame by remember(definition.id) { mutableStateOf(0) }
+    LaunchedEffect(rehearsal) {
+        val frames = rehearsal ?: return@LaunchedEffect
+        for (index in frames.indices) {
+            rehearsalFrame = index
+            delay(900)
+        }
+        delay(1_500)
+        rehearsal = null
+    }
+    val run = rehearsal?.getOrNull(rehearsalFrame) ?: liveRun
 
     val projection = remember(stagedDefinition, run, roles, positions) {
         projectWorkflowTerrarium(
@@ -138,7 +154,7 @@ internal fun GeministratorWorkflowTerrarium(
                 serviceVisits = projection.serviceVisits,
                 editable = true,
                 compact = compact,
-                tissue = if (building) tissue.copy(egg = null) else tissue,
+                tissue = if (building && rehearsal == null) tissue.copy(egg = null) else tissue,
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
@@ -173,6 +189,7 @@ internal fun GeministratorWorkflowTerrarium(
                 selectedTaskId = selectedTaskId,
                 canUndo = tide.canUndo,
                 canRedo = tide.canRedo,
+                onRehearse = { rehearsal = rehearsalFrames(stagedDefinition, liveRun) },
                 onEdit = ::applyEdit,
                 onUndo = {
                     val back = tide.undo()

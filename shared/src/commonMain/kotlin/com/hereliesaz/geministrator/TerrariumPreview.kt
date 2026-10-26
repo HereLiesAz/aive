@@ -49,7 +49,7 @@ fun TerrariumVisualProofScreen(
     ) {
         GeministratorWorkflowTerrarium(
             definition = fixture.definition,
-            run = fixture.run,
+            liveRun = fixture.run,
             roles = fixture.roles,
             selectedTaskId = "implementation",
             onTaskSelected = {},

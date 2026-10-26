@@ -28,6 +28,7 @@ import com.hereliesaz.geministrator.resources.build_knot_on_success
 import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_pick_a_creature
 import com.hereliesaz.geministrator.resources.build_redo
+import com.hereliesaz.geministrator.resources.build_rehearse
 import com.hereliesaz.geministrator.resources.build_undo
 import org.jetbrains.compose.resources.stringResource
 
@@ -70,10 +71,12 @@ internal fun TerrariumConnections(
     onEdit: (TerrariumDependencyEditResult) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onRehearse: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(label = stringResource(Res.string.build_rehearse), seed = "rehearse", onClick = onRehearse)
             if (canUndo) AzphaltPill(label = stringResource(Res.string.build_undo), seed = "tide-undo", onClick = onUndo)
             if (canRedo) AzphaltPill(label = stringResource(Res.string.build_redo), seed = "tide-redo", onClick = onRedo)
         }

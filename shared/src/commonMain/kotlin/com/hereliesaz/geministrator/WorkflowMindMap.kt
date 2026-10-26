@@ -25,7 +25,7 @@ internal fun GeministratorWorkflowMindMap(
 ) {
     GeministratorWorkflowTerrarium(
         definition = definition,
-        run = run,
+        liveRun = run,
         roles = roles,
         selectedTaskId = selectedTaskId,
         onTaskSelected = onTaskSelected,
