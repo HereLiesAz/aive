@@ -6,19 +6,20 @@ import kotlin.test.assertEquals
 
 class ClaspStateTest {
     @Test
-    fun states() {
-        assertEquals(ClaspState.Flowing, claspState(H2g2WorkflowState.Complete, H2g2WorkflowState.Active))
-        assertEquals(ClaspState.Succeeded, claspState(H2g2WorkflowState.Complete, H2g2WorkflowState.Complete))
-        assertEquals(ClaspState.Failed, claspState(H2g2WorkflowState.Failed, H2g2WorkflowState.Pending))
-        assertEquals(ClaspState.Blocked, claspState(H2g2WorkflowState.Complete, H2g2WorkflowState.Blocked))
-        assertEquals(ClaspState.Quiet, claspState(H2g2WorkflowState.Active, H2g2WorkflowState.Pending))
+    fun theGlowIsTheOutcomeThePulseIsTheWaiting() {
+        assertEquals(Clasp(ClaspOutcome.None, ClaspFlow.Through), clasp(H2g2WorkflowState.Active, H2g2WorkflowState.Pending))
+        assertEquals(Clasp(ClaspOutcome.Succeeded, ClaspFlow.Through), clasp(H2g2WorkflowState.Complete, H2g2WorkflowState.Active))
+        assertEquals(Clasp(ClaspOutcome.Succeeded, ClaspFlow.Still), clasp(H2g2WorkflowState.Complete, H2g2WorkflowState.Complete))
+        assertEquals(Clasp(ClaspOutcome.Failed, ClaspFlow.Still), clasp(H2g2WorkflowState.Failed, H2g2WorkflowState.Pending))
+        assertEquals(Clasp(ClaspOutcome.Failed, ClaspFlow.ToClasp), clasp(H2g2WorkflowState.Complete, H2g2WorkflowState.Blocked))
+        assertEquals(Clasp(ClaspOutcome.None, ClaspFlow.Still), clasp(H2g2WorkflowState.Pending, H2g2WorkflowState.Pending))
     }
 
     @Test
-    fun flowingCrossesTheClaspBlockedStopsAtIt() {
-        assertEquals(0.5f to null, claspPulse(ClaspState.Flowing, 0.25f))
-        assertEquals(null to 0.5f, claspPulse(ClaspState.Flowing, 0.75f))
-        assertEquals(0.9f to null, claspPulse(ClaspState.Blocked, 0.9f))
-        assertEquals(null to null, claspPulse(ClaspState.Succeeded, 0.5f))
+    fun throughCrossesTheClaspToClaspStopsAtIt() {
+        assertEquals(0.5f to null, claspPulse(ClaspFlow.Through, 0.25f))
+        assertEquals(null to 0.5f, claspPulse(ClaspFlow.Through, 0.75f))
+        assertEquals(0.9f to null, claspPulse(ClaspFlow.ToClasp, 0.9f))
+        assertEquals(null to null, claspPulse(ClaspFlow.Still, 0.5f))
     }
 }

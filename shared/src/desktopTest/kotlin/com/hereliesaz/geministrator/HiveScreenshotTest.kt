@@ -103,13 +103,23 @@ class HiveScreenshotTest {
         }
         // Every clasp state at once: done (green), failed (red), blocked (red, slice stopping at it).
         shoot("8-clasps", 900, 1400) {
+            // Review runs on any outcome of Implement (yellow pulse); Ship only on Review's failure (red).
+            val knotted = definition.copy(
+                tasks = definition.tasks.map {
+                    when (it.id.value) {
+                        "review" -> it.copy(condition = com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome(TaskDefinitionId("build")))
+                        "ship" -> it.copy(condition = com.hereliesaz.geministrator.domain.TaskCondition.OnFailure(TaskDefinitionId("review")))
+                        else -> it
+                    }
+                },
+            )
             GeministratorWorkflowTerrarium(
-                definition,
+                knotted,
                 run(
                     WorkflowRunStatus.Running,
                     Triple("contract", TaskRunStatus.Completed, "claude"),
                     Triple("build", TaskRunStatus.Completed, "claude"),
-                    Triple("review", TaskRunStatus.Failed, "gemini"),
+                    Triple("review", TaskRunStatus.Running, "gemini"),
                     Triple("ship", TaskRunStatus.Blocked, "claude"),
                 ),
                 roles,

@@ -84,11 +84,20 @@ class TissueProjectionTest {
     }
 
     @Test
-    fun aFailedRunWithersItsEggAndACompletedOneHatches() {
-        assertEquals(
-            TissueEggOutcome.Withered,
-            projectTissue(definition, run(WorkflowRunStatus.Failed, "contract" to (TaskRunStatus.Failed to "a")), positions).egg?.outcome,
+    fun betweenTasksTheEggStaysOnTheLastTailThatFedIt() {
+        val egg = assertNotNull(
+            projectTissue(
+                definition,
+                run(WorkflowRunStatus.Running, "contract" to (TaskRunStatus.Completed to "a"), "implement" to (TaskRunStatus.Ready to "a")),
+                positions,
+            ).egg,
         )
+        assertEquals(listOf("contract"), egg.feederIds)
+    }
+
+    @Test
+    fun aFailedRunHasNoEggAndACompletedOneHatches() {
+        assertNull(projectTissue(definition, run(WorkflowRunStatus.Failed, "contract" to (TaskRunStatus.Failed to "a")), positions).egg)
         assertEquals(
             TissueEggOutcome.Hatched,
             projectTissue(definition, run(WorkflowRunStatus.Completed, "contract" to (TaskRunStatus.Completed to "a")), positions).egg?.outcome,

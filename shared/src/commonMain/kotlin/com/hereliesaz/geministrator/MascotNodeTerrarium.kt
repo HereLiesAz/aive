@@ -300,10 +300,17 @@ private fun MascotNodeTerrarium(
             return start to end
         }
 
-        fun claspStateOf(from: String, to: String): ClaspState {
-            val up = subjectById[from]?.node?.state ?: return ClaspState.Quiet
-            val down = subjectById[to]?.node?.state ?: return ClaspState.Quiet
-            return claspState(up, down)
+        fun claspOf(from: String, to: String): Clasp {
+            val up = subjectById[from]?.node?.state ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
+            val down = subjectById[to]?.node?.state ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
+            return clasp(up, down)
+        }
+
+        /** The pulse's colour is what the tether waits for: success green, failure red, either yellow. */
+        fun knotColour(from: String, to: String): Color = when (tissue?.knots?.get(from to to) ?: TerrariumKnot.OnSuccess) {
+            TerrariumKnot.OnSuccess -> ClaspGreen
+            TerrariumKnot.OnFailure -> ClaspRed
+            TerrariumKnot.OnAnyOutcome -> Azphalt.Yellow
         }
 
         /**
@@ -321,12 +328,11 @@ private fun MascotNodeTerrarium(
                     else -> return@mapNotNull null
                 }
                 val there = screenCenter(workingPositions[other] ?: subjectById[other]?.position ?: return@mapNotNull null)
-                val state = claspStateOf(from, to)
-                val (upstreamPulse, downstreamPulse) = claspPulse(state, linkPulse())
+                val (upstreamPulse, downstreamPulse) = claspPulse(claspOf(from, to).flow, linkPulse())
                 TendrilReach(
                     at = local((centre + there) / 2f),
                     pulse = if (id == from) upstreamPulse else downstreamPulse,
-                    pulseColor = if (state == ClaspState.Blocked) ClaspRed else Azphalt.Yellow,
+                    pulseColor = knotColour(from, to),
                 )
             }
             return if (tetherFromId == id) clasps + TendrilReach(local(tetherEnd)) else clasps
@@ -638,13 +644,13 @@ private fun MascotNodeTerrarium(
             }
         }
 
-        // Each clasp glows by how its crossing went: green done, red failed or blocked.
+        // Each clasp glows by how the upstream work came out: green succeeded, red failed or blocked.
         Canvas(Modifier.fillMaxSize()) {
             tendrilLinks.distinct().forEach { (from, to) ->
-                val glow = when (claspStateOf(from, to)) {
-                    ClaspState.Succeeded -> ClaspGreen
-                    ClaspState.Failed, ClaspState.Blocked -> ClaspRed
-                    else -> return@forEach
+                val glow = when (claspOf(from, to).outcome) {
+                    ClaspOutcome.Succeeded -> ClaspGreen
+                    ClaspOutcome.Failed -> ClaspRed
+                    ClaspOutcome.None -> return@forEach
                 }
                 val a = screenCenter(workingPositions[from] ?: subjectById[from]?.position ?: return@forEach)
                 val b = screenCenter(workingPositions[to] ?: subjectById[to]?.position ?: return@forEach)

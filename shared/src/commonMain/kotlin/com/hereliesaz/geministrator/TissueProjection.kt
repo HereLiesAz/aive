@@ -22,6 +22,8 @@ internal data class TissueScene(
     val egg: TissueEgg?,
     /** Tethers (from, to) carrying a knot other than on-success; drawn dashed. */
     val conditional: Set<Pair<String, String>> = emptySet(),
+    /** Upstream to downstream: what that tether waits for. Absent means on success. */
+    val knots: Map<Pair<String, String>, TerrariumKnot> = emptyMap(),
     /** Creatures waiting on a person (approval or escalation): they rise to the surface. */
     val atSurface: Set<String> = emptySet(),
     /** Each creature's Echo state, from the needs (docs/Swarm-OS.md); grounded creatures are left out. */
@@ -43,12 +45,12 @@ internal data class TissueEgg(
     val position: H2g2TerrariumPosition,
     /** Completed tasks over all tasks, 0..1. */
     val growth: Float,
-    /** Tasks being worked on now; each feeds the egg with its tail. */
+    /** Tasks being worked on now, each feeding the egg with its tail; between tasks, the last one that did. */
     val feederIds: List<String>,
     val outcome: TissueEggOutcome,
 )
 
-internal enum class TissueEggOutcome { Gestating, Hatched, Withered }
+internal enum class TissueEggOutcome { Gestating, Hatched }
 
 private val FEEDING = setOf(
     TaskRunStatus.Planning,
@@ -81,12 +83,16 @@ internal fun projectTissue(
 
     val started = run.status != WorkflowRunStatus.Created ||
         run.taskRuns.values.any { it.status != TaskRunStatus.Created }
-    val egg = if (!started || taskIds.isEmpty()) {
+    // A failed or cancelled run has no egg: it had one until it failed.
+    val ended = run.status == WorkflowRunStatus.Failed || run.status == WorkflowRunStatus.Cancelled
+    val egg = if (!started || ended || taskIds.isEmpty()) {
         null
     } else {
         val statusOf = definition.tasks.associate { it.id.value to run.taskRuns[it.id]?.status }
         val completed = taskIds.count { statusOf[it] == TaskRunStatus.Completed }
+        // Between tasks nobody is feeding it, so it stays on the tail of the last one that did.
         val feeders = taskIds.filter { statusOf[it] in FEEDING }
+            .ifEmpty { listOf(taskIds.lastOrNull { statusOf[it] == TaskRunStatus.Completed } ?: taskIds.first()) }
         val anchors = (feeders.ifEmpty { taskIds }).mapNotNull(positions::get)
         val centre = if (anchors.isEmpty()) {
             H2g2TerrariumPosition(0.5f, 0.5f)
@@ -102,7 +108,6 @@ internal fun projectTissue(
             feederIds = feeders,
             outcome = when (run.status) {
                 WorkflowRunStatus.Completed -> TissueEggOutcome.Hatched
-                WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled -> TissueEggOutcome.Withered
                 else -> TissueEggOutcome.Gestating
             },
         )
@@ -114,6 +119,14 @@ internal fun projectTissue(
             TaskCondition.Always -> null
         }
     }
+    // What each knotted tether waits for; a tether not listed waits for success.
+    val knots = definition.tasks.mapNotNull { task ->
+        when (val condition = task.condition) {
+            is TaskCondition.OnAnyOutcome -> (condition.ofTask.value to task.id.value) to TerrariumKnot.OnAnyOutcome
+            is TaskCondition.OnFailure -> (condition.ofTask.value to task.id.value) to TerrariumKnot.OnFailure
+            TaskCondition.Always -> null
+        }
+    }.toMap()
     val atSurface = run.taskRuns.entries
         .filter { (_, taskRun) -> taskRun.status == TaskRunStatus.AwaitingApproval || taskRun.status == TaskRunStatus.Escalated }
         .mapTo(mutableSetOf()) { (id, _) -> id.value }
@@ -121,6 +134,7 @@ internal fun projectTissue(
         capillaries = capillaries,
         providerOf = providerOf,
         egg = egg,
+        knots = knots,
         conditional = conditional,
         atSurface = atSurface,
         held = definition.tasks.filter { it.holdOutput }.mapTo(mutableSetOf()) { it.id.value },

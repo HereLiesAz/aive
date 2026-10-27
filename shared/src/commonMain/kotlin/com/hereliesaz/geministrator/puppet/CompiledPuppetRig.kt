@@ -271,7 +271,14 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
         for (j in 0 until n) drawPart(this, atlas, pose, fit, scratch, part, j)
         drawCircle(
-            Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), centre, radius),
+            // An energy pulse: white-hot at its core, burning out through the knot's colour.
+            Brush.radialGradient(
+                0f to Color.White,
+                0.3f to color,
+                1f to color.copy(alpha = 0f),
+                center = centre,
+                radius = radius,
+            ),
             radius,
             centre,
             blendMode = BlendMode.SrcIn,
