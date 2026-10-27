@@ -1,3 +1,22 @@
+buildscript {
+    configurations.configureEach {
+        // CVE-2026-102554 (GHSA-xxph-c9ww-hj94): Guava before 33.7.2 over-allocates when deserializing.
+        // Guava only arrives transitively; lift every older request to the fixed release, keeping its flavour.
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.google.guava" && requested.name == "guava") {
+                val version = requested.version.orEmpty()
+                val (major, minor, patch) = (Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(version)?.destructured
+                    ?: return@eachDependency)
+                val old = major.toInt() < 33 || (major.toInt() == 33 && (minor.toInt() < 7 || (minor.toInt() == 7 && patch.ifEmpty { "0" }.toInt() < 2)))
+                if (old) {
+                    useVersion(if (version.endsWith("-android")) "33.7.2-android" else "33.7.2-jre")
+                    because("CVE-2026-102554")
+                }
+            }
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.androidApplication) apply false
     alias(libs.plugins.androidMultiplatformLibrary) apply false
@@ -32,6 +51,25 @@ if (useMavenLocalH2g2) {
                     .using(module("com.hereliesaz.conveyance:conveyance-core:0.1.0"))
                 substitute(module("com.github.HereLiesAz.Conveyance:conveyance-compose:653122cd8ec79a4b3ceadd44d99fe80f66c9905d"))
                     .using(module("com.hereliesaz.conveyance:conveyance-compose:0.1.0"))
+            }
+        }
+    }
+}
+
+allprojects {
+    configurations.configureEach {
+        // CVE-2026-102554 (GHSA-xxph-c9ww-hj94): Guava before 33.7.2 over-allocates when deserializing.
+        // Guava only arrives transitively; lift every older request to the fixed release, keeping its flavour.
+        resolutionStrategy.eachDependency {
+            if (requested.group == "com.google.guava" && requested.name == "guava") {
+                val version = requested.version.orEmpty()
+                val (major, minor, patch) = (Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(version)?.destructured
+                    ?: return@eachDependency)
+                val old = major.toInt() < 33 || (major.toInt() == 33 && (minor.toInt() < 7 || (minor.toInt() == 7 && patch.ifEmpty { "0" }.toInt() < 2)))
+                if (old) {
+                    useVersion(if (version.endsWith("-android")) "33.7.2-android" else "33.7.2-jre")
+                    because("CVE-2026-102554")
+                }
             }
         }
     }
