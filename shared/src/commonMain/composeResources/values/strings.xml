@@ -174,7 +174,7 @@
     <string name="district_empty">No combs yet. Bring one in from the Azphalt Store or build one.</string>
     <string name="district_needs_you">needs you</string>
     <string name="district_state_idle">empty</string>
-    <string name="district_state_gestating">brooding</string>
+    <string name="district_state_gestating">swarming</string>
     <string name="district_state_hatched">emerged</string>
     <string name="district_state_withered">lost</string>
     <string name="district_surface">Your hive</string>
@@ -945,8 +945,8 @@
         <item quantity="other">%1$d creatures</item>
     </plurals>
     <plurals name="district_scars">
-        <item quantity="one">%1$d capped cell</item>
-        <item quantity="other">%1$d capped cells</item>
+        <item quantity="one">%1$d comb</item>
+        <item quantity="other">%1$d combs</item>
     </plurals>
     <plurals name="store_update_count">
         <item quantity="one">%1$d update</item>

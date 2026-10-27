@@ -24,7 +24,7 @@ The rules of that world are `Node-Creature-Genome.md`. The binding rule is `Ecol
 
 ## Distances (semantic zoom)
 
-The Aive is a hive. All the way out is **the hive**: every workflow is a **comb** in it. A run is **brood** in a cell, fed by the creatures working on it; when it clears the brood **emerges** as a new agent, and a finished run is a **capped cell** you can open to replay. New agents from the Store are **drifters** (bees that join a hive not their own). Creatures folded together are a **cluster**.
+The Aive is a hive. All the way out is **the hive**: every workflow is a **comb** in it. A run in flight is a **swarm**, fed by the creatures working on it; when it clears it **emerges** as a new agent, and a finished run is a **comb** you can open to replay. New agents from the Store are **drifters** (bees that join a hive not their own). Creatures folded together are a **cluster**.
 
 There are no tabs. How close you are decides what you see.
 
@@ -39,7 +39,7 @@ Pinch moves between distances; double-tap dives one level, two-finger tap surfac
 
 ## Everything has a place in the tissue
 
-- **Runs are eggs.** A launched run grows one egg fed by the tail of every creature working on it, and it swells as tasks finish. It hatches a new agent when the run clears; it withers when the run fails. Finished runs leave a **capped cell** where the egg was: tap it to replay the run, ghosted, in place. *(Replaces Runs.)*
+- **Runs are eggs.** A launched run grows one egg fed by the tail of every creature working on it, and it swells as tasks finish. It hatches a new agent when the run clears; it withers when the run fails. Finished runs leave a **comb** where the egg was: tap it to replay the run, ghosted, in place. *(Replaces Runs.)*
 - **The inbox is a creature at the surface.** A creature that needs you (a gate, an approval, an escalation) rises toward the viewer and pulses. From any distance its comb shows the pulse. Tap to answer, in place. *(Replaces Inbox.)*
 - **Artifacts are what a creature leaves along its synapses**: tap a synapse to see what crossed it. Contaminated work shows as the stain it already is. *(Replaces Artifacts.)*
 - **The lineage is the family tree** of everyone who lived: kin, rarity, how hard each line is to breed. *(Replaces the Swarm roster.)*
@@ -71,7 +71,7 @@ Each tool is a real control (see the ledger). One sits in the creature's needs p
 
 ## Accessibility
 
-Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove; the tide has Undo and Redo; every creature, synapse, egg and capped cell is a labelled semantics node; every distance is reachable from the rim.
+Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove; the tide has Undo and Redo; every creature, synapse, egg and comb is a labelled semantics node; every distance is reachable from the rim.
 
 ## Build order
 
@@ -79,7 +79,7 @@ Every gesture has a plain equivalent. Each needs panel has a **Connections** lis
 2. **Needs panel** (slide-over) with the four needs and the per-creature tools.
 3. **Build mode:** tethers, the tide, Connections list. Collisions stop editing.
 4. **Semantic zoom:** hive, comb, creature, mind. Tabs retire one by one.
-5. **Inbox at the surface, capped cells for runs, lineage, the Store as drifters.**
+5. **Inbox at the surface, combs for runs, lineage, the Store as drifters.**
 6. **Breeding:** cleared runs hatch configs; the planner's clones; import; Echo and sepsis live.
 
 Each step ships on its own.
