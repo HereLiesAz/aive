@@ -19,6 +19,8 @@ internal fun constrainTendrils(
     iterations: Int = 6,
     /** Bodies closer than this push apart, so creatures never sit on top of each other. */
     minPx: Float = 0f,
+    /** Linked bodies may come this close (their tendrils are short); unlinked keep [minPx]. */
+    linkedMinPx: Float = minPx,
     /** Bodies stay this far inside the field's edges, so none is cut off. */
     marginPx: Float = 0f,
 ): Map<String, H2g2TerrariumPosition> {
@@ -26,6 +28,7 @@ internal fun constrainTendrils(
     val x = positions.mapValues { it.value.x * widthPx }.toMutableMap()
     val y = positions.mapValues { it.value.y * heightPx }.toMutableMap()
     val ids = positions.keys.toList()
+    val linked = links.flatMap { (a, b) -> listOf(a to b, b to a) }.toSet()
     fun share(a: String, b: String) = when (pinned) {
         a -> 0f to 1f
         b -> 1f to 0f
@@ -38,10 +41,11 @@ internal fun constrainTendrils(
                 val dx = x.getValue(b) - x.getValue(a)
                 val dy = y.getValue(b) - y.getValue(a)
                 val d = hypot(dx, dy)
-                if (d >= minPx) continue
+                val floor = if ((a to b) in linked) linkedMinPx else minPx
+                if (d >= floor) continue
                 // Coincident bodies part sideways.
                 val (ux, uy) = if (d == 0f) 1f to 0f else dx / d to dy / d
-                val gap = minPx - d
+                val gap = floor - d
                 val (sa, sb) = share(a, b)
                 x[a] = x.getValue(a) - ux * gap * sa; y[a] = y.getValue(a) - uy * gap * sa
                 x[b] = x.getValue(b) + ux * gap * sb; y[b] = y.getValue(b) + uy * gap * sb

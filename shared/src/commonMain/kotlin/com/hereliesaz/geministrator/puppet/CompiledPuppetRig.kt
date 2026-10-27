@@ -8,6 +8,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.min
@@ -39,6 +41,25 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     private val restSy = FloatArray(partCount) { rig.parts[it].rest.scaleY }
     private val restAlpha = FloatArray(partCount) { rig.parts[it].rest.alpha }
     private val flexibility = FloatArray(partCount) { 1f - rig.parts[it].rigidity }
+    /**
+     * A part's tip, from its pivot in local px: the pivot reflected through the sprite's centre,
+     * so a tendril pinned at its base reaches out to the far end.
+     */
+    private val tipX = FloatArray(partCount) { (1f - 2f * rig.parts[it].pivot.x) * rig.parts[it].drawnWidth }
+    private val tipY = FloatArray(partCount) { (1f - 2f * rig.parts[it].pivot.y) * rig.parts[it].drawnHeight }
+
+    /** Parts named `tendril…`: the limbs creatures join by (docs/Node-Creature-Genome.md, Wiring). */
+    val tendrilParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tendril") }.toIntArray()
+
+    /** Tendril [part]'s base and tip in artboard px, from an evaluated [pose]. */
+    fun tendrilBase(part: Int, pose: PuppetPoseBuffer): Offset = Offset(pose.world[part * 6 + 4], pose.world[part * 6 + 5])
+
+    fun tendrilTip(part: Int, pose: PuppetPoseBuffer): Offset {
+        val o = part * 6
+        val w = pose.world
+        return Offset(w[o] * tipX[part] + w[o + 2] * tipY[part] + w[o + 4], w[o + 1] * tipX[part] + w[o + 3] * tipY[part] + w[o + 5])
+    }
+
     private val anchorX = FloatArray(partCount)
     private val anchorY = FloatArray(partCount)
 
@@ -125,30 +146,23 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             val sx = restSx[i] * (1f + (sample(ch, CH_SX, cycle, 1f) - 1f) * f)
             val sy = restSy[i] * (1f + (sample(ch, CH_SY, cycle, 1f) - 1f) * f)
             val al = restAlpha[i] * sample(ch, CH_ALPHA, cycle, 1f)
-            val r = deg * DEG
-            val cs = cos(r)
-            val sn = sin(r)
-            // Local affine: T * R * S.
-            val la = cs * sx
-            val lb = sn * sx
-            val lc = -sn * sy
-            val ld = cs * sy
-            val o = i * 6
-            val p = parentIndex[i]
-            if (p < 0) {
-                w[o] = la; w[o + 1] = lb; w[o + 2] = lc; w[o + 3] = ld; w[o + 4] = x; w[o + 5] = y
-                out.alpha[i] = al.coerceIn(0f, 1f)
-            } else {
-                val q = p * 6
-                val pa = w[q]; val pb = w[q + 1]; val pc = w[q + 2]; val pd = w[q + 3]
-                val ptx = w[q + 4]; val pty = w[q + 5]
-                w[o] = pa * la + pc * lb
-                w[o + 1] = pb * la + pd * lb
-                w[o + 2] = pa * lc + pc * ld
-                w[o + 3] = pb * lc + pd * ld
-                w[o + 4] = pa * x + pc * y + ptx
-                w[o + 5] = pb * x + pd * y + pty
-                out.alpha[i] = (out.alpha[p] * al).coerceIn(0f, 1f)
+            compose(i, deg, sx, sy, x, y, al, out)
+            // A reaching tendril turns from its base toward its target and stretches, a little, to meet it.
+            val tx = out.reachX[i]
+            if (!tx.isNaN()) {
+                val ty = out.reachY[i]
+                val o = i * 6
+                val vx = w[o] * tipX[i] + w[o + 2] * tipY[i]
+                val vy = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
+                val dx = tx - w[o + 4]
+                val dy = ty - w[o + 5]
+                val v = hypot(vx, vy)
+                if (v > 0f) {
+                    val turn = (atan2(dy, dx) - atan2(vy, vx)) / DEG
+                    val k = (hypot(dx, dy) / v).coerceIn(MIN_REACH, out.maxReach)
+                    val alongX = kotlin.math.abs(tipX[i]) >= kotlin.math.abs(tipY[i])
+                    compose(i, deg + turn, if (alongX) sx * k else sx, if (alongX) sy else sy * k, x, y, al, out)
+                }
             }
         }
         for (k in 0 until attachmentCount) {
@@ -157,6 +171,35 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             val ly = attLocalY[k]
             out.attachX[k] = w[o] * lx + w[o + 2] * ly + w[o + 4]
             out.attachY[k] = w[o + 1] * lx + w[o + 3] * ly + w[o + 5]
+        }
+    }
+
+    private fun compose(i: Int, deg: Float, sx: Float, sy: Float, x: Float, y: Float, al: Float, out: PuppetPoseBuffer) {
+        val w = out.world
+        val r = deg * DEG
+        val cs = cos(r)
+        val sn = sin(r)
+        // Local affine: T * R * S.
+        val la = cs * sx
+        val lb = sn * sx
+        val lc = -sn * sy
+        val ld = cs * sy
+        val o = i * 6
+        val p = parentIndex[i]
+        if (p < 0) {
+            w[o] = la; w[o + 1] = lb; w[o + 2] = lc; w[o + 3] = ld; w[o + 4] = x; w[o + 5] = y
+            out.alpha[i] = al.coerceIn(0f, 1f)
+        } else {
+            val q = p * 6
+            val pa = w[q]; val pb = w[q + 1]; val pc = w[q + 2]; val pd = w[q + 3]
+            val ptx = w[q + 4]; val pty = w[q + 5]
+            w[o] = pa * la + pc * lb
+            w[o + 1] = pb * la + pd * lb
+            w[o + 2] = pa * lc + pc * ld
+            w[o + 3] = pb * lc + pd * ld
+            w[o + 4] = pa * x + pc * y + ptx
+            w[o + 5] = pb * x + pd * y + pty
+            out.alpha[i] = (out.alpha[p] * al).coerceIn(0f, 1f)
         }
     }
 
@@ -212,6 +255,8 @@ class CompiledPuppetRig(val rig: PuppetRig) {
 
     companion object {
         private const val DEG = (PI / 180.0).toFloat()
+        /** A tendril curls shorter than its sprite down to this, no further. */
+        private const val MIN_REACH = 0.7f
         private val CHANNELS = listOf(
             PuppetChannel.X, PuppetChannel.Y, PuppetChannel.Rotation,
             PuppetChannel.ScaleX, PuppetChannel.ScaleY, PuppetChannel.Alpha,
@@ -231,6 +276,18 @@ class PuppetPoseBuffer(partCount: Int, attachmentCount: Int) {
     val alpha = FloatArray(partCount)
     val attachX = FloatArray(attachmentCount)
     val attachY = FloatArray(attachmentCount)
+
+    /** Per part, an artboard point a tendril reaches for; NaN leaves the part to its motion. */
+    val reachX = FloatArray(partCount) { Float.NaN }
+    val reachY = FloatArray(partCount) { Float.NaN }
+
+    /** How far a tendril may stretch past its sprite: a little, not much. */
+    var maxReach = 1.25f
+
+    fun clearReach() {
+        reachX.fill(Float.NaN)
+        reachY.fill(Float.NaN)
+    }
 }
 
 /**

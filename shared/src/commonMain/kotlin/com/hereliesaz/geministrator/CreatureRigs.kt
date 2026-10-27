@@ -315,15 +315,46 @@ internal fun RiggedCreatureSurface(
     /** Read inside the draw scope, so a ticking clock invalidates drawing only, not composition. */
     phase: () -> Float,
     modifier: Modifier = Modifier,
+    /**
+     * Points, in this box's px, the creature's tendrils reach for: one tendril each, the one already
+     * facing that way. Read in the draw scope.
+     */
+    reach: () -> List<Offset> = { emptyList() },
 ) {
     val compiled = loaded.compiled
     val buffer = remember(compiled) { compiled.newBuffer() }
     val matrix = remember { Matrix() }
     val stateIndex = remember(compiled, state) { compiled.stateIndex(state.name) }
     Canvas(modifier) {
-        compiled.evaluate(stateIndex, phase(), buffer)
         val fit = PuppetFit.of(compiled.rig.canvas, size.width, size.height, CREATURE_RIG_CONTENT_SCALE)
+        buffer.clearReach()
+        compiled.evaluate(stateIndex, phase(), buffer)
+        val targets = reach()
+        if (targets.isNotEmpty() && compiled.tendrilParts.isNotEmpty()) {
+            assignTendrils(compiled, buffer, targets.map { Offset((it.x - fit.offsetX) / fit.scale, (it.y - fit.offsetY) / fit.scale) })
+            compiled.evaluate(stateIndex, phase(), buffer)
+        }
         compiled.draw(this, loaded.atlas, buffer, fit, matrix)
+    }
+}
+
+/**
+ * Gives each artboard target the free tendril pointing most nearly at it, in an evaluated [pose].
+ * More targets than tendrils: the rest go unreached.
+ */
+internal fun assignTendrils(compiled: CompiledPuppetRig, pose: PuppetPoseBuffer, targets: List<Offset>) {
+    val free = compiled.tendrilParts.toMutableList()
+    targets.forEach { target ->
+        val best = free.maxByOrNull { part ->
+            val base = compiled.tendrilBase(part, pose)
+            val along = compiled.tendrilTip(part, pose) - base
+            val toward = target - base
+            val n = along.getDistance() * toward.getDistance()
+            if (n == 0f) -1f else (along.x * toward.x + along.y * toward.y) / n
+        } ?: return
+        free -= best
+        pose.reachX[best] = target.x
+        pose.reachY[best] = target.y
     }
 }
 
