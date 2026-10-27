@@ -29,7 +29,7 @@ internal fun NodeMascotSurface(
     motionPhase: () -> Float,
     modifier: Modifier = Modifier,
     /** Where its tendrils reach, in this box's px (RiggedCreatureSurface). */
-    reach: () -> List<Offset> = { emptyList() },
+    reach: () -> List<TendrilReach> = { emptyList() },
 ) {
     val slug = remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }
     val rig = rememberCreatureRig(slug)

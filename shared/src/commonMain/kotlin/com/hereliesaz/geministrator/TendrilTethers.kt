@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
+import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import kotlin.math.hypot
 
 /**
@@ -84,3 +85,58 @@ internal fun constrainTendrils(
 /** How far a tendril is stretched past its rest length, 0 (slack) to 1 (at its limit). */
 internal fun tendrilStretch(distancePx: Float, restPx: Float, maxPx: Float): Float =
     ((distancePx - restPx) / (maxPx - restPx)).coerceIn(0f, 1f)
+
+/**
+ * A clasp between two tendrils (docs/Swarm-OS.md): the energy pulse running through it, coloured
+ * by what the downstream creature waits for (its knot), and the clasp's own glow, coloured by how
+ * the upstream work came out.
+ */
+internal enum class ClaspOutcome {
+    /** No result yet. */
+    None,
+    /** The upstream work succeeded: green. */
+    Succeeded,
+    /** It failed, or the far side is blocked: red. */
+    Failed,
+}
+
+internal enum class ClaspFlow {
+    /** Nothing runs. */
+    Still,
+    /** The pulse runs base to clasp to base: waiting on the upstream, or its result crossing. */
+    Through,
+    /** Blocked: the pulse runs up to the clasp and stops there. */
+    ToClasp,
+}
+
+internal data class Clasp(val outcome: ClaspOutcome, val flow: ClaspFlow)
+
+private val Working = setOf(H2g2WorkflowState.Active, H2g2WorkflowState.Gate)
+
+internal fun clasp(upstream: H2g2WorkflowState, downstream: H2g2WorkflowState): Clasp {
+    val outcome = when {
+        downstream == H2g2WorkflowState.Blocked || upstream == H2g2WorkflowState.Failed -> ClaspOutcome.Failed
+        upstream == H2g2WorkflowState.Complete -> ClaspOutcome.Succeeded
+        else -> ClaspOutcome.None
+    }
+    val flow = when {
+        downstream == H2g2WorkflowState.Blocked -> ClaspFlow.ToClasp
+        // The downstream waits while the upstream works, and its result crosses as the downstream picks up.
+        upstream in Working && downstream !in setOf(H2g2WorkflowState.Complete, H2g2WorkflowState.Failed) -> ClaspFlow.Through
+        upstream in setOf(H2g2WorkflowState.Complete, H2g2WorkflowState.Failed) &&
+            downstream in Working + H2g2WorkflowState.Ready -> ClaspFlow.Through
+        else -> ClaspFlow.Still
+    }
+    return Clasp(outcome, flow)
+}
+
+/**
+ * Where the pulse is on each side at clock [t] (0..1): first the upstream tendril, base to tip,
+ * then the downstream one, tip to base. Positions run 0 (base) to 1 (tip); null when the pulse is
+ * on the other side or nothing runs.
+ */
+internal fun claspPulse(flow: ClaspFlow, t: Float): Pair<Float?, Float?> = when (flow) {
+    ClaspFlow.Through -> (2f * t).let { p -> if (p < 1f) p to null else null to (2f - p) }
+    ClaspFlow.ToClasp -> t to null
+    ClaspFlow.Still -> null to null
+}

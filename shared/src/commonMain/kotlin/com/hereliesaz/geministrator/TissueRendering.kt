@@ -45,10 +45,7 @@ internal fun DrawScope.drawTissueEgg(
     toScreen: (H2g2TerrariumPosition) -> Offset,
 ) {
     val at = toScreen(egg.position)
-    val shell = when (egg.outcome) {
-        TissueEggOutcome.Withered -> Color(0xFF4A4139)
-        else -> Azphalt.Yellow
-    }
+    val shell = Azphalt.Yellow
     val t = egg.growth.coerceIn(0f, 1f)
     val rx = (7f + 12f * t).dp.toPx() * zoom
     val ry = (9f + 15f * t).dp.toPx() * zoom
