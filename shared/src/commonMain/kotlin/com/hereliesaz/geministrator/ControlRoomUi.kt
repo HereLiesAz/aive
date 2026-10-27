@@ -568,6 +568,20 @@ private fun MainDestination(
                                 }
                             },
                             onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
+                            edge = {
+                                azphaltStoreService?.let { store ->
+                                HiveEdge(
+                                    onLoadPackages = { store.search().packages },
+                                    onBringIn = { item ->
+                                        // Opens the Store on this package, where its install is approved.
+                                        DurableUiState.store.putString("azphalt-store.query", "")
+                                        DurableUiState.store.putString("azphalt-store.category", "All")
+                                        DurableUiState.store.putString("azphalt-store.selected-package", item.id)
+                                        onDestinationSelected(ControlRoomDestination.AddOns)
+                                    },
+                                )
+                                }
+                            },
                             roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty(),
                             onAdopt = { child ->
                                 val roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty()
