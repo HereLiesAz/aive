@@ -22,6 +22,8 @@ internal data class Neighbourhood(
     val needsYou: Int,
     /** Runs that finished, cleared or failed: the scars. */
     val scars: Int,
+    /** Up to three of its creatures, by role, to draw inside it. */
+    val creatureRoles: List<String> = emptyList(),
 )
 
 internal enum class NeighbourhoodState { Idle, Gestating, Hatched, Withered }
@@ -51,6 +53,8 @@ internal fun projectDistrict(
                 it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated
             } ?: 0,
             scars = own.count { it.status in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled) },
+            creatureRoles = definition.tasks.mapNotNull { it.roleId?.value }.distinct().take(3)
+                .map { id -> id.split('-').joinToString(" ") { part -> part.replaceFirstChar(Char::uppercase) } },
         )
     }
 }

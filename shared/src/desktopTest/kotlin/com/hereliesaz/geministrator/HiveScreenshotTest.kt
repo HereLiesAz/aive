@@ -101,7 +101,7 @@ class HiveScreenshotTest {
         shoot("1-hive-live", 900, 1400) {
             GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
         }
-        shoot("2-hive-build", 900, 1900) {
+        shoot("2-hive-build", 900, 2600) {
             GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it }, startInBuild = true)
         }
         shoot("3-whole-hive", 900, 1400) {
