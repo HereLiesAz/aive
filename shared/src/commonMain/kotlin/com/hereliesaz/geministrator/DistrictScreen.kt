@@ -81,6 +81,8 @@ internal fun DistrictScreen(
     onNewHive: () -> Unit = {},
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
+    /** The hive's edge: what the Store offers (HiveEdge). */
+    edge: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
@@ -131,6 +133,7 @@ internal fun DistrictScreen(
                         }
                     }
                 }
+            edge()
             Lineage(roles, onAdopt)
         }
     }

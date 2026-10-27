@@ -116,6 +116,21 @@ class HiveScreenshotTest {
         shoot("5-launch-bar", 900, 600) {
             HiveLaunchBar("shot", onLaunch = { _, _ -> })
         }
+        shoot("6-hive-edge", 900, 900) {
+            // In the app the edge sits inside the whole hive's dark tissue.
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color(0xFF1E1A17)).padding(16.dp)) { AzphaltThemedSurface(Azphalt.Ink) {
+                HiveEdge(
+                    onLoadPackages = {
+                        listOf(
+                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r1", name = "Violacea reviewer", description = "Reviews diffs against the contract", author = "azphalt", version = "1", kind = "role"),
+                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r2", name = "Glacia researcher", description = "Finds sources and cites them", author = "azphalt", version = "1", kind = "role"),
+                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w1", name = "Bug triage", author = "azphalt", version = "1", kind = "workflow"),
+                        )
+                    },
+                    onBringIn = {},
+                )
+            } }
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {
