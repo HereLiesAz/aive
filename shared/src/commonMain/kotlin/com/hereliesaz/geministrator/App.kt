@@ -377,12 +377,13 @@ fun App(
         val workflowLibraryHost = WorkflowLibraryHost(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
-            launchWorkflow = { definition, packageRoles, objective ->
+            launchWorkflow = { definition, packageRoles, objective, repository ->
                 val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
                     activeRuntime.launchSavedWorkflow(
                         definition = definition,
                         existingProject = existingProject,
                         objective = objective ?: definition.description ?: definition.name,
+                        repository = repository ?: existingProject?.repository,
                         supplementalRoles = packageRoles,
                     )
                 }

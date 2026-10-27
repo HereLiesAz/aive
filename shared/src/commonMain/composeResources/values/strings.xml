@@ -187,6 +187,7 @@
     <string name="hive_new_name">New hive</string>
     <string name="hive_not_yet_run">Not yet run</string>
     <string name="hive_objective">Objective for the next swarm</string>
+    <string name="hive_repository">Repository (owner/repo or URL; blank keeps the current one)</string>
     <string name="hive_launch">Launch</string>
     <string name="hive_launch_failed">The swarm could not launch.</string>
     <string name="hive_timeline">TIMELINE</string>
