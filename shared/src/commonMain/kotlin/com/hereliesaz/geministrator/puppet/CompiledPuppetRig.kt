@@ -1,6 +1,11 @@
 package com.hereliesaz.geministrator.puppet
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -226,43 +231,95 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         pose: PuppetPoseBuffer,
         fit: PuppetFit,
         scratch: Matrix,
+    ) {
+        for (i in drawOrder) {
+            for (j in pose.segments[i] - 1 downTo 0) drawPart(scope, atlas, pose, fit, scratch, i, j)
+        }
+    }
+
+    /**
+     * A slice of light travelling a tendril: [at] runs 0 (base) to 1 (tip, across every segment).
+     * Masked to the tendril's own pixels, so it lights the limb and nothing else, with a soft glow
+     * around it.
+     */
+    fun drawPulse(
+        scope: DrawScope,
+        atlas: ImageBitmap,
+        pose: PuppetPoseBuffer,
+        fit: PuppetFit,
+        scratch: Matrix,
+        part: Int,
+        at: Float,
+        color: Color,
+    ) = with(scope) {
+        val o = part * 6
+        val w = pose.world
+        val n = pose.segments[part]
+        val stepX = w[o] * tipX[part] + w[o + 2] * tipY[part]
+        val stepY = w[o + 1] * tipX[part] + w[o + 3] * tipY[part]
+        val centre = Offset(
+            fit.offsetX + (w[o + 4] + stepX * n * at) * fit.scale,
+            fit.offsetY + (w[o + 5] + stepY * n * at) * fit.scale,
+        )
+        val radius = hypot(stepX, stepY) * fit.scale * 0.32f
+        // Glow first, under the limb's lit slice.
+        drawCircle(
+            Brush.radialGradient(listOf(color.copy(alpha = 0.45f), color.copy(alpha = 0f)), centre, radius * 2.2f),
+            radius * 2.2f,
+            centre,
+        )
+        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+        for (j in 0 until n) drawPart(this, atlas, pose, fit, scratch, part, j)
+        drawCircle(
+            Brush.radialGradient(listOf(color, color.copy(alpha = 0f)), centre, radius),
+            radius,
+            centre,
+            blendMode = BlendMode.SrcIn,
+        )
+        drawContext.canvas.restore()
+    }
+
+    private fun drawPart(
+        scope: DrawScope,
+        atlas: ImageBitmap,
+        pose: PuppetPoseBuffer,
+        fit: PuppetFit,
+        scratch: Matrix,
+        i: Int,
+        j: Int,
     ) = with(scope) {
         val w = pose.world
-        for (i in drawOrder) {
-            val part = rig.parts[i]
-            val rect = part.rect ?: continue
-            val alpha = pose.alpha[i]
-            if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) continue
-            val o = i * 6
-            // Segment j is the same sprite moved out along the tendril by j tip-lengths.
-            val stepX = w[o] * tipX[i] + w[o + 2] * tipY[i]
-            val stepY = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
-            for (j in pose.segments[i] - 1 downTo 0) {
-                scratch.reset()
-                val v = scratch.values
-                v[Matrix.ScaleX] = w[o]
-                v[Matrix.SkewY] = w[o + 1]
-                v[Matrix.SkewX] = w[o + 2]
-                v[Matrix.ScaleY] = w[o + 3]
-                v[Matrix.TranslateX] = w[o + 4] + stepX * j
-                v[Matrix.TranslateY] = w[o + 5] + stepY * j
-                withTransform({
-                    translate(fit.offsetX, fit.offsetY)
-                    scale(fit.scale, fit.scale, pivot = Offset.Zero)
-                    transform(scratch)
-                    translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
-                    scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
-                }) {
-                    drawImage(
-                        image = atlas,
-                        srcOffset = IntOffset(rect.x, rect.y),
-                        srcSize = IntSize(rect.w, rect.h),
-                        dstOffset = IntOffset.Zero,
-                        dstSize = IntSize(rect.w, rect.h),
-                        alpha = alpha,
-                    )
-                }
-            }
+        val part = rig.parts[i]
+        val rect = part.rect ?: return@with
+        val alpha = pose.alpha[i]
+        if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) return@with
+        val o = i * 6
+        // Segment j is the same sprite moved out along the tendril by j tip-lengths.
+        val stepX = w[o] * tipX[i] + w[o + 2] * tipY[i]
+        val stepY = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
+        scratch.reset()
+        val v = scratch.values
+        v[Matrix.ScaleX] = w[o]
+        v[Matrix.SkewY] = w[o + 1]
+        v[Matrix.SkewX] = w[o + 2]
+        v[Matrix.ScaleY] = w[o + 3]
+        v[Matrix.TranslateX] = w[o + 4] + stepX * j
+        v[Matrix.TranslateY] = w[o + 5] + stepY * j
+        withTransform({
+            translate(fit.offsetX, fit.offsetY)
+            scale(fit.scale, fit.scale, pivot = Offset.Zero)
+            transform(scratch)
+            translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
+            scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
+        }) {
+            drawImage(
+                image = atlas,
+                srcOffset = IntOffset(rect.x, rect.y),
+                srcSize = IntSize(rect.w, rect.h),
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(rect.w, rect.h),
+                alpha = alpha,
+            )
         }
     }
 

@@ -319,7 +319,7 @@ internal fun RiggedCreatureSurface(
      * Points, in this box's px, the creature's tendrils reach for: one tendril each, the one already
      * facing that way. Read in the draw scope.
      */
-    reach: () -> List<Offset> = { emptyList() },
+    reach: () -> List<TendrilReach> = { emptyList() },
 ) {
     val compiled = loaded.compiled
     val buffer = remember(compiled) { compiled.newBuffer() }
@@ -330,33 +330,51 @@ internal fun RiggedCreatureSurface(
         buffer.clearReach()
         compiled.evaluate(stateIndex, phase(), buffer)
         val targets = reach()
-        if (targets.isNotEmpty() && compiled.tendrilParts.isNotEmpty()) {
-            assignTendrils(compiled, buffer, targets.map { Offset((it.x - fit.offsetX) / fit.scale, (it.y - fit.offsetY) / fit.scale) })
-            compiled.evaluate(stateIndex, phase(), buffer)
+        val parts = if (targets.isNotEmpty() && compiled.tendrilParts.isNotEmpty()) {
+            assignTendrils(compiled, buffer, targets.map { Offset((it.at.x - fit.offsetX) / fit.scale, (it.at.y - fit.offsetY) / fit.scale) })
+                .also { compiled.evaluate(stateIndex, phase(), buffer) }
+        } else {
+            emptyList()
         }
         compiled.draw(this, loaded.atlas, buffer, fit, matrix)
+        targets.forEachIndexed { k, target ->
+            val part = parts.getOrNull(k) ?: return@forEachIndexed
+            val pulse = target.pulse ?: return@forEachIndexed
+            compiled.drawPulse(this, loaded.atlas, buffer, fit, matrix, part, pulse, target.pulseColor)
+        }
     }
 }
 
 /**
- * Gives each artboard target the free tendril pointing most nearly at it, in an evaluated [pose].
- * More targets than tendrils: the rest go unreached.
+ * Gives each artboard target the free tendril pointing most nearly at it, in an evaluated [pose],
+ * and returns the part per target. More targets than tendrils: the rest go unreached (null).
  */
-internal fun assignTendrils(compiled: CompiledPuppetRig, pose: PuppetPoseBuffer, targets: List<Offset>) {
+internal fun assignTendrils(compiled: CompiledPuppetRig, pose: PuppetPoseBuffer, targets: List<Offset>): List<Int?> {
     val free = compiled.tendrilParts.toMutableList()
-    targets.forEach { target ->
+    return targets.map { target ->
         val best = free.maxByOrNull { part ->
             val base = compiled.tendrilBase(part, pose)
             val along = compiled.tendrilTip(part, pose) - base
             val toward = target - base
             val n = along.getDistance() * toward.getDistance()
             if (n == 0f) -1f else (along.x * toward.x + along.y * toward.y) / n
-        } ?: return
+        } ?: return@map null
         free -= best
         pose.reachX[best] = target.x
         pose.reachY[best] = target.y
+        best
     }
 }
+
+/**
+ * One tendril's reach: [at] in the creature's box px, and the slice of light travelling it,
+ * [pulse] from 0 (base) to 1 (tip), or null when nothing flows.
+ */
+internal data class TendrilReach(
+    val at: Offset,
+    val pulse: Float? = null,
+    val pulseColor: androidx.compose.ui.graphics.Color = Azphalt.Yellow,
+)
 
 /**
  * Where a node's arm socket sits on screen.

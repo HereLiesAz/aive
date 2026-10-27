@@ -300,26 +300,36 @@ private fun MascotNodeTerrarium(
             return start to end
         }
 
+        fun claspStateOf(from: String, to: String): ClaspState {
+            val up = subjectById[from]?.node?.state ?: return ClaspState.Quiet
+            val down = subjectById[to]?.node?.state ?: return ClaspState.Quiet
+            return claspState(up, down)
+        }
+
         /**
          * Where [id]'s tendrils reach, in its own box px: half way to each partner, where the two
          * tips clasp, and toward the finger while a tether is being drawn from it.
          */
-        fun tendrilReach(id: String): List<Offset> {
+        fun tendrilReach(id: String): List<TendrilReach> {
             val centre = screenCenter(workingPositions[id] ?: subjectById[id]?.position ?: return emptyList())
             val half = creatureSizePx / 2f
             fun local(p: Offset) = Offset((p.x - centre.x) / zoom + half, (p.y - centre.y) / zoom + half)
-            val partners = tendrilLinks.mapNotNull { (from, to) ->
-                when (id) {
+            val clasps = tendrilLinks.distinct().mapNotNull { (from, to) ->
+                val other = when (id) {
                     from -> to
                     to -> from
-                    else -> null
+                    else -> return@mapNotNull null
                 }
-            }.distinct()
-            val clasps = partners.mapNotNull { other ->
                 val there = screenCenter(workingPositions[other] ?: subjectById[other]?.position ?: return@mapNotNull null)
-                local((centre + there) / 2f)
+                val state = claspStateOf(from, to)
+                val (upstreamPulse, downstreamPulse) = claspPulse(state, linkPulse())
+                TendrilReach(
+                    at = local((centre + there) / 2f),
+                    pulse = if (id == from) upstreamPulse else downstreamPulse,
+                    pulseColor = if (state == ClaspState.Blocked) ClaspRed else Azphalt.Yellow,
+                )
             }
-            return if (tetherFromId == id) clasps + local(tetherEnd) else clasps
+            return if (tetherFromId == id) clasps + TendrilReach(local(tetherEnd)) else clasps
         }
 
         fun creatureAt(point: Offset, except: String?): String? = subjects.asSequence()
@@ -628,6 +638,27 @@ private fun MascotNodeTerrarium(
             }
         }
 
+        // Each clasp glows by how its crossing went: green done, red failed or blocked.
+        Canvas(Modifier.fillMaxSize()) {
+            tendrilLinks.distinct().forEach { (from, to) ->
+                val glow = when (claspStateOf(from, to)) {
+                    ClaspState.Succeeded -> ClaspGreen
+                    ClaspState.Failed, ClaspState.Blocked -> ClaspRed
+                    else -> return@forEach
+                }
+                val a = screenCenter(workingPositions[from] ?: subjectById[from]?.position ?: return@forEach)
+                val b = screenCenter(workingPositions[to] ?: subjectById[to]?.position ?: return@forEach)
+                val at = (a + b) / 2f
+                val r = creatureSizePx * zoom * 0.09f
+                drawCircle(
+                    androidx.compose.ui.graphics.Brush.radialGradient(listOf(glow.copy(alpha = 0.75f), glow.copy(alpha = 0f)), at, r * 2.4f),
+                    r * 2.4f,
+                    at,
+                )
+                drawCircle(glow, r * 0.45f, at)
+            }
+        }
+
         // The swarm's egg rides above the bodies, below its feeders, so it is never hidden.
         tissue?.egg?.let { egg ->
             Canvas(Modifier.fillMaxSize()) {
@@ -763,3 +794,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
         drawLine(color, a, b, strokeWidth = w, cap = StrokeCap.Round)
     }
 }
+
+/** Clasp glows: luminous on the dark tissue. */
+private val ClaspGreen = Color(0xFF6BE04A)
+private val ClaspRed = Color(0xFFFF3B30)

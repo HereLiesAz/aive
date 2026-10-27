@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
+import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import kotlin.math.hypot
 
 /**
@@ -84,3 +85,36 @@ internal fun constrainTendrils(
 /** How far a tendril is stretched past its rest length, 0 (slack) to 1 (at its limit). */
 internal fun tendrilStretch(distancePx: Float, restPx: Float, maxPx: Float): Float =
     ((distancePx - restPx) / (maxPx - restPx)).coerceIn(0f, 1f)
+
+/** What a clasp between two tendrils shows (docs/Swarm-OS.md): the flow across it, and how it went. */
+internal enum class ClaspState {
+    /** Nothing has crossed yet. */
+    Quiet,
+    /** Work is crossing: a slice of light runs base to clasp to base. */
+    Flowing,
+    /** Crossed and done: the clasp glows green. */
+    Succeeded,
+    /** One side failed: the clasp glows red. */
+    Failed,
+    /** The far side is blocked: the clasp glows red, and a red slice runs up to it and stops. */
+    Blocked,
+}
+
+internal fun claspState(upstream: H2g2WorkflowState, downstream: H2g2WorkflowState): ClaspState = when {
+    downstream == H2g2WorkflowState.Blocked -> ClaspState.Blocked
+    upstream == H2g2WorkflowState.Failed || downstream == H2g2WorkflowState.Failed -> ClaspState.Failed
+    upstream == H2g2WorkflowState.Complete && downstream in setOf(H2g2WorkflowState.Active, H2g2WorkflowState.Gate, H2g2WorkflowState.Ready) -> ClaspState.Flowing
+    upstream == H2g2WorkflowState.Complete -> ClaspState.Succeeded
+    else -> ClaspState.Quiet
+}
+
+/**
+ * Where the slice is on each side at clock [t] (0..1): first the upstream tendril, base to tip,
+ * then the downstream one, tip to base. Positions run 0 (base) to 1 (tip); null when the slice is
+ * on the other side or nothing flows. A blocked clasp's slice only ever runs the upstream side.
+ */
+internal fun claspPulse(state: ClaspState, t: Float): Pair<Float?, Float?> = when (state) {
+    ClaspState.Flowing -> (2f * t).let { p -> if (p < 1f) p to null else null to (2f - p) }
+    ClaspState.Blocked -> t to null
+    else -> null to null
+}

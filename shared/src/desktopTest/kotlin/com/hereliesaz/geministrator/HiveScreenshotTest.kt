@@ -101,6 +101,23 @@ class HiveScreenshotTest {
         shoot("1-hive-live", 900, 1400) {
             GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
         }
+        // Every clasp state at once: done (green), failed (red), blocked (red, slice stopping at it).
+        shoot("8-clasps", 900, 1400) {
+            GeministratorWorkflowTerrarium(
+                definition,
+                run(
+                    WorkflowRunStatus.Running,
+                    Triple("contract", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Completed, "claude"),
+                    Triple("review", TaskRunStatus.Failed, "gemini"),
+                    Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
         shoot("2-hive-build", 900, 2600) {
             GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it }, startInBuild = true)
         }
