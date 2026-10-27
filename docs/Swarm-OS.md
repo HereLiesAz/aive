@@ -24,14 +24,14 @@ The rules of that world are `Node-Creature-Genome.md`. The binding rule is `Ecol
 
 ## Distances (semantic zoom)
 
-The Aive is a hive. All the way out is **the hive**: every workflow is a **comb** in it. A run in flight is a **swarm**, fed by the creatures working on it; when it clears it **emerges** as a new agent, and a finished run is a **comb** you can open to replay. New agents from the Store are **drifters** (bees that join a hive not their own). Creatures folded together are a **cluster**.
+The Aive is a hive. **The hive** is both a single workflow and all of them at once: zoomed in, one hive; all the way out, the whole hive. A run in flight is a **swarm**, fed by the creatures working on it; when it clears it **emerges** as a new agent, and a finished run is a **comb** you can open to replay. New agents from the Store are **drifters** (bees that join a hive not their own). Creatures folded together are a **cluster**.
 
 There are no tabs. How close you are decides what you see.
 
 | Distance | You see | Replaces |
 |---|---|---|
-| **The hive** (all the way out) | every workflow as a comb of the tissue, live; drifters arriving; the Store at the edge | Overview, Workflows library, Store |
-| **The comb** | one workflow: its creatures, synapses, the eggs in flight | the mind map, the Bowl tab, Runs |
+| **The hive** (all the way out) | every workflow at once, live; drifters arriving; the Store at the edge | Overview, Workflows library, Store |
+| **A hive** | one workflow: its creatures, synapses, the eggs in flight | the mind map, the Bowl tab, Runs |
 | **A creature** | its needs panel slides over: job, species, kin, provider, what it's working on | task and role editing |
 | **Inside a creature** | its mind: instructions, tools, provider settings, what it's thinking now | Swarm role editor, technical inspector |
 
@@ -40,10 +40,10 @@ Pinch moves between distances; double-tap dives one level, two-finger tap surfac
 ## Everything has a place in the tissue
 
 - **Runs are eggs.** A launched run grows one egg fed by the tail of every creature working on it, and it swells as tasks finish. It hatches a new agent when the run clears; it withers when the run fails. Finished runs leave a **comb** where the egg was: tap it to replay the run, ghosted, in place. *(Replaces Runs.)*
-- **The inbox is a creature at the surface.** A creature that needs you (a gate, an approval, an escalation) rises toward the viewer and pulses. From any distance its comb shows the pulse. Tap to answer, in place. *(Replaces Inbox.)*
+- **The inbox is a creature at the surface.** A creature that needs you (a gate, an approval, an escalation) rises toward the viewer and pulses. From any distance its hive shows the pulse. Tap to answer, in place. *(Replaces Inbox.)*
 - **Artifacts are what a creature leaves along its synapses**: tap a synapse to see what crossed it. Contaminated work shows as the stain it already is. *(Replaces Artifacts.)*
 - **The lineage is the family tree** of everyone who lived: kin, rarity, how hard each line is to breed. *(Replaces the Swarm roster.)*
-- **The Store is where drifters come from.** Workflows from the Store arrive as new combs; agents arrive as drifters at the hive's edge. **Import** is the cure for the clone trap, and the Store should say so. *(Replaces the Store tab.)*
+- **The Store is where drifters come from.** Workflows from the Store arrive as new hives; agents arrive as drifters at the hive's edge. **Import** is the cure for the clone trap, and the Store should say so. *(Replaces the Store tab.)*
 - **Memory is the tissue's tone.** Its clarity is how much the swarm remembers; its tint is whose voice fills it. Consolidation is sleep. *(Replaces Memory.)*
 - **The machinery is the vasculature.** Providers are capillaries, budget is perfusion, compute is the heartbeat. Swipe up from a capillary to reach its settings. *(Replaces Settings, Repositories, Compute.)*
 
@@ -78,7 +78,7 @@ Every gesture has a plain equivalent. Each needs panel has a **Connections** lis
 1. **The field.** The Overview mind map becomes the tissue: top-down, capillaries for providers, synapses for dependencies, eggs for runs in flight, driven only by run events (the ledger).
 2. **Needs panel** (slide-over) with the four needs and the per-creature tools.
 3. **Build mode:** tethers, the tide, Connections list. Collisions stop editing.
-4. **Semantic zoom:** hive, comb, creature, mind. Tabs retire one by one.
+4. **Semantic zoom:** the whole hive, one hive, creature, mind. Tabs retire one by one.
 5. **Inbox at the surface, combs for runs, lineage, the Store as drifters.**
 6. **Breeding:** cleared runs hatch configs; the planner's clones; import; Echo and sepsis live.
 

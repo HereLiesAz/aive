@@ -171,7 +171,7 @@
     <string name="mind_budget">TOKEN BUDGET PER RUN</string>
     <string name="mind_no_budget">none</string>
     <string name="district_your_swarm">YOUR HIVE</string>
-    <string name="district_empty">No combs yet. Bring one in from the Azphalt Store or build one.</string>
+    <string name="district_empty">The hive is empty. Bring a workflow in from the Azphalt Store or build one.</string>
     <string name="district_needs_you">needs you</string>
     <string name="district_state_idle">empty</string>
     <string name="district_state_gestating">swarming</string>
