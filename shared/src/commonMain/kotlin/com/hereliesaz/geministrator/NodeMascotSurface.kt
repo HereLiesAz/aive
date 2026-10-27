@@ -28,6 +28,8 @@ internal fun NodeMascotSurface(
     /** The shared animation clock. Read in the draw scope (no per-frame recomposition). */
     motionPhase: () -> Float,
     modifier: Modifier = Modifier,
+    /** Where its tendrils reach, in this box's px (RiggedCreatureSurface). */
+    reach: () -> List<Offset> = { emptyList() },
 ) {
     val slug = remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }
     val rig = rememberCreatureRig(slug)
@@ -37,6 +39,7 @@ internal fun NodeMascotSurface(
             state = state,
             phase = { creatureRigPhase(motionPhase(), hueSeed) },
             modifier = modifier,
+            reach = reach,
         )
     } else {
         CreatureRigPlaceholder(

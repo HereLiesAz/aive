@@ -216,10 +216,16 @@ private fun MascotNodeTerrarium(
         val creatureSizePx = with(density) { creatureSize.toPx() }
         val halfCreaturePx = creatureSizePx / 2f
         // Tendril reach, measured at zoom 1: slack up to rest, and no farther than max.
-        val tendrilRestPx = creatureSizePx * 1.25f
-        val tendrilMaxPx = creatureSizePx * 1.5f
-        val bodyGapPx = creatureSizePx * 1.05f
+        // The rigs' tendril sprites are short: linked creatures sit close enough for two tips to
+        // clasp half way, stretched a little (CompiledPuppetRig maxReach); unlinked ones keep apart.
+        // Joined creatures pack close, like cells; a tendril grows segments to span the gap
+        // (CompiledPuppetRig maxSegments). Unjoined ones keep a body's width apart.
+        val tendrilRestPx = creatureSizePx * 0.75f
+        val tendrilMaxPx = creatureSizePx * 0.95f
+        val bodyGapPx = creatureSizePx * 0.9f
+        val linkedGapPx = creatureSizePx * 0.7f
         val tendrilLinks = remember(relationships) {
+            // Only task-to-task links clasp; the orchestrator is the hive itself and joins nothing.
             relationships
                 .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
                 .map { it.from to it.to }
@@ -227,7 +233,7 @@ private fun MascotNodeTerrarium(
         // Creatures already too far apart for their tendrils are drawn together once the field is measured.
         LaunchedEffect(subjectPositions, widthPx, heightPx, tendrilLinks) {
             if (draggingId == null) {
-                workingPositions = constrainTendrils(workingPositions, tendrilLinks, widthPx, heightPx, tendrilMaxPx, minPx = bodyGapPx, marginPx = halfCreaturePx, iterations = 40)
+                workingPositions = constrainTendrils(workingPositions, tendrilLinks, widthPx, heightPx, tendrilMaxPx, minPx = bodyGapPx, linkedMinPx = linkedGapPx, marginPx = halfCreaturePx, iterations = 40)
             }
         }
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
@@ -292,6 +298,28 @@ private fun MascotNodeTerrarium(
             val end = rigSocket(relationship.to, toCenter, -normalized.x, -normalized.y)
                 ?: (toCenter - normalized * anchorRadius)
             return start to end
+        }
+
+        /**
+         * Where [id]'s tendrils reach, in its own box px: half way to each partner, where the two
+         * tips clasp, and toward the finger while a tether is being drawn from it.
+         */
+        fun tendrilReach(id: String): List<Offset> {
+            val centre = screenCenter(workingPositions[id] ?: subjectById[id]?.position ?: return emptyList())
+            val half = creatureSizePx / 2f
+            fun local(p: Offset) = Offset((p.x - centre.x) / zoom + half, (p.y - centre.y) / zoom + half)
+            val partners = tendrilLinks.mapNotNull { (from, to) ->
+                when (id) {
+                    from -> to
+                    to -> from
+                    else -> null
+                }
+            }.distinct()
+            val clasps = partners.mapNotNull { other ->
+                val there = screenCenter(workingPositions[other] ?: subjectById[other]?.position ?: return@mapNotNull null)
+                local((centre + there) / 2f)
+            }
+            return if (tetherFromId == id) clasps + local(tetherEnd) else clasps
         }
 
         fun creatureAt(point: Offset, except: String?): String? = subjects.asSequence()
@@ -376,47 +404,7 @@ private fun MascotNodeTerrarium(
                 }
             }
 
-            // On the dark tissue, synapses are light; on the plain ground they take the ground's ink.
-            val linkInk = if (tissue != null) Azphalt.White else onGround
-            relationships.forEach { relationship ->
-                val toSubject = subjectById[relationship.to] ?: return@forEach
-                val (start, end) = relationshipEndpoints(relationship) ?: return@forEach
-
-                val blocked = toSubject.node.state == H2g2WorkflowState.Blocked ||
-                    toSubject.node.state == H2g2WorkflowState.Failed
-                val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
-                // Tendrils are flesh-toned on the tissue; a blocked one reddens, an active one brightens.
-                val color = when {
-                    blocked -> GeministratorColors.error
-                    active -> Color(0xFFF4E3D3)
-                    tissue != null -> Color(0xFFC9A99A)
-                    else -> linkInk.copy(alpha = 0.6f)
-                }
-                // Joined by their tendrils: each creature reaches half way and the two tips clasp.
-                // A tendril thins as it stretches toward its limit.
-                val fromCentre = screenCenter(workingPositions[relationship.from] ?: subjectById[relationship.from]?.position ?: return@forEach)
-                val toCentre = screenCenter(workingPositions[relationship.to] ?: toSubject.position)
-                val stretch = tendrilStretch((toCentre - fromCentre).getDistance() / zoom, tendrilRestPx, tendrilMaxPx)
-                val knotted = tissue?.conditional?.contains(relationship.from to relationship.to) == true
-                val mid = (start + end) / 2f
-                val bow = (end - start).let { d -> Offset(-d.y, d.x) } * (0.12f * (1f - stretch))
-                drawTendril(start, mid + bow, color, zoom, stretch, knotted)
-                drawTendril(end, mid + bow, color, zoom, stretch, knotted)
-                drawCircle(color = color, radius = (3.5f - 1.5f * stretch).dp.toPx() * zoom, center = mid + bow)
-                if (active) {
-                    val pulse = start + (end - start) * linkPulse()
-                    drawCircle(
-                        color = linkInk.copy(alpha = 0.72f),
-                        radius = 3.dp.toPx(),
-                        center = pulse,
-                    )
-                }
-            }
-            tetherFromId?.let { from ->
-                val start = screenCenter(workingPositions[from] ?: subjectById[from]?.position ?: return@let)
-                drawLine(Azphalt.White.copy(alpha = 0.9f), start, tetherEnd, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
-                drawCircle(Azphalt.White, radius = 6.dp.toPx(), center = tetherEnd, style = Stroke(width = 2.dp.toPx()))
-            }
+            // No drawn synapses: creatures join by their own tendrils (NodeMascotSurface reach).
             sliceTrail.zipWithNext().forEach { (p, q) ->
                 drawLine(Azphalt.Yellow.copy(alpha = 0.8f), p, q, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             }
@@ -525,6 +513,7 @@ private fun MascotNodeTerrarium(
                                 tendrilMaxPx,
                                 pinned = node.id,
                                 minPx = bodyGapPx,
+                                linkedMinPx = linkedGapPx,
                                 marginPx = halfCreaturePx,
                             )
                             val nextPx = screenCenter(next)
@@ -611,6 +600,7 @@ private fun MascotNodeTerrarium(
                     state = node.state,
                     motionPhase = { motionPhase() },
                     modifier = Modifier.fillMaxSize(),
+                    reach = { tendrilReach(node.id) },
                 )
                 H2g2SwarmAdornmentLayer(
                     adornments = adornments[node.id].orEmpty(),
@@ -618,10 +608,11 @@ private fun MascotNodeTerrarium(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                // One label, the job's name, on the state's colour; the full state is in the semantics.
+                // Packed like cells, creatures carry no names until tapped: the selected one shows its
+                // job on the state's colour. The full state is always in the semantics.
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
-                Text(
+                if (isSelected) Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
