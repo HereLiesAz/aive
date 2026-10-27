@@ -619,6 +619,8 @@ private fun MascotNodeTerrarium(
                 )
 
                 // One label, the job's name, on the state's colour; the full state is in the semantics.
+                // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
+                val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
                 Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
@@ -626,7 +628,7 @@ private fun MascotNodeTerrarium(
                     style = AzphaltType.endCap,
                     color = stateColor.contrastingText,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
+                        .align(if (carriesEgg) Alignment.TopCenter else Alignment.BottomCenter)
                         .widthIn(max = creatureSize)
                         .clip(RoundedCornerShape(999.dp))
                         .background(stateColor)
@@ -638,12 +640,10 @@ private fun MascotNodeTerrarium(
         // The swarm's egg rides above the bodies, below its feeders, so it is never hidden.
         tissue?.egg?.let { egg ->
             Canvas(Modifier.fillMaxSize()) {
-                val feeders = egg.feederIds.mapNotNull { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
-                val at = if (feeders.isEmpty()) screenCenter(egg.position) else Offset(
-                    feeders.map { it.x }.average().toFloat(),
-                    feeders.maxOf { it.y } + creatureSizePx * zoom * 0.95f,
-                )
-                drawTissueEgg(egg, zoom, toScreen = { at }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
+                // The egg hangs at the end of the working creature's tail: nothing else joins them.
+                val feeder = egg.feederIds.lastOrNull()?.let { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
+                val at = feeder?.let { Offset(it.x, it.y + creatureSizePx * zoom * 0.46f) } ?: screenCenter(egg.position)
+                drawTissueEgg(egg, zoom, toScreen = { at })
             }
         }
 

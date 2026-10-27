@@ -43,25 +43,11 @@ internal fun DrawScope.drawTissueEgg(
     egg: TissueEgg,
     zoom: Float,
     toScreen: (H2g2TerrariumPosition) -> Offset,
-    creatureCentre: (String) -> Offset?,
 ) {
     val at = toScreen(egg.position)
     val shell = when (egg.outcome) {
         TissueEggOutcome.Withered -> Color(0xFF4A4139)
         else -> Azphalt.Yellow
-    }
-    egg.feederIds.forEach { id ->
-        val from = creatureCentre(id) ?: return@forEach
-        val tail = Offset(from.x + 14.dp.toPx() * zoom, from.y + 18.dp.toPx() * zoom)
-        val mid = Offset(
-            (tail.x + at.x) / 2f + (tail.y - at.y) * 0.25f,
-            (tail.y + at.y) / 2f - (tail.x - at.x) * 0.25f,
-        )
-        val path = Path().apply {
-            moveTo(tail.x, tail.y)
-            quadraticTo(mid.x, mid.y, at.x, at.y)
-        }
-        drawPath(path, Azphalt.Yellow.copy(alpha = 0.85f), style = Stroke(width = 4.dp.toPx() * zoom, cap = StrokeCap.Round))
     }
     val t = egg.growth.coerceIn(0f, 1f)
     val rx = (7f + 12f * t).dp.toPx() * zoom
