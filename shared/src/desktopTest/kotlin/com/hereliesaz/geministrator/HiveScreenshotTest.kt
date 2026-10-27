@@ -113,6 +113,9 @@ class HiveScreenshotTest {
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        shoot("5-launch-bar", 900, 600) {
+            HiveLaunchBar("shot", onLaunch = { _, _ -> })
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {

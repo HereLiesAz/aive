@@ -30,7 +30,7 @@ class WorkflowLibraryHost(
     private val persistence: WorkflowPersistence,
     private val storeService: AzphaltStoreService?,
     private val authoredStore: AuthoredWorkflowStore = SettingsAuthoredWorkflowStore(),
-    private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>, String?) -> Unit,
+    private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>, String?, com.hereliesaz.geministrator.domain.RepositoryRef?) -> Unit,
     private val onPackagesChanged: () -> Unit,
     private val onWorkflowCreated: suspend (WorkflowDefinition) -> Unit = {},
 ) {
@@ -124,7 +124,12 @@ class WorkflowLibraryHost(
         authoredStore.remove(id)
     }
 
-    suspend fun run(definition: WorkflowDefinition, objective: String? = null) {
+    /** [repository] null keeps the current project's repository. */
+    suspend fun run(
+        definition: WorkflowDefinition,
+        objective: String? = null,
+        repository: com.hereliesaz.geministrator.domain.RepositoryRef? = null,
+    ) {
         composition.validated(definition)
         val neededRoleIds = buildSet {
             definition.tasks.forEach { task ->
@@ -141,7 +146,7 @@ class WorkflowLibraryHost(
             .filter { it.id in neededRoleIds }
             .distinctBy(RoleDefinition::id)
             .toList()
-        launchWorkflow(definition, packageRoles, objective?.trim()?.takeIf(String::isNotEmpty))
+        launchWorkflow(definition, packageRoles, objective?.trim()?.takeIf(String::isNotEmpty), repository)
     }
 
     fun packagesChanged() = onPackagesChanged()

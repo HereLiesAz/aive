@@ -25,6 +25,7 @@ import com.hereliesaz.geministrator.resources.hive_launch
 import com.hereliesaz.geministrator.resources.hive_launch_failed
 import com.hereliesaz.geministrator.resources.hive_new_name
 import com.hereliesaz.geministrator.resources.hive_objective
+import com.hereliesaz.geministrator.resources.hive_repository
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
 import kotlinx.coroutines.launch
@@ -38,9 +39,20 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = Modifier) {
     val host = LocalWorkflowLibraryHost.current ?: return
+    HiveLaunchBar(definition.id.value, onLaunch = { objective, repository -> host.run(definition, objective, repository) }, modifier)
+}
+
+/** The launch bar's body: [onLaunch] gets the objective and repository, each null when blank. */
+@Composable
+internal fun HiveLaunchBar(
+    key: String,
+    onLaunch: suspend (String?, com.hereliesaz.geministrator.domain.RepositoryRef?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val scope = rememberCoroutineScope()
-    var objective by remember(definition.id) { mutableStateOf("") }
-    var message by remember(definition.id) { mutableStateOf<String?>(null) }
+    var objective by remember(key) { mutableStateOf("") }
+    var repository by remember(key) { mutableStateOf("") }
+    var message by remember(key) { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = objective,
@@ -50,12 +62,23 @@ internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = 
             colors = azphaltTextFieldColors(),
             modifier = Modifier.fillMaxWidth(),
         )
+        // Where the swarm works; blank keeps the current project's repository.
+        OutlinedTextField(
+            value = repository,
+            onValueChange = { repository = it },
+            label = { Text(stringResource(Res.string.hive_repository)) },
+            singleLine = true,
+            colors = azphaltTextFieldColors(),
+            modifier = Modifier.fillMaxWidth(),
+        )
         AzphaltPill(
             label = stringResource(Res.string.hive_launch),
             seed = "hive-launch",
             onClick = {
                 scope.launch {
-                    message = runCatching { host.run(definition, objective.trim().ifBlank { null }) }
+                    message = runCatching {
+                        onLaunch(objective.trim().ifBlank { null }, hiveRepository(repository))
+                    }
                         .fold({ null }, { it.message ?: getString(Res.string.hive_launch_failed) })
                     if (message == null) objective = ""
                 }
@@ -63,6 +86,17 @@ internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = 
         )
         message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
     }
+}
+
+/** A pasted repository: GitLab when it says so, GitHub otherwise; blank is none. */
+internal fun hiveRepository(locator: String): com.hereliesaz.geministrator.domain.RepositoryRef? {
+    val clean = locator.trim().ifBlank { return null }
+    val source = if ("gitlab.com" in clean.lowercase()) {
+        com.hereliesaz.geministrator.domain.RepositorySource.GitLab
+    } else {
+        com.hereliesaz.geministrator.domain.RepositorySource.GitHub
+    }
+    return com.hereliesaz.geministrator.domain.parseRepositoryRef(source, clean)
 }
 
 /** A comb's timeline (mockup H3): the run's events in order, what the Runs tab used to list. */
