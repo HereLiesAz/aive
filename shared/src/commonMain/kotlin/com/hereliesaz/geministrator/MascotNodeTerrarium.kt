@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -158,7 +159,6 @@ private fun MascotNodeTerrarium(
         val selected = selectedId?.let(subjectPositions::get)
         if (selected != null) {
             focusTarget = Offset(selected.x, selected.y)
-            zoomTarget = maxOf(zoomTarget, if (compact) 1.55f else 1.35f)
         }
     }
 
@@ -210,12 +210,15 @@ private fun MascotNodeTerrarium(
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         val density = LocalDensity.current
-        val creatureSize = if (compact) 154.dp else 176.dp
+        // Creatures scale to the field so a whole hive fits: roughly a grid of them with room between.
+        val creatureSize = (minOf(maxWidth, maxHeight) / (kotlin.math.sqrt(subjects.size.toFloat()) + 1.4f))
+            .coerceIn(72.dp, if (compact) 154.dp else 176.dp)
         val creatureSizePx = with(density) { creatureSize.toPx() }
         val halfCreaturePx = creatureSizePx / 2f
         // Tendril reach, measured at zoom 1: slack up to rest, and no farther than max.
-        val tendrilRestPx = creatureSizePx * 0.95f
-        val tendrilMaxPx = creatureSizePx * 1.2f
+        val tendrilRestPx = creatureSizePx * 1.25f
+        val tendrilMaxPx = creatureSizePx * 1.5f
+        val bodyGapPx = creatureSizePx * 1.05f
         val tendrilLinks = remember(relationships) {
             relationships
                 .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
@@ -224,7 +227,7 @@ private fun MascotNodeTerrarium(
         // Creatures already too far apart for their tendrils are drawn together once the field is measured.
         LaunchedEffect(subjectPositions, widthPx, heightPx, tendrilLinks) {
             if (draggingId == null) {
-                workingPositions = constrainTendrils(workingPositions, tendrilLinks, widthPx, heightPx, tendrilMaxPx)
+                workingPositions = constrainTendrils(workingPositions, tendrilLinks, widthPx, heightPx, tendrilMaxPx, minPx = bodyGapPx, marginPx = halfCreaturePx, iterations = 40)
             }
         }
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
@@ -382,9 +385,11 @@ private fun MascotNodeTerrarium(
                 val blocked = toSubject.node.state == H2g2WorkflowState.Blocked ||
                     toSubject.node.state == H2g2WorkflowState.Failed
                 val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
+                // Tendrils are flesh-toned on the tissue; a blocked one reddens, an active one brightens.
                 val color = when {
-                    blocked -> GeministratorColors.error.copy(alpha = 0.40f)
-                    active -> linkInk.copy(alpha = 0.85f)
+                    blocked -> GeministratorColors.error
+                    active -> Color(0xFFF4E3D3)
+                    tissue != null -> Color(0xFFC9A99A)
                     else -> linkInk.copy(alpha = 0.6f)
                 }
                 // Joined by their tendrils: each creature reaches half way and the two tips clasp.
@@ -414,9 +419,6 @@ private fun MascotNodeTerrarium(
             }
             sliceTrail.zipWithNext().forEach { (p, q) ->
                 drawLine(Azphalt.Yellow.copy(alpha = 0.8f), p, q, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
-            }
-            tissue?.egg?.let { egg ->
-                drawTissueEgg(egg, zoom, toScreen = { screenCenter(it) }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             }
         }
 
@@ -522,6 +524,8 @@ private fun MascotNodeTerrarium(
                                 heightPx,
                                 tendrilMaxPx,
                                 pinned = node.id,
+                                minPx = bodyGapPx,
+                                marginPx = halfCreaturePx,
                             )
                             val nextPx = screenCenter(next)
                             // Without a drop handler, bodies only arrange: no creature is ever a drop target.
@@ -614,32 +618,32 @@ private fun MascotNodeTerrarium(
                     modifier = Modifier.fillMaxSize(),
                 )
 
+                // One label, the job's name, on the state's colour; the full state is in the semantics.
                 Text(
-                    text = if (taskLabel.isEmpty()) action else "$action · $taskLabel",
+                    text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = AzphaltType.endCap,
                     color = stateColor.contrastingText,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = creatureSize)
                         .clip(RoundedCornerShape(999.dp))
                         .background(stateColor)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
-                Text(
-                    text = node.label.uppercase(),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = AzphaltType.endCap,
-                    color = Azphalt.White,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(Azphalt.Ink.copy(alpha = 0.92f))
-                        .padding(horizontal = 9.dp, vertical = 5.dp),
+            }
+        }
+
+        // The swarm's egg rides above the bodies, below its feeders, so it is never hidden.
+        tissue?.egg?.let { egg ->
+            Canvas(Modifier.fillMaxSize()) {
+                val feeders = egg.feederIds.mapNotNull { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
+                val at = if (feeders.isEmpty()) screenCenter(egg.position) else Offset(
+                    feeders.map { it.x }.average().toFloat(),
+                    feeders.maxOf { it.y } + creatureSizePx * zoom * 0.95f,
                 )
+                drawTissueEgg(egg, zoom, toScreen = { at }) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             }
         }
 
@@ -758,8 +762,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
     knotted: Boolean,
 ) {
     val segments = 10
-    val base = (5f - 2.5f * stretch).dp.toPx() * zoom
-    val end = (1.6f - 0.6f * stretch).dp.toPx() * zoom
+    val base = (9f - 4f * stretch).dp.toPx() * zoom
+    val end = (3f - 1f * stretch).dp.toPx() * zoom
     for (i in 0 until segments) {
         if (knotted && i % 2 == 1) continue
         val a = root + (tip - root) * (i / segments.toFloat())

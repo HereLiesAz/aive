@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -157,7 +159,7 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
-            .size(width = 150.dp, height = 196.dp)
+            .size(width = 150.dp, height = 214.dp)
             .clip(RoundedCornerShape(24.dp))
             .clickable(role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) {
@@ -179,8 +181,20 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
                     val rx = (7f + 12f * t).dp.toPx()
                     val ry = (9f + 15f * t).dp.toPx()
                     val shell = if (neighbourhood.state == NeighbourhoodState.Withered) Withered else Azphalt.Yellow
-                    drawOval(shell, topLeft = Offset(c.x - rx, c.y - ry), size = Size(rx * 2f, ry * 2f))
+                    drawOval(shell, topLeft = Offset(c.x - rx, c.y + r * 0.55f - ry), size = Size(rx * 2f, ry * 2f))
                 }
+            }
+            // A few of its creatures, at rest, so a hive reads as its swarm and not an empty ring.
+            val spots = listOf(-24 to -20, 24 to -24, 0 to 22)
+            neighbourhood.creatureRoles.forEachIndexed { i, role ->
+                val (dx, dy) = spots[i]
+                NodeMascotSurface(
+                    roleLabel = role,
+                    hueSeed = neighbourhood.definitionId + i,
+                    state = H2g2WorkflowState.Pending,
+                    motionPhase = { 0f },
+                    modifier = Modifier.size(50.dp).offset(dx.dp, dy.dp),
+                )
             }
         }
         Text(
@@ -190,7 +204,13 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
             textAlign = TextAlign.Center,
             maxLines = 2,
         )
-        Text(listOfNotNull(stateLabel, needsYou ?: scars).joinToString(" · "), style = AzphaltType.endCap, color = azphaltOnSurface())
+        Text(
+            listOfNotNull(stateLabel, needsYou ?: scars).joinToString(" · "),
+            style = AzphaltType.endCap,
+            color = azphaltOnSurface(),
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+        )
     }
 }
 
