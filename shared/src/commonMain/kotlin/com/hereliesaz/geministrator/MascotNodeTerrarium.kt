@@ -213,6 +213,20 @@ private fun MascotNodeTerrarium(
         val creatureSize = if (compact) 154.dp else 176.dp
         val creatureSizePx = with(density) { creatureSize.toPx() }
         val halfCreaturePx = creatureSizePx / 2f
+        // Tendril reach, measured at zoom 1: slack up to rest, and no farther than max.
+        val tendrilRestPx = creatureSizePx * 0.95f
+        val tendrilMaxPx = creatureSizePx * 1.2f
+        val tendrilLinks = remember(relationships) {
+            relationships
+                .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
+                .map { it.from to it.to }
+        }
+        // Creatures already too far apart for their tendrils are drawn together once the field is measured.
+        LaunchedEffect(subjectPositions, widthPx, heightPx, tendrilLinks) {
+            if (draggingId == null) {
+                workingPositions = constrainTendrils(workingPositions, tendrilLinks, widthPx, heightPx, tendrilMaxPx)
+            }
+        }
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val onGround = azphaltOnSurface()
 
@@ -370,32 +384,20 @@ private fun MascotNodeTerrarium(
                 val active = relationship.active || relationship.kind == H2g2TerrariumRelationshipKind.Transfer
                 val color = when {
                     blocked -> GeministratorColors.error.copy(alpha = 0.40f)
-                    active -> linkInk.copy(alpha = 0.42f)
-                    else -> linkInk.copy(alpha = 0.28f)
+                    active -> linkInk.copy(alpha = 0.85f)
+                    else -> linkInk.copy(alpha = 0.6f)
                 }
-                val stroke = (if (active) 2.dp else 1.5.dp).toPx()
-
-                // A soft shadow line under the link keeps it readable over the grid.
-                drawLine(
-                    color = Azphalt.Ink.copy(alpha = 0.10f),
-                    start = start,
-                    end = end,
-                    strokeWidth = stroke + 1.dp.toPx(),
-                    cap = StrokeCap.Round,
-                )
-                drawLine(
-                    color = color,
-                    start = start,
-                    end = end,
-                    strokeWidth = stroke,
-                    cap = StrokeCap.Round,
-                    // A knotted (conditional) tether is dashed.
-                    pathEffect = if (tissue?.conditional?.contains(relationship.from to relationship.to) == true) {
-                        PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 6.dp.toPx()))
-                    } else {
-                        null
-                    },
-                )
+                // Joined by their tendrils: each creature reaches half way and the two tips clasp.
+                // A tendril thins as it stretches toward its limit.
+                val fromCentre = screenCenter(workingPositions[relationship.from] ?: subjectById[relationship.from]?.position ?: return@forEach)
+                val toCentre = screenCenter(workingPositions[relationship.to] ?: toSubject.position)
+                val stretch = tendrilStretch((toCentre - fromCentre).getDistance() / zoom, tendrilRestPx, tendrilMaxPx)
+                val knotted = tissue?.conditional?.contains(relationship.from to relationship.to) == true
+                val mid = (start + end) / 2f
+                val bow = (end - start).let { d -> Offset(-d.y, d.x) } * (0.12f * (1f - stretch))
+                drawTendril(start, mid + bow, color, zoom, stretch, knotted)
+                drawTendril(end, mid + bow, color, zoom, stretch, knotted)
+                drawCircle(color = color, radius = (3.5f - 1.5f * stretch).dp.toPx() * zoom, center = mid + bow)
                 if (active) {
                     val pulse = start + (end - start) * linkPulse()
                     drawCircle(
@@ -493,7 +495,10 @@ private fun MascotNodeTerrarium(
                                     creatureAt(tetherEnd, except = from)?.let { to -> onTetherDrawn?.invoke(from, to) }
                                     return@detectDragGestures
                                 }
-                                onNodeMoved(node.id, workingPositions[node.id] ?: subject.position)
+                                // The dragged creature and every partner its tendrils pulled along keep their places.
+                                workingPositions.forEach { (id, position) ->
+                                    if (id == node.id || subjectPositions[id] != position) onNodeMoved(id, position)
+                                }
                                 val target = dropTargetId
                                 if (target != null && target != node.id) onNodeDroppedOn?.invoke(node.id, target)
                                 draggingId = null
@@ -510,7 +515,14 @@ private fun MascotNodeTerrarium(
                                 x = current.x + dragAmount.x / (widthPx * zoom),
                                 y = current.y + dragAmount.y / (heightPx * zoom),
                             ).clamped()
-                            workingPositions = workingPositions + (node.id to next)
+                            workingPositions = constrainTendrils(
+                                workingPositions + (node.id to next),
+                                tendrilLinks,
+                                widthPx,
+                                heightPx,
+                                tendrilMaxPx,
+                                pinned = node.id,
+                            )
                             val nextPx = screenCenter(next)
                             // Without a drop handler, bodies only arrange: no creature is ever a drop target.
                             if (onNodeDroppedOn == null) return@detectDragGestures
@@ -734,4 +746,25 @@ private fun segmentsCross(a: Offset, b: Offset, p: Offset, q: Offset): Boolean {
     val d3 = side(a, b, p)
     val d4 = side(a, b, q)
     return (d1 > 0f) != (d2 > 0f) && (d3 > 0f) != (d4 > 0f)
+}
+
+/** One tendril: tapered from the body to the clasp, thinner when stretched; dashed when knotted. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
+    root: Offset,
+    tip: Offset,
+    color: androidx.compose.ui.graphics.Color,
+    zoom: Float,
+    stretch: Float,
+    knotted: Boolean,
+) {
+    val segments = 10
+    val base = (5f - 2.5f * stretch).dp.toPx() * zoom
+    val end = (1.6f - 0.6f * stretch).dp.toPx() * zoom
+    for (i in 0 until segments) {
+        if (knotted && i % 2 == 1) continue
+        val a = root + (tip - root) * (i / segments.toFloat())
+        val b = root + (tip - root) * ((i + 1) / segments.toFloat())
+        val w = base + (end - base) * (i / (segments - 1).toFloat())
+        drawLine(color, a, b, strokeWidth = w, cap = StrokeCap.Round)
+    }
 }

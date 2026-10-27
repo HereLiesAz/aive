@@ -253,3 +253,30 @@ private fun com.hereliesaz.geministrator.domain.TaskCondition.refersOutside(memb
     is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> ofTask !in members
     com.hereliesaz.geministrator.domain.TaskCondition.Always -> false
 }
+
+/** A creature's job (H4): the task's own fields, edited in place. Only what is given changes. */
+internal fun setTerrariumJob(
+    definition: WorkflowDefinition,
+    taskId: TaskDefinitionId,
+    objective: String? = null,
+    criteria: List<String>? = null,
+    humanApproval: Boolean? = null,
+    maxAttempts: Int? = null,
+): TerrariumDependencyEditResult {
+    val task = definition.tasks.firstOrNull { it.id == taskId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    if (objective != null && objective.isBlank()) return TerrariumDependencyEditResult.Rejected("A job needs an objective")
+    val next = task.copy(
+        objective = objective?.trim() ?: task.objective,
+        acceptanceCriteria = criteria?.map(String::trim)?.filter(String::isNotEmpty)
+            ?.map { com.hereliesaz.geministrator.domain.AcceptanceCriterion(it) } ?: task.acceptanceCriteria,
+        approvalPolicy = when (humanApproval) {
+            null -> task.approvalPolicy
+            true -> com.hereliesaz.geministrator.domain.ApprovalPolicy.HumanApproval
+            false -> com.hereliesaz.geministrator.domain.ApprovalPolicy.None
+        },
+        retryPolicy = maxAttempts?.let { task.retryPolicy.copy(maxAttempts = it.coerceIn(1, 10)) } ?: task.retryPolicy,
+    )
+    if (next == task) return TerrariumDependencyEditResult.NoChange
+    return TerrariumDependencyEditResult.Applied(definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it }))
+}

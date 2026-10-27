@@ -528,7 +528,7 @@ internal fun RunsScreen(
     }
 }
 
-private fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when (event) {
+internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when (event) {
     is TaskBecameReady -> event.taskDefinitionId
     is ExecutorAssigned -> event.taskDefinitionId
     is AgentAssigned -> event.taskDefinitionId
@@ -548,7 +548,7 @@ private fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when 
 }
 
 @Composable
-private fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
+internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is WorkflowCreated -> stringResource(Res.string.runs_workflow_created)
     is TaskBecameReady -> stringResource(Res.string.runs_task_ready)
     is ExecutorAssigned -> stringResource(Res.string.runs_executor_assigned)
@@ -570,7 +570,7 @@ private fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
 }
 
-private fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
+internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is WorkflowCreated -> event.objective?.take(80) ?: event.workflowRunId.value.takeLast(8)
     is ApprovalRequired -> event.reason.take(80)
     is ApprovalDecisionReceived -> event.decidedByRoleId?.value ?: "system"
