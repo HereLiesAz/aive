@@ -47,6 +47,8 @@ internal fun GeministratorWorkflowTerrarium(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     onSurface: (() -> Unit)? = null,
+    /** Opens in Build instead of Live; for a hive that has never run, and for screenshots. */
+    startInBuild: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -139,7 +141,7 @@ internal fun GeministratorWorkflowTerrarium(
     }
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
-    var building by remember(definition.id) { mutableStateOf(false) }
+    var building by remember(definition.id) { mutableStateOf(startInBuild) }
     // While grouping, taps gather creatures instead of selecting one.
     var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
 
