@@ -57,7 +57,11 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     fun tendrilTip(part: Int, pose: PuppetPoseBuffer): Offset {
         val o = part * 6
         val w = pose.world
-        return Offset(w[o] * tipX[part] + w[o + 2] * tipY[part] + w[o + 4], w[o + 1] * tipX[part] + w[o + 3] * tipY[part] + w[o + 5])
+        val n = pose.segments[part]
+        return Offset(
+            (w[o] * tipX[part] + w[o + 2] * tipY[part]) * n + w[o + 4],
+            (w[o + 1] * tipX[part] + w[o + 3] * tipY[part]) * n + w[o + 5],
+        )
     }
 
     private val anchorX = FloatArray(partCount)
@@ -159,7 +163,11 @@ class CompiledPuppetRig(val rig: PuppetRig) {
                 val v = hypot(vx, vy)
                 if (v > 0f) {
                     val turn = (atan2(dy, dx) - atan2(vy, vx)) / DEG
-                    val k = (hypot(dx, dy) / v).coerceIn(MIN_REACH, out.maxReach)
+                    // Too far for one sprite: the tendril grows segments, copies of itself end to end.
+                    val need = hypot(dx, dy) / v
+                    val segments = kotlin.math.ceil(need / out.maxReach).toInt().coerceIn(1, out.maxSegments)
+                    out.segments[i] = segments
+                    val k = (need / segments).coerceIn(MIN_REACH, out.maxReach)
                     val alongX = kotlin.math.abs(tipX[i]) >= kotlin.math.abs(tipY[i])
                     compose(i, deg + turn, if (alongX) sx * k else sx, if (alongX) sy else sy * k, x, y, al, out)
                 }
@@ -226,29 +234,34 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             val alpha = pose.alpha[i]
             if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) continue
             val o = i * 6
-            scratch.reset()
-            val v = scratch.values
-            v[Matrix.ScaleX] = w[o]
-            v[Matrix.SkewY] = w[o + 1]
-            v[Matrix.SkewX] = w[o + 2]
-            v[Matrix.ScaleY] = w[o + 3]
-            v[Matrix.TranslateX] = w[o + 4]
-            v[Matrix.TranslateY] = w[o + 5]
-            withTransform({
-                translate(fit.offsetX, fit.offsetY)
-                scale(fit.scale, fit.scale, pivot = Offset.Zero)
-                transform(scratch)
-                translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
-                scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
-            }) {
-                drawImage(
-                    image = atlas,
-                    srcOffset = IntOffset(rect.x, rect.y),
-                    srcSize = IntSize(rect.w, rect.h),
-                    dstOffset = IntOffset.Zero,
-                    dstSize = IntSize(rect.w, rect.h),
-                    alpha = alpha,
-                )
+            // Segment j is the same sprite moved out along the tendril by j tip-lengths.
+            val stepX = w[o] * tipX[i] + w[o + 2] * tipY[i]
+            val stepY = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
+            for (j in pose.segments[i] - 1 downTo 0) {
+                scratch.reset()
+                val v = scratch.values
+                v[Matrix.ScaleX] = w[o]
+                v[Matrix.SkewY] = w[o + 1]
+                v[Matrix.SkewX] = w[o + 2]
+                v[Matrix.ScaleY] = w[o + 3]
+                v[Matrix.TranslateX] = w[o + 4] + stepX * j
+                v[Matrix.TranslateY] = w[o + 5] + stepY * j
+                withTransform({
+                    translate(fit.offsetX, fit.offsetY)
+                    scale(fit.scale, fit.scale, pivot = Offset.Zero)
+                    transform(scratch)
+                    translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
+                    scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
+                }) {
+                    drawImage(
+                        image = atlas,
+                        srcOffset = IntOffset(rect.x, rect.y),
+                        srcSize = IntSize(rect.w, rect.h),
+                        dstOffset = IntOffset.Zero,
+                        dstSize = IntSize(rect.w, rect.h),
+                        alpha = alpha,
+                    )
+                }
             }
         }
     }
@@ -281,12 +294,19 @@ class PuppetPoseBuffer(partCount: Int, attachmentCount: Int) {
     val reachX = FloatArray(partCount) { Float.NaN }
     val reachY = FloatArray(partCount) { Float.NaN }
 
-    /** How far a tendril may stretch past its sprite: a little, not much. */
+    /** How far each tendril segment may stretch past its sprite: a little, not much. */
     var maxReach = 1.25f
+
+    /** Most segments a tendril grows to reach. */
+    var maxSegments = 3
+
+    /** Per part, how many copies of the sprite it draws end to end; 1 unless reaching far. */
+    val segments = IntArray(partCount) { 1 }
 
     fun clearReach() {
         reachX.fill(Float.NaN)
         reachY.fill(Float.NaN)
+        segments.fill(1)
     }
 }
 

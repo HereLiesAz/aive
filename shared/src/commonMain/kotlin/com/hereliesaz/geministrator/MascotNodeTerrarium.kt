@@ -218,14 +218,17 @@ private fun MascotNodeTerrarium(
         // Tendril reach, measured at zoom 1: slack up to rest, and no farther than max.
         // The rigs' tendril sprites are short: linked creatures sit close enough for two tips to
         // clasp half way, stretched a little (CompiledPuppetRig maxReach); unlinked ones keep apart.
-        // Measured over the rigs: a tendril reaches about 0.38 of the box from the body, at full stretch.
-        val tendrilRestPx = creatureSizePx * 0.6f
-        val tendrilMaxPx = creatureSizePx * 0.7f
-        val bodyGapPx = creatureSizePx * 1.05f
-        val linkedGapPx = creatureSizePx * 0.55f
+        // Joined creatures pack close, like cells; a tendril grows segments to span the gap
+        // (CompiledPuppetRig maxSegments). Unjoined ones keep a body's width apart.
+        val tendrilRestPx = creatureSizePx * 0.75f
+        val tendrilMaxPx = creatureSizePx * 0.95f
+        val bodyGapPx = creatureSizePx * 0.9f
+        val linkedGapPx = creatureSizePx * 0.7f
         val tendrilLinks = remember(relationships) {
-            // Every relationship is a clasp of tendrils, so every one is held within reach.
-            relationships.map { it.from to it.to }
+            // Only task-to-task links clasp; the orchestrator is the hive itself and joins nothing.
+            relationships
+                .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
+                .map { it.from to it.to }
         }
         // Creatures already too far apart for their tendrils are drawn together once the field is measured.
         LaunchedEffect(subjectPositions, widthPx, heightPx, tendrilLinks) {
@@ -305,10 +308,10 @@ private fun MascotNodeTerrarium(
             val centre = screenCenter(workingPositions[id] ?: subjectById[id]?.position ?: return emptyList())
             val half = creatureSizePx / 2f
             fun local(p: Offset) = Offset((p.x - centre.x) / zoom + half, (p.y - centre.y) / zoom + half)
-            val partners = relationships.mapNotNull { r ->
+            val partners = tendrilLinks.mapNotNull { (from, to) ->
                 when (id) {
-                    r.from -> r.to
-                    r.to -> r.from
+                    from -> to
+                    to -> from
                     else -> null
                 }
             }.distinct()
@@ -605,10 +608,11 @@ private fun MascotNodeTerrarium(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                // One label, the job's name, on the state's colour; the full state is in the semantics.
+                // Packed like cells, creatures carry no names until tapped: the selected one shows its
+                // job on the state's colour. The full state is always in the semantics.
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
-                Text(
+                if (isSelected) Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
