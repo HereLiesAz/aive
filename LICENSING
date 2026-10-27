@@ -11,7 +11,8 @@ Authoritative, path-by-path license layout.
 
 | Layer | License |
 |---|---|
-| The app and everything in this repository not listed below: `shared`, `providers/*`, `androidApp`, `desktopApp`, `webApp`, the memory and orchestration layers, `tools/*`, docs | **PolyForm Noncommercial 1.0.0** (`/LICENSE`) |
+| The app and everything in this repository not listed below: `shared`, `androidApp`, `desktopApp`, `webApp`, the memory and orchestration layers, `tools/*`, docs | **PolyForm Noncommercial 1.0.0** (`/LICENSE`) |
+| `providers/llm` — setup and client code for third-party hosted models (the models remain their operators') | **Apache License 2.0** (`providers/llm/LICENSE`) |
 | `vendor/conveyance-h2g2` | Its own license, as stated in that tree |
 | Bundled third-party data: WordNet (`shared/src/commonMain/composeResources/files/aive-wordnet-v1.txt.gz`) | WordNet license (Princeton University); notice in `THIRD_PARTY_NOTICES.md` |
 | Downloaded model weights (Qwen2.5-0.5B-Instruct base and the released LoRA adapters, the Association Linker embedder) | Their upstream licenses, listed in `THIRD_PARTY_NOTICES.md`; fetched at run time, not stored in this repository |
