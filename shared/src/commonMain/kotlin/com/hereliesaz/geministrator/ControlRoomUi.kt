@@ -614,7 +614,8 @@ private fun MainDestination(
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 AzphaltPill(
                                     label = stringResource(Res.string.district_surface),
                                     seed = "zoom-out-district",
@@ -626,6 +627,21 @@ private fun MainDestination(
                                         seed = "hive-timeline",
                                         selected = showTimeline,
                                         onClick = { showTimeline = !showTimeline },
+                                    )
+                                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
+                                    AzphaltPill(
+                                        label = stringResource(Res.string.hive_more_editing),
+                                        seed = "hive-more-editing",
+                                        onClick = {
+                                            hiveScope.launch {
+                                                val id = live.run.workflowDefinitionId.value
+                                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
+                                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
+                                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+                                                }
+                                                onDestinationSelected(ControlRoomDestination.Workflows)
+                                            }
+                                        },
                                     )
                                 }
                             }

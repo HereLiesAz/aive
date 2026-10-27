@@ -131,6 +131,14 @@ class HiveScreenshotTest {
                 )
             } }
         }
+        shoot("7-live-row", 780, 300) {
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(label = "Your hive", seed = "zoom-out-district", onClick = {})
+                AzphaltPill(label = "Timeline", seed = "hive-timeline", onClick = {})
+                AzphaltPill(label = "More editing", seed = "hive-more-editing", onClick = {})
+            }
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {
