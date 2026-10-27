@@ -39,10 +39,20 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = Modifier) {
     val host = LocalWorkflowLibraryHost.current ?: return
+    HiveLaunchBar(definition.id.value, onLaunch = { objective, repository -> host.run(definition, objective, repository) }, modifier)
+}
+
+/** The launch bar's body: [onLaunch] gets the objective and repository, each null when blank. */
+@Composable
+internal fun HiveLaunchBar(
+    key: String,
+    onLaunch: suspend (String?, com.hereliesaz.geministrator.domain.RepositoryRef?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val scope = rememberCoroutineScope()
-    var objective by remember(definition.id) { mutableStateOf("") }
-    var repository by remember(definition.id) { mutableStateOf("") }
-    var message by remember(definition.id) { mutableStateOf<String?>(null) }
+    var objective by remember(key) { mutableStateOf("") }
+    var repository by remember(key) { mutableStateOf("") }
+    var message by remember(key) { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(
             value = objective,
@@ -67,7 +77,7 @@ internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = 
             onClick = {
                 scope.launch {
                     message = runCatching {
-                        host.run(definition, objective.trim().ifBlank { null }, hiveRepository(repository))
+                        onLaunch(objective.trim().ifBlank { null }, hiveRepository(repository))
                     }
                         .fold({ null }, { it.message ?: getString(Res.string.hive_launch_failed) })
                     if (message == null) objective = ""
