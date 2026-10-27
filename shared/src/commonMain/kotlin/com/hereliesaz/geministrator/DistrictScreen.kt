@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,8 @@ import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.district_creatures
 import com.hereliesaz.geministrator.resources.district_empty
 import com.hereliesaz.geministrator.resources.district_import_agent
+import com.hereliesaz.geministrator.resources.hive_new
+import com.hereliesaz.geministrator.resources.hive_not_yet_run
 import com.hereliesaz.geministrator.resources.lineage_adopt
 import com.hereliesaz.geministrator.resources.lineage_adopted
 import com.hereliesaz.geministrator.resources.lineage_lineage
@@ -69,16 +72,21 @@ private val Hatched = Color(0xFF5AAE34)
 @Composable
 internal fun DistrictScreen(
     onLoadDefinitions: suspend () -> List<WorkflowDefinition>,
-    onLoadRuns: suspend () -> List<WorkflowRun>,
+    /** Runs grouped by the project they ran in; the whole hive is laid out by project. */
+    onLoadRuns: suspend () -> List<Pair<String, List<WorkflowRun>>>,
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
     onImportAgent: () -> Unit,
+    onNewHive: () -> Unit = {},
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
+    var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(Unit) {
-        district = projectDistrict(onLoadDefinitions(), onLoadRuns())
+        val byProject = onLoadRuns()
+        projectOfRun = byProject.flatMap { (project, runs) -> runs.map { it.id.value to project } }.toMap()
+        district = projectDistrict(onLoadDefinitions(), byProject.flatMap { it.second })
     }
     Column(
         modifier = modifier
@@ -90,25 +98,37 @@ internal fun DistrictScreen(
     ) {
         AzphaltThemedSurface(Azphalt.Ink) {
             Text(stringResource(Res.string.district_your_swarm), style = AzphaltType.section, color = azphaltOnSurface())
-            // Strangers come from the Store: the cure for the clone trap.
-            AzphaltPill(
-                label = stringResource(Res.string.district_import_agent),
-                seed = "district-import",
-                onClick = onImportAgent,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
+                // Drifters come from the Store: the cure for the clone trap.
+                AzphaltPill(
+                    label = stringResource(Res.string.district_import_agent),
+                    seed = "district-import",
+                    onClick = onImportAgent,
+                )
+            }
             val neighbourhoods = district ?: return@AzphaltThemedSurface
             if (neighbourhoods.isEmpty()) {
                 Text(stringResource(Res.string.district_empty), style = AzphaltType.body, color = azphaltOnSurface())
             }
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                neighbourhoods.forEach { neighbourhood ->
-                    NeighbourhoodCell(neighbourhood, onClick = { onEnterNeighbourhood(neighbourhood) })
+            // Laid out by project: the project of each hive's latest run; hives that never ran come last.
+            val notYetRun = stringResource(Res.string.hive_not_yet_run)
+            neighbourhoods
+                .groupBy { hood -> hood.latestRunId?.let(projectOfRun::get) ?: notYetRun }
+                .entries
+                .sortedBy { (project, _) -> project == notYetRun }
+                .forEach { (project, hives) ->
+                    Text(project.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        hives.forEach { neighbourhood ->
+                            NeighbourhoodCell(neighbourhood, onClick = { onEnterNeighbourhood(neighbourhood) })
+                        }
+                    }
                 }
-            }
             Lineage(roles, onAdopt)
         }
     }

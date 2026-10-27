@@ -1,5 +1,11 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.resources.hive_show_timeline
+import com.hereliesaz.geministrator.resources.hive_more_editing
+import com.hereliesaz.geministrator.resources.hive_show_hive
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -83,17 +89,21 @@ enum class ControlRoomDestination(val label: String) {
 
     /** The main-navigation entry that is highlighted while this destination is open. */
     val navigationItem: ControlRoomDestination
-        get() = if (this in OverviewSections) Overview else this
+        get() = if (this in OverviewSections || this in RetiredSections) Overview else this
 
     companion object {
         /**
          * Opened from the section row at the top of [Overview], not from the main navigation.
          * Overview itself shows the run mind map until one of these is tapped.
          */
-        val OverviewSections: List<ControlRoomDestination> = listOf(Runs, Workflows, Company)
+        // Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows stays reachable from a hive's More editing.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company)
+
+        /** Reachable, but no longer shown in Overview's section row. */
+        val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
 
         /** Left out of the main navigation: Overview's sections, and Inbox (its header badge opens it). */
-        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + Inbox
+        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + Inbox
 
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
@@ -529,17 +539,32 @@ private fun MainDestination(
                 ControlRoomDestination.Overview -> {
                     // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
                     var inDistrict by rememberDurableBooleanState("overview.zoom.district")
+                    // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
+                    var restingHiveId by rememberDurableStringState("overview.resting-hive")
+                    var showTimeline by rememberDurableBooleanState("overview.timeline")
+                    val hiveHost = LocalWorkflowLibraryHost.current
+                    val hiveScope = rememberCoroutineScope()
                     if (inDistrict) {
                         DistrictScreen(
                             onLoadDefinitions = onLoadWorkflowDefinitions,
-                            onLoadRuns = { onLoadRunHistory().flatMap { it.second } },
+                            onLoadRuns = { onLoadRunHistory().map { (project, runs) -> project.name to runs } },
                             onEnterNeighbourhood = { neighbourhood ->
                                 val runId = neighbourhood.latestRunId
                                 if (runId != null) {
                                     onSwitchRun(runId)
-                                    inDistrict = false
+                                    restingHiveId = ""
                                 } else {
-                                    onDestinationSelected(ControlRoomDestination.Workflows)
+                                    restingHiveId = neighbourhood.definitionId
+                                }
+                                inDistrict = false
+                            },
+                            onNewHive = {
+                                hiveHost?.let { host ->
+                                    hiveScope.launch {
+                                        val hive = createEmptyHive(host, onLoadWorkflowDefinitions())
+                                        restingHiveId = hive.id.value
+                                        inDistrict = false
+                                    }
                                 }
                             },
                             onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
@@ -552,20 +577,59 @@ private fun MainDestination(
                             },
                             modifier = Modifier.fillMaxSize(),
                         )
-                    } else {
-                        Column(Modifier.fillMaxSize()) {
+                    } else if (restingHiveId.isNotBlank()) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                             AzphaltPill(
                                 label = stringResource(Res.string.district_surface),
                                 seed = "zoom-out-district",
                                 onClick = { inDistrict = true },
                             )
-                            (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.let { live ->
+                            RestingHive(
+                                definitionId = restingHiveId,
+                                onLoadDefinitions = onLoadWorkflowDefinitions,
+                                selectedTaskId = selectedTaskId,
+                                onTaskSelected = onTaskSelected,
+                                onSurface = { inDistrict = true },
+                            )
+                            AzphaltPill(
+                                label = stringResource(Res.string.hive_more_editing),
+                                seed = "hive-more-editing",
+                                onClick = { onDestinationSelected(ControlRoomDestination.Workflows) },
+                            )
+                        }
+                    } else {
+                        Column(Modifier.fillMaxSize()) {
+                            val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AzphaltPill(
+                                    label = stringResource(Res.string.district_surface),
+                                    seed = "zoom-out-district",
+                                    onClick = { inDistrict = true },
+                                )
+                                if (live != null) {
+                                    AzphaltPill(
+                                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
+                                        seed = "hive-timeline",
+                                        selected = showTimeline,
+                                        onClick = { showTimeline = !showTimeline },
+                                    )
+                                }
+                            }
+                            live?.let {
+                                // The hive's combs: its finished swarms. Opening one switches to it.
                                 RunScars(
-                                    currentRun = live.run,
-                                    onLoadRuns = { onLoadRunHistory().flatMap { it.second } },
+                                    currentRun = it.run,
+                                    onLoadRuns = { onLoadRunHistory().flatMap { pair -> pair.second } },
                                     onReplay = onSwitchRun,
                                 )
                             }
+                            if (live != null && showTimeline) {
+                                RunTimeline(
+                                    runKey = live.run.id.value + live.run.updatedAtEpochMillis,
+                                    onLoadTimeline = onLoadRunTimeline,
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                )
+                            } else {
         MindMapRunScreen(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             selectedTaskId = selectedTaskId,
@@ -586,6 +650,8 @@ private fun MainDestination(
                             onSurface = { inDistrict = true },
                             runtimeState = runtimeState,
                         )
+                            }
+                            live?.let { HiveLaunchBar(it.definition) }
                         }
                     }
                 }

@@ -155,6 +155,7 @@ internal fun TerrariumConnections(
                 )
             }
         }
+        HiveJobEditor(definition = definition, task = selected, onEdit = onEdit)
         val candidates = definition.tasks.filter { it.id != selected.id && it.id !in selected.dependsOn }
         if (candidates.isNotEmpty()) {
             Text(stringResource(Res.string.build_add_connection), style = AzphaltType.eyebrow, color = azphaltOnSurface())
