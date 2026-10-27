@@ -55,7 +55,7 @@ const uid = (prefix, taken) => {
 const round = (v, d = 3) => Math.round(v * 10 ** d) / 10 ** d;
 const partById = (id) => doc.parts.find((p) => p.id === id);
 const attachmentKinds = ['arm-socket', 'tail-base', 'tail-tip', 'tendril-base', 'tendril-tip', 'prop-slot', 'eye', 'other'];
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function toast(msg) {
   const t = $('#toast');
@@ -886,19 +886,19 @@ function partListHtml(tree, layers = false) {
   const rows = [];
   const walk = (parent, depth) => {
     doc.parts.filter((p) => (p.parent ?? null) === parent).sort((a, b) => a.z - b.z).forEach((p) => {
-      rows.push(`<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}" style="padding-left:${8 + depth * 14}px">${esc(p.id)}<span class="meta">z ${p.z}</span></li>`);
+      rows.push(`<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}" style="padding-left:${8 + depth * 14}px">${esc(p.id)}<span class="meta">z ${esc(p.z)}</span></li>`);
       walk(p.id, depth + 1);
     });
   };
   if (tree) walk(null, 0);
   else (layers ? [...doc.parts].sort((a, b) => a.z - b.z) : doc.parts).forEach((p) => rows.push(
-    `<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}">${esc(p.id)}<span class="meta">${layers ? `z ${p.z}` : `${p.poly ? 'poly' : 'rect'} ${p.cut ? `${p.cut.w}×${p.cut.h}` : ''}`}</span></li>`
+    `<li data-part="${esc(p.id)}" class="${p.id === ui.sel ? 'sel' : ''}">${esc(p.id)}<span class="meta">${layers ? `z ${esc(p.z)}` : `${p.poly ? 'poly' : 'rect'} ${p.cut ? `${esc(p.cut.w)}×${esc(p.cut.h)}` : ''}`}</span></li>`
   ));
   return `<ul class="list" id="${layers ? 'layer-list' : 'part-list'}">${rows.join('')}</ul>`;
 }
 
 const num = (field, value, step = 1, extra = '') =>
-  `<input type="number" data-f="${field}" value="${value}" step="${step}" ${extra}>`;
+  `<input type="number" data-f="${field}" value="${esc(value)}" step="${step}" ${extra}>`;
 
 function renderPanel() {
   renderStageTools();
@@ -907,7 +907,7 @@ function renderPanel() {
   if (ui.mode === 'cut') {
     html += '<h3>Sheets</h3>';
     html += doc.sources.length
-      ? `<ul class="list" id="source-list">${doc.sources.map((s) => `<li data-source="${esc(s.id)}" class="${s.id === ui.source ? 'sel' : ''}">${esc(s.name)}<span class="meta">${images.get(s.id)?.width ?? '?'}×${images.get(s.id)?.height ?? '?'}</span></li>`).join('')}</ul>`
+      ? `<ul class="list" id="source-list">${doc.sources.map((s) => `<li data-source="${esc(s.id)}" class="${s.id === ui.source ? 'sel' : ''}">${esc(s.name)}<span class="meta">${esc(images.get(s.id)?.width ?? '?')}×${esc(images.get(s.id)?.height ?? '?')}</span></li>`).join('')}</ul>`
       : '<p class="small">Import a PNG character sheet, or several part PNGs at once (each becomes a part).</p>';
     html += '<h3>Parts</h3>' + partListHtml(false);
     if (p) {
@@ -963,12 +963,12 @@ function renderPanel() {
         ${doc.attachments.filter((a) => a.part === p.id).map((a) => `
           <div class="row" data-attach="${esc(a.id)}"><input type="text" data-af="id" value="${esc(a.id)}">
             <select data-af="kind">${[...new Set([...attachmentKinds, a.kind || 'other'])].map((k) => `<option ${k === a.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
-            <input type="number" data-af="x" value="${a.x}" step="0.01"><input type="number" data-af="y" value="${a.y}" step="0.01">
+            <input type="number" data-af="x" value="${esc(a.x)}" step="0.01"><input type="number" data-af="y" value="${esc(a.y)}" step="0.01">
             <button class="btn ghost" data-act="del-attach">×</button></div>`).join('') || '<p class="small">Use "Add attachment" and tap the part.</p>'}`;
     }
   } else {
     html += `<h3>Fallback state</h3><div class="row"><select id="fallback">${['', ...core.STATE_NAMES]
-      .map((s) => `<option value="${s}" ${s === (doc.fallbackState ?? '') ? 'selected' : ''}>${s || '(rest pose)'}</option>`).join('')}</select></div>
+      .map((s) => `<option value="${esc(s)}" ${s === (doc.fallbackState ?? '') ? 'selected' : ''}>${esc(s || '(rest pose)')}</option>`).join('')}</select></div>
       <h3>Parts</h3>${partListHtml(true)}`;
     if (p) html += motionEditorHtml(p);
   }
@@ -988,7 +988,7 @@ function motionEditorHtml(p) {
       <tr data-ch="${ch}" data-sine="1"><td colspan="4"><span class="small">sine</span>
         amp ${num('amplitude', s?.amplitude ?? 0, 0.1)} freq ${num('frequency', s?.frequency ?? 1, 1)} phase ${num('phase', s?.phase ?? 0, 0.05)}</td></tr>`;
   }).join('');
-  return `<h3>${esc(p.id)} · ${ui.state}</h3>
+  return `<h3>${esc(p.id)} · ${esc(ui.state)}</h3>
     <div class="row"><button class="btn" data-act="blink">Blink keys (scaleY)</button><button class="btn ghost" data-act="clear-motion">Clear</button>
       <button class="btn ghost" data-act="copy-state">Copy state to empty states</button></div>
     <table class="keys">${rows}</table>`;

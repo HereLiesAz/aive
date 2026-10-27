@@ -2,7 +2,6 @@ use crate::{best_decode_backend, decode_payload, BITCOS_VERSION};
 use jni::objects::{JByteArray, JClass};
 use jni::sys::{jbyteArray, jint, jlong};
 use jni::JNIEnv;
-use std::ptr::null_mut;
 
 #[no_mangle]
 pub extern "system" fn Java_com_hereliesaz_geministrator_inference_BitcosNativeBridge_abiVersion(
@@ -24,34 +23,28 @@ pub extern "system" fn Java_com_hereliesaz_geministrator_inference_BitcosNativeB
 pub extern "system" fn Java_com_hereliesaz_geministrator_inference_BitcosNativeBridge_decodePayload<
     'local,
 >(
-    env: JNIEnv<'local>,
+    mut env: JNIEnv<'local>,
     _class: JClass<'local>,
     element_count: jlong,
     presence: JByteArray<'local>,
     signs: JByteArray<'local>,
 ) -> jbyteArray {
-    if element_count < 0 {
-        return null_mut();
-    }
+    // Any failure hands Java a null array; no raw pointer is made or touched on this side.
+    decode_to_java(&mut env, element_count, &presence, &signs)
+        .unwrap_or_default()
+        .into_raw()
+}
 
-    let presence = match env.convert_byte_array(&presence) {
-        Ok(value) => value,
-        Err(_) => return null_mut(),
-    };
-    let signs = match env.convert_byte_array(&signs) {
-        Ok(value) => value,
-        Err(_) => return null_mut(),
-    };
-    let decoded = match decode_payload(element_count as u64, &presence, &signs) {
-        Ok(value) => value,
-        Err(_) => return null_mut(),
-    };
-    let bytes = decoded
-        .into_iter()
-        .map(|value| value as u8)
-        .collect::<Vec<_>>();
-    match env.byte_array_from_slice(&bytes) {
-        Ok(array) => array.into_raw(),
-        Err(_) => null_mut(),
-    }
+fn decode_to_java<'local>(
+    env: &mut JNIEnv<'local>,
+    element_count: jlong,
+    presence: &JByteArray<'local>,
+    signs: &JByteArray<'local>,
+) -> Option<JByteArray<'local>> {
+    let element_count = u64::try_from(element_count).ok()?;
+    let presence = env.convert_byte_array(presence).ok()?;
+    let signs = env.convert_byte_array(signs).ok()?;
+    let decoded = decode_payload(element_count, &presence, &signs).ok()?;
+    let bytes: Vec<u8> = decoded.iter().map(|&value| value as u8).collect();
+    env.byte_array_from_slice(&bytes).ok()
 }
