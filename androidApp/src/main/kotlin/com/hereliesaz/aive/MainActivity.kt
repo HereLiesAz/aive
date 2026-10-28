@@ -97,6 +97,8 @@ import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var updateCoordinator: AndroidUpdateCoordinator
+    // Breeds bought through Google Play (docs/Node-Creature-Genome.md, Breeds).
+    private val breedPurchases by lazy { PlayBreedPurchases(this) }
     // OkHttp, not CIO: the Azphalt Store (https://azphalt.store) and model downloads should use the
     // platform TLS stack and system trust, which CIO's own TLS implementation does not.
     private val repositoryHttpClient by lazy {
@@ -459,6 +461,7 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                     else -> App(
+                        breedPurchases = breedPurchases,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,

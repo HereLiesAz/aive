@@ -196,6 +196,7 @@ dependencies {
     implementation(libs.jgit)
     implementation(projects.providers.llm)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.play.billing.ktx)
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.javascriptengine)
     implementation("androidx.core:core:1.19.1")

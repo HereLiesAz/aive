@@ -231,11 +231,21 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         pose: PuppetPoseBuffer,
         fit: PuppetFit,
         scratch: Matrix,
+        /**
+         * A part drawn with another rig's sprite (a bred creature's tendrils or tail, inherited from
+         * another parent): the donor's atlas and part, placed where this rig's part sits. Null keeps
+         * this rig's own sprite.
+         */
+        donor: ((Int) -> Pair<ImageBitmap, PuppetPart>?)? = null,
     ) {
         for (i in drawOrder) {
-            for (j in pose.segments[i] - 1 downTo 0) drawPart(scope, atlas, pose, fit, scratch, i, j)
+            val (sheet, sprite) = donor?.invoke(i) ?: (atlas to rig.parts[i])
+            for (j in pose.segments[i] - 1 downTo 0) drawPart(scope, sheet, pose, fit, scratch, i, j, sprite)
         }
     }
+
+    /** The parts named `tail…`: the limb that carries the egg. */
+    val tailParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tail") }.toIntArray()
 
     /**
      * A slice of light travelling a tendril: [at] runs 0 (base) to 1 (tip, across every segment).
@@ -251,6 +261,8 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         part: Int,
         at: Float,
         color: Color,
+        /** The tendril's sprite when it is another rig's (an inherited limb). */
+        sprite: Pair<ImageBitmap, PuppetPart>? = null,
     ) = with(scope) {
         val o = part * 6
         val w = pose.world
@@ -269,7 +281,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             centre,
         )
         drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-        for (j in 0 until n) drawPart(this, atlas, pose, fit, scratch, part, j)
+        for (j in 0 until n) drawPart(this, sprite?.first ?: atlas, pose, fit, scratch, part, j, sprite?.second ?: rig.parts[part])
         drawCircle(
             // An energy pulse: white-hot at its core, burning out through the knot's colour.
             Brush.radialGradient(
@@ -294,9 +306,10 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         scratch: Matrix,
         i: Int,
         j: Int,
+        /** The sprite to draw at part [i]'s place; another rig's for an inherited limb. */
+        part: PuppetPart = rig.parts[i],
     ) = with(scope) {
         val w = pose.world
-        val part = rig.parts[i]
         val rect = part.rect ?: return@with
         val alpha = pose.alpha[i]
         if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) return@with
@@ -312,10 +325,18 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         v[Matrix.ScaleY] = w[o + 3]
         v[Matrix.TranslateX] = w[o + 4] + stepX * j
         v[Matrix.TranslateY] = w[o + 5] + stepY * j
+        // An inherited limb points the way this rig's own limb did: turn it from its own reach onto ours.
+        val turn = if (part === rig.parts[i]) {
+            0f
+        } else {
+            val theirs = atan2((1f - 2f * part.pivot.y) * part.drawnHeight, (1f - 2f * part.pivot.x) * part.drawnWidth)
+            (atan2(tipY[i], tipX[i]) - theirs) / DEG
+        }
         withTransform({
             translate(fit.offsetX, fit.offsetY)
             scale(fit.scale, fit.scale, pivot = Offset.Zero)
             transform(scratch)
+            if (turn != 0f) rotate(turn, pivot = Offset.Zero)
             translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
             scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
         }) {

@@ -116,8 +116,16 @@ internal data class Stable(
     fun add(breed: String, count: Int = 1): Stable = copy(owned = owned + (breed to ((owned[breed] ?: 0) + count)))
 }
 
-/** The rig a creature key is drawn with. A bred creature shows its body breed's rig. */
-internal fun Stable.rigOf(key: String): String = bred.firstOrNull { it.id == key }?.body ?: key
+/**
+ * The rig a creature key is drawn with. A bred creature is "body+tendrils+tail": its body breed's
+ * rig wearing its other parents' limbs (NodeMascotSurface).
+ */
+internal fun Stable.rigOf(key: String): String = bred.firstOrNull { it.id == key }
+    ?.let { "${it.body}+${it.tendrils}+${it.tail}" }
+    ?: key
+
+/** The breed whose body a creature key wears: its rarity and name come from it. */
+internal fun Stable.bodyOf(key: String): String = rigOf(key).substringBefore('+')
 
 /** 1, 1, 2, 3, 5, 8… */
 internal fun fibonacci(n: Int): Int {

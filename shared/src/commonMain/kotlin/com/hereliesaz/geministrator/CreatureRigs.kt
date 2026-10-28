@@ -320,8 +320,12 @@ internal fun RiggedCreatureSurface(
      * facing that way. Read in the draw scope.
      */
     reach: () -> List<TendrilReach> = { emptyList() },
+    /** A bred creature's limbs inherited from other parents: their tendrils, their tail. */
+    tendrilsFrom: LoadedCreatureRig? = null,
+    tailFrom: LoadedCreatureRig? = null,
 ) {
     val compiled = loaded.compiled
+    val donor = remember(compiled, tendrilsFrom, tailFrom) { inheritedLimbs(compiled, tendrilsFrom, tailFrom) }
     val buffer = remember(compiled) { compiled.newBuffer() }
     val matrix = remember { Matrix() }
     val stateIndex = remember(compiled, state) { compiled.stateIndex(state.name) }
@@ -336,13 +340,33 @@ internal fun RiggedCreatureSurface(
         } else {
             emptyList()
         }
-        compiled.draw(this, loaded.atlas, buffer, fit, matrix)
+        compiled.draw(this, loaded.atlas, buffer, fit, matrix, donor?.let { map -> { i -> map[i] } })
         targets.forEachIndexed { k, target ->
             val part = parts.getOrNull(k) ?: return@forEachIndexed
             val pulse = target.pulse ?: return@forEachIndexed
-            compiled.drawPulse(this, loaded.atlas, buffer, fit, matrix, part, pulse, target.pulseColor)
+            compiled.drawPulse(this, loaded.atlas, buffer, fit, matrix, part, pulse, target.pulseColor, donor?.get(part))
         }
     }
+}
+
+/**
+ * Which of [host]'s parts wear another rig's sprite: its tendrils from [tendrils], its tail from
+ * [tail], slot for slot (cycling when the donor has fewer). Null when nothing is inherited.
+ */
+internal fun inheritedLimbs(
+    host: CompiledPuppetRig,
+    tendrils: LoadedCreatureRig?,
+    tail: LoadedCreatureRig?,
+): Map<Int, Pair<androidx.compose.ui.graphics.ImageBitmap, com.hereliesaz.geministrator.puppet.PuppetPart>>? {
+    val map = HashMap<Int, Pair<androidx.compose.ui.graphics.ImageBitmap, com.hereliesaz.geministrator.puppet.PuppetPart>>()
+    fun take(slots: IntArray, donor: LoadedCreatureRig?, donorSlots: (CompiledPuppetRig) -> IntArray) {
+        val from = donor ?: return
+        val theirs = donorSlots(from.compiled).takeIf { it.isNotEmpty() } ?: return
+        slots.forEachIndexed { k, slot -> map[slot] = from.atlas to from.compiled.rig.parts[theirs[k % theirs.size]] }
+    }
+    take(host.tendrilParts, tendrils) { it.tendrilParts }
+    take(host.tailParts, tail) { it.tailParts }
+    return map.takeIf { it.isNotEmpty() }
 }
 
 /**

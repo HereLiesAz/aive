@@ -111,7 +111,7 @@ internal fun StableSection(modifier: Modifier = Modifier) {
                 StableTile(
                     rig = stable.rigOf(key),
                     title = creatureName(stable, catalog, key),
-                    caption = catalog[stable.rigOf(key)]?.rarity.orEmpty(),
+                    caption = catalog[stable.bodyOf(key)]?.rarity.orEmpty(),
                     count = if (key == stable.starter) stringResource(Res.string.stable_unlimited) else (stable.owned[key] ?: 1).toString(),
                 )
             }
@@ -195,5 +195,27 @@ internal fun CreaturePicker(role: RoleDefinitionId, modifier: Modifier = Modifie
                 )
             }
         }
+    }
+}
+
+/** A breed for sale (mockup B5): the creature, its name and rarity, and its price on the buy button. */
+@Composable
+internal fun BreedRow(rig: String, title: String, caption: String, price: String, onBuy: (() -> Unit)?) {
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
+            .background(androidx.compose.ui.graphics.Color(0xFF2A231E))
+            .padding(8.dp),
+    ) {
+        StableCreature(rig, 64)
+        Column(Modifier.weight(1f)) {
+            Text(title, style = AzphaltType.body, color = Azphalt.White)
+            Text(caption, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
+        }
+        // Without a way to pay on this platform, the price still shows; the button does nothing.
+        AzphaltPill(label = price, seed = "buy-$rig", onClick = { onBuy?.invoke() })
     }
 }

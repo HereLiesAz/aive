@@ -70,6 +70,8 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 fun App(
+    /** Buying breeds from the platform store; null where there is none (prices show, Buy doesn't). */
+    breedPurchases: BreedPurchases? = null,
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
@@ -185,7 +187,11 @@ fun App(
 
     // The keeper's stable (docs/Node-Creature-Genome.md, Breeds): which creature each agent wears.
     val stableHost = remember { StableHost() }
-    LaunchedEffect(stableHost) { stableHost.load() }
+    LaunchedEffect(stableHost, breedPurchases) {
+        stableHost.load()
+        // Breeds paid for while the app was closed join the stable now.
+        runCatching { breedPurchases?.unclaimed() }.getOrNull()?.forEach(stableHost::bought)
+    }
 
     // Breeding (docs/Swarm-OS.md step 6): when the live run clears, it hatches one config from the
     // agents that did its work, kept unadopted in the roster. The child's id is the run's, so a
@@ -445,6 +451,7 @@ fun App(
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalStableHost provides stableHost,
+            LocalBreedPurchases provides breedPurchases,
             LocalCreatureRig provides { label -> stableHost.rigFor(rolesByName[label]) },
         ) {
             Scaffold { paddingValues ->
