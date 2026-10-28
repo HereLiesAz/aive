@@ -13,12 +13,16 @@ import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 
 private val TissueCore = Color(0xFF2A231E)
 private val TissueEdge = Color(0xFF141110)
-private val Capillary = Color(0xFFC6392F)
 
-/** The tissue ground: dark, lit from the centre, with one capillary per provider in use. */
+/** The tissue ground: dark, lit from the centre, with each provider's blood supply (Vasculature.kt). */
 internal fun DrawScope.drawTissueGround(
     tissue: TissueScene,
-    toScreen: (H2g2TerrariumPosition) -> Offset,
+    zoom: Float = 1f,
+    creatureRadius: Float = 0f,
+    phase: Float = 0f,
+    /** Whether a creature is working now: its provider's blood flows. */
+    isFlowing: (String) -> Boolean = { false },
+    creatureCentre: (String) -> Offset? = { null },
 ) {
     drawRect(
         Brush.radialGradient(
@@ -27,11 +31,27 @@ internal fun DrawScope.drawTissueGround(
             radius = maxOf(size.width, size.height) * 0.75f,
         ),
     )
-    tissue.capillaries.forEach { capillary ->
-        val start = toScreen(capillary.start)
-        val end = toScreen(capillary.end)
-        drawLine(Capillary.copy(alpha = 0.35f), start, end, strokeWidth = 22.dp.toPx(), cap = StrokeCap.Round)
-        drawLine(Capillary.copy(alpha = 0.9f), start, end, strokeWidth = 6.dp.toPx(), cap = StrokeCap.Round)
+    // Each provider's vascular tree, from its edge of the field to the creatures it feeds.
+    val minWidth = 1.6.dp.toPx() * zoom
+    tissue.capillaries.forEachIndexed { index, capillary ->
+        val fed = tissue.providerOf.filterValues { it == capillary.providerId }.keys.sorted()
+        val centres = fed.mapNotNull(creatureCentre)
+        if (centres.isEmpty()) return@forEachIndexed
+        val towards = Offset(centres.map { it.x }.average().toFloat(), centres.map { it.y }.average().toFloat())
+        val seed = capillary.providerId.hashCode()
+        val entry = vesselEntry(index, towards, size.width, size.height)
+        val vessels = VesselCache.get(capillary.providerId, entry, centres, creatureRadius, size, zoom) {
+            grownVasculature(
+                entry = entry,
+                targets = centres.map { it to creatureRadius * 1.5f },
+                bounds = size,
+                step = 13.dp.toPx() * zoom,
+                minWidth = minWidth,
+                maxWidth = 8.dp.toPx() * zoom,
+                seed = seed,
+            )
+        }
+        drawVasculature(vessels, flowing = fed.any(isFlowing), phase = phase, cell = 2.dp.toPx() * zoom)
     }
 }
 
@@ -57,4 +77,35 @@ internal fun DrawScope.drawTissueEgg(
         topLeft = Offset(at.x - rx * 0.3f - hx, at.y - ry * 0.35f - hy),
         size = Size(hx * 2f, hy * 2f),
     )
+}
+
+/**
+ * Grown vasculature is costly, so each provider's is kept until its creatures, the field or the
+ * zoom change (rounded, so a still field never regrows).
+ */
+private object VesselCache {
+    private val cache = LinkedHashMap<String, List<Vessel>>()
+
+    fun get(
+        provider: String,
+        entry: Offset,
+        centres: List<Offset>,
+        radius: Float,
+        field: Size,
+        zoom: Float,
+        grow: () -> List<Vessel>,
+    ): List<Vessel> {
+        fun r(v: Float) = (v / 4f).toInt()
+        val key = buildString {
+            append(provider).append('|').append(r(entry.x)).append(',').append(r(entry.y))
+            centres.forEach { append('|').append(r(it.x)).append(',').append(r(it.y)) }
+            append('|').append(r(radius)).append('|').append(r(field.width)).append(',').append(r(field.height))
+            append('|').append((zoom * 20).toInt())
+        }
+        cache[key]?.let { return it }
+        val grown = grow()
+        cache[key] = grown
+        while (cache.size > 24) cache.remove(cache.keys.first())
+        return grown
+    }
 }

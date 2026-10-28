@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.use
@@ -175,7 +176,7 @@ class HiveScreenshotTest {
                 }
             }
         }
-        shoot("9-stable-pick", 900, 2600, dark(fresh) { StableSection() })
+        shoot("9-stable-pick", 900, 3000, dark(fresh) { StableSection() })
         val kept = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { host ->
             runBlocking { host.load() }
             host.chooseStarter(host.catalog.starters.first().id)
@@ -216,10 +217,48 @@ class HiveScreenshotTest {
                 HiveEdge(onLoadPackages = { emptyList() }, onBringIn = {}, shelfAtStart = EdgeShelf.Breeds)
             }
         })
+        // Close in on the vessels (zoom 250%), where the red cells show.
+        shoot("15-vessels-close", 900, 1400) {
+            val scene = TissueScene(
+                capillaries = listOf(TissueCapillary("claude", com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition(0f, 0f), com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition(1f, 1f))),
+                providerOf = mapOf("a" to "claude", "b" to "claude"),
+                egg = null,
+            )
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val centres = mapOf("a" to Offset(size.width * 0.38f, size.height * 0.42f), "b" to Offset(size.width * 0.66f, size.height * 0.7f))
+                drawTissueGround(scene, zoom = 2.5f, creatureRadius = 100f, phase = 0.3f, isFlowing = { true }) { centres[it] }
+                centres.values.forEach { drawCircle(androidx.compose.ui.graphics.Color(0x33FFFFFF), 100f, it) }
+            }
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {
                     creatureNeeds(TaskDefinitionId("build"), definition, liveRun, roles)?.let { CreatureNeedsPanel(it) }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun shootsTheEntireCard() {
+        fun entire(status: EntireStatus) = object : EntireIntegration {
+            override suspend fun status() = status
+            override suspend fun logIn(): String? = null
+            override fun setRecordRuns(record: Boolean) = Unit
+            override suspend fun clone(reference: String): String? = null
+        }
+        listOf(
+            "17-entire-not-installed" to EntireStatus(),
+            "18-entire-signed-out" to EntireStatus(version = "Entire CLI 0.9.2"),
+            "19-entire-signed-in" to EntireStatus(version = "Entire CLI 0.9.2", account = "HereLiesAz", recordRuns = true),
+        ).forEach { (name, status) ->
+            shoot(name, 900, 3600) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalEntire provides entire(status)) {
+                    RepositoryServiceScreen(
+                        connectedServiceIds = setOf(RepositoryServiceCatalog.GITHUB_ID),
+                        onConfigureService = {},
+                        onDisconnectService = {},
+                    )
                 }
             }
         }

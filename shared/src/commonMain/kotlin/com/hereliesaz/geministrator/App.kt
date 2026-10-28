@@ -72,6 +72,8 @@ import org.jetbrains.compose.resources.getString
 fun App(
     /** Buying breeds from the platform store; null where there is none (prices show, Buy doesn't). */
     breedPurchases: BreedPurchases? = null,
+    /** Entire on the desktop (docs/Entire.md); null elsewhere. */
+    entire: EntireIntegration? = null,
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
@@ -452,6 +454,7 @@ fun App(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
+            LocalEntire provides entire,
             LocalCreatureRig provides { label -> stableHost.rigFor(rolesByName[label]) },
         ) {
             Scaffold { paddingValues ->

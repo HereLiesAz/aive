@@ -38,6 +38,27 @@ import com.hereliesaz.geministrator.resources.repositories_reconfigure
 import com.hereliesaz.geministrator.resources.repositories_repository_service
 import com.hereliesaz.geministrator.resources.repositories_repository_services
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.hereliesaz.geministrator.resources.repositories_entire
+import com.hereliesaz.geministrator.resources.repositories_entire_checking
+import com.hereliesaz.geministrator.resources.repositories_entire_clone
+import com.hereliesaz.geministrator.resources.repositories_entire_cloned_to
+import com.hereliesaz.geministrator.resources.repositories_entire_cloning
+import com.hereliesaz.geministrator.resources.repositories_entire_install
+import com.hereliesaz.geministrator.resources.repositories_entire_keeps_every_agent_session
+import com.hereliesaz.geministrator.resources.repositories_entire_log_in
+import com.hereliesaz.geministrator.resources.repositories_entire_logging_in
+import com.hereliesaz.geministrator.resources.repositories_entire_not_installed
+import com.hereliesaz.geministrator.resources.repositories_entire_not_installed_cap
+import com.hereliesaz.geministrator.resources.repositories_entire_not_signed_in
+import com.hereliesaz.geministrator.resources.repositories_entire_off
+import com.hereliesaz.geministrator.resources.repositories_entire_on
+import com.hereliesaz.geministrator.resources.repositories_entire_record_runs
+import com.hereliesaz.geministrator.resources.repositories_entire_reference_hint
+import com.hereliesaz.geministrator.resources.repositories_entire_repository
+import com.hereliesaz.geministrator.resources.repositories_entire_signed_in_as
 
 @Composable
 internal fun RepositoryServiceScreen(
@@ -122,6 +143,8 @@ internal fun RepositoryServiceScreen(
             )
         }
 
+        LocalEntire.current?.let { entire -> EntireRecord(entire) }
+
         AzphaltRecord(
             seed = "repository-service-local-git",
             eyebrow = stringResource(Res.string.repositories_desktop_repository_service),
@@ -130,4 +153,119 @@ internal fun RepositoryServiceScreen(
             endCap = stringResource(Res.string.repositories_no_token),
         )
     }
+}
+
+/**
+ * Entire as a repository host (docs/Entire.md): whether its command is installed, who is signed
+ * in, whether runs are recorded as checkpoints, and cloning an Entire repository.
+ */
+@Composable
+private fun EntireRecord(entire: EntireIntegration) {
+    val uriHandler = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<EntireStatus?>(null) }
+    var busy by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var reference by remember { mutableStateOf("") }
+    LaunchedEffect(entire) { status = runCatching { entire.status() }.getOrDefault(EntireStatus()) }
+    val current = status
+    val loggingIn = stringResource(Res.string.repositories_entire_logging_in)
+    val cloning = stringResource(Res.string.repositories_entire_cloning)
+    var cloned by remember { mutableStateOf<String?>(null) }
+
+    AzphaltRecord(
+        seed = "repository-service-entire",
+        eyebrow = stringResource(Res.string.repositories_repository_service),
+        title = stringResource(Res.string.repositories_entire),
+        body = buildString {
+            append(stringResource(Res.string.repositories_entire_keeps_every_agent_session))
+            append("\n")
+            append(
+                when {
+                    current == null -> stringResource(Res.string.repositories_entire_checking)
+                    !current.installed -> stringResource(Res.string.repositories_entire_not_installed)
+                    current.account != null -> stringResource(Res.string.repositories_entire_signed_in_as, current.account)
+                    else -> stringResource(Res.string.repositories_entire_not_signed_in)
+                },
+            )
+            cloned?.let { append("\n").append(stringResource(Res.string.repositories_entire_cloned_to, it)) }
+            (busy ?: note)?.let { append("\n").append(it) }
+        },
+        endCap = when {
+            current == null -> null
+            !current.installed -> stringResource(Res.string.repositories_entire_not_installed_cap)
+            current.account != null -> stringResource(Res.string.common_connected)
+            else -> stringResource(Res.string.repositories_not_configured)
+        },
+        selected = current?.account != null,
+        well = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (current != null && !current.installed) {
+                    AzphaltPill(
+                        label = stringResource(Res.string.repositories_entire_install),
+                        seed = "repository-service-entire-install",
+                        onClick = { uriHandler.openUri(ENTIRE_INSTALL_URL) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (current?.installed == true) {
+                    if (current.account == null) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.repositories_entire_log_in),
+                            seed = "repository-service-entire-login",
+                            onClick = {
+                                if (busy != null) return@AzphaltPill
+                                busy = loggingIn
+                                scope.launch {
+                                    note = entire.logIn()
+                                    status = runCatching { entire.status() }.getOrDefault(current)
+                                    busy = null
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    AzphaltPill(
+                        label = stringResource(Res.string.repositories_entire_record_runs),
+                        seed = "repository-service-entire-record",
+                        selected = current.recordRuns,
+                        stateDescription = stringResource(if (current.recordRuns) Res.string.repositories_entire_on else Res.string.repositories_entire_off),
+                        role = androidx.compose.ui.semantics.Role.Switch,
+                        onClick = {
+                            entire.setRecordRuns(!current.recordRuns)
+                            status = current.copy(recordRuns = !current.recordRuns)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (current.account != null) {
+                        AzphaltTextField(
+                            value = reference,
+                            onValueChange = { reference = it },
+                            label = stringResource(Res.string.repositories_entire_repository),
+                            placeholder = stringResource(Res.string.repositories_entire_reference_hint),
+                            errorMessage = stringResource(Res.string.repositories_entire_reference_hint)
+                                .takeIf { reference.isNotBlank() && !isEntireRepositoryReference(reference) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        AzphaltPill(
+                            label = stringResource(Res.string.repositories_entire_clone),
+                            seed = "repository-service-entire-clone",
+                            onClick = {
+                                if (busy != null || !isEntireRepositoryReference(reference)) return@AzphaltPill
+                                busy = cloning
+                                note = null
+                                scope.launch {
+                                    runCatching { entire.clone(reference) }
+                                        .onSuccess { path -> if (path != null) cloned = path }
+                                        .onFailure { note = it.message }
+                                    busy = null
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            }
+        },
+    )
 }

@@ -119,6 +119,8 @@ fun main() {
         scope = memoryScope,
         localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
     ).also { it.attach() }
+    val entireRecorder = EntireRecorder()
+    val desktopEntire = DesktopEntire()
 
     try {
         application {
@@ -135,7 +137,7 @@ fun main() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 val providers = remember(credentials, repositoryCredentials) {
-                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient)
+                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder)
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -343,6 +345,7 @@ fun main() {
                         onCancel = { configuringProviderId = null },
                     )
                     else -> App(
+                        entire = desktopEntire,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -433,6 +436,7 @@ internal fun configuredDesktopProviders(
     credentials: Map<String, String>,
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
+    entireRecorder: EntireRecorder? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
@@ -454,6 +458,7 @@ internal fun configuredDesktopProviders(
                 id = AgentProviderId("openai-local-workspace"),
                 displayName = "OpenAI / Local Workspace",
                 api = OpenAiResponsesApi(keyProvider),
+                entire = entireRecorder,
             ),
         )
         addGitLabWorkspaceProvider(
@@ -472,6 +477,7 @@ internal fun configuredDesktopProviders(
                 id = AgentProviderId("anthropic-local-workspace"),
                 displayName = "Claude / Local Workspace",
                 api = AnthropicMessagesApi(keyProvider),
+                entire = entireRecorder,
             ),
         )
         addGitLabWorkspaceProvider(
@@ -490,6 +496,7 @@ internal fun configuredDesktopProviders(
                 id = AgentProviderId("gemini-local-workspace"),
                 displayName = "Gemini / Local Workspace",
                 api = GeminiGenerateContentApi(keyProvider),
+                entire = entireRecorder,
             ),
         )
         addGitLabWorkspaceProvider(
@@ -508,6 +515,7 @@ internal fun configuredDesktopProviders(
                 id = AgentProviderId("xai-local-workspace"),
                 displayName = "Grok / Local Workspace",
                 api = XaiResponsesApi(keyProvider),
+                entire = entireRecorder,
             ),
         )
         addGitLabWorkspaceProvider(
