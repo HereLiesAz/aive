@@ -182,6 +182,8 @@
     <string name="hive_edge">At the edge of the hive</string>
     <string name="hive_edge_drifters">Drifters</string>
     <string name="hive_edge_hives">Hives</string>
+    <string name="hive_edge_breeds">Breeds</string>
+    <string name="hive_edge_only_here">%1$s · only here</string>
     <string name="hive_edge_bring_in">Bring in</string>
     <string name="stable_choose">Your first creature</string>
     <string name="stable_choose_hint">Pick one. It is yours without limit. Every other breed you hatch or buy, one at a time.</string>

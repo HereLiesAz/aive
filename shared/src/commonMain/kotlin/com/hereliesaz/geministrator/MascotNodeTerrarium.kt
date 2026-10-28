@@ -247,8 +247,10 @@ private fun MascotNodeTerrarium(
         // Connections start and end at the creatures' `arm-socket` attachments. Each node's pose is
         // evaluated once per frame into a reused buffer; nodes whose rig has not loaded (or has no
         // socket facing the partner) use the silhouette-edge anchor below.
-        val rigSlugs = remember(subjects) {
-            subjects.associate { it.node.id to CreatureRigMapping.slugFor(it.node.label) }
+        // The body each agent wears: the keeper's creature when there is a stable, else its role's.
+        val keptRig = LocalCreatureRig.current
+        val rigSlugs = subjects.associate { subject ->
+            subject.node.id to (keptRig(subject.node.label)?.substringBefore('+') ?: CreatureRigMapping.slugFor(subject.node.label))
         }
         LaunchedEffect(rigSlugs) {
             rigSlugs.values.toSet().forEach { slug -> launch { CreatureRigCache.get(slug) } }

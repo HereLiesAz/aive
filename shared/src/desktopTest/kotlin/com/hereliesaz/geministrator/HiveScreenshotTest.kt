@@ -193,6 +193,29 @@ class HiveScreenshotTest {
                 GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
             }
         }
+        // A bred child: one parent's body wearing the other's tendrils and a third's tail.
+        shoot("13-bred", 900, 520) {
+            androidx.compose.foundation.layout.Row(
+                Modifier.background(androidx.compose.ui.graphics.Color(0xFF1E1A17)).padding(16.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+            ) {
+                StableCreature("feedback-listener", 90)
+                StableCreature("threat-modeler", 90)
+                StableCreature("support-agent", 90)
+                StableCreature("feedback-listener+threat-modeler+support-agent", 160)
+            }
+        }
+        // Breeds in the Store (mockup B5): name, rarity, price; nothing else.
+        val shop = object : BreedPurchases {
+            override suspend fun prices(breedIds: List<String>) = breedIds.associateWith { "$1.99" }
+            override suspend fun buy(breedId: String) = false
+            override suspend fun unclaimed() = emptyList<String>()
+        }
+        shoot("14-breeds-store", 900, 1500, dark(kept) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalBreedPurchases provides shop) {
+                HiveEdge(onLoadPackages = { emptyList() }, onBringIn = {}, shelfAtStart = EdgeShelf.Breeds)
+            }
+        })
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {
