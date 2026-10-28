@@ -183,12 +183,18 @@ fun App(
         }
     }
 
+    // The keeper's stable (docs/Node-Creature-Genome.md, Breeds): which creature each agent wears.
+    val stableHost = remember { StableHost() }
+    LaunchedEffect(stableHost) { stableHost.load() }
+
     // Breeding (docs/Swarm-OS.md step 6): when the live run clears, it hatches one config from the
     // agents that did its work, kept unadopted in the roster. The child's id is the run's, so a
     // run hatches once however often this effect runs.
     val liveRun = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     LaunchedEffect(liveRun?.run?.id, liveRun?.run?.status) {
         val presentation = liveRun ?: return@LaunchedEffect
+        // Each cleared run counts toward the stable's next generation (counted once per run).
+        stableHost.runCleared(presentation.run)
         val child = hatchFromRun(presentation.run, presentation.roles) ?: return@LaunchedEffect
         val target = runtime ?: return@LaunchedEffect
         try {
@@ -435,7 +441,12 @@ fun App(
             },
         )
 
-        CompositionLocalProvider(LocalWorkflowLibraryHost provides workflowLibraryHost) {
+        val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
+        CompositionLocalProvider(
+            LocalWorkflowLibraryHost provides workflowLibraryHost,
+            LocalStableHost provides stableHost,
+            LocalCreatureRig provides { label -> stableHost.rigFor(rolesByName[label]) },
+        ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {

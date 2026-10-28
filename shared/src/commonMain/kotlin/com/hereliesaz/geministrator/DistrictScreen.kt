@@ -133,6 +133,7 @@ internal fun DistrictScreen(
                         }
                     }
                 }
+            StableSection()
             edge()
             Lineage(roles, onAdopt)
         }

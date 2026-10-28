@@ -166,6 +166,33 @@ class HiveScreenshotTest {
                 AzphaltPill(label = "More editing", seed = "hive-more-editing", onClick = {})
             }
         }
+        // The stable (mockups B1-B4), on the whole hive's dark tissue.
+        val fresh = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { runBlocking { it.load() } }
+        fun dark(host: StableHost, content: @androidx.compose.runtime.Composable () -> Unit) = @androidx.compose.runtime.Composable {
+            androidx.compose.runtime.CompositionLocalProvider(LocalStableHost provides host) {
+                Box(Modifier.background(androidx.compose.ui.graphics.Color(0xFF1E1A17)).padding(16.dp)) {
+                    AzphaltThemedSurface(Azphalt.Ink) { content() }
+                }
+            }
+        }
+        shoot("9-stable-pick", 900, 2600, dark(fresh) { StableSection() })
+        val kept = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { host ->
+            runBlocking { host.load() }
+            host.chooseStarter(host.catalog.starters.first().id)
+            host.catalog.breeds.filter { it.sold && !it.starter }.take(2).forEach { host.bought(it.id) }
+            host.assign(engineer.id, host.stable.keys[1])
+            host.runCleared(liveRun.copy(id = WorkflowRunId("hatch-shot"), status = WorkflowRunStatus.Completed, taskRuns = liveRun.taskRuns.mapValues { (_, r) -> r.copy(status = TaskRunStatus.Completed) }))
+        }
+        shoot("10-stable", 900, 2200, dark(kept) { StableSection() })
+        shoot("11-creature-picker", 900, 700, dark(kept) { CreaturePicker(engineer.id) })
+        shoot("12-hive-with-stable", 900, 1400) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                LocalStableHost provides kept,
+                LocalCreatureRig provides { label -> kept.rigFor(roles.firstOrNull { it.name == label }?.id) },
+            ) {
+                GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+            }
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {

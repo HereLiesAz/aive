@@ -31,7 +31,10 @@ internal fun NodeMascotSurface(
     /** Where its tendrils reach, in this box's px (RiggedCreatureSurface). */
     reach: () -> List<TendrilReach> = { emptyList() },
 ) {
-    val slug = remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }
+    // The keeper's creature for this agent (docs/Node-Creature-Genome.md, Breeds); the role only
+    // decides the look before a stable exists.
+    val kept = LocalCreatureRig.current(roleLabel)
+    val slug = kept ?: remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }
     val rig = rememberCreatureRig(slug)
     if (rig != null) {
         RiggedCreatureSurface(
