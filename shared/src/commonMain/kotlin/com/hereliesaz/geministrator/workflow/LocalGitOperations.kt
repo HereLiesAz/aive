@@ -72,9 +72,26 @@ sealed interface LocalGitOperation {
         override val label = "Export ${branch ?: "current branch"} to the picked folder"
     }
 
+    /**
+     * Desktop only: publishes the current branch to Entire and opens a Trail for it titled [title]
+     * (`entire trail create`), so it can be reviewed there (docs/Entire.md).
+     */
+    data class EntireTrail(val title: String) : LocalGitOperation {
+        override val label = "Open Entire trail \"$title\""
+    }
+
+    /**
+     * Desktop only: mirrors [reference] (`/gh/<owner>/<repo>` or `/et/<project>/<repo>`) onto
+     * Entire (`entire repo mirror add`), returning once the mirror is registered.
+     */
+    data class EntireMirror(val reference: String) : LocalGitOperation {
+        override val label = "Mirror $reference on Entire"
+    }
+
     companion object {
         const val SUPPORTED = "status, fetch, pull, add-all, push, checkout:<ref>, create-branch:<branch>, " +
-            "worktree-branch:<branch>[@<base>], commit:<message>, push-set-upstream:<branch>, export[:<branch>]"
+            "worktree-branch:<branch>[@<base>], commit:<message>, push-set-upstream:<branch>, export[:<branch>], " +
+            "entire-trail:<title>, entire-mirror:</gh|et/owner/repo>"
 
         fun parse(raw: String): LocalGitOperation {
             val operation = raw.trim()
@@ -97,6 +114,20 @@ sealed interface LocalGitOperation {
                 operation.startsWith("commit:") -> Commit(
                     operation.substringAfter(':').trim().also {
                         require(it.isNotEmpty()) { "Commit message is required" }
+                    },
+                )
+                operation.startsWith("entire-trail:") -> EntireTrail(
+                    operation.substringAfter(':').trim().also {
+                        require(it.isNotEmpty() && it.length <= 200 && '\n' !in it) {
+                            "Entire trail title must be one line of at most 200 characters"
+                        }
+                    },
+                )
+                operation.startsWith("entire-mirror:") -> EntireMirror(
+                    operation.substringAfter(':').trim().also {
+                        require(com.hereliesaz.geministrator.isEntireRepositoryReference(it)) {
+                            "Entire mirror needs /gh/<owner>/<repo> or /et/<project>/<repo>"
+                        }
                     },
                 )
                 operation.startsWith("push-set-upstream:") ->

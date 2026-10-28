@@ -238,4 +238,29 @@ class HiveScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun shootsTheEntireCard() {
+        fun entire(status: EntireStatus) = object : EntireIntegration {
+            override suspend fun status() = status
+            override suspend fun logIn(): String? = null
+            override fun setRecordRuns(record: Boolean) = Unit
+            override suspend fun clone(reference: String): String? = null
+        }
+        listOf(
+            "17-entire-not-installed" to EntireStatus(),
+            "18-entire-signed-out" to EntireStatus(version = "Entire CLI 0.9.2"),
+            "19-entire-signed-in" to EntireStatus(version = "Entire CLI 0.9.2", account = "HereLiesAz", recordRuns = true),
+        ).forEach { (name, status) ->
+            shoot(name, 900, 3600) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalEntire provides entire(status)) {
+                    RepositoryServiceScreen(
+                        connectedServiceIds = setOf(RepositoryServiceCatalog.GITHUB_ID),
+                        onConfigureService = {},
+                        onDisconnectService = {},
+                    )
+                }
+            }
+        }
+    }
 }

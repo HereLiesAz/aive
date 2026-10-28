@@ -107,6 +107,8 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`Local-Git-Repository-Operations.md`](Local-Git-Repository-Operations.md) defines the Desktop-only Local Git operation strings, their fixed process arguments, and the `CommandOutput` artifacts they emit.
 
+[`Entire.md`](Entire.md) describes Desktop's Entire support: Local Git runs recorded as Entire checkpoints through the `entire-agent-aive` plugin, recent checkpoints as drifter context, and Entire sign-in, cloning, Trails and mirrors.
+
 [`REPOSITORY_AND_COMPANY_CUSTOMIZATION.md`](REPOSITORY_AND_COMPANY_CUSTOMIZATION.md) describes connected-repository search on the run setup screen and custom swarm roster management.
 
 ### Memory and orchestration model training

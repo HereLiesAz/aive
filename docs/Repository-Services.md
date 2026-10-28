@@ -43,6 +43,10 @@ Only GitLab.com is supported (`https://gitlab.com/api/v4`); repository operation
 
 On Desktop, The Aive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `haive/...` branches.
 
+### Entire
+
+On Desktop, with the `entire` command installed, The Aive signs in to Entire, clones Entire repositories, opens Trails and mirrors repositories, records Local Git runs as Entire checkpoints, and gives drifters a repository's recent checkpoints as context. See `Entire.md`.
+
 ## Orchestration artifacts
 
 Repository operations emit normal workflow artifacts. The run overview consumes their metadata to show, when available:

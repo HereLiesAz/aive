@@ -50,6 +50,8 @@ internal class LocalWorkspaceAgentProvider(
     override val id: AgentProviderId,
     private val displayName: String,
     private val api: TextGenerationApi,
+    /** Entire: checkpoints read as context, and each run recorded as one (docs/Entire.md). */
+    private val entire: EntireRecorder? = null,
 ) : AgentProvider {
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
     private enum class TaskMode { Specification, Mutate }
@@ -430,6 +432,15 @@ internal class LocalWorkspaceAgentProvider(
             val selectedFiles = selectFiles(plan, trackedFiles, request)
             val snapshot = buildSnapshot(workspace, selectedFiles)
             require(snapshot.isNotBlank()) { "No readable tracked source files were selected for the workspace task" }
+            val recording = entire?.recordingCli()
+            val sessionId = "aive-${safeSegment(request.taskRunId.value)}-${UUID.randomUUID().toString().take(8)}"
+            if (recording != null) {
+                runCatching {
+                    entire?.sessions?.begin(sessionId, root.absolutePath, displayName)
+                    entire?.sessions?.prompt(sessionId, request.objective.trim())
+                    entire?.sessions?.response(sessionId, plan.text)
+                }
+            }
             val generated = generation.run(patchPrompt(request, plan, trackedFiles, snapshot), onThinking)
             val patch = extractUnifiedDiff(generated.text)
             require(patch.isNotBlank()) { "$displayName did not return a unified Git diff" }
@@ -462,6 +473,9 @@ internal class LocalWorkspaceAgentProvider(
             } finally {
                 withContext(Dispatchers.IO) { runCatching { hooksDir.deleteRecursively() } }
             }
+            val checkpoint = recording?.let { cli ->
+                recordCheckpoint(cli, root, workspace, baseCommit, sessionId, generated)
+            }
             val headCommit = git(workspace, "rev-parse", "HEAD").requireSuccess("read workspace commit").output.trim()
             val committedPatch = git(workspace, "show", "--format=", "--binary", headCommit)
                 .requireSuccess("capture committed patch")
@@ -485,6 +499,22 @@ internal class LocalWorkspaceAgentProvider(
                         ),
                     ),
                 )
+                checkpoint?.let { result ->
+                    add(
+                        ProviderArtifact(
+                            kind = ArtifactKind.CommandOutput,
+                            label = if (result.ok) "Entire checkpoint" else "Entire checkpoint not recorded",
+                            textContent = result.message.take(4_000).ifBlank { "entire session attach exited ${result.exitCode}" },
+                            mediaType = "text/plain",
+                            metadata = mapOf(
+                                "branch" to branch,
+                                "headCommit" to headCommit,
+                                "entireSession" to sessionId,
+                                "exitCode" to result.exitCode.toString(),
+                            ),
+                        ),
+                    )
+                }
                 add(
                     ProviderArtifact(
                         kind = ArtifactKind.CommandOutput,
@@ -520,12 +550,47 @@ internal class LocalWorkspaceAgentProvider(
         }
     }
 
+    /**
+     * Finishes the run's Entire transcript and attaches it to the commit just made, which gains an
+     * `Entire-Checkpoint` trailer. Null when Entire isn't set up in [root].
+     */
+    private suspend fun recordCheckpoint(
+        cli: EntireCli,
+        root: File,
+        workspace: File,
+        baseCommit: String,
+        sessionId: String,
+        generated: TextGenerationResult,
+    ): EntireCli.Result? {
+        val recorder = entire ?: return null
+        return try {
+            val changes = git(workspace, "diff", "--name-status", "--no-renames", baseCommit, "HEAD").output
+                .lineSequence()
+                .mapNotNull { line -> line.split('\t').takeIf { it.size >= 2 }?.let { it[0].take(1) to it[1] } }
+                .toList()
+            recorder.sessions.response(sessionId, generated.text)
+            recorder.sessions.files(
+                sessionId,
+                modified = changes.filter { it.first == "M" }.map { it.second },
+                new = changes.filter { it.first == "A" }.map { it.second },
+                deleted = changes.filter { it.first == "D" }.map { it.second },
+            )
+            recorder.sessions.usage(sessionId, generated.inputTokens, generated.outputTokens)
+            recorder.attach(cli, root, workspace, sessionId)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Throwable) {
+            EntireCli.Result(-1, "", failure.message ?: "Entire checkpoint failed")
+        }
+    }
+
     private suspend fun generatePlan(
         request: AgentTaskRequest,
         root: File,
         trackedFiles: List<String>,
     ): Pair<WorkspacePlan, TextGenerationResult> {
-        val result = api.generate(planPrompt(request, root, trackedFiles))
+        val history = runCatching { entire?.checkpointContext(root) }.getOrNull()
+        val result = api.generate(planPrompt(request, root, trackedFiles, history))
         val fullText = result.text.trim()
         val approvedText = fullText.take(8_000)
         return WorkspacePlan(
@@ -534,7 +599,12 @@ internal class LocalWorkspaceAgentProvider(
         ) to result
     }
 
-    private fun planPrompt(request: AgentTaskRequest, root: File, trackedFiles: List<String>): String = buildString {
+    private fun planPrompt(
+        request: AgentTaskRequest,
+        root: File,
+        trackedFiles: List<String>,
+        checkpointHistory: String? = null,
+    ): String = buildString {
         appendLine("You are planning a real code change in a Local Git repository. Do not invent files or claim changes yet.")
         appendLine("Repository root: ${root.name}")
         appendLine("Task: ${request.objective.trim()}")
@@ -542,6 +612,11 @@ internal class LocalWorkspaceAgentProvider(
         if (request.acceptanceCriteria.isNotEmpty()) {
             appendLine("Acceptance criteria:")
             request.acceptanceCriteria.forEach { appendLine("- ${it.description.trim()}") }
+        }
+        if (!checkpointHistory.isNullOrBlank()) {
+            appendLine()
+            appendLine("Recent Entire checkpoints on this branch (earlier agent sessions, newest first):")
+            appendLine(checkpointHistory.take(MAX_CONTEXT_ARTIFACT_CHARS / 4))
         }
         appendLine()
         appendLine("Tracked files:")

@@ -20,7 +20,9 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
+internal class LocalGitRepositoryOperationClient(
+    private val locateEntire: () -> EntireCli? = EntireCli::locate,
+) : RepositoryOperationClient {
     private val runs = ConcurrentHashMap<String, ExternalExecutionRun>()
 
     override fun supports(project: Project): Boolean =
@@ -63,11 +65,21 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
         }
 
         writeStartedMarker(marker, operation, parsed.label)
+        val entire = if (parsed is LocalGitOperation.EntireTrail || parsed is LocalGitOperation.EntireMirror) locateEntire() else null
         val command = when (parsed) {
             is LocalGitOperation.Checkout -> checkoutCommand(root, parsed.ref)
+            is LocalGitOperation.EntireTrail ->
+                entire?.let { listOf(it.binary.absolutePath, "trail", "create", "--title", parsed.title) }
+            is LocalGitOperation.EntireMirror ->
+                entire?.let { listOf(it.binary.absolutePath, "repo", "mirror", "add", parsed.reference, "--no-wait") }
             else -> parsed.command(root)
         }
-        val result = runGit(command)
+        val result = if (command == null) {
+            GitCommandResult(-1, "The entire command is not installed. See $ENTIRE_INSTALL_URL")
+        } else {
+            // Entire works on the repository it runs in.
+            runGit(command, directory = root)
+        }
         // A worktree branch reports the new worktree's state; the user's checkout is untouched.
         val worktree = (parsed as? LocalGitOperation.WorktreeBranch)?.worktreeDirectory(root.path)?.let(::File)
         val snapshot = inspect(worktree ?: root)
@@ -86,7 +98,7 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
             metadata = buildMap {
                 put("repositorySource", RepositorySource.Local.name)
                 put("operation", operation)
-                put("command", command.joinToString(" "))
+                put("command", command?.joinToString(" ").orEmpty())
                 put("exitCode", result.exitCode.toString())
                 worktree?.let { put("worktreePath", it.absolutePath) }
                 snapshot.branch?.let { put("branch", it) }
@@ -201,9 +213,10 @@ internal class LocalGitRepositoryOperationClient : RepositoryOperationClient {
         }
     }
 
-    private suspend fun runGit(command: List<String>): GitCommandResult = withContext(Dispatchers.IO) {
+    private suspend fun runGit(command: List<String>, directory: File? = null): GitCommandResult = withContext(Dispatchers.IO) {
         try {
             val builder = ProcessBuilder(command).redirectErrorStream(true)
+            directory?.let(builder::directory)
             sanitizeGitEnvironment(builder)
             val process = builder.start()
             runCatching { process.outputStream.close() }
@@ -380,5 +393,6 @@ private fun LocalGitOperation.command(root: File): List<String> {
         is LocalGitOperation.Commit -> git + listOf("commit", "-m", message)
         is LocalGitOperation.PushSetUpstream -> git + listOf("push", "--set-upstream", "origin", branch)
         is LocalGitOperation.Export -> error("Export applies to imported repositories (Android) only")
+        is LocalGitOperation.EntireTrail, is LocalGitOperation.EntireMirror -> error("Entire operations run the entire command")
     }
 }

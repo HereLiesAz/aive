@@ -135,6 +135,8 @@ internal class AndroidLocalGitRepositoryOperationClient(
                     .setCommitter(AndroidLocalRepositoryStore.IDENTITY)
                     .call()
                     .let { "Committed ${it.name.take(12)}: ${operation.message}" }
+                is LocalGitOperation.EntireTrail, is LocalGitOperation.EntireMirror ->
+                    error("${operation.label} runs through the entire command, which only the desktop app has.")
                 is LocalGitOperation.Export -> error("unreachable")
             }
         }

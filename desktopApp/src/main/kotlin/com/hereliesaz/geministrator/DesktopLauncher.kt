@@ -9,8 +9,14 @@ import javax.swing.JWindow
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 
-/** Desktop bootstrap that shows the static logo until the app's first window appears. */
-fun main() {
+/**
+ * Desktop bootstrap that shows the static logo until the app's first window appears. Started as
+ * `entire-agent <subcommand>`, it is Entire's `entire-agent-aive` plugin instead, with no window.
+ */
+fun main(args: Array<String>) {
+    if (args.firstOrNull() == ENTIRE_AGENT_ARGUMENT) {
+        kotlin.system.exitProcess(runEntireAgentPlugin(args.drop(1)))
+    }
     val splash = createDesktopSplash()
     val icon = loadImage("haive-icon-color.png")
     val windowWatcher = Timer(40, null)
