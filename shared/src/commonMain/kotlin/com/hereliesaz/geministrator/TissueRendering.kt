@@ -32,7 +32,7 @@ internal fun DrawScope.drawTissueGround(
         ),
     )
     // Each provider's vascular tree, from its edge of the field to the creatures it feeds.
-    val minWidth = 0.9.dp.toPx() * zoom
+    val minWidth = 1.6.dp.toPx() * zoom
     tissue.capillaries.forEachIndexed { index, capillary ->
         val fed = tissue.providerOf.filterValues { it == capillary.providerId }.keys.sorted()
         val centres = fed.mapNotNull(creatureCentre)
@@ -43,15 +43,15 @@ internal fun DrawScope.drawTissueGround(
         val vessels = VesselCache.get(capillary.providerId, entry, centres, creatureRadius, size, zoom) {
             grownVasculature(
                 entry = entry,
-                targets = centres.map { it to creatureRadius },
+                targets = centres.map { it to creatureRadius * 1.5f },
                 bounds = size,
-                step = 7.dp.toPx() * zoom,
+                step = 13.dp.toPx() * zoom,
                 minWidth = minWidth,
-                maxWidth = 4.dp.toPx() * zoom,
+                maxWidth = 8.dp.toPx() * zoom,
                 seed = seed,
             )
         }
-        drawVasculature(vessels, flowing = fed.any(isFlowing), phase = phase, cell = 1.1.dp.toPx() * zoom)
+        drawVasculature(vessels, flowing = fed.any(isFlowing), phase = phase, cell = 2.dp.toPx() * zoom)
     }
 }
 
