@@ -66,7 +66,7 @@ class PlayBreedPurchases(private val activity: Activity) : BreedPurchases {
                     },
                 )
                 .build(),
-        ).productDetailsList
+        ).productDetailsList.orEmpty()
     }
 
     override suspend fun prices(breedIds: List<String>): Map<String, String> = details(breedIds).mapNotNull { product ->
