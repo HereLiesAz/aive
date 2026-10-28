@@ -1,0 +1,781 @@
+{
+ "breeds": [
+  {
+   "id": "architect",
+   "name": "Caerulea 005",
+   "genus": "Caerulea",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "compliance-officer"
+   ]
+  },
+  {
+   "id": "feedback-listener",
+   "name": "Caerulea 033",
+   "genus": "Caerulea",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "migration-engineer",
+    "monitoring-sentinel",
+    "compliance-officer"
+   ]
+  },
+  {
+   "id": "monitoring-sentinel",
+   "name": "Caerulea 049",
+   "genus": "Caerulea",
+   "rarity": "Rare",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "feedback-listener",
+    "migration-engineer",
+    "compliance-officer"
+   ]
+  },
+  {
+   "id": "compliance-officer",
+   "name": "Caerulea 063",
+   "genus": "Caerulea",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "migration-engineer",
+    "ml-engineer",
+    "feedback-listener"
+   ]
+  },
+  {
+   "id": "migration-engineer",
+   "name": "Caerulea 064",
+   "genus": "Caerulea",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "feedback-listener",
+    "compliance-officer",
+    "monitoring-sentinel"
+   ]
+  },
+  {
+   "id": "ml-engineer",
+   "name": "Caerulea 070",
+   "genus": "Caerulea",
+   "rarity": "Rare",
+   "source": "both",
+   "lottery": "rare",
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "compliance-officer"
+   ]
+  },
+  {
+   "id": "system-maintainer",
+   "name": "Coronata 054",
+   "genus": "Coronata",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "decision-helper"
+   ]
+  },
+  {
+   "id": "knowledge-keeper-sheet-2-variant",
+   "name": "Crepuscula 022",
+   "genus": "Crepuscula",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "resource-manager-sheet-3-variant",
+   "name": "Discordia 041",
+   "genus": "Discordia",
+   "rarity": "Common",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "data-miner-sheet-1-variant-1",
+   "name": "Favilla 016",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "database-administrator",
+    "security-analyst",
+    "site-reliability-engineer"
+   ]
+  },
+  {
+   "id": "translator-sheet-1-variant",
+   "name": "Favilla 019",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "decision-helper"
+   ]
+  },
+  {
+   "id": "scheduler-sheet-2-variant",
+   "name": "Favilla 026",
+   "genus": "Favilla",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "documenter",
+    "decision-helper",
+    "support-agent"
+   ]
+  },
+  {
+   "id": "documenter",
+   "name": "Favilla 029",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "scheduler-sheet-2-variant",
+    "support-agent",
+    "decision-helper"
+   ]
+  },
+  {
+   "id": "decision-helper",
+   "name": "Favilla 034",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "scheduler-sheet-2-variant",
+    "documenter"
+   ]
+  },
+  {
+   "id": "scheduler-sheet-3-variant",
+   "name": "Favilla 040",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "support-agent",
+    "scheduler-sheet-2-variant"
+   ]
+  },
+  {
+   "id": "strategy-scout",
+   "name": "Favilla 053",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "site-reliability-engineer",
+    "deployment-pilot",
+    "documenter"
+   ]
+  },
+  {
+   "id": "database-administrator",
+   "name": "Favilla 057",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "data-miner-sheet-1-variant-1",
+    "site-reliability-engineer",
+    "security-analyst"
+   ]
+  },
+  {
+   "id": "site-reliability-engineer",
+   "name": "Favilla 059",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "database-administrator",
+    "data-miner-sheet-1-variant-1",
+    "documenter"
+   ]
+  },
+  {
+   "id": "support-agent",
+   "name": "Favilla 068",
+   "genus": "Favilla",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "scheduler-sheet-3-variant",
+    "documenter"
+   ]
+  },
+  {
+   "id": "guardian",
+   "name": "Glacia 030",
+   "genus": "Glacia",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "network-engineer",
+    "migration-engineer"
+   ]
+  },
+  {
+   "id": "network-engineer",
+   "name": "Glacia 058",
+   "genus": "Glacia",
+   "rarity": "Very rare",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 9.99,
+   "mutation": 1,
+   "pairsWith": [
+    "guardian"
+   ]
+  },
+  {
+   "id": "creative-synthesizer",
+   "name": "Iridia 031",
+   "genus": "Iridia",
+   "rarity": "Uncommon",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "communicator",
+   "name": "Noctua 042",
+   "genus": "Noctua",
+   "rarity": "Rare",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "simulator",
+   "name": "Phosphora 028",
+   "genus": "Phosphora",
+   "rarity": "Mythic",
+   "source": "breed",
+   "lottery": "mythic",
+   "starter": false,
+   "price": 19.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "ux-designer",
+   "name": "Sanguina 002",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "pattern-seer"
+   ]
+  },
+  {
+   "id": "pattern-seer",
+   "name": "Sanguina 037",
+   "genus": "Sanguina",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "idea-catalyst-2",
+    "ux-designer"
+   ]
+  },
+  {
+   "id": "integrator",
+   "name": "Sanguina 043",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "threat-modeler",
+    "security-analyst",
+    "deployment-pilot"
+   ]
+  },
+  {
+   "id": "security-analyst",
+   "name": "Sanguina 044",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "deployment-pilot",
+    "business-analyst",
+    "threat-modeler"
+   ]
+  },
+  {
+   "id": "deployment-pilot",
+   "name": "Sanguina 048",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "security-analyst",
+    "business-analyst",
+    "threat-modeler"
+   ]
+  },
+  {
+   "id": "idea-catalyst-2",
+   "name": "Sanguina 051",
+   "genus": "Sanguina",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "pattern-seer"
+   ]
+  },
+  {
+   "id": "threat-modeler",
+   "name": "Sanguina 062",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "integrator",
+    "deployment-pilot",
+    "security-analyst"
+   ]
+  },
+  {
+   "id": "business-analyst",
+   "name": "Sanguina 066",
+   "genus": "Sanguina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "security-analyst",
+    "deployment-pilot",
+    "integrator"
+   ]
+  },
+  {
+   "id": "optimizer-sheet-2-variant",
+   "name": "Succina 027",
+   "genus": "Succina",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "legal-counsel"
+   ]
+  },
+  {
+   "id": "flow-director",
+   "name": "Succina 035",
+   "genus": "Succina",
+   "rarity": "Rare",
+   "source": "breed",
+   "lottery": null,
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "sustainability-advocate",
+    "optimizer-sheet-3-variant",
+    "legal-counsel"
+   ]
+  },
+  {
+   "id": "optimizer-sheet-3-variant",
+   "name": "Succina 039",
+   "genus": "Succina",
+   "rarity": "Very rare",
+   "source": "breed",
+   "lottery": null,
+   "starter": false,
+   "price": 9.99,
+   "mutation": 1,
+   "pairsWith": [
+    "sustainability-advocate",
+    "flow-director",
+    "legal-counsel"
+   ]
+  },
+  {
+   "id": "sustainability-advocate",
+   "name": "Succina 055",
+   "genus": "Succina",
+   "rarity": "Very rare",
+   "source": "breed",
+   "lottery": null,
+   "starter": false,
+   "price": 9.99,
+   "mutation": 1,
+   "pairsWith": [
+    "flow-director",
+    "optimizer-sheet-3-variant",
+    "legal-counsel"
+   ]
+  },
+  {
+   "id": "legal-counsel",
+   "name": "Succina 071",
+   "genus": "Succina",
+   "rarity": "Rare",
+   "source": "both",
+   "lottery": "rare",
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "flow-director",
+    "optimizer-sheet-3-variant",
+    "sustainability-advocate"
+   ]
+  },
+  {
+   "id": "pattern-seeker-sheet-1-variant",
+   "name": "Thalassa 018",
+   "genus": "Thalassa",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "test-automation-engineer"
+   ]
+  },
+  {
+   "id": "connector-sheet-1-variant",
+   "name": "Thalassa 020",
+   "genus": "Thalassa",
+   "rarity": "Rare",
+   "source": "breed",
+   "lottery": null,
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": []
+  },
+  {
+   "id": "quality-guardian",
+   "name": "Thalassa 045",
+   "genus": "Thalassa",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "data-scientist",
+    "test-automation-engineer",
+    "pattern-seeker-sheet-1-variant"
+   ]
+  },
+  {
+   "id": "documentation-specialist",
+   "name": "Thalassa 046",
+   "genus": "Thalassa",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "test-automation-engineer",
+    "systems-analyst",
+    "pattern-seeker-sheet-1-variant"
+   ]
+  },
+  {
+   "id": "systems-analyst",
+   "name": "Thalassa 056",
+   "genus": "Thalassa",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "connector-sheet-1-variant"
+   ]
+  },
+  {
+   "id": "test-automation-engineer",
+   "name": "Thalassa 061",
+   "genus": "Thalassa",
+   "rarity": "Common",
+   "source": "both",
+   "lottery": null,
+   "starter": true,
+   "price": 0.99,
+   "mutation": 1,
+   "pairsWith": [
+    "pattern-seeker-sheet-1-variant",
+    "quality-guardian"
+   ]
+  },
+  {
+   "id": "data-scientist",
+   "name": "Thalassa 069",
+   "genus": "Thalassa",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "quality-guardian",
+    "connector-sheet-1-variant"
+   ]
+  },
+  {
+   "id": "knowledge-keeper-sheet-1-variant",
+   "name": "Violacea 017",
+   "genus": "Violacea",
+   "rarity": "Rare",
+   "source": "both",
+   "lottery": "rare",
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "test-explorer",
+    "feedback-collector",
+    "process-mapper"
+   ]
+  },
+  {
+   "id": "data-miner-sheet-3-variant",
+   "name": "Violacea 036",
+   "genus": "Violacea",
+   "rarity": "Rare",
+   "source": "store",
+   "lottery": null,
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "build-engineer",
+    "knowledge-keeper-sheet-1-variant",
+    "test-explorer"
+   ]
+  },
+  {
+   "id": "test-explorer",
+   "name": "Violacea 047",
+   "genus": "Violacea",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "build-engineer",
+    "knowledge-keeper-sheet-1-variant",
+    "feedback-collector"
+   ]
+  },
+  {
+   "id": "feedback-collector",
+   "name": "Violacea 050",
+   "genus": "Violacea",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "knowledge-keeper-sheet-1-variant",
+    "process-mapper",
+    "build-engineer"
+   ]
+  },
+  {
+   "id": "process-mapper",
+   "name": "Violacea 052",
+   "genus": "Violacea",
+   "rarity": "Rare",
+   "source": "both",
+   "lottery": "rare",
+   "starter": false,
+   "price": 4.99,
+   "mutation": 1,
+   "pairsWith": [
+    "observability-engineer",
+    "knowledge-keeper-sheet-1-variant",
+    "feedback-collector"
+   ]
+  },
+  {
+   "id": "build-engineer",
+   "name": "Violacea 060",
+   "genus": "Violacea",
+   "rarity": "Uncommon",
+   "source": "both",
+   "lottery": null,
+   "starter": false,
+   "price": 1.99,
+   "mutation": 1,
+   "pairsWith": [
+    "test-explorer",
+    "data-miner-sheet-3-variant",
+    "observability-engineer"
+   ]
+  },
+  {
+   "id": "observability-engineer",
+   "name": "Violacea 065",
+   "genus": "Violacea",
+   "rarity": "Very rare",
+   "source": "both",
+   "lottery": "very-rare",
+   "starter": false,
+   "price": 9.99,
+   "mutation": 1,
+   "pairsWith": [
+    "process-mapper",
+    "build-engineer",
+    "knowledge-keeper-sheet-1-variant"
+   ]
+  },
+  {
+   "id": "content-strategist",
+   "name": "Viridia 067",
+   "genus": "Viridia",
+   "rarity": "Mythic",
+   "source": "breed",
+   "lottery": "mythic",
+   "starter": false,
+   "price": 19.99,
+   "mutation": 1,
+   "pairsWith": []
+  }
+ ]
+}

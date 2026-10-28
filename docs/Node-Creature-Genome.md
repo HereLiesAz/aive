@@ -67,6 +67,18 @@ Rarity is how improbable a creature's allele combination is (summed allele surpr
 
 **Kinship** (measured similarity) groups them into 14 genera on the lineage map. **Breeding difficulty** is separate from rarity: it's how isolated a creature is from its nearest kin. *Discordia 041* is common but nearly impossible to breed; *Succina 055* is very rare but breeds easily within its genus.
 
+## Breeds
+
+A creature's breed is the keeper's, not its role's: any agent can wear any breed the keeper owns. The catalog is `shared/src/commonMain/composeResources/files/breeds.json`, built from the lineage by `tools/creature-genome/breeds.py`; new breeds are added there with the same fields.
+
+- **The stable.** The keeper picks one starter (a Common breed); it is unlimited, and every agent without another creature wears it. Every other creature is owned one at a time, bred or bought, and lives in one agent at a time.
+- **Generations.** Generation *n* needs Fib(*n*) cleared workflows (1, 1, 2, 3, 5…). When they clear, the run's contributors hatch the next generation: body from one parent, tendrils from the other, tail from either. A pure child joins its breed's count; a mixed one is one of a kind.
+- **Mutation.** Each breed has a positive mutation score. A hatch swings the next generation's workflow count by the parents' higher score, earlier or later, never below 1.
+- **Pairing.** Each breed lists the breeds it pairs with; its own kind and genus always do. A good pair swings the count in the keeper's favour three times in four; a poor pair, against.
+- **Lottery.** Each hatch draws once, rarest first: Mythic 1 in 1000, Very rare 1 in 100, Rare 1 in 20.
+- **Sources.** Some breeds are sold and never hatch (their parts are never passed on); some hatch and are never sold.
+- **Hidden.** The keeper sees only names, rarity, how many they own, and prices. Mutation, pairing, pace and odds are never shown.
+
 ## The rules of life
 
 Each tick, every creature is judged on its **synapses** *k* (live partners it's wired to), its **load** (tasks in hand), its valence *V*, and the runs it's working on.
