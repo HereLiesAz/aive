@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.use
@@ -216,6 +217,19 @@ class HiveScreenshotTest {
                 HiveEdge(onLoadPackages = { emptyList() }, onBringIn = {}, shelfAtStart = EdgeShelf.Breeds)
             }
         })
+        // Close in on the vessels (zoom 250%), where the red cells show.
+        shoot("15-vessels-close", 900, 1400) {
+            val scene = TissueScene(
+                capillaries = listOf(TissueCapillary("claude", com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition(0f, 0f), com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition(1f, 1f))),
+                providerOf = mapOf("a" to "claude", "b" to "claude"),
+                egg = null,
+            )
+            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                val centres = mapOf("a" to Offset(size.width * 0.38f, size.height * 0.42f), "b" to Offset(size.width * 0.66f, size.height * 0.7f))
+                drawTissueGround(scene, zoom = 2.5f, creatureRadius = 100f, phase = 0.3f, isFlowing = { true }) { centres[it] }
+                centres.values.forEach { drawCircle(androidx.compose.ui.graphics.Color(0x33FFFFFF), 100f, it) }
+            }
+        }
         shoot("4-needs", 700, 1000) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Box(Modifier.background(Azphalt.Ink).padding(16.dp)) {

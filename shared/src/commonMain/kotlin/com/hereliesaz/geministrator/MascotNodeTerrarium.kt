@@ -404,7 +404,13 @@ private fun MascotNodeTerrarium(
                 },
         ) {
             if (tissue != null) {
-                drawTissueGround(tissue) { screenCenter(it) }
+                drawTissueGround(
+                    tissue,
+                    zoom = zoom,
+                    creatureRadius = creatureSizePx * zoom * 0.42f,
+                    phase = linkPulse(),
+                    isFlowing = { id -> subjectById[id]?.node?.state == H2g2WorkflowState.Active },
+                ) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             } else {
                 drawRect(Azphalt.Ink.copy(alpha = 0.025f))
                 val grid = 48.dp.toPx() * zoom
