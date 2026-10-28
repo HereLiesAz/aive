@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.releasedDependencies
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -135,7 +136,7 @@ fun TaskExecutorContext.toAiveTaskEnvelope(
     resolvedSurfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
 ): AiveTaskEnvelope {
     val redaction = definition.payloadRedactionPolicy
-    val artifacts = task.dependsOn
+    val artifacts = definition.releasedDependencies(task)
         .flatMap { dependencyId -> run.taskRuns[dependencyId]?.artifacts.orEmpty() }
         .filterNot { it.kind in redaction.excludedArtifactKinds }
         .map { artifact ->

@@ -315,17 +315,90 @@ internal fun RiggedCreatureSurface(
     /** Read inside the draw scope, so a ticking clock invalidates drawing only, not composition. */
     phase: () -> Float,
     modifier: Modifier = Modifier,
+    /**
+     * Points, in this box's px, the creature's tendrils reach for: one tendril each, the one already
+     * facing that way. Read in the draw scope.
+     */
+    reach: () -> List<TendrilReach> = { emptyList() },
+    /** A bred creature's limbs inherited from other parents: their tendrils, their tail. */
+    tendrilsFrom: LoadedCreatureRig? = null,
+    tailFrom: LoadedCreatureRig? = null,
 ) {
     val compiled = loaded.compiled
+    val donor = remember(compiled, tendrilsFrom, tailFrom) { inheritedLimbs(compiled, tendrilsFrom, tailFrom) }
     val buffer = remember(compiled) { compiled.newBuffer() }
     val matrix = remember { Matrix() }
     val stateIndex = remember(compiled, state) { compiled.stateIndex(state.name) }
     Canvas(modifier) {
-        compiled.evaluate(stateIndex, phase(), buffer)
         val fit = PuppetFit.of(compiled.rig.canvas, size.width, size.height, CREATURE_RIG_CONTENT_SCALE)
-        compiled.draw(this, loaded.atlas, buffer, fit, matrix)
+        buffer.clearReach()
+        compiled.evaluate(stateIndex, phase(), buffer)
+        val targets = reach()
+        val parts = if (targets.isNotEmpty() && compiled.tendrilParts.isNotEmpty()) {
+            assignTendrils(compiled, buffer, targets.map { Offset((it.at.x - fit.offsetX) / fit.scale, (it.at.y - fit.offsetY) / fit.scale) })
+                .also { compiled.evaluate(stateIndex, phase(), buffer) }
+        } else {
+            emptyList()
+        }
+        compiled.draw(this, loaded.atlas, buffer, fit, matrix, donor?.let { map -> { i -> map[i] } })
+        targets.forEachIndexed { k, target ->
+            val part = parts.getOrNull(k) ?: return@forEachIndexed
+            val pulse = target.pulse ?: return@forEachIndexed
+            compiled.drawPulse(this, loaded.atlas, buffer, fit, matrix, part, pulse, target.pulseColor, donor?.get(part))
+        }
     }
 }
+
+/**
+ * Which of [host]'s parts wear another rig's sprite: its tendrils from [tendrils], its tail from
+ * [tail], slot for slot (cycling when the donor has fewer). Null when nothing is inherited.
+ */
+internal fun inheritedLimbs(
+    host: CompiledPuppetRig,
+    tendrils: LoadedCreatureRig?,
+    tail: LoadedCreatureRig?,
+): Map<Int, Pair<androidx.compose.ui.graphics.ImageBitmap, com.hereliesaz.geministrator.puppet.PuppetPart>>? {
+    val map = HashMap<Int, Pair<androidx.compose.ui.graphics.ImageBitmap, com.hereliesaz.geministrator.puppet.PuppetPart>>()
+    fun take(slots: IntArray, donor: LoadedCreatureRig?, donorSlots: (CompiledPuppetRig) -> IntArray) {
+        val from = donor ?: return
+        val theirs = donorSlots(from.compiled).takeIf { it.isNotEmpty() } ?: return
+        slots.forEachIndexed { k, slot -> map[slot] = from.atlas to from.compiled.rig.parts[theirs[k % theirs.size]] }
+    }
+    take(host.tendrilParts, tendrils) { it.tendrilParts }
+    take(host.tailParts, tail) { it.tailParts }
+    return map.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Gives each artboard target the free tendril pointing most nearly at it, in an evaluated [pose],
+ * and returns the part per target. More targets than tendrils: the rest go unreached (null).
+ */
+internal fun assignTendrils(compiled: CompiledPuppetRig, pose: PuppetPoseBuffer, targets: List<Offset>): List<Int?> {
+    val free = compiled.tendrilParts.toMutableList()
+    return targets.map { target ->
+        val best = free.maxByOrNull { part ->
+            val base = compiled.tendrilBase(part, pose)
+            val along = compiled.tendrilTip(part, pose) - base
+            val toward = target - base
+            val n = along.getDistance() * toward.getDistance()
+            if (n == 0f) -1f else (along.x * toward.x + along.y * toward.y) / n
+        } ?: return@map null
+        free -= best
+        pose.reachX[best] = target.x
+        pose.reachY[best] = target.y
+        best
+    }
+}
+
+/**
+ * One tendril's reach: [at] in the creature's box px, and the slice of light travelling it,
+ * [pulse] from 0 (base) to 1 (tip), or null when nothing flows.
+ */
+internal data class TendrilReach(
+    val at: Offset,
+    val pulse: Float? = null,
+    val pulseColor: androidx.compose.ui.graphics.Color = Azphalt.Yellow,
+)
 
 /**
  * Where a node's arm socket sits on screen.

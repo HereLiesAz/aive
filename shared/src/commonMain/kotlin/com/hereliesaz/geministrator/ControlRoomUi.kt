@@ -1,5 +1,11 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.resources.hive_show_timeline
+import com.hereliesaz.geministrator.resources.hive_more_editing
+import com.hereliesaz.geministrator.resources.hive_show_hive
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -49,7 +55,9 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
+import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.district_surface
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -81,17 +89,21 @@ enum class ControlRoomDestination(val label: String) {
 
     /** The main-navigation entry that is highlighted while this destination is open. */
     val navigationItem: ControlRoomDestination
-        get() = if (this in OverviewSections) Overview else this
+        get() = if (this in OverviewSections || this in RetiredSections) Overview else this
 
     companion object {
         /**
          * Opened from the section row at the top of [Overview], not from the main navigation.
          * Overview itself shows the run mind map until one of these is tapped.
          */
-        val OverviewSections: List<ControlRoomDestination> = listOf(Runs, Workflows, Company)
+        // Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows stays reachable from a hive's More editing.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company)
+
+        /** Reachable, but no longer shown in Overview's section row. */
+        val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
 
         /** Left out of the main navigation: Overview's sections, and Inbox (its header badge opens it). */
-        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + Inbox
+        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + Inbox
 
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
@@ -524,25 +536,155 @@ private fun MainDestination(
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
-                ControlRoomDestination.Overview -> MindMapRunScreen(
-                    modifier = Modifier.fillMaxSize(),
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
-                    onLaunchWorkflow = onLaunchWorkflow,
-                    onLoadLaunchableRuns = onLoadLaunchableRuns,
-                    projectFileService = projectFileService,
-                    onImportProjectFile = onImportProjectFile,
-                    onRecoverFromCorruption = onRecoverFromCorruption,
-                    onRetryRuntime = onRetryRuntime,
-                    onOpenSettings = onOpenSettings,
-                    onValidateWorkflow = onValidateWorkflow,
-                    availableRepositorySources = availableRepositorySources,
-                    onPickLocalRepository = onPickLocalRepository,
-                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                    onSearchRepositories = onSearchRepositories,
-                    compact = compact,
-                    runtimeState = runtimeState,
-                )
+                ControlRoomDestination.Overview -> {
+                    // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
+                    var inDistrict by rememberDurableBooleanState("overview.zoom.district")
+                    // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
+                    var restingHiveId by rememberDurableStringState("overview.resting-hive")
+                    var showTimeline by rememberDurableBooleanState("overview.timeline")
+                    val hiveHost = LocalWorkflowLibraryHost.current
+                    val hiveScope = rememberCoroutineScope()
+                    if (inDistrict) {
+                        DistrictScreen(
+                            onLoadDefinitions = onLoadWorkflowDefinitions,
+                            onLoadRuns = { onLoadRunHistory().map { (project, runs) -> project.name to runs } },
+                            onEnterNeighbourhood = { neighbourhood ->
+                                val runId = neighbourhood.latestRunId
+                                if (runId != null) {
+                                    onSwitchRun(runId)
+                                    restingHiveId = ""
+                                } else {
+                                    restingHiveId = neighbourhood.definitionId
+                                }
+                                inDistrict = false
+                            },
+                            onNewHive = {
+                                hiveHost?.let { host ->
+                                    hiveScope.launch {
+                                        val hive = createEmptyHive(host, onLoadWorkflowDefinitions())
+                                        restingHiveId = hive.id.value
+                                        inDistrict = false
+                                    }
+                                }
+                            },
+                            onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
+                            edge = {
+                                azphaltStoreService?.let { store ->
+                                HiveEdge(
+                                    onLoadPackages = { store.search().packages },
+                                    onBringIn = { item ->
+                                        // Opens the Store on this package, where its install is approved.
+                                        DurableUiState.store.putString("azphalt-store.query", "")
+                                        DurableUiState.store.putString("azphalt-store.category", "All")
+                                        DurableUiState.store.putString("azphalt-store.selected-package", item.id)
+                                        onDestinationSelected(ControlRoomDestination.AddOns)
+                                    },
+                                )
+                                }
+                            },
+                            roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty(),
+                            onAdopt = { child ->
+                                val roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty()
+                                onSaveRoleCollection(
+                                    roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID } + child.copy(enabled = true),
+                                )
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (restingHiveId.isNotBlank()) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            AzphaltPill(
+                                label = stringResource(Res.string.district_surface),
+                                seed = "zoom-out-district",
+                                onClick = { inDistrict = true },
+                            )
+                            RestingHive(
+                                definitionId = restingHiveId,
+                                onLoadDefinitions = onLoadWorkflowDefinitions,
+                                selectedTaskId = selectedTaskId,
+                                onTaskSelected = onTaskSelected,
+                                onSurface = { inDistrict = true },
+                            )
+                            AzphaltPill(
+                                label = stringResource(Res.string.hive_more_editing),
+                                seed = "hive-more-editing",
+                                onClick = { onDestinationSelected(ControlRoomDestination.Workflows) },
+                            )
+                        }
+                    } else {
+                        Column(Modifier.fillMaxSize()) {
+                            val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                AzphaltPill(
+                                    label = stringResource(Res.string.district_surface),
+                                    seed = "zoom-out-district",
+                                    onClick = { inDistrict = true },
+                                )
+                                if (live != null) {
+                                    AzphaltPill(
+                                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
+                                        seed = "hive-timeline",
+                                        selected = showTimeline,
+                                        onClick = { showTimeline = !showTimeline },
+                                    )
+                                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
+                                    AzphaltPill(
+                                        label = stringResource(Res.string.hive_more_editing),
+                                        seed = "hive-more-editing",
+                                        onClick = {
+                                            hiveScope.launch {
+                                                val id = live.run.workflowDefinitionId.value
+                                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
+                                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
+                                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+                                                }
+                                                onDestinationSelected(ControlRoomDestination.Workflows)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                            live?.let {
+                                // The hive's combs: its finished swarms. Opening one switches to it.
+                                RunScars(
+                                    currentRun = it.run,
+                                    onLoadRuns = { onLoadRunHistory().flatMap { pair -> pair.second } },
+                                    onReplay = onSwitchRun,
+                                )
+                            }
+                            if (live != null && showTimeline) {
+                                RunTimeline(
+                                    runKey = live.run.id.value + live.run.updatedAtEpochMillis,
+                                    onLoadTimeline = onLoadRunTimeline,
+                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                )
+                            } else {
+        MindMapRunScreen(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            selectedTaskId = selectedTaskId,
+                            onTaskSelected = onTaskSelected,
+                            onLaunchWorkflow = onLaunchWorkflow,
+                            onLoadLaunchableRuns = onLoadLaunchableRuns,
+                            projectFileService = projectFileService,
+                            onImportProjectFile = onImportProjectFile,
+                            onRecoverFromCorruption = onRecoverFromCorruption,
+                            onRetryRuntime = onRetryRuntime,
+                            onOpenSettings = onOpenSettings,
+                            onValidateWorkflow = onValidateWorkflow,
+                            availableRepositorySources = availableRepositorySources,
+                            onPickLocalRepository = onPickLocalRepository,
+                            connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                            onSearchRepositories = onSearchRepositories,
+                            compact = compact,
+                            onSurface = { inDistrict = true },
+                            runtimeState = runtimeState,
+                        )
+                            }
+                            live?.let { HiveLaunchBar(it.definition) }
+                        }
+                    }
+                }
                 ControlRoomDestination.Runs -> RunsScreen(
                     runtimeState = runtimeState,
                     onLoadRunHistory = onLoadRunHistory,

@@ -1,6 +1,11 @@
 package com.hereliesaz.geministrator.puppet
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -8,6 +13,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.min
@@ -39,6 +46,29 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     private val restSy = FloatArray(partCount) { rig.parts[it].rest.scaleY }
     private val restAlpha = FloatArray(partCount) { rig.parts[it].rest.alpha }
     private val flexibility = FloatArray(partCount) { 1f - rig.parts[it].rigidity }
+    /**
+     * A part's tip, from its pivot in local px: the pivot reflected through the sprite's centre,
+     * so a tendril pinned at its base reaches out to the far end.
+     */
+    private val tipX = FloatArray(partCount) { (1f - 2f * rig.parts[it].pivot.x) * rig.parts[it].drawnWidth }
+    private val tipY = FloatArray(partCount) { (1f - 2f * rig.parts[it].pivot.y) * rig.parts[it].drawnHeight }
+
+    /** Parts named `tendril…`: the limbs creatures join by (docs/Node-Creature-Genome.md, Wiring). */
+    val tendrilParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tendril") }.toIntArray()
+
+    /** Tendril [part]'s base and tip in artboard px, from an evaluated [pose]. */
+    fun tendrilBase(part: Int, pose: PuppetPoseBuffer): Offset = Offset(pose.world[part * 6 + 4], pose.world[part * 6 + 5])
+
+    fun tendrilTip(part: Int, pose: PuppetPoseBuffer): Offset {
+        val o = part * 6
+        val w = pose.world
+        val n = pose.segments[part]
+        return Offset(
+            (w[o] * tipX[part] + w[o + 2] * tipY[part]) * n + w[o + 4],
+            (w[o + 1] * tipX[part] + w[o + 3] * tipY[part]) * n + w[o + 5],
+        )
+    }
+
     private val anchorX = FloatArray(partCount)
     private val anchorY = FloatArray(partCount)
 
@@ -125,30 +155,27 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             val sx = restSx[i] * (1f + (sample(ch, CH_SX, cycle, 1f) - 1f) * f)
             val sy = restSy[i] * (1f + (sample(ch, CH_SY, cycle, 1f) - 1f) * f)
             val al = restAlpha[i] * sample(ch, CH_ALPHA, cycle, 1f)
-            val r = deg * DEG
-            val cs = cos(r)
-            val sn = sin(r)
-            // Local affine: T * R * S.
-            val la = cs * sx
-            val lb = sn * sx
-            val lc = -sn * sy
-            val ld = cs * sy
-            val o = i * 6
-            val p = parentIndex[i]
-            if (p < 0) {
-                w[o] = la; w[o + 1] = lb; w[o + 2] = lc; w[o + 3] = ld; w[o + 4] = x; w[o + 5] = y
-                out.alpha[i] = al.coerceIn(0f, 1f)
-            } else {
-                val q = p * 6
-                val pa = w[q]; val pb = w[q + 1]; val pc = w[q + 2]; val pd = w[q + 3]
-                val ptx = w[q + 4]; val pty = w[q + 5]
-                w[o] = pa * la + pc * lb
-                w[o + 1] = pb * la + pd * lb
-                w[o + 2] = pa * lc + pc * ld
-                w[o + 3] = pb * lc + pd * ld
-                w[o + 4] = pa * x + pc * y + ptx
-                w[o + 5] = pb * x + pd * y + pty
-                out.alpha[i] = (out.alpha[p] * al).coerceIn(0f, 1f)
+            compose(i, deg, sx, sy, x, y, al, out)
+            // A reaching tendril turns from its base toward its target and stretches, a little, to meet it.
+            val tx = out.reachX[i]
+            if (!tx.isNaN()) {
+                val ty = out.reachY[i]
+                val o = i * 6
+                val vx = w[o] * tipX[i] + w[o + 2] * tipY[i]
+                val vy = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
+                val dx = tx - w[o + 4]
+                val dy = ty - w[o + 5]
+                val v = hypot(vx, vy)
+                if (v > 0f) {
+                    val turn = (atan2(dy, dx) - atan2(vy, vx)) / DEG
+                    // Too far for one sprite: the tendril grows segments, copies of itself end to end.
+                    val need = hypot(dx, dy) / v
+                    val segments = kotlin.math.ceil(need / out.maxReach).toInt().coerceIn(1, out.maxSegments)
+                    out.segments[i] = segments
+                    val k = (need / segments).coerceIn(MIN_REACH, out.maxReach)
+                    val alongX = kotlin.math.abs(tipX[i]) >= kotlin.math.abs(tipY[i])
+                    compose(i, deg + turn, if (alongX) sx * k else sx, if (alongX) sy else sy * k, x, y, al, out)
+                }
             }
         }
         for (k in 0 until attachmentCount) {
@@ -157,6 +184,35 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             val ly = attLocalY[k]
             out.attachX[k] = w[o] * lx + w[o + 2] * ly + w[o + 4]
             out.attachY[k] = w[o + 1] * lx + w[o + 3] * ly + w[o + 5]
+        }
+    }
+
+    private fun compose(i: Int, deg: Float, sx: Float, sy: Float, x: Float, y: Float, al: Float, out: PuppetPoseBuffer) {
+        val w = out.world
+        val r = deg * DEG
+        val cs = cos(r)
+        val sn = sin(r)
+        // Local affine: T * R * S.
+        val la = cs * sx
+        val lb = sn * sx
+        val lc = -sn * sy
+        val ld = cs * sy
+        val o = i * 6
+        val p = parentIndex[i]
+        if (p < 0) {
+            w[o] = la; w[o + 1] = lb; w[o + 2] = lc; w[o + 3] = ld; w[o + 4] = x; w[o + 5] = y
+            out.alpha[i] = al.coerceIn(0f, 1f)
+        } else {
+            val q = p * 6
+            val pa = w[q]; val pb = w[q + 1]; val pc = w[q + 2]; val pd = w[q + 3]
+            val ptx = w[q + 4]; val pty = w[q + 5]
+            w[o] = pa * la + pc * lb
+            w[o + 1] = pb * la + pd * lb
+            w[o + 2] = pa * lc + pc * ld
+            w[o + 3] = pb * lc + pd * ld
+            w[o + 4] = pa * x + pc * y + ptx
+            w[o + 5] = pb * x + pd * y + pty
+            out.alpha[i] = (out.alpha[p] * al).coerceIn(0f, 1f)
         }
     }
 
@@ -175,43 +231,130 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         pose: PuppetPoseBuffer,
         fit: PuppetFit,
         scratch: Matrix,
+        /**
+         * A part drawn with another rig's sprite (a bred creature's tendrils or tail, inherited from
+         * another parent): the donor's atlas and part, placed where this rig's part sits. Null keeps
+         * this rig's own sprite.
+         */
+        donor: ((Int) -> Pair<ImageBitmap, PuppetPart>?)? = null,
+    ) {
+        for (i in drawOrder) {
+            val (sheet, sprite) = donor?.invoke(i) ?: (atlas to rig.parts[i])
+            for (j in pose.segments[i] - 1 downTo 0) drawPart(scope, sheet, pose, fit, scratch, i, j, sprite)
+        }
+    }
+
+    /** The parts named `tail…`: the limb that carries the egg. */
+    val tailParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tail") }.toIntArray()
+
+    /**
+     * A slice of light travelling a tendril: [at] runs 0 (base) to 1 (tip, across every segment).
+     * Masked to the tendril's own pixels, so it lights the limb and nothing else, with a soft glow
+     * around it.
+     */
+    fun drawPulse(
+        scope: DrawScope,
+        atlas: ImageBitmap,
+        pose: PuppetPoseBuffer,
+        fit: PuppetFit,
+        scratch: Matrix,
+        part: Int,
+        at: Float,
+        color: Color,
+        /** The tendril's sprite when it is another rig's (an inherited limb). */
+        sprite: Pair<ImageBitmap, PuppetPart>? = null,
+    ) = with(scope) {
+        val o = part * 6
+        val w = pose.world
+        val n = pose.segments[part]
+        val stepX = w[o] * tipX[part] + w[o + 2] * tipY[part]
+        val stepY = w[o + 1] * tipX[part] + w[o + 3] * tipY[part]
+        val centre = Offset(
+            fit.offsetX + (w[o + 4] + stepX * n * at) * fit.scale,
+            fit.offsetY + (w[o + 5] + stepY * n * at) * fit.scale,
+        )
+        val radius = hypot(stepX, stepY) * fit.scale * 0.32f
+        // Glow first, under the limb's lit slice.
+        drawCircle(
+            Brush.radialGradient(listOf(color.copy(alpha = 0.45f), color.copy(alpha = 0f)), centre, radius * 2.2f),
+            radius * 2.2f,
+            centre,
+        )
+        drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+        for (j in 0 until n) drawPart(this, sprite?.first ?: atlas, pose, fit, scratch, part, j, sprite?.second ?: rig.parts[part])
+        drawCircle(
+            // An energy pulse: white-hot at its core, burning out through the knot's colour.
+            Brush.radialGradient(
+                0f to Color.White,
+                0.3f to color,
+                1f to color.copy(alpha = 0f),
+                center = centre,
+                radius = radius,
+            ),
+            radius,
+            centre,
+            blendMode = BlendMode.SrcIn,
+        )
+        drawContext.canvas.restore()
+    }
+
+    private fun drawPart(
+        scope: DrawScope,
+        atlas: ImageBitmap,
+        pose: PuppetPoseBuffer,
+        fit: PuppetFit,
+        scratch: Matrix,
+        i: Int,
+        j: Int,
+        /** The sprite to draw at part [i]'s place; another rig's for an inherited limb. */
+        part: PuppetPart = rig.parts[i],
     ) = with(scope) {
         val w = pose.world
-        for (i in drawOrder) {
-            val part = rig.parts[i]
-            val rect = part.rect ?: continue
-            val alpha = pose.alpha[i]
-            if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) continue
-            val o = i * 6
-            scratch.reset()
-            val v = scratch.values
-            v[Matrix.ScaleX] = w[o]
-            v[Matrix.SkewY] = w[o + 1]
-            v[Matrix.SkewX] = w[o + 2]
-            v[Matrix.ScaleY] = w[o + 3]
-            v[Matrix.TranslateX] = w[o + 4]
-            v[Matrix.TranslateY] = w[o + 5]
-            withTransform({
-                translate(fit.offsetX, fit.offsetY)
-                scale(fit.scale, fit.scale, pivot = Offset.Zero)
-                transform(scratch)
-                translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
-                scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
-            }) {
-                drawImage(
-                    image = atlas,
-                    srcOffset = IntOffset(rect.x, rect.y),
-                    srcSize = IntSize(rect.w, rect.h),
-                    dstOffset = IntOffset.Zero,
-                    dstSize = IntSize(rect.w, rect.h),
-                    alpha = alpha,
-                )
-            }
+        val rect = part.rect ?: return@with
+        val alpha = pose.alpha[i]
+        if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) return@with
+        val o = i * 6
+        // Segment j is the same sprite moved out along the tendril by j tip-lengths.
+        val stepX = w[o] * tipX[i] + w[o + 2] * tipY[i]
+        val stepY = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
+        scratch.reset()
+        val v = scratch.values
+        v[Matrix.ScaleX] = w[o]
+        v[Matrix.SkewY] = w[o + 1]
+        v[Matrix.SkewX] = w[o + 2]
+        v[Matrix.ScaleY] = w[o + 3]
+        v[Matrix.TranslateX] = w[o + 4] + stepX * j
+        v[Matrix.TranslateY] = w[o + 5] + stepY * j
+        // An inherited limb points the way this rig's own limb did: turn it from its own reach onto ours.
+        val turn = if (part === rig.parts[i]) {
+            0f
+        } else {
+            val theirs = atan2((1f - 2f * part.pivot.y) * part.drawnHeight, (1f - 2f * part.pivot.x) * part.drawnWidth)
+            (atan2(tipY[i], tipX[i]) - theirs) / DEG
+        }
+        withTransform({
+            translate(fit.offsetX, fit.offsetY)
+            scale(fit.scale, fit.scale, pivot = Offset.Zero)
+            transform(scratch)
+            if (turn != 0f) rotate(turn, pivot = Offset.Zero)
+            translate(-part.pivot.x * part.drawnWidth, -part.pivot.y * part.drawnHeight)
+            scale(part.drawnWidth / rect.w, part.drawnHeight / rect.h, pivot = Offset.Zero)
+        }) {
+            drawImage(
+                image = atlas,
+                srcOffset = IntOffset(rect.x, rect.y),
+                srcSize = IntSize(rect.w, rect.h),
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(rect.w, rect.h),
+                alpha = alpha,
+            )
         }
     }
 
     companion object {
         private const val DEG = (PI / 180.0).toFloat()
+        /** A tendril curls shorter than its sprite down to this, no further. */
+        private const val MIN_REACH = 0.7f
         private val CHANNELS = listOf(
             PuppetChannel.X, PuppetChannel.Y, PuppetChannel.Rotation,
             PuppetChannel.ScaleX, PuppetChannel.ScaleY, PuppetChannel.Alpha,
@@ -231,6 +374,25 @@ class PuppetPoseBuffer(partCount: Int, attachmentCount: Int) {
     val alpha = FloatArray(partCount)
     val attachX = FloatArray(attachmentCount)
     val attachY = FloatArray(attachmentCount)
+
+    /** Per part, an artboard point a tendril reaches for; NaN leaves the part to its motion. */
+    val reachX = FloatArray(partCount) { Float.NaN }
+    val reachY = FloatArray(partCount) { Float.NaN }
+
+    /** How far each tendril segment may stretch past its sprite: a little, not much. */
+    var maxReach = 1.25f
+
+    /** Most segments a tendril grows to reach. */
+    var maxSegments = 3
+
+    /** Per part, how many copies of the sprite it draws end to end; 1 unless reaching far. */
+    val segments = IntArray(partCount) { 1 }
+
+    fun clearReach() {
+        reachX.fill(Float.NaN)
+        reachY.fill(Float.NaN)
+        segments.fill(1)
+    }
 }
 
 /**

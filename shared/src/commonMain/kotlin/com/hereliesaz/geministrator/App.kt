@@ -70,6 +70,8 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 fun App(
+    /** Buying breeds from the platform store; null where there is none (prices show, Buy doesn't). */
+    breedPurchases: BreedPurchases? = null,
     providers: Collection<AgentProvider>,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
@@ -180,6 +182,33 @@ fun App(
         onDispose {
             runtime?.close()
             runtime = null
+        }
+    }
+
+    // The keeper's stable (docs/Node-Creature-Genome.md, Breeds): which creature each agent wears.
+    val stableHost = remember { StableHost() }
+    LaunchedEffect(stableHost, breedPurchases) {
+        stableHost.load()
+        // Breeds paid for while the app was closed join the stable now.
+        runCatching { breedPurchases?.unclaimed() }.getOrNull()?.forEach(stableHost::bought)
+    }
+
+    // Breeding (docs/Swarm-OS.md step 6): when the live run clears, it hatches one config from the
+    // agents that did its work, kept unadopted in the roster. The child's id is the run's, so a
+    // run hatches once however often this effect runs.
+    val liveRun = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    LaunchedEffect(liveRun?.run?.id, liveRun?.run?.status) {
+        val presentation = liveRun ?: return@LaunchedEffect
+        // Each cleared run counts toward the stable's next generation (counted once per run).
+        stableHost.runCleared(presentation.run)
+        val child = hatchFromRun(presentation.run, presentation.roles) ?: return@LaunchedEffect
+        val target = runtime ?: return@LaunchedEffect
+        try {
+            if (target.persistence.roles.all().none { it.id == child.id }) target.saveRole(child)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Hatching is best effort; a failed hatch never disturbs the run.
         }
     }
 
@@ -360,12 +389,13 @@ fun App(
         val workflowLibraryHost = WorkflowLibraryHost(
             persistence = workflowPersistence,
             storeService = azphaltStoreService,
-            launchWorkflow = { definition, packageRoles, objective ->
+            launchWorkflow = { definition, packageRoles, objective, repository ->
                 val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
                     activeRuntime.launchSavedWorkflow(
                         definition = definition,
                         existingProject = existingProject,
                         objective = objective ?: definition.description ?: definition.name,
+                        repository = repository ?: existingProject?.repository,
                         supplementalRoles = packageRoles,
                     )
                 }
@@ -417,7 +447,13 @@ fun App(
             },
         )
 
-        CompositionLocalProvider(LocalWorkflowLibraryHost provides workflowLibraryHost) {
+        val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
+        CompositionLocalProvider(
+            LocalWorkflowLibraryHost provides workflowLibraryHost,
+            LocalStableHost provides stableHost,
+            LocalBreedPurchases provides breedPurchases,
+            LocalCreatureRig provides { label -> stableHost.rigFor(rolesByName[label]) },
+        ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {

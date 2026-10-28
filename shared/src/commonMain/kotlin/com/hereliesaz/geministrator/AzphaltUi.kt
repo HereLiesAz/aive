@@ -210,7 +210,8 @@ internal fun AzphaltPill(
     role: Role = Role.Button,
     stateDescription: String? = null,
 ) {
-    val hue = if (selected) Azphalt.Ink else Azphalt.hue(seed)
+    // Selected is Ink, unless it would sit on Ink: then Yellow, so it never vanishes into its surface.
+    val hue = if (selected) { if (azphaltSurface() == Azphalt.Ink) Azphalt.Yellow else Azphalt.Ink } else Azphalt.hue(seed)
     val content = hue.onOpposite()
     val pillRole = role
     Row(
@@ -299,7 +300,7 @@ internal fun AzphaltRecord(
     modifier: Modifier = Modifier,
     well: (@Composable () -> Unit)? = null,
 ) {
-    val hue = if (selected) Azphalt.Ink else Azphalt.hue(seed)
+    val hue = if (selected) { if (azphaltSurface() == Azphalt.Ink) Azphalt.Yellow else Azphalt.Ink } else Azphalt.hue(seed)
     val content = hue.onOpposite()
     val radius = animatedRecordRadius(selected)
     val description = buildString {

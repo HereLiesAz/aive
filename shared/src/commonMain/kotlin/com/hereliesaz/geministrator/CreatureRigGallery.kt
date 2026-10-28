@@ -119,14 +119,17 @@ internal fun CreatureRigGrid(columns: Int, cell: Dp = 132.dp, modifier: Modifier
                 chunk.forEachIndexed { col, label ->
                     val state = states[(row * columns + col) % states.size]
                     Column(Modifier.width(cell), horizontalAlignment = Alignment.CenterHorizontally) {
+                        // The gallery shows every rig by its own label, not the keeper's stable.
                         Box(Modifier.size(cell)) {
-                            NodeMascotSurface(
-                                roleLabel = label,
-                                hueSeed = label,
-                                state = state,
-                                motionPhase = { if (reduceMotion) 0f else animatedPhase },
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            androidx.compose.runtime.CompositionLocalProvider(LocalCreatureRig provides { null }) {
+                                NodeMascotSurface(
+                                    roleLabel = label,
+                                    hueSeed = label,
+                                    state = state,
+                                    motionPhase = { if (reduceMotion) 0f else animatedPhase },
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                         }
                         Text(
                             text = "$label · ${state.name}",

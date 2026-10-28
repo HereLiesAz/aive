@@ -164,6 +164,8 @@ import com.hereliesaz.geministrator.resources.swarm_sqlite_document_content_uri
 import com.hereliesaz.geministrator.resources.swarm_sqlite_document_uri
 import com.hereliesaz.geministrator.resources.swarm_sqlite_query_result_available_to_scripts
 import com.hereliesaz.geministrator.resources.swarm_standing_instructions
+import com.hereliesaz.geministrator.resources.swarm_token_budget
+import com.hereliesaz.geministrator.resources.swarm_token_budget_hint
 import com.hereliesaz.geministrator.resources.swarm_surface_alias
 import com.hereliesaz.geministrator.resources.swarm_surface_aliases_must_be_unique_and
 import com.hereliesaz.geministrator.resources.swarm_surfaces
@@ -213,6 +215,7 @@ internal fun CustomCompanyProviderScreen(
     var roleNameDraft by rememberDurableStringState(COMPANY_ROLE_NAME_KEY)
     var roleDescDraft by rememberDurableStringState(COMPANY_ROLE_DESCRIPTION_KEY)
     var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
+    var roleTokenBudgetDraft by rememberDurableStringState(COMPANY_ROLE_TOKEN_BUDGET_KEY)
     var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
     var roleExecutionSourceDraft by rememberDurableJsonState(
@@ -262,6 +265,7 @@ internal fun CustomCompanyProviderScreen(
         roleNameDraft = ""
         roleDescDraft = ""
         roleInstructionsDraft = ""
+        roleTokenBudgetDraft = ""
         roleProviderDraftValue = ""
         roleExecutionSourceDraft = RoleExecutionSource.Agent
         roleSurfacesDraft = emptyList()
@@ -276,6 +280,7 @@ internal fun CustomCompanyProviderScreen(
         roleNameDraft = role.name
         roleDescDraft = role.description
         roleInstructionsDraft = role.instructions
+        roleTokenBudgetDraft = role.tokenBudget?.toString().orEmpty()
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
         roleExecutionSourceDraft = role.executionSource
         roleSurfacesDraft = role.surfaces
@@ -402,6 +407,14 @@ internal fun CustomCompanyProviderScreen(
                 onValueChange = { roleInstructionsDraft = it },
                 label = { Text(stringResource(Res.string.swarm_standing_instructions)) },
                 minLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = roleTokenBudgetDraft,
+                onValueChange = { input -> roleTokenBudgetDraft = input.filter(Char::isDigit) },
+                label = { Text(stringResource(Res.string.swarm_token_budget)) },
+                supportingText = { Text(stringResource(Res.string.swarm_token_budget_hint)) },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -725,6 +738,7 @@ internal fun CustomCompanyProviderScreen(
                                 surfaces = roleSurfacesDraft,
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
+                                tokenBudget = roleTokenBudgetDraft.toLongOrNull()?.takeIf { it > 0 },
                             )
                             val editingIndex = editingRoleId?.let { oldId ->
                                 draftRoles.indexOfFirst { it.id.value == oldId }
@@ -1474,6 +1488,7 @@ private const val COMPANY_ROLE_ID_KEY = "company.role.id"
 private const val COMPANY_ROLE_NAME_KEY = "company.role.name"
 private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
+private const val COMPANY_ROLE_TOKEN_BUDGET_KEY = "company.role.token-budget"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
 private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"
 private const val COMPANY_ROLE_SURFACES_KEY = "company.role.surfaces"

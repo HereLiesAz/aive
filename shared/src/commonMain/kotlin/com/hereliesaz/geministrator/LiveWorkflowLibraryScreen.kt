@@ -58,6 +58,7 @@ import com.hereliesaz.geministrator.resources.library_pinned_clear
 import com.hereliesaz.geministrator.resources.library_tab_combine
 import com.hereliesaz.geministrator.resources.library_tab_library
 import com.hereliesaz.geministrator.resources.library_tab_overview
+import com.hereliesaz.geministrator.resources.library_tab_bowl
 import com.hereliesaz.geministrator.resources.library_tab_save
 import com.hereliesaz.geministrator.resources.library_tab_store
 import com.hereliesaz.geministrator.resources.library_tab_tasks
@@ -299,6 +300,7 @@ internal fun LiveWorkflowLibraryScreen(
                             WorkflowLibraryTab.Library -> stringResource(Res.string.library_tab_library)
                             WorkflowLibraryTab.Store -> stringResource(Res.string.library_tab_store)
                             WorkflowLibraryTab.Overview -> stringResource(Res.string.library_tab_overview)
+                            WorkflowLibraryTab.Bowl -> stringResource(Res.string.library_tab_bowl)
                             WorkflowLibraryTab.Tasks -> stringResource(Res.string.library_tab_tasks)
                             WorkflowLibraryTab.Combine -> stringResource(Res.string.library_tab_combine)
                             WorkflowLibraryTab.Save -> stringResource(Res.string.library_tab_save)
@@ -446,6 +448,23 @@ internal fun LiveWorkflowLibraryScreen(
                                         }
                                     }
                                 },
+                            )
+                        }
+
+                        WorkflowLibraryTab.Bowl -> if (currentDraft != null) {
+                            // Phase 1 of docs/Fishbowl-Builder.md: the bowl with no run. Dropping one
+                            // creature on another edits the unsaved draft; Save persists it.
+                            GeministratorWorkflowTerrarium(
+                                definition = currentDraft,
+                                liveRun = remember(currentDraft.id) { restingWorkflowRun(currentDraft) },
+                                roles = roles,
+                                selectedTaskId = selectedTaskId,
+                                onTaskSelected = { taskId -> selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId },
+                                onStageDefinition = { candidate ->
+                                    draft = candidate
+                                    candidate
+                                },
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
 

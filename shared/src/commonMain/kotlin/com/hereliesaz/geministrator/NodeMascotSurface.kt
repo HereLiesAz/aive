@@ -28,15 +28,27 @@ internal fun NodeMascotSurface(
     /** The shared animation clock. Read in the draw scope (no per-frame recomposition). */
     motionPhase: () -> Float,
     modifier: Modifier = Modifier,
+    /** Where its tendrils reach, in this box's px (RiggedCreatureSurface). */
+    reach: () -> List<TendrilReach> = { emptyList() },
 ) {
-    val slug = remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }
+    // The keeper's creature for this agent (docs/Node-Creature-Genome.md, Breeds); the role only
+    // decides the look before a stable exists.
+    val kept = LocalCreatureRig.current(roleLabel)
+    // A bred creature's key is "body+tendrils+tail": one rig, wearing two others' limbs.
+    val limbs = (kept ?: remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }).split('+')
+    val slug = limbs[0]
     val rig = rememberCreatureRig(slug)
+    val tendrilsFrom = limbs.getOrNull(1)?.takeIf { it != slug }?.let { rememberCreatureRig(it) }
+    val tailFrom = limbs.getOrNull(2)?.takeIf { it != slug }?.let { rememberCreatureRig(it) }
     if (rig != null) {
         RiggedCreatureSurface(
             loaded = rig,
             state = state,
             phase = { creatureRigPhase(motionPhase(), hueSeed) },
             modifier = modifier,
+            reach = reach,
+            tendrilsFrom = tendrilsFrom,
+            tailFrom = tailFrom,
         )
     } else {
         CreatureRigPlaceholder(
