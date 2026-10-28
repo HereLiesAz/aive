@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -48,10 +49,17 @@ internal fun StableCreature(rig: String, size: Int, modifier: Modifier = Modifie
             hueSeed = rig,
             state = H2g2WorkflowState.Pending,
             motionPhase = { 0f },
-            modifier = modifier.size(size.dp),
+            // The rig leaves a margin for the field's name pills; out here the whole creature is
+            // drawn larger, tendrils and tail with it, into that margin.
+            modifier = modifier.size(size.dp).graphicsLayer {
+                scaleX = STABLE_CREATURE_SCALE
+                scaleY = STABLE_CREATURE_SCALE
+            },
         )
     }
 }
+
+private const val STABLE_CREATURE_SCALE = 1.35f
 
 /** A creature key's name: its breed's, or its parents' for a bred one. Never its stats. */
 @Composable
@@ -134,14 +142,14 @@ private fun StableTile(
     Column(
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
         modifier = Modifier
-            .size(width = 132.dp, height = 176.dp)
+            .size(width = 156.dp, height = 236.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
             .background(ground)
             .let { if (onClick != null) it.clickable(role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick) else it }
             .padding(8.dp),
     ) {
-        Box(contentAlignment = androidx.compose.ui.Alignment.TopEnd) {
-            StableCreature(rig, 104)
+        Box(Modifier.size(width = 140.dp, height = 168.dp), contentAlignment = androidx.compose.ui.Alignment.TopEnd) {
+            StableCreature(rig, 120, Modifier.align(androidx.compose.ui.Alignment.Center))
             count?.let { Text(it, style = AzphaltType.section, color = if (selected) Azphalt.Ink else Azphalt.Yellow) }
         }
         Text(title, style = AzphaltType.endCap, color = ink, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -157,7 +165,7 @@ private fun HatchingCard(hatching: Hatching, stable: Stable, catalog: BreedCatal
         if (child == null) {
             Text(stringResource(Res.string.stable_hatched_nothing), style = AzphaltType.body, color = azphaltOnSurface())
         } else {
-            Box { StableCreature(stable.rigOf(child), 140) }
+            Box(Modifier.size(200.dp), contentAlignment = androidx.compose.ui.Alignment.Center) { StableCreature(stable.rigOf(child), 140) }
             Text(creatureName(stable, catalog, child), style = AzphaltType.body, color = azphaltOnSurface())
         }
         hatching.stranger?.let { stranger ->
@@ -210,7 +218,7 @@ internal fun BreedRow(rig: String, title: String, caption: String, price: String
             .background(androidx.compose.ui.graphics.Color(0xFF2A231E))
             .padding(8.dp),
     ) {
-        StableCreature(rig, 64)
+        StableCreature(rig, 80)
         Column(Modifier.weight(1f)) {
             Text(title, style = AzphaltType.body, color = Azphalt.White)
             Text(caption, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))

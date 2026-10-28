@@ -176,7 +176,7 @@ class HiveScreenshotTest {
                 }
             }
         }
-        shoot("9-stable-pick", 900, 2600, dark(fresh) { StableSection() })
+        shoot("9-stable-pick", 900, 3000, dark(fresh) { StableSection() })
         val kept = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { host ->
             runBlocking { host.load() }
             host.chooseStarter(host.catalog.starters.first().id)
