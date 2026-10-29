@@ -16,12 +16,15 @@ data class ProcedureSnapshot(
     val revision: Long = 0L,
     val definitions: List<ProcedureDefinition> = emptyList(),
     val evidence: List<ProcedureEvidence> = emptyList(),
+    /** Bounded, source-redacted execution receipts, independent of summarized contextual memory. */
+    val traces: List<ProcedureTrace> = emptyList(),
 )
 
 @Serializable
 data class ProcedureMutation(
     val definitionsToAdd: List<ProcedureDefinition> = emptyList(),
     val evidenceToAdd: List<ProcedureEvidence> = emptyList(),
+    val tracesToAdd: List<ProcedureTrace> = emptyList(),
 )
 
 /** Revisions prevent one candidate writer from overwriting another writer's evidence. */
@@ -51,11 +54,12 @@ class InMemoryProcedureStore(
 
     override suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean = mutex.withLock {
         if (snapshot.revision != expectedRevision) return@withLock false
-        require(mutation.definitionsToAdd.isNotEmpty() || mutation.evidenceToAdd.isNotEmpty()) {
+        require(mutation.definitionsToAdd.isNotEmpty() || mutation.evidenceToAdd.isNotEmpty() || mutation.tracesToAdd.isNotEmpty()) {
             "Empty procedural memory mutation"
         }
         val newDefinitions = snapshot.definitions + mutation.definitionsToAdd
         val newEvidence = snapshot.evidence + mutation.evidenceToAdd
+        val newTraces = snapshot.traces + mutation.tracesToAdd
         require(newDefinitions.all { it.ref.workflowId == workflowId }) {
             "Cannot write a procedure belonging to another workflow bank"
         }
@@ -75,7 +79,13 @@ class InMemoryProcedureStore(
         require(newEvidence.all { it.procedure in validRefs }) {
             "Evidence must reference an existing procedure in this bank"
         }
-        snapshot = ProcedureSnapshot(snapshot.revision + 1, newDefinitions, newEvidence)
+        require(newTraces.all { it.workflowId == workflowId }) {
+            "Cannot bank a trace for another workflow"
+        }
+        require(newTraces.map { it.receiptKey }.distinct().size == newTraces.size) {
+            "An execution receipt can be stored only once per workflow and attempt"
+        }
+        snapshot = ProcedureSnapshot(snapshot.revision + 1, newDefinitions, newEvidence, newTraces)
         true
     }
 
@@ -88,6 +98,8 @@ class InMemoryProcedureStore(
         require(initial.evidence.map { it.procedure to it.receiptId }.distinct().size == initial.evidence.size)
         val refs = initial.definitions.mapTo(hashSetOf()) { it.ref }
         require(initial.evidence.all { it.procedure in refs })
+        require(initial.traces.all { it.workflowId == workflowId })
+        require(initial.traces.map { it.receiptKey }.distinct().size == initial.traces.size)
     }
 }
 
