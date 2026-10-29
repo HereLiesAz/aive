@@ -2,6 +2,8 @@ package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
+import com.hereliesaz.geministrator.memory.procedural.ProcedureBankCatalog
+import com.hereliesaz.geministrator.memory.procedural.ProcedureMutation
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
@@ -74,6 +76,8 @@ class MemoryLayerController(
     val localModels: MemoryLocalModelManager? = null,
     /** The workflow lineage DAG and project membership (add-only). */
     val lineage: MemoryLineage = MemoryLineage(),
+    /** Durable per-workflow procedural receipts; optional for tests/previews. Never an executor. */
+    val procedureCatalog: ProcedureBankCatalog? = null,
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     private val drainMutex = Mutex()
@@ -543,9 +547,16 @@ class MemoryLayerController(
         if (active && settings.value.proceduralTraceCaptureEnabled) {
             val inserted = proceduralTraceMutex.withLock {
                 registerWorkflow(trace.workflowId, trace.projectId)
+                procedureCatalog?.own(trace.workflowId)?.let { procedureBank ->
+                    while (true) {
+                        val current = procedureBank.read()
+                        if (current.traces.any { it.receiptKey == trace.receiptKey }) break
+                        if (procedureBank.commit(current.revision, ProcedureMutation(tracesToAdd = listOf(trace)))) break
+                    }
+                }
                 val bank = banks.store(trace.workflowId)
                 val source = "executor:${trace.taskRunId}:${trace.attempt}"
-                val description = "Execution receipt: ${trace.contextualSummary()}"
+                val description = "Execution receipt ${trace.receiptKey}: ${trace.contextualSummary()}"
                 val alreadyRecorded = bank.read().episodes.any { episode ->
                     episode.sourceSessionId == source && episode.userPrompt == description
                 }
