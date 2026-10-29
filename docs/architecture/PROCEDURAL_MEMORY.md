@@ -1,6 +1,6 @@
 # Aive procedural memory: reflexes, habits, and contextual-memory integration
 
-Status: **Proposed architecture — not implemented.** This design extends the normative [Memory-layer](../Memory-layer.md), [Memory Banking and Attention](MEMORY_BANKING_AND_ATTENTION.md), [GRIP](GRIP.md), [Role Execution Sources](ROLE_EXECUTION_SOURCES.md), and [Duplex MCP](DUPLEX_MCP.md) contracts. It does not change their existing authority boundaries.
+Status: **Architecture proposed; initial non-executable procedure definitions, in-memory catalog and contextual provenance filtering implemented.** Execution, durable SQL persistence, promotion, automatic recall and duplex procedure exchange are not implemented. This design extends the normative [Memory-layer](../Memory-layer.md), [Memory Banking and Attention](MEMORY_BANKING_AND_ATTENTION.md), [GRIP](GRIP.md), [Role Execution Sources](ROLE_EXECUTION_SOURCES.md), and [Duplex MCP](DUPLEX_MCP.md) contracts. It does not change their existing authority boundaries.
 
 ## 1. The four pillars
 
