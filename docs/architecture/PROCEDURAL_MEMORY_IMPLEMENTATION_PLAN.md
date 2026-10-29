@@ -1,6 +1,6 @@
 # Procedural Memory: implementation and integration plan
 
-Status: **Planned — no executable procedural-memory runtime has been implemented.** Companion design: [PROCEDURAL_MEMORY.md](PROCEDURAL_MEMORY.md). Scope: Aive's four memory pillars (recollection, consolidation, reflexes, habits) and its agent-neutral duplex MCP transport.
+Status: **Foundation, opt-in execution receipts, and durable procedural sidecars implemented; no macro execution or validation is enabled.** Companion design: [PROCEDURAL_MEMORY.md](PROCEDURAL_MEMORY.md). Scope: Aive's four memory pillars (recollection, consolidation, reflexes, habits) and its agent-neutral duplex MCP transport.
 
 ## Principles and decisions to lock first
 
@@ -86,6 +86,14 @@ The duplex protocol design can proceed in parallel with local reflex execution, 
 **Tests:** Process restart; migration; lineage and cross-project isolation; forgetting only source; concurrent version approval; corrupted blobs; tampered digest; duplicate IDs.
 
 **Gate:** Reload the same procedure/evidence after restart with identical digest and no unauthorized executable eligibility.
+
+### Durable storage implementation status
+
+The SQLDelight `ProcedureDatabase` schema is separate from the contextual `MemoryDatabase`: its own database per workflow bank holds candidate definitions, attributed evidence, a structured/redacted execution-receipt journal, and a monotonically advancing revision. Common validation runs inside the storage transaction and rejects cross-bank records, duplicate versions and receipts, dangling evidence, and invalid snapshots. The SQLite revision is read on every operation to reject stale writers after process restart. `clear(expectedRevision)` erases the sidecar's records while advancing its revision.
+
+Platform adapters are `androidSqlProcedureCatalog`, `desktopSqlProcedureCatalog`, and `webProcedureCatalog`. The browser adapter uses a separately named OPFS worker; storage failure falls back to session-only in-memory memory and can be reported to the host. The platform memory bootstraps inject their procedure catalog into `MemoryLayerController` so opt-in redacted executor receipts are journaled *before* the corresponding contextual summary is queued. `clearAll()` clears the selected workflow's procedure bank as well as its contextual bank. Tests exercise durable SQL reopen, stale revisions, corrupt/inconsistent writes, bank lineage, and receipt deduplication.
+
+**Remaining before this milestone is complete:** stable content-addressed code/blob storage, bounded export/import, explicit deletion of proposals derived from individually forgotten or raw-purged episodes, cross-process multi-writer benchmark, migrations for later schema versions, and user-facing procedure-library management. No procedure is executable; even an evidence entry claiming `Verified` remains only a report. Until verification/promotion exists, candidates remain inspection-only.
 
 ## Milestone 3 — candidate discovery and generalization
 
