@@ -74,6 +74,7 @@ internal fun HiveLaunchBar(
         AzphaltPill(
             label = stringResource(Res.string.hive_launch),
             seed = "hive-launch",
+            tone = PillTone.Primary,
             onClick = {
                 scope.launch {
                     message = runCatching {

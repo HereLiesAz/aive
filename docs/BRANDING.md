@@ -47,10 +47,24 @@ default that might not match the surface it lands on.
 - `AzphaltContrastTest` enumerates every palette token (ground pages and folds, hues, caps, Ink,
   Yellow, White) and fails if any surface yields an on-colour below the thresholds.
 
+## Controls: colour means something
+
+Hues belong to living things: creatures, hives and the tissue they live in. Controls and cards are
+calm, so colour on them always says something (`AzphaltUi.kt`):
+
+- **Pills** (`AzphaltPill`, `tone`): `Quiet` (the default) is outlined in the surface's content
+  colour; `Primary`, the one main action in view (Launch, Connect), and any selected pill are filled
+  with the surface's strong colour (Ink, or Yellow on a dark surface); `Danger` is red, and only for
+  the final step of something irreversible (delete everything, reject, remove a role). A pill that
+  merely opens a confirmation stays `Quiet`; the confirmation is where it turns red.
+- **Cards** (`AzphaltRecord`, `AzphaltNote`, `ConnectionRow`) are Ink, lifted Ink on an Ink surface,
+  and Yellow outlined in the content colour when selected. Their wells are the other Ink.
+- No control takes its colour from a hash of its name.
+
 ## Ground and the shell header
 
 The page colour (the "ground": Mustard, Maroon, Navy, Cerulean, Teal, Pink) is chosen in
-**Settings > Appearance > Ground**, on every platform. It is persisted on the device and cycles to
+**Keeper's room > Appearance > Ground**, on every platform. It is persisted on the device and cycles to
 the next ground on each press. The header and sidebar carry no ground control.
 
 In its place the header (compact layout) and the top of the sidebar (wide layout) carry the inbox

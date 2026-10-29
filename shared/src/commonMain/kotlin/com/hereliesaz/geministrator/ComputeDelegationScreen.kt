@@ -77,6 +77,8 @@ internal fun ComputeDelegationScreen(
     onAssignRole: (WorkflowDefinitionId, RoleDefinitionId, ComputeDelegationTarget) -> Unit,
     onAssignTask: (WorkflowDefinitionId, TaskDefinitionId, ComputeDelegationTarget) -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside the Keeper's room's Compute part: no title or scroll of its own. */
+    embedded: Boolean = false,
 ) {
     val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val localNodeId = distributedComputeState.configuration.nodeId
@@ -88,19 +90,21 @@ internal fun ComputeDelegationScreen(
         )
 
     Column(
-        modifier = modifier
+        modifier = if (embedded) modifier else modifier
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.compute_compute), style = AzphaltType.hero, color = azphaltOnSurface())
-        Text(
-            stringResource(Res.string.compute_coordinate_where_work_runs_assign_the) +
-                stringResource(Res.string.compute_assignments_are_enforced_by_the_relay),
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
+        if (!embedded) {
+            Text(stringResource(Res.string.compute_compute), style = AzphaltType.hero, color = azphaltOnSurface())
+            Text(
+                stringResource(Res.string.compute_coordinate_where_work_runs_assign_the) +
+                    stringResource(Res.string.compute_assignments_are_enforced_by_the_relay),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+        }
 
         ComputeSectionLabel(stringResource(Res.string.compute_fleet))
         AzphaltRecord(

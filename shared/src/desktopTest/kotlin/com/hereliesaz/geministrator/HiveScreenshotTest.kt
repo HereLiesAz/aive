@@ -239,28 +239,46 @@ class HiveScreenshotTest {
         }
     }
 
+    /** The Keeper's room: every part, wide and on a phone, with Entire signed in and out. */
     @Test
-    fun shootsTheEntireCard() {
+    fun shootsTheKeepersRoom() {
         fun entire(status: EntireStatus) = object : EntireIntegration {
             override suspend fun status() = status
             override suspend fun logIn(): String? = null
             override fun setRecordRuns(record: Boolean) = Unit
             override suspend fun clone(reference: String): String? = null
         }
-        listOf(
-            "17-entire-not-installed" to EntireStatus(),
-            "18-entire-signed-out" to EntireStatus(version = "Entire CLI 0.9.2"),
-            "19-entire-signed-in" to EntireStatus(version = "Entire CLI 0.9.2", account = "HereLiesAz", recordRuns = true),
-        ).forEach { (name, status) ->
-            shoot(name, 900, 3600) {
-                androidx.compose.runtime.CompositionLocalProvider(LocalEntire provides entire(status)) {
-                    RepositoryServiceScreen(
-                        connectedServiceIds = setOf(RepositoryServiceCatalog.GITHUB_ID),
-                        onConfigureService = {},
-                        onDisconnectService = {},
-                    )
-                }
+        val signedIn = EntireStatus(version = "Entire CLI 0.9.2", account = "HereLiesAz", recordRuns = true)
+        fun room(section: KeeperSection, compact: Boolean, status: EntireStatus, providers: Set<String>) = @androidx.compose.runtime.Composable {
+            DurableUiState.store.putString("keeper.section", section.name)
+            DurableUiState.store.putBoolean("keeper.open", true)
+            androidx.compose.runtime.CompositionLocalProvider(LocalEntire provides entire(status)) {
+                KeeperRoom(
+                    sections = KeeperSection.entries,
+                    opening = section,
+                    compact = compact,
+                    statusOf = { if (it == KeeperSection.Connections) keeperCount(providers.size + 1) else null },
+                    content = { part, partModifier ->
+                        ProviderSettingsScreen(
+                            connectedProviderIds = providers,
+                            section = part,
+                            compact = compact,
+                            trailing = {
+                                if (part == KeeperSection.Connections) {
+                                    RepositoryConnections(setOf(RepositoryServiceCatalog.GITHUB_ID), {}, {}, compact)
+                                }
+                            },
+                            modifier = partModifier,
+                        )
+                    },
+                )
             }
         }
+        val two = setOf(ProviderCatalog.ANTHROPIC_ID, ProviderCatalog.OPENROUTER_ID)
+        shoot("17-keeper-connections", 2400, 1500) { room(KeeperSection.Connections, false, signedIn, two)() }
+        shoot("18-keeper-connections-first-run", 2400, 1500) { room(KeeperSection.Connections, false, EntireStatus(), emptySet())() }
+        shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
+        shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
+        shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
     }
 }

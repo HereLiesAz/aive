@@ -499,6 +499,7 @@ internal fun MindMapRunScreen(
                 )
                 }
                 AzphaltPill(
+                    tone = PillTone.Primary,
                     label = if (runtimeState is ApplicationRuntimeState.NoRun) stringResource(Res.string.overview_start_run) else stringResource(Res.string.overview_create_project_start_run),
                     seed = "project-start-run",
                     selected = projectName.isNotBlank() && objective.isNotBlank(),

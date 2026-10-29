@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -37,6 +38,7 @@ import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.inbox_badge_none
 import com.hereliesaz.geministrator.resources.inbox_badge_unread
 import com.hereliesaz.geministrator.resources.inbox_badge_unread_many
+import com.hereliesaz.geministrator.resources.keeper_room
 import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
 
@@ -201,5 +203,41 @@ private fun InboxGlyph(color: Color, modifier: Modifier = Modifier) {
         val stroke = Stroke(width = 2f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawPath(tray, color, style = stroke)
         drawPath(slot, color, style = stroke)
+    }
+}
+
+/**
+ * The way into the Keeper's room from a phone's header (docs/Keepers-Room.md): a gear, beside the
+ * inbox, so setup is always one tap away without a navigation row.
+ */
+@Composable
+internal fun KeeperButton(selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(Res.string.keeper_room)
+    val fill = if (selected) azphaltStrong() else null
+    val glyph = fill?.onOpposite() ?: azphaltOnSurface()
+    Box(
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = label
+                this.selected = selected
+            }
+            .size(AzphaltMinTouchTarget)
+            .clip(RoundedCornerShape(999.dp))
+            .then(if (fill != null) Modifier.background(fill) else Modifier)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(24.dp)) {
+            val c = Offset(size.width / 2f, size.height / 2f)
+            val unit = size.width / 24f
+            for (i in 0 until 8) {
+                val a = i * (kotlin.math.PI / 4).toFloat()
+                val dir = Offset(kotlin.math.cos(a), kotlin.math.sin(a))
+                drawLine(glyph, c + dir * (7f * unit), c + dir * (10.5f * unit), strokeWidth = 3.2f * unit)
+            }
+            drawCircle(glyph, radius = 7.5f * unit, center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.4f * unit))
+            drawCircle(glyph, radius = 2.6f * unit, center = c, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.2f * unit))
+        }
     }
 }

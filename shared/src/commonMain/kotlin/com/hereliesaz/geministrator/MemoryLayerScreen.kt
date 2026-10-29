@@ -92,7 +92,6 @@ import com.hereliesaz.geministrator.resources.memory_keep_90_days
 import com.hereliesaz.geministrator.resources.memory_keep_all_raw_history
 import com.hereliesaz.geministrator.resources.memory_keep_it
 import com.hereliesaz.geministrator.resources.memory_memories_condensed_together
-import com.hereliesaz.geministrator.resources.memory_memory
 import com.hereliesaz.geministrator.resources.memory_memory_cleared
 import com.hereliesaz.geministrator.resources.memory_memory_is_not_available_in_this
 import com.hereliesaz.geministrator.resources.memory_memory_off
@@ -152,13 +151,13 @@ import org.jetbrains.compose.resources.stringResource
 internal fun MemoryLayerScreen(
     controller: MemoryLayerController?,
     connectedProviderIds: Set<String>,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
+        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.memory_memory), style = AzphaltType.hero, color = azphaltOnSurface())
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),
@@ -607,7 +606,7 @@ private fun DataSection(controller: MemoryLayerController) {
                     clearConfirm = false
                     message = getString(Res.string.memory_memory_cleared)
                 }
-            })
+            }, tone = PillTone.Danger)
             AzphaltPill(stringResource(Res.string.memory_keep_it), "memory-clear-cancel", onClick = { clearConfirm = false })
         }
     }

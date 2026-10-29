@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,6 +40,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.keeper_add_provider
 import com.hereliesaz.geministrator.resources.confirm_cancel
 import com.hereliesaz.geministrator.resources.confirm_disconnect_action
 import com.hereliesaz.geministrator.resources.confirm_disconnect_body
@@ -437,6 +439,11 @@ internal fun ProviderSettingsScreen(
     remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    /** The part of the Keeper's room this shows (docs/Keepers-Room.md). */
+    section: KeeperSection = KeeperSection.Connections,
+    compact: Boolean = false,
+    /** More of the same section, after this screen's own controls (repositories, compute assignments). */
+    trailing: @Composable ColumnScope.() -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -498,64 +505,77 @@ internal fun ProviderSettingsScreen(
     }
 
     Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
+        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.settings_settings), style = AzphaltType.hero, color = azphaltOnSurface())
+      if (section == KeeperSection.Connections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
-        Text(
-            stringResource(Res.string.settings_connect_as_many_providers_as_you),
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-
         if (connectedProviderIds.isEmpty()) {
+            Text(
+                stringResource(Res.string.settings_connect_as_many_providers_as_you),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
             FirstRunFreeProvidersCard(onConnect = onConfigureProvider)
         }
 
-        ProviderCatalog.entries.forEach { entry ->
-            val connected = entry.id in connectedProviderIds
+        var addingProvider by rememberDurableBooleanState("keeper.connections.adding-provider")
+        ProviderCatalog.entries.filter { it.id in connectedProviderIds }.forEach { entry ->
             val healthRaw = healthResults?.get(entry.id)
             val health = healthRaw?.substringBefore('\n')
             val healthDetails = healthRaw?.substringAfter('\n', "")
-            AzphaltRecord(
-                seed = "provider-catalog-${entry.id}",
-                eyebrow = stringResource(Res.string.settings_provider),
-                title = entry.displayName,
-                body = buildString {
-                    append(entry.description)
-                    append("\n")
-                    append(if (connected) health ?: stringResource(Res.string.settings_credential_configured) else stringResource(Res.string.settings_no_credential_configured))
-                },
-                endCap = when {
-                    !connected -> stringResource(Res.string.settings_not_configured)
-                    health != null -> health.substringBefore(" ·")
-                    else -> stringResource(Res.string.common_connected)
-                },
-                well = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ConnectionRow(
+                name = entry.displayName,
+                detail = health ?: stringResource(Res.string.settings_credential_configured),
+                status = health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
+                connected = true,
+                compact = compact,
+            ) {
+                AzphaltPill(
+                    stringResource(Res.string.settings_reconfigure),
+                    "configure-provider-${entry.id}",
+                    onClick = { onConfigureProvider(entry.id) },
+                )
+                AzphaltPill(
+                    stringResource(Res.string.settings_disconnect),
+                    "disconnect-provider-${entry.id}",
+                    onClick = { disconnectProviderId = entry.id },
+                )
+            }
+            if (!healthDetails.isNullOrBlank()) {
+                ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
+            }
+        }
+        val unconnected = ProviderCatalog.entries.filter { it.id !in connectedProviderIds }
+        if (unconnected.isNotEmpty()) {
+            AddConnectionRow(
+                label = stringResource(Res.string.keeper_add_provider),
+                hint = unconnected.take(5).joinToString(", ") { it.displayName } + if (unconnected.size > 5) "…" else "",
+                open = addingProvider,
+                onToggle = { addingProvider = !addingProvider },
+            )
+            if (addingProvider) {
+                unconnected.forEach { entry ->
+                    ConnectionRow(
+                        name = entry.displayName,
+                        detail = entry.description,
+                        status = null,
+                        connected = false,
+                        compact = compact,
+                    ) {
                         AzphaltPill(
-                            if (connected) stringResource(Res.string.settings_reconfigure) else stringResource(Res.string.common_connect),
+                            stringResource(Res.string.common_connect),
                             "configure-provider-${entry.id}",
                             onClick = { onConfigureProvider(entry.id) },
+                            tone = PillTone.Primary,
                         )
-                        if (connected) {
-                            AzphaltPill(
-                                stringResource(Res.string.settings_disconnect),
-                                "disconnect-provider-${entry.id}",
-                                onClick = { disconnectProviderId = entry.id },
-                            )
-                        }
                         AzphaltPill(
                             stringResource(Res.string.settings_get_api_key),
                             "get-key-${entry.id}",
                             onClick = { uriHandler.openUri(entry.apiKeyUrl) },
                         )
                     }
-                },
-            )
-            if (connected && !healthDetails.isNullOrBlank()) {
-                ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
+                }
             }
         }
 
@@ -582,20 +602,22 @@ internal fun ProviderSettingsScreen(
                 }
             }
         }
-        AzphaltPill(
-            if (healthResults == null) stringResource(Res.string.settings_check_provider_health) else stringResource(Res.string.settings_refresh_health),
-            "health-check",
-            onClick = {
-                healthChecking = true
-                healthResults = null
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (connectedProviderIds.isNotEmpty()) {
+            AzphaltPill(
+                if (healthResults == null) stringResource(Res.string.settings_check_provider_health) else stringResource(Res.string.settings_refresh_health),
+                "health-check",
+                onClick = {
+                    healthChecking = true
+                    healthResults = null
+                },
+            )
+        }
+      }
 
         // Appearance: the page colour ("ground"). It lives here, not in the header, so every shell
         // (Android, Desktop, Web) offers it in one place. The pill and its text take their colours
         // from the surfaces they sit on like every other control.
-        ProviderSectionLabel(stringResource(Res.string.settings_appearance))
+      if (section == KeeperSection.Appearance) {
         Text(
             stringResource(Res.string.settings_ground_explain),
             style = AzphaltType.body,
@@ -608,7 +630,9 @@ internal fun ProviderSettingsScreen(
             onClick = { Azphalt.rerollGround() },
             modifier = Modifier.fillMaxWidth(),
         )
+      }
 
+      if (section == KeeperSection.About) {
         crashReportingSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_crash_reports))
             Text(
@@ -627,6 +651,9 @@ internal fun ProviderSettingsScreen(
             )
         }
 
+      }
+
+      if (section == KeeperSection.Device) {
         remoteAccessSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
             Text(
@@ -823,6 +850,9 @@ internal fun ProviderSettingsScreen(
             }
         }
 
+      }
+
+      if (section == KeeperSection.Compute) {
         ProviderSectionLabel(stringResource(Res.string.settings_compute_pool))
         Text(
             stringResource(Res.string.settings_connect_this_device_to_the_same) +
@@ -952,6 +982,7 @@ internal fun ProviderSettingsScreen(
                     stringResource(Res.string.settings_disconnect),
                     "distributed-disconnect",
                     onClick = onDisconnectDistributedCompute,
+                    tone = PillTone.Danger,
                 )
             }
         }
@@ -984,8 +1015,11 @@ internal fun ProviderSettingsScreen(
             }
         }
 
-        ProviderSectionLabel(stringResource(Res.string.settings_projects))
+      }
+
+      if (section == KeeperSection.Projects) {
         if (projectFileService != null) {
+            ProviderSectionLabel(stringResource(Res.string.settings_projects))
             Text(
                 stringResource(Res.string.settings_project_files_use_the_ive_extension),
                 style = AzphaltType.body,
@@ -1167,6 +1201,9 @@ internal fun ProviderSettingsScreen(
             }
         }
 
+      }
+
+      if (section == KeeperSection.About) {
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
@@ -1195,6 +1232,9 @@ internal fun ProviderSettingsScreen(
             )
         }
 
+      }
+
+      if (section == KeeperSection.Projects) {
         ProviderSectionLabel(stringResource(Res.string.settings_privacy))
         if (!clearConfirm) {
             AzphaltPill(
@@ -1215,10 +1255,12 @@ internal fun ProviderSettingsScreen(
                 AzphaltPill(stringResource(Res.string.settings_delete_everything), "clear-data-confirm", onClick = {
                     onClearWorkflowData()
                     clearConfirm = false
-                })
+                }, tone = PillTone.Danger)
                 AzphaltPill(stringResource(Res.string.common_cancel), "clear-data-cancel", onClick = { clearConfirm = false })
             }
         }
+      }
+        trailing()
     }
 }
 

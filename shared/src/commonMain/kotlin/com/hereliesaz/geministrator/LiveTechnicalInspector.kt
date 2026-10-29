@@ -223,6 +223,7 @@ internal fun TechnicalInspector(
                     endCap = stringResource(Res.string.common_reject),
                     onClick = { confirmingStop = false },
                     modifier = Modifier.fillMaxWidth(),
+                    tone = PillTone.Danger,
                 )
             }
         }
@@ -250,6 +251,7 @@ internal fun TechnicalInspector(
                 endCap = stringResource(Res.string.common_reject),
                 onClick = { confirmingStop = true },
                 modifier = Modifier.fillMaxWidth(),
+                tone = PillTone.Danger,
             )
         }
         if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
