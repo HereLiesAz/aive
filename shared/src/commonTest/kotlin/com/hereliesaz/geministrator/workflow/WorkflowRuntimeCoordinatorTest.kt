@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class WorkflowRuntimeCoordinatorTest {
     @Test
@@ -311,6 +312,86 @@ class WorkflowRuntimeCoordinatorTest {
         )
     }
 
+    @Test
+    fun throwingDispatchFailsOnlyItsTaskAndKeepsEarlierDispatches() = runBlocking {
+        val (definition, run) = twoGitHubActionRun()
+        val integration = FakeSystemExecutorIntegration(throwOn = mapOf("boom.yml" to IllegalStateException("GitHub said no")))
+        val fixture = fixture(integrations = TaskExecutorIntegrationRegistry(listOf(integration)))
+
+        val result = fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(run),
+            nowEpochMillis = 20L,
+            artifactIdFactory = ::artifactId,
+        )
+
+        val first = result.run.taskRuns.getValue(TaskDefinitionId("first"))
+        assertEquals(TaskRunStatus.Running, first.status)
+        assertEquals("external-ci-1", first.externalRunId)
+        val second = result.run.taskRuns.getValue(TaskDefinitionId("second"))
+        // The failure went through the retry policy instead of leaving the task Ready.
+        assertEquals(TaskRunStatus.Retrying, second.status)
+        assertEquals(2, second.attempt)
+    }
+
+    @Test
+    fun dispatchesAlreadyStartedSurviveACycleThatEndsEarly() = runBlocking {
+        val (definition, run) = twoGitHubActionRun()
+        val integration = FakeSystemExecutorIntegration(
+            throwOn = mapOf("boom.yml" to kotlinx.coroutines.CancellationException("stopped")),
+        )
+        val fixture = fixture(integrations = TaskExecutorIntegrationRegistry(listOf(integration)))
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> {
+            fixture.coordinator.cycle(
+                project = project(),
+                definition = definition,
+                state = WorkflowRuntimeState(run),
+                nowEpochMillis = 20L,
+                artifactIdFactory = ::artifactId,
+            )
+        }
+        assertEquals(
+            "external-ci-1",
+            fixture.persistence.runs.get(run.id)?.taskRuns?.get(TaskDefinitionId("first"))?.externalRunId,
+        )
+
+        integration.throwOn = emptyMap()
+        fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(run),
+            nowEpochMillis = 30L,
+            artifactIdFactory = ::artifactId,
+        )
+        assertEquals(1, integration.dispatchesOf("ok.yml"))
+    }
+
+    private fun twoGitHubActionRun(): Pair<WorkflowDefinition, WorkflowRun> {
+        val tasks = listOf("first" to "ok.yml", "second" to "boom.yml").map { (id, workflow) ->
+            TaskDefinition(
+                id = TaskDefinitionId(id),
+                name = id,
+                objective = "Run $workflow",
+                roleId = null,
+                executor = TaskExecutor.GitHubAction(workflow),
+            )
+        }
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("definition-two-ci"),
+            name = "Workflow",
+            tasks = tasks,
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        val run = run(
+            definition = definition,
+            status = WorkflowRunStatus.Running,
+            taskRuns = tasks.associate { it.id to taskRun(it.id, TaskRunStatus.Ready, it.executor!!) },
+        )
+        return definition to run
+    }
+
     private fun fixture(
         gateway: FakeManagedSessionGateway = FakeManagedSessionGateway(),
         integrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
@@ -416,14 +497,22 @@ private class FakeManagedSessionGateway(
 
 private class FakeSystemExecutorIntegration(
     private val dispatchDelayMillis: Long = 0L,
+    /** Workflow file -> what dispatching it throws. */
+    var throwOn: Map<String, Throwable> = emptyMap(),
 ) : TaskExecutorIntegration {
     var dispatchCount = 0
     var reconcileCount = 0
+    private val dispatchedWorkflows = mutableListOf<String>()
+
+    fun dispatchesOf(workflow: String): Int = dispatchedWorkflows.count { it == workflow }
 
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.GitHubAction
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         dispatchCount += 1
+        val workflow = (context.executor as TaskExecutor.GitHubAction).workflow
+        dispatchedWorkflows += workflow
+        throwOn[workflow]?.let { throw it }
         if (dispatchDelayMillis > 0L) delay(dispatchDelayMillis)
         return TaskExecutorExecution(
             status = TaskRunStatus.Running,
