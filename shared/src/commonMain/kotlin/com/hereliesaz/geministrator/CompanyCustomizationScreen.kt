@@ -187,6 +187,11 @@ import com.hereliesaz.geministrator.resources.swarm_workflow_policies
 import com.hereliesaz.geministrator.resources.swarm_working
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * The Swarm: every role, its arrangement, and the form that adds or changes one. With [focusRole]
+ * it is one creature's mind (docs/Keepers-Room.md, stage 3): that role's form alone, open from the
+ * start, its id fixed, and applying it saves the swarm at once.
+ */
 @Composable
 internal fun CustomCompanyProviderScreen(
     runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
@@ -195,6 +200,7 @@ internal fun CustomCompanyProviderScreen(
     onResetRoleCollection: () -> Unit = {},
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
+    focusRole: RoleDefinitionId? = null,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val runtimeRoles = liveWorkflow?.roles
@@ -202,38 +208,41 @@ internal fun CustomCompanyProviderScreen(
         ?: (runtimeState as? ApplicationRuntimeState.NoProject)?.roles
         ?: emptyList()
     val visibleRoles = runtimeRoles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
+    // A creature's mind keeps its own draft, apart from the Swarm's: applying one role must never
+    // save another the keeper left unsaved in the Swarm.
+    val draftKey: (String) -> String = { key -> focusRole?.let { "mind.${it.value}.$key" } ?: key }
     var draftRoles by rememberDurableJsonState(
-        key = COMPANY_DRAFT_ROLES_KEY,
+        key = draftKey(COMPANY_DRAFT_ROLES_KEY),
         serializer = ListSerializer(RoleDefinition.serializer()),
         initialValue = visibleRoles,
     )
-    var editingRoleIdValue by rememberDurableStringState(COMPANY_EDITING_ROLE_KEY)
+    var editingRoleIdValue by rememberDurableStringState(draftKey(COMPANY_EDITING_ROLE_KEY))
     val editingRoleId = editingRoleIdValue.takeIf(String::isNotBlank)
-    var showRoleForm by rememberDurableBooleanState(COMPANY_SHOW_ROLE_FORM_KEY)
-    var roleIdDraft by rememberDurableStringState(COMPANY_ROLE_ID_KEY)
-    var roleNameDraft by rememberDurableStringState(COMPANY_ROLE_NAME_KEY)
-    var roleDescDraft by rememberDurableStringState(COMPANY_ROLE_DESCRIPTION_KEY)
-    var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
-    var roleTokenBudgetDraft by rememberDurableStringState(COMPANY_ROLE_TOKEN_BUDGET_KEY)
-    var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
+    var showRoleForm by rememberDurableBooleanState(draftKey(COMPANY_SHOW_ROLE_FORM_KEY))
+    var roleIdDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_ID_KEY))
+    var roleNameDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_NAME_KEY))
+    var roleDescDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_DESCRIPTION_KEY))
+    var roleInstructionsDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_INSTRUCTIONS_KEY))
+    var roleTokenBudgetDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_TOKEN_BUDGET_KEY))
+    var roleProviderDraftValue by rememberDurableStringState(draftKey(COMPANY_ROLE_PROVIDER_KEY))
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
     var roleExecutionSourceDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_EXECUTION_SOURCE_KEY,
+        key = draftKey(COMPANY_ROLE_EXECUTION_SOURCE_KEY),
         serializer = RoleExecutionSource.serializer(),
         initialValue = RoleExecutionSource.Agent,
     )
     var roleSurfacesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_SURFACES_KEY,
+        key = draftKey(COMPANY_ROLE_SURFACES_KEY),
         serializer = ListSerializer(RoleSurface.serializer()),
         initialValue = emptyList(),
     )
     var roleCapabilitiesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_CAPABILITIES_KEY,
+        key = draftKey(COMPANY_ROLE_CAPABILITIES_KEY),
         serializer = SetSerializer(AgentCapability.serializer()),
         initialValue = emptySet(),
     )
     var roleAuthoritiesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_AUTHORITIES_KEY,
+        key = draftKey(COMPANY_ROLE_AUTHORITIES_KEY),
         serializer = SetSerializer(RoleAuthority.serializer()),
         initialValue = emptySet(),
     )
@@ -288,6 +297,11 @@ internal fun CustomCompanyProviderScreen(
     }
 
     val dirty = draftRoles != visibleRoles
+    // The mind's form starts from the role as it is saved now, never from a stale draft.
+    val focused = focusRole?.let { id -> visibleRoles.firstOrNull { it.id == id } }
+    LaunchedEffect(focused) {
+        if (focused != null) editRole(focused)
+    }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
             it.status in setOf(
@@ -302,9 +316,10 @@ internal fun CustomCompanyProviderScreen(
         .orEmpty()
 
     Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
+        modifier = if (focusRole != null) modifier else modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (focusRole == null) {
         Text(
             stringResource(Res.string.swarm_these_are_aive_s_semantic_orchestration),
             style = AzphaltType.body,
@@ -366,8 +381,9 @@ internal fun CustomCompanyProviderScreen(
                 },
             )
         }
+        }
 
-        if (showRoleForm) {
+        if (showRoleForm && (focusRole == null || editingRoleId == focusRole.value)) {
             Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),
                 style = AzphaltType.eyebrow,
@@ -381,7 +397,8 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             val reservedRoleId = roleIdDraft.trim() == ROLE_COLLECTION_MARKER_ID
-            OutlinedTextField(
+            // A creature's mind keeps its id: its creature, its breeds and its tasks hang on it.
+            if (focusRole == null) OutlinedTextField(
                 value = roleIdDraft,
                 onValueChange = { roleIdDraft = it },
                 label = { Text(stringResource(Res.string.swarm_role_id_slug)) },
@@ -751,7 +768,14 @@ internal fun CustomCompanyProviderScreen(
                                 } else {
                                     draftRoles + role
                                 }
-                                clearEditor()
+                                if (focusRole != null) {
+                                    // One creature's mind has no separate save: applying it saves this role
+                                    // into the swarm as it is saved now, and nothing else.
+                                    onSaveRoleCollection(visibleRoles.map { if (it.id == focusRole) role else it })
+                                    editRole(role)
+                                } else {
+                                    clearEditor()
+                                }
                             }
                         }
                     },
@@ -759,11 +783,12 @@ internal fun CustomCompanyProviderScreen(
                 AzphaltPill(
                     label = stringResource(Res.string.common_cancel),
                     seed = "company-role-cancel",
-                    onClick = ::clearEditor,
+                    onClick = { if (focused != null) editRole(focused) else clearEditor() },
                 )
             }
         }
 
+        if (focusRole != null) return@Column
         CompanySectionLabel(stringResource(Res.string.swarm_role_arrangement))
         if (draftRoles.isEmpty()) {
             Text(

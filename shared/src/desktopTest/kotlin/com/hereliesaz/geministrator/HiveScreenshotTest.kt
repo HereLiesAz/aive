@@ -327,6 +327,26 @@ class HiveScreenshotTest {
         shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
     }
 
+    /** A creature's panel (docs/Keepers-Room.md, stage 3): its Needs, its Work, its Mind. */
+    @Test
+    fun shootsTheCreaturePanel() {
+        val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
+        val presentation = LiveWorkflowPresentation(project, definition, liveRun, roles)
+        fun panel(task: String, tab: CreatureTab, compact: Boolean) = @androidx.compose.runtime.Composable {
+            AzphaltThemedSurface(Azphalt.Ink) {
+                TechnicalInspector(
+                    selectedTaskId = task,
+                    liveWorkflow = presentation,
+                    tab = tab,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        shoot("32-creature-needs", 824, 1830) { panel("review", CreatureTab.Needs, true)() }
+        shoot("33-creature-work", 824, 1830) { panel("build", CreatureTab.Work, true)() }
+        shoot("34-creature-mind", 824, 1830) { panel("build", CreatureTab.Mind, true)() }
+    }
+
     /** The neuron, the body of programmatic work, in its states. */
     @Test
     fun shootsTheNeuron() {

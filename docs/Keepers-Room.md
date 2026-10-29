@@ -1,6 +1,6 @@
 # The Keeper's room
 
-The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), and **the Keeper's room**, where everything that sets the hive up lives. Consolidating the app into those two places is planned in stages, below; stages 1 and 2 are done.
+The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), and **the Keeper's room**, where everything that sets the hive up lives. Consolidating the app into those two places is planned in stages, below; all three are done.
 
 ## Parts
 
@@ -35,7 +35,17 @@ There is no navigation row. One header sits over every screen, wide and on a pho
 - **The breadcrumb**: Hive › a hive › a creature, or Hive › a place opened from it (Swarm, Inbox, the Keeper's room). The last step is where you are; any earlier step goes back up. Hive is the district, every hive at once; a hive is its swarm; a creature is the one selected. It replaces the page titles. On a phone it takes its own line.
 - **The Inbox** badge and **the Keeper's room** gear.
 
-Inside a hive, one row holds its places: its Swarm, the Memory swarm, Artifacts and the Store. The Store is also the district's edge. Runs and Workflows stay retired into the hive.
+Inside a hive, one row holds its places: its Swarm, the Memory swarm and the Store. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
+
+## A creature's panel
+
+Selecting a creature opens its panel, in three tabs (`TechnicalInspector`, `CreatureTab`); the breadcrumb ends on the open one (Hive › a hive › a creature › Mind):
+
+- **Needs:** its needs, and what it waits on you for: a plan or task to approve, an escalation, a nested gate, and messages to its agent. This was the Inbox.
+- **Work:** its state, executor and provider, progress, what it was sent, and its artifacts, each opening on its contents. This was Artifacts.
+- **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles.
+
+A creature opens on Needs when it waits on you, otherwise on Work. The header's Inbox badge opens the first creature waiting on you, on its Needs. Only the Hall Monitor's pause, which speaks for the whole hive, keeps a place of its own (`Inbox`).
 
 `ControlRoomDestination.Settings` is the Keeper's room. `Repositories` and `Compute` remain as destinations, so existing links still land, but each opens its part of the room.
 
@@ -47,4 +57,4 @@ A first launch opens on the hive, not on a form (`MindMapRunScreen`, `FirstCreat
 
 1. **Stage 1 (done):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.
 2. **Stage 2 (done):** the hive as home. A first launch opens on the hive with the starter creature and one step to feed it (no "No project" form); a breadcrumb (Hive › a hive › a creature) replaces page titles and the navigation row.
-3. **Stage 3:** Inbox, Runs, Artifacts and the Swarm role editor move into the creature's panel (Needs, Work, Mind) and the hive's combs; their destinations retire. The breadcrumb gains the creature's last step: its mind.
+3. **Stage 3 (done):** Inbox, Runs, Artifacts and the Swarm role editor move into the creature's panel (Needs, Work, Mind) and the hive's combs; their destinations retire. The breadcrumb gains the creature's last step.
