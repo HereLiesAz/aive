@@ -208,38 +208,41 @@ internal fun CustomCompanyProviderScreen(
         ?: (runtimeState as? ApplicationRuntimeState.NoProject)?.roles
         ?: emptyList()
     val visibleRoles = runtimeRoles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
+    // A creature's mind keeps its own draft, apart from the Swarm's: applying one role must never
+    // save another the keeper left unsaved in the Swarm.
+    val draftKey: (String) -> String = { key -> focusRole?.let { "mind.${it.value}.$key" } ?: key }
     var draftRoles by rememberDurableJsonState(
-        key = COMPANY_DRAFT_ROLES_KEY,
+        key = draftKey(COMPANY_DRAFT_ROLES_KEY),
         serializer = ListSerializer(RoleDefinition.serializer()),
         initialValue = visibleRoles,
     )
-    var editingRoleIdValue by rememberDurableStringState(COMPANY_EDITING_ROLE_KEY)
+    var editingRoleIdValue by rememberDurableStringState(draftKey(COMPANY_EDITING_ROLE_KEY))
     val editingRoleId = editingRoleIdValue.takeIf(String::isNotBlank)
-    var showRoleForm by rememberDurableBooleanState(COMPANY_SHOW_ROLE_FORM_KEY)
-    var roleIdDraft by rememberDurableStringState(COMPANY_ROLE_ID_KEY)
-    var roleNameDraft by rememberDurableStringState(COMPANY_ROLE_NAME_KEY)
-    var roleDescDraft by rememberDurableStringState(COMPANY_ROLE_DESCRIPTION_KEY)
-    var roleInstructionsDraft by rememberDurableStringState(COMPANY_ROLE_INSTRUCTIONS_KEY)
-    var roleTokenBudgetDraft by rememberDurableStringState(COMPANY_ROLE_TOKEN_BUDGET_KEY)
-    var roleProviderDraftValue by rememberDurableStringState(COMPANY_ROLE_PROVIDER_KEY)
+    var showRoleForm by rememberDurableBooleanState(draftKey(COMPANY_SHOW_ROLE_FORM_KEY))
+    var roleIdDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_ID_KEY))
+    var roleNameDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_NAME_KEY))
+    var roleDescDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_DESCRIPTION_KEY))
+    var roleInstructionsDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_INSTRUCTIONS_KEY))
+    var roleTokenBudgetDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_TOKEN_BUDGET_KEY))
+    var roleProviderDraftValue by rememberDurableStringState(draftKey(COMPANY_ROLE_PROVIDER_KEY))
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
     var roleExecutionSourceDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_EXECUTION_SOURCE_KEY,
+        key = draftKey(COMPANY_ROLE_EXECUTION_SOURCE_KEY),
         serializer = RoleExecutionSource.serializer(),
         initialValue = RoleExecutionSource.Agent,
     )
     var roleSurfacesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_SURFACES_KEY,
+        key = draftKey(COMPANY_ROLE_SURFACES_KEY),
         serializer = ListSerializer(RoleSurface.serializer()),
         initialValue = emptyList(),
     )
     var roleCapabilitiesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_CAPABILITIES_KEY,
+        key = draftKey(COMPANY_ROLE_CAPABILITIES_KEY),
         serializer = SetSerializer(AgentCapability.serializer()),
         initialValue = emptySet(),
     )
     var roleAuthoritiesDraft by rememberDurableJsonState(
-        key = COMPANY_ROLE_AUTHORITIES_KEY,
+        key = draftKey(COMPANY_ROLE_AUTHORITIES_KEY),
         serializer = SetSerializer(RoleAuthority.serializer()),
         initialValue = emptySet(),
     )
@@ -294,9 +297,10 @@ internal fun CustomCompanyProviderScreen(
     }
 
     val dirty = draftRoles != visibleRoles
-    val focused = focusRole?.let { id -> draftRoles.firstOrNull { it.id == id } }
-    LaunchedEffect(focusRole, focused) {
-        if (focused != null && editingRoleId != focused.id.value) editRole(focused)
+    // The mind's form starts from the role as it is saved now, never from a stale draft.
+    val focused = focusRole?.let { id -> visibleRoles.firstOrNull { it.id == id } }
+    LaunchedEffect(focused) {
+        if (focused != null) editRole(focused)
     }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
@@ -765,8 +769,9 @@ internal fun CustomCompanyProviderScreen(
                                     draftRoles + role
                                 }
                                 if (focusRole != null) {
-                                    // One creature's mind has no separate save: applying it is saving it.
-                                    onSaveRoleCollection(draftRoles)
+                                    // One creature's mind has no separate save: applying it saves this role
+                                    // into the swarm as it is saved now, and nothing else.
+                                    onSaveRoleCollection(visibleRoles.map { if (it.id == focusRole) role else it })
                                     editRole(role)
                                 } else {
                                     clearEditor()
