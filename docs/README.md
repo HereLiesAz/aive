@@ -53,6 +53,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/BITNET_B1_58_ADOPTION_BENCHMARK.md`](architecture/BITNET_B1_58_ADOPTION_BENCHMARK.md) records the gate-ordered pre-adoption review of native BitNet b1.58 specialists against the Epoch-8 Qwen/ONNX baseline (not adopted).
 
+### Four-pillar memory: procedural reflexes and habits (proposed)
+
+[`architecture/PROCEDURAL_MEMORY.md`](architecture/PROCEDURAL_MEMORY.md) defines the planned fourth-pillar architecture: recollection, consolidation, reflexes and habits, combining lineage-scoped contextual recall with a governed versioned macro library and agent-neutral duplex MCP collaboration. [`architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md`](architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md) details the staged implementation, source-file integration points, acceptance tests, roll-out controls and dependency gates. These documents describe a **proposal**, not a currently shipped macro executor.
+
 ### Memory banking and attention
 
 Memory is organised per workflow run: every run has its own memory bank, continuations and merges read their ancestors' banks through a lineage, and the other runs of the same project are readable at recall, read-only. [`Memory-layer.md`](Memory-layer.md#workflow-banks-and-lineage) states the model (lineage, merge, project membership and expansion, provenance, deliberation-resolved consolidation, the size curve, time ranges, raw-history retention); [`architecture/GRIP.md`](architecture/GRIP.md) states where recall reads.
