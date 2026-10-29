@@ -237,6 +237,24 @@ class PuppetRigEvaluatorTest {
     }
 
     @Test
+    fun validateMatchesTheEditorsChecks() {
+        val part = PuppetPart("p", rect = PuppetRect(0, 0, 10, 10))
+        val ok = rig(listOf(part), states = mapOf("Active" to motion("p", PuppetPartMotion(keys = mapOf("y" to listOf(PuppetKeyframe(0f, 1f)))))))
+        ok.validate()
+        listOf(
+            ok.copy(parts = listOf(part.copy(rect = PuppetRect(60, 0, 10, 10)))), // outside the 64px atlas
+            ok.copy(parts = listOf(part.copy(rect = PuppetRect(-1, 0, 10, 10)))),
+            ok.copy(parts = listOf(part.copy(rect = PuppetRect(0, 0, 0, 10)))),
+            ok.copy(parts = listOf(part.copy(rest = PuppetTransform(x = Float.NaN)))),
+            ok.copy(parts = listOf(part.copy(rest = PuppetTransform(scaleY = Float.POSITIVE_INFINITY)))),
+            ok.copy(states = mapOf("Active" to motion("gone", PuppetPartMotion(keys = mapOf("y" to listOf(PuppetKeyframe(0f, 1f))))))),
+            ok.copy(states = mapOf("Active" to motion("p", PuppetPartMotion(keys = mapOf("spin" to listOf(PuppetKeyframe(0f, 1f))))))),
+            ok.copy(states = mapOf("Exploded" to PuppetStateMotion())),
+            ok.copy(atlas = PuppetAtlas("a.png", 0, 64)),
+        ).forEach { bad -> assertFailsWith<IllegalArgumentException> { bad.validate() } }
+    }
+
+    @Test
     fun parserRoundTripsAndRejectsBadRigs() {
         val r = rig(listOf(PuppetPart("a"), PuppetPart("b", parent = "a")))
         assertEquals(r, PuppetRig.parse(PuppetRig.encode(r)))
