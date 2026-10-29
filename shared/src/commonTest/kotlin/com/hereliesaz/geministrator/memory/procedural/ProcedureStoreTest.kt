@@ -168,6 +168,37 @@ class ProcedureStoreTest {
     }
 
     @Test
+    fun redactedReceiptsUseStableKeysAndRejectCrossWorkflowAndDuplicates() = runTest {
+        val store = InMemoryProcedureStore("root")
+        val trace = ProcedureTrace(
+            workflowId = "root",
+            projectId = "project",
+            taskRunId = "task",
+            taskDefinitionId = "definition",
+            attempt = 1,
+            phase = ProcedureTracePhase.Reconcile,
+            executorKind = "TestRunner",
+            outcome = ProcedureTraceOutcome.Completed,
+            artifactCount = 1,
+            recordedAtEpochMillis = 10,
+        )
+        assertTrue(store.commit(0, ProcedureMutation(tracesToAdd = listOf(trace))))
+        assertFailsWith<IllegalArgumentException> {
+            store.commit(1, ProcedureMutation(tracesToAdd = listOf(trace.copy(recordedAtEpochMillis = 20))))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            store.commit(1, ProcedureMutation(tracesToAdd = listOf(trace.copy(workflowId = "foreign"))))
+        }
+        assertEquals(1, store.read().traces.size)
+        assertEquals(1L, store.read().revision)
+        val decoded = Json.decodeFromString(
+            ProcedureSnapshot.serializer(),
+            Json.encodeToString(ProcedureSnapshot.serializer(), store.read()),
+        )
+        assertEquals(store.read(), InMemoryProcedureStore("root", decoded).read())
+    }
+
+    @Test
     fun snapshotSerializesAndCanBeReconstructedWithoutPromoting() = runTest {
         val store = InMemoryProcedureStore("root")
         val def = definition(kind = ProcedureKind.Habit)
