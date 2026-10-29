@@ -1,9 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ApprovalGateId
-import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
-import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
@@ -20,28 +18,6 @@ class WorkflowApprovalService(
     private val sessionGateway: ManagedSessionGateway,
     private val failureEscalationDecisionStore: FailureEscalationDecisionStore? = null,
 ) {
-    suspend fun ensurePlanGate(
-        run: WorkflowRun,
-        taskDefinitionId: TaskDefinitionId,
-        gateIdFactory: (TaskDefinitionId) -> ApprovalGateId,
-        nowEpochMillis: Long,
-    ): ApprovalGate {
-        val existing = gateRepository.unresolved(run.id).firstOrNull {
-            it.taskDefinitionId == taskDefinitionId && it.kind == ApprovalGateKind.PlanApproval
-        }
-        if (existing != null) return existing
-
-        return gateCoordinator.open(
-            id = gateIdFactory(taskDefinitionId),
-            workflowRunId = run.id,
-            taskDefinitionId = taskDefinitionId,
-            kind = ApprovalGateKind.PlanApproval,
-            reason = "Provider plan requires independent approval before execution.",
-            requiredRoleId = BuiltInRoles.Architect.id,
-            nowEpochMillis = nowEpochMillis,
-        )
-    }
-
     /**
      * Approves a plan gate. [handle] is the provider session that drafted the plan, or null for an
      * engine-held plan (see EnginePlanGate.kt): nothing runs yet, so the decision is only recorded and
