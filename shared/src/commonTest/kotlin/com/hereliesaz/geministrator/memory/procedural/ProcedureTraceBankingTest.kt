@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.memory.InMemoryMemoryStore
 import com.hereliesaz.geministrator.memory.MemoryBanks
 import com.hereliesaz.geministrator.memory.MemoryEngineProvider
 import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLineage
 import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.russhwolf.settings.MapSettings
@@ -34,10 +35,14 @@ class ProcedureTraceBankingTest {
     fun optInRecordsProvenanceButDeduplicatesTerminalReconcilesAndRestarts() = runBlocking {
         val store = InMemoryMemoryStore()
         val banks = MemoryBanks.inMemory(mapOf("workflow" to store))
+        val lineage = MemoryLineage()
+        val procedures = ProcedureBankCatalog(lineage)
         val settings = MemoryLayerSettingsStore(MapSettings())
         val scope = CoroutineScope(Dispatchers.Unconfined)
         fun controller() = MemoryLayerController(
             banks = banks,
+            procedureCatalog = procedures,
+            lineage = lineage,
             settingsStore = settings,
             engineProvider = object : MemoryEngineProvider {},
             scope = scope,
@@ -48,6 +53,7 @@ class ProcedureTraceBankingTest {
         first.procedureTraceSink.record(trace())
         first.procedureTraceSink.record(trace())
         assertEquals(1, store.read().episodes.size)
+        assertEquals(1, procedures.own("workflow").read().traces.size)
         val entry = store.read().episodes.single()
         assertEquals("workflow", entry.workflowRunId)
         assertEquals("project", entry.projectId)
@@ -59,6 +65,7 @@ class ProcedureTraceBankingTest {
 
         val restarted = controller()
         restarted.procedureTraceSink.record(trace())
+        assertEquals(1, procedures.own("workflow").read().traces.size)
         assertEquals(1, store.read().episodes.size)
         assertEquals(1, store.read().queue.size)
     }
