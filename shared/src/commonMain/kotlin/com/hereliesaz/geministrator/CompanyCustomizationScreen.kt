@@ -169,7 +169,6 @@ import com.hereliesaz.geministrator.resources.swarm_token_budget_hint
 import com.hereliesaz.geministrator.resources.swarm_surface_alias
 import com.hereliesaz.geministrator.resources.swarm_surface_aliases_must_be_unique_and
 import com.hereliesaz.geministrator.resources.swarm_surfaces
-import com.hereliesaz.geministrator.resources.swarm_swarm
 import com.hereliesaz.geministrator.resources.swarm_tabular_rows_available_to_scripts_as
 import com.hereliesaz.geministrator.resources.swarm_test_design
 import com.hereliesaz.geministrator.resources.swarm_test_design_policy
@@ -306,7 +305,6 @@ internal fun CustomCompanyProviderScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.swarm_swarm), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             stringResource(Res.string.swarm_these_are_aive_s_semantic_orchestration),
             style = AzphaltType.body,

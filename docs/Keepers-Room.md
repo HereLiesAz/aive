@@ -1,6 +1,6 @@
 # The Keeper's room
 
-The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), and **the Keeper's room**, where everything that sets the hive up lives. This is stage 1 of consolidating the app into those two places; the plan is below.
+The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), and **the Keeper's room**, where everything that sets the hive up lives. Consolidating the app into those two places is planned in stages, below; stages 1 and 2 are done.
 
 ## Parts
 
@@ -29,10 +29,22 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 
 ## Navigation
 
-`ControlRoomDestination.Settings` is the Keeper's room. `Repositories` and `Compute` remain as destinations, so existing links still land, but each opens its part of the room and none has its own navigation entry. On a phone the room is the header's gear, not a pill in the row.
+There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):
+
+- **The Aive** and how its runtime is.
+- **The breadcrumb**: Hive › a hive › a creature, or Hive › a place opened from it (Swarm, Inbox, the Keeper's room). The last step is where you are; any earlier step goes back up. Hive is the district, every hive at once; a hive is its swarm; a creature is the one selected. It replaces the page titles. On a phone it takes its own line.
+- **The Inbox** badge and **the Keeper's room** gear.
+
+Inside a hive, one row holds its places: its Swarm, the Memory swarm, Artifacts and the Store. The Store is also the district's edge. Runs and Workflows stay retired into the hive.
+
+`ControlRoomDestination.Settings` is the Keeper's room. `Repositories` and `Compute` remain as destinations, so existing links still land, but each opens its part of the room.
+
+## First launch
+
+A first launch opens on the hive, not on a form (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. Feeding keeps the picked starter and names the hive from the first words it was fed. The name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
 
 ## Consolidation plan
 
-1. **Stage 1 (this):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.
-2. **Stage 2:** the hive as home. A first launch opens on the hive with the starter creature and one step to feed it (no "No project" form); a breadcrumb (Hive › a hive › a creature › its mind) replaces page titles and the navigation row.
-3. **Stage 3:** Inbox, Runs, Artifacts and the Swarm role editor move into the creature's panel (Needs, Work, Mind) and the hive's combs; their destinations retire.
+1. **Stage 1 (done):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.
+2. **Stage 2 (done):** the hive as home. A first launch opens on the hive with the starter creature and one step to feed it (no "No project" form); a breadcrumb (Hive › a hive › a creature) replaces page titles and the navigation row.
+3. **Stage 3:** Inbox, Runs, Artifacts and the Swarm role editor move into the creature's panel (Needs, Work, Mind) and the hive's combs; their destinations retire. The breadcrumb gains the creature's last step: its mind.

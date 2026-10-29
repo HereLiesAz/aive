@@ -63,7 +63,6 @@ import com.hereliesaz.geministrator.resources.store_aive_calls_this_model_direct
 import com.hereliesaz.geministrator.resources.store_approve_publisher_key_change_for_this
 import com.hereliesaz.geministrator.resources.store_azphalt
 import com.hereliesaz.geministrator.resources.store_azphalt_package_import_is_unavailable_on
-import com.hereliesaz.geministrator.resources.store_azphalt_store
 import com.hereliesaz.geministrator.resources.store_azphalt_store_could_not_be_loaded
 import com.hereliesaz.geministrator.resources.store_azphalt_store_search_failed
 import com.hereliesaz.geministrator.resources.store_change_key
@@ -341,7 +340,6 @@ internal fun AzphaltStoreScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(Res.string.store_azphalt_store), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             snapshot?.repository?.name?.let { stringResource(Res.string.store_workflows_roles_models_and_llms, it) }
                 ?: stringResource(Res.string.store_verified_workflows_roles_models_and_llms),

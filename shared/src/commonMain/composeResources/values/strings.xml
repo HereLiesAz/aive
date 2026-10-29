@@ -457,8 +457,10 @@
     <string name="nav_runtime_no_project">RUNTIME · NO PROJECT</string>
     <string name="nav_runtime_no_run">RUNTIME · NO RUN</string>
     <string name="nav_runtime_resume_failed">RUNTIME · RESUME FAILED</string>
-    <string name="nav_swarm_os">SWARM OS</string>
     <string name="nav_the_aive">THE AIVE</string>
+    <string name="crumb_hive">Hive</string>
+    <string name="crumb_label">Where you are</string>
+    <string name="crumb_here">You are here</string>
 
     <string name="overview_has_no_persisted_workflow_run">%1$s has no persisted workflow run. Define an objective below to start one.</string>
     <string name="overview_a_workflow_gate_is_waiting_for">A workflow gate is waiting for human input.</string>
@@ -484,6 +486,10 @@
     <string name="overview_no_decision_required">No decision required</string>
     <string name="overview_no_project">NO PROJECT</string>
     <string name="overview_objective">Objective</string>
+    <string name="first_hive">Your first hive</string>
+    <string name="first_hive_hint">Feed it work and it plans the rest, hatching the creatures it needs. Name, repository and saved projects are under Options.</string>
+    <string name="first_hive_objective">What should it work on?</string>
+    <string name="first_hive_feed">Feed it</string>
     <string name="overview_open_a_different_saved_project">Open a different saved project…</string>
     <string name="overview_or_create_a_new_project">OR CREATE A NEW PROJECT</string>
     <string name="overview_owner_attention">Owner attention</string>

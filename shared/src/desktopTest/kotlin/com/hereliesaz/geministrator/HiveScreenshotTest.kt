@@ -284,6 +284,49 @@ class HiveScreenshotTest {
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
     }
 
+    /** The shell (docs/Keepers-Room.md, stage 2): the breadcrumb header over the hive, its places and a first launch. */
+    @Test
+    fun shootsTheShell() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
+        val live = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, liveRun, roles))
+        val fresh = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { runBlocking { it.load() } }
+        fun shell(
+            destination: ControlRoomDestination,
+            state: ApplicationRuntimeState,
+            compact: Boolean,
+            selected: String? = null,
+            district: Boolean = false,
+        ) = @androidx.compose.runtime.Composable {
+            DurableUiState.store.putBoolean("overview.zoom.district", district)
+            DurableUiState.store.putString("overview.resting-hive", "")
+            androidx.compose.runtime.CompositionLocalProvider(LocalStableHost provides fresh) {
+                ControlRoom(
+                    destination = destination,
+                    onDestinationSelected = {},
+                    selectedTaskId = selected,
+                    onTaskSelected = {},
+                    onLaunchWorkflow = { _, _, _, _ -> },
+                    onApproveTask = {},
+                    onRejectPlan = {},
+                    onResolveEscalation = { _, _ -> },
+                    onRecoverFromCorruption = {},
+                    onLoadWorkflowDefinitions = { listOf(definition) },
+                    compact = compact,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(),
+                    runtimeState = state,
+                )
+            }
+        }
+        shoot("25-shell-hive", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false)() }
+        shoot("26-shell-phone-hive", 824, 1830) { shell(ControlRoomDestination.Overview, live, true)() }
+        shoot("27-shell-creature", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, selected = "build")() }
+        shoot("28-shell-first-launch", 824, 1830) { shell(ControlRoomDestination.Overview, ApplicationRuntimeState.NoProject(), true)() }
+        shoot("29-shell-swarm", 2400, 1500) { shell(ControlRoomDestination.Company, live, false)() }
+        shoot("30-shell-district", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, district = true)() }
+        shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
+    }
+
     /** The neuron, the body of programmatic work, in its states. */
     @Test
     fun shootsTheNeuron() {

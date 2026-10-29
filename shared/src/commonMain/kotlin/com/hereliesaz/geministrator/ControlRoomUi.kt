@@ -30,6 +30,12 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.hereliesaz.geministrator.domain.displayName
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,14 +63,15 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.district_surface
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
 import com.hereliesaz.geministrator.resources.nav_runtime_no_project
 import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
-import com.hereliesaz.geministrator.resources.nav_swarm_os
+import com.hereliesaz.geministrator.resources.crumb_here
+import com.hereliesaz.geministrator.resources.crumb_hive
+import com.hereliesaz.geministrator.resources.crumb_label
 import com.hereliesaz.geministrator.resources.nav_the_aive
 import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
@@ -87,7 +94,7 @@ enum class ControlRoomDestination(val label: String) {
     Settings("Keeper's room"),
     ;
 
-    /** The main-navigation entry that is highlighted while this destination is open. */
+    /** The place this destination belongs to: the hive, or the Keeper's room. */
     val navigationItem: ControlRoomDestination
         get() = when {
             this in OverviewSections || this in RetiredSections -> Overview
@@ -97,21 +104,18 @@ enum class ControlRoomDestination(val label: String) {
 
     companion object {
         /**
-         * Opened from the section row at the top of [Overview], not from the main navigation.
-         * Overview itself shows the run mind map until one of these is tapped.
+         * The hive's own places, in the row across its top (docs/Keepers-Room.md). There is no other
+         * navigation: the breadcrumb leads back up, the header opens the Inbox and the Keeper's room.
          */
-        // Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows stays reachable from a hive's More editing.
-        // Memory is a swarm of its own, running beside every run (docs/Keepers-Room.md): it lives in the hive, not the Keeper's room.
-        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory)
+        // Memory is a swarm of its own, running beside every run: it lives in the hive, not the Keeper's room.
+        // Artifacts move into each creature's panel in stage 3; the Store is also the district's edge.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory, Artifacts, AddOns)
 
-        /** Reachable, but no longer shown in Overview's section row. */
+        /** Reachable, but not in the hive's row: Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows opens from a hive's More editing. */
         val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
 
         /** Parts of the Keeper's room ([Settings]) that once had their own place (docs/Keepers-Room.md). */
         val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute)
-
-        /** Left out of the main navigation: Overview's sections, the Keeper's room's parts, and Inbox (its header badge opens it). */
-        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + KeeperParts + Inbox
 
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
@@ -193,6 +197,32 @@ fun ControlRoom(
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
         (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
+    // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
+    // Held here so the breadcrumb and the hive agree on where the keeper is.
+    val district = rememberDurableBooleanState("overview.zoom.district")
+    // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
+    val restingHive = rememberDurableStringState("overview.resting-hive")
+    val restingDefinition by produceState<WorkflowDefinition?>(null, restingHive.value) {
+        value = restingHive.value.takeIf(String::isNotBlank)?.let { id ->
+            runCatching { onLoadWorkflowDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == id }
+        }
+    }
+    val crumbs = shellCrumbs(
+        destination = destination,
+        inDistrict = district.value,
+        hiveName = liveWorkflow?.definition?.name ?: restingDefinition?.name,
+        creatureName = selectedTaskId?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
+        onOpenDistrict = {
+            selectedTaskId?.let(onTaskSelected)
+            district.value = true
+            onDestinationSelected(ControlRoomDestination.Overview)
+        },
+        onOpenHive = {
+            selectedTaskId?.let(onTaskSelected)
+            district.value = false
+            onDestinationSelected(ControlRoomDestination.Overview)
+        },
+    )
 
     Box(
         modifier = Modifier
@@ -200,145 +230,77 @@ fun ControlRoom(
             .background(ground.page)
             .padding(contentPadding),
     ) {
-        if (compact) {
-            Column(Modifier.fillMaxSize()) {
-                CompactHeader(
-                    unreadInbox = unreadInbox,
-                    onOpenInbox = openInbox,
-                    keeperOpen = destination.navigationItem == ControlRoomDestination.Settings,
-                    onOpenKeeper = { onDestinationSelected(ControlRoomDestination.Settings) },
-                )
-                CompactNavigation(destination, onDestinationSelected, destinations)
-                MainDestination(
-                    destination = destination,
-                    onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
-                    computeAvailable = ControlRoomDestination.Compute in destinations,
-                    onDestinationSelected = onDestinationSelected,
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
-                    onLaunchWorkflow = onLaunchWorkflow,
+        Column(Modifier.fillMaxSize()) {
+            ShellHeader(
+                crumbs = crumbs,
+                runtimeState = runtimeState,
+                unreadInbox = unreadInbox,
+                onOpenInbox = openInbox,
+                keeperOpen = destination.navigationItem == ControlRoomDestination.Settings,
+                onOpenKeeper = { onDestinationSelected(ControlRoomDestination.Settings) },
+                compact = compact,
+            )
+            MainDestination(
+                destination = destination,
+                onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                computeAvailable = ControlRoomDestination.Compute in destinations,
+                onDestinationSelected = onDestinationSelected,
+                selectedTaskId = selectedTaskId,
+                onTaskSelected = onTaskSelected,
+                onLaunchWorkflow = onLaunchWorkflow,
                 onLoadLaunchableRuns = onLoadLaunchableRuns,
-                    onApproveTask = onApproveTask,
-                    onRejectPlan = onRejectPlan,
-                    onResolveEscalation = onResolveEscalation,
-                    onMessageAgent = onMessageAgent,
-                    onRecoverFromCorruption = onRecoverFromCorruption,
-                    onRetryRuntime = onRetryRuntime,
-                    onCheckProviderHealth = onCheckProviderHealth,
-                    onClearWorkflowData = onClearWorkflowData,
-                    onExportJson = onExportJson,
-                    onImportJson = onImportJson,
-                    projectFileService = projectFileService,
-                    roleSurfaceFilePicker = roleSurfaceFilePicker,
-                    onExportCurrentProjectFile = onExportCurrentProjectFile,
-                    onImportProjectFile = onImportProjectFile,
-                    setupFileActions = setupFileActions,
-                    onLoadRunHistory = onLoadRunHistory,
-                    onSwitchRun = onSwitchRun,
-                    onLoadRunTimeline = onLoadRunTimeline,
-                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
-                    onExportDiagnosticBundle = onExportDiagnosticBundle,
-                    onValidateWorkflow = onValidateWorkflow,
-                    onSaveRoleCollection = onSaveRoleCollection,
-                    onResetRoleCollection = onResetRoleCollection,
-                    onAssignWorkflowCompute = onAssignWorkflowCompute,
-                    onAssignRoleCompute = onAssignRoleCompute,
-                    onAssignTaskCompute = onAssignTaskCompute,
-                    onSearchRepositories = onSearchRepositories,
-                    availableRepositorySources = availableRepositorySources,
-                    onPickLocalRepository = onPickLocalRepository,
-                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                    onConfigureRepositoryService = onConfigureRepositoryService,
-                    onDisconnectRepositoryService = onDisconnectRepositoryService,
-                    onReconfigureProvider = onReconfigureProvider,
-                    onDisconnectProvider = onDisconnectProvider,
-                    distributedComputeState = distributedComputeState,
-                    onSaveDistributedCompute = onSaveDistributedCompute,
-                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
-                    crashReportingSetting = crashReportingSetting,
-                    remoteAccessSetting = remoteAccessSetting,
-                    localPlannerSetting = localPlannerSetting,
-                    localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
-                    memoryLayer = memoryLayer,
-                    azphaltStoreService = azphaltStoreService,
-                    azphaltPackageImportRequest = azphaltPackageImportRequest,
-                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
-                    connectedProviderIds = connectedProviderIds,
-                    modifier = Modifier.weight(1f),
-                    compact = true,
-                    runtimeState = runtimeState,
-                )
-            }
-        } else {
-            Row(Modifier.fillMaxSize()) {
-                PillNavigation(
-                    destination = destination,
-                    onDestinationSelected = onDestinationSelected,
-                    destinations = destinations,
-                    runtimeState = runtimeState,
-                    unreadInbox = unreadInbox,
-                    onOpenInbox = openInbox,
-                    modifier = Modifier.width(220.dp).fillMaxHeight(),
-                )
-                MainDestination(
-                    destination = destination,
-                    onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
-                    computeAvailable = ControlRoomDestination.Compute in destinations,
-                    onDestinationSelected = onDestinationSelected,
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
-                    onLaunchWorkflow = onLaunchWorkflow,
-                onLoadLaunchableRuns = onLoadLaunchableRuns,
-                    onApproveTask = onApproveTask,
-                    onRejectPlan = onRejectPlan,
-                    onResolveEscalation = onResolveEscalation,
-                    onMessageAgent = onMessageAgent,
-                    onRecoverFromCorruption = onRecoverFromCorruption,
-                    onRetryRuntime = onRetryRuntime,
-                    onCheckProviderHealth = onCheckProviderHealth,
-                    onClearWorkflowData = onClearWorkflowData,
-                    onExportJson = onExportJson,
-                    onImportJson = onImportJson,
-                    projectFileService = projectFileService,
-                    roleSurfaceFilePicker = roleSurfaceFilePicker,
-                    onExportCurrentProjectFile = onExportCurrentProjectFile,
-                    onImportProjectFile = onImportProjectFile,
-                    setupFileActions = setupFileActions,
-                    onLoadRunHistory = onLoadRunHistory,
-                    onSwitchRun = onSwitchRun,
-                    onLoadRunTimeline = onLoadRunTimeline,
-                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
-                    onExportDiagnosticBundle = onExportDiagnosticBundle,
-                    onValidateWorkflow = onValidateWorkflow,
-                    onSaveRoleCollection = onSaveRoleCollection,
-                    onResetRoleCollection = onResetRoleCollection,
-                    onAssignWorkflowCompute = onAssignWorkflowCompute,
-                    onAssignRoleCompute = onAssignRoleCompute,
-                    onAssignTaskCompute = onAssignTaskCompute,
-                    onSearchRepositories = onSearchRepositories,
-                    availableRepositorySources = availableRepositorySources,
-                    onPickLocalRepository = onPickLocalRepository,
-                    connectedRepositoryServiceIds = connectedRepositoryServiceIds,
-                    onConfigureRepositoryService = onConfigureRepositoryService,
-                    onDisconnectRepositoryService = onDisconnectRepositoryService,
-                    onReconfigureProvider = onReconfigureProvider,
-                    onDisconnectProvider = onDisconnectProvider,
-                    distributedComputeState = distributedComputeState,
-                    onSaveDistributedCompute = onSaveDistributedCompute,
-                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
-                    crashReportingSetting = crashReportingSetting,
-                    remoteAccessSetting = remoteAccessSetting,
-                    localPlannerSetting = localPlannerSetting,
-                    localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
-                    memoryLayer = memoryLayer,
-                    azphaltStoreService = azphaltStoreService,
-                    azphaltPackageImportRequest = azphaltPackageImportRequest,
-                    onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
-                    connectedProviderIds = connectedProviderIds,
-                    modifier = Modifier.weight(1f),
-                    runtimeState = runtimeState,
-                )
-            }
+                onApproveTask = onApproveTask,
+                onRejectPlan = onRejectPlan,
+                onResolveEscalation = onResolveEscalation,
+                onMessageAgent = onMessageAgent,
+                onRecoverFromCorruption = onRecoverFromCorruption,
+                onRetryRuntime = onRetryRuntime,
+                onCheckProviderHealth = onCheckProviderHealth,
+                onClearWorkflowData = onClearWorkflowData,
+                onExportJson = onExportJson,
+                onImportJson = onImportJson,
+                projectFileService = projectFileService,
+                roleSurfaceFilePicker = roleSurfaceFilePicker,
+                onExportCurrentProjectFile = onExportCurrentProjectFile,
+                onImportProjectFile = onImportProjectFile,
+                setupFileActions = setupFileActions,
+                onLoadRunHistory = onLoadRunHistory,
+                onSwitchRun = onSwitchRun,
+                onLoadRunTimeline = onLoadRunTimeline,
+                onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
+                onExportDiagnosticBundle = onExportDiagnosticBundle,
+                onValidateWorkflow = onValidateWorkflow,
+                onSaveRoleCollection = onSaveRoleCollection,
+                onResetRoleCollection = onResetRoleCollection,
+                onAssignWorkflowCompute = onAssignWorkflowCompute,
+                onAssignRoleCompute = onAssignRoleCompute,
+                onAssignTaskCompute = onAssignTaskCompute,
+                onSearchRepositories = onSearchRepositories,
+                availableRepositorySources = availableRepositorySources,
+                onPickLocalRepository = onPickLocalRepository,
+                connectedRepositoryServiceIds = connectedRepositoryServiceIds,
+                onConfigureRepositoryService = onConfigureRepositoryService,
+                onDisconnectRepositoryService = onDisconnectRepositoryService,
+                onReconfigureProvider = onReconfigureProvider,
+                onDisconnectProvider = onDisconnectProvider,
+                distributedComputeState = distributedComputeState,
+                onSaveDistributedCompute = onSaveDistributedCompute,
+                onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                crashReportingSetting = crashReportingSetting,
+                remoteAccessSetting = remoteAccessSetting,
+                localPlannerSetting = localPlannerSetting,
+                localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                memoryLayer = memoryLayer,
+                azphaltStoreService = azphaltStoreService,
+                azphaltPackageImportRequest = azphaltPackageImportRequest,
+                onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
+                connectedProviderIds = connectedProviderIds,
+                modifier = Modifier.weight(1f),
+                compact = compact,
+                district = district,
+                restingHive = restingHive,
+                runtimeState = runtimeState,
+            )
         }
 
         if (inspectorVisible) {
@@ -368,105 +330,107 @@ fun ControlRoom(
     }
 }
 
+/** One step of the breadcrumb: where the keeper is, and the way back up. */
+internal data class ShellCrumb(val label: String, val seed: String, val onClick: (() -> Unit)?)
+
+/**
+ * The breadcrumb (docs/Keepers-Room.md, stage 2): Hive › a hive › a creature, or Hive › a place
+ * opened from it. It replaces the navigation and the page titles; the last step is where you are.
+ */
 @Composable
-private fun PillNavigation(
+private fun shellCrumbs(
     destination: ControlRoomDestination,
-    onDestinationSelected: (ControlRoomDestination) -> Unit,
-    destinations: List<ControlRoomDestination>,
+    inDistrict: Boolean,
+    hiveName: String?,
+    creatureName: String?,
+    onOpenDistrict: () -> Unit,
+    onOpenHive: () -> Unit,
+): List<ShellCrumb> = buildList {
+    add(ShellCrumb(stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict))
+    if (destination == ControlRoomDestination.Overview) {
+        if (inDistrict) return@buildList
+        hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
+        creatureName?.let { add(ShellCrumb(it, "crumb-creature", null)) }
+    } else {
+        add(ShellCrumb(destination.label, "crumb-${destination.name}", null))
+    }
+}
+
+/** The selected creature's name: its role, else what does its work. */
+private fun creatureCrumb(taskId: String, live: LiveWorkflowPresentation?, resting: WorkflowDefinition?): String? {
+    val id = TaskDefinitionId(taskId)
+    live?.let { workflow ->
+        val task = workflow.definition.tasks.firstOrNull { it.id == id } ?: return null
+        val run = workflow.run.taskRuns[id]
+        val roleId = run?.assignedRoleId ?: task.roleId
+        return workflow.roles.firstOrNull { it.id == roleId }?.name ?: (run?.executor ?: task.effectiveExecutor()).displayName()
+    }
+    return resting?.tasks?.firstOrNull { it.id == id }?.name
+}
+
+/**
+ * The one header, on every screen and size: the Aive and how its runtime is, the breadcrumb, then
+ * the Inbox and the Keeper's room. On a phone the breadcrumb takes its own line under them.
+ */
+@Composable
+private fun ShellHeader(
+    crumbs: List<ShellCrumb>,
     runtimeState: ApplicationRuntimeState,
     unreadInbox: Int,
     onOpenInbox: () -> Unit,
-    modifier: Modifier = Modifier,
+    keeperOpen: Boolean,
+    onOpenKeeper: () -> Unit,
+    compact: Boolean,
 ) {
-    val entrance = remember { AzphaltEntrance.roll() }
     Column(
-        modifier = modifier.padding(start = 14.dp, top = 22.dp, bottom = 18.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 12.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.section, color = azphaltOnSurface())
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                stringResource(Res.string.nav_swarm_os),
-                style = AzphaltType.eyebrow,
-                color = azphaltOnSurface(),
-                modifier = Modifier.weight(1f),
-            )
-            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
-        }
-        Spacer(Modifier.height(12.dp))
-        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation }
-        items.forEachIndexed { index, item ->
-            AzphaltPill(
-                label = item.label,
-                seed = "nav-$index-${item.name}",
-                selected = item == destination.navigationItem,
-                endCap = null,
-                onClick = { onDestinationSelected(item) },
-                modifier = Modifier
-                    .fillMaxWidth(if (item == destination.navigationItem) 0.96f else 0.84f - (index % 3) * 0.03f)
-                    .azphaltEntrance(entrance, index, items.size),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        Text(
-            runtimeStatusLabel(runtimeState),
-            style = AzphaltType.eyebrow,
-            color = azphaltOnSurface(),
-            modifier = Modifier.azphaltLiveRegion(),
-        )
-    }
-}
-
-@Composable
-private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit, keeperOpen: Boolean, onOpenKeeper: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column {
-            Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
-            Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column {
+                Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
+                Text(
+                    runtimeStatusLabel(runtimeState),
+                    style = AzphaltType.eyebrow,
+                    color = azphaltOnSurface(),
+                    modifier = Modifier.azphaltLiveRegion(),
+                )
+            }
+            if (!compact) Breadcrumb(crumbs, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
             InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
             KeeperButton(selected = keeperOpen, onClick = onOpenKeeper)
         }
+        if (compact) Breadcrumb(crumbs, Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun CompactNavigation(
-    destination: ControlRoomDestination,
-    onDestinationSelected: (ControlRoomDestination) -> Unit,
-    destinations: List<ControlRoomDestination>,
-) {
-    val entrance = remember { AzphaltEntrance.roll() }
+private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) {
+    val label = stringResource(Res.string.crumb_label)
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .semantics { contentDescription = label }
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        // The Keeper's room has the gear in the header.
-        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation || it == ControlRoomDestination.Settings }
-        items.forEachIndexed { index, item ->
+        crumbs.forEachIndexed { index, crumb ->
+            if (index > 0) Text("›", style = AzphaltType.lead, color = azphaltOnSurface())
+            val here = index == crumbs.lastIndex
             AzphaltPill(
-                label = item.label,
-                seed = "compact-$index-${item.name}",
-                selected = item == destination.navigationItem,
-                onClick = { onDestinationSelected(item) },
-                modifier = Modifier.azphaltEntrance(entrance, index, items.size),
+                label = crumb.label,
+                seed = crumb.seed,
+                selected = here,
+                stateDescription = if (here) stringResource(Res.string.crumb_here) else null,
+                onClick = { if (!here) crumb.onClick?.invoke() },
             )
         }
     }
 }
 
 /**
- * Runs, Workflows and Swarm across the top of Overview. Tapping the open one returns to the
- * Overview mind map.
+ * The hive's own places across its top: its Swarm, the Memory swarm, Artifacts and the Store.
+ * Tapping the open one returns to the hive.
  */
 @Composable
 private fun OverviewSectionTabs(
@@ -549,18 +513,19 @@ private fun MainDestination(
     onOpenSettings: () -> Unit = {},
     onDestinationSelected: (ControlRoomDestination) -> Unit = {},
     computeAvailable: Boolean = true,
+    district: MutableState<Boolean> = remember { mutableStateOf(false) },
+    restingHive: MutableState<String> = remember { mutableStateOf("") },
 ) {
     Column(modifier.fillMaxSize()) {
-        if (destination.navigationItem == ControlRoomDestination.Overview) {
+        // A first launch is one step: no places to wander off to until there is a hive.
+        if (destination.navigationItem == ControlRoomDestination.Overview && runtimeState !is ApplicationRuntimeState.NoProject) {
             OverviewSectionTabs(destination, onDestinationSelected)
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
                 ControlRoomDestination.Overview -> {
-                    // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
-                    var inDistrict by rememberDurableBooleanState("overview.zoom.district")
-                    // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
-                    var restingHiveId by rememberDurableStringState("overview.resting-hive")
+                    var inDistrict by district
+                    var restingHiveId by restingHive
                     var showTimeline by rememberDurableBooleanState("overview.timeline")
                     val hiveHost = LocalWorkflowLibraryHost.current
                     val hiveScope = rememberCoroutineScope()
@@ -613,11 +578,6 @@ private fun MainDestination(
                         )
                     } else if (restingHiveId.isNotBlank()) {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            AzphaltPill(
-                                label = stringResource(Res.string.district_surface),
-                                seed = "zoom-out-district",
-                                onClick = { inDistrict = true },
-                            )
                             RestingHive(
                                 definitionId = restingHiveId,
                                 onLoadDefinitions = onLoadWorkflowDefinitions,
@@ -636,11 +596,7 @@ private fun MainDestination(
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
                             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
                             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AzphaltPill(
-                                    label = stringResource(Res.string.district_surface),
-                                    seed = "zoom-out-district",
-                                    onClick = { inDistrict = true },
-                                )
+                                // Out to the district is the breadcrumb's first step.
                                 if (live != null) {
                                     AzphaltPill(
                                         label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
