@@ -115,6 +115,7 @@ fun main() {
         banks = kotlinx.coroutines.runBlocking { desktopSqlMemoryBanks(memoryLineage) },
         settingsStore = MemoryLayerSettingsStore.createDefault(),
         lineage = memoryLineage,
+        procedureCatalog = com.hereliesaz.geministrator.memory.procedural.desktopSqlProcedureCatalog(memoryLineage),
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
         localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
