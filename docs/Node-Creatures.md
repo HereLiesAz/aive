@@ -51,6 +51,7 @@ Each `TaskRunStatus` is a physiological state, so a person can read the run with
 Work done programmatically rather than by an agent wears one body: **the neuron**, a faceted soma, dendrites and a myelinated axon (`files/rigs/neuron.rig.json`, sliced from `docs/swarm-terrarium/characters/000_neuron/neuron.png` by `tools/puppet-rig/slice/rig_painting.py`). That covers:
 
 - the deterministic executors: Python, JavaScript, Test Runner, Deployment, Repository Operation, Nested Workflow;
+- remote steps: GitHub Actions and external services, each its own node rather than a passing visitor;
 - roles that run a script or an action instead of an agent (`RoleExecutionSource` other than `Agent`);
 - memory stages running without a model (the memory swarm).
 

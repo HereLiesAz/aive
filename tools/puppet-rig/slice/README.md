@@ -28,7 +28,7 @@ Both stages take `--only <substring>` (directory, sheet name or rig slug). `slic
   - beak/prop: small compact pieces.
   - tendrils: everything else, numbered clockwise from 12 o'clock.
 - **Base point.** Sheets are exploded views, so each tendril's attachment end is its thin end nearest the soma. For the tail, it is the thin end farthest from the egg.
-- **Overrides.** `overrides.json` corrects individual sheets after review of `preview.png`. It maps component indices to classes, and also supports `drop`, `tail_chain` (a segmented tail) and `no_rig`.
+- **Overrides.** `overrides.json` corrects individual sheets after review of `preview.png`. It maps component indices to classes, and also supports `drop`, `tail_chain` (a segmented tail), `no_rig`, and `eyes_from_reference` (eyes the sheet never drew, cut from the reference painting by box: `[{"id": "eye.left", "box": [x0, y0, x1, y1]}]`).
 - **Output** (generated, git-ignored — re-run to reproduce). `<dir>/rig/parts/<sheet-slug>/`: `<part>.png` (original pixels, 2 px pad), `parts.json` and `preview.png`.
 
 ## Stage 2: `build_rigs.py`

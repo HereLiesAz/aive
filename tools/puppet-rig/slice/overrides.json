@@ -65,7 +65,27 @@
   "classes": {
    "3": "tendril",
    "4": "tendril"
-  }
+  },
+  "eyes_from_reference": [
+   {
+    "id": "eye.left",
+    "box": [
+     127,
+     182,
+     180,
+     240
+    ]
+   },
+   {
+    "id": "eye.right",
+    "box": [
+     201,
+     190,
+     231,
+     245
+    ]
+   }
+  ]
  },
  "042_communicator/ChatGPT Image Oct 5, 2026, 10_38_31 PM-2.png": {
   "classes": {

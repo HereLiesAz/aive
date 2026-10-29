@@ -32,17 +32,18 @@ internal data class WorkflowTerrariumProjection(
     val adornments: Map<String, List<H2g2SwarmAdornment>>,
     /** External/non-resident services that physically visit the terrarium and leave again. */
     val serviceVisits: List<H2g2TerrariumServiceVisit>,
+    /** Labels of the creatures doing programmatic work: they wear the neuron, whatever they are called. */
+    val programmaticLabels: Set<String> = emptySet(),
 )
 
 /**
  * Projects orchestration truth into the living terrarium without pretending every workflow node is
- * an agent. [TaskExecutor.RoleAgent] tasks become agent creatures; deterministic/automated
- * executors ([TaskExecutor.Script], [TaskExecutor.TestRunner], [TaskExecutor.RepositoryOperation],
- * [TaskExecutor.Deployment], [TaskExecutor.NestedWorkflow]) become the automated-process creature
- * instead — a real node, not an adornment, since real work still happens even without an agent
- * driving it. The remaining mechanical dependencies may become tools or clothing, external
- * services become transient visiting vehicles, and creature-to-creature flow stays a synaptic
- * relationship.
+ * an agent. [TaskExecutor.RoleAgent] tasks become agent creatures; every other executor that does
+ * work ([TaskExecutor.Script], [TaskExecutor.TestRunner], [TaskExecutor.RepositoryOperation],
+ * [TaskExecutor.Deployment], [TaskExecutor.NestedWorkflow], [TaskExecutor.GitHubAction],
+ * [TaskExecutor.ExternalService]) becomes the neuron instead: a real node, not an adornment, so the
+ * swarm doubles as a standing flowchart. Human approval is worn as clothing, and
+ * creature-to-creature flow stays a synaptic relationship.
  */
 internal fun projectWorkflowTerrarium(
     definition: WorkflowDefinition,
@@ -154,7 +155,6 @@ internal fun projectWorkflowTerrarium(
 
     val relationships = linkedMapOf<String, H2g2TerrariumRelationship>()
     val adornments = linkedMapOf<String, MutableList<H2g2SwarmAdornment>>()
-    val serviceVisits = linkedMapOf<String, H2g2TerrariumServiceVisit>()
 
     agentTasks.forEach { downstream ->
         downstream.dependsOn.forEach { dependencyId ->
@@ -163,11 +163,8 @@ internal fun projectWorkflowTerrarium(
                 downstreamAgentId = downstream.id,
                 tasksById = tasksById,
                 agentIds = agentIds,
-                run = run,
-                targetPosition = subjectPositions.getValue(downstream.id.value),
                 relationships = relationships,
                 adornments = adornments,
-                serviceVisits = serviceVisits,
                 visited = mutableSetOf(),
             )
         }
@@ -192,8 +189,17 @@ internal fun projectWorkflowTerrarium(
         subjects = subjects,
         relationships = relationships.values.toList(),
         adornments = adornments.mapValues { (_, values) -> values.distinctBy(H2g2SwarmAdornment::dependencyId) },
-        serviceVisits = serviceVisits.values.toList(),
+        serviceVisits = emptyList(),
+        programmaticLabels = agentTasks
+            .filterNot { task -> (run.taskRuns[task.id]?.executor ?: task.effectiveExecutor()).isAgent() }
+            .mapNotNullTo(hashSetOf()) { task -> subjects.firstOrNull { it.node.id == task.id.value }?.node?.label },
     )
+}
+
+private fun TaskExecutor.isAgent(): Boolean = when (this) {
+    is TaskExecutor.RoleAgent -> true
+    is TaskExecutor.Distributed -> delegate.isAgent()
+    else -> false
 }
 
 private fun collectDependencyPresentation(
@@ -201,11 +207,8 @@ private fun collectDependencyPresentation(
     downstreamAgentId: TaskDefinitionId,
     tasksById: Map<TaskDefinitionId, TaskDefinition>,
     agentIds: Set<TaskDefinitionId>,
-    run: WorkflowRun,
-    targetPosition: H2g2TerrariumPosition,
     relationships: MutableMap<String, H2g2TerrariumRelationship>,
     adornments: MutableMap<String, MutableList<H2g2SwarmAdornment>>,
-    serviceVisits: MutableMap<String, H2g2TerrariumServiceVisit>,
     visited: MutableSet<TaskDefinitionId>,
 ) {
     if (!visited.add(dependencyId)) return
@@ -222,32 +225,11 @@ private fun collectDependencyPresentation(
         return
     }
 
-    val executor = dependency.effectiveExecutor()
-    when (executor) {
-        is TaskExecutor.ExternalService -> addServiceVisit(
-            dependency = dependency,
-            downstreamAgentId = downstreamAgentId,
-            taskRun = run.taskRuns[dependency.id],
-            serviceName = executor.service,
-            operation = executor.operation,
-            targetPosition = targetPosition,
-            serviceVisits = serviceVisits,
+    dependency.effectiveExecutor().dependencyAdornmentManifestation()?.let { manifestation ->
+        adornments.getOrPut(downstreamAgentId.value) { mutableListOf() } += h2g2SwarmAdornment(
+            dependencyId = "${dependency.id.value}->${downstreamAgentId.value}",
+            manifestation = manifestation,
         )
-        is TaskExecutor.GitHubAction -> addServiceVisit(
-            dependency = dependency,
-            downstreamAgentId = downstreamAgentId,
-            taskRun = run.taskRuns[dependency.id],
-            serviceName = "GitHub",
-            operation = executor.workflow,
-            targetPosition = targetPosition,
-            serviceVisits = serviceVisits,
-        )
-        else -> executor.dependencyAdornmentManifestation()?.let { manifestation ->
-            adornments.getOrPut(downstreamAgentId.value) { mutableListOf() } += h2g2SwarmAdornment(
-                dependencyId = "${dependency.id.value}->${downstreamAgentId.value}",
-                manifestation = manifestation,
-            )
-        }
     }
 
     dependency.dependsOn.forEach { upstream ->
@@ -256,44 +238,14 @@ private fun collectDependencyPresentation(
             downstreamAgentId = downstreamAgentId,
             tasksById = tasksById,
             agentIds = agentIds,
-            run = run,
-            targetPosition = targetPosition,
             relationships = relationships,
             adornments = adornments,
-            serviceVisits = serviceVisits,
             visited = visited,
         )
     }
 }
 
-private fun addServiceVisit(
-    dependency: TaskDefinition,
-    downstreamAgentId: TaskDefinitionId,
-    taskRun: TaskRun?,
-    serviceName: String,
-    operation: String?,
-    targetPosition: H2g2TerrariumPosition,
-    serviceVisits: MutableMap<String, H2g2TerrariumServiceVisit>,
-) {
-    val attempt = taskRun?.attempt ?: 1
-    val visitKey = "service:${dependency.id.value}:${downstreamAgentId.value}:$attempt"
-    serviceVisits[visitKey] = H2g2TerrariumServiceVisit(
-        id = visitKey,
-        serviceName = serviceName,
-        operation = operation,
-        target = targetPosition,
-        active = taskRun?.status.isServiceVisitActive(),
-    )
-}
-
-private fun TaskRunStatus?.isServiceVisitActive(): Boolean = this in setOf(
-    TaskRunStatus.Planning,
-    TaskRunStatus.Running,
-    TaskRunStatus.Verifying,
-    TaskRunStatus.Retrying,
-)
-
-// Deployment/TestRunner/RepositoryOperation/NestedWorkflow/Script are promoted to full creatures
+// Every executor but HumanApproval is promoted to a full creature
 // by isTerrariumCreature() above and never reach this function as a *dependency's* executor while
 // still classified that way; the branches stay for exhaustiveness and for any future executor kind
 // that opts back out of creature status.
@@ -310,7 +262,7 @@ private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManif
 
     is TaskExecutor.ExternalService,
     is TaskExecutor.GitHubAction,
-    -> null
+    -> H2g2DependencyManifestation.Tool
 
     is TaskExecutor.RoleAgent -> H2g2DependencyManifestation.Synapse
     is TaskExecutor.Distributed -> delegate.dependencyAdornmentManifestation()
@@ -318,11 +270,9 @@ private fun TaskExecutor.dependencyAdornmentManifestation(): H2g2DependencyManif
 
 /**
  * Whether this executor gets its own creature node in the terrarium. True for agent-driven work
- * and for the deterministic/automated executor kinds that still represent real, visible work —
- * rendered as the automated-process neuron ([NodeCreatureRoleKind.AutomatedProcess]) rather than
- * an agent mascot. [TaskExecutor.HumanApproval], [TaskExecutor.ExternalService] and
- * [TaskExecutor.GitHubAction] stay non-creature presentations (clothing adornment / visiting
- * vehicle) since they represent something outside the terrarium reaching in, not local automation.
+ * and for every programmatic executor, local or remote, rendered as the neuron
+ * ([CreatureRigMapping.PROGRAMMATIC_RIG]) rather than an agent mascot. Only
+ * [TaskExecutor.HumanApproval] stays worn (clothing): a person's sign-off is not a step the swarm runs.
  */
 private fun TaskExecutor.isTerrariumCreature(): Boolean = when (this) {
     is TaskExecutor.RoleAgent,
@@ -331,12 +281,11 @@ private fun TaskExecutor.isTerrariumCreature(): Boolean = when (this) {
     is TaskExecutor.RepositoryOperation,
     is TaskExecutor.Deployment,
     is TaskExecutor.NestedWorkflow,
-    -> true
-
-    is TaskExecutor.HumanApproval,
     is TaskExecutor.ExternalService,
     is TaskExecutor.GitHubAction,
-    -> false
+    -> true
+
+    is TaskExecutor.HumanApproval -> false
 
     is TaskExecutor.Distributed -> delegate.isTerrariumCreature()
 }

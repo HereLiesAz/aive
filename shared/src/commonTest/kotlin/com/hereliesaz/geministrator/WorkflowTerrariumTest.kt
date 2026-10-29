@@ -77,6 +77,46 @@ class WorkflowTerrariumTest {
     }
 
     @Test
+    fun remoteStepsAreNeuronsInTheFlowchart() {
+        val implement = agentTask(id = "implement", roleId = BuiltInRoles.ImplementationEngineer.id)
+        val ci = TaskDefinition(
+            id = TaskDefinitionId("ci"),
+            name = "Run CI",
+            objective = "Build on GitHub",
+            roleId = null,
+            dependsOn = setOf(implement.id),
+            executor = TaskExecutor.GitHubAction("ci.yml"),
+        )
+        val notify = TaskDefinition(
+            id = TaskDefinitionId("notify"),
+            name = "Tell the channel",
+            objective = "Post the result",
+            roleId = null,
+            dependsOn = setOf(ci.id),
+            executor = TaskExecutor.ExternalService("Slack", "post"),
+        )
+        val verify = agentTask(id = "verify", roleId = BuiltInRoles.QaEngineer.id, dependsOn = setOf(notify.id))
+        val definition = workflow(implement, ci, notify, verify)
+        val projection = projectWorkflowTerrarium(
+            definition = definition,
+            run = runFor(definition),
+            roles = listOf(BuiltInRoles.ImplementationEngineer, BuiltInRoles.QaEngineer),
+        )
+
+        assertNotNull(projection.subjects.singleOrNull { it.node.id == "ci" })
+        assertNotNull(projection.subjects.singleOrNull { it.node.id == "notify" })
+        assertEquals(setOf("GitHub Action", "Slack"), projection.programmaticLabels)
+        assertTrue(projection.serviceVisits.isEmpty())
+        listOf("implement" to "ci", "ci" to "notify", "notify" to "verify").forEach { (from, to) ->
+            assertTrue(
+                projection.relationships.any {
+                    it.kind == H2g2TerrariumRelationshipKind.Dependency && it.from == from && it.to == to
+                },
+            )
+        }
+    }
+
+    @Test
     fun explicitOrchestratorTaskUsesCanonicalHostIdentityWithoutSyntheticDuplicate() {
         val orchestrator = agentTask("orchestrate", BuiltInRoles.Orchestrator.id)
         val worker = agentTask(
