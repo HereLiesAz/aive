@@ -111,8 +111,10 @@ const shot = process.argv[3] || path.join(os.tmpdir(), 'puppet-rig.png');
 
   const pose = await page.evaluate(() => window.puppetRig.evaluate('Active', 0.25));
   const angle = Math.atan2(pose.byId.arm.m[1], pose.byId.arm.m[0]) * 180 / Math.PI;
-  // Rest -30° plus half the 12° animation sine at quarter phase.
-  if (Math.abs(angle - (-24)) > 0.02) throw new Error(`rigidity did not attenuate motion: ${angle}`);
+  // A tail never rotates: its base stays at rest -30°, and half (rigidity) the 12° sine at quarter
+  // phase bends it instead, twice that across the arc.
+  if (Math.abs(angle - (-30)) > 0.02) throw new Error(`tail rotated: ${angle}`);
+  if (Math.abs(pose.byId.arm.bend - 12) > 0.02) throw new Error(`rigidity did not attenuate the bend: ${pose.byId.arm.bend}`);
   if (pose.byId.arm.h !== 80) throw new Error('tail was not stretched to 80px');
 
   await page.selectOption('#new-attachment-kind', 'tail-tip');
