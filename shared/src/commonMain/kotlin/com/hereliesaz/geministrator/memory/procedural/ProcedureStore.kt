@@ -32,6 +32,8 @@ interface ProcedureStore {
     suspend fun read(): ProcedureSnapshot
     /** False on revision conflict; invalid or cross-bank writes throw. */
     suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean
+    /** Explicit privacy erasure; its revision is advanced so old writers cannot restore data. */
+    suspend fun clear(expectedRevision: Long): Boolean
 }
 
 /**
@@ -51,6 +53,12 @@ class InMemoryProcedureStore(
     }
 
     override suspend fun read(): ProcedureSnapshot = mutex.withLock { snapshot }
+
+    override suspend fun clear(expectedRevision: Long): Boolean = mutex.withLock {
+        if (snapshot.revision != expectedRevision) return@withLock false
+        snapshot = ProcedureSnapshot(revision = snapshot.revision + 1)
+        true
+    }
 
     override suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean = mutex.withLock {
         if (snapshot.revision != expectedRevision) return@withLock false
