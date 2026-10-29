@@ -53,6 +53,18 @@ class ServiceExecutorIntegrationsTest {
     }
 
     @Test
+    fun repositoryOperationRetryUsesANewIdentityPerAttempt() = runBlocking {
+        val client = RecordingRepositoryClient()
+        val integration = RepositoryOperationExecutorIntegration(client)
+        val first = context(TaskExecutor.RepositoryOperation("push"))
+
+        integration.dispatch(first)
+        integration.dispatch(first.copy(taskRun = first.taskRun.copy(status = TaskRunStatus.Retrying, attempt = 2)))
+
+        assertEquals(listOf("task-run", "task-run#attempt-2"), client.identities)
+    }
+
+    @Test
     fun externalServiceCarriesServiceAndOperation() = runBlocking {
         val client = RecordingExternalServiceClient()
         val integration = ExternalServiceExecutorIntegration(client)
@@ -114,6 +126,12 @@ class ServiceExecutorIntegrationsTest {
 private class RecordingRepositoryClient : RepositoryOperationClient {
     var operation: String? = null
     var runId: String? = null
+    val identities = mutableListOf<String>()
+
+    override suspend fun start(project: Project, operation: String, operationIdentity: String): ExternalExecutionRun {
+        identities += operationIdentity
+        return start(project, operation)
+    }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         this.operation = operation

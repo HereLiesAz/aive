@@ -14,6 +14,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 
 class LocalGitRepositoryOperationClientTest {
@@ -70,6 +73,37 @@ class LocalGitRepositoryOperationClientTest {
 
         assertEquals(started, reconciled)
         assertNotNull(reconciled.artifacts.single().metadata["headCommit"])
+    }
+
+    @Test
+    fun aNewAttemptIdentityRunsAgainInsteadOfReplayingTheFailure() = withGitRepository { root ->
+        val client = LocalGitRepositoryOperationClient()
+        val first = runBlocking { client.start(project(root), "checkout:later", "task-run") }
+        assertEquals(ExternalExecutionStatus.Failed, first.status)
+
+        git(root, "branch", "later")
+        val sameAttempt = runBlocking { client.start(project(root), "checkout:later", "task-run") }
+        val retry = runBlocking { client.start(project(root), "checkout:later", "task-run#attempt-2") }
+
+        assertEquals(ExternalExecutionStatus.Failed, sameAttempt.status)
+        assertEquals(ExternalExecutionStatus.Completed, retry.status, retry.message)
+        assertEquals("later", git(root, "branch", "--show-current").trim())
+    }
+
+    @Test
+    fun concurrentStartsOfOneRunExecuteGitOnce() = withGitRepository { root ->
+        repeat(10) { round ->
+            val results = runBlocking {
+                // Separate clients share only the on-disk record, as two processes would.
+                List(16) { LocalGitRepositoryOperationClient() }.map { client ->
+                    async(Dispatchers.IO) { client.start(project(root), "create-branch:once-$round", "same-run") }
+                }.awaitAll()
+            }
+
+            // Only one start ran `git switch -c`; a second run would have failed with "already exists".
+            assertTrue(results.none { result -> result.artifacts.any { "already exists" in it.textContent.orEmpty() } }, "$results")
+            assertEquals(1, results.count { it.status == ExternalExecutionStatus.Completed && !it.message.orEmpty().endsWith("recovered") })
+        }
     }
 
     private fun project(root: Path): Project = Project(

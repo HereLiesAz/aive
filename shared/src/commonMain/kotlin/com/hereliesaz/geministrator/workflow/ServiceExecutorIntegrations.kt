@@ -34,9 +34,19 @@ class RepositoryOperationExecutorIntegration(
             client.start(
                 context.project,
                 executor.operation,
-                context.taskRun.id.value,
+                repositoryOperationIdentity(context),
             ).toRepositoryTaskExecution(context)
         }
+    }
+
+    /**
+     * Idempotency key for one attempt. The task run ID is the same for every attempt, so a retry
+     * needs the attempt in the key or the client would replay the earlier attempt's recorded result.
+     * The first attempt keeps the bare ID so records written before attempts were keyed still match.
+     */
+    private fun repositoryOperationIdentity(context: TaskExecutorContext): String {
+        val taskRun = context.taskRun
+        return if (taskRun.attempt <= 1) taskRun.id.value else "${taskRun.id.value}#attempt-${taskRun.attempt}"
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
