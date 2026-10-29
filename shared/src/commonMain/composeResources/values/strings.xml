@@ -461,6 +461,10 @@
     <string name="crumb_hive">Hive</string>
     <string name="crumb_label">Where you are</string>
     <string name="crumb_here">You are here</string>
+    <string name="creature_tab_needs">Needs</string>
+    <string name="creature_tab_work">Work</string>
+    <string name="creature_tab_mind">Mind</string>
+    <string name="creature_needs_nothing">Nothing needed from you.</string>
 
     <string name="overview_has_no_persisted_workflow_run">%1$s has no persisted workflow run. Define an objective below to start one.</string>
     <string name="overview_a_workflow_gate_is_waiting_for">A workflow gate is waiting for human input.</string>

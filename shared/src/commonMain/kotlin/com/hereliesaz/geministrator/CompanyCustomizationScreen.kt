@@ -187,6 +187,11 @@ import com.hereliesaz.geministrator.resources.swarm_workflow_policies
 import com.hereliesaz.geministrator.resources.swarm_working
 import org.jetbrains.compose.resources.stringResource
 
+/**
+ * The Swarm: every role, its arrangement, and the form that adds or changes one. With [focusRole]
+ * it is one creature's mind (docs/Keepers-Room.md, stage 3): that role's form alone, open from the
+ * start, its id fixed, and applying it saves the swarm at once.
+ */
 @Composable
 internal fun CustomCompanyProviderScreen(
     runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
@@ -195,6 +200,7 @@ internal fun CustomCompanyProviderScreen(
     onResetRoleCollection: () -> Unit = {},
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
+    focusRole: RoleDefinitionId? = null,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val runtimeRoles = liveWorkflow?.roles
@@ -288,6 +294,10 @@ internal fun CustomCompanyProviderScreen(
     }
 
     val dirty = draftRoles != visibleRoles
+    val focused = focusRole?.let { id -> draftRoles.firstOrNull { it.id == id } }
+    LaunchedEffect(focusRole, focused) {
+        if (focused != null && editingRoleId != focused.id.value) editRole(focused)
+    }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
             it.status in setOf(
@@ -302,9 +312,10 @@ internal fun CustomCompanyProviderScreen(
         .orEmpty()
 
     Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
+        modifier = if (focusRole != null) modifier else modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (focusRole == null) {
         Text(
             stringResource(Res.string.swarm_these_are_aive_s_semantic_orchestration),
             style = AzphaltType.body,
@@ -366,8 +377,9 @@ internal fun CustomCompanyProviderScreen(
                 },
             )
         }
+        }
 
-        if (showRoleForm) {
+        if (showRoleForm && (focusRole == null || editingRoleId == focusRole.value)) {
             Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),
                 style = AzphaltType.eyebrow,
@@ -381,7 +393,8 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             val reservedRoleId = roleIdDraft.trim() == ROLE_COLLECTION_MARKER_ID
-            OutlinedTextField(
+            // A creature's mind keeps its id: its creature, its breeds and its tasks hang on it.
+            if (focusRole == null) OutlinedTextField(
                 value = roleIdDraft,
                 onValueChange = { roleIdDraft = it },
                 label = { Text(stringResource(Res.string.swarm_role_id_slug)) },
@@ -751,7 +764,13 @@ internal fun CustomCompanyProviderScreen(
                                 } else {
                                     draftRoles + role
                                 }
-                                clearEditor()
+                                if (focusRole != null) {
+                                    // One creature's mind has no separate save: applying it is saving it.
+                                    onSaveRoleCollection(draftRoles)
+                                    editRole(role)
+                                } else {
+                                    clearEditor()
+                                }
                             }
                         }
                     },
@@ -759,11 +778,12 @@ internal fun CustomCompanyProviderScreen(
                 AzphaltPill(
                     label = stringResource(Res.string.common_cancel),
                     seed = "company-role-cancel",
-                    onClick = ::clearEditor,
+                    onClick = { if (focused != null) editRole(focused) else clearEditor() },
                 )
             }
         }
 
+        if (focusRole != null) return@Column
         CompanySectionLabel(stringResource(Res.string.swarm_role_arrangement))
         if (draftRoles.isEmpty()) {
             Text(

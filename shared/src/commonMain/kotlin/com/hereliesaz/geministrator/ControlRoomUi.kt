@@ -108,11 +108,16 @@ enum class ControlRoomDestination(val label: String) {
          * navigation: the breadcrumb leads back up, the header opens the Inbox and the Keeper's room.
          */
         // Memory is a swarm of its own, running beside every run: it lives in the hive, not the Keeper's room.
-        // Artifacts move into each creature's panel in stage 3; the Store is also the district's edge.
-        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory, Artifacts, AddOns)
+        // The Store is also the district's edge. The Swarm keeps adding, arranging and resetting roles;
+        // one role's mind is changed in its creature's panel.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory, AddOns)
 
-        /** Reachable, but not in the hive's row: Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows opens from a hive's More editing. */
-        val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
+        /**
+         * Reachable, but not in the hive's row (docs/Keepers-Room.md, stage 3): Runs are the hive's
+         * combs; Workflows opens from a hive's More editing; Artifacts are each creature's Work; the
+         * Inbox is each creature's Needs, and the Hall Monitor's pause.
+         */
+        val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows, Artifacts, Inbox)
 
         /** Parts of the Keeper's room ([Settings]) that once had their own place (docs/Keepers-Room.md). */
         val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute)
@@ -184,16 +189,36 @@ fun ControlRoom(
     connectedProviderIds: Set<String> = emptySet(),
 ) {
     val ground = Azphalt.currentGround
-    // Unread Inbox items: pending decisions, and the Hall Monitor pause. Opening the Inbox marks
-    // everything it lists as read.
+    val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    // The creature panel's tab (Needs, Work, Mind): a creature opens on Needs when it waits on you.
+    var creatureTabName by rememberDurableStringState("creature.panel.tab", CreatureTab.Work.name)
+    val creatureTab = CreatureTab.entries.firstOrNull { it.name == creatureTabName } ?: CreatureTab.Work
+    LaunchedEffect(selectedTaskId) {
+        selectedTaskId?.let { id -> creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(id))).name }
+    }
+    // Unread items: decisions creatures wait on, and the Hall Monitor pause. The badge opens the first
+    // creature waiting on you, on its Needs (the Inbox retired into it, docs/Keepers-Room.md stage 3);
+    // only the Hall Monitor, which speaks for the whole hive, still has a place of its own.
     val inboxReadLog = remember { InboxReadLog(Settings()) }
     val inboxKeys = remember(runtimeState) { inboxItemKeys(runtimeState) }
     val unreadInbox = unreadInboxCount(inboxKeys, inboxReadLog.read)
     LaunchedEffect(destination, inboxKeys) {
         if (destination == ControlRoomDestination.Inbox) inboxReadLog.markRead(inboxKeys)
     }
-    val openInbox = { onDestinationSelected(ControlRoomDestination.Inbox) }
-    val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    val openInbox = {
+        inboxReadLog.markRead(inboxKeys)
+        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || isHallMonitorTrial(it) }
+            ?.let { live -> firstCreatureNeedingYou(live) }
+        when {
+            liveWorkflow != null && waiting == null -> onDestinationSelected(ControlRoomDestination.Inbox)
+            waiting != null -> {
+                if (selectedTaskId != waiting) onTaskSelected(waiting)
+                creatureTabName = CreatureTab.Needs.name
+                onDestinationSelected(ControlRoomDestination.Overview)
+            }
+            else -> onDestinationSelected(ControlRoomDestination.Inbox)
+        }
+    }
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
         (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
@@ -212,6 +237,7 @@ fun ControlRoom(
         inDistrict = district.value,
         hiveName = liveWorkflow?.definition?.name ?: restingDefinition?.name,
         creatureName = selectedTaskId?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
+        creatureTab = creatureTab.takeIf { selectedTaskId != null && liveWorkflow != null }?.label(),
         onOpenDistrict = {
             selectedTaskId?.let(onTaskSelected)
             district.value = true
@@ -319,6 +345,11 @@ fun ControlRoom(
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
                         onMessageAgent = onMessageAgent,
+                        tab = creatureTab,
+                        onTabChange = { creatureTabName = it.name },
+                        onSaveRoleCollection = onSaveRoleCollection,
+                        connectedProviderIds = connectedProviderIds,
+                        roleSurfaceFilePicker = roleSurfaceFilePicker,
                         modifier = Modifier
                             .fillMaxWidth()
                             .fillMaxHeight(if (compact) 0.72f else 0.62f),
@@ -343,6 +374,7 @@ private fun shellCrumbs(
     inDistrict: Boolean,
     hiveName: String?,
     creatureName: String?,
+    creatureTab: String?,
     onOpenDistrict: () -> Unit,
     onOpenHive: () -> Unit,
 ): List<ShellCrumb> = buildList {
@@ -351,6 +383,7 @@ private fun shellCrumbs(
         if (inDistrict) return@buildList
         hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
         creatureName?.let { add(ShellCrumb(it, "crumb-creature", null)) }
+        if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
     } else {
         add(ShellCrumb(destination.label, "crumb-${destination.name}", null))
     }
@@ -778,3 +811,7 @@ private fun runtimeStatusLabel(state: ApplicationRuntimeState): String = when (s
     is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.nav_runtime_disconnected)
     is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.nav_runtime_resume_failed)
 }
+
+/** The first creature, in plan order, waiting on the keeper. */
+internal fun firstCreatureNeedingYou(live: LiveWorkflowPresentation): String? =
+    live.definition.tasks.firstOrNull { task -> live.run.taskRuns[task.id]?.let(::creatureNeedsYou) == true }?.id?.value

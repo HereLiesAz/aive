@@ -26,6 +26,10 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.semantics.Role
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.TaskRun
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_approve
@@ -88,6 +92,10 @@ import com.hereliesaz.geministrator.resources.mind_budget
 import com.hereliesaz.geministrator.resources.mind_instructions
 import com.hereliesaz.geministrator.resources.mind_no_budget
 import com.hereliesaz.geministrator.resources.mind_tools
+import com.hereliesaz.geministrator.resources.creature_needs_nothing
+import com.hereliesaz.geministrator.resources.creature_tab_mind
+import com.hereliesaz.geministrator.resources.creature_tab_work
+import com.hereliesaz.geministrator.resources.creature_tab_needs
 import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.geministrator.resources.inspector_acceptance_criteria_count
 import org.jetbrains.compose.resources.pluralStringResource
@@ -101,6 +109,11 @@ internal fun TechnicalInspector(
     onResolveEscalation: (String, Boolean) -> Unit = { _, _ -> },
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     modifier: Modifier = Modifier,
+    tab: CreatureTab = CreatureTab.Needs,
+    onTabChange: (CreatureTab) -> Unit = {},
+    onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
+    connectedProviderIds: Set<String> = emptySet(),
+    roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -123,6 +136,7 @@ internal fun TechnicalInspector(
     var messageSending by remember(selectedTaskId) { mutableStateOf(false) }
     // Reject plan and Stop workflow cannot be undone, so each asks first: true = stop.
     var confirmingStop by remember(selectedTaskId) { mutableStateOf<Boolean?>(null) }
+    var openArtifact by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
     val identity = role?.name ?: executor.displayName()
@@ -139,23 +153,7 @@ internal fun TechnicalInspector(
         Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
-        creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
-            ?.let { CreatureNeedsPanel(it) }
-        // Programmatic roles wear the neuron and never a kept creature: they only connect.
-        role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
-            ?.let { CreaturePicker(it.id) }
-        // Inside the creature (docs/Swarm-OS.md): its config. Its genes never change; editing them in
-        // the Swarm hatches a new config rather than altering this one.
-        role?.let { mind ->
-            LiveInspectorLine(stringResource(Res.string.mind_instructions), mind.instructions.ifBlank { "—" })
-            if (mind.capabilitiesRequired.isNotEmpty()) {
-                LiveInspectorLine(stringResource(Res.string.mind_tools), mind.capabilitiesRequired.joinToString { it.name })
-            }
-            LiveInspectorLine(
-                stringResource(Res.string.mind_budget),
-                mind.tokenBudget?.toString() ?: stringResource(Res.string.mind_no_budget),
-            )
-        }
+        CreatureTabs(tab, onTabChange)
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
@@ -169,160 +167,203 @@ internal fun TechnicalInspector(
                 dismissLabel = stringResource(Res.string.confirm_cancel),
             )
         }
-        LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
-        LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
-        LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference())
-        LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), taskRun.assignedRoleId?.value ?: task.roleId?.value ?: "—")
-        LiveInspectorLine(stringResource(Res.string.inspector_provider), taskRun.assignedProviderId?.value ?: "—")
-        LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
-        LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
-        LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
-        taskRun.progress?.let { progress ->
-            LiveInspectorLine(stringResource(Res.string.inspector_progress), "${(progress * 100f).toInt()}%", live = true)
-        }
-        taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
-            val label = if (
-                taskRun.status == TaskRunStatus.AwaitingApproval &&
-                taskRun.assignedProviderId != null
-            ) {
-                stringResource(Res.string.inspector_plan)
-            } else {
-                stringResource(Res.string.inspector_now)
+        when (tab) {
+            CreatureTab.Needs -> {
+                creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+                    ?.let { CreatureNeedsPanel(it) }
+                if (taskRun.status == TaskRunStatus.AwaitingApproval) {
+                    val providerPlan = taskRun.assignedProviderId != null
+                    AzphaltPill(
+                        label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
+                        seed = "approve-$selectedTaskId",
+                        endCap = stringResource(Res.string.inspector_proceed),
+                        onClick = { onApproveTask(selectedTaskId) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        stringResource(if (providerPlan) Res.string.inspector_hint_approve_plan else Res.string.inspector_hint_approve_task),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                    if (providerPlan) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.inspector_reject_plan),
+                            seed = "reject-plan-$selectedTaskId",
+                            endCap = stringResource(Res.string.common_reject),
+                            onClick = { confirmingStop = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            tone = PillTone.Danger,
+                        )
+                    }
+                }
+                if (taskRun.awaitsNestedHumanApproval()) {
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_approve_nested_gate),
+                        seed = "approve-nested-$selectedTaskId",
+                        endCap = stringResource(Res.string.inspector_proceed),
+                        onClick = { onApproveTask(selectedTaskId) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(stringResource(Res.string.inspector_hint_approve_nested), style = AzphaltType.body, color = azphaltOnSurface())
+                }
+                if (taskRun.status == TaskRunStatus.Escalated) {
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_retry_task),
+                        seed = "escalation-approve-$selectedTaskId",
+                        endCap = stringResource(Res.string.common_approve),
+                        onClick = { onResolveEscalation(selectedTaskId, true) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_stop_workflow),
+                        seed = "escalation-reject-$selectedTaskId",
+                        endCap = stringResource(Res.string.common_reject),
+                        onClick = { confirmingStop = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        tone = PillTone.Danger,
+                    )
+                }
+                if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
+                    OutlinedTextField(
+                        value = messageDraft,
+                        onValueChange = {
+                            messageDraft = it
+                            messageStatus = null
+                        },
+                        label = { Text(stringResource(Res.string.inspector_message_agent)) },
+                        minLines = 2,
+                        enabled = !messageSending,
+                        colors = azphaltTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    AzphaltPill(
+                        label = if (messageSending) stringResource(Res.string.inspector_sending) else stringResource(Res.string.inspector_send_message),
+                        seed = "message-$selectedTaskId",
+                        endCap = stringResource(Res.string.inspector_send),
+                        onClick = {
+                            val message = messageDraft.trim()
+                            if (message.isNotEmpty() && !messageSending) {
+                                messageSending = true
+                                messageStatus = null
+                                scope.launch {
+                                    val failure = onMessageAgent(selectedTaskId, message)
+                                    messageSending = false
+                                    if (failure == null) {
+                                        messageDraft = ""
+                                        messageStatus = getString(Res.string.inspector_sent)
+                                    } else {
+                                        messageStatus = failure
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
+                }
+                if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
+                    Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
+                }
             }
-            LiveInspectorLine(label, it, live = true)
-        }
-        taskRun.blockingReason?.let {
-            LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
-        }
-        LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
-        taskRun.artifacts.forEachIndexed { index, artifact ->
-            val reference = artifact.uri
-                ?: artifact.textContent?.takeIf(String::isNotBlank)?.let { stringResource(Res.string.inspector_inline_evidence) }
-                ?: stringResource(Res.string.inspector_stored_evidence)
-            LiveInspectorLine(
-                stringResource(Res.string.inspector_artifact, index + 1, artifact.kind.name),
-                "${artifact.label} · $reference",
-            )
-        }
-        if (taskRun.status == TaskRunStatus.AwaitingApproval) {
-            val providerPlan = taskRun.assignedProviderId != null
-            AzphaltPill(
-                label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
-                seed = "approve-$selectedTaskId",
-                endCap = stringResource(Res.string.inspector_proceed),
-                onClick = { onApproveTask(selectedTaskId) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                stringResource(if (providerPlan) Res.string.inspector_hint_approve_plan else Res.string.inspector_hint_approve_task),
-                style = AzphaltType.body,
-                color = azphaltOnSurface(),
-            )
-            if (providerPlan) {
-                AzphaltPill(
-                    label = stringResource(Res.string.inspector_reject_plan),
-                    seed = "reject-plan-$selectedTaskId",
-                    endCap = stringResource(Res.string.common_reject),
-                    onClick = { confirmingStop = false },
-                    modifier = Modifier.fillMaxWidth(),
-                    tone = PillTone.Danger,
-                )
-            }
-        }
-        if (taskRun.awaitsNestedHumanApproval()) {
-            AzphaltPill(
-                label = stringResource(Res.string.inspector_approve_nested_gate),
-                seed = "approve-nested-$selectedTaskId",
-                endCap = stringResource(Res.string.inspector_proceed),
-                onClick = { onApproveTask(selectedTaskId) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(stringResource(Res.string.inspector_hint_approve_nested), style = AzphaltType.body, color = azphaltOnSurface())
-        }
-        if (taskRun.status == TaskRunStatus.Escalated) {
-            AzphaltPill(
-                label = stringResource(Res.string.inspector_retry_task),
-                seed = "escalation-approve-$selectedTaskId",
-                endCap = stringResource(Res.string.common_approve),
-                onClick = { onResolveEscalation(selectedTaskId, true) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            AzphaltPill(
-                label = stringResource(Res.string.inspector_stop_workflow),
-                seed = "escalation-reject-$selectedTaskId",
-                endCap = stringResource(Res.string.common_reject),
-                onClick = { confirmingStop = true },
-                modifier = Modifier.fillMaxWidth(),
-                tone = PillTone.Danger,
-            )
-        }
-        if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
-            OutlinedTextField(
-                value = messageDraft,
-                onValueChange = {
-                    messageDraft = it
-                    messageStatus = null
-                },
-                label = { Text(stringResource(Res.string.inspector_message_agent)) },
-                minLines = 2,
-                enabled = !messageSending,
-                colors = azphaltTextFieldColors(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            AzphaltPill(
-                label = if (messageSending) stringResource(Res.string.inspector_sending) else stringResource(Res.string.inspector_send_message),
-                seed = "message-$selectedTaskId",
-                endCap = stringResource(Res.string.inspector_send),
-                onClick = {
-                    val message = messageDraft.trim()
-                    if (message.isNotEmpty() && !messageSending) {
-                        messageSending = true
-                        messageStatus = null
-                        scope.launch {
-                            val failure = onMessageAgent(selectedTaskId, message)
-                            messageSending = false
-                            if (failure == null) {
-                                messageDraft = ""
-                                messageStatus = getString(Res.string.inspector_sent)
-                            } else {
-                                messageStatus = failure
+            CreatureTab.Work -> {
+                LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
+                LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
+                LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference())
+                LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), taskRun.assignedRoleId?.value ?: task.roleId?.value ?: "—")
+                LiveInspectorLine(stringResource(Res.string.inspector_provider), taskRun.assignedProviderId?.value ?: "—")
+                LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
+                LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
+                LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
+                taskRun.progress?.let { progress ->
+                    LiveInspectorLine(stringResource(Res.string.inspector_progress), "${(progress * 100f).toInt()}%", live = true)
+                }
+                taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
+                    val label = if (
+                        taskRun.status == TaskRunStatus.AwaitingApproval &&
+                        taskRun.assignedProviderId != null
+                    ) {
+                        stringResource(Res.string.inspector_plan)
+                    } else {
+                        stringResource(Res.string.inspector_now)
+                    }
+                    LiveInspectorLine(label, it, live = true)
+                }
+                taskRun.blockingReason?.let {
+                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
+                }
+                // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
+                LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
+                taskRun.artifacts.forEach { artifact ->
+                    val open = openArtifact == artifact.id.value
+                    AzphaltRecord(
+                        seed = "artifact-${artifact.id.value}",
+                        eyebrow = artifact.kind.name,
+                        title = artifact.label,
+                        body = artifact.uri
+                            ?: artifact.textContent?.takeIf(String::isNotBlank)?.let { stringResource(Res.string.inspector_inline_evidence) }
+                            ?: stringResource(Res.string.inspector_stored_evidence),
+                        endCap = null,
+                        selected = open,
+                        onClick = { openArtifact = if (open) null else artifact.id.value },
+                        well = if (open) {
+                            {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    artifact.uri?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+                                    artifact.textContent?.takeIf(String::isNotBlank)?.let {
+                                        Text(it, style = AzphaltType.body, color = azphaltOnSurface())
+                                    }
+                                }
+                            }
+                        } else null,
+                    )
+                }
+                val roleForPayload = role
+                    ?: task.roleId?.let { rid -> liveWorkflow.roles.firstOrNull { it.id == rid } }
+                val isAgentTask = executor is TaskExecutor.RoleAgent || task.roleId != null
+                if (isAgentTask && roleForPayload != null) {
+                    val redaction = liveWorkflow.definition.payloadRedactionPolicy
+                    val allContextArtifacts = task.dependsOn
+                        .flatMap { depId -> liveWorkflow.run.taskRuns[depId]?.artifacts.orEmpty() }
+                    val sentArtifacts = allContextArtifacts.filter { it.kind !in redaction.excludedArtifactKinds }
+                    LiveInspectorLine(stringResource(Res.string.inspector_payload_context), buildString {
+                        append(stringResource(Res.string.inspector_role, roleForPayload.name))
+                        append("\nObjective: ${if (redaction.redactObjective) "[redacted by policy]" else task.objective.take(120) + if (task.objective.length > 120) "…" else ""}")
+                        if (task.acceptanceCriteria.isNotEmpty()) {
+                            append(pluralStringResource(Res.plurals.inspector_acceptance_criteria_count, task.acceptanceCriteria.size, task.acceptanceCriteria.size))
+                        }
+                        if (!redaction.redactRoleInstructions && roleForPayload.instructions.isNotBlank()) {
+                            append("\nRole instructions: ${roleForPayload.instructions.take(80)}${if (roleForPayload.instructions.length > 80) "…" else ""}")
+                        } else if (redaction.redactRoleInstructions) {
+                            append(stringResource(Res.string.inspector_role_instructions_redacted_by_policy))
+                        }
+                        if (allContextArtifacts.isNotEmpty()) {
+                            append(stringResource(Res.string.inspector_context_artifacts_sent, sentArtifacts.size))
+                            if (sentArtifacts.size < allContextArtifacts.size) {
+                                append(stringResource(Res.string.inspector_excluded_by_redaction_policy, allContextArtifacts.size - sentArtifacts.size))
                             }
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
-        }
-        val roleForPayload = role
-            ?: task.roleId?.let { rid -> liveWorkflow.roles.firstOrNull { it.id == rid } }
-        val isAgentTask = executor is TaskExecutor.RoleAgent || task.roleId != null
-        if (isAgentTask && roleForPayload != null) {
-            val redaction = liveWorkflow.definition.payloadRedactionPolicy
-            val allContextArtifacts = task.dependsOn
-                .flatMap { depId -> liveWorkflow.run.taskRuns[depId]?.artifacts.orEmpty() }
-            val sentArtifacts = allContextArtifacts.filter { it.kind !in redaction.excludedArtifactKinds }
-            LiveInspectorLine(stringResource(Res.string.inspector_payload_context), buildString {
-                append(stringResource(Res.string.inspector_role, roleForPayload.name))
-                append("\nObjective: ${if (redaction.redactObjective) "[redacted by policy]" else task.objective.take(120) + if (task.objective.length > 120) "…" else ""}")
-                if (task.acceptanceCriteria.isNotEmpty()) {
-                    append(pluralStringResource(Res.plurals.inspector_acceptance_criteria_count, task.acceptanceCriteria.size, task.acceptanceCriteria.size))
+                    })
+                    LiveInspectorLine(stringResource(Res.string.inspector_provider_target), taskRun.assignedProviderId?.value ?: task.executor?.let { ex ->
+                        if (ex is TaskExecutor.RoleAgent) stringResource(Res.string.inspector_any_capable_provider) else "—"
+                    } ?: stringResource(Res.string.inspector_any_capable_provider))
                 }
-                if (!redaction.redactRoleInstructions && roleForPayload.instructions.isNotBlank()) {
-                    append("\nRole instructions: ${roleForPayload.instructions.take(80)}${if (roleForPayload.instructions.length > 80) "…" else ""}")
-                } else if (redaction.redactRoleInstructions) {
-                    append(stringResource(Res.string.inspector_role_instructions_redacted_by_policy))
-                }
-                if (allContextArtifacts.isNotEmpty()) {
-                    append(stringResource(Res.string.inspector_context_artifacts_sent, sentArtifacts.size))
-                    if (sentArtifacts.size < allContextArtifacts.size) {
-                        append(stringResource(Res.string.inspector_excluded_by_redaction_policy, allContextArtifacts.size - sentArtifacts.size))
-                    }
-                }
-            })
-            LiveInspectorLine(stringResource(Res.string.inspector_provider_target), taskRun.assignedProviderId?.value ?: task.executor?.let { ex ->
-                if (ex is TaskExecutor.RoleAgent) stringResource(Res.string.inspector_any_capable_provider) else "—"
-            } ?: stringResource(Res.string.inspector_any_capable_provider))
+            }
+            CreatureTab.Mind -> {
+                // Programmatic roles wear the neuron and never a kept creature: they only connect.
+                role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
+                    ?.let { CreaturePicker(it.id) }
+                // Inside the creature (docs/Swarm-OS.md): its config, changed here (docs/Keepers-Room.md,
+                // stage 3). Its genes never change; changing its mind hatches a new config.
+                role?.let { mind ->
+                    CustomCompanyProviderScreen(
+                        runtimeState = ApplicationRuntimeState.Live(liveWorkflow),
+                        connectedProviderIds = connectedProviderIds,
+                        onSaveRoleCollection = onSaveRoleCollection,
+                        roleSurfaceFilePicker = roleSurfaceFilePicker,
+                        focusRole = mind.id,
+                    )
+                } ?: LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
+            }
         }
     }
     }
@@ -353,5 +394,45 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
     ) {
         Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(value, style = AzphaltType.body, color = azphaltOnSurface())
+    }
+}
+
+/**
+ * The creature's panel, in three (docs/Keepers-Room.md, stage 3): what it needs from you (once the
+ * Inbox), its work and what it made (once Artifacts), and its mind (once the Swarm's role editor).
+ */
+enum class CreatureTab { Needs, Work, Mind }
+
+/** Whether this creature is waiting on the keeper: a plan or task to approve, or an escalation. */
+internal fun creatureNeedsYou(taskRun: TaskRun): Boolean =
+    taskRun.status == TaskRunStatus.AwaitingApproval ||
+        taskRun.status == TaskRunStatus.Escalated ||
+        taskRun.awaitsNestedHumanApproval()
+
+/** The tab a creature opens on: Needs when it is waiting on you, else its Work. */
+internal fun openingTab(taskRun: TaskRun?): CreatureTab =
+    if (taskRun != null && creatureNeedsYou(taskRun)) CreatureTab.Needs else CreatureTab.Work
+
+@Composable
+internal fun CreatureTab.label(): String = stringResource(
+    when (this) {
+        CreatureTab.Needs -> Res.string.creature_tab_needs
+        CreatureTab.Work -> Res.string.creature_tab_work
+        CreatureTab.Mind -> Res.string.creature_tab_mind
+    },
+)
+
+@Composable
+private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        CreatureTab.entries.forEach { entry ->
+            AzphaltPill(
+                label = entry.label(),
+                seed = "creature-tab-${entry.name}",
+                selected = entry == tab,
+                role = Role.Tab,
+                onClick = { onTabChange(entry) },
+            )
+        }
     }
 }
