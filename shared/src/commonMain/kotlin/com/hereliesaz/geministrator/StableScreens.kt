@@ -1,7 +1,8 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.draw.clip
@@ -173,7 +174,9 @@ private fun StableTile(
     selected: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
-    val ground = if (selected) Azphalt.Yellow else androidx.compose.ui.graphics.Color(0xFF2A231E)
+    // Records (docs/BRANDING.md): Ink, and Yellow outlined in Ink when selected, so the chosen one
+    // stands off the mustard ground rather than melting into it.
+    val ground = if (selected) Azphalt.Yellow else Azphalt.Ink
     val ink = if (selected) Azphalt.Ink else Azphalt.White
     Column(
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
@@ -181,7 +184,14 @@ private fun StableTile(
             .size(width = 156.dp, height = 236.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
             .background(ground)
-            .let { if (onClick != null) it.clickable(role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick) else it }
+            .let { if (selected) it.border(3.dp, Azphalt.Ink, androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) else it }
+            .let {
+                if (onClick != null) {
+                    it.selectable(selected = selected, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = onClick)
+                } else {
+                    it
+                }
+            }
             .padding(8.dp),
     ) {
         Box(Modifier.size(width = 140.dp, height = 168.dp), contentAlignment = androidx.compose.ui.Alignment.TopEnd) {

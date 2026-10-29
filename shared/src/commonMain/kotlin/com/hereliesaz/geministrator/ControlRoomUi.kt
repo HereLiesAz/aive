@@ -34,6 +34,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import androidx.compose.runtime.getValue
@@ -82,12 +85,9 @@ internal object ControlRoomBreakpoints {
 
 enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
-    Runs("Runs"),
     Workflows("Workflows"),
     Company("Swarm"),
-    Artifacts("Artifacts"),
     Inbox("Inbox"),
-    Repositories("Repositories"),
     Compute("Compute"),
     Memory("Memory swarm"),
     AddOns("AZPHALT STORE"),
@@ -113,14 +113,14 @@ enum class ControlRoomDestination(val label: String) {
         val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory, AddOns)
 
         /**
-         * Reachable, but not in the hive's row (docs/Keepers-Room.md, stage 3): Runs are the hive's
-         * combs; Workflows opens from a hive's More editing; Artifacts are each creature's Work; the
-         * Inbox is each creature's Needs, and the Hall Monitor's pause.
+         * Reachable, but not in the hive's row (docs/Keepers-Room.md, stage 3): Workflows opens from a
+         * hive's More editing; the Inbox is the Hall Monitor's pause. Runs became the hive's combs and
+         * Artifacts each creature's Work.
          */
-        val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows, Artifacts, Inbox)
+        val RetiredSections: Set<ControlRoomDestination> = setOf(Workflows, Inbox)
 
         /** Parts of the Keeper's room ([Settings]) that once had their own place (docs/Keepers-Room.md). */
-        val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute)
+        val KeeperParts: Set<ControlRoomDestination> = setOf(Compute)
 
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
@@ -190,40 +190,8 @@ fun ControlRoom(
 ) {
     val ground = Azphalt.currentGround
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-    // The creature panel's tab (Needs, Work, Mind): a creature opens on Needs when it waits on you.
-    var creatureTabName by rememberDurableStringState("creature.panel.tab", CreatureTab.Work.name)
-    val creatureTab = CreatureTab.entries.firstOrNull { it.name == creatureTabName } ?: CreatureTab.Work
-    LaunchedEffect(selectedTaskId) {
-        selectedTaskId?.let { id -> creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(id))).name }
-    }
-    // Unread items: decisions creatures wait on, and the Hall Monitor pause. The badge opens the first
-    // creature waiting on you, on its Needs (the Inbox retired into it, docs/Keepers-Room.md stage 3);
-    // only the Hall Monitor, which speaks for the whole hive, still has a place of its own.
-    val inboxReadLog = remember { InboxReadLog(Settings()) }
-    val inboxKeys = remember(runtimeState) { inboxItemKeys(runtimeState) }
-    val unreadInbox = unreadInboxCount(inboxKeys, inboxReadLog.read)
-    LaunchedEffect(destination, inboxKeys) {
-        if (destination == ControlRoomDestination.Inbox) inboxReadLog.markRead(inboxKeys)
-    }
-    val openInbox = {
-        inboxReadLog.markRead(inboxKeys)
-        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || isHallMonitorTrial(it) }
-            ?.let { live -> firstCreatureNeedingYou(live) }
-        when {
-            liveWorkflow != null && waiting == null -> onDestinationSelected(ControlRoomDestination.Inbox)
-            waiting != null -> {
-                if (selectedTaskId != waiting) onTaskSelected(waiting)
-                creatureTabName = CreatureTab.Needs.name
-                onDestinationSelected(ControlRoomDestination.Overview)
-            }
-            else -> onDestinationSelected(ControlRoomDestination.Inbox)
-        }
-    }
-    val inspectorVisible = selectedTaskId != null &&
-        liveWorkflow != null &&
-        (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
     // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
-    // Held here so the breadcrumb and the hive agree on where the keeper is.
+    // Held here so the breadcrumb, Back and the hive agree on where the keeper is.
     val district = rememberDurableBooleanState("overview.zoom.district")
     // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
     val restingHive = rememberDurableStringState("overview.resting-hive")
@@ -232,22 +200,85 @@ fun ControlRoom(
             runCatching { onLoadWorkflowDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == id }
         }
     }
+    // The Keeper's room's open part, held here so the breadcrumb can name it.
+    val keeperSectionName = rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
+    val keeperOpen = rememberDurableBooleanState("keeper.open")
+    val inspectorVisible = selectedTaskId != null &&
+        liveWorkflow != null &&
+        destination == ControlRoomDestination.Overview &&
+        !district.value
+    // Out to the district: the creature panel belongs to a hive, so it closes on the way.
+    val zoomOut = {
+        if (inspectorVisible) selectedTaskId?.let(onTaskSelected)
+        district.value = true
+    }
+    // The creature panel's tab (Needs, Work, Mind). A creature opens on Needs when it waits on you,
+    // else on Work; the tab survives a restart while the same creature stays open.
+    var creatureTabName by rememberDurableStringState("creature.panel.tab", CreatureTab.Work.name)
+    var creatureTabTask by rememberDurableStringState("creature.panel.task")
+    val creatureTab = CreatureTab.entries.firstOrNull { it.name == creatureTabName } ?: CreatureTab.Work
+    LaunchedEffect(selectedTaskId) {
+        if (selectedTaskId != null && selectedTaskId != creatureTabTask) {
+            creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name
+            creatureTabTask = selectedTaskId
+        }
+    }
+    // Unread items: decisions creatures wait on, and the Hall Monitor pause. The badge opens the first
+    // creature waiting on you, on its Needs (the Inbox retired into it, docs/Keepers-Room.md stage 3);
+    // only the Hall Monitor, which speaks for the whole hive, still has a place of its own. An item is
+    // read once its creature's panel has been open, so the badge counts what is still unseen.
+    val inboxReadLog = remember { InboxReadLog(Settings()) }
+    val inboxKeys = remember(runtimeState) { inboxItemKeys(runtimeState) }
+    val unreadInbox = unreadInboxCount(inboxKeys, inboxReadLog.read)
+    LaunchedEffect(destination, inboxKeys) {
+        if (destination == ControlRoomDestination.Inbox) inboxReadLog.markRead(inboxKeys)
+    }
+    LaunchedEffect(selectedTaskId, inspectorVisible, inboxKeys) {
+        val run = liveWorkflow?.run ?: return@LaunchedEffect
+        if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
+    }
+    val openInbox = {
+        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || isHallMonitorTrial(it) }
+            ?.let { live -> firstCreatureNeedingYou(live, unseen = { key -> key !in inboxReadLog.read }) }
+        if (waiting != null) {
+            district.value = false
+            if (selectedTaskId != waiting) onTaskSelected(waiting)
+            creatureTabName = CreatureTab.Needs.name
+            creatureTabTask = waiting
+            onDestinationSelected(ControlRoomDestination.Overview)
+        } else {
+            onDestinationSelected(ControlRoomDestination.Inbox)
+        }
+    }
+    // Back zooms out of a hive to the district before it leaves the app; the panel and other places
+    // handle Back themselves first.
+    PlatformBackHandler(
+        enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
+            (liveWorkflow != null || restingHive.value.isNotBlank()),
+    ) { zoomOut() }
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
         hiveName = liveWorkflow?.definition?.name ?: restingDefinition?.name,
-        creatureName = selectedTaskId?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
-        creatureTab = creatureTab.takeIf { selectedTaskId != null && liveWorkflow != null }?.label(),
+        creatureName = selectedTaskId?.takeIf { inspectorVisible }?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
+        creatureTab = creatureTab.takeIf { inspectorVisible }?.label(),
+        keeperPart = KeeperSection.entries.firstOrNull { it.name == keeperSectionName.value }
+            ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.title) },
         onOpenDistrict = {
-            selectedTaskId?.let(onTaskSelected)
-            district.value = true
-            onDestinationSelected(ControlRoomDestination.Overview)
+            if (destination == ControlRoomDestination.Overview) {
+                zoomOut()
+            } else {
+                // From a place opened off the hive, Hive goes back to the hive you came from.
+                onDestinationSelected(ControlRoomDestination.Overview)
+            }
         },
         onOpenHive = {
-            selectedTaskId?.let(onTaskSelected)
+            if (inspectorVisible) selectedTaskId?.let(onTaskSelected)
             district.value = false
             onDestinationSelected(ControlRoomDestination.Overview)
         },
+        onCloseCreature = { selectedTaskId?.let(onTaskSelected) },
+        onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
     )
 
     Box(
@@ -263,7 +294,11 @@ fun ControlRoom(
                 unreadInbox = unreadInbox,
                 onOpenInbox = openInbox,
                 keeperOpen = destination.navigationItem == ControlRoomDestination.Settings,
-                onOpenKeeper = { onDestinationSelected(ControlRoomDestination.Settings) },
+                onOpenKeeper = {
+                    // The gear opens the room itself, its list on a phone, not whichever part was left open.
+                    if (destination.navigationItem != ControlRoomDestination.Settings) keeperOpen.value = false
+                    onDestinationSelected(ControlRoomDestination.Settings)
+                },
                 compact = compact,
             )
             MainDestination(
@@ -325,6 +360,9 @@ fun ControlRoom(
                 compact = compact,
                 district = district,
                 restingHive = restingHive,
+                onZoomOut = zoomOut,
+                keeperSectionName = keeperSectionName,
+                keeperOpen = keeperOpen,
                 runtimeState = runtimeState,
             )
         }
@@ -375,18 +413,29 @@ private fun shellCrumbs(
     hiveName: String?,
     creatureName: String?,
     creatureTab: String?,
+    keeperPart: String?,
     onOpenDistrict: () -> Unit,
     onOpenHive: () -> Unit,
+    onCloseCreature: () -> Unit,
+    onCloseKeeperPart: (() -> Unit)?,
 ): List<ShellCrumb> = buildList {
     add(ShellCrumb(stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict))
-    if (destination == ControlRoomDestination.Overview) {
-        if (inDistrict) return@buildList
-        hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
-        creatureName?.let { add(ShellCrumb(it, "crumb-creature", null)) }
-        if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
-    } else {
-        add(ShellCrumb(destination.label, "crumb-${destination.name}", null))
+    when {
+        destination == ControlRoomDestination.Overview -> {
+            if (inDistrict) return@buildList
+            hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
+            creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
+            if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
+        }
+        destination.navigationItem == ControlRoomDestination.Settings -> {
+            add(ShellCrumb(ControlRoomDestination.Settings.label, "crumb-keeper", onCloseKeeperPart))
+            keeperPart?.let { add(ShellCrumb(it, "crumb-keeper-part", null)) }
+        }
+        else -> add(ShellCrumb(destination.label, "crumb-${destination.name}", null))
     }
+}.let { crumbs ->
+    // Where you are is never a way to go: the last step reads as a place, not a button.
+    crumbs.mapIndexed { index, crumb -> if (index == crumbs.lastIndex) crumb.copy(onClick = null) else crumb }
 }
 
 /** The selected creature's name: its role, else what does its work. */
@@ -440,38 +489,53 @@ private fun ShellHeader(
 @Composable
 private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) {
     val label = stringResource(Res.string.crumb_label)
+    val here = stringResource(Res.string.crumb_here)
+    val scroll = rememberScrollState()
+    // A long trail scrolls so where you are, its last step, stays in view.
+    LaunchedEffect(crumbs.map { it.label }, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
     Row(
         modifier = modifier
             .semantics { contentDescription = label }
-            .horizontalScroll(rememberScrollState()),
+            .horizontalScroll(scroll),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         crumbs.forEachIndexed { index, crumb ->
-            if (index > 0) Text("›", style = AzphaltType.lead, color = azphaltOnSurface())
-            val here = index == crumbs.lastIndex
-            AzphaltPill(
-                label = crumb.label,
-                seed = crumb.seed,
-                selected = here,
-                stateDescription = if (here) stringResource(Res.string.crumb_here) else null,
-                onClick = { if (!here) crumb.onClick?.invoke() },
-            )
+            if (index > 0) Text("›", style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.clearAndSetSemantics {})
+            val onClick = crumb.onClick
+            if (onClick != null) {
+                AzphaltPill(label = crumb.label, seed = crumb.seed, onClick = onClick)
+            } else {
+                // A step that goes nowhere is a place, not a button: the last is where you are.
+                AzphaltPill(
+                    label = crumb.label,
+                    seed = crumb.seed,
+                    selected = index == crumbs.lastIndex,
+                    stateDescription = if (index == crumbs.lastIndex) here else null,
+                    onClick = {},
+                    modifier = Modifier.clearAndSetSemantics {
+                        contentDescription = crumb.label
+                        heading()
+                        if (index == crumbs.lastIndex) stateDescription = here
+                    },
+                )
+            }
         }
     }
 }
 
 /**
- * The hive's own places across its top: its Swarm, the Memory swarm, Artifacts and the Store.
+ * The hive's own places across its top: its Swarm, the Memory swarm and the Store.
  * Tapping the open one returns to the hive.
  */
 @Composable
 private fun OverviewSectionTabs(
+    compact: Boolean,
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
@@ -548,11 +612,14 @@ private fun MainDestination(
     computeAvailable: Boolean = true,
     district: MutableState<Boolean> = remember { mutableStateOf(false) },
     restingHive: MutableState<String> = remember { mutableStateOf("") },
+    onZoomOut: () -> Unit = { district.value = true },
+    keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
+    keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive.
         if (destination.navigationItem == ControlRoomDestination.Overview && runtimeState !is ApplicationRuntimeState.NoProject) {
-            OverviewSectionTabs(destination, onDestinationSelected)
+            OverviewSectionTabs(compact, destination, onDestinationSelected)
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
@@ -610,13 +677,16 @@ private fun MainDestination(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else if (restingHiveId.isNotBlank()) {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact)),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             RestingHive(
                                 definitionId = restingHiveId,
                                 onLoadDefinitions = onLoadWorkflowDefinitions,
                                 selectedTaskId = selectedTaskId,
                                 onTaskSelected = onTaskSelected,
-                                onSurface = { inDistrict = true },
+                                onSurface = onZoomOut,
                             )
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),
@@ -628,7 +698,11 @@ private fun MainDestination(
                         Column(Modifier.fillMaxSize()) {
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
                             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-                            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.foundation.layout.FlowRow(
+                                modifier = Modifier.padding(horizontal = hiveGutter(compact)),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 // Out to the district is the breadcrumb's first step.
                                 if (live != null) {
                                     AzphaltPill(
@@ -686,21 +760,15 @@ private fun MainDestination(
                             connectedRepositoryServiceIds = connectedRepositoryServiceIds,
                             onSearchRepositories = onSearchRepositories,
                             compact = compact,
-                            onSurface = { inDistrict = true },
+                            onSurface = onZoomOut,
                             runtimeState = runtimeState,
+                            hasProvider = connectedProviderIds.isNotEmpty(),
                         )
                             }
                             live?.let { HiveLaunchBar(it.definition) }
                         }
                     }
                 }
-                ControlRoomDestination.Runs -> RunsScreen(
-                    runtimeState = runtimeState,
-                    onLoadRunHistory = onLoadRunHistory,
-                    onSwitchRun = onSwitchRun,
-                    onLoadRunTimeline = onLoadRunTimeline,
-                    modifier = Modifier.fillMaxSize(),
-                )
                 ControlRoomDestination.Workflows -> LiveWorkflowLibraryScreen(
                     runtimeState = runtimeState,
                     onLoadDefinitions = onLoadWorkflowDefinitions,
@@ -717,7 +785,6 @@ private fun MainDestination(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
                 )
-                ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
@@ -735,12 +802,13 @@ private fun MainDestination(
                     modifier = Modifier.fillMaxSize(),
                 )
                 ControlRoomDestination.Settings,
-                ControlRoomDestination.Repositories,
                 ControlRoomDestination.Compute -> KeeperRoom(
                     sections = KeeperSection.entries.filter {
                         it != KeeperSection.Compute || computeAvailable
                     },
                     opening = KeeperSection.of(place),
+                    selectedName = keeperSectionName,
+                    open = keeperOpen,
                     compact = compact,
                     statusOf = { section ->
                         when (section) {
@@ -814,4 +882,16 @@ private fun runtimeStatusLabel(state: ApplicationRuntimeState): String = when (s
 
 /** The first creature, in plan order, waiting on the keeper. */
 internal fun firstCreatureNeedingYou(live: LiveWorkflowPresentation): String? =
-    live.definition.tasks.firstOrNull { task -> live.run.taskRuns[task.id]?.let(::creatureNeedsYou) == true }?.id?.value
+    firstCreatureNeedingYou(live) { true }
+
+/**
+ * The first creature, in plan order, waiting on the keeper, preferring one whose wait is still
+ * [unseen] (its Inbox key unread), so the badge walks through every waiting creature in turn.
+ */
+internal fun firstCreatureNeedingYou(live: LiveWorkflowPresentation, unseen: (String) -> Boolean): String? {
+    val waiting = live.definition.tasks.filter { task -> live.run.taskRuns[task.id]?.let(::creatureNeedsYou) == true }
+    return (waiting.firstOrNull { task -> inboxItemKeys(live.run, task.id.value).any(unseen) } ?: waiting.firstOrNull())?.id?.value
+}
+
+/** The hive's left edge: its rows of places and actions line up with the hive's own content. */
+internal fun hiveGutter(compact: Boolean) = if (compact) 16.dp else 26.dp

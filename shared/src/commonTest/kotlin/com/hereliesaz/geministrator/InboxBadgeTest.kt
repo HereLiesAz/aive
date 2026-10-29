@@ -68,6 +68,20 @@ class InboxBadgeTest {
     }
 
     @Test
+    fun aCreatureAtANestedGateIsWaitingOnYouToo() {
+        // The badge and the creature's Needs share one definition of waiting on the keeper.
+        val nested = taskRun("child", TaskRunStatus.Running).copy(
+            executor = com.hereliesaz.geministrator.domain.TaskExecutor.NestedWorkflow(WorkflowDefinitionId("inner")),
+            progressMessage = com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient.NESTED_HUMAN_APPROVAL_PREFIX + " gate",
+        )
+        val keys = inboxItemKeys(run(nested, taskRun("busy", TaskRunStatus.Running)))
+        assertEquals(1, keys.size)
+        assertTrue(keys.single().startsWith("nested-approval|r1|child"))
+        assertEquals(keys, inboxItemKeys(run(nested), "child"))
+        assertTrue(inboxItemKeys(run(nested), "busy").isEmpty())
+    }
+
+    @Test
     fun aPausedRunListsOnlyItsPauseReport() {
         val keys = inboxItemKeys(run(taskRun("plan", TaskRunStatus.AwaitingApproval), pause = pause()))
         assertEquals(listOf("pause|r1|report"), keys)

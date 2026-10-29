@@ -384,12 +384,14 @@ internal fun CustomCompanyProviderScreen(
         }
 
         if (showRoleForm && (focusRole == null || editingRoleId == focusRole.value)) {
-            Text(
+            // In a creature's Mind the tab and breadcrumb already say whose mind this is.
+            if (focusRole == null) Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),
                 style = AzphaltType.eyebrow,
                 color = azphaltOnSurface(),
             )
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = roleNameDraft,
                 onValueChange = { roleNameDraft = it },
                 label = { Text(stringResource(Res.string.swarm_role_name)) },
@@ -399,6 +401,7 @@ internal fun CustomCompanyProviderScreen(
             val reservedRoleId = roleIdDraft.trim() == ROLE_COLLECTION_MARKER_ID
             // A creature's mind keeps its id: its creature, its breeds and its tasks hang on it.
             if (focusRole == null) OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = roleIdDraft,
                 onValueChange = { roleIdDraft = it },
                 label = { Text(stringResource(Res.string.swarm_role_id_slug)) },
@@ -412,6 +415,7 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = roleDescDraft,
                 onValueChange = { roleDescDraft = it },
                 label = { Text(stringResource(Res.string.swarm_description)) },
@@ -419,6 +423,7 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = roleInstructionsDraft,
                 onValueChange = { roleInstructionsDraft = it },
                 label = { Text(stringResource(Res.string.swarm_standing_instructions)) },
@@ -426,6 +431,7 @@ internal fun CustomCompanyProviderScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = roleTokenBudgetDraft,
                 onValueChange = { input -> roleTokenBudgetDraft = input.filter(Char::isDigit) },
                 label = { Text(stringResource(Res.string.swarm_token_budget)) },
@@ -552,6 +558,7 @@ internal fun CustomCompanyProviderScreen(
                     }
 
                     OutlinedTextField(
+                        colors = azphaltTextFieldColors(),
                         value = source.source,
                         onValueChange = { roleExecutionSourceDraft = source.copy(source = it) },
                         label = { Text(if (source.language == ScriptLanguage.JavaScript) stringResource(Res.string.swarm_javascript) else stringResource(Res.string.swarm_python)) },
@@ -997,6 +1004,7 @@ private fun CompanyRoleSurfaceEditor(
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
+                    colors = azphaltTextFieldColors(),
                     value = surface.alias,
                     onValueChange = { value ->
                         when (surface) {
@@ -1107,6 +1115,7 @@ private fun CompanySpreadsheetSurfaceFields(
 
     when (val source = surface.source) {
         is SpreadsheetSource.AppFile -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.name,
             onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
             label = { Text(stringResource(Res.string.swarm_app_spreadsheet_file)) },
@@ -1115,6 +1124,7 @@ private fun CompanySpreadsheetSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         is SpreadsheetSource.Inline -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.text,
             onValueChange = { onChange(surface.copy(source = source.copy(text = it))) },
             label = { Text(stringResource(Res.string.swarm_spreadsheet_data)) },
@@ -1122,6 +1132,7 @@ private fun CompanySpreadsheetSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         is SpreadsheetSource.Https -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.url,
             onValueChange = { onChange(surface.copy(source = source.copy(url = it), writable = false)) },
             label = { Text(stringResource(Res.string.swarm_https_csv_tsv_url)) },
@@ -1129,6 +1140,7 @@ private fun CompanySpreadsheetSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         is SpreadsheetSource.DocumentUri -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.uri,
             onValueChange = { onChange(surface.copy(source = source.copy(uri = it))) },
             label = { Text(stringResource(Res.string.swarm_document_content_uri)) },
@@ -1137,6 +1149,7 @@ private fun CompanySpreadsheetSurfaceFields(
         )
         is SpreadsheetSource.GoogleSheet -> {
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = source.spreadsheetId,
                 onValueChange = {
                     onChange(
@@ -1153,6 +1166,7 @@ private fun CompanySpreadsheetSurfaceFields(
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                colors = azphaltTextFieldColors(),
                 value = source.gid,
                 onValueChange = {
                     onChange(
@@ -1250,6 +1264,7 @@ private fun CompanySqlSurfaceFields(
 
     when (val source = surface.source) {
         is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.name,
             onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
             label = { Text(stringResource(Res.string.swarm_sqlite_database_name)) },
@@ -1258,6 +1273,7 @@ private fun CompanySqlSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         is SqlDatabaseSource.DocumentUri -> OutlinedTextField(
+            colors = azphaltTextFieldColors(),
             value = source.uri,
             onValueChange = { onChange(surface.copy(source = source.copy(uri = it), writable = false)) },
             label = { Text(stringResource(Res.string.swarm_sqlite_document_content_uri)) },
@@ -1266,6 +1282,7 @@ private fun CompanySqlSurfaceFields(
         )
     }
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = surface.query,
         onValueChange = { onChange(surface.copy(query = it)) },
         label = { Text(stringResource(Res.string.swarm_read_query)) },
@@ -1296,6 +1313,7 @@ private fun CompanyFlowchartSurfaceFields(
     onChange: (RoleSurface) -> Unit,
 ) {
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = surface.source,
         onValueChange = { onChange(surface.copy(source = it)) },
         label = { Text(stringResource(Res.string.swarm_mermaid_flowchart)) },
@@ -1336,6 +1354,7 @@ private fun CompanyMaxRowsField(
     onChange: (Int) -> Unit,
 ) {
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = value.toString(),
         onValueChange = { raw ->
             raw.toIntOrNull()
@@ -1361,6 +1380,7 @@ private fun CompanyGitHubActionFields(
     onChange: (workflow: String, ref: String, contextInput: String) -> Unit,
 ) {
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = workflow,
         onValueChange = { onChange(it, ref, contextInput) },
         label = { Text(stringResource(Res.string.swarm_workflow_file_or_id)) },
@@ -1369,6 +1389,7 @@ private fun CompanyGitHubActionFields(
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = ref,
         onValueChange = { onChange(workflow, it, contextInput) },
         label = { Text(stringResource(Res.string.swarm_ref_branch_optional)) },
@@ -1377,6 +1398,7 @@ private fun CompanyGitHubActionFields(
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = contextInput,
         onValueChange = { onChange(workflow, ref, it) },
         label = { Text(stringResource(Res.string.swarm_aive_context_input)) },
@@ -1405,6 +1427,7 @@ private fun CompanyGitHubScriptRunnerFields(
         },
     )
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = runner.scriptInput,
         onValueChange = { onChange(runner.copy(scriptInput = it.ifBlank { "aive_script" })) },
         label = { Text(stringResource(Res.string.swarm_script_input)) },
@@ -1412,6 +1435,7 @@ private fun CompanyGitHubScriptRunnerFields(
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
+        colors = azphaltTextFieldColors(),
         value = runner.languageInput,
         onValueChange = { onChange(runner.copy(languageInput = it.ifBlank { "aive_language" })) },
         label = { Text(stringResource(Res.string.swarm_language_input)) },
