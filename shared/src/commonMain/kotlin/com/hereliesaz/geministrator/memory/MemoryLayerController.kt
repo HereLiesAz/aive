@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
@@ -76,6 +77,8 @@ class MemoryLayerController(
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     private val drainMutex = Mutex()
+    /** Prevent repeated terminal reconciliation from banking duplicate receipts in one process. */
+    private val proceduralTraceMutex = Mutex()
 
     val settings: StateFlow<MemoryLayerSettings> = settingsStore.state
 
@@ -531,6 +534,47 @@ class MemoryLayerController(
         }
     }
 
+    /**
+     * Non-executing receipt hook, intentionally separate from provider-session memory.
+     * Only conservative, allowlisted metadata is banked; the underlying script/output is omitted.
+     * The bank itself is checked for the same receipt, so restart/reconciliation does not replay it.
+     */
+    val procedureTraceSink: ProcedureTraceSink = ProcedureTraceSink { trace ->
+        if (active && settings.value.proceduralTraceCaptureEnabled) {
+            val inserted = proceduralTraceMutex.withLock {
+                registerWorkflow(trace.workflowId, trace.projectId)
+                val bank = banks.store(trace.workflowId)
+                val source = "executor:${trace.taskRunId}:${trace.attempt}"
+                val description = "Execution receipt: ${trace.contextualSummary()}"
+                val alreadyRecorded = bank.read().episodes.any { episode ->
+                    episode.sourceSessionId == source && episode.userPrompt == description
+                }
+                if (alreadyRecorded) {
+                    false
+                } else {
+                    layerFor(trace.workflowId).queue.enqueueBank(
+                        MemoryBankRequest(
+                            sourceSessionId = source,
+                            text = description,
+                            label = "System executor receipt",
+                            sourceKind = MemorySourceKind.Artifact,
+                            scope = MemoryBankScope(
+                                projectId = trace.projectId,
+                                workflowRunId = trace.workflowId,
+                                taskRunId = trace.taskRunId,
+                                taskDefinitionId = trace.taskDefinitionId,
+                            ),
+                            bankedAtEpochMillis = trace.recordedAtEpochMillis,
+                        ),
+                        priority = MemoryQueuePriority.Normal,
+                    )
+                    true
+                }
+            }
+            if (inserted) drainSoon()
+        }
+    }
+
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
@@ -926,6 +970,7 @@ class MemoryLayerController(
     fun attach() {
         MemoryRuntimeBridge.observer = observer
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
+        MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
         drainSoon()
     }
 
