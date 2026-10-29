@@ -105,6 +105,29 @@ class SqlWorkflowPersistenceTest {
     }
 
     @Test
+    fun anUnreadableRowIsQuarantinedInsteadOfCondemningTheStore() = runBlocking {
+        val file = tempDatabase()
+        val first = desktopSqlWorkflowPersistence(file)
+        val damaged = run("damaged", updatedAt = 2L)
+        val healthy = run("healthy", updatedAt = 9L)
+        first.projects.put(project)
+        first.runs.put(damaged)
+        first.runs.put(healthy)
+        java.sql.DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { connection ->
+            connection.prepareStatement("UPDATE run SET payload = '{\"truncated' WHERE id = 'damaged'").executeUpdate()
+        }
+
+        val restored = desktopSqlWorkflowPersistence(file)
+        assertEquals(listOf(healthy), restored.runs.byProject(project.id))
+        assertNull(restored.runs.get(damaged.id))
+        assertEquals(project, restored.projects.get(project.id))
+        assertEquals(listOf("WorkflowRun"), restored.quarantinedRecords.map { it.kind })
+        assertNull(restored.lastCorruptionError)
+        // The export still works and carries everything readable.
+        assertTrue("healthy" in restored.exportJson())
+    }
+
+    @Test
     fun eventsComeBackInOccurrenceOrderPerRun() = runBlocking {
         val persistence = desktopSqlWorkflowPersistence(null)
         val runId = WorkflowRunId("run")
