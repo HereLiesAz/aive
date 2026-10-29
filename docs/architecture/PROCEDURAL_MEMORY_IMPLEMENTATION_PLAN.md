@@ -168,7 +168,7 @@ The duplex protocol design can proceed in parallel with local reflex execution, 
 
 - Feature flags by platform and mode: `capture`, `suggest`, `invoke`, `duplex-share`, `low-risk-auto-invoke` (default off).
 - Explicit safe defaults and import provenance; show executor availability and which steps require human approval.
-- Metrics: verified reuse rate, failures, fallbacks, quaratined procedures, prompt input/output tokens, retrieval overhead, recovery cost, actual net token savings, run latency/cost, policy denials, remote replay counts.
+- Metrics: verified reuse rate, failures, fallbacks, quarantined procedures, prompt input/output tokens, retrieval overhead, recovery cost, actual net token savings, run latency/cost, policy denials, remote replay counts.
 - Evaluations compare same task/model/environment with and without procedural memory; success and authority preservation are **hard gates**. A token gain does not excuse safety, weaker verification, or hidden irreversible side effects.
 - Platform matrix for Android (JS sandbox), Desktop, JS/Wasm, Actions, distributed nodes and MCP peers. Expose unsupported execution types as inspection-only.
 
