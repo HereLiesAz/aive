@@ -134,6 +134,34 @@ class OpenAiCompatibleChatApiTest {
     }
 
     @Test
+    fun refusesToSendAKeyOverPlainHttpToAPublicHostWhenGeneratingOrStreaming() = runTest {
+        var requests = 0
+        val client = HttpClient(MockEngine {
+            requests += 1
+            respond(content = "{}", status = HttpStatusCode.OK)
+        })
+        val api = OpenAiCompatibleChatApi(
+            apiKeyProvider = LlmApiKeyProvider { "secret-key" },
+            model = "model",
+            baseUrl = "http://api.example.com/v1",
+            client = client,
+        )
+
+        try {
+            listOf<suspend () -> Unit>(
+                { api.generate("hello") },
+                { api.stream("hello") {} },
+            ).forEach { call ->
+                val failure = assertFailsWith<IllegalArgumentException> { call() }
+                assertContains(failure.message.orEmpty(), "plain HTTP")
+            }
+            assertEquals(0, requests)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun hostedRegistryHasUniqueStableIds() {
         val entries = HostedLlmProviders.builtInEntries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)

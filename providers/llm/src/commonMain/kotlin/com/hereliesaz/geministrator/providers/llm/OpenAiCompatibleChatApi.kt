@@ -46,12 +46,18 @@ class OpenAiCompatibleChatApi(
         }
     }
 
-    override suspend fun generate(prompt: String): TextGenerationResult {
+    /** The key to send, checked to be present (when required) and safe to send to [baseUrl]. */
+    private suspend fun sendableApiKey(): String {
         val apiKey = apiKeyProvider.getApiKey().trim()
         require(apiKey.isNotEmpty() || !requireApiKey) { "API key is not configured" }
         require(apiKey.isEmpty() || CleartextPolicy.allowsSecret(baseUrl)) {
             "Refusing to send an API key over plain HTTP to a public host; use an https:// base URL"
         }
+        return apiKey
+    }
+
+    override suspend fun generate(prompt: String): TextGenerationResult {
+        val apiKey = sendableApiKey()
 
         val response = client.post("$baseUrl/chat/completions") {
             if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
@@ -96,8 +102,7 @@ class OpenAiCompatibleChatApi(
      * others), `reasoning` (OpenRouter, Groq) or inline `<think>` spans.
      */
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
-        val apiKey = apiKeyProvider.getApiKey().trim()
-        require(apiKey.isNotEmpty() || !requireApiKey) { "API key is not configured" }
+        val apiKey = sendableApiKey()
         return withReasoningFallback(requestUsage, { requestUsage = false }) { usageOption ->
             val text = StringBuilder()
             val reasoning = StringBuilder()
