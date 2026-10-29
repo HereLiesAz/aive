@@ -7,6 +7,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 
 /**
@@ -19,8 +20,22 @@ internal class StableHost(private val store: DurableUiStateStore = DurableUiStat
     var stable by mutableStateOf(read())
         private set
 
-    suspend fun load() {
-        catalog = runCatching { BreedCatalog.load() }.getOrDefault(BreedCatalog())
+    /** Whether [catalog] is the real one; purchases are claimed only once it is. */
+    var catalogLoaded = false
+        private set
+
+    /** Loads the catalog; false (leaving an empty catalog) when it could not be read. */
+    suspend fun load(): Boolean {
+        val loaded = try {
+            BreedCatalog.load()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            null
+        }
+        catalog = loaded ?: BreedCatalog()
+        catalogLoaded = loaded != null
+        return catalogLoaded
     }
 
     fun chooseStarter(breed: String) {
@@ -37,9 +52,33 @@ internal class StableHost(private val store: DurableUiStateStore = DurableUiStat
 
     fun dismissHatching() = update(stable.copy(lastHatching = null))
 
-    /** A breed bought from the Store joins the stable, one creature. */
-    fun bought(breed: String) {
-        if (catalog[breed]?.sold == true) update(stable.add(breed))
+    /**
+     * Breeds bought from the Store join the stable, one creature per breed of each purchase. Each
+     * purchase is granted (saved at once) and only then consumed through [shop]. Nothing is claimed
+     * before the catalog has loaded, and a purchase naming a breed the catalog does not sell stays
+     * unconsumed for a later launch. A failed consume leaves the purchase to
+     * [BreedPurchases.unclaimed]; its token, kept in [Stable.granted] until consumed, stops it being
+     * granted twice. Returns the breeds granted by this call.
+     */
+    suspend fun claim(shop: BreedPurchases, paid: List<BreedPurchase>): List<String> {
+        if (!catalogLoaded) return emptyList()
+        val added = mutableListOf<String>()
+        for (purchase in paid) {
+            if (purchase.token !in stable.granted) {
+                if (purchase.breedIds.isEmpty() || purchase.breedIds.any { catalog[it]?.sold != true }) continue
+                update(purchase.breedIds.fold(stable, Stable::add).let { it.copy(granted = it.granted + purchase.token) })
+                added += purchase.breedIds
+            }
+            val consumed = try {
+                shop.consume(purchase)
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: Exception) {
+                false
+            }
+            if (consumed) update(stable.copy(granted = stable.granted - purchase.token))
+        }
+        return added
     }
 
     /** The rig the agent [roleId] is drawn with (the starter when unassigned), or null before a starter is chosen. */
