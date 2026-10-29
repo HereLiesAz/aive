@@ -357,6 +357,7 @@ internal fun CustomCompanyProviderScreen(
                                 clearEditor()
                                 onResetRoleCollection()
                             },
+                            tone = PillTone.Danger,
                         )
                         AzphaltPill(
                             label = stringResource(Res.string.common_cancel),
@@ -813,6 +814,7 @@ internal fun CustomCompanyProviderScreen(
                                     draftRoles = draftRoles.filterNot { it.id == role.id }
                                     if (editingRoleId == role.id.value) clearEditor()
                                 },
+                                tone = PillTone.Danger,
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1005,6 +1007,7 @@ private fun CompanyRoleSurfaceEditor(
                     seed = "role-surface-remove-$index",
                     onClick = onRemove,
                     modifier = Modifier.fillMaxWidth(),
+                    tone = PillTone.Danger,
                 )
             }
         },

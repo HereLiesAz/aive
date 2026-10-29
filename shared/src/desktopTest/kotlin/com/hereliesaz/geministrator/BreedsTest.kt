@@ -42,6 +42,36 @@ class BreedsTest {
     )
 
     @Test
+    fun programmaticWorkOnlyConnects() {
+        // A script's task run, though its role is "b": the neuron did it, so it is no parent and no count.
+        val scripted = run("r-script", "a", "b").let { r ->
+            val (key, task) = r.taskRuns.entries.last()
+            r.copy(taskRuns = r.taskRuns + (key to task.copy(executor = com.hereliesaz.geministrator.domain.TaskExecutor.TestRunner())))
+        }
+        val stable = Stable(starter = "a")
+        assertEquals(listOf("a"), stable.contributorsOf(scripted))
+        val onlyScripts = scripted.copy(taskRuns = scripted.taskRuns.mapValues { (_, t) -> t.copy(executor = com.hereliesaz.geministrator.domain.TaskExecutor.TestRunner()) })
+        assertEquals(emptyList(), stable.contributorsOf(onlyScripts))
+    }
+
+    @Test
+    fun programmaticWorkCountsButIsNeverAParent() {
+        val testRunner = com.hereliesaz.geministrator.domain.TaskExecutor.TestRunner()
+        // Role "b"'s task was a test run: the neuron did it, so "b" is no parent.
+        val mixed = run("r-mixed", "a", "b").let { r ->
+            val (key, task) = r.taskRuns.entries.last()
+            r.copy(taskRuns = r.taskRuns + (key to task.copy(executor = testRunner)))
+        }
+        val stable = Stable(starter = "a")
+        assertEquals(listOf("a"), stable.contributorsOf(mixed))
+        // A run of programmatic work alone still counts toward the next generation.
+        val scriptsOnly = mixed.copy(id = WorkflowRunId("r-scripts"), taskRuns = mixed.taskRuns.mapValues { (_, t) -> t.copy(executor = testRunner) })
+        assertEquals(emptyList(), stable.contributorsOf(scriptsOnly))
+        val counted = Stable(starter = "a", need = 3).onRunCleared(scriptsOnly, stable.contributorsOf(scriptsOnly), catalog)
+        assertEquals(1, counted.progress)
+    }
+
+    @Test
     fun fibonacciPace() = assertEquals(listOf(1, 1, 2, 3, 5, 8), (1..6).map(::fibonacci))
 
     @Test

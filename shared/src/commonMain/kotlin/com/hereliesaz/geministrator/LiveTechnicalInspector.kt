@@ -141,7 +141,9 @@ internal fun TechnicalInspector(
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
             ?.let { CreatureNeedsPanel(it) }
-        role?.let { CreaturePicker(it.id) }
+        // Programmatic roles wear the neuron and never a kept creature: they only connect.
+        role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
+            ?.let { CreaturePicker(it.id) }
         // Inside the creature (docs/Swarm-OS.md): its config. Its genes never change; editing them in
         // the Swarm hatches a new config rather than altering this one.
         role?.let { mind ->
@@ -223,6 +225,7 @@ internal fun TechnicalInspector(
                     endCap = stringResource(Res.string.common_reject),
                     onClick = { confirmingStop = false },
                     modifier = Modifier.fillMaxWidth(),
+                    tone = PillTone.Danger,
                 )
             }
         }
@@ -250,6 +253,7 @@ internal fun TechnicalInspector(
                 endCap = stringResource(Res.string.common_reject),
                 onClick = { confirmingStop = true },
                 modifier = Modifier.fillMaxWidth(),
+                tone = PillTone.Danger,
             )
         }
         if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {

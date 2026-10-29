@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
@@ -204,9 +206,24 @@ internal fun Stable.onRunCleared(
     )
 }
 
-/** The creature keys of the agents that did [run]'s work, most work first. */
+/**
+ * Whether an agent did this work. Programmatic work (a script, a test run, a deployment, a nested
+ * workflow, an action) is the neuron's: it counts toward the run like any other, but the neuron has
+ * no genes, so it is never a parent and never sways the mutation (docs/Node-Creature-Genome.md, Breeds).
+ */
+internal val TaskRun.byAgent: Boolean
+    get() = executor.let { it == null || it.isAgent }
+
+private val TaskExecutor.isAgent: Boolean
+    get() = when (this) {
+        is TaskExecutor.RoleAgent -> true
+        is TaskExecutor.Distributed -> delegate.isAgent
+        else -> false
+    }
+
+/** The parents [run] offers a hatch: the creature keys of the agents that did its work, most work first. */
 internal fun Stable.contributorsOf(run: WorkflowRun): List<String> = run.taskRuns.values
-    .filter { it.status == TaskRunStatus.Completed }
+    .filter { it.status == TaskRunStatus.Completed && it.byAgent }
     .mapNotNull { it.assignedRoleId }
     .groupingBy { it }
     .eachCount()

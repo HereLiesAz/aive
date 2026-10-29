@@ -157,5 +157,5 @@ internal val creatureRigGalleryEntries: List<String> by lazy {
         (0 until 10_000).asSequence().map { "Custom Role $it" }
             .first { CreatureRigMapping.slugFor(it) == slug }
     }
-    kinds + CreatureRigMapping.NAMED_ONLY_SLUGS + generics
+    kinds + CreatureRigMapping.NAMED_ONLY_SLUGS + generics + CreatureRigMapping.PROGRAMMATIC_RIG
 }

@@ -562,9 +562,12 @@ function drawRig(dpr) {
     const c = e.part.cut && partCanvas(e.part);
     if (!c || e.alpha <= 0) continue;
     const m = core.mul(view, e.m);
-    ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
     ctx.globalAlpha = e.alpha;
-    ctx.drawImage(c, e.boxLeft, e.boxTop, e.w, e.h);
+    if (core.isLimb(e.part) && Math.abs(e.bend) > 0.01) drawBentLimb(c, e, m);
+    else {
+      ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      ctx.drawImage(c, e.boxLeft, e.boxTop, e.w, e.h);
+    }
   }
   ctx.globalAlpha = 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -594,6 +597,41 @@ function drawRig(dpr) {
     ctx.strokeStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(q.x - 5, q.y); ctx.lineTo(q.x + 5, q.y); ctx.moveTo(q.x, q.y - 5); ctx.lineTo(q.x, q.y + 5); ctx.stroke();
     label(id, q.x + 6, q.y - 6);
+  }
+}
+
+/**
+ * A limb bent along its arc (limbs bend and stretch, never rotate): the sprite in thin slices
+ * across its axis, each placed on the curve and turned with it. The app draws the same bend as a
+ * mesh; slices are close enough for a preview.
+ */
+function drawBentLimb(img, e, m) {
+  const ax = core.limbAxis(e.part);
+  const SLICES = 24;
+  // Slice along the axis: in the axis frame, the sprite box spans [lo, hi].
+  const corners = [[e.boxLeft, e.boxTop], [e.boxLeft + e.w, e.boxTop], [e.boxLeft, e.boxTop + e.h], [e.boxLeft + e.w, e.boxTop + e.h]];
+  const along = corners.map(([x, y]) => x * ax.x + y * ax.y);
+  const lo = Math.min(...along), hi = Math.max(...along);
+  const step = (hi - lo) / SLICES;
+  for (let k = 0; k < SLICES; k++) {
+    const u0 = lo + k * step;
+    const mid = u0 + step / 2;
+    const q = core.placeOnLimb(e.part, mid * ax.x, mid * ax.y, e.bend);
+    // The slice's own frame: placed on the curve, turned by the curve's direction there.
+    const r = core.mul(m, core.trs(q.x, q.y, (q.angle * 180) / Math.PI, 1, 1));
+    ctx.setTransform(r[0], r[1], r[2], r[3], r[4], r[5]);
+    ctx.save();
+    ctx.beginPath();
+    // Clip to this slice (perpendicular to the axis), with a hair of overlap so no seam shows.
+    const a0 = -step / 2 - 0.6, a1 = step / 2 + 0.6, big = e.w + e.h;
+    ctx.moveTo(a0 * ax.x - big * ax.y, a0 * ax.y + big * ax.x);
+    ctx.lineTo(a1 * ax.x - big * ax.y, a1 * ax.y + big * ax.x);
+    ctx.lineTo(a1 * ax.x + big * ax.y, a1 * ax.y - big * ax.x);
+    ctx.lineTo(a0 * ax.x + big * ax.y, a0 * ax.y - big * ax.x);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, e.boxLeft - mid * ax.x, e.boxTop - mid * ax.y, e.w, e.h);
+    ctx.restore();
   }
 }
 

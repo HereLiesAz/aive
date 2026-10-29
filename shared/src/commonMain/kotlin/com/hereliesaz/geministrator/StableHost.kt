@@ -29,6 +29,10 @@ internal class StableHost(private val store: DurableUiStateStore = DurableUiStat
 
     fun assign(role: RoleDefinitionId, key: String?) = update(stable.assign(role, key))
 
+    /**
+     * Every cleared run counts toward the next generation, programmatic work included; only the
+     * agents' creatures are its parents, so the neuron never passes on genes or sways the mutation.
+     */
     fun runCleared(run: WorkflowRun) = update(stable.onRunCleared(run, stable.contributorsOf(run), catalog))
 
     fun dismissHatching() = update(stable.copy(lastHatching = null))

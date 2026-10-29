@@ -82,14 +82,18 @@ enum class ControlRoomDestination(val label: String) {
     Inbox("Inbox"),
     Repositories("Repositories"),
     Compute("Compute"),
-    Memory("Memory"),
+    Memory("Memory swarm"),
     AddOns("AZPHALT STORE"),
-    Settings("Settings"),
+    Settings("Keeper's room"),
     ;
 
     /** The main-navigation entry that is highlighted while this destination is open. */
     val navigationItem: ControlRoomDestination
-        get() = if (this in OverviewSections || this in RetiredSections) Overview else this
+        get() = when {
+            this in OverviewSections || this in RetiredSections -> Overview
+            this in KeeperParts -> Settings
+            else -> this
+        }
 
     companion object {
         /**
@@ -97,13 +101,17 @@ enum class ControlRoomDestination(val label: String) {
          * Overview itself shows the run mind map until one of these is tapped.
          */
         // Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows stays reachable from a hive's More editing.
-        val OverviewSections: List<ControlRoomDestination> = listOf(Company)
+        // Memory is a swarm of its own, running beside every run (docs/Keepers-Room.md): it lives in the hive, not the Keeper's room.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory)
 
         /** Reachable, but no longer shown in Overview's section row. */
         val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
 
-        /** Left out of the main navigation: Overview's sections, and Inbox (its header badge opens it). */
-        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + Inbox
+        /** Parts of the Keeper's room ([Settings]) that once had their own place (docs/Keepers-Room.md). */
+        val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute)
+
+        /** Left out of the main navigation: Overview's sections, the Keeper's room's parts, and Inbox (its header badge opens it). */
+        val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + KeeperParts + Inbox
 
         /** Destinations shown in navigation; [Compute] only where the build offers distributed compute. */
         fun available(distributedComputeAvailable: Boolean): List<ControlRoomDestination> =
@@ -194,11 +202,17 @@ fun ControlRoom(
     ) {
         if (compact) {
             Column(Modifier.fillMaxSize()) {
-                CompactHeader(unreadInbox = unreadInbox, onOpenInbox = openInbox)
+                CompactHeader(
+                    unreadInbox = unreadInbox,
+                    onOpenInbox = openInbox,
+                    keeperOpen = destination.navigationItem == ControlRoomDestination.Settings,
+                    onOpenKeeper = { onDestinationSelected(ControlRoomDestination.Settings) },
+                )
                 CompactNavigation(destination, onDestinationSelected, destinations)
                 MainDestination(
                     destination = destination,
                     onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                    computeAvailable = ControlRoomDestination.Compute in destinations,
                     onDestinationSelected = onDestinationSelected,
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
@@ -269,6 +283,7 @@ fun ControlRoom(
                 MainDestination(
                     destination = destination,
                     onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                    computeAvailable = ControlRoomDestination.Compute in destinations,
                     onDestinationSelected = onDestinationSelected,
                     selectedTaskId = selectedTaskId,
                     onTaskSelected = onTaskSelected,
@@ -407,7 +422,7 @@ private fun PillNavigation(
 }
 
 @Composable
-private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit) {
+private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit, keeperOpen: Boolean, onOpenKeeper: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -417,7 +432,10 @@ private fun CompactHeader(unreadInbox: Int, onOpenInbox: () -> Unit) {
             Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.lead, color = azphaltOnSurface())
             Text(stringResource(Res.string.nav_swarm_os), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         }
-        InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
+            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper)
+        }
     }
 }
 
@@ -432,7 +450,8 @@ private fun CompactNavigation(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation }
+        // The Keeper's room has the gear in the header.
+        val items = destinations.filterNot { it in ControlRoomDestination.NotInNavigation || it == ControlRoomDestination.Settings }
         items.forEachIndexed { index, item ->
             AzphaltPill(
                 label = item.label,
@@ -529,6 +548,7 @@ private fun MainDestination(
     runtimeState: ApplicationRuntimeState,
     onOpenSettings: () -> Unit = {},
     onDestinationSelected: (ControlRoomDestination) -> Unit = {},
+    computeAvailable: Boolean = true,
 ) {
     Column(modifier.fillMaxSize()) {
         if (destination.navigationItem == ControlRoomDestination.Overview) {
@@ -710,23 +730,10 @@ private fun MainDestination(
                 )
                 ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
-                ControlRoomDestination.Repositories -> RepositoryServiceScreen(
-                    connectedServiceIds = connectedRepositoryServiceIds,
-                    onConfigureService = onConfigureRepositoryService,
-                    onDisconnectService = onDisconnectRepositoryService,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                ControlRoomDestination.Compute -> ComputeDelegationScreen(
-                    runtimeState = runtimeState,
-                    distributedComputeState = distributedComputeState,
-                    onAssignWorkflow = onAssignWorkflowCompute,
-                    onAssignRole = onAssignRoleCompute,
-                    onAssignTask = onAssignTaskCompute,
-                    modifier = Modifier.fillMaxSize(),
-                )
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
                     connectedProviderIds = connectedProviderIds,
+                    compact = compact,
                     modifier = Modifier.fillMaxSize(),
                 )
                 ControlRoomDestination.AddOns -> AzphaltStoreScreen(
@@ -738,28 +745,69 @@ private fun MainDestination(
                     onDisconnectProvider = onDisconnectProvider,
                     modifier = Modifier.fillMaxSize(),
                 )
-                ControlRoomDestination.Settings -> ProviderSettingsScreen(
-                    connectedProviderIds = connectedProviderIds,
-                    onCheckProviderHealth = onCheckProviderHealth,
-                    onClearWorkflowData = onClearWorkflowData,
-                    onExportJson = onExportJson,
-                    onImportJson = onImportJson,
-                    projectFileService = projectFileService,
-                    onExportCurrentProjectFile = onExportCurrentProjectFile,
-                    onImportProjectFile = onImportProjectFile,
-                    setupFileActions = setupFileActions,
-                    onExportDiagnosticBundle = onExportDiagnosticBundle,
-                    onConfigureProvider = onReconfigureProvider,
-                    onDisconnectProvider = onDisconnectProvider,
-                    distributedComputeState = distributedComputeState,
-                    onSaveDistributedCompute = onSaveDistributedCompute,
-                    onDisconnectDistributedCompute = onDisconnectDistributedCompute,
-                    crashReportingSetting = crashReportingSetting,
-                    remoteAccessSetting = remoteAccessSetting,
-                    localPlannerSetting = localPlannerSetting,
-                    localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                ControlRoomDestination.Settings,
+                ControlRoomDestination.Repositories,
+                ControlRoomDestination.Compute -> KeeperRoom(
+                    sections = KeeperSection.entries.filter {
+                        it != KeeperSection.Compute || computeAvailable
+                    },
+                    opening = KeeperSection.of(place),
+                    compact = compact,
+                    statusOf = { section ->
+                        when (section) {
+                            KeeperSection.Connections -> keeperCount(connectedProviderIds.size + connectedRepositoryServiceIds.size)
+                            KeeperSection.Compute -> if (distributedComputeState.connected) null else keeperCount(0)
+                            else -> null
+                        }
+                    },
+                    content = { section, partModifier ->
+                            ProviderSettingsScreen(
+                                connectedProviderIds = connectedProviderIds,
+                                onCheckProviderHealth = onCheckProviderHealth,
+                                onClearWorkflowData = onClearWorkflowData,
+                                onExportJson = onExportJson,
+                                onImportJson = onImportJson,
+                                projectFileService = projectFileService,
+                                onExportCurrentProjectFile = onExportCurrentProjectFile,
+                                onImportProjectFile = onImportProjectFile,
+                                setupFileActions = setupFileActions,
+                                onExportDiagnosticBundle = onExportDiagnosticBundle,
+                                onConfigureProvider = onReconfigureProvider,
+                                onDisconnectProvider = onDisconnectProvider,
+                                distributedComputeState = distributedComputeState,
+                                onSaveDistributedCompute = onSaveDistributedCompute,
+                                onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                                crashReportingSetting = crashReportingSetting,
+                                remoteAccessSetting = remoteAccessSetting,
+                                localPlannerSetting = localPlannerSetting,
+                                localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                                section = section,
+                                compact = compact,
+                                trailing = {
+                                    when (section) {
+                                        KeeperSection.Connections -> RepositoryConnections(
+                                            connectedServiceIds = connectedRepositoryServiceIds,
+                                            onConfigureService = onConfigureRepositoryService,
+                                            onDisconnectService = onDisconnectRepositoryService,
+                                            compact = compact,
+                                        )
+                                        KeeperSection.Compute -> ComputeDelegationScreen(
+                                            runtimeState = runtimeState,
+                                            distributedComputeState = distributedComputeState,
+                                            onAssignWorkflow = onAssignWorkflowCompute,
+                                            onAssignRole = onAssignRoleCompute,
+                                            onAssignTask = onAssignTaskCompute,
+                                            embedded = true,
+                                        )
+                                        else -> Unit
+                                    }
+                                },
+                                modifier = partModifier,
+                            )
+                    },
                     modifier = Modifier.fillMaxSize(),
                 )
+
             }
         }
     }

@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator
 import com.russhwolf.settings.Settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -199,6 +200,25 @@ internal object AzphaltType {
     )
 }
 
+/**
+ * What a pill is for, which is all its colour says (docs/BRANDING.md, Controls). Hues belong to
+ * living things (creatures, hives); controls are calm.
+ */
+internal enum class PillTone {
+    /** Most controls: outlined in the surface's content colour. */
+    Quiet,
+    /** The one main action in view: filled. */
+    Primary,
+    /** Removes, deletes, rejects or stops something: red. */
+    Danger,
+}
+
+/** The filled colour for a selected or primary control on the current surface: Ink, or Yellow on dark. */
+@Composable
+internal fun azphaltStrong(): Color = if (azphaltOnSurface() == Color.White) Azphalt.Yellow else Azphalt.Ink
+
+internal val AzphaltDanger = Color(0xFFC6392F)
+
 @Composable
 internal fun AzphaltPill(
     label: String,
@@ -209,10 +229,17 @@ internal fun AzphaltPill(
     modifier: Modifier = Modifier,
     role: Role = Role.Button,
     stateDescription: String? = null,
+    tone: PillTone = PillTone.Quiet,
 ) {
-    // Selected is Ink, unless it would sit on Ink: then Yellow, so it never vanishes into its surface.
-    val hue = if (selected) { if (azphaltSurface() == Azphalt.Ink) Azphalt.Yellow else Azphalt.Ink } else Azphalt.hue(seed)
-    val content = hue.onOpposite()
+    // Selected and primary fill with the surface's strong colour; danger fills red; the rest are outlined.
+    val filled = selected || tone != PillTone.Quiet
+    val fill = when {
+        tone == PillTone.Danger && !selected -> AzphaltDanger
+        filled -> azphaltStrong()
+        else -> Color.Transparent
+    }
+    val line = azphaltOnSurface()
+    val content = if (filled) fill.onOpposite() else line
     val pillRole = role
     Row(
         modifier = modifier
@@ -225,7 +252,8 @@ internal fun AzphaltPill(
             .azphaltSelectedTransform(selected)
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
-            .background(hue)
+            .background(fill)
+            .then(if (filled) Modifier else Modifier.border(2.dp, line, RoundedCornerShape(999.dp)))
             .clickable(onClick = onClick)
             .padding(start = 16.dp, top = 9.dp, bottom = 9.dp, end = if (endCap == null) 16.dp else 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -233,15 +261,14 @@ internal fun AzphaltPill(
     ) {
         Text(label.uppercase(), style = AzphaltType.capsule, color = content)
         if (endCap != null) {
-            val cap = if (selected) Azphalt.Yellow else Azphalt.cap(seed)
-            val capContent = cap.onOpposite()
+            // The cap is the pill's opposite: a small chip of the content colour.
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(cap)
+                    .background(content)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(endCap.uppercase(), style = AzphaltType.endCap, color = capContent)
+                Text(endCap.uppercase(), style = AzphaltType.endCap, color = content.onOpposite())
             }
         }
     }
@@ -300,8 +327,11 @@ internal fun AzphaltRecord(
     modifier: Modifier = Modifier,
     well: (@Composable () -> Unit)? = null,
 ) {
-    val hue = if (selected) { if (azphaltSurface() == Azphalt.Ink) Azphalt.Yellow else Azphalt.Ink } else Azphalt.hue(seed)
+    // A card, not a creature: Ink (lifted Ink on a dark surface), and Yellow when selected.
+    val hue = recordFill(selected)
     val content = hue.onOpposite()
+    // Selected Yellow can sit on a yellow ground: outline it in the ground's content colour.
+    val outline = azphaltOnSurface()
     val radius = animatedRecordRadius(selected)
     val description = buildString {
         append(title)
@@ -330,6 +360,7 @@ internal fun AzphaltRecord(
             .fillMaxWidth()
             .clip(RoundedCornerShape(radius))
             .background(hue)
+            .then(if (selected) Modifier.border(2.dp, outline, RoundedCornerShape(radius)) else Modifier)
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -341,7 +372,7 @@ internal fun AzphaltRecord(
             ) {
                 Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = content)
                 if (endCap != null) {
-                    val cap = if (selected) Azphalt.Yellow else Azphalt.cap(seed)
+                    val cap = content
                     Box(
                         modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(cap).padding(horizontal = 8.dp, vertical = 4.dp),
                     ) {
@@ -356,18 +387,31 @@ internal fun AzphaltRecord(
         if (body != null) Text(body, style = AzphaltType.body, color = content)
         AzphaltChildBand(visible = well != null) {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(WELL_SURFACE).padding(14.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(wellFill(hue)).padding(14.dp),
             ) {
                 // The well is its own dark surface: everything in it takes the opposite of the
                 // well, never the page ground's text colour (dark-on-dark on Mustard and Pink).
-                AzphaltThemedSurface(WELL_SURFACE) { well?.invoke() }
+                AzphaltThemedSurface(wellFill(hue)) { well?.invoke() }
             }
         }
     }
 }
 
-/** The dark panel a record's [AzphaltRecord] `well` sits on. */
-private val WELL_SURFACE = Azphalt.Ink
+/** Ink one step lighter: a card on an Ink surface, and the well inside an Ink card. */
+internal val AzphaltLiftedInk = Color(0xFF2E2723)
+
+@Composable
+private fun recordFill(selected: Boolean): Color {
+    val surface = azphaltSurface()
+    return when {
+        selected -> Azphalt.Yellow
+        surface == Azphalt.Ink || surface == AzphaltLiftedInk -> AzphaltLiftedInk
+        else -> Azphalt.Ink
+    }
+}
+
+/** The dark panel a record's [AzphaltRecord] `well` sits on: set apart from the card around it. */
+private fun wellFill(card: Color): Color = if (card == Azphalt.Ink) AzphaltLiftedInk else Azphalt.Ink
 
 @Composable
 internal fun AzphaltNote(
@@ -376,7 +420,7 @@ internal fun AzphaltNote(
     value: String,
     modifier: Modifier = Modifier,
 ) {
-    val hue = Azphalt.hue(seed)
+    val hue = recordFill(selected = false)
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))

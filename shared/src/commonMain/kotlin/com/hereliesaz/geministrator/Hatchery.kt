@@ -18,13 +18,15 @@ internal fun hatchFromRun(run: WorkflowRun, roles: Collection<RoleDefinition>): 
     val rolesById = roles.associateBy(RoleDefinition::id)
     // Contributors, most completed tasks first; ties by id so the same run always hatches the same child.
     val contributors = run.taskRuns.values
-        .filter { it.status == TaskRunStatus.Completed }
+        .filter { it.status == TaskRunStatus.Completed && it.byAgent }
         .mapNotNull { it.assignedRoleId }
         .groupingBy { it }
         .eachCount()
         .entries
         .sortedWith(compareByDescending<Map.Entry<RoleDefinitionId, Int>> { it.value }.thenBy { it.key.value })
         .mapNotNull { rolesById[it.key] }
+        // Programmatic roles (a script or an action) only connect; they are never a parent.
+        .filter { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
     val a = contributors.firstOrNull() ?: return null
     val childId = RoleDefinitionId("hatch-${run.id.value}")
     val b = contributors.getOrNull(1)

@@ -83,6 +83,8 @@ A creature's breed is the keeper's, not its role's: any agent can wear any breed
 
 Each tick, every creature is judged on its **synapses** *k* (live partners it's wired to), its **load** (tasks in hand), its valence *V*, and the runs it's working on.
 
+Programmatic work (the neuron, `Node-Creatures.md`) counts toward a generation's workflows, but only agents' creatures are parents: the neuron passes on no genes and adds nothing to the mutation swing.
+
 ### Wiring
 
 A synapse forms when one creature's task reads another's output: every dependency in a workflow is a synapse. Across it:

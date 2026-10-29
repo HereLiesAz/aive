@@ -36,6 +36,8 @@ import com.hereliesaz.geministrator.memory.MemoryStageEngine
 import com.hereliesaz.geministrator.memory.parked
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.memory_swarm
+import com.hereliesaz.geministrator.resources.memory_swarm_lead
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.common_remove
@@ -92,7 +94,6 @@ import com.hereliesaz.geministrator.resources.memory_keep_90_days
 import com.hereliesaz.geministrator.resources.memory_keep_all_raw_history
 import com.hereliesaz.geministrator.resources.memory_keep_it
 import com.hereliesaz.geministrator.resources.memory_memories_condensed_together
-import com.hereliesaz.geministrator.resources.memory_memory
 import com.hereliesaz.geministrator.resources.memory_memory_cleared
 import com.hereliesaz.geministrator.resources.memory_memory_is_not_available_in_this
 import com.hereliesaz.geministrator.resources.memory_memory_off
@@ -152,13 +153,17 @@ import org.jetbrains.compose.resources.stringResource
 internal fun MemoryLayerScreen(
     controller: MemoryLayerController?,
     connectedProviderIds: Set<String>,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
+        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.memory_memory), style = AzphaltType.hero, color = azphaltOnSurface())
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(Res.string.memory_swarm), style = AzphaltType.section, color = azphaltOnSurface())
+            Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface())
+        }
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),
@@ -253,7 +258,18 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         projectMemoryTerrarium(snapshot, settings, engines, activity)
     }
     // No selection passed in: selecting would zoom onto one creature and hide the pipeline.
+    // Stages that run without a model are programmatic work, and wear its body.
+    val programmatic = remember(engines) {
+        MemoryTerrariumStage.entries
+            .filter { stage -> stage.roles.all { (engines.resolved[it] ?: MemoryEngineKind.Programmatic) == MemoryEngineKind.Programmatic } }
+            .map { it.label }
+            .toSet()
+    }
+    val outerRig = LocalCreatureRig.current
     Box(Modifier.fillMaxWidth().height(440.dp).clipToBounds()) {
+      androidx.compose.runtime.CompositionLocalProvider(
+          LocalCreatureRig provides { label -> if (label in programmatic) CreatureRigMapping.PROGRAMMATIC_RIG else outerRig(label) },
+      ) {
         PlatformNodeTerrarium(
             subjects = projection.subjects,
             relationships = projection.relationships,
@@ -266,6 +282,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
             modifier = Modifier.fillMaxWidth().height(440.dp),
             editable = false,
         )
+      }
     }
 
     MemorySectionLabel(stringResource(Res.string.memory_stage, selectedStage.stage.name))
@@ -607,7 +624,7 @@ private fun DataSection(controller: MemoryLayerController) {
                     clearConfirm = false
                     message = getString(Res.string.memory_memory_cleared)
                 }
-            })
+            }, tone = PillTone.Danger)
             AzphaltPill(stringResource(Res.string.memory_keep_it), "memory-clear-cancel", onClick = { clearConfirm = false })
         }
     }

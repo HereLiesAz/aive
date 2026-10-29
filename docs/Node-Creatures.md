@@ -46,6 +46,16 @@ Each `TaskRunStatus` is a physiological state, so a person can read the run with
 | `Failed` | ended badly | Sags, dims and trembles; its pearl never forms. Clearly a corpse, never mistaken for waiting. The tide can still bring it back. |
 | `Cancelled` | stopped on purpose | Curls up and sinks to the sediment, intact: stopped, not broken. |
 
+## Programmatic work: the neuron
+
+Work done programmatically rather than by an agent wears one body: **the neuron**, a faceted soma, dendrites and a myelinated axon (`files/rigs/neuron.rig.json`, sliced from `docs/swarm-terrarium/characters/000_neuron/neuron.png` by `tools/puppet-rig/slice/rig_painting.py`). That covers:
+
+- the deterministic executors: Python, JavaScript, Test Runner, Deployment, Repository Operation, Nested Workflow;
+- roles that run a script or an action instead of an agent (`RoleExecutionSource` other than `Agent`);
+- memory stages running without a model (the memory swarm).
+
+The neuron only connects. It takes its place in the swarm, wired to what feeds it and what it feeds, so the swarm doubles as a standing flowchart of the workflow, every step visible. Its work counts toward a run like any other, but it has no genes: it is never a parent of a hatch, never sways a generation's mutation, and is never in the stable or the Store. A programmatic role has no creature to choose.
+
 ## Birth, breeding, mutation, death
 
 - **Birth.** A phase is born from the egg the previous phase gestated. When the Orchestrator plans new tasks during a run, they hatch from its bulb, which is why the Orchestrator's tail is the longest.

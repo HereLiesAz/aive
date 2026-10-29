@@ -27,6 +27,43 @@ class PuppetRigEvaluatorTest {
 
     private fun motion(part: String, m: PuppetPartMotion) = PuppetStateMotion(mapOf(part to m))
 
+    /** A 10x40 tendril hanging from (50,50): pivot at its top centre, tip 40px below. */
+    private fun limbRig(turn: Float) = rig(
+        parts = listOf(
+            PuppetPart("tendril.0", rect = PuppetRect(0, 0, 10, 40), pivot = PuppetPoint(0.5f, 0f), rest = PuppetTransform(x = 50f, y = 50f)),
+            PuppetPart("tendril.0.bud", parent = "tendril.0", kind = "other", rest = PuppetTransform(x = 0f, y = 40f)),
+        ),
+        states = mapOf("Active" to motion("tendril.0", PuppetPartMotion(keys = mapOf("rotation" to listOf(PuppetKeyframe(0f, turn)))))),
+        attachments = listOf(PuppetAttachment("tip", "tendril.0", 0.5f, 1f, "tendril-tip")),
+    )
+
+    @Test
+    fun limbsBendAndNeverRotate() {
+        val pose = PuppetRigEvaluator.evaluate(limbRig(30f), "Active", 0f)
+        val limb = pose.part("tendril.0")!!
+        // The base keeps its rest direction: no rotation in the transform.
+        near(1f, limb.transform.a); near(0f, limb.transform.b); near(0f, limb.transform.c); near(1f, limb.transform.d)
+        // The rotation channel is where the tip goes, seen from the base: it bends twice that.
+        near(60f, limb.bend)
+        val tip = pose.attachments.getValue("tip")
+        val chord = kotlin.math.atan2(-(tip.x - 50f), tip.y - 50f) * 180f / kotlin.math.PI.toFloat()
+        near(30f, chord, 0.05f)
+        // An arc is shorter across than along: the tip comes in a little, not swung out at full length.
+        assertTrue(kotlin.math.hypot(tip.x - 50f, tip.y - 50f) < 40f)
+        // What rides the limb rides its curve: the bud sits at the bent tip.
+        val bud = pose.part("tendril.0.bud")!!.pivotWorld
+        near(tip.x, bud.x); near(tip.y, bud.y)
+    }
+
+    @Test
+    fun eggsAndPodsAreNotLimbs() {
+        assertTrue(PuppetPart("tail.2").isLimb)
+        assertTrue(PuppetPart("tendril.mid").isLimb)
+        assertTrue(!PuppetPart("tail.egg").isLimb)
+        assertTrue(!PuppetPart("tail.pod.0").isLimb)
+        assertTrue(PuppetPart("arm", kind = "tendril").isLimb)
+    }
+
     @Test
     fun hierarchyComposesParentTransforms() {
         val r = rig(listOf(

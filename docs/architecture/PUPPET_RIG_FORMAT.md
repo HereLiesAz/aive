@@ -111,6 +111,25 @@ alpha = clamp(alpha(parent) · rest.alpha · ka, 0, 1)
 The part's box is drawn in its local frame at `(-pivot.x · w, -pivot.y · h)` with size `(w, h)` =
 `size`. So the pivot is the local origin, and rotation and scale happen around it. Alpha is inherited.
 
+## Limbs: bend and stretch, never rotate
+
+A **limb** is a part of kind `tendril` or `tail`, or, in rigs from before `kind`, a part named
+`tendril`/`tail` with optional `.N`, `.base`, `.mid`, `.lower` or `.upper` segments (`tail.egg` and
+`tail.pod.N` are not limbs). Limbs bend and stretch; they never rotate.
+
+- A limb runs from its pivot (its base) to its tip: the pivot reflected through the centre of its
+  drawn box. Its `rest.rotation` lays it out; animation never turns its base.
+- Its `rotation` channel **bends** it instead. The value says where the tip goes, seen from the base
+  (as if the limb swung whole); the limb curves evenly along its length, a circular arc whose
+  total turn, base to tip, is twice the value (`bend = 2 × rotation`), so the tip travels as far
+  as a swing would have taken it while the base stays put.
+- It **stretches** along that arc: its scale channels as before, and, when it reaches for a
+  partner, as far as it needs (in segments when too far for one sprite).
+- What rides a limb rides its curve: a child part's `rest.x/y` and an attachment on the limb are
+  placed on the bent limb and turned with it.
+- Evaluators report a limb's transform at its rest direction plus its `bend` (degrees, positive
+  clockwise). Renderers draw it as a mesh (aive, `LimbBend.kt`) or in slices (the editor).
+
 ## Attachment points
 
 ```json
@@ -154,7 +173,7 @@ must be unique; missing parent-point references are invalid.
 | Channel | Combined with rest | Identity |
 |---|---|---|
 | `x`, `y` | added (artboard px, parent-local) | 0 |
-| `rotation` | added (degrees) | 0 |
+| `rotation` | added (degrees); on a limb, bends it instead (see Limbs) | 0 |
 | `scaleX`, `scaleY` | multiplied | 1 |
 | `alpha` | multiplied | 1 |
 

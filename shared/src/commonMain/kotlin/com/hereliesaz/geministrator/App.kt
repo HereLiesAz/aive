@@ -450,12 +450,18 @@ fun App(
         )
 
         val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
+        // A role that runs a script or an action rather than an agent is programmatic work: it wears the neuron, never a kept creature.
+        val programmaticRoles = (liveRun?.roles.orEmpty() + BuiltInRoles.all)
+            .filter { it.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
+            .mapTo(hashSetOf()) { it.name }
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,
-            LocalCreatureRig provides { label -> stableHost.rigFor(rolesByName[label]) },
+            LocalCreatureRig provides { label ->
+                if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
+            },
         ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
