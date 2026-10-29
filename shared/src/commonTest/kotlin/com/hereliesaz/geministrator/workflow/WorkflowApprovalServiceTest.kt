@@ -22,9 +22,9 @@ import kotlin.test.assertTrue
 
 class WorkflowApprovalServiceTest {
     @Test
-    fun architectApprovalDrivesProviderPlanApprovalAndAuditEvent() = runBlocking {
+    fun humanApprovalDrivesProviderPlanApprovalAndAuditEvent() = runBlocking {
         val fixture = fixture()
-        val decided = fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Plan is sound", 20L)
+        val decided = fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Plan is sound", 20L)
         assertEquals(ApprovalGateStatus.Approved, decided.status)
         assertEquals(1, fixture.gateway.approvalCalls)
         assertTrue(fixture.events.snapshot().any { it is ApprovalDecisionReceived && it.approved })
@@ -33,7 +33,7 @@ class WorkflowApprovalServiceTest {
     @Test
     fun providerRejectionCancelsSessionBeforePersistingRejectedGate() = runBlocking {
         val fixture = fixture(ProviderActionResult.Rejected("provider refused plan"))
-        val decided = fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 20L)
+        val decided = fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 20L)
         assertEquals(ApprovalGateStatus.Rejected, decided.status)
         assertEquals("provider refused plan", decided.decisionNote)
         assertEquals(ApprovalGateStatus.Rejected, fixture.repository.get(fixture.gate.id)?.status)
@@ -48,7 +48,7 @@ class WorkflowApprovalServiceTest {
     fun providerExceptionLeavesDurableApplyingGateWithoutDecisionEvent() = runBlocking {
         val fixture = fixture(failure = IllegalStateException("provider unavailable"))
         assertFailsWith<IllegalStateException> {
-            fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 20L)
+            fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 20L)
         }
         assertEquals(ApprovalGateStatus.Applying, fixture.repository.get(fixture.gate.id)?.status)
         assertTrue(fixture.events.snapshot().none { it is ApprovalDecisionReceived })
@@ -58,13 +58,13 @@ class WorkflowApprovalServiceTest {
     fun applyingGateRecoversAcceptedProviderWithoutRepeatingApproval() = runBlocking {
         val fixture = fixture(failure = IllegalStateException("response lost"))
         assertFailsWith<IllegalStateException> {
-            fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 20L)
+            fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 20L)
         }
         assertEquals(1, fixture.gateway.approvalCalls)
         fixture.gateway.failure = null
         fixture.gateway.sessionStatus = ManagedSessionStatus.Running
 
-        val recovered = fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 21L)
+        val recovered = fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 21L)
 
         assertEquals(ApprovalGateStatus.Approved, recovered.status)
         assertEquals(1, fixture.gateway.approvalCalls)
@@ -76,13 +76,13 @@ class WorkflowApprovalServiceTest {
     fun applyingGateStillAwaitingApprovalCancelsAndRejectsWithoutRepeatingApproval() = runBlocking {
         val fixture = fixture(failure = IllegalStateException("response lost"))
         assertFailsWith<IllegalStateException> {
-            fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 20L)
+            fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 20L)
         }
         assertEquals(1, fixture.gateway.approvalCalls)
         fixture.gateway.failure = null
         fixture.gateway.sessionStatus = ManagedSessionStatus.AwaitingApproval
 
-        val recovered = fixture.service.approvePlan(fixture.gate.id, fixture.handle, BuiltInRoles.Architect.id, "Approve", 21L)
+        val recovered = fixture.service.approvePlan(fixture.gate.id, fixture.handle, null, "Approve", 21L)
 
         assertEquals(ApprovalGateStatus.Rejected, recovered.status)
         assertEquals(1, fixture.gateway.approvalCalls)
@@ -114,8 +114,18 @@ class WorkflowApprovalServiceTest {
         val repository = ApprovalMemoryRepository()
         val events = InMemoryWorkflowEventSink()
         val gateway = ApprovalGateway(result, failure)
-        val service = WorkflowApprovalService(repository, ApprovalGateCoordinator(repository, events), gateway)
-        val gate = service.ensurePlanGate(run, taskId, { ApprovalGateId("gate") }, 10L)
+        val coordinator = ApprovalGateCoordinator(repository, events)
+        val service = WorkflowApprovalService(repository, coordinator, gateway)
+        // Opened as WorkflowRuntimeCoordinator opens plan gates.
+        val gate = coordinator.open(
+            id = ApprovalGateId("gate"),
+            workflowRunId = run.id,
+            taskDefinitionId = taskId,
+            kind = ApprovalGateKind.PlanApproval,
+            reason = "Plan approval required for 'Task'",
+            requiresHuman = true,
+            nowEpochMillis = 10L,
+        )
         return ApprovalFixture(
             repository,
             events,

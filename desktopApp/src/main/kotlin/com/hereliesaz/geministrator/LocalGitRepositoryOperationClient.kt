@@ -12,7 +12,10 @@ import com.hereliesaz.geministrator.workflow.LocalGitOperation
 import com.hereliesaz.geministrator.workflow.RepositoryOperationClient
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
@@ -50,21 +53,17 @@ internal class LocalGitRepositoryOperationClient(
         val runId = stableRunId(operationIdentity, operation)
         val marker = operationMarker(root, runId)
 
-        readMarker(marker, runId)?.let { existing ->
-            runs[runId] = existing
-            return existing
-        }
-        if (marker.isFile) {
-            val interrupted = ExternalExecutionRun(
+        // The reservation is created atomically, so of two starts for one run ID exactly one runs Git.
+        if (!reserveMarker(marker, operation, parsed.label)) {
+            val existing = readMarker(marker, runId) ?: ExternalExecutionRun(
                 id = runId,
                 status = ExternalExecutionStatus.Failed,
                 message = "Local Git operation was interrupted after reservation; automatic replay is refused.",
             )
-            runs[runId] = interrupted
-            return interrupted
+            runs[runId] = existing
+            return existing
         }
 
-        writeStartedMarker(marker, operation, parsed.label)
         val entire = if (parsed is LocalGitOperation.EntireTrail || parsed is LocalGitOperation.EntireMirror) locateEntire() else null
         val command = when (parsed) {
             is LocalGitOperation.Checkout -> checkoutCommand(root, parsed.ref)
@@ -220,9 +219,7 @@ internal class LocalGitRepositoryOperationClient(
             sanitizeGitEnvironment(builder)
             val process = builder.start()
             runCatching { process.outputStream.close() }
-            val outputReader = Thread {
-                // Read concurrently with waitFor so a full pipe cannot deadlock the subprocess.
-            }
+            // Read concurrently with waitFor so a full pipe cannot deadlock the subprocess.
             val outputFuture = java.util.concurrent.CompletableFuture.supplyAsync {
                 process.inputStream.bufferedReader().use { it.readText() }.trim()
             }
@@ -259,16 +256,23 @@ internal class LocalGitRepositoryOperationClient(
         return File(File(gitDir), "haive-operations/$runId.properties")
     }
 
-    private fun writeStartedMarker(marker: File, operation: String, label: String) {
-        writeMarker(
-            marker,
-            Properties().apply {
-                setProperty("state", "started")
-                setProperty("operation", operation)
-                setProperty("label", label)
-                setProperty("startedAt", System.currentTimeMillis().toString())
-            },
-        )
+    /** Creates the "started" record only if no record exists yet; false when one already does. */
+    private fun reserveMarker(marker: File, operation: String, label: String): Boolean {
+        marker.parentFile?.mkdirs()
+        val properties = Properties().apply {
+            setProperty("state", "started")
+            setProperty("operation", operation)
+            setProperty("label", label)
+            setProperty("startedAt", System.currentTimeMillis().toString())
+        }
+        return try {
+            Files.newOutputStream(marker.toPath(), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).use {
+                properties.store(it, "Aive Local Git operation")
+            }
+            true
+        } catch (_: FileAlreadyExistsException) {
+            false
+        }
     }
 
     private fun writeCompletedMarker(
@@ -295,12 +299,16 @@ internal class LocalGitRepositoryOperationClient(
         )
     }
 
+    /** Replaces the record in one atomic move, so a reader never finds it missing or half-written. */
     private fun writeMarker(marker: File, properties: Properties) {
         marker.parentFile?.mkdirs()
-        val temporary = File(marker.parentFile, "${marker.name}.tmp")
-        FileOutputStream(temporary).use { properties.store(it, "Aive Local Git operation") }
-        if (marker.exists()) marker.delete()
-        require(temporary.renameTo(marker)) { "Unable to persist Local Git operation record" }
+        val temporary = Files.createTempFile(marker.parentFile.toPath(), marker.name, ".tmp")
+        try {
+            Files.newOutputStream(temporary).use { properties.store(it, "Aive Local Git operation") }
+            Files.move(temporary, marker.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 
     private fun readMarker(marker: File, runId: String): ExternalExecutionRun? {

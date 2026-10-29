@@ -32,7 +32,7 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
     is WorkflowValidationError.MissingExecutor ->
         "Task '${taskId.value}' has no executor or role assigned. Every task must specify who does the work."
     is WorkflowValidationError.MissingRepositoryMutationApproval ->
-        "Repository mutation task '${taskId.value}' must depend on a human-approval task."
+        "Repository mutation task '${taskId.value}' must depend on an unconditional human-approval task."
     is WorkflowValidationError.SelfDependency ->
         "Task '${taskId.value}' lists itself as a dependency. A task cannot depend on itself."
     is WorkflowValidationError.Cycle ->
@@ -58,6 +58,7 @@ object WorkflowGraphValidator {
         val knownIds = grouped.keys
         val tasksById = definition.tasks.associateBy { it.id }
 
+        // A conditional approval can be skipped at runtime, so only an unconditional one gates.
         fun hasHumanApprovalAncestor(taskId: TaskDefinitionId): Boolean {
             val visited = mutableSetOf<TaskDefinitionId>()
             fun visit(id: TaskDefinitionId): Boolean {
@@ -65,7 +66,8 @@ object WorkflowGraphValidator {
                 val task = tasksById[id] ?: return false
                 return task.dependsOn.any { dependencyId ->
                     val dependency = tasksById[dependencyId] ?: return@any false
-                    dependency.executor is TaskExecutor.HumanApproval || visit(dependencyId)
+                    (dependency.executor is TaskExecutor.HumanApproval && dependency.condition is TaskCondition.Always) ||
+                        visit(dependencyId)
                 }
             }
             return visit(taskId)
