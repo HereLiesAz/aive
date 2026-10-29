@@ -2,8 +2,10 @@ package com.hereliesaz.geministrator.memory.procedural
 
 import com.hereliesaz.geministrator.memory.MemoryEpisodeId
 import com.hereliesaz.geministrator.memory.MemoryLineage
+import com.hereliesaz.geministrator.memory.memoryBankFileStem
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.sql.DriverManager
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -117,6 +119,22 @@ class SqlProcedureStoreTest {
         assertFalse(reopened.commit(1L, ProcedureMutation(tracesToAdd = listOf(trace()))))
         assertTrue(reopened.commit(2L, ProcedureMutation(tracesToAdd = listOf(trace()))))
         assertEquals(1, desktopSqlProcedureStore("root", dir).read().traces.size)
+    }
+
+    @Test
+    fun malformedPersistedCandidateFailsClosedOnReopen() = runBlocking {
+        val dir = directory()
+        val store = desktopSqlProcedureStore("root", dir)
+        assertTrue(store.commit(0, ProcedureMutation(definitionsToAdd = listOf(definition()))))
+        val file = File(dir, "${memoryBankFileStem("root")}.db")
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeUpdate("UPDATE procedure_definition SET body = '{'")
+            }
+        }
+        assertFailsWith<ProcedureStoreCorruptionException> {
+            desktopSqlProcedureStore("root", dir).read()
+        }
     }
 
     @Test
