@@ -78,6 +78,7 @@ class DuplexManagedSessionBridge(
 class DuplexSessionObserver(
     private val memory: MemorySessionObserver,
     private val peer: DuplexMcpPeer,
+    private val session: ManagedSessionHandle,
 ) : MemorySessionObserver {
     override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
         memory.onSessionStarted(handle, request)
@@ -85,7 +86,7 @@ class DuplexSessionObserver(
 
     override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
         memory.onSessionEvent(handle, event)
-        publish(event)
+        if (handle == session) publish(event)
     }
 
     override suspend fun onSessionEvent(
@@ -94,7 +95,7 @@ class DuplexSessionObserver(
         reply: suspend (String) -> ProviderActionResult,
     ) {
         memory.onSessionEvent(handle, event, reply)
-        publish(event)
+        if (handle == session) publish(event)
     }
 
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
