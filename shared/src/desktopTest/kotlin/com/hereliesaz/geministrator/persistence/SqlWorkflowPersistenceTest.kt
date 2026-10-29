@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.workflow.ApprovalGate
@@ -179,7 +180,10 @@ class SqlWorkflowPersistenceTest {
         assertEquals(project, other.importProjectFile(projectFile))
         assertEquals(1, other.events.forRun(run.id).size)
         assertEquals(1, other.artifacts.forRun(run).size)
-        assertEquals(1, other.approvalGates.unresolved(run.id).size)
+        // A project file carries no approvals: its open gate arrives rejected and its run cancelled.
+        assertTrue(other.approvalGates.unresolved(run.id).isEmpty())
+        assertEquals(ApprovalGateStatus.Rejected, other.approvalGates.get(gate(run.id).id)?.status)
+        assertEquals(WorkflowRunStatus.Cancelled, other.runs.get(run.id)?.status)
 
         sql.clearWorkflowData()
         assertTrue(sql.projects.all().isEmpty())

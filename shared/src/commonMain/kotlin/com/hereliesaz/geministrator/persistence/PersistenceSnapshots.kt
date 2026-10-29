@@ -2,15 +2,22 @@ package com.hereliesaz.geministrator.persistence
 
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.repairKnownNodeCreatureRigCycle
 import com.hereliesaz.geministrator.workflow.ApprovalGate
+import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
+import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
+import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -107,8 +114,67 @@ internal fun decodeProjectFile(encoded: String, json: Json): PersistenceSnapshot
     require(project.id.value == document.projectId) {
         "Project file metadata does not match the embedded project"
     }
-    return imported
+    return imported.asUntrustedImport(document.savedAtEpochMillis)
 }
+
+/**
+ * A .ive file is untrusted input: anyone can hand one over, and the app imports a detected one on
+ * first launch. Its definitions must pass the same graph validation as authored ones, and its runs
+ * arrive as history, never as work in progress: a run that had not finished is imported cancelled
+ * (unfinished tasks cancelled, finished ones kept), and every gate still pending or applying is
+ * rejected. Approvals, approved plans and Ready tasks in the file therefore cannot make anything
+ * execute here; continuing the work takes a new run that a person starts and approves.
+ */
+internal fun PersistenceSnapshot.asUntrustedImport(importedAtEpochMillis: Long): PersistenceSnapshot {
+    val validDefinitions = definitions.map { definition ->
+        repairKnownNodeCreatureRigCycle(definition).also { repaired ->
+            val errors = WorkflowGraphValidator.validate(repaired)
+            require(errors.isEmpty()) {
+                "Project file workflow '${repaired.name}' is invalid: " +
+                    errors.joinToString(" ") { it.humanReadable() }
+            }
+        }
+    }
+    val stopped = BlockingReason(
+        code = IMPORTED_RUN_STOPPED_CODE,
+        message = "Imported from a project file. Start a new run to continue this work.",
+    )
+    return copy(
+        definitions = validDefinitions,
+        runs = runs.map { run ->
+            if (run.status == WorkflowRunStatus.Completed ||
+                run.status == WorkflowRunStatus.Failed ||
+                run.status == WorkflowRunStatus.Cancelled
+            ) {
+                run
+            } else {
+                run.copy(
+                    status = WorkflowRunStatus.Cancelled,
+                    taskRuns = run.taskRuns.mapValues { (_, taskRun) ->
+                        if (taskRun.status == TaskRunStatus.Completed || taskRun.status == TaskRunStatus.Failed) {
+                            taskRun
+                        } else {
+                            taskRun.copy(status = TaskRunStatus.Cancelled, blockingReason = stopped)
+                        }
+                    },
+                )
+            }
+        },
+        approvalGates = approvalGates.map { gate ->
+            if (gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
+                gate.reject(
+                    decidedByRoleId = null,
+                    note = "Imported from a project file; approvals are never carried over.",
+                    nowEpochMillis = importedAtEpochMillis,
+                )
+            } else {
+                gate
+            }
+        },
+    )
+}
+
+internal const val IMPORTED_RUN_STOPPED_CODE = "imported-run-stopped"
 
 /** Decodes and migrates a whole-store export written by exportJson(). */
 internal fun decodeImportSnapshot(encoded: String, json: Json): PersistenceSnapshot {

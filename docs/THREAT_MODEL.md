@@ -56,6 +56,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Provider artifacts are stored as opaque `ArtifactRef` values. The runtime never executes their content.
 - Provider completion requires explicit reconciliation. A provider claiming immediate success returns `Completed` only after the runtime polls and confirms.
 - Acceptance criteria are authored by the workflow definition, not the provider.
+- A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
 
@@ -335,6 +336,7 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 
 **Threats**
 - Malicious import: an exported run bundle contains crafted events that corrupt workflow state or inject false history.
+- Forged approvals: a crafted `.ive` project file carries a workflow that skips `HumanApproval`, a run whose approval task is already `Completed`, pre-approved gates, or a `Ready` repository operation. The app imports a detected `.ive` file on first launch and opens its latest run.
 - Credential leakage: provider tokens stored in Settings are included in exported bundles.
 
 **Mitigations in place**
@@ -342,9 +344,12 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
   - **Android:** AES-GCM with an Android Keystore key; ciphertext in SharedPreferences.
   - **Desktop:** macOS Keychain, Linux Secret Service, or Windows DPAPI. Storage is refused when none is available.
 - Schema migrations validate field types and reject unknown executor kinds.
+- `.ive` project files are untrusted input (`decodeProjectFile`, used by every backend). Every workflow definition in the file must pass `WorkflowGraphValidator`, or the import is refused and nothing is written. Imported runs arrive as history: a run that had not finished is imported `Cancelled` (unfinished tasks cancelled, finished ones kept), and every pending or applying gate is imported `Rejected`. Nothing from the file resumes or executes on its own, including after the first-launch auto-import; continuing the work takes a new run that a person starts and approves.
 
 **Remaining gaps**
 - Imported run bundles are not cryptographically signed. A tampered bundle is accepted if it passes schema validation.
+- An imported `.ive` file's history (finished runs, their approved gates and artifacts) is shown as the file states it; it is not evidence that those approvals happened.
+- Whole-store JSON restore (`importJson`) is treated as the user's own backup and is not re-validated.
 - The web build encrypts credentials in `localStorage` with a non-extractable AES-GCM key held in IndexedDB (`credential-vault.js`). That defeats copied or dumped storage, not script running on the origin, which can still ask the key to decrypt. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) fall back to plaintext.
 
 ## Invariants
