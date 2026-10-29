@@ -58,6 +58,16 @@ def sheet_slug(file_name: str) -> str:
     return slugify(base)
 
 
+def check_slugs(sheets) -> None:
+    """Raise if two sheets of one directory slug alike: they would share (and wipe) one output dir."""
+    seen: dict[tuple[str, str], str] = {}
+    for d, f in sheets:
+        key = (d, sheet_slug(f))
+        if key in seen:
+            raise ValueError(f"sheets {seen[key]!r} and {f!r} in {d or 'characters/'} both slug to {key[1]!r}; rename one")
+        seen[key] = f
+
+
 def sheet_key(d: str, f: str) -> str:
     """Key of a sheet in overrides.json: `<dir>/<file>`, or the bare file name for a sheet directly in `characters/`."""
     return f"{d}/{f}" if d else f
@@ -414,16 +424,28 @@ def process_sheet(d: str, f: str, ov_all: dict, out_root: str | None = None):
     slug = sheet_slug(f)
     out = out_root or os.path.join(CHAR_ROOT, d, "rig", "parts", slug)
     os.makedirs(out, exist_ok=True)
-    for old in os.listdir(out):
-        if old.endswith(".png"):
+    # Remove only what this sheet wrote last time (its parts and preview), never other files.
+    try:
+        with open(os.path.join(out, "parts.json")) as fh:
+            stale = [r["id"] + ".png" for r in json.load(fh).get("parts", [])] + ["preview.png"]
+    except (OSError, ValueError, KeyError, TypeError):
+        stale = ["preview.png"]
+    for old in stale:
+        if os.path.basename(old) == old and os.path.exists(os.path.join(out, old)):
             os.remove(os.path.join(out, old))
+    # Each faint antialiased edge pixel (alpha <= ALPHA_T, in no part's mask) belongs to the part
+    # whose solid pixels are nearest, so a part keeps its own soft edge and none of a neighbour's.
+    solid = arr[..., 3] > ALPHA_T
+    _, (near_y, near_x) = ndi.distance_transform_edt(~solid, return_indices=True)
     recs = []
     for p in parts:
         x0, y0, x1, y1 = p.bbox
         X0, Y0 = max(0, x0 - 2), max(0, y0 - 2)
         X1, Y1 = min(img.width, x1 + 2), min(img.height, y1 + 2)
         crop = arr[Y0:Y1, X0:X1].copy()
-        crop[..., 3] = np.where(p.mask[Y0:Y1, X0:X1] | ndi.binary_dilation(p.mask[Y0:Y1, X0:X1], iterations=2), crop[..., 3], 0)
+        own = p.mask[Y0:Y1, X0:X1]
+        edge = ndi.binary_dilation(own, iterations=2) & ~solid[Y0:Y1, X0:X1] & p.mask[near_y[Y0:Y1, X0:X1], near_x[Y0:Y1, X0:X1]]
+        crop[..., 3] = np.where(own | edge, crop[..., 3], 0)
         Image.fromarray(crop).save(os.path.join(out, f"{p.pid}.png"), optimize=True)
         rec = dict(idx=p.idx, id=p.pid, cls=p.cls.split(".")[0], source_bbox=[int(X0), int(Y0), int(X1 - X0), int(Y1 - Y0)], size=[int(X1 - X0), int(Y1 - Y0)],
                    area=int(p.area), confidence=float(p.conf))
@@ -448,6 +470,7 @@ def parts_sheets():
     for d, f, st, verdict in discover():
         if verdict == "candidate" and sheet_key(d, f) not in skip:
             res.append((d, f))
+    check_slugs(res)
     return res
 
 

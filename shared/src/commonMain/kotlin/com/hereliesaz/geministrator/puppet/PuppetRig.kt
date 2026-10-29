@@ -49,11 +49,18 @@ data class PuppetRig(
         fun encode(rig: PuppetRig): String = json.encodeToString(serializer(), rig)
     }
 
-    /** Structural checks: format/version, unique ids, resolvable parents, no cycles. */
+    /**
+     * Structural checks, as the editor's `validateRig` (tools/puppet-rig/rig-core.js): format and
+     * version, unique ids, resolvable parents, no cycles, rects inside the atlas, finite numbers,
+     * and motion only for parts, channels and states that exist.
+     */
     fun validate() {
         require(format == FORMAT) { "Not an aive puppet rig (format=$format)." }
         require(version == VERSION) { "Unsupported puppet rig version $version." }
-        require(canvas.width > 0f && canvas.height > 0f) { "Canvas must have a positive size." }
+        require(canvas.width.isFinite() && canvas.height.isFinite() && canvas.width > 0f && canvas.height > 0f) {
+            "Canvas must have a positive size."
+        }
+        require(atlas.width > 0 && atlas.height > 0) { "Atlas must have a positive size." }
         val ids = parts.map { it.id }
         require(ids.toSet().size == ids.size) { "Duplicate part ids." }
         val byId = parts.associateBy { it.id }
@@ -63,6 +70,15 @@ data class PuppetRig(
             require(part.kind in setOf("body", "tail", "tendril", "other")) {
                 "Part ${part.id} has an unknown kind."
             }
+            part.rect?.let { r ->
+                require(r.x >= 0 && r.y >= 0 && r.w > 0 && r.h > 0) { "Part ${part.id} rect must be positive integers." }
+                require(r.x + r.w <= atlas.width && r.y + r.h <= atlas.height) { "Part ${part.id} rect lies outside the atlas." }
+            }
+            val rest = part.rest
+            require(
+                listOf(rest.x, rest.y, rest.rotation, rest.scaleX, rest.scaleY, rest.alpha, part.z, part.pivot.x, part.pivot.y)
+                    .all(Float::isFinite) && part.size.let { it == null || (it.w.isFinite() && it.h.isFinite()) },
+            ) { "Part ${part.id} has a non-finite rest, pivot, size or z." }
             require(part.rigidity.isFinite() && part.rigidity in 0f..1f) {
                 "Part ${part.id} rigidity must be between 0 and 1."
             }
@@ -86,7 +102,29 @@ data class PuppetRig(
                 hops++
             }
         }
-        attachments.forEach { require(byId.containsKey(it.part)) { "Attachment ${it.id} references missing part ${it.part}." } }
+        attachments.forEach {
+            require(byId.containsKey(it.part)) { "Attachment ${it.id} references missing part ${it.part}." }
+            require(it.x.isFinite() && it.y.isFinite()) { "Attachment ${it.id} must have finite x/y." }
+        }
+        states.forEach { (state, motion) ->
+            require(state in STATE_NAMES) { "State \"$state\" is not an H2g2WorkflowState name." }
+            motion.parts.forEach { (partId, partMotion) ->
+                require(byId.containsKey(partId)) { "State $state animates missing part $partId." }
+                partMotion.keys.forEach { (channel, keys) ->
+                    require(channel in PuppetChannel.ALL) { "State $state/$partId: unknown channel $channel." }
+                    require(keys.all { it.t.isFinite() && it.t in 0f..1f && it.v.isFinite() }) {
+                        "State $state/$partId/$channel: keys need t in [0,1] and a finite v."
+                    }
+                }
+                partMotion.sine.forEach { (channel, sine) ->
+                    require(channel in PuppetChannel.ALL) { "State $state/$partId: unknown sine channel $channel." }
+                    require(sine.amplitude.isFinite() && sine.frequency.isFinite() && sine.phase.isFinite()) {
+                        "State $state/$partId/$channel: bad sine."
+                    }
+                }
+            }
+        }
+        require(fallbackState == null || fallbackState in STATE_NAMES) { "fallbackState must be a state name." }
     }
 }
 

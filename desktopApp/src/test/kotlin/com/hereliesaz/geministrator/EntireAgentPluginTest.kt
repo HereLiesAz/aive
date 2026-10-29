@@ -51,6 +51,11 @@ class EntireAgentPluginTest {
         val read = json("read-session", stdin = """{"session_id":"s-1","session_ref":"$path"}""")
         assertEquals(listOf("a.txt"), read["modified_files"]!!.jsonArray.map { it.jsonPrimitive.content })
         assertEquals(listOf("b.txt"), read["new_files"]!!.jsonArray.map { it.jsonPrimitive.content })
+        // The session round-trips: read-session's native_data is what write-session restores.
+        val original = java.io.File(path).readBytes()
+        java.io.File(path).delete()
+        assertEquals(0, call("write-session", stdin = read.toString()).first)
+        assertTrue(original.contentEquals(java.io.File(path).readBytes()))
         assertEquals(listOf("Make it two"), json("extract-prompts", "--session-ref", path, "--offset", "0")["prompts"]!!.jsonArray.map { it.jsonPrimitive.content })
         assertEquals(listOf("a.txt", "b.txt"), json("extract-modified-files", "--path", path, "--offset", "0")["files"]!!.jsonArray.map { it.jsonPrimitive.content })
         val tokens = json("calculate-tokens", "--offset", "0", stdin = java.io.File(path).readText())
@@ -78,5 +83,25 @@ class EntireAgentPluginTest {
     @Test
     fun sessionIdsCannotLeaveTheFolder() {
         assertEquals("-etc-passwd", AiveEntireSessions.safeSessionId("../etc/passwd"))
+    }
+
+    @Test
+    fun beginningASessionPrunesTranscriptsPastRetention() {
+        val dir = Files.createTempDirectory("aive-entire-prune").toFile()
+        val now = java.time.Instant.parse("2026-10-29T12:00:00Z")
+        val store = AiveEntireSessions(dir, retention = java.time.Duration.ofDays(30), now = { now })
+        fun aged(name: String, days: Long) = java.io.File(dir, name).apply {
+            writeText("{}\n")
+            setLastModified(now.minus(java.time.Duration.ofDays(days)).toEpochMilli())
+        }
+        val old = aged("old.jsonl", 31)
+        val recent = aged("recent.jsonl", 29)
+        val other = aged("notes.txt", 400)
+        val reused = aged("again.jsonl", 90)
+        store.begin("again", "/repo", null)
+        assertTrue(!old.exists())
+        assertTrue(recent.exists())
+        assertTrue(other.exists(), "only transcripts are pruned")
+        assertTrue(reused.readText().contains("\"session\""), "the session being begun is kept and restarted")
     }
 }

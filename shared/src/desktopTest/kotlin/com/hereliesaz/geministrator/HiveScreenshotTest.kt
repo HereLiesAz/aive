@@ -179,10 +179,17 @@ class HiveScreenshotTest {
             }
         }
         shoot("9-stable-pick", 900, 3000, dark(fresh) { StableSection() })
+        val shop = object : BreedPurchases {
+            override suspend fun prices(breedIds: List<String>) = breedIds.associateWith { "$1.99" }
+            override suspend fun buy(breedId: String) = emptyList<BreedPurchase>()
+            override suspend fun unclaimed() = emptyList<BreedPurchase>()
+            override suspend fun consume(purchase: BreedPurchase) = true
+        }
         val kept = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { host ->
             runBlocking { host.load() }
             host.chooseStarter(host.catalog.starters.first().id)
-            host.catalog.breeds.filter { it.sold && !it.starter }.take(2).forEach { host.bought(it.id) }
+            val bought = host.catalog.breeds.filter { it.sold && !it.starter }.take(2).map { BreedPurchase("shot-${it.id}", listOf(it.id)) }
+            runBlocking { host.claim(shop, bought) }
             host.assign(engineer.id, host.stable.keys[1])
             host.runCleared(liveRun.copy(id = WorkflowRunId("hatch-shot"), status = WorkflowRunStatus.Completed, taskRuns = liveRun.taskRuns.mapValues { (_, r) -> r.copy(status = TaskRunStatus.Completed) }))
         }
@@ -209,11 +216,6 @@ class HiveScreenshotTest {
             }
         }
         // Breeds in the Store (mockup B5): name, rarity, price; nothing else.
-        val shop = object : BreedPurchases {
-            override suspend fun prices(breedIds: List<String>) = breedIds.associateWith { "$1.99" }
-            override suspend fun buy(breedId: String) = false
-            override suspend fun unclaimed() = emptyList<String>()
-        }
         shoot("14-breeds-store", 900, 1500, dark(kept) {
             androidx.compose.runtime.CompositionLocalProvider(LocalBreedPurchases provides shop) {
                 HiveEdge(onLoadPackages = { emptyList() }, onBringIn = {}, shelfAtStart = EdgeShelf.Breeds)

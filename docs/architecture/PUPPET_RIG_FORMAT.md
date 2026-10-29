@@ -24,7 +24,7 @@ A rig ships as two files:
 
 The artboard is `canvas.width` x `canvas.height`, origin at the top-left, +x right, +y down. It is
 the creature's bounding box. A renderer scales the artboard uniformly to fit its surface and
-centers it (`RiggedPuppetSurface` does this), so a rig can be authored at any resolution. The shipped creature rigs use artboards of about 400 to 520 px.
+centers it (`PuppetFit` does this), so a rig can be authored at any resolution. The shipped creature rigs use artboards of about 400 to 520 px.
 
 ## Document
 
@@ -228,9 +228,10 @@ The editor packs parts with a 2 px gap using shelf packing. Any packing is valid
 - Model + parser: `PuppetRig.parse(text)` (kotlinx.serialization, validates ids, parents and cycles).
 - Evaluator: `PuppetRigEvaluator.evaluate(rig, state.name, phase)` returns a `PuppetPose`. It holds per-part world
   affine transforms and alpha in draw order, plus attachment positions in artboard px. It is pure common code.
-- Rendering: `RiggedPuppetSurface(rig, atlas: ImageBitmap, state.name, phase, modifier)`.
+- Rendering: `RiggedCreatureSurface(loaded, state, phase, modifier)` draws a rig loaded by
+  `rememberCreatureRig("<role>")`, through `CompiledPuppetRig.draw`.
 - Resources: put `<role>.rig.json` and its atlas in `shared/src/commonMain/composeResources/files/rigs/`.
-  Then `rememberPuppetRig("<role>")` (composable) or `PuppetRigResources.load("<role>")` (suspend) reads
+  Then `rememberCreatureRig("<role>")` (composable) or `PuppetRigResources.load("<role>")` (suspend) reads
   `files/rigs/<role>.rig.json` and decodes `files/rigs/<atlas.image>`.
 - Node creatures: `CreatureRigMapping.slugFor(label)` picks the rig, `CreatureRigCache` loads each rig once and shares it, and
   `CompiledPuppetRig` evaluates a pose into a reusable buffer each frame (it matches `PuppetRigEvaluator`). `arm-socket`

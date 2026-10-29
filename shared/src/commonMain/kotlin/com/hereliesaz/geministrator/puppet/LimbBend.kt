@@ -134,13 +134,34 @@ internal object LimbBend {
 
 /** Grid cells across and along a limb's sprite: enough for a smooth bend. */
 private const val LIMB_GRID = 10
+private const val LIMB_VERTICES = (LIMB_GRID + 1) * (LIMB_GRID + 1)
+
+/** The mesh's triangles: the same for every limb, so built once. */
+private val LIMB_INDICES: List<Int> = ArrayList<Int>(LIMB_GRID * LIMB_GRID * 6).apply {
+    val n = LIMB_GRID + 1
+    for (gy in 0 until LIMB_GRID) {
+        for (gx in 0 until LIMB_GRID) {
+            val i = gy * n + gx
+            add(i); add(i + 1); add(i + n)
+            add(i + 1); add(i + n + 1); add(i + n)
+        }
+    }
+}
+private val LIMB_COLORS: List<Color> = List(LIMB_VERTICES) { Color.White }
 
 /**
- * Draws a limb's [sprite] bent and stretched, as a textured mesh. [world] is the limb's world
- * affine `[a b c d tx ty]` (its rest direction, no bend) at [offset] in [worldArray]; artboard px
- * map to the draw scope with [fit]. The sprite lies along its own axis; the curve along [part]'s
- * (an inherited limb's sprite is laid along this rig's limb). [shift] is the copy's place along a
- * multi-segment limb.
+ * Reusable buffers for [drawLimbMesh], so a limb drawn every frame allocates only the [Vertices]
+ * (which copies its lists into its own arrays). One per renderer; not for concurrent draws.
+ */
+internal class LimbMeshScratch {
+    val positions = ArrayList<Offset>(LIMB_VERTICES)
+    val texture = ArrayList<Offset>(LIMB_VERTICES)
+    val point = FloatArray(3)
+    val paint = Paint().apply { isAntiAlias = true }
+}
+
+/**
+ * Draws a limb's [sprite] bent and stretched, as a textured mesh laid by [layLimbMesh].
  */
 internal fun DrawScope.drawLimbMesh(
     atlas: ImageBitmap,
@@ -155,57 +176,79 @@ internal fun DrawScope.drawLimbMesh(
     segments: Int,
     shift: Float,
     shader: androidx.compose.ui.graphics.Shader,
+    scratch: LimbMeshScratch = LimbMeshScratch(),
 ) {
-    val rect = sprite.rect ?: return
-    if (alpha <= 0f || rect.w <= 0 || rect.h <= 0) return
+    if (alpha <= 0f) return
+    if (!layLimbMesh(sprite, part, worldArray, offset, fit, bendDeg, stretch, segments, shift, scratch)) return
+    val paint = scratch.paint.apply {
+        this.shader = shader
+        this.alpha = alpha
+    }
+    drawContext.canvas.drawVertices(
+        Vertices(VertexMode.Triangles, scratch.positions, scratch.texture, LIMB_COLORS, LIMB_INDICES),
+        BlendMode.Modulate,
+        paint,
+    )
+}
+
+/**
+ * Lays a limb's mesh into [scratch]: an 11×11 grid over [sprite], row by row from its top, each
+ * vertex in draw-scope px with its atlas texel. [worldArray] holds the limb's world affine
+ * `[a b c d tx ty]` (its rest direction, no bend) at [offset]; artboard px map to the draw scope
+ * with [fit]. The curve is [part]'s: its axis and its length. An inherited limb's [sprite] (another
+ * rig's) is laid along that axis and scaled evenly to that length, so its tip lands where this
+ * rig's tip is, as [CompiledPuppetRig.along], reach, the pulse, children and attachments reckon it.
+ * [shift] is the copy's place along a multi-segment limb. False, laying nothing, for an empty sprite.
+ */
+internal fun layLimbMesh(
+    sprite: PuppetPart,
+    part: PuppetPart,
+    worldArray: FloatArray,
+    offset: Int,
+    fit: PuppetFit,
+    bendDeg: Float,
+    stretch: Float,
+    segments: Int,
+    shift: Float,
+    scratch: LimbMeshScratch,
+): Boolean {
+    val rect = sprite.rect ?: return false
+    if (rect.w <= 0 || rect.h <= 0) return false
     val stx = sprite.limbTipX
     val sty = sprite.limbTipY
     val spriteLength = hypot(stx, sty)
     val ptx = part.limbTipX
     val pty = part.limbTipY
     val partLength = hypot(ptx, pty)
-    if (spriteLength <= 0f || partLength <= 0f) return
+    if (spriteLength <= 0f || partLength <= 0f) return false
     val sax = stx / spriteLength
     val say = sty / spriteLength
     val ax = ptx / partLength
     val ay = pty / partLength
+    // The sprite scaled to the limb's length: 1 for the limb's own sprite.
+    val toLength = partLength / spriteLength
     val w = worldArray
     val o = offset
     val left = -sprite.pivot.x * sprite.drawnWidth
     val top = -sprite.pivot.y * sprite.drawnHeight
-    val out = FloatArray(3)
-    val n = LIMB_GRID + 1
-    val positions = ArrayList<Offset>(n * n)
-    val texture = ArrayList<Offset>(n * n)
+    val out = scratch.point
+    val positions = scratch.positions.apply { clear() }
+    val texture = scratch.texture.apply { clear() }
     for (gy in 0..LIMB_GRID) {
         val fy = gy / LIMB_GRID.toFloat()
         for (gx in 0..LIMB_GRID) {
             val fx = gx / LIMB_GRID.toFloat()
             val x = left + fx * sprite.drawnWidth
             val y = top + fy * sprite.drawnHeight
-            LimbBend.place(x * sax + y * say, -x * say + y * sax, ax, ay, spriteLength, bendDeg, stretch, segments, shift, out)
+            LimbBend.place(
+                (x * sax + y * say) * toLength, (-x * say + y * sax) * toLength, ax, ay, partLength,
+                bendDeg, stretch, segments, shift, out,
+            )
             val wx = w[o] * out[0] + w[o + 2] * out[1] + w[o + 4]
             val wy = w[o + 1] * out[0] + w[o + 3] * out[1] + w[o + 5]
             positions += Offset(fit.offsetX + wx * fit.scale, fit.offsetY + wy * fit.scale)
             texture += Offset(rect.x + fx * rect.w, rect.y + fy * rect.h)
         }
     }
-    val indices = ArrayList<Int>(LIMB_GRID * LIMB_GRID * 6)
-    for (gy in 0 until LIMB_GRID) {
-        for (gx in 0 until LIMB_GRID) {
-            val i = gy * n + gx
-            indices += i; indices += i + 1; indices += i + n
-            indices += i + 1; indices += i + n + 1; indices += i + n
-        }
-    }
-    val paint = Paint().apply {
-        this.shader = shader
-        this.alpha = alpha
-        isAntiAlias = true
-    }
-    drawContext.canvas.drawVertices(
-        Vertices(VertexMode.Triangles, positions, texture, List(positions.size) { Color.White }, indices),
-        BlendMode.Modulate,
-        paint,
-    )
+    return true
 }

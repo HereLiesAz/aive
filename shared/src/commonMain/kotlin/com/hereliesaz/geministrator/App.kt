@@ -194,9 +194,16 @@ fun App(
     // The keeper's stable (docs/Node-Creature-Genome.md, Breeds): which creature each agent wears.
     val stableHost = remember { StableHost() }
     LaunchedEffect(stableHost, breedPurchases) {
-        stableHost.load()
-        // Breeds paid for while the app was closed join the stable now.
-        runCatching { breedPurchases?.unclaimed() }.getOrNull()?.forEach(stableHost::bought)
+        // Breeds paid for while the app was closed join the stable now, once the catalog is known.
+        if (!stableHost.load() || breedPurchases == null) return@LaunchedEffect
+        val paid = try {
+            breedPurchases.unclaimed()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            emptyList()
+        }
+        stableHost.claim(breedPurchases, paid)
     }
 
     // Breeding (docs/Swarm-OS.md step 6): when the live run clears, it hatches one config from the
