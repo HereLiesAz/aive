@@ -49,8 +49,8 @@ import org.jetbrains.compose.resources.decodeToImageBitmap
  *    gets its rig.
  * 5. Classifier kinds with no creature of their own use [KIND_FALLBACKS] (data engineer ->
  *    database administrator, storyteller -> communicator, ...), and the deterministic executors
- *    (Python, JavaScript, Test Runner, Deployment, Repository Operation, Nested Workflow) use
- *    [AUTOMATED_PROCESS_RIGS].
+ *    (Python, JavaScript, Test Runner, Deployment, Repository Operation, Nested Workflow) are
+ *    programmatic work: they wear the neuron, [PROGRAMMATIC_RIG].
  * 6. Unknown/custom roles ([NodeCreatureRoleKind.Generic]) get one of `generic-01..06`, chosen by
  *    a stable hash of the normalized label, so the same custom role always looks the same.
  */
@@ -76,16 +76,13 @@ internal object CreatureRigMapping {
         NodeCreatureRoleKind.Pathfinder to "strategy-scout",
     )
 
-    /** The deterministic executors (normalized label -> creature). Anything else automated uses [DEFAULT_AUTOMATED_RIG]. */
-    val AUTOMATED_PROCESS_RIGS: Map<String, String> = mapOf(
-        "javascript" to "process-mapper",
-        "python" to "process-mapper",
-        "test runner" to "test-automation-engineer",
-        "deployment" to "deployment-pilot",
-        "repository operation" to "build-engineer",
-        "nested workflow" to "flow-director",
-    )
-    const val DEFAULT_AUTOMATED_RIG = "process-mapper"
+    /**
+     * The neuron: the body of anything done programmatically rather than by an agent, whether a
+     * deterministic executor (Python, JavaScript, Test Runner, Deployment, Repository Operation,
+     * Nested Workflow) or a memory stage running without a model (docs/Node-Creatures.md,
+     * Programmatic work). Sliced from one painting by `tools/puppet-rig/slice/rig_painting.py`.
+     */
+    const val PROGRAMMATIC_RIG = "neuron"
 
     val bySlugKind: Map<NodeCreatureRoleKind, String> = mapOf(
         // Core roles 001-015 without a parts sheet (all but UX designer and architect) wear a creature already
@@ -169,7 +166,7 @@ internal object CreatureRigMapping {
 
     private fun slugForKind(kind: NodeCreatureRoleKind, normalizedLabel: String): String = when (kind) {
         NodeCreatureRoleKind.Generic -> genericSlugFor(normalizedLabel)
-        NodeCreatureRoleKind.AutomatedProcess -> AUTOMATED_PROCESS_RIGS[normalizedLabel] ?: DEFAULT_AUTOMATED_RIG
+        NodeCreatureRoleKind.AutomatedProcess -> PROGRAMMATIC_RIG
         else -> bySlugKind[kind] ?: KIND_FALLBACKS[kind] ?: genericSlugFor(normalizedLabel)
     }
 
@@ -189,7 +186,7 @@ internal object CreatureRigMapping {
     private val LABEL_SEPARATORS = Regex("[\\s_]+")
 
     /** All slugs the mapping can produce. */
-    val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS
+    val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS + PROGRAMMATIC_RIG
 
     private fun stableHash(value: String): Int {
         var hash = 0x45D9F3B

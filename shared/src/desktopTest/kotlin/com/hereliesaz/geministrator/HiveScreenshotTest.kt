@@ -27,6 +27,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import kotlinx.coroutines.runBlocking
+import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
+import androidx.compose.foundation.layout.size
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -280,5 +282,20 @@ class HiveScreenshotTest {
         shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
         shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
+    }
+
+    /** The neuron, the body of programmatic work, in its states. */
+    @Test
+    fun shootsTheNeuron() {
+        runBlocking { CreatureRigCache.get(CreatureRigMapping.PROGRAMMATIC_RIG) }
+        shoot("22-neuron", 1800, 520) {
+            AzphaltThemedSurface(Azphalt.Ink) {
+                androidx.compose.foundation.layout.Row(Modifier.background(Azphalt.Ink)) {
+                    listOf(H2g2WorkflowState.Pending, H2g2WorkflowState.Active, H2g2WorkflowState.Blocked, H2g2WorkflowState.Failed).forEach { state ->
+                        NodeMascotSurface(roleLabel = "Python", hueSeed = "python", state = state, motionPhase = { 0.3f }, modifier = Modifier.size(220.dp))
+                    }
+                }
+            }
+        }
     }
 }

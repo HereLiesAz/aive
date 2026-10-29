@@ -53,14 +53,14 @@
     <string name="common_connect">Connect</string>
     <string name="common_connected">Connected</string>
     <string name="common_off">Off</string>
+    <string name="memory_swarm">Memory swarm</string>
+    <string name="memory_swarm_lead">A swarm of its own, running beside every other: it banks what each run learns. Each stage works programmatically, or on a model you choose.</string>
     <string name="keeper_room">Keeper's room</string>
     <string name="keeper_feeds_the_hive">Feeds the hive</string>
     <string name="keeper_the_keeper">The keeper</string>
     <string name="keeper_on_count">%1$d on</string>
     <string name="keeper_connections">Connections</string>
     <string name="keeper_connections_lead">What your creatures run on, and where their work lands.</string>
-    <string name="keeper_memory">Memory</string>
-    <string name="keeper_memory_lead">What the swarm remembers between runs, and who tends it.</string>
     <string name="keeper_compute">Compute</string>
     <string name="keeper_compute_lead">Other machines that can take the swarm's work, and which work goes where.</string>
     <string name="keeper_projects">Projects and data</string>

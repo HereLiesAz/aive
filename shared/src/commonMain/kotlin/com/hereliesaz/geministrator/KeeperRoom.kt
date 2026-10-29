@@ -48,8 +48,6 @@ import com.hereliesaz.geministrator.resources.keeper_connections_lead
 import com.hereliesaz.geministrator.resources.keeper_device
 import com.hereliesaz.geministrator.resources.keeper_device_lead
 import com.hereliesaz.geministrator.resources.keeper_feeds_the_hive
-import com.hereliesaz.geministrator.resources.keeper_memory
-import com.hereliesaz.geministrator.resources.keeper_memory_lead
 import com.hereliesaz.geministrator.resources.keeper_on_count
 import com.hereliesaz.geministrator.resources.keeper_projects
 import com.hereliesaz.geministrator.resources.keeper_projects_lead
@@ -69,7 +67,6 @@ internal enum class KeeperSection(
     val feedsTheHive: Boolean,
 ) {
     Connections(Res.string.keeper_connections, Res.string.keeper_connections_lead, true),
-    Memory(Res.string.keeper_memory, Res.string.keeper_memory_lead, true),
     Compute(Res.string.keeper_compute, Res.string.keeper_compute_lead, true),
     Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false),
     Device(Res.string.keeper_device, Res.string.keeper_device_lead, false),
@@ -82,7 +79,6 @@ internal enum class KeeperSection(
         fun of(destination: ControlRoomDestination): KeeperSection? = when (destination) {
             ControlRoomDestination.Repositories -> Connections
             ControlRoomDestination.Compute -> Compute
-            ControlRoomDestination.Memory -> Memory
             else -> null
         }
     }

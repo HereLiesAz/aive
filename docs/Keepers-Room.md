@@ -7,7 +7,6 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | Group | Part | Holds | Was |
 |---|---|---|---|
 | Feeds the hive | **Connections** | AI providers, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
-| | **Memory** | the memory layer | Memory |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
@@ -15,6 +14,8 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | | **About and privacy** | crash reports, diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
+
+Memory is not here: it is a swarm of its own, running beside every other, so it lives in the hive (**Memory swarm**, beside Swarm at the top of the hive). Its stages that run without a model wear the neuron (`Node-Creatures.md`, Programmatic work).
 
 ## Layout
 
@@ -28,10 +29,10 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 
 ## Navigation
 
-`ControlRoomDestination.Settings` is the Keeper's room. `Repositories`, `Compute` and `Memory` remain as destinations, so existing links still land, but each opens its part of the room and none has its own navigation entry. On a phone the room is the header's gear, not a pill in the row.
+`ControlRoomDestination.Settings` is the Keeper's room. `Repositories` and `Compute` remain as destinations, so existing links still land, but each opens its part of the room and none has its own navigation entry. On a phone the room is the header's gear, not a pill in the row.
 
 ## Consolidation plan
 
-1. **Stage 1 (this):** the Keeper's room; calm controls (`BRANDING.md`, Controls).
+1. **Stage 1 (this):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.
 2. **Stage 2:** the hive as home. A first launch opens on the hive with the starter creature and one step to feed it (no "No project" form); a breadcrumb (Hive › a hive › a creature › its mind) replaces page titles and the navigation row.
 3. **Stage 3:** Inbox, Runs, Artifacts and the Swarm role editor move into the creature's panel (Needs, Work, Mind) and the hive's combs; their destinations retire.

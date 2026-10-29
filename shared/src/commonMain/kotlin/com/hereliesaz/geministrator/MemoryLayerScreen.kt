@@ -36,6 +36,8 @@ import com.hereliesaz.geministrator.memory.MemoryStageEngine
 import com.hereliesaz.geministrator.memory.parked
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.memory_swarm
+import com.hereliesaz.geministrator.resources.memory_swarm_lead
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.common_remove
@@ -158,6 +160,10 @@ internal fun MemoryLayerScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(Res.string.memory_swarm), style = AzphaltType.section, color = azphaltOnSurface())
+            Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface())
+        }
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),
@@ -252,7 +258,18 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         projectMemoryTerrarium(snapshot, settings, engines, activity)
     }
     // No selection passed in: selecting would zoom onto one creature and hide the pipeline.
+    // Stages that run without a model are programmatic work, and wear its body.
+    val programmatic = remember(engines) {
+        MemoryTerrariumStage.entries
+            .filter { stage -> stage.roles.all { (engines.resolved[it] ?: MemoryEngineKind.Programmatic) == MemoryEngineKind.Programmatic } }
+            .map { it.label }
+            .toSet()
+    }
+    val outerRig = LocalCreatureRig.current
     Box(Modifier.fillMaxWidth().height(440.dp).clipToBounds()) {
+      androidx.compose.runtime.CompositionLocalProvider(
+          LocalCreatureRig provides { label -> if (label in programmatic) CreatureRigMapping.PROGRAMMATIC_RIG else outerRig(label) },
+      ) {
         PlatformNodeTerrarium(
             subjects = projection.subjects,
             relationships = projection.relationships,
@@ -265,6 +282,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
             modifier = Modifier.fillMaxWidth().height(440.dp),
             editable = false,
         )
+      }
     }
 
     MemorySectionLabel(stringResource(Res.string.memory_stage, selectedStage.stage.name))

@@ -128,7 +128,6 @@ class CreatureRigMappingTest {
         val labels = buildList {
             addAll(MascotCharacterCatalog.explicitCharacters.map { it.roleLabel })
             addAll(CreatureRigMapping.bySlugKind.keys.map(CreatureRigMapping::displayName))
-            addAll(CreatureRigMapping.AUTOMATED_PROCESS_RIGS.keys)
             addAll(listOf("Python", "JavaScript", "Test Runner", "Deployment", "Repository Operation", "Nested Workflow"))
             addAll(listOf("Data Engineer", "Content Creator", "Technical Author", "Bug Reporter", "World Builder", "Storyteller", "Pathfinder"))
             addAll(listOf("", "   ", "Orchestrator", "UX Designer", "Weather Oracle", "creature", "Zorblax"))
@@ -147,8 +146,7 @@ class CreatureRigMappingTest {
         val own = CreatureRigMapping.bySlugKind.keys + CreatureRigMapping.KIND_FALLBACKS.keys
         val missing = NodeCreatureRoleKind.entries - own - NodeCreatureRoleKind.Generic - NodeCreatureRoleKind.AutomatedProcess
         assertEquals(emptyList(), missing, "role kinds without a creature or fallback")
-        (CreatureRigMapping.KIND_FALLBACKS.values + CreatureRigMapping.AUTOMATED_PROCESS_RIGS.values +
-            CreatureRigMapping.DEFAULT_AUTOMATED_RIG).forEach {
+        (CreatureRigMapping.KIND_FALLBACKS.values + CreatureRigMapping.PROGRAMMATIC_RIG).forEach {
             assertTrue(it in CreatureRigMapping.allSlugs, "fallback creature $it is not a mapped rig")
         }
     }
@@ -158,12 +156,12 @@ class CreatureRigMappingTest {
         assertEquals("creature", CreatureRigMapping.slugFor("Film Showrunner"))
         assertEquals("content-strategist", CreatureRigMapping.slugFor("Brand Strategist"))
         assertEquals("idea-catalyst-1", CreatureRigMapping.slugFor("Contract Reviewer"))
-        assertEquals("process-mapper", CreatureRigMapping.slugFor("Python"))
-        assertEquals("process-mapper", CreatureRigMapping.slugFor("JavaScript"))
-        assertEquals("test-automation-engineer", CreatureRigMapping.slugFor("Test Runner"))
-        assertEquals("deployment-pilot", CreatureRigMapping.slugFor("Deployment"))
-        assertEquals("build-engineer", CreatureRigMapping.slugFor("Repository Operation"))
-        assertEquals("flow-director", CreatureRigMapping.slugFor("Nested Workflow"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("Python"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("JavaScript"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("Test Runner"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("Deployment"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("Repository Operation"))
+        assertEquals("neuron", CreatureRigMapping.slugFor("Nested Workflow"))
         assertEquals("database-administrator", CreatureRigMapping.slugFor("Data Engineer"))
         assertEquals("communicator", CreatureRigMapping.slugFor("Storyteller"))
         assertEquals("strategy-scout", CreatureRigMapping.slugFor("Pathfinder"))

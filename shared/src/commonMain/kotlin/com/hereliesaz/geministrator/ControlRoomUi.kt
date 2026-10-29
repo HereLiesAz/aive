@@ -82,7 +82,7 @@ enum class ControlRoomDestination(val label: String) {
     Inbox("Inbox"),
     Repositories("Repositories"),
     Compute("Compute"),
-    Memory("Memory"),
+    Memory("Memory swarm"),
     AddOns("AZPHALT STORE"),
     Settings("Keeper's room"),
     ;
@@ -101,13 +101,14 @@ enum class ControlRoomDestination(val label: String) {
          * Overview itself shows the run mind map until one of these is tapped.
          */
         // Runs and Workflows are retired into the hive (docs/Swarm-OS.md); Workflows stays reachable from a hive's More editing.
-        val OverviewSections: List<ControlRoomDestination> = listOf(Company)
+        // Memory is a swarm of its own, running beside every run (docs/Keepers-Room.md): it lives in the hive, not the Keeper's room.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory)
 
         /** Reachable, but no longer shown in Overview's section row. */
         val RetiredSections: Set<ControlRoomDestination> = setOf(Runs, Workflows)
 
         /** Parts of the Keeper's room ([Settings]) that once had their own place (docs/Keepers-Room.md). */
-        val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute, Memory)
+        val KeeperParts: Set<ControlRoomDestination> = setOf(Repositories, Compute)
 
         /** Left out of the main navigation: Overview's sections, the Keeper's room's parts, and Inbox (its header badge opens it). */
         val NotInNavigation: Set<ControlRoomDestination> = OverviewSections.toSet() + RetiredSections + KeeperParts + Inbox
@@ -729,6 +730,12 @@ private fun MainDestination(
                 )
                 ControlRoomDestination.Artifacts -> LiveArtifactBrowserScreen(runtimeState, Modifier.fillMaxSize())
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+                ControlRoomDestination.Memory -> MemoryLayerScreen(
+                    controller = memoryLayer,
+                    connectedProviderIds = connectedProviderIds,
+                    compact = compact,
+                    modifier = Modifier.fillMaxSize(),
+                )
                 ControlRoomDestination.AddOns -> AzphaltStoreScreen(
                     service = azphaltStoreService,
                     importRequest = azphaltPackageImportRequest,
@@ -740,8 +747,7 @@ private fun MainDestination(
                 )
                 ControlRoomDestination.Settings,
                 ControlRoomDestination.Repositories,
-                ControlRoomDestination.Compute,
-                ControlRoomDestination.Memory -> KeeperRoom(
+                ControlRoomDestination.Compute -> KeeperRoom(
                     sections = KeeperSection.entries.filter {
                         it != KeeperSection.Compute || computeAvailable
                     },
@@ -755,14 +761,7 @@ private fun MainDestination(
                         }
                     },
                     content = { section, partModifier ->
-                        when (section) {
-                            KeeperSection.Memory -> MemoryLayerScreen(
-                                controller = memoryLayer,
-                                connectedProviderIds = connectedProviderIds,
-                                compact = compact,
-                                modifier = partModifier,
-                            )
-                            else -> ProviderSettingsScreen(
+                            ProviderSettingsScreen(
                                 connectedProviderIds = connectedProviderIds,
                                 onCheckProviderHealth = onCheckProviderHealth,
                                 onClearWorkflowData = onClearWorkflowData,
@@ -805,7 +804,6 @@ private fun MainDestination(
                                 },
                                 modifier = partModifier,
                             )
-                        }
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
