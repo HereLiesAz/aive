@@ -342,7 +342,7 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 **Mitigations in place**
 - Credentials are stored separately from workflow persistence and are never serialized into run state or exported bundles.
   - **Android:** AES-GCM with an Android Keystore key; ciphertext in SharedPreferences.
-  - **Desktop:** macOS Keychain, Linux Secret Service, or Windows DPAPI. Storage is refused when none is available.
+  - **Desktop:** macOS Keychain, Linux Secret Service, or Windows DPAPI. Storage is refused when none is available. The OS tools run as fixed argument lists (never a shell string) with a 20-second bound and stderr discarded, so a locked keyring cannot hang the app; account ids that are not plain catalog-style ids are never passed to them.
 - Schema migrations validate field types and reject unknown executor kinds.
 - `.ive` project files are untrusted input (`decodeProjectFile`, used by every backend). Every workflow definition in the file must pass `WorkflowGraphValidator`, or the import is refused and nothing is written. Imported runs arrive as history: a run that had not finished is imported `Cancelled` (unfinished tasks cancelled, finished ones kept), and every pending or applying gate is imported `Rejected`. Nothing from the file resumes or executes on its own, including after the first-launch auto-import; continuing the work takes a new run that a person starts and approves.
 

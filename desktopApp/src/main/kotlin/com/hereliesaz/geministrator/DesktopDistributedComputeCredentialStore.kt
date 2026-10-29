@@ -72,87 +72,81 @@ internal class DesktopDistributedComputeCredentialStore {
         val os: String get() = System.getProperty("os.name", "").lowercase()
 
         fun readFromKeychain(): String? = runCatching {
-            when {
-                os.contains("mac") -> {
-                    val result = ProcessBuilder(
+            val result = when {
+                os.contains("mac") -> CredentialTool.run(
+                    listOf(
                         "security", "find-generic-password",
                         "-s", KEYCHAIN_SERVICE,
                         "-a", ACCOUNT,
                         "-w",
-                    ).start()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
-                }
+                    ),
+                )
                 os.contains("win") -> {
                     val tokenFile = windowsTokenFile()
                     if (!tokenFile.isFile) return@runCatching null
-                    val result = windowsPowerShell(WINDOWS_READ_SCRIPT, tokenFile).start()
-                    result.outputStream.close()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
+                    CredentialTool.run(windowsPowerShell(WINDOWS_READ_SCRIPT, tokenFile))
                 }
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
-                    val result = ProcessBuilder(
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
+                    listOf(
                         "secret-tool", "lookup",
                         "service", KEYCHAIN_SERVICE,
                         "account", ACCOUNT,
-                    ).start()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
-                }
+                    ),
+                )
                 else -> null
             }
+            result?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
         }.getOrNull()
 
         fun writeToKeychain(token: String): Boolean = runCatching {
             when {
                 os.contains("mac") -> {
-                    ProcessBuilder(
-                        "security", "delete-generic-password",
-                        "-s", KEYCHAIN_SERVICE,
-                        "-a", ACCOUNT,
-                    ).start().waitFor()
+                    CredentialTool.run(
+                        listOf(
+                            "security", "delete-generic-password",
+                            "-s", KEYCHAIN_SERVICE,
+                            "-a", ACCOUNT,
+                        ),
+                    )
                     MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, ACCOUNT, token)
                 }
-                os.contains("win") -> {
-                    val process = windowsPowerShell(WINDOWS_WRITE_SCRIPT, windowsTokenFile()).start()
-                    process.outputStream.bufferedWriter().use { it.write(token) }
-                    process.waitFor() == 0
-                }
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
-                    val process = ProcessBuilder(
+                os.contains("win") ->
+                    CredentialTool.run(windowsPowerShell(WINDOWS_WRITE_SCRIPT, windowsTokenFile()), stdin = token)?.ok == true
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
+                    listOf(
                         "secret-tool", "store",
                         "--label", "Aive distributed compute relay",
                         "service", KEYCHAIN_SERVICE,
                         "account", ACCOUNT,
-                    ).start()
-                    process.outputStream.bufferedWriter().use { it.write(token) }
-                    process.waitFor() == 0
-                }
+                    ),
+                    stdin = token,
+                )?.ok == true
                 else -> false
             }
         }.getOrElse { false }
 
         fun deleteFromKeychain() = runCatching {
             when {
-                os.contains("mac") -> ProcessBuilder(
-                    "security", "delete-generic-password",
-                    "-s", KEYCHAIN_SERVICE,
-                    "-a", ACCOUNT,
-                ).start().waitFor()
+                os.contains("mac") -> CredentialTool.run(
+                    listOf(
+                        "security", "delete-generic-password",
+                        "-s", KEYCHAIN_SERVICE,
+                        "-a", ACCOUNT,
+                    ),
+                )
                 os.contains("win") -> {
                     windowsTokenFile().delete()
                     // Earlier builds wrote a Credential Manager entry that could never be read back.
-                    ProcessBuilder("cmdkey", "/delete:$KEYCHAIN_SERVICE/$ACCOUNT").start().waitFor()
+                    CredentialTool.run(CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, ACCOUNT))
                 }
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> ProcessBuilder(
-                    "secret-tool", "clear",
-                    "service", KEYCHAIN_SERVICE,
-                    "account", ACCOUNT,
-                ).start().waitFor()
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
+                    listOf(
+                        "secret-tool", "clear",
+                        "service", KEYCHAIN_SERVICE,
+                        "account", ACCOUNT,
+                    ),
+                )
+                else -> null
             }
         }
     }
