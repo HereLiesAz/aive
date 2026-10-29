@@ -144,6 +144,9 @@ class DuplexMcpPeer(
         return json.parseToJsonElement(text)
     }
 
+    /** Close this peer-specific client without closing the caller-owned base client. */
+    fun close() = safeClient.close()
+
     private fun decodeEnvelope(data: JsonObject): DuplexEnvelope = DuplexEnvelope(
         seq = data.getValue("seq").jsonPrimitive.long,
         id = data.getValue("id").jsonPrimitive.content,
