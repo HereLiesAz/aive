@@ -486,6 +486,24 @@ def layout(meta, imgs, ov, ref):
             p.k = k
             if r["id"] == "eye.right" and len(eyes) == 2:
                 p.size_mul = (0.86, 1.0)  # turned away a little
+    # ---- eyes the sheet never drew: cut from the painting, where they sit (reference px are artboard px)
+    if not eyes and used_ref:
+        for spec in ov.get("eyes_from_reference", []):
+            x0, y0, x1, y1 = spec["box"]
+            w, h = x1 - x0, y1 - y0
+            crop = ref["img"].crop((x0, y0, x1, y1))
+            mask = Image.new("L", (w, h), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, w - 1, h - 1), fill=255)
+            a = np.minimum(np.asarray(crop)[..., 3], np.asarray(mask))
+            crop.putalpha(Image.fromarray(a.astype(np.uint8)))
+            recs[spec["id"]] = {"id": spec["id"], "cls": "eye", "source_bbox": [x0, y0, w, h], "size": [w, h]}
+            imgs[spec["id"]] = crop
+            p = mk(spec["id"], "eye")
+            p.parent = soma.id
+            p.X, p.Y, p.k = x0 + w / 2, y0 + h / 2, 1.0
+            p.ref_matched = True
+            eye_ids.add(spec["id"])
+            matched_eyes.append(spec["id"])
     # ---- lids, parented to the eye on their side
     for r in lids:
         side = r["id"].split(".")[-1]
