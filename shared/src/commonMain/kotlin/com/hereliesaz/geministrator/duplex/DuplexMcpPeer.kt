@@ -41,7 +41,7 @@ class DuplexMcpPeer(
     private val bearerToken: String,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val safeClient = client.config { followRedirects = false }
+    private val safeClient: HttpClient
     private val sequenceMutex = Mutex()
     private var nextRpcId = 1L
 
@@ -58,6 +58,7 @@ class DuplexMcpPeer(
         require(url.parameters.isEmpty() && url.user == null && url.password == null) {
             "Duplex endpoint must not contain credentials or query parameters"
         }
+        safeClient = client.config { followRedirects = false }
     }
 
     suspend fun send(kind: DuplexKind, body: String, replyTo: String? = null): DuplexEnvelope {
