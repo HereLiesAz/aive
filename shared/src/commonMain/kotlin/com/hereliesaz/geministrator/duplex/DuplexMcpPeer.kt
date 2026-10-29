@@ -13,6 +13,7 @@ import io.ktor.http.Url
 import io.ktor.http.URLProtocol
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -41,7 +42,7 @@ class DuplexMcpPeer(
     private val bearerToken: String,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val safeClient = client.config { followRedirects = false }
+    private val safeClient: HttpClient
     private val sequenceMutex = Mutex()
     private var nextRpcId = 1L
 
@@ -58,6 +59,7 @@ class DuplexMcpPeer(
         require(url.parameters.isEmpty() && url.user == null && url.password == null) {
             "Duplex endpoint must not contain credentials or query parameters"
         }
+        safeClient = client.config { followRedirects = false }
     }
 
     suspend fun send(kind: DuplexKind, body: String, replyTo: String? = null): DuplexEnvelope {

@@ -38,6 +38,7 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -75,6 +76,8 @@ fun App(
     /** Entire on the desktop (docs/Entire.md); null elsewhere. */
     entire: EntireIntegration? = null,
     providers: Collection<AgentProvider>,
+    /** Bound only to an explicitly selected task; default stays disconnected. */
+    duplexAttachment: DuplexSessionAttachment? = null,
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
@@ -127,7 +130,7 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
+    LaunchedEffect(providers, duplexAttachment, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
@@ -135,6 +138,7 @@ fun App(
             val created = ApplicationRuntime.create(
                 providers = providers,
                 scope = scope,
+                duplexAttachment = duplexAttachment,
                 persistence = workflowPersistence,
                 executorIntegrations = executorIntegrations,
                 roleSurfaceRuntime = roleSurfaceRuntime,
