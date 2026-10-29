@@ -44,3 +44,12 @@ INSERT INTO procedure_evidence (id, procedure_ref, receipt_id, body) VALUES (?, 
 
 insertTrace:
 INSERT INTO procedure_trace (receipt_key, body) VALUES (?, ?);
+
+deleteDefinitions:
+DELETE FROM procedure_definition;
+
+deleteEvidence:
+DELETE FROM procedure_evidence;
+
+deleteTraces:
+DELETE FROM procedure_trace;
