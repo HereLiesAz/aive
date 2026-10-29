@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.workflow.approvedEnginePlan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -42,9 +43,11 @@ import kotlinx.coroutines.runInterruptible
  * Desktop-only coding provider for linked Local Git projects.
  *
  * The model never receives shell access. It receives a bounded repository snapshot and returns a
- * unified diff. Haive validates that diff with `git apply --check`, applies it inside an isolated
- * Git worktree, and commits the resulting branch with hooks disabled. Repository code is never
- * executed on the desktop host; verification must use a genuinely sandboxed test-capable provider.
+ * unified diff. Haive checks every path Git would touch, validates the diff with `git apply --check`,
+ * applies it inside an isolated Git worktree, and commits the resulting branch. Every Git command
+ * runs with repository hooks and the fsmonitor disabled, so Haive itself never runs repository code;
+ * Git still honours the user's own configured filters (for example LFS) when it checks files out.
+ * Verification must use a genuinely sandboxed test-capable provider.
  */
 internal class LocalWorkspaceAgentProvider(
     override val id: AgentProviderId,
@@ -91,6 +94,8 @@ internal class LocalWorkspaceAgentProvider(
         const val MAX_CONTEXT_ARTIFACT_CHARS = 30_000
         const val PROCESS_TIMEOUT_SECONDS = 120L
 
+        /** Files whose content makes Git run commands (filters, drivers) or fetch other repositories. */
+        val GIT_CONTROL_FILES = setOf(".gitattributes", ".gitmodules")
     }
 
     private val sessionsMutex = Mutex()
@@ -416,10 +421,19 @@ internal class LocalWorkspaceAgentProvider(
         val workspace = withContext(Dispatchers.IO) {
             Files.createTempDirectory("haive-${safeSegment(request.taskRunId.value)}-").toFile()
         }
-        var worktreeAdded = false
+        // Hooks run on `worktree add` (post-checkout) and `commit`; an empty hooks directory disables them.
+        val hooksDir = withContext(Dispatchers.IO) {
+            Files.createTempDirectory("haive-empty-hooks-").toFile()
+        }
+        val noHooks = arrayOf("-c", "core.hooksPath=${hooksDir.absolutePath}")
+        // Set before `worktree add` starts: a cancellation mid-command can leave its branch behind.
+        var worktreeStarted = false
+        var delivered = false
         return try {
+            worktreeStarted = true
             git(
                 root,
+                *noHooks,
                 "worktree",
                 "add",
                 "-b",
@@ -427,7 +441,6 @@ internal class LocalWorkspaceAgentProvider(
                 workspace.absolutePath,
                 baseCommit,
             ).requireSuccess("create isolated Git worktree")
-            worktreeAdded = true
 
             val selectedFiles = selectFiles(plan, trackedFiles, request)
             val snapshot = buildSnapshot(workspace, selectedFiles)
@@ -444,7 +457,7 @@ internal class LocalWorkspaceAgentProvider(
             val generated = generation.run(patchPrompt(request, plan, trackedFiles, snapshot), onThinking)
             val patch = extractUnifiedDiff(generated.text)
             require(patch.isNotBlank()) { "$displayName did not return a unified Git diff" }
-            validatePatchPaths(patch)
+            validatePatchPaths(workspace, patch)
 
             applyPatch(workspace, patch)
             val changed = git(workspace, "status", "--porcelain").requireSuccess("inspect workspace changes").output
@@ -454,25 +467,17 @@ internal class LocalWorkspaceAgentProvider(
             val commitMessage = "Haive: ${firstObjectiveLine.take(68)}".trimEnd()
 
             git(workspace, "add", "--all").requireSuccess("stage workspace changes")
-            val hooksDir = withContext(Dispatchers.IO) {
-                Files.createTempDirectory("haive-empty-hooks-").toFile()
-            }
-            val commit = try {
-                git(
-                    workspace,
-                    "-c",
-                    "core.hooksPath=${hooksDir.absolutePath}",
-                    "-c",
-                    "user.name=Haive",
-                    "-c",
-                    "user.email=haive@local.invalid",
-                    "commit",
-                    "-m",
-                    commitMessage,
-                ).requireSuccess("commit workspace changes")
-            } finally {
-                withContext(Dispatchers.IO) { runCatching { hooksDir.deleteRecursively() } }
-            }
+            val commit = git(
+                workspace,
+                *noHooks,
+                "-c",
+                "user.name=Haive",
+                "-c",
+                "user.email=haive@local.invalid",
+                "commit",
+                "-m",
+                commitMessage,
+            ).requireSuccess("commit workspace changes")
             val checkpoint = recording?.let { cli ->
                 recordCheckpoint(cli, root, workspace, baseCommit, sessionId, generated)
             }
@@ -535,17 +540,22 @@ internal class LocalWorkspaceAgentProvider(
             WorkspaceOutcome(
                 artifacts = artifacts,
                 generationUsage = generated,
-            )
+            ).also { delivered = true }
         } finally {
-            if (worktreeAdded) {
-                try {
-                    git(root, "worktree", "remove", "--force", workspace.absolutePath)
-                } catch (_: Throwable) {
-                    // Best-effort cleanup only. The branch/commit remain durable in the source repository.
+            // Cleanup must outlive cancellation: a cancelled coroutine cannot otherwise even start the
+            // process that removes the worktree.
+            withContext(NonCancellable) {
+                if (worktreeStarted) {
+                    // Best-effort cleanup only; each step runs even when an earlier one fails.
+                    runCatching { git(root, "worktree", "remove", "--force", workspace.absolutePath) }
+                    // A delivered branch stays durable in the source repository; one nobody will hear
+                    // about (failure or cancellation) is removed with its worktree.
+                    if (!delivered) runCatching { git(root, "branch", "-D", branch) }
                 }
-            }
-            withContext(Dispatchers.IO) {
-                runCatching { workspace.deleteRecursively() }
+                withContext(Dispatchers.IO) {
+                    runCatching { workspace.deleteRecursively() }
+                    runCatching { hooksDir.deleteRecursively() }
+                }
             }
         }
     }
@@ -764,14 +774,10 @@ internal class LocalWorkspaceAgentProvider(
     }
 
     private suspend fun applyPatch(workspace: File, patch: String) {
-        runProcess(
-            command = listOf("git", "-C", workspace.absolutePath, "apply", "--check", "--whitespace=nowarn", "-"),
-            stdin = patch,
-        ).requireSuccess("validate generated patch")
-        runProcess(
-            command = listOf("git", "-C", workspace.absolutePath, "apply", "--whitespace=nowarn", "-"),
-            stdin = patch,
-        ).requireSuccess("apply generated patch")
+        gitWithInput(workspace, patch, "apply", "--check", "--whitespace=nowarn", "-")
+            .requireSuccess("validate generated patch")
+        gitWithInput(workspace, patch, "apply", "--whitespace=nowarn", "-")
+            .requireSuccess("apply generated patch")
     }
 
     private fun extractUnifiedDiff(raw: String): String {
@@ -784,22 +790,46 @@ internal class LocalWorkspaceAgentProvider(
         return if (diff.isBlank()) "" else diff.trimEnd() + "\n"
     }
 
-    private fun validatePatchPaths(patch: String) {
-        patch.lineSequence()
-            .filter { it.startsWith("diff --git ") }
-            .forEach { header ->
-                val parts = header.split(' ')
-                require(parts.size >= 4) { "Generated diff contains an invalid file header" }
-                listOf(parts[2].removePrefix("a/"), parts[3].removePrefix("b/")).forEach { path ->
-                    require(path.isNotBlank()) { "Generated diff contains an empty path" }
-                    require(!path.startsWith('/') && ".." !in path.split('/') && ".git" !in path.split('/')) {
-                        "Generated diff attempts to write outside the repository: $path"
-                    }
-                    require(path.substringAfterLast('/') !in setOf(".gitattributes", ".gitmodules")) {
-                        "Generated diff may not modify Git execution-control file: $path"
-                    }
-                }
-            }
+    /**
+     * Checks every path the patch would touch, as Git itself parses it, so rename/copy headers,
+     * quoted (octal-escaped) names and traditional `---`/`+++` patches cannot hide a path.
+     * `git apply --numstat` names each file's post-image (or the deleted file); the same listing of
+     * the reversed patch names each pre-image, so together they cover both sides of every rename
+     * and copy. A patch Git cannot parse is rejected.
+     */
+    private suspend fun validatePatchPaths(workspace: File, patch: String) {
+        val paths = listOf(
+            arrayOf("apply", "--numstat", "-z", "-"),
+            arrayOf("apply", "--numstat", "-z", "-R", "-"),
+        ).flatMapTo(linkedSetOf()) { args ->
+            parseNumstatPaths(gitWithInput(workspace, patch, *args).requireSuccess("parse generated patch").output)
+        }
+        require(paths.isNotEmpty()) { "Generated diff names no files" }
+        paths.forEach(::requireAllowedPatchPath)
+    }
+
+    private fun parseNumstatPaths(output: String): List<String> = output
+        .split('\u0000')
+        .filter(String::isNotEmpty)
+        .map { record ->
+            // `<added>\t<deleted>\t<path>`; the path is raw (unquoted) with -z and may itself hold tabs.
+            val fields = record.split('\t', limit = 3)
+            require(fields.size == 3 && fields[2].isNotEmpty()) { "Generated diff contains an unparseable file entry" }
+            fields[2]
+        }
+
+    private fun requireAllowedPatchPath(path: String) {
+        require(path.isNotBlank()) { "Generated diff contains an empty path" }
+        val segments = path.split('/', '\\')
+        require(
+            !path.startsWith('/') && !path.startsWith('\\') &&
+                segments.none { it == ".." || it.equals(".git", ignoreCase = true) },
+        ) {
+            "Generated diff attempts to write outside the repository: $path"
+        }
+        require(segments.last().lowercase() !in GIT_CONTROL_FILES) {
+            "Generated diff may not modify Git execution-control file: $path"
+        }
     }
 
     private fun workspaceBranch(request: AgentTaskRequest): String =
@@ -811,8 +841,11 @@ internal class LocalWorkspaceAgentProvider(
         .trim('-', '.', '_')
         .ifBlank { "task" }
 
-    private suspend fun git(root: File, vararg args: String): ProcessResult =
-        runProcess(listOf("git", "-C", root.absolutePath) + args)
+    private suspend fun git(root: File, vararg args: String): ProcessResult = gitWithInput(root, null, *args)
+
+    /** Every Git command runs with the repository's fsmonitor command disabled; it is host code. */
+    private suspend fun gitWithInput(root: File, stdin: String?, vararg args: String): ProcessResult =
+        runProcess(listOf("git", "-C", root.absolutePath, "-c", "core.fsmonitor=false") + args, stdin = stdin)
 
     private suspend fun runProcess(
         command: List<String>,
@@ -823,6 +856,7 @@ internal class LocalWorkspaceAgentProvider(
         val process = withContext(Dispatchers.IO) {
             ProcessBuilder(command)
                 .apply { if (directory != null) this.directory(directory) }
+                .apply { sanitizeGitEnvironment(this) }
                 .redirectErrorStream(true)
                 .start()
         }

@@ -17,11 +17,18 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 class LocalWorkspaceAgentProviderTest {
     @Test
@@ -131,6 +138,135 @@ class LocalWorkspaceAgentProviderTest {
         assertEquals("initial\n", root.resolve("README.md").readText())
     }
 
+    @Test
+    fun patchesThatReachGitControlFilesThroughHeadersGitParsesAreRejected() {
+        val renameOntoAttributes = """
+            diff --git a/README.md b/README.md
+            similarity index 100%
+            rename from README.md
+            rename to .gitattributes
+        """.trimIndent()
+        val quotedOctalAttributes = """
+            diff --git "a/\056gitattributes" "b/\056gitattributes"
+            new file mode 100644
+            --- /dev/null
+            +++ "b/\056gitattributes"
+            @@ -0,0 +1 @@
+            +* filter=evil
+        """.trimIndent()
+        val copyOntoModules = """
+            diff --git a/README.md b/README.md
+            copy from README.md
+            copy to sub/.gitmodules
+        """.trimIndent()
+        val traditionalAfterGitHeader = """
+            diff --git a/README.md b/README.md
+            --- a/README.md
+            +++ b/README.md
+            @@ -1 +1 @@
+            -initial
+            +changed
+            --- a/other
+            +++ b/.GITATTRIBUTES
+            @@ -0,0 +1 @@
+            +x
+        """.trimIndent()
+        val unparseable = "diff --git a/README.md b/README.md\nthis is not a patch\n"
+
+        listOf(renameOntoAttributes, quotedOctalAttributes, copyOntoModules, traditionalAfterGitHeader, unparseable)
+            .forEachIndexed { index, patch ->
+                withGitRepository { root ->
+                    val events = runPatch(root, TaskRunId("hostile-$index"), patch)
+                    val failure = events.filterIsInstance<AgentEvent.Failed>().singleOrNull()
+                    assertTrue(failure != null, "patch $index was not rejected: $events")
+                    assertTrue(events.none { it is AgentEvent.ArtifactProduced }, "patch $index produced a change")
+                    assertEquals("", git(root, "branch", "--list", "haive/*").trim(), "patch $index left its branch")
+                }
+            }
+    }
+
+    @Test
+    fun repositoryHooksNeverRunDuringWorktreeCreationOrCommit() = withGitRepository { root ->
+        val marker = root.resolveSibling("${root.fileName}-hook-ran")
+        try {
+            val hooks = root.resolve(".git/hooks")
+            Files.createDirectories(hooks)
+            listOf("post-checkout", "pre-commit", "commit-msg", "post-commit").forEach { name ->
+                hooks.resolve(name).apply {
+                    writeText("#!/bin/sh\necho $name >> '${marker.toAbsolutePath()}'\n")
+                    toFile().setExecutable(true)
+                }
+            }
+
+            val events = runPatch(root, TaskRunId("hooks"), README_PATCH)
+
+            assertCompleted(events)
+            assertFalse(Files.exists(marker), "a repository hook ran: ${if (Files.exists(marker)) marker.readText() else ""}")
+        } finally {
+            Files.deleteIfExists(marker)
+        }
+    }
+
+    @Test
+    fun cancellationRemovesTheWorktreeBranchAndTemporaryDirectories() = withGitRepository { root ->
+        val generating = CompletableDeferred<Unit>()
+        val api = object : TextGenerationApi {
+            var calls = 0
+            override suspend fun generate(prompt: String): TextGenerationResult {
+                if (calls++ == 0) return TextGenerationResult(text = "Plan\nFILES:\nREADME.md")
+                generating.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val provider = LocalWorkspaceAgentProvider(AgentProviderId("cancel-test"), "Cancel test", api)
+        val tempRoot = Path.of(System.getProperty("java.io.tmpdir"))
+        fun haiveTempDirs() = Files.list(tempRoot).use { paths ->
+            paths.filter { it.fileName.toString().startsWith("haive-") && it.fileName.toString().contains("cancel") ||
+                it.fileName.toString().startsWith("haive-empty-hooks-") }.toList().toSet()
+        }
+        val before = haiveTempDirs()
+
+        runBlocking {
+            val handle = provider.start(request(root, TaskRunId("cancel-me")))
+            val observation = launch(Dispatchers.Default) { provider.observe(handle.providerRunId).toList() }
+            withTimeout(60_000) { generating.await() }
+            assertTrue(git(root, "branch", "--list", "haive/*").isNotBlank(), "worktree branch was not created")
+            observation.cancelAndJoin()
+        }
+
+        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+        assertEquals(1, git(root, "worktree", "list", "--porcelain").lines().count { it.startsWith("worktree ") })
+        assertEquals(before, haiveTempDirs())
+    }
+
+    @Test
+    fun gitEnvironmentIsStrippedOfInheritedRepositoryOverrides() {
+        val environment = mutableMapOf(
+            "PATH" to "/usr/bin",
+            "GIT_DIR" to "/elsewhere/.git",
+            "GIT_INDEX_FILE" to "/elsewhere/index",
+            "git_work_tree" to "/elsewhere",
+            "SSH_ASKPASS" to "/usr/bin/askpass",
+        )
+
+        sanitizeGitEnvironment(environment)
+
+        assertEquals(
+            mapOf("PATH" to "/usr/bin", "GIT_TERMINAL_PROMPT" to "0", "GCM_INTERACTIVE" to "Never"),
+            environment,
+        )
+    }
+
+    private fun runPatch(root: Path, taskRunId: TaskRunId, patch: String): List<AgentEvent> {
+        val api = QueueTextApi(
+            TextGenerationResult(text = "Change the README.\nFILES:\nREADME.md"),
+            TextGenerationResult(text = patch),
+        )
+        val provider = LocalWorkspaceAgentProvider(AgentProviderId("patch-test"), "Patch test", api)
+        val handle = runBlocking { provider.start(request(root, taskRunId)) }
+        return runBlocking { provider.observe(handle.providerRunId).toList() }
+    }
+
     private fun assertCompleted(events: List<AgentEvent>) {
         val failure = events.filterIsInstance<AgentEvent.Failed>().lastOrNull()
         assertTrue(failure == null, failure?.reason ?: "Workspace provider emitted a failure")
@@ -188,6 +324,17 @@ class LocalWorkspaceAgentProviderTest {
         val exitCode = process.waitFor()
         check(exitCode == 0) { "${command.joinToString(" ")} failed ($exitCode): $output" }
         return output
+    }
+
+    private companion object {
+        val README_PATCH = """
+            diff --git a/README.md b/README.md
+            --- a/README.md
+            +++ b/README.md
+            @@ -1 +1 @@
+            -initial
+            +changed
+        """.trimIndent()
     }
 
     private class QueueTextApi(vararg responses: TextGenerationResult) : TextGenerationApi {

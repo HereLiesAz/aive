@@ -151,15 +151,19 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 
 **Threats**
 - A generated patch escapes the repository, modifies Git control files, or triggers hooks.
-- Repository code executes on the desktop host.
+- Repository code executes on the desktop host, for example through hooks (including a tracked `core.hooksPath` such as `.husky`) or a configured fsmonitor command.
 - A patch clobbers the user's uncommitted work.
 
 **Mitigations in place**
 - The model never gets shell access. It receives a bounded snapshot (up to 28 files and 180,000 characters) and returns a unified diff.
-- Diff paths are validated. Absolute paths, `.git/`, `..` segments, `.gitattributes`, and `.gitmodules` are rejected. The diff must pass `git apply --check` before it is applied.
-- The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts.
-- Commits run with `core.hooksPath` set to an empty temporary directory, so repository hooks do not execute.
-- Repository code is never executed on the host. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+- Diff paths are validated as Git parses them: `git apply --numstat -z` on the patch and on its reverse lists both sides of every file, including rename/copy targets, quoted (octal-escaped) names and traditional `---`/`+++` sections. Absolute paths, `.git/` and `..` segments, and `.gitattributes`/`.gitmodules` (compared case-insensitively) are rejected, as is any patch Git cannot parse. The diff must then pass `git apply --check` before it is applied.
+- The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `haive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
+- `git worktree add` (post-checkout) and `git commit` run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
+- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+
+**Residual risks**
+- Git still honours the user's own Git configuration while checking out and committing. A clean/smudge filter or other driver that the user configured (for example Git LFS, or a filter that runs a tracked script) runs for paths the repository's existing `.gitattributes` select.
+- When Entire recording is on, `entire session attach` amends the commit in the worktree with Entire's own process, which does not get the hooks override.
 
 ### Repository operations
 
