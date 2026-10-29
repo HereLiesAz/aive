@@ -298,4 +298,38 @@ class HiveScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun shootsTheFlowchart() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val flow = definition.copy(
+            tasks = listOf(
+                task("contract", "Contract", architect),
+                task("build", "Implement", engineer, "contract"),
+                TaskDefinition(TaskDefinitionId("ci"), "Run CI", "Build on GitHub", null, dependsOn = setOf(TaskDefinitionId("build")), executor = TaskExecutor.GitHubAction("ci.yml")),
+                TaskDefinition(TaskDefinitionId("notify"), "Tell the channel", "Post the result", null, dependsOn = setOf(TaskDefinitionId("ci")), executor = TaskExecutor.ExternalService("Slack", "post")),
+                task("review", "Review", qa, "notify"),
+            ),
+        )
+        shoot("24-flowchart", 900, 1400) {
+            GeministratorWorkflowTerrarium(flow, liveRun.copy(workflowDefinitionId = flow.id), roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+        }
+    }
+
+    @Test
+    fun shootsTheResourceManager() {
+        val rig = "resource-manager-sheet-3-variant"
+        runBlocking { CreatureRigCache.get(rig) }
+        shoot("23-resource-manager", 1800, 520) {
+            AzphaltThemedSurface(Azphalt.Ink) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalCreatureRig provides { rig }) {
+                    androidx.compose.foundation.layout.Row(Modifier.background(Azphalt.Ink)) {
+                        listOf(0.05f, 0.3f, 0.55f, 0.8f).forEach { phase ->
+                            NodeMascotSurface(roleLabel = rig, hueSeed = rig, state = H2g2WorkflowState.Active, motionPhase = { phase }, modifier = Modifier.size(220.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

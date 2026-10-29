@@ -147,11 +147,18 @@ internal fun GeministratorWorkflowTerrarium(
 
     Column(modifier = modifier.fillMaxWidth()) {
         TerrariumModeToggle(building = building, onBuildingChange = { building = it })
+        val outerRig = LocalCreatureRig.current
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(if (compact) 470.dp else 620.dp),
         ) {
+          // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
+          androidx.compose.runtime.CompositionLocalProvider(
+              LocalCreatureRig provides { label ->
+                  if (label in projection.programmaticLabels) CreatureRigMapping.PROGRAMMATIC_RIG else outerRig(label)
+              },
+          ) {
             PlatformNodeTerrarium(
                 subjects = projection.subjects,
                 relationships = animatedRelationships,
@@ -194,6 +201,7 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+          }
         }
 
         if (building) {

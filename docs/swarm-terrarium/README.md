@@ -38,7 +38,7 @@ The other characters (`016`-`071`: data miner, knowledge keeper, simulator, guar
 - Blocked nodes visibly sag; failed nodes sag further, dim and tremble.
 - Complete nodes hop once and settle.
 - Connections between nodes start and end at the creatures' `arm-socket` attachment facing the partner node, drawn as a link line with a pulse when it is active. If no socket faces that way the silhouette edge is used.
-- Drag/drop workflow authoring, external service visits, dependency adornments, persisted layout, and task selection are part of the production interaction model.
+- Drag/drop workflow authoring, dependency adornments, persisted layout, and task selection are part of the production interaction model. GitHub Actions and external services are neurons in the flow, not visitors.
 
 ## Rigs
 
