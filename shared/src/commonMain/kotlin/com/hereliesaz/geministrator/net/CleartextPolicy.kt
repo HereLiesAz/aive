@@ -13,8 +13,15 @@ object CleartextPolicy {
         return isLocalOrPrivateHost(hostOf(lower))
     }
 
+    /**
+     * The host an HTTP client connects to for [lowerUrl]. The authority ends at the first `/`, `?`,
+     * `#` or `\` (URL parsers treat `\` like `/`), and only then is userinfo (up to the last `@`)
+     * dropped, so an `@` or `.local` in a fragment, query or path can never pose as the host.
+     */
     internal fun hostOf(lowerUrl: String): String {
-        val authority = lowerUrl.removePrefix("http://").substringBefore('/').substringBefore('?').substringAfterLast('@')
+        val rest = lowerUrl.removePrefix("http://")
+        val end = rest.indexOfFirst { it == '/' || it == '?' || it == '#' || it == '\\' }
+        val authority = (if (end < 0) rest else rest.substring(0, end)).substringAfterLast('@')
         return if (authority.startsWith("[")) authority.substringBefore(']').removePrefix("[") else authority.substringBefore(':')
     }
 

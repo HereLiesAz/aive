@@ -8,6 +8,7 @@ internal class DesktopProviderCredentialStore {
     private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     fun read(providerId: String): String? {
+        if (!CredentialTool.isSafeAccountId(providerId)) return null
         val secure = readFromKeychain(providerId)
             ?: readWindowsDpapi(providerId)
         if (secure != null) return secure
@@ -30,6 +31,7 @@ internal class DesktopProviderCredentialStore {
 
     fun write(providerId: String, apiKey: String) {
         require(ProviderCatalog.entry(providerId) != null) { "Unknown provider $providerId" }
+        require(CredentialTool.isSafeAccountId(providerId)) { "Unsupported provider id $providerId" }
         val clean = apiKey.trim()
         require(clean.isNotEmpty()) { "API key is required" }
         require(writeSecure(providerId, clean)) {
@@ -40,7 +42,8 @@ internal class DesktopProviderCredentialStore {
     }
 
     fun clear(providerId: String) {
-        deleteFromKeychain(providerId)
+        // An id that could not have been stored is never handed to a credential tool.
+        if (CredentialTool.isSafeAccountId(providerId)) deleteFromKeychain(providerId)
         if (os.contains("win")) fallback.remove(windowsDpapiKey(providerId))
         fallback.remove(providerId)
         fallback.flush()
@@ -53,56 +56,47 @@ internal class DesktopProviderCredentialStore {
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
 
-        fun readFromKeychain(providerId: String): String? = runCatching {
-            when {
-                os.contains("mac") -> {
-                    val result = ProcessBuilder(
-                        "security", "find-generic-password",
-                        "-s", KEYCHAIN_SERVICE,
-                        "-a", providerId,
-                        "-w",
-                    ).start()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
-                }
-                os.contains("win") -> null
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
-                    val result = ProcessBuilder(
-                        "secret-tool", "lookup",
-                        "service", KEYCHAIN_SERVICE,
-                        "account", providerId,
-                    ).start()
-                    val output = result.inputStream.bufferedReader().readText().trim()
-                    result.waitFor()
-                    output.takeIf { it.isNotEmpty() && result.exitValue() == 0 }
-                }
-                else -> null
+        fun readFromKeychain(providerId: String): String? {
+            val command = when {
+                os.contains("mac") -> listOf(
+                    "security", "find-generic-password",
+                    "-s", KEYCHAIN_SERVICE,
+                    "-a", providerId,
+                    "-w",
+                )
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> listOf(
+                    "secret-tool", "lookup",
+                    "service", KEYCHAIN_SERVICE,
+                    "account", providerId,
+                )
+                else -> return null
             }
-        }.getOrNull()
+            return CredentialTool.run(command)?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
+        }
 
         fun writeToKeychain(providerId: String, apiKey: String): Boolean = runCatching {
             when {
                 os.contains("mac") -> {
                     // Delete first to avoid duplicate-item errors.
-                    ProcessBuilder(
-                        "security", "delete-generic-password",
-                        "-s", KEYCHAIN_SERVICE,
-                        "-a", providerId,
-                    ).start().waitFor()
+                    CredentialTool.run(
+                        listOf(
+                            "security", "delete-generic-password",
+                            "-s", KEYCHAIN_SERVICE,
+                            "-a", providerId,
+                        ),
+                    )
                     MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, providerId, apiKey)
                 }
                 os.contains("win") -> false
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
-                    val proc = ProcessBuilder(
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
+                    listOf(
                         "secret-tool", "store",
                         "--label", "Haive API key ($providerId)",
                         "service", KEYCHAIN_SERVICE,
                         "account", providerId,
-                    ).start()
-                    proc.outputStream.bufferedWriter().use { it.write(apiKey) }
-                    proc.waitFor() == 0
-                }
+                    ),
+                    stdin = apiKey,
+                )?.ok == true
                 else -> false
             }
         }.getOrElse { false }
@@ -120,21 +114,18 @@ internal class DesktopProviderCredentialStore {
                 ?.trim()
                 ?.takeIf(String::isNotEmpty)
                 ?: return null
-            return runCatching {
-                val script = """
-                    ${'$'}cipher = [Console]::In.ReadToEnd().Trim()
-                    ${'$'}bytes = [Convert]::FromBase64String(${'$'}cipher)
-                    ${'$'}plain = [Security.Cryptography.ProtectedData]::Unprotect(
-                        ${'$'}bytes, ${'$'}null, [Security.Cryptography.DataProtectionScope]::CurrentUser
-                    )
-                    [Console]::Out.Write([Text.Encoding]::UTF8.GetString(${'$'}plain))
-                """.trimIndent()
-                val process = ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script).start()
-                process.outputStream.bufferedWriter().use { it.write(encoded) }
-                val output = process.inputStream.bufferedReader().readText()
-                process.waitFor()
-                output.takeIf { process.exitValue() == 0 && it.isNotBlank() }
-            }.getOrNull()
+            val script = """
+                ${'$'}cipher = [Console]::In.ReadToEnd().Trim()
+                ${'$'}bytes = [Convert]::FromBase64String(${'$'}cipher)
+                ${'$'}plain = [Security.Cryptography.ProtectedData]::Unprotect(
+                    ${'$'}bytes, ${'$'}null, [Security.Cryptography.DataProtectionScope]::CurrentUser
+                )
+                [Console]::Out.Write([Text.Encoding]::UTF8.GetString(${'$'}plain))
+            """.trimIndent()
+            return CredentialTool.run(
+                listOf("powershell", "-NoProfile", "-NonInteractive", "-Command", script),
+                stdin = encoded,
+            )?.takeIf { it.ok }?.output?.takeIf(String::isNotBlank)
         }
 
         fun writeWindowsDpapi(providerId: String, apiKey: String): Boolean {
@@ -148,10 +139,11 @@ internal class DesktopProviderCredentialStore {
                     )
                     [Console]::Out.Write([Convert]::ToBase64String(${'$'}cipher))
                 """.trimIndent()
-                val process = ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script).start()
-                process.outputStream.bufferedWriter().use { it.write(apiKey) }
-                val encoded = process.inputStream.bufferedReader().readText().trim()
-                val ok = process.waitFor() == 0 && encoded.isNotEmpty()
+                val encoded = CredentialTool.run(
+                    listOf("powershell", "-NoProfile", "-NonInteractive", "-Command", script),
+                    stdin = apiKey,
+                )?.takeIf { it.ok }?.output?.trim().orEmpty()
+                val ok = encoded.isNotEmpty()
                 if (ok) {
                     val prefs = Preferences.userRoot().node(PREFERENCES_NODE)
                     prefs.put(windowsDpapiKey(providerId), encoded)
@@ -163,26 +155,25 @@ internal class DesktopProviderCredentialStore {
 
         fun deleteFromKeychain(providerId: String) = runCatching {
             when {
-                os.contains("mac") -> {
-                    ProcessBuilder(
+                os.contains("mac") -> CredentialTool.run(
+                    listOf(
                         "security", "delete-generic-password",
                         "-s", KEYCHAIN_SERVICE,
                         "-a", providerId,
-                    ).start().waitFor()
-                }
-                os.contains("win") -> {
-                    ProcessBuilder(
-                        "powershell", "-NonInteractive", "-Command",
-                        "cmdkey /delete:'$KEYCHAIN_SERVICE/$providerId'",
-                    ).start().waitFor()
-                }
-                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> {
-                    ProcessBuilder(
+                    ),
+                )
+                // Earlier builds wrote a Credential Manager entry; `cmdkey` runs directly, never through a shell.
+                os.contains("win") -> CredentialTool.run(
+                    CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, providerId),
+                )
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
+                    listOf(
                         "secret-tool", "clear",
                         "service", KEYCHAIN_SERVICE,
                         "account", providerId,
-                    ).start().waitFor()
-                }
+                    ),
+                )
+                else -> null
             }
         }
     }

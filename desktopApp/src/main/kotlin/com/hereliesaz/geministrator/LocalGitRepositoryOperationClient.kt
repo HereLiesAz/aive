@@ -243,20 +243,6 @@ internal class LocalGitRepositoryOperationClient(
         }
     }
 
-    private fun sanitizeGitEnvironment(builder: ProcessBuilder) {
-        val environment = builder.environment()
-        environment.keys
-            .filter { key ->
-                key.startsWith("GIT_", ignoreCase = true) ||
-                    key.equals("SSH_ASKPASS", ignoreCase = true) ||
-                    key.equals("GCM_INTERACTIVE", ignoreCase = true)
-            }
-            .toList()
-            .forEach(environment::remove)
-        environment["GIT_TERMINAL_PROMPT"] = "0"
-        environment["GCM_INTERACTIVE"] = "Never"
-    }
-
     private fun destroyProcessTree(process: Process) {
         runCatching {
             process.toHandle().descendants().forEach { child -> runCatching { child.destroyForcibly() } }

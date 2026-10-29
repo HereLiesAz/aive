@@ -11,14 +11,10 @@ internal object MacKeychain {
     fun addGenericPassword(service: String, account: String, secret: String): Boolean {
         // The interactive parser is line based, so a line break would end the command early.
         if (secret.any { it == '\n' || it == '\r' || it == '\u0000' }) return false
-        val process = ProcessBuilder("security", "-i").redirectErrorStream(true).start()
-        process.outputStream.bufferedWriter().use { writer ->
-            writer.write(
-                "add-generic-password -s ${quote(service)} -a ${quote(account)} -w ${quote(secret)} -U\n",
-            )
-        }
-        process.inputStream.readBytes()
-        return process.waitFor() == 0
+        return CredentialTool.run(
+            listOf("security", "-i"),
+            stdin = "add-generic-password -s ${quote(service)} -a ${quote(account)} -w ${quote(secret)} -U\n",
+        )?.ok == true
     }
 
     /** Double-quoted argument as the `security -i` parser reads it: only `\` and `"` need escaping. */
