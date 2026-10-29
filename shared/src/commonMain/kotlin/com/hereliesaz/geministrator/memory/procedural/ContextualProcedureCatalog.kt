@@ -27,7 +27,8 @@ class ContextualProcedureCatalog(
                 }.toSet()
                 cached[producer] = episodes
             }
-            if (candidate.definition.sourceEpisodeIds.all { it in episodes }) result += candidate
+            val available = requireNotNull(episodes)
+            if (candidate.definition.sourceEpisodeIds.all { it in available }) result += candidate
         }
         return result
     }
