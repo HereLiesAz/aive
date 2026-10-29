@@ -161,6 +161,28 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 - Commits run with `core.hooksPath` set to an empty temporary directory, so repository hooks do not execute.
 - Repository code is never executed on the host. The agent records a "Host execution withheld" artifact, and nothing is pushed.
 
+### Entire checkpoints and the `entire` CLI (desktop)
+
+See `docs/Entire.md`.
+
+**Threats**
+- Checkpoint text (another agent's prompt, intent and summary, or a commit message) is attacker-controlled and flows into a Local Git run's planning prompt: prompt injection that steers the plan or the diff.
+- The `entire` binary runs on the host with the keeper's permissions. A binary planted on `PATH`, or a compromised install, runs whatever it likes.
+- `entire` runs `entire-agent-aive`, which reads transcripts; a crafted session reference could read files outside the sessions folder, or `write-session` could write outside it.
+- Transcripts (prompts, plans, diffs) are committed into checkpoints in the repository's git history, so once that history is pushed they reach everyone who can read the repository.
+
+**Mitigations in place**
+- Checkpoint context is bounded (at most eight checkpoints, the newest three with intent and summary, each field truncated) and only informs the plan: the model still returns a diff that passes the Local Git agent's path validation and `git apply --check`, in an isolated worktree with hooks disabled, and nothing runs on the host.
+- `entire` is located on absolute `PATH` entries or its installers' fixed folders, never resolved against a repository, and always run with a fixed argument list, never through a shell; `GIT_*` variables are cleared and every call has a timeout.
+- The plugin refuses any transcript, session reference or restore target outside the sessions folder, and session ids are reduced to safe file names.
+- External agents are allowed only in the run's temporary worktree's untracked `.entire/settings.local.json`; the keeper's own settings are never changed.
+- Recording is off until the keeper turns it on, and only applies where the repository already has Entire set up.
+
+**Remaining gaps**
+- Prompt injection through checkpoint text is mitigated by the diff pipeline, not prevented: a plan can still be steered toward a harmful but well-formed patch, which is why the branch is left for review.
+- The Aive does not verify the `entire` binary's signature or origin.
+- Recorded transcripts cannot be withdrawn from a pushed checkpoint by The Aive.
+
 ### Repository operations
 
 GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
