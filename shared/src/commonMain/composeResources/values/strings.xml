@@ -491,9 +491,15 @@
     <string name="overview_no_project">NO PROJECT</string>
     <string name="overview_objective">Objective</string>
     <string name="first_hive">Your first hive</string>
-    <string name="first_hive_hint">Feed it work and it plans the rest, hatching the creatures it needs. Name, repository and saved projects are under Options.</string>
+    <string name="first_hive_hint">Feed it work and it plans the rest, hatching the creatures it needs. Its name, a repository and saved projects are under Options.</string>
     <string name="first_hive_objective">What should it work on?</string>
     <string name="first_hive_feed">Feed it</string>
+    <string name="hive_gone">This hive is gone. Hive, above, leads back to the rest.</string>
+    <string name="district_loading">Gathering the hives…</string>
+    <string name="district_load_failed">The hives could not be read: %1$s</string>
+    <string name="first_hive_options">Options: name, repository, saved projects</string>
+    <string name="first_hive_connect">Connect a provider</string>
+    <string name="first_hive_connect_hint">First, what it thinks with: connect an AI provider. Some are free and need no key.</string>
     <string name="overview_open_a_different_saved_project">Open a different saved project…</string>
     <string name="overview_or_create_a_new_project">OR CREATE A NEW PROJECT</string>
     <string name="overview_owner_attention">Owner attention</string>
@@ -659,7 +665,7 @@
     <string name="settings_ai_providers">AI Providers</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_ground">Ground</string>
-    <string name="settings_ground_explain">The page colour behind everything. Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_ground_explain">Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>

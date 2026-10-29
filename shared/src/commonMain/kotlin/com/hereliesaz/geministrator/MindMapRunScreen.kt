@@ -100,6 +100,9 @@ import com.hereliesaz.geministrator.resources.overview_enter_name_and_objective
 import com.hereliesaz.geministrator.resources.overview_enter_objective
 import com.hereliesaz.geministrator.resources.overview_invalid_repository_location
 import com.hereliesaz.geministrator.resources.overview_options
+import com.hereliesaz.geministrator.resources.first_hive_options
+import com.hereliesaz.geministrator.resources.first_hive_connect_hint
+import com.hereliesaz.geministrator.resources.first_hive_connect
 import com.hereliesaz.geministrator.resources.first_hive_feed
 import com.hereliesaz.geministrator.resources.first_hive_objective
 import com.hereliesaz.geministrator.resources.first_hive_hint
@@ -129,6 +132,8 @@ internal fun MindMapRunScreen(
     compact: Boolean,
     onSurface: (() -> Unit)? = null,
     runtimeState: ApplicationRuntimeState,
+    /** Whether any AI provider is connected; a first launch asks for one first when not. */
+    hasProvider: Boolean = true,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val scope = rememberCoroutineScope()
@@ -137,10 +142,6 @@ internal fun MindMapRunScreen(
     val noRunProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
     val existingRepository = noRunProject?.repository
     val draftScope = noRunProject?.id?.value ?: "new-project"
-    var branchIsolation by rememberDurableBooleanState(
-        key = "overview.$draftScope.branch-isolation",
-        initialValue = false,
-    )
     val selectableRepositorySources = remember(availableRepositorySources, existingRepository?.source) {
         (availableRepositorySources + listOfNotNull(existingRepository?.source))
             .ifEmpty { setOf(RepositorySource.GitHub, RepositorySource.GitLab) }
@@ -328,6 +329,7 @@ internal fun MindMapRunScreen(
                     }
 
                     OutlinedTextField(
+                        colors = azphaltTextFieldColors(),
                         value = projectName,
                         onValueChange = { projectName = it },
                         label = { Text(stringResource(Res.string.overview_project_name)) },
@@ -339,6 +341,7 @@ internal fun MindMapRunScreen(
                 if (!firstLaunch) projectFields()
 
                 OutlinedTextField(
+                    colors = azphaltTextFieldColors(),
                     value = objective,
                     onValueChange = { objective = it },
                     label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
@@ -346,7 +349,7 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 AzphaltPill(
-                    label = stringResource(Res.string.overview_options),
+                    label = stringResource(if (firstLaunch) Res.string.first_hive_options else Res.string.overview_options),
                     seed = "launch-options",
                     selected = optionsOpen,
                     onClick = { optionsOpen = !optionsOpen },
@@ -405,6 +408,7 @@ internal fun MindMapRunScreen(
                 if (repositorySearchConnected) {
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
+                            colors = azphaltTextFieldColors(),
                             value = repositoryLocator,
                             onValueChange = {
                                 repositoryLocator = it
@@ -468,6 +472,7 @@ internal fun MindMapRunScreen(
                     }
                 } else {
                     OutlinedTextField(
+                        colors = azphaltTextFieldColors(),
                         value = repositoryLocator,
                         onValueChange = {
                             repositoryLocator = it
@@ -491,6 +496,7 @@ internal fun MindMapRunScreen(
                     )
                 }
                 OutlinedTextField(
+                    colors = azphaltTextFieldColors(),
                     value = defaultBranch,
                     onValueChange = { defaultBranch = it },
                     label = { Text(stringResource(Res.string.overview_default_branch_optional)) },
@@ -518,8 +524,20 @@ internal fun MindMapRunScreen(
                     },
                 )
                 }
+                // Before anything can think, a provider: the first hive's first step when none is connected.
+                val needsProvider = firstLaunch && !hasProvider
+                if (needsProvider) {
+                    Text(stringResource(Res.string.first_hive_connect_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                    AzphaltPill(
+                        tone = PillTone.Primary,
+                        label = stringResource(Res.string.first_hive_connect),
+                        seed = "first-hive-connect",
+                        onClick = onOpenSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 AzphaltPill(
-                    tone = PillTone.Primary,
+                    tone = if (needsProvider) PillTone.Quiet else PillTone.Primary,
                     label = when {
                         firstLaunch -> stringResource(Res.string.first_hive_feed)
                         runtimeState is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_start_run)
@@ -529,20 +547,24 @@ internal fun MindMapRunScreen(
                     selected = (firstLaunch || projectName.isNotBlank()) && objective.isNotBlank(),
                     onClick = {
                         val locator = repositoryLocator.trim()
-                        // A first hive needs no name to start: it takes one from what it was fed.
-                        if (firstLaunch && projectName.isBlank()) projectName = firstHiveName(objective)
+                        // A first hive needs no name to start: it takes one from what it was fed, once
+                        // it has been fed (an empty tap must not name it "First hive" for good).
+                        val name = projectName.trim().ifBlank {
+                            if (firstLaunch && objective.isNotBlank()) firstHiveName(objective) else ""
+                        }
                         // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
                         // but launch failed" in any future "nothing happens" report.
                         platformDebugLog(
                             "AiveLaunch",
-                            "CREATE PROJECT + START RUN tapped: project=${projectName.trim()} " +
+                            "CREATE PROJECT + START RUN tapped: project=$name " +
                                 "repo=${locator.ifEmpty { "<none>" }} objectiveChars=${objective.trim().length}",
                         )
-                        if (projectName.isBlank() || objective.isBlank()) {
+                        if (name.isBlank() || objective.isBlank()) {
                             // Previously a silent no-op: the only cue was the pill's unselected colour.
                             launchFieldsError = when {
-                                projectName.isBlank() && objective.isBlank() -> missingBothMessage
-                                projectName.isBlank() -> missingNameMessage
+                                firstLaunch || name.isNotBlank() -> missingObjectiveMessage
+                                objective.isBlank() -> missingBothMessage
+                                name.isBlank() -> missingNameMessage
                                 else -> missingObjectiveMessage
                             }
                             platformDebugLog("AiveLaunch", "Launch blocked: $launchFieldsError")
@@ -558,7 +580,7 @@ internal fun MindMapRunScreen(
                         if (firstLaunch) stableHost?.takeIf { it.stable.starter == null }?.let { host -> pickedStarter?.let(host::chooseStarter) }
                         if (locator.isEmpty()) {
                             repositoryError = null
-                            onLaunchWorkflow(projectName.trim(), objective.trim(), null, parents)
+                            onLaunchWorkflow(name, objective.trim(), null, parents)
                         } else {
                             runCatching {
                                 parseRepositoryRef(
@@ -569,7 +591,7 @@ internal fun MindMapRunScreen(
                             }.fold(
                                 onSuccess = { repository ->
                                     repositoryError = null
-                                    onLaunchWorkflow(projectName.trim(), objective.trim(), repository, parents)
+                                    onLaunchWorkflow(name, objective.trim(), repository, parents)
                                 },
                                 onFailure = { failure ->
                                     repositoryError = failure.message ?: invalidRepositoryMessage
@@ -598,27 +620,14 @@ internal fun MindMapRunScreen(
         val completed = run.taskRuns.values.count { it.status == TaskRunStatus.Completed }
         val total = run.taskRuns.size
 
+        // The breadcrumb names the hive; here, what it was fed and how far along it is.
+        Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface())
         Text(
-            run.objective.uppercase(),
-            style = if (compact) AzphaltType.section else AzphaltType.hero,
-            color = azphaltOnSurface(),
-        )
-        Text(
-            liveWorkflow.definition.name.uppercase(),
+            "${run.status.label()} · $completed/$total".uppercase(),
             style = AzphaltType.eyebrow,
             color = azphaltOnSurface(),
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        ) {
-            AzphaltPill(
-                run.status.label(),
-                "run-status",
-                endCap = "$completed/$total",
-                onClick = {},
-            )
-        }
+        )
 
         if (run.status.isFinished()) {
             ContinueRunPanel(
@@ -636,18 +645,18 @@ internal fun MindMapRunScreen(
             )
         }
 
-        val awaitingHuman = run.status == WorkflowRunStatus.AwaitingHuman
-        AzphaltRecord(
-            seed = "owner-attention",
-            eyebrow = stringResource(Res.string.overview_owner_attention),
-            title = if (awaitingHuman) stringResource(Res.string.overview_decision_required) else stringResource(Res.string.overview_no_decision_required),
-            body = if (awaitingHuman) {
-                stringResource(Res.string.overview_a_workflow_gate_is_waiting_for)
-            } else {
-                stringResource(Res.string.overview_runtime_is_advancing_without_human_intervention)
-            },
-            endCap = if (awaitingHuman) stringResource(Res.string.overview_required) else stringResource(Res.string.overview_clear),
-        )
+        // Only when a creature waits on you, and it opens that creature: the same "needs you" as the
+        // header's badge and the creature's Needs.
+        firstCreatureNeedingYou(liveWorkflow)?.let { waiting ->
+            AzphaltRecord(
+                seed = "owner-attention",
+                eyebrow = stringResource(Res.string.overview_owner_attention),
+                title = stringResource(Res.string.overview_decision_required),
+                body = stringResource(Res.string.overview_a_workflow_gate_is_waiting_for),
+                endCap = stringResource(Res.string.overview_required),
+                onClick = { if (selectedTaskId != waiting) onTaskSelected(waiting) },
+            )
+        }
 
         val validationErrors = remember(liveWorkflow.definition) { onValidateWorkflow() }
         if (validationErrors.isNotEmpty()) {
@@ -668,24 +677,12 @@ internal fun MindMapRunScreen(
                 ?.taskDefinitionId?.value
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(Res.string.overview_swarm_execution), style = AzphaltType.eyebrow, color = azphaltOnSurface(), modifier = Modifier.weight(1f))
-            if (activeTaskId != null) {
-                AzphaltPill(
-                    label = stringResource(Res.string.overview_jump_to_active),
-                    seed = "jump-active",
-                    onClick = { onTaskSelected(activeTaskId) },
-                )
-            }
+        if (activeTaskId != null) {
             AzphaltPill(
-                label = stringResource(Res.string.overview_branch),
-                seed = "branch-isolation",
-                selected = branchIsolation,
-                onClick = { branchIsolation = !branchIsolation },
+                label = stringResource(Res.string.overview_jump_to_active),
+                seed = "jump-active",
+                // Opens the working creature; never closes it if it is already open.
+                onClick = { if (selectedTaskId != activeTaskId) onTaskSelected(activeTaskId) },
             )
         }
         GeministratorWorkflowMindMap(
@@ -694,7 +691,6 @@ internal fun MindMapRunScreen(
             roles = liveWorkflow.roles,
             selectedTaskId = selectedTaskId,
             onTaskSelected = onTaskSelected,
-            branchIsolation = branchIsolation,
             modifier = Modifier.fillMaxWidth(),
             onSurface = onSurface,
         )

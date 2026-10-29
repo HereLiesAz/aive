@@ -32,7 +32,7 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):
 
 - **The Aive** and how its runtime is.
-- **The breadcrumb**: Hive › a hive › a creature, or Hive › a place opened from it (Swarm, Inbox, the Keeper's room). The last step is where you are; any earlier step goes back up. Hive is the district, every hive at once; a hive is its swarm; a creature is the one selected. It replaces the page titles. On a phone it takes its own line.
+- **The breadcrumb**: Hive › a hive › a creature › its tab, or Hive › a place opened from it (Swarm, the Keeper's room › its part). The last step is where you are and is not a button; any earlier step goes back up to it, popping rather than stacking. Hive is the district, every hive at once; from a place opened off the hive, Hive returns to the hive you came from. A creature's step closes its panel. It replaces the page titles. On a phone it takes its own line and scrolls to keep where you are in view.
 - **The Inbox** badge and **the Keeper's room** gear.
 
 Inside a hive, one row holds its places: its Swarm, the Memory swarm and the Store. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
@@ -45,13 +45,17 @@ Selecting a creature opens its panel, in three tabs (`TechnicalInspector`, `Crea
 - **Work:** its state, executor and provider, progress, what it was sent, and its artifacts, each opening on its contents. This was Artifacts.
 - **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles.
 
-A creature opens on Needs when it waits on you, otherwise on Work. The header's Inbox badge opens the first creature waiting on you, on its Needs. Only the Hall Monitor's pause, which speaks for the whole hive, keeps a place of its own (`Inbox`).
+A creature opens on Needs when it waits on you, otherwise on Work; the open tab survives a restart while the same creature stays open. Waiting on you means a plan or task to approve, an escalation, or a nested gate, one definition for the badge, the panel and the hive's Owner attention card (shown only then, opening that creature). The header's Inbox badge counts the waits not yet seen and opens the next unseen one, on its Needs; opening a creature's panel marks its wait seen. Only the Hall Monitor's pause, which speaks for the whole hive, keeps a place of its own (`Inbox`).
 
-`ControlRoomDestination.Settings` is the Keeper's room. `Repositories` and `Compute` remain as destinations, so existing links still land, but each opens its part of the room.
+The panel's Needs holds only decisions; messages to its agent sit with its Work. Reject plan and Stop workflow stay quiet; the confirmation is where red appears (`BRANDING.md`).
+
+Back closes the creature panel, then returns through the places opened off the hive, then zooms from a hive out to the district, then leaves the app. Reaching the hive clears the way back.
+
+`ControlRoomDestination.Settings` is the Keeper's room; `Compute` opens its Compute part. The gear opens the room itself (its list, on a phone). Runs, Artifacts and Repositories no longer exist as destinations.
 
 ## First launch
 
-A first launch opens on the hive, not on a form (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. Feeding keeps the picked starter and names the hive from the first words it was fed. The name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
+Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. With no AI provider connected, **Connect a provider** comes first and Feed it waits quietly. Feeding keeps the picked starter and names the hive from the first words it was fed (never from an empty tap). Its name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
 
 ## Consolidation plan
 

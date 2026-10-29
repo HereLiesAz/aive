@@ -42,6 +42,8 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.district_loading
+import com.hereliesaz.geministrator.resources.district_load_failed
 import com.hereliesaz.geministrator.resources.district_creatures
 import com.hereliesaz.geministrator.resources.district_empty
 import com.hereliesaz.geministrator.resources.district_import_agent
@@ -63,7 +65,8 @@ import org.jetbrains.compose.resources.stringResource
 private val DistrictCore = Color(0xFF2A231E)
 private val DistrictEdge = Color(0xFF141110)
 private val Withered = Color(0xFF4A4139)
-private val Hatched = Color(0xFF5AAE34)
+// The palette only (docs/BRANDING.md): a hatched hive's ring is Yellow; a withered one dims.
+private val Hatched = Azphalt.Yellow
 
 /**
  * The district (docs/Swarm-OS.md): every workflow you keep, as a neighbourhood of one dark tissue.
@@ -87,10 +90,17 @@ internal fun DistrictScreen(
 ) {
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var loadFailure by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        val byProject = onLoadRuns()
-        projectOfRun = byProject.flatMap { (project, runs) -> runs.map { it.id.value to project } }.toMap()
-        district = projectDistrict(onLoadDefinitions(), byProject.flatMap { it.second })
+        // A store that cannot be read says so here rather than taking the whole screen down.
+        runCatching {
+            val byProject = onLoadRuns()
+            projectOfRun = byProject.flatMap { (project, runs) -> runs.map { it.id.value to project } }.toMap()
+            district = projectDistrict(onLoadDefinitions(), byProject.flatMap { it.second })
+        }.onFailure { failure ->
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            loadFailure = failure.message ?: failure::class.simpleName
+        }
     }
     Column(
         modifier = modifier
@@ -111,7 +121,15 @@ internal fun DistrictScreen(
                     onClick = onImportAgent,
                 )
             }
-            val neighbourhoods = district ?: return@AzphaltThemedSurface
+            loadFailure?.let { message ->
+                Text(stringResource(Res.string.district_load_failed, message), style = AzphaltType.body, color = azphaltOnSurface())
+            }
+            val neighbourhoods = district ?: run {
+                if (loadFailure == null) {
+                    Text(stringResource(Res.string.district_loading), style = AzphaltType.body, color = azphaltOnSurface())
+                }
+                return@AzphaltThemedSurface
+            }
             if (neighbourhoods.isEmpty()) {
                 Text(stringResource(Res.string.district_empty), style = AzphaltType.body, color = azphaltOnSurface())
             }
@@ -146,7 +164,7 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
         NeighbourhoodState.Idle -> Withered
         NeighbourhoodState.Gestating -> Azphalt.Yellow
         NeighbourhoodState.Hatched -> Hatched
-        NeighbourhoodState.Withered -> GeministratorColors.error
+        NeighbourhoodState.Withered -> Color(0xFF7A6E5F)
     }
     val stateLabel = stringResource(
         when (neighbourhood.state) {

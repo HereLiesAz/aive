@@ -63,12 +63,25 @@ internal fun inboxItemKeys(run: WorkflowRun): List<String> {
         return listOf(inboxKey("pause", run.id.value, pause.reportArtifactId.value))
     }
     return run.taskRuns.values
-        .filter { it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated }
+        .filter(::creatureNeedsYou)
         .sortedBy { it.taskDefinitionId.value }
-        .map { taskRun ->
-            val kind = if (taskRun.status == TaskRunStatus.AwaitingApproval) "approval" else "escalation"
-            inboxKey(kind, run.id.value, taskRun.taskDefinitionId.value, taskRun.attempt.toString())
-        }
+        .map { inboxKey(run, it) }
+}
+
+/** The Inbox items one creature, [taskId], stands for: its wait on the keeper, if it is waiting. */
+internal fun inboxItemKeys(run: WorkflowRun, taskId: String): List<String> =
+    run.taskRuns.values
+        .filter { it.taskDefinitionId.value == taskId && creatureNeedsYou(it) }
+        .map { inboxKey(run, it) }
+
+// One definition of waiting on the keeper, shared with the creature panel ([creatureNeedsYou]).
+private fun inboxKey(run: WorkflowRun, taskRun: com.hereliesaz.geministrator.domain.TaskRun): String {
+    val kind = when {
+        taskRun.status == TaskRunStatus.AwaitingApproval -> "approval"
+        taskRun.status == TaskRunStatus.Escalated -> "escalation"
+        else -> "nested-approval"
+    }
+    return inboxKey(kind, run.id.value, taskRun.taskDefinitionId.value, taskRun.attempt.toString())
 }
 
 /** The Inbox items for whatever the application is showing; none unless a run is live. */

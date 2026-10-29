@@ -6,9 +6,10 @@ import kotlin.test.assertFalse
 
 class AppStartupDestinationTest {
     @Test
-    fun startupOpensSettingsWhenNoProviderIsConfigured() {
+    fun startupOpensTheHiveEvenWithNoProvider() {
+        // The first hive asks for a provider as its first step (docs/Keepers-Room.md, First launch).
         assertEquals(
-            ControlRoomDestination.Settings,
+            ControlRoomDestination.Overview,
             startupControlRoomDestination(hasConfiguredProvider = false),
         )
     }

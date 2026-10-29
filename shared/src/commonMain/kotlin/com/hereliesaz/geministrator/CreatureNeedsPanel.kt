@@ -36,16 +36,19 @@ import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
 private val NeedTrack = Color(0xFF4A4139)
-private val EchoWarm = Color(0xFFD9762A)
-private val EchoSeptic = Color(0xFF7FA34A)
-private val IntegrityGreen = Color(0xFF5AAE34)
-private val OutputTeal = Color(0xFF2FA9C4)
+// The palette only (docs/BRANDING.md): a healthy need fills Yellow; a grounding that has gone
+// septic dims to muted Ink rather than taking a hue of its own.
+private val EchoWarm = Azphalt.Yellow
+private val EchoSeptic = Color(0xFF7A6E5F)
+private val IntegrityGreen = Azphalt.Yellow
+private val OutputTeal = Azphalt.Yellow
 
 /** The four needs (docs/Swarm-OS.md), shown on the inspector's Ink surface. */
 @Composable
-internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modifier) {
+internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modifier, titled: Boolean = true) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(stringResource(Res.string.needs_needs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        // In the creature panel the Needs tab already names it.
+        if (titled) Text(stringResource(Res.string.needs_needs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         val state = stringResource(
             when (needs.echoState) {
                 EchoState.Grounded -> Res.string.needs_echo_grounded

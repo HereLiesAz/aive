@@ -27,6 +27,7 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -50,7 +51,6 @@ import com.hereliesaz.geministrator.resources.inspector_executor_ref
 import com.hereliesaz.geministrator.resources.inspector_external_run
 import com.hereliesaz.geministrator.resources.inspector_github_actions
 import com.hereliesaz.geministrator.resources.inspector_inline_evidence
-import com.hereliesaz.geministrator.resources.inspector_inspector
 import com.hereliesaz.geministrator.resources.inspector_local_sandbox
 import com.hereliesaz.geministrator.resources.inspector_message
 import com.hereliesaz.geministrator.resources.inspector_message_agent
@@ -150,7 +150,6 @@ internal fun TechnicalInspector(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(Res.string.inspector_inspector), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         CreatureTabs(tab, onTabChange)
@@ -170,13 +169,12 @@ internal fun TechnicalInspector(
         when (tab) {
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
-                    ?.let { CreatureNeedsPanel(it) }
+                    ?.let { CreatureNeedsPanel(it, titled = false) }
                 if (taskRun.status == TaskRunStatus.AwaitingApproval) {
                     val providerPlan = taskRun.assignedProviderId != null
                     AzphaltPill(
                         label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
                         seed = "approve-$selectedTaskId",
-                        endCap = stringResource(Res.string.inspector_proceed),
                         onClick = { onApproveTask(selectedTaskId) },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -189,10 +187,8 @@ internal fun TechnicalInspector(
                         AzphaltPill(
                             label = stringResource(Res.string.inspector_reject_plan),
                             seed = "reject-plan-$selectedTaskId",
-                            endCap = stringResource(Res.string.common_reject),
                             onClick = { confirmingStop = false },
                             modifier = Modifier.fillMaxWidth(),
-                            tone = PillTone.Danger,
                         )
                     }
                 }
@@ -200,7 +196,6 @@ internal fun TechnicalInspector(
                     AzphaltPill(
                         label = stringResource(Res.string.inspector_approve_nested_gate),
                         seed = "approve-nested-$selectedTaskId",
-                        endCap = stringResource(Res.string.inspector_proceed),
                         onClick = { onApproveTask(selectedTaskId) },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -210,19 +205,22 @@ internal fun TechnicalInspector(
                     AzphaltPill(
                         label = stringResource(Res.string.inspector_retry_task),
                         seed = "escalation-approve-$selectedTaskId",
-                        endCap = stringResource(Res.string.common_approve),
                         onClick = { onResolveEscalation(selectedTaskId, true) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     AzphaltPill(
                         label = stringResource(Res.string.inspector_stop_workflow),
                         seed = "escalation-reject-$selectedTaskId",
-                        endCap = stringResource(Res.string.common_reject),
                         onClick = { confirmingStop = true },
                         modifier = Modifier.fillMaxWidth(),
-                        tone = PillTone.Danger,
                     )
                 }
+                if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
+                    Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
+                }
+            }
+            CreatureTab.Work -> {
+                // Talking to its agent is part of its work, not something it needs from you.
                 if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
                     OutlinedTextField(
                         value = messageDraft,
@@ -239,7 +237,6 @@ internal fun TechnicalInspector(
                     AzphaltPill(
                         label = if (messageSending) stringResource(Res.string.inspector_sending) else stringResource(Res.string.inspector_send_message),
                         seed = "message-$selectedTaskId",
-                        endCap = stringResource(Res.string.inspector_send),
                         onClick = {
                             val message = messageDraft.trim()
                             if (message.isNotEmpty() && !messageSending) {
@@ -261,15 +258,12 @@ internal fun TechnicalInspector(
                     )
                     messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
                 }
-                if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
-                    Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
-                }
-            }
-            CreatureTab.Work -> {
                 LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
                 LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
                 LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference())
-                LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), taskRun.assignedRoleId?.value ?: task.roleId?.value ?: "—")
+                (taskRun.assignedRoleId?.value ?: task.roleId?.value)
+                    ?.takeIf { it != executor.reference() }
+                    ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
                 LiveInspectorLine(stringResource(Res.string.inspector_provider), taskRun.assignedProviderId?.value ?: "—")
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
                 LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
@@ -424,7 +418,7 @@ internal fun CreatureTab.label(): String = stringResource(
 
 @Composable
 private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CreatureTab.entries.forEach { entry ->
             AzphaltPill(
                 label = entry.label(),

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -77,7 +78,6 @@ internal enum class KeeperSection(
     companion object {
         /** The part an old destination now opens on. */
         fun of(destination: ControlRoomDestination): KeeperSection? = when (destination) {
-            ControlRoomDestination.Repositories -> Connections
             ControlRoomDestination.Compute -> Compute
             else -> null
         }
@@ -101,9 +101,13 @@ internal fun KeeperRoom(
     statusOf: @Composable (KeeperSection) -> String?,
     content: @Composable (KeeperSection, Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    // The open part and, on a phone, whether it is open over the list; the shell holds these so its
+    // breadcrumb can name the part (docs/Keepers-Room.md).
+    selectedName: MutableState<String> = rememberDurableStringState("keeper.section", KeeperSection.Connections.name),
+    open: MutableState<Boolean> = rememberDurableBooleanState("keeper.open"),
 ) {
-    var selectedName by rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
-    var open by rememberDurableBooleanState("keeper.open")
+    var selectedName by selectedName
+    var open by open
     LaunchedEffect(opening) {
         if (opening != null) {
             selectedName = opening.name
@@ -115,17 +119,8 @@ internal fun KeeperRoom(
     if (compact) {
         PlatformBackHandler(enabled = open) { open = false }
         if (open) {
+            // The breadcrumb's "Keeper's room" step, or Back, returns to the list.
             Column(modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AzphaltPill(
-                        label = "‹ " + stringResource(Res.string.keeper_room),
-                        seed = "keeper-back",
-                        onClick = { open = false },
-                    )
-                }
                 KeeperSectionHeading(selected, compact = true)
                 content(selected, Modifier.weight(1f).fillMaxWidth())
             }
@@ -134,7 +129,6 @@ internal fun KeeperRoom(
                 modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(stringResource(Res.string.keeper_room), style = AzphaltType.section, color = azphaltOnSurface())
                 KeeperSectionList(sections, selected = null, statusOf = statusOf) {
                     selectedName = it.name
                     open = true

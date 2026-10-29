@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hive_gone
 import com.hereliesaz.geministrator.resources.hive_launch
 import com.hereliesaz.geministrator.resources.hive_launch_failed
 import com.hereliesaz.geministrator.resources.hive_new_name
@@ -136,12 +137,20 @@ internal fun RestingHive(
 ) {
     val host = LocalWorkflowLibraryHost.current
     var definition by remember(definitionId) { mutableStateOf<WorkflowDefinition?>(null) }
-    LaunchedEffect(definitionId) { definition = onLoadDefinitions().firstOrNull { it.id.value == definitionId } }
-    val current = definition ?: return
+    var missing by remember(definitionId) { mutableStateOf(false) }
+    LaunchedEffect(definitionId) {
+        definition = runCatching { onLoadDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == definitionId }
+        missing = definition == null
+    }
+    val current = definition ?: run {
+        // A hive deleted since it was last open: say so; the breadcrumb leads back out.
+        if (missing) Text(stringResource(Res.string.hive_gone), style = AzphaltType.body, color = azphaltOnSurface(), modifier = modifier)
+        return
+    }
     val roles = remember(host) { mutableStateOf<Collection<com.hereliesaz.geministrator.domain.RoleDefinition>>(emptyList()) }
     LaunchedEffect(host) { roles.value = host?.installedRoles().orEmpty() }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(current.name.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
+        // The breadcrumb names the hive.
         GeministratorWorkflowTerrarium(
             definition = current,
             liveRun = remember(current.id) { restingWorkflowRun(current) },

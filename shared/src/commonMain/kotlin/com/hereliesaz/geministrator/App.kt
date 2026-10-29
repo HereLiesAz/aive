@@ -349,7 +349,7 @@ fun App(
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
         val taskInspectorVisible = selectedTaskId != null &&
-            (destination == ControlRoomDestination.Overview || destination == ControlRoomDestination.Runs)
+            destination == ControlRoomDestination.Overview
 
         PlatformBackHandler(
             enabled = taskInspectorVisible ||
@@ -475,12 +475,17 @@ fun App(
                         destinations = destinations,
                         onDestinationSelected = { target ->
                             if (target != destination) {
-                                navigationHistory = navigationHistory + destination
+                                // The hive is home: reaching it clears the way back. Returning to a place
+                                // already on the way back pops to it, so Back never ping-pongs and the
+                                // history never grows past the places actually open.
+                                val earlier = navigationHistory.indexOf(target)
+                                navigationHistory = when {
+                                    target == ControlRoomDestination.Overview -> emptyList()
+                                    earlier >= 0 -> navigationHistory.take(earlier)
+                                    else -> navigationHistory + destination
+                                }
                                 destinationName = target.name
-                                if (
-                                    target != ControlRoomDestination.Overview &&
-                                    target != ControlRoomDestination.Runs
-                                ) {
+                                if (target != ControlRoomDestination.Overview) {
                                     selectedTaskIdValue = ""
                                 }
                             }
@@ -787,7 +792,11 @@ internal object ControlRoomSession {
     var destinationName: String? = null
 }
 
+/**
+ * Every launch opens on the hive (docs/Keepers-Room.md): with no provider yet, the first hive asks
+ * for one as its first step rather than the app opening on the Keeper's room.
+ */
+@Suppress("UNUSED_PARAMETER")
 internal fun startupControlRoomDestination(
     hasConfiguredProvider: Boolean,
-): ControlRoomDestination =
-    if (hasConfiguredProvider) ControlRoomDestination.Overview else ControlRoomDestination.Settings
+): ControlRoomDestination = ControlRoomDestination.Overview
