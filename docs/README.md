@@ -142,3 +142,7 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 ## Naming
 
 The product name is **The Aive**. Technical artifact names may use `haive`. The Google Play Android application ID is `com.hereliesaz.aive`; GitHub-release Android builds keep `com.hereliesaz.haive` permanently so existing installs upgrade in place.
+
+### Agent-to-agent communication
+
+[`architecture/DUPLEX_MCP.md`](architecture/DUPLEX_MCP.md) defines the opt-in, agent-neutral full-duplex MCP peer, its bounded messaging semantics, and its governed connection to live Aive task sessions and memory.
