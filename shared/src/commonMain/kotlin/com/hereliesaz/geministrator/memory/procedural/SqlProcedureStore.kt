@@ -35,6 +35,20 @@ class SqlProcedureStore(
 
     override suspend fun read(): ProcedureSnapshot = mutex.withLock { readUnlocked() }
 
+    override suspend fun clear(expectedRevision: Long): Boolean = mutex.withLock {
+        var cleared = false
+        database.transaction {
+            val current = readUnlocked()
+            if (current.revision != expectedRevision) return@transaction
+            queries.deleteEvidence()
+            queries.deleteTraces()
+            queries.deleteDefinitions()
+            queries.setRevision((current.revision + 1).toString())
+            cleared = true
+        }
+        cleared
+    }
+
     override suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean =
         mutex.withLock {
             var committed = false
