@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.duplex
 
+import kotlin.random.Random
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -49,6 +50,7 @@ class DuplexAgentBus(
     private val mutex = Mutex()
     private val inboxes = mapOf(DuplexPeer.A to Inbox(), DuplexPeer.B to Inbox())
     private val outstanding = mutableMapOf<String, Outstanding>()
+    private val instanceId = Random.nextLong().toULong().toString(16)
     private var nextId = 1L
 
     suspend fun send(from: DuplexPeer, kind: DuplexKind, body: String, replyTo: String? = null): DuplexEnvelope =
@@ -73,7 +75,7 @@ class DuplexAgentBus(
             }
             val envelope = DuplexEnvelope(
                 seq = target.next++,
-                id = "duplex-${nextId++}",
+                id = "duplex-$instanceId-${nextId++}",
                 from = from,
                 kind = kind,
                 body = body,
