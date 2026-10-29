@@ -1,0 +1,46 @@
+CREATE TABLE procedure_meta (
+  key TEXT NOT NULL PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE procedure_definition (
+  ref TEXT NOT NULL PRIMARY KEY,
+  body TEXT NOT NULL
+);
+
+CREATE TABLE procedure_evidence (
+  id TEXT NOT NULL PRIMARY KEY,
+  procedure_ref TEXT NOT NULL,
+  receipt_id TEXT NOT NULL,
+  body TEXT NOT NULL,
+  UNIQUE(procedure_ref, receipt_id)
+);
+
+CREATE TABLE procedure_trace (
+  receipt_key TEXT NOT NULL PRIMARY KEY,
+  body TEXT NOT NULL
+);
+
+revision:
+SELECT value FROM procedure_meta WHERE key = 'revision';
+
+setRevision:
+INSERT OR REPLACE INTO procedure_meta (key, value) VALUES ('revision', ?);
+
+allDefinitions:
+SELECT body FROM procedure_definition ORDER BY rowid;
+
+allEvidence:
+SELECT body FROM procedure_evidence ORDER BY rowid;
+
+allTraces:
+SELECT body FROM procedure_trace ORDER BY rowid;
+
+insertDefinition:
+INSERT INTO procedure_definition (ref, body) VALUES (?, ?);
+
+insertEvidence:
+INSERT INTO procedure_evidence (id, procedure_ref, receipt_id, body) VALUES (?, ?, ?, ?);
+
+insertTrace:
+INSERT INTO procedure_trace (receipt_key, body) VALUES (?, ?);
