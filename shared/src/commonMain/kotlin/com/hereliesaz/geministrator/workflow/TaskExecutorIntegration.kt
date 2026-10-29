@@ -23,6 +23,7 @@ import com.hereliesaz.geministrator.orchestration.ToolCapability
 import com.hereliesaz.geministrator.orchestration.ToolRouteDecision
 import com.hereliesaz.geministrator.orchestration.ToolRoutingInput
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
+import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.russhwolf.settings.Settings
 
 /**
@@ -220,10 +221,10 @@ class TaskExecutorIntegrationRegistry(
     private val integrations = integrations.toList()
 
     fun integrationFor(executor: TaskExecutor): TaskExecutorIntegration? =
-        routeIntegration(executor, integrations.filter { it.supports(executor) })?.withEvidenceIndexing()
+        routeIntegration(executor, integrations.filter { it.supports(executor) })?.withEvidenceIndexing()?.withProceduralTracing()
 
     fun integrationFor(executor: TaskExecutor, project: Project): TaskExecutorIntegration? =
-        routeIntegration(executor, integrations.filter { it.supports(executor, project) })?.withEvidenceIndexing()
+        routeIntegration(executor, integrations.filter { it.supports(executor, project) })?.withEvidenceIndexing()?.withProceduralTracing()
 
     fun isAvailable(executor: TaskExecutor): Boolean =
         integrations.any { it.supports(executor) }
@@ -285,6 +286,9 @@ class TaskExecutorIntegrationRegistry(
         val selectedIndex = ids.indexOf(route.tool)
         return candidates.getOrNull(selectedIndex)
     }
+
+    private fun TaskExecutorIntegration.withProceduralTracing(): TaskExecutorIntegration =
+        ProcedureTracingTaskExecutorIntegration(this) { MemoryRuntimeBridge.procedureTraceSink }
 
     private fun TaskExecutorIntegration.withEvidenceIndexing(): TaskExecutorIntegration {
         val registry = inferenceDataRegistry ?: return this

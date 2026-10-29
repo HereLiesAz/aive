@@ -39,6 +39,8 @@ data class MemoryLayerSettings(
     val enabled: Boolean = true,
     /** Banking continues; consolidation waits. */
     val consolidationPaused: Boolean = false,
+    /** Opt-in metadata-only system executor tracing; disabled by default until user enables it. */
+    val proceduralTraceCaptureEnabled: Boolean = false,
     val engines: Map<MemoryMicroAgentRole, MemoryStageEngine> = emptyMap(),
     val policy: MemoryConsolidationPolicy = MemoryConsolidationPolicy(),
     /** Raw history retention for every project without its own setting. Default: keep everything. */
