@@ -451,7 +451,16 @@ class MemoryLayerController(
     /** Clears the selected workflow's own records. Ancestors' and other workflows' banks are untouched. */
     suspend fun clearAll() {
         drainMutex.withLock {
-            (selectedOwnStore() ?: return@withLock).replace(MemorySnapshot())
+            val own = selectedOwnStore() ?: return@withLock
+            val workflowId = selectedWorkflow() ?: return@withLock
+            // Erase the procedure sidecar first; it must not remain after "clear all memory".
+            procedureCatalog?.own(workflowId)?.let { bank ->
+                while (true) {
+                    val current = bank.read()
+                    if (bank.clear(current.revision)) break
+                }
+            }
+            own.replace(MemorySnapshot())
             resetLayers()
         }
         publish()
