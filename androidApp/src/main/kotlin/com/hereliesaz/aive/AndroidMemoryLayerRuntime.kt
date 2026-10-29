@@ -657,6 +657,7 @@ internal class AndroidMemoryLayerRuntime(
         banks = banks,
         settingsStore = MemoryLayerSettingsStore.createDefault(),
         lineage = memoryLineage,
+        procedureCatalog = com.hereliesaz.geministrator.memory.procedural.androidSqlProcedureCatalog(context, memoryLineage),
         engineProvider = engineProvider,
         scope = scope,
         localModels = AndroidMemoryLocalModels(installer, scope),
