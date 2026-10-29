@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.duplex
 
+import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -32,7 +33,11 @@ class DuplexManagedSessionBridge(
             if (entry.id !in delivered) {
                 when (entry.kind) {
                     DuplexKind.Message, DuplexKind.Request -> {
-                        val result = gateway.message(handle, entry.body)
+                        // External messages must never masquerade as internal memory recalls.
+                        val text = if (entry.body.startsWith(MEMORY_MESSAGE_MARKER)) {
+                            "[external duplex peer] " + entry.body
+                        } else entry.body
+                        val result = gateway.message(handle, text)
                         when (result) {
                             ProviderActionResult.Accepted -> {
                                 delivered += entry.id
@@ -107,7 +112,7 @@ class DuplexSessionObserver(
 
     private suspend fun publish(event: AgentEvent) {
         val text = when (event) {
-            is AgentEvent.Message -> event.content.takeUnless { it.startsWith("⟦memory⟧") }
+            is AgentEvent.Message -> event.content.takeUnless { it.startsWith(MEMORY_MESSAGE_MARKER) }
             is AgentEvent.Progress -> event.message
             is AgentEvent.PlanGenerated -> event.summary
             is AgentEvent.ArtifactProduced -> event.artifact.label
