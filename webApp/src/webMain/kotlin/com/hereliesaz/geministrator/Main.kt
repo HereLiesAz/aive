@@ -80,6 +80,7 @@ fun main() {
         banks = deferredMemoryBanks(memoryBanks),
         settingsStore = MemoryLayerSettingsStore.createDefault(),
         lineage = memoryLineage,
+        procedureCatalog = com.hereliesaz.geministrator.memory.procedural.webProcedureCatalog(memoryLineage),
         engineProvider = memoryEngines,
         scope = memoryScope,
     ).also { it.attach() }
