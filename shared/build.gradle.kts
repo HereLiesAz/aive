@@ -124,6 +124,11 @@ sqldelight {
         }
         // Workflow state (projects, runs, events, artifacts, gates) on Android and desktop; see
         // docs/architecture/STORAGE_SCALE.md. Its own source directory keeps the two schemas apart.
+        create("ProcedureDatabase") {
+            packageName.set("com.hereliesaz.geministrator.memory.procedural.db")
+            srcDirs.setFrom("src/commonMain/sqldelight-procedural")
+            generateAsync.set(true)
+        }
         create("WorkflowDatabase") {
             packageName.set("com.hereliesaz.geministrator.persistence.db")
             srcDirs.setFrom("src/commonMain/sqldelight-workflow")
