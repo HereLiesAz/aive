@@ -65,7 +65,6 @@ internal fun LiveInboxScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
         Text(
             when (runtimeState) {
                 ApplicationRuntimeState.Loading -> stringResource(Res.string.inbox_loading_runtime)

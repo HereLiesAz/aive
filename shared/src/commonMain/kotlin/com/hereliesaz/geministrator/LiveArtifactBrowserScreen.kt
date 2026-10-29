@@ -20,7 +20,6 @@ import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.artifacts_artifact_id
-import com.hereliesaz.geministrator.resources.artifacts_artifacts
 import com.hereliesaz.geministrator.resources.artifacts_loading_runtime
 import com.hereliesaz.geministrator.resources.artifacts_no_artifacts_have_been_produced_by
 import com.hereliesaz.geministrator.resources.artifacts_no_artifacts_match
@@ -82,7 +81,6 @@ internal fun LiveArtifactBrowserScreen(
             .padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(Res.string.artifacts_artifacts), style = AzphaltType.hero, color = azphaltOnSurface())
 
         when {
             live == null -> {

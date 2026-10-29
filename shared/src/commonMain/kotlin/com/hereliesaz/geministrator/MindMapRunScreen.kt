@@ -100,6 +100,10 @@ import com.hereliesaz.geministrator.resources.overview_enter_name_and_objective
 import com.hereliesaz.geministrator.resources.overview_enter_objective
 import com.hereliesaz.geministrator.resources.overview_invalid_repository_location
 import com.hereliesaz.geministrator.resources.overview_options
+import com.hereliesaz.geministrator.resources.first_hive_feed
+import com.hereliesaz.geministrator.resources.first_hive_objective
+import com.hereliesaz.geministrator.resources.first_hive_hint
+import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.overview_recover_delete_all_data
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -219,7 +223,17 @@ internal fun MindMapRunScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         if (liveWorkflow == null) {
-            RuntimeStateRecord(runtimeState, compact)
+            // A first launch opens on the hive (docs/Keepers-Room.md, stage 2): the creature, and one step to feed it.
+            val firstLaunch = runtimeState is ApplicationRuntimeState.NoProject
+            val stableHost = LocalStableHost.current
+            var pickedStarter by remember(stableHost) { mutableStateOf(stableHost?.catalog?.starters?.firstOrNull()?.id) }
+            if (firstLaunch) {
+                Text(stringResource(Res.string.first_hive), style = if (compact) AzphaltType.section else AzphaltType.hero, color = azphaltOnSurface())
+                FirstCreature(picked = pickedStarter, onPick = { pickedStarter = it })
+                Text(stringResource(Res.string.first_hive_hint), style = AzphaltType.body, color = azphaltOnSurface())
+            } else {
+                RuntimeStateRecord(runtimeState, compact)
+            }
             val corrupted = (runtimeState as? ApplicationRuntimeState.ResumeFailed)?.isCorrupted == true
             if (corrupted) {
                 AzphaltPill(
@@ -265,64 +279,69 @@ internal fun MindMapRunScreen(
                 }
             }
             if (runtimeState is ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
-                if (projectFileService != null) {
-                    Text(
-                        stringResource(Res.string.overview_project),
-                        style = AzphaltType.eyebrow,
-                        color = azphaltOnSurface(),
-                    )
-                    Text(
-                        stringResource(Res.string.overview_aive_automatically_reopens_the_last_saved),
-                        style = AzphaltType.body,
-                        color = azphaltOnSurface(),
-                    )
-                    AzphaltPill(
-                        label = stringResource(Res.string.overview_open_a_different_saved_project),
-                        seed = "overview-open-different-project",
-                        onClick = {
-                            scope.launch {
-                                runCatching {
-                                    val opened = projectFileService.chooseAndRead() ?: return@launch
-                                    onImportProjectFile(opened.content)
-                                        ?: error("Project could not be loaded")
-                                }.onSuccess {
-                                    projectLoadError = null
-                                }.onFailure { failure ->
-                                    projectLoadError = failure.message ?: getString(Res.string.overview_project_load_failed)
+                // Which project, and its name: up front for a project that exists, under Options on a first launch.
+                val projectFields: @Composable () -> Unit = {
+                    if (projectFileService != null) {
+                        Text(
+                            stringResource(Res.string.overview_project),
+                            style = AzphaltType.eyebrow,
+                            color = azphaltOnSurface(),
+                        )
+                        Text(
+                            stringResource(Res.string.overview_aive_automatically_reopens_the_last_saved),
+                            style = AzphaltType.body,
+                            color = azphaltOnSurface(),
+                        )
+                        AzphaltPill(
+                            label = stringResource(Res.string.overview_open_a_different_saved_project),
+                            seed = "overview-open-different-project",
+                            onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        val opened = projectFileService.chooseAndRead() ?: return@launch
+                                        onImportProjectFile(opened.content)
+                                            ?: error("Project could not be loaded")
+                                    }.onSuccess {
+                                        projectLoadError = null
+                                    }.onFailure { failure ->
+                                        projectLoadError = failure.message ?: getString(Res.string.overview_project_load_failed)
+                                    }
                                 }
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    projectLoadError?.let { message ->
-                        AzphaltRecord(
-                            seed = "overview-project-load-error",
-                            eyebrow = stringResource(Res.string.overview_project_load_failed),
-                            title = stringResource(Res.string.overview_could_not_open_saved_project),
-                            body = message,
-                            endCap = stringResource(Res.string.common_dismiss),
-                            onClick = { projectLoadError = null },
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        projectLoadError?.let { message ->
+                            AzphaltRecord(
+                                seed = "overview-project-load-error",
+                                eyebrow = stringResource(Res.string.overview_project_load_failed),
+                                title = stringResource(Res.string.overview_could_not_open_saved_project),
+                                body = message,
+                                endCap = stringResource(Res.string.common_dismiss),
+                                onClick = { projectLoadError = null },
+                            )
+                        }
+                        Text(
+                            stringResource(Res.string.overview_or_create_a_new_project),
+                            style = AzphaltType.eyebrow,
+                            color = azphaltOnSurface(),
                         )
                     }
-                    Text(
-                        stringResource(Res.string.overview_or_create_a_new_project),
-                        style = AzphaltType.eyebrow,
-                        color = azphaltOnSurface(),
-                    )
-                }
 
-                OutlinedTextField(
-                    value = projectName,
-                    onValueChange = { projectName = it },
-                    label = { Text(stringResource(Res.string.overview_project_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                    OutlinedTextField(
+                        value = projectName,
+                        onValueChange = { projectName = it },
+                        label = { Text(stringResource(Res.string.overview_project_name)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                }
+                if (!firstLaunch) projectFields()
 
                 OutlinedTextField(
                     value = objective,
                     onValueChange = { objective = it },
-                    label = { Text(stringResource(Res.string.overview_objective)) },
+                    label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
                     minLines = if (compact) 2 else 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -334,6 +353,7 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (optionsOpen) {
+                if (firstLaunch) projectFields()
                 Text(
                     stringResource(Res.string.overview_link_repository),
                     style = AzphaltType.eyebrow,
@@ -500,11 +520,17 @@ internal fun MindMapRunScreen(
                 }
                 AzphaltPill(
                     tone = PillTone.Primary,
-                    label = if (runtimeState is ApplicationRuntimeState.NoRun) stringResource(Res.string.overview_start_run) else stringResource(Res.string.overview_create_project_start_run),
+                    label = when {
+                        firstLaunch -> stringResource(Res.string.first_hive_feed)
+                        runtimeState is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_start_run)
+                        else -> stringResource(Res.string.overview_create_project_start_run)
+                    },
                     seed = "project-start-run",
-                    selected = projectName.isNotBlank() && objective.isNotBlank(),
+                    selected = (firstLaunch || projectName.isNotBlank()) && objective.isNotBlank(),
                     onClick = {
                         val locator = repositoryLocator.trim()
+                        // A first hive needs no name to start: it takes one from what it was fed.
+                        if (firstLaunch && projectName.isBlank()) projectName = firstHiveName(objective)
                         // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
                         // but launch failed" in any future "nothing happens" report.
                         platformDebugLog(
@@ -529,6 +555,7 @@ internal fun MindMapRunScreen(
                         }
                         val parents = lineage.continuesWorkflowRunIds
                         launchFieldsError = null
+                        if (firstLaunch) stableHost?.takeIf { it.stable.starter == null }?.let { host -> pickedStarter?.let(host::chooseStarter) }
                         if (locator.isEmpty()) {
                             repositoryError = null
                             onLaunchWorkflow(projectName.trim(), objective.trim(), null, parents)
@@ -745,3 +772,7 @@ private fun TaskRunStatus.activityRank(): Int = when (this) {
     TaskRunStatus.Created -> 1
     TaskRunStatus.Cancelled -> 0
 }
+
+/** A first hive's name, from the first words of what it was fed. */
+internal fun firstHiveName(objective: String): String =
+    objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { "First hive" }

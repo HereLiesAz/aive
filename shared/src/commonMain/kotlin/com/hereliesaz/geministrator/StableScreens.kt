@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -123,6 +125,40 @@ internal fun StableSection(modifier: Modifier = Modifier) {
                     count = if (key == stable.starter) stringResource(Res.string.stable_unlimited) else (stable.owned[key] ?: 1).toString(),
                 )
             }
+        }
+    }
+}
+
+/**
+ * The first hive's creature (docs/Keepers-Room.md, stage 2): the keeper's starter, large; before one
+ * is kept, the starters to pick from, [picked] filled. Feeding the hive keeps the picked one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun FirstCreature(picked: String?, onPick: (String) -> Unit, modifier: Modifier = Modifier) {
+    val host = LocalStableHost.current ?: return
+    val catalog = host.catalog
+    val starter = host.stable.starter
+    if (starter != null) {
+        Box(modifier.fillMaxWidth().height(240.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            StableCreature(host.stable.rigOf(starter), 180)
+        }
+        return
+    }
+    if (catalog.starters.isEmpty()) return
+    // One row, scrolled sideways, so the step that feeds the hive stays in view.
+    androidx.compose.foundation.layout.Row(
+        modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        catalog.starters.forEach { breed ->
+            StableTile(
+                rig = breed.id,
+                title = breed.name,
+                caption = breed.rarity,
+                selected = picked == breed.id,
+                onClick = { onPick(breed.id) },
+            )
         }
     }
 }

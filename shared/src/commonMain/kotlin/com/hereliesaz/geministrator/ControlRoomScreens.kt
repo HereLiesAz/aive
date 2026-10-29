@@ -113,7 +113,6 @@ import com.hereliesaz.geministrator.resources.runs_release_failed_after_3_attemp
 import com.hereliesaz.geministrator.resources.runs_retry_scheduled_attempt
 import com.hereliesaz.geministrator.resources.runs_run
 import com.hereliesaz.geministrator.resources.runs_running
-import com.hereliesaz.geministrator.resources.runs_runs
 import com.hereliesaz.geministrator.resources.runs_security_risk
 import com.hereliesaz.geministrator.resources.runs_stop
 import com.hereliesaz.geministrator.resources.runs_task_cancelled
@@ -480,7 +479,6 @@ internal fun RunsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(stringResource(Res.string.runs_runs), style = AzphaltType.hero, color = azphaltOnSurface())
         val entries = history
         if (entries == null) {
             Text(

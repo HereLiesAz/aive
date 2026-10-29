@@ -36,7 +36,6 @@ import com.hereliesaz.geministrator.memory.MemoryStageEngine
 import com.hereliesaz.geministrator.memory.parked
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.memory_swarm
 import com.hereliesaz.geministrator.resources.memory_swarm_lead
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_dismiss
@@ -160,10 +159,8 @@ internal fun MemoryLayerScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(Res.string.memory_swarm), style = AzphaltType.section, color = azphaltOnSurface())
-            Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface())
-        }
+        // The breadcrumb names the place; the lead says what it is.
+        Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface())
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),

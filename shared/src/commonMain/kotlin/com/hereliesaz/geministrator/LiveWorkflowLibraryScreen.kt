@@ -267,7 +267,6 @@ internal fun LiveWorkflowLibraryScreen(
                     },
                 )
             } else if (tab == WorkflowLibraryTab.Library) {
-                Text(stringResource(Res.string.library_workflows), style = AzphaltType.hero, color = azphaltOnSurface())
                 Text(
                     stringResource(Res.string.library_installed_workflows_saved_compositions_and_reusable),
                     style = AzphaltType.body,
