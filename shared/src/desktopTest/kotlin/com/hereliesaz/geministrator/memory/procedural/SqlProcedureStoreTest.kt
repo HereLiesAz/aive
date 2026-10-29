@@ -101,6 +101,25 @@ class SqlProcedureStoreTest {
     }
 
     @Test
+    fun clearingBankPersistsAndRejectsPreClearRevision() = runBlocking {
+        val dir = directory()
+        val store = desktopSqlProcedureStore("root", dir)
+        assertTrue(store.commit(0L, ProcedureMutation(
+            definitionsToAdd = listOf(definition()),
+            tracesToAdd = listOf(trace()),
+        )))
+        assertFalse(store.clear(0L))
+        assertTrue(store.clear(1L))
+        val reopened = desktopSqlProcedureStore("root", dir)
+        assertEquals(2L, reopened.read().revision)
+        assertTrue(reopened.read().definitions.isEmpty())
+        assertTrue(reopened.read().traces.isEmpty())
+        assertFalse(reopened.commit(1L, ProcedureMutation(tracesToAdd = listOf(trace()))))
+        assertTrue(reopened.commit(2L, ProcedureMutation(tracesToAdd = listOf(trace()))))
+        assertEquals(1, desktopSqlProcedureStore("root", dir).read().traces.size)
+    }
+
+    @Test
     fun invalidTraceIsNotRecordedAndDoesNotBumpRevision() = runBlocking {
         val dir = directory()
         val store = desktopSqlProcedureStore("root", dir)
