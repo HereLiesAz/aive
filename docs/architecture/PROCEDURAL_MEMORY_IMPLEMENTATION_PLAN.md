@@ -48,6 +48,16 @@ The duplex protocol design can proceed in parallel with local reflex execution, 
 
 **Gate:** Baseline and event fields reproducible; every executor either has structured receipts or is marked unsupported for learning.
 
+## Execution tracing slice (implemented behind opt-in setting)
+
+- `ProcedureTracingTaskExecutorIntegration` decorates routed system executors at `TaskExecutorIntegrationRegistry.integrationFor`; it records dispatch and terminal reconciliation outcomes without substituting an executor. Repeated Running/Verifying reconciliations do not enter memory.
+- `ProcedureTraceRedactor` structurally allowlists executor kind, phase, status, artifact kinds and counts, task/workflow/project IDs and attempt. It never reads command text, script source, response text, error messages, artifact labels/contents/URIs, credentials or remote run IDs. "Completed" is a reported state, **not** an independent verification.
+- `MemoryRuntimeBridge.procedureTraceSink` routes a completed observation to `MemoryLayerController`. The controller adds a bounded, descriptive `MemorySourceKind.Artifact` bank entry to the task's workflow bank at normal priority; same-source identical receipts are checked against stored episodes before appending, including after restart. This entry is contextual experience only, not runnable code.
+- `MemoryLayerSettings.proceduralTraceCaptureEnabled` defaults to **false** and requires explicit opt-in through `MemoryLayerController.updateSettings { it.copy(proceduralTraceCaptureEnabled = true) }`; all capture is also disabled while memory itself is disabled. UI exposure is deferred.
+- Tests cover the registry decorator, redaction, observer-failure isolation, reported-vs-verified semantics, disabled behavior, contextual provenance and re-report deduplication.
+
+**Not yet implemented:** raw typed tool-call capture inside hosted providers, replayable source-artifact capture, a separate durable typed receipt journal, user-facing enablement, benchmark instrumentation, promotion or executable reflexes. Current dedupe is a bank scan and cannot reconstruct a source after raw-history purging. These are follow-on tasks, not hidden guarantees.
+
 ## Milestone 1 — typed execution-trace collector
 
 **Proposed files:** `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/memory/procedural/ProcedureTrace.kt`, `ProceduralTraceObserver.kt`, `ProceduralTraceRedactor.kt`. Update `workflow/TaskExecutorIntegration.kt` and the approved concrete integrations.
