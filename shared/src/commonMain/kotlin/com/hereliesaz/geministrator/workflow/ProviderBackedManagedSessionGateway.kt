@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
@@ -46,6 +47,8 @@ class ProviderBackedManagedSessionGateway(
      * recalled memory. Upstream artifacts only, by default.
      */
     private val contextRetriever: ContextRetriever? = SimilarityContextRetriever(listOf(ArtifactChunkSource)),
+    /** Opt-in agent-neutral conversation hook; never a substitute for memory or workflow gates. */
+    private val duplexAttachment: DuplexSessionAttachment? = null,
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -350,6 +353,7 @@ class ProviderBackedManagedSessionGateway(
                     InferenceTerminalStatus.Cancelled,
                 )
                 recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
+                recordMemory { duplexAttachment?.onSessionFinished(handle, ManagedSessionStatus.Failed) }
             }
             result
         }
@@ -378,6 +382,8 @@ class ProviderBackedManagedSessionGateway(
             }
         }
         if (!shouldObserve) return
+        // Only a configured task binding may participate, and attachment failures never fail work.
+        recordMemory { duplexAttachment?.onSessionStarted(handle, this) }
 
         val provider = providerFor(handle)
         scope.launch {
@@ -416,6 +422,7 @@ class ProviderBackedManagedSessionGateway(
                             )
                             providerRegistry.recordOutcome(handle.providerId, success = false)
                             recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
+                recordMemory { duplexAttachment?.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
                         return@launch
                     }
@@ -601,6 +608,7 @@ class ProviderBackedManagedSessionGateway(
             else -> Unit
         }
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
+        recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
@@ -614,6 +622,7 @@ class ProviderBackedManagedSessionGateway(
             )
             providerRegistry.recordOutcome(handle.providerId, success = status == ManagedSessionStatus.Completed)
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
+            recordMemory { duplexAttachment?.onSessionFinished(handle, status) }
         }
     }
 

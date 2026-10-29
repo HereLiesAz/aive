@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.persistence.InMemorySettings
+import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -32,6 +33,72 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ProviderBackedManagedSessionGatewayTest {
+    @Test
+    fun duplexAttachmentObservesReconnectEventsAndTerminalStatusWithoutReplacingMemory() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = FailingProvider()
+        val handle = ManagedSessionHandle(TaskRunId("duplex-task"), provider.id, ProviderRunId("failing-run"))
+        val trace = mutableListOf<String>()
+        val hook = object : DuplexSessionAttachment {
+            override suspend fun onSessionStarted(handle: ManagedSessionHandle, gateway: ManagedSessionGateway) {
+                synchronized(trace) { trace += "started" }
+            }
+            override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
+                if (event is AgentEvent.Failed) synchronized(trace) { trace += "failed" }
+            }
+            override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
+                synchronized(trace) { trace += status.name }
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope,
+                duplexAttachment = hook,
+            )
+            gateway.reconnect(handle, ManagedSessionStatus.Running)
+            withTimeout(2_000L) {
+                while (synchronized(trace) { trace.size } < 3) delay(10L)
+            }
+            assertEquals(listOf("started", "failed", "Failed"), synchronized(trace) { trace.toList() })
+            assertEquals(ManagedSessionStatus.Failed, gateway.status(handle))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun duplexTransportFailureCannotChangeProviderOutcome() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = FailingProvider()
+        val handle = ManagedSessionHandle(TaskRunId("duplex-failed-link"), provider.id, ProviderRunId("failing-run"))
+        val hook = object : DuplexSessionAttachment {
+            override suspend fun onSessionStarted(handle: ManagedSessionHandle, gateway: ManagedSessionGateway) {
+                error("peer offline on startup")
+            }
+            override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
+                error("peer offline on event")
+            }
+            override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
+                error("peer offline on completion")
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope,
+                duplexAttachment = hook,
+            )
+            gateway.reconnect(handle, ManagedSessionStatus.Running)
+            withTimeout(2_000L) {
+                while (gateway.status(handle) != ManagedSessionStatus.Failed) delay(10L)
+            }
+            assertEquals("HTTP 503: upstream unavailable", gateway.progress(handle)?.message)
+        } finally {
+            scope.cancel()
+        }
+    }
+
     @Test
     fun providerSelectionPreservesCancellation() {
         runBlocking {

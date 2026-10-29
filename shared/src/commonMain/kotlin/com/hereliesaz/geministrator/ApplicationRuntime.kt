@@ -42,6 +42,7 @@ import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
+import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.workflow.ApprovalGateCoordinator
 import com.hereliesaz.geministrator.workflow.ApprovalGateKind
 import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
@@ -785,6 +786,8 @@ class ApplicationRuntime private constructor(
             orchestrationUtilities: LocalOrchestrationUtilityFamily =
                 DeterministicLocalOrchestrationUtilities,
             localModelLibrary: LocalModelLibrary = MemoryEpoch8LocalModelLibrary.library,
+            /** Opt-in, task-scoped external agent conversation channel. Off unless explicitly provided. */
+            duplexAttachment: DuplexSessionAttachment? = null,
             /** Repository and artifact chunks offered to the Context Packer; upstream artifacts only by default. */
             contextRetriever: com.hereliesaz.geministrator.retrieval.ContextRetriever? =
                 com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
@@ -804,6 +807,7 @@ class ApplicationRuntime private constructor(
                 scope = runtimeScope,
                 orchestrationUtilities = orchestrationUtilities,
                 contextRetriever = contextRetriever,
+                duplexAttachment = duplexAttachment,
             )
             val publisher = WorkflowRuntimePublisher()
             val effectiveExecutorIntegrations = executorIntegrations
