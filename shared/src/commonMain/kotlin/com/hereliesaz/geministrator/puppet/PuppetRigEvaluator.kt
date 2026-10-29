@@ -42,11 +42,15 @@ data class PuppetAffine(
     }
 }
 
-/** Evaluated part: [transform] maps part-local px (origin at the pivot) to artboard px. */
+/**
+ * Evaluated part: [transform] maps part-local px (origin at the pivot) to artboard px. A limb's
+ * [transform] keeps its rest direction; [bend] (degrees) is how far it curves base to tip.
+ */
 data class PuppetPartPose(
     val part: PuppetPart,
     val transform: PuppetAffine,
     val alpha: Float,
+    val bend: Float = 0f,
 ) {
     /** Top-left of the drawn box in part-local px. */
     val boxLeft: Float get() = -part.pivot.x * part.drawnWidth
@@ -80,10 +84,13 @@ object PuppetRigEvaluator {
         val byId = rig.parts.associateBy { it.id }
         val attachmentsById = rig.attachments.associateBy { it.id }
         val world = HashMap<String, Pair<PuppetAffine, Float>>()
+        val bends = HashMap<String, Float>()
+        val bent = FloatArray(3)
 
         fun resolve(part: PuppetPart): Pair<PuppetAffine, Float> {
             world[part.id]?.let { return it }
-            val parent = part.parent?.let { byId[it] }?.let(::resolve) ?: (PuppetAffine.Identity to 1f)
+            val parentPart0 = part.parent?.let(byId::get)
+            val parent = parentPart0?.let(::resolve) ?: (PuppetAffine.Identity to 1f)
             val m = motion?.parts?.get(part.id)
             val flexibility = 1f - part.rigidity
             fun ch(name: String): Float {
@@ -99,10 +106,23 @@ object PuppetRigEvaluator {
                 (socket.y - parentPart.pivot.y) * parentPart.drawnHeight
             } else 0f
             val rest = part.rest
+            // A limb never rotates: its rotation channel is its bend.
+            val turn = ch(PuppetChannel.Rotation)
+            if (part.isLimb) bends[part.id] = LimbBend.bendOf(turn)
+            var x = anchorX + rest.x + ch(PuppetChannel.X)
+            var y = anchorY + rest.y + ch(PuppetChannel.Y)
+            var follow = 0f
+            // On a bent limb, a child rides the curve: placed on it, turned with it.
+            if (parentPart0 != null && parentPart0.isLimb) {
+                LimbBend.placeLocal(parentPart0, x, y, bends[parentPart0.id] ?: 0f, 1f, 1, 0f, bent)
+                x = bent[0]
+                y = bent[1]
+                follow = bent[2] * 180f / PI.toFloat()
+            }
             val local = PuppetAffine.trs(
-                x = anchorX + rest.x + ch(PuppetChannel.X),
-                y = anchorY + rest.y + ch(PuppetChannel.Y),
-                degrees = rest.rotation + ch(PuppetChannel.Rotation),
+                x = x,
+                y = y,
+                degrees = rest.rotation + follow + if (part.isLimb) 0f else turn,
                 sx = rest.scaleX * ch(PuppetChannel.ScaleX),
                 sy = rest.scaleY * ch(PuppetChannel.ScaleY),
             )
@@ -114,12 +134,19 @@ object PuppetRigEvaluator {
 
         val poses = rig.parts.withIndex()
             .sortedWith(compareBy({ it.value.z }, { it.index }))
-            .map { (_, part) -> resolve(part).let { (t, a) -> PuppetPartPose(part, t, a) } }
+            .map { (_, part) -> resolve(part).let { (t, a) -> PuppetPartPose(part, t, a, bends[part.id] ?: 0f) } }
         val poseById = poses.associateBy { it.part.id }
         val attachments = rig.attachments.associate { att ->
             val pose = poseById.getValue(att.part)
             val p = pose.part
-            att.id to pose.transform.apply((att.x - p.pivot.x) * p.drawnWidth, (att.y - p.pivot.y) * p.drawnHeight)
+            val lx = (att.x - p.pivot.x) * p.drawnWidth
+            val ly = (att.y - p.pivot.y) * p.drawnHeight
+            if (p.isLimb) {
+                LimbBend.placeLocal(p, lx, ly, pose.bend, 1f, 1, 0f, bent)
+                att.id to pose.transform.apply(bent[0], bent[1])
+            } else {
+                att.id to pose.transform.apply(lx, ly)
+            }
         }
         return PuppetPose(poses, attachments, resolved)
     }

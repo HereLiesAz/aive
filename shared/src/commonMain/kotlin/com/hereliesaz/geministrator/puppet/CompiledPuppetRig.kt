@@ -56,17 +56,32 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     /** Parts named `tendril…`: the limbs creatures join by (docs/Node-Creature-Genome.md, Wiring). */
     val tendrilParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tendril") }.toIntArray()
 
+    /** Tendrils and tails: they bend and stretch, never rotate ([isLimb]). */
+    private val limb = BooleanArray(partCount) { rig.parts[it].isLimb }
+    private val limbLength = FloatArray(partCount) { hypot(tipX[it], tipY[it]) }
+    private val axisX = FloatArray(partCount) { if (limbLength[it] > 0f) tipX[it] / limbLength[it] else 1f }
+    private val axisY = FloatArray(partCount) { if (limbLength[it] > 0f) tipY[it] / limbLength[it] else 0f }
+    private val bent = FloatArray(3)
+    private val reached = FloatArray(2)
+
     /** Tendril [part]'s base and tip in artboard px, from an evaluated [pose]. */
     fun tendrilBase(part: Int, pose: PuppetPoseBuffer): Offset = Offset(pose.world[part * 6 + 4], pose.world[part * 6 + 5])
 
-    fun tendrilTip(part: Int, pose: PuppetPoseBuffer): Offset {
+    fun tendrilTip(part: Int, pose: PuppetPoseBuffer): Offset = along(part, 1f, pose)
+
+    /** The point [at] (0 base, 1 tip, across every segment) along limb [part]'s curve, artboard px. */
+    fun along(part: Int, at: Float, pose: PuppetPoseBuffer): Offset {
         val o = part * 6
         val w = pose.world
         val n = pose.segments[part]
-        return Offset(
-            (w[o] * tipX[part] + w[o + 2] * tipY[part]) * n + w[o + 4],
-            (w[o + 1] * tipX[part] + w[o + 3] * tipY[part]) * n + w[o + 5],
+        val length = limbLength[part]
+        val total = at * n
+        val copy = kotlin.math.floor(total).coerceIn(0f, (n - 1).toFloat())
+        LimbBend.place(
+            (total - copy) * length, 0f, axisX[part], axisY[part], length,
+            if (limb[part]) pose.bend[part] else 0f, pose.stretch[part], n, copy, bent,
         )
+        return Offset(w[o] * bent[0] + w[o + 2] * bent[1] + w[o + 4], w[o + 1] * bent[0] + w[o + 3] * bent[1] + w[o + 5])
     }
 
     private val anchorX = FloatArray(partCount)
@@ -149,39 +164,62 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         for (i in evalOrder) {
             val ch = motion?.get(i)
             val f = flexibility[i]
-            val x = anchorX[i] + restX[i] + sample(ch, CH_X, cycle, 0f) * f
-            val y = anchorY[i] + restY[i] + sample(ch, CH_Y, cycle, 0f) * f
-            val deg = restRot[i] + sample(ch, CH_ROT, cycle, 0f) * f
+            var x = anchorX[i] + restX[i] + sample(ch, CH_X, cycle, 0f) * f
+            var y = anchorY[i] + restY[i] + sample(ch, CH_Y, cycle, 0f) * f
+            // A limb never rotates: its rotation channel is its bend.
+            val turn = sample(ch, CH_ROT, cycle, 0f) * f
+            var deg = restRot[i] + if (limb[i]) 0f else turn
+            out.bend[i] = if (limb[i]) LimbBend.bendOf(turn) else 0f
+            out.stretch[i] = 1f
+            // On a bent limb, a child rides the curve: placed on it, turned with it.
+            val p = parentIndex[i]
+            if (p >= 0 && limb[p]) {
+                LimbBend.place(
+                    x * axisX[p] + y * axisY[p], -x * axisY[p] + y * axisX[p], axisX[p], axisY[p], limbLength[p],
+                    out.bend[p], out.stretch[p], 1, 0f, bent,
+                )
+                x = bent[0]
+                y = bent[1]
+                deg += bent[2] / DEG
+            }
             val sx = restSx[i] * (1f + (sample(ch, CH_SX, cycle, 1f) - 1f) * f)
             val sy = restSy[i] * (1f + (sample(ch, CH_SY, cycle, 1f) - 1f) * f)
             val al = restAlpha[i] * sample(ch, CH_ALPHA, cycle, 1f)
             compose(i, deg, sx, sy, x, y, al, out)
-            // A reaching tendril turns from its base toward its target and stretches, a little, to meet it.
+            // A reaching tendril bends from its base, which keeps its direction, until its tip meets
+            // its target, and stretches along the way; too far for one sprite, it grows segments.
             val tx = out.reachX[i]
-            if (!tx.isNaN()) {
-                val ty = out.reachY[i]
+            if (!tx.isNaN() && limbLength[i] > 0f) {
                 val o = i * 6
-                val vx = w[o] * tipX[i] + w[o + 2] * tipY[i]
-                val vy = w[o + 1] * tipX[i] + w[o + 3] * tipY[i]
-                val dx = tx - w[o + 4]
-                val dy = ty - w[o + 5]
-                val v = hypot(vx, vy)
-                if (v > 0f) {
-                    val turn = (atan2(dy, dx) - atan2(vy, vx)) / DEG
-                    // Too far for one sprite: the tendril grows segments, copies of itself end to end.
-                    val need = hypot(dx, dy) / v
+                val a = w[o]; val b = w[o + 1]; val c = w[o + 2]; val d = w[o + 3]
+                val det = a * d - b * c
+                if (det != 0f) {
+                    val dx = tx - w[o + 4]
+                    val dy = out.reachY[i] - w[o + 5]
+                    val lx = (d * dx - c * dy) / det
+                    val ly = (-b * dx + a * dy) / det
+                    LimbBend.reach(lx, ly, axisX[i], axisY[i], reached)
+                    val need = reached[1] / limbLength[i]
                     val segments = kotlin.math.ceil(need / out.maxReach).toInt().coerceIn(1, out.maxSegments)
                     out.segments[i] = segments
-                    val k = (need / segments).coerceIn(MIN_REACH, out.maxReach)
-                    val alongX = kotlin.math.abs(tipX[i]) >= kotlin.math.abs(tipY[i])
-                    compose(i, deg + turn, if (alongX) sx * k else sx, if (alongX) sy else sy * k, x, y, al, out)
+                    out.stretch[i] = (need / segments).coerceIn(MIN_REACH, out.maxReach)
+                    out.bend[i] = reached[0]
                 }
             }
         }
         for (k in 0 until attachmentCount) {
-            val o = attPart[k] * 6
-            val lx = attLocalX[k]
-            val ly = attLocalY[k]
+            val part = attPart[k]
+            val o = part * 6
+            var lx = attLocalX[k]
+            var ly = attLocalY[k]
+            if (limb[part]) {
+                LimbBend.place(
+                    lx * axisX[part] + ly * axisY[part], -lx * axisY[part] + ly * axisX[part], axisX[part], axisY[part],
+                    limbLength[part], out.bend[part], out.stretch[part], out.segments[part], 0f, bent,
+                )
+                lx = bent[0]
+                ly = bent[1]
+            }
             out.attachX[k] = w[o] * lx + w[o + 2] * ly + w[o + 4]
             out.attachY[k] = w[o + 1] * lx + w[o + 3] * ly + w[o + 5]
         }
@@ -240,7 +278,11 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     ) {
         for (i in drawOrder) {
             val (sheet, sprite) = donor?.invoke(i) ?: (atlas to rig.parts[i])
-            for (j in pose.segments[i] - 1 downTo 0) drawPart(scope, sheet, pose, fit, scratch, i, j, sprite)
+            if (limb[i]) {
+                for (j in pose.segments[i] - 1 downTo 0) drawLimb(scope, sheet, pose, fit, i, j, sprite)
+            } else {
+                drawPart(scope, sheet, pose, fit, scratch, i, 0, sprite)
+            }
         }
     }
 
@@ -269,11 +311,9 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         val n = pose.segments[part]
         val stepX = w[o] * tipX[part] + w[o + 2] * tipY[part]
         val stepY = w[o + 1] * tipX[part] + w[o + 3] * tipY[part]
-        val centre = Offset(
-            fit.offsetX + (w[o + 4] + stepX * n * at) * fit.scale,
-            fit.offsetY + (w[o + 5] + stepY * n * at) * fit.scale,
-        )
-        val radius = hypot(stepX, stepY) * fit.scale * 0.32f
+        val point = along(part, at, pose)
+        val centre = Offset(fit.offsetX + point.x * fit.scale, fit.offsetY + point.y * fit.scale)
+        val radius = hypot(stepX, stepY) * pose.stretch[part] * fit.scale * 0.32f
         // Glow first, under the limb's lit slice.
         drawCircle(
             Brush.radialGradient(listOf(color.copy(alpha = 0.45f), color.copy(alpha = 0f)), centre, radius * 2.2f),
@@ -281,7 +321,11 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             centre,
         )
         drawContext.canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-        for (j in 0 until n) drawPart(this, sprite?.first ?: atlas, pose, fit, scratch, part, j, sprite?.second ?: rig.parts[part])
+        for (j in 0 until n) {
+            val sheet = sprite?.first ?: atlas
+            val drawn = sprite?.second ?: rig.parts[part]
+            if (limb[part]) drawLimb(this, sheet, pose, fit, part, j, drawn) else drawPart(this, sheet, pose, fit, scratch, part, j, drawn)
+        }
         drawCircle(
             // An energy pulse: white-hot at its core, burning out through the knot's colour.
             Brush.radialGradient(
@@ -296,6 +340,35 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             blendMode = BlendMode.SrcIn,
         )
         drawContext.canvas.restore()
+    }
+
+    private val shaders = HashMap<ImageBitmap, androidx.compose.ui.graphics.Shader>()
+
+    /** Copy [j] of limb [i], bent and stretched along its curve ([drawLimbMesh]). */
+    private fun drawLimb(
+        scope: DrawScope,
+        atlas: ImageBitmap,
+        pose: PuppetPoseBuffer,
+        fit: PuppetFit,
+        i: Int,
+        j: Int,
+        sprite: PuppetPart,
+    ) {
+        val shader = shaders.getOrPut(atlas) { androidx.compose.ui.graphics.ImageShader(atlas) }
+        scope.drawLimbMesh(
+            atlas = atlas,
+            sprite = sprite,
+            part = rig.parts[i],
+            worldArray = pose.world,
+            offset = i * 6,
+            fit = fit,
+            alpha = pose.alpha[i],
+            bendDeg = pose.bend[i],
+            stretch = pose.stretch[i],
+            segments = pose.segments[i],
+            shift = j.toFloat(),
+            shader = shader,
+        )
     }
 
     private fun drawPart(
@@ -387,6 +460,12 @@ class PuppetPoseBuffer(partCount: Int, attachmentCount: Int) {
 
     /** Per part, how many copies of the sprite it draws end to end; 1 unless reaching far. */
     val segments = IntArray(partCount) { 1 }
+
+    /** Per limb, how far it curves base to tip (degrees, positive clockwise); 0 for other parts. */
+    val bend = FloatArray(partCount)
+
+    /** Per limb, how much longer than its sprite each segment is drawn along its curve. */
+    val stretch = FloatArray(partCount) { 1f }
 
     fun clearReach() {
         reachX.fill(Float.NaN)

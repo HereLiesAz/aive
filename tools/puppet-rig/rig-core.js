@@ -48,6 +48,36 @@ export function partSize(p) {
   };
 }
 
+// ---- limbs bend and stretch, never rotate (LimbBend.kt; spec, Limbs) ----
+const LIMB_ID = /^(tendril|tail)(\.(\d+|base|mid|lower|upper))*$/;
+/** Tendrils and tails: by kind, or, in rigs from before kinds, by name (never an egg or a pod). */
+export const isLimb = (p) => p.kind === 'tendril' || p.kind === 'tail' || ((p.kind ?? 'other') === 'other' && LIMB_ID.test(p.id));
+/** A limb's bend from its rotation channel: the tip goes where the channel points, seen from the base. */
+export const bendOf = (rotation) => 2 * rotation;
+/** The limb's axis in part-local px: from the pivot to the tip (the pivot reflected through the box centre). */
+export function limbAxis(p) {
+  const { w, h } = partSize(p);
+  const pivot = p.pivot || { x: 0.5, y: 0.5 };
+  const x = (1 - 2 * pivot.x) * w, y = (1 - 2 * pivot.y) * h;
+  const length = Math.hypot(x, y);
+  return length > 0 ? { x: x / length, y: y / length, length } : { x: 1, y: 0, length: 0 };
+}
+/** Where part-local point (x, y) of limb p lands bent by bendDeg: { x, y, angle (radians) }. */
+export function placeOnLimb(p, x, y, bendDeg, stretch = 1, segments = 1, shift = 0) {
+  const ax = limbAxis(p);
+  if (ax.length <= 0) return { x, y, angle: 0 };
+  const along = x * ax.x + y * ax.y, across = -x * ax.y + y * ax.x;
+  const px = -ax.y, py = ax.x;
+  const s = (along + shift * ax.length) * stretch;
+  const total = ax.length * stretch * segments;
+  const theta = (bendDeg * Math.PI) / 180;
+  if (s <= 0 || total <= 0 || Math.abs(theta) < 1e-4) return { x: s * ax.x + across * px, y: s * ax.y + across * py, angle: 0 };
+  const k = theta / total, phi = k * s;
+  const cx = Math.sin(phi) / k + across * -Math.sin(phi);
+  const cy = (1 - Math.cos(phi)) / k + across * Math.cos(phi);
+  return { x: cx * ax.x + cy * px, y: cx * ax.y + cy * py, angle: phi };
+}
+
 export function attachmentOffset(p, a) {
   const { w, h } = partSize(p);
   const pivot = p.pivot || { x: 0.5, y: 0.5 };
@@ -91,7 +121,8 @@ export function channelValue(motion, ch, cycle) {
 }
 
 /**
- * Evaluates the rig. Returns { parts: [{part, m, alpha, w, h, boxLeft, boxTop}] in draw order,
+ * Evaluates the rig. Returns { parts: [{part, m, alpha, bend, w, h, boxLeft, boxTop}] in draw order
+ * (a limb's m keeps its rest direction; bend is how far it curves, degrees),
  * byId, attachments: {id: {x, y}}, resolvedState }.
  */
 export function evaluate(rig, state, phase) {
@@ -112,19 +143,28 @@ export function evaluate(rig, state, phase) {
     const r = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, alpha: 1, ...(p.rest || {}) };
     const socket = byIdAttachment[p.connectTo];
     const anchor = parentPart && socket?.part === parentPart.id ? attachmentOffset(parentPart, socket) : { x: 0, y: 0 };
-    const local = trs(anchor.x + r.x + ch('x'), anchor.y + r.y + ch('y'), r.rotation + ch('rotation'), r.scaleX * ch('scaleX'), r.scaleY * ch('scaleY'));
+    // A limb never rotates: its rotation channel is its bend.
+    const turn = ch('rotation');
+    const bend = isLimb(p) ? bendOf(turn) : 0;
+    let x = anchor.x + r.x + ch('x'), y = anchor.y + r.y + ch('y'), follow = 0;
+    // On a bent limb, a child rides the curve: placed on it, turned with it.
+    if (parentPart && isLimb(parentPart)) {
+      const q = placeOnLimb(parentPart, x, y, parent.bend);
+      x = q.x; y = q.y; follow = (q.angle * 180) / Math.PI;
+    }
+    const local = trs(x, y, r.rotation + follow + (isLimb(p) ? 0 : turn), r.scaleX * ch('scaleX'), r.scaleY * ch('scaleY'));
     const alpha = Math.min(1, Math.max(0, parent.alpha * r.alpha * channelValue(pm, 'alpha', cycle)));
-    world[p.id] = { m: mul(parent.m, local), alpha };
+    world[p.id] = { m: mul(parent.m, local), alpha, bend };
     return world[p.id];
   };
   const parts = rig.parts
     .map((p, i) => ({ p, i }))
     .sort((a, b) => (a.p.z ?? 0) - (b.p.z ?? 0) || a.i - b.i)
     .map(({ p }) => {
-      const { m, alpha } = resolve(p);
+      const { m, alpha, bend } = resolve(p);
       const { w, h } = partSize(p);
       const pv = p.pivot || { x: 0.5, y: 0.5 };
-      return { part: p, m, alpha, w, h, boxLeft: -pv.x * w, boxTop: -pv.y * h };
+      return { part: p, m, alpha, bend, w, h, boxLeft: -pv.x * w, boxTop: -pv.y * h };
     });
   const byId = Object.fromEntries(parts.map((e) => [e.part.id, e]));
   const attachments = {};
@@ -132,7 +172,8 @@ export function evaluate(rig, state, phase) {
     const e = byId[a.part];
     if (!e) continue;
     const offset = attachmentOffset(e.part, a);
-    attachments[a.id] = apply(e.m, offset.x, offset.y);
+    const q = isLimb(e.part) ? placeOnLimb(e.part, offset.x, offset.y, e.bend) : offset;
+    attachments[a.id] = apply(e.m, q.x, q.y);
   }
   return { parts, byId, attachments, resolvedState: resolved };
 }

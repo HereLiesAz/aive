@@ -1,6 +1,6 @@
 // Pure format/evaluator regression checks. Run: node tools/puppet-rig/test/rig-core.mjs
 import assert from 'node:assert/strict';
-import { evaluate, validateRig } from '../rig-core.js';
+import { evaluate, validateRig, isLimb } from '../rig-core.js';
 
 const rig = {
   format: 'aive-puppet-rig', version: 1, role: 'test', canvas: { width: 100, height: 100 },
@@ -62,3 +62,19 @@ for (const part of legacy.parts) {
 assert.deepEqual(validateRig(legacy), []);
 assert.equal(evaluate(legacy, 'Active', 0).byId.tail.h, 20);
 console.log('puppet-rig core: all checks passed');
+
+// Limbs bend and stretch, never rotate: the rotation channel bends the limb twice its value.
+const bent = {
+  format: 'aive-puppet-rig', version: 1, role: 'bend', canvas: { width: 100, height: 100 },
+  atlas: { image: 'a.png', width: 64, height: 64 },
+  parts: [{ id: 'tendril.0', rect: { x: 0, y: 0, w: 10, h: 40 }, pivot: { x: 0.5, y: 0 }, rest: { x: 50, y: 50 } }],
+  attachments: [{ id: 'tip', part: 'tendril.0', x: 0.5, y: 1, kind: 'tendril-tip' }],
+  states: { Active: { parts: { 'tendril.0': { keys: { rotation: [{ t: 0, v: 30, ease: 'linear' }] } } } } },
+};
+const bp = evaluate(bent, 'Active', 0);
+assert.deepEqual(bp.byId['tendril.0'].m.slice(0, 4).map((v) => Math.round(v * 1e6) / 1e6), [1, 0, 0, 1]);
+assert.equal(bp.byId['tendril.0'].bend, 60);
+const chord = (Math.atan2(-(bp.attachments.tip.x - 50), bp.attachments.tip.y - 50) * 180) / Math.PI;
+assert.ok(Math.abs(chord - 30) < 0.05, `chord ${chord}`);
+assert.ok(!isLimb({ id: 'tail.egg' }) && isLimb({ id: 'tail.1' }));
+console.log('puppet-rig limbs: bend checks passed');

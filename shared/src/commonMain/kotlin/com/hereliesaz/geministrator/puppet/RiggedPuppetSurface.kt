@@ -37,11 +37,21 @@ fun RiggedPuppetSurface(
         val fit = min(size.width / rig.canvas.width, size.height / rig.canvas.height)
         val offsetX = (size.width - rig.canvas.width * fit) / 2f
         val offsetY = (size.height - rig.canvas.height * fit) / 2f
+        val shader = androidx.compose.ui.graphics.ImageShader(atlas)
+        val fitted = PuppetFit(fit, offsetX, offsetY)
         pose.parts.forEach { partPose ->
             val part = partPose.part
             val rect = part.rect ?: return@forEach
             if (partPose.alpha <= 0f || rect.w <= 0 || rect.h <= 0) return@forEach
             val t = partPose.transform
+            // Limbs bend and stretch, never rotate.
+            if (part.isLimb) {
+                drawLimbMesh(
+                    atlas, part, part, floatArrayOf(t.a, t.b, t.c, t.d, t.tx, t.ty), 0, fitted, partPose.alpha,
+                    partPose.bend, 1f, 1, 0f, shader,
+                )
+                return@forEach
+            }
             val matrix = Matrix().apply {
                 values[Matrix.ScaleX] = t.a
                 values[Matrix.SkewY] = t.b
