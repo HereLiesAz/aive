@@ -21,6 +21,11 @@ CREATE TABLE procedure_trace (
   body TEXT NOT NULL
 );
 
+CREATE TABLE procedure_artifact (
+  digest TEXT NOT NULL PRIMARY KEY,
+  body TEXT NOT NULL
+);
+
 revision:
 SELECT value FROM procedure_meta WHERE key = 'revision';
 
@@ -53,3 +58,12 @@ DELETE FROM procedure_evidence;
 
 deleteTraces:
 DELETE FROM procedure_trace;
+
+allArtifacts:
+SELECT body FROM procedure_artifact ORDER BY rowid;
+
+insertArtifact:
+INSERT INTO procedure_artifact (digest, body) VALUES (?, ?);
+
+deleteArtifacts:
+DELETE FROM procedure_artifact;
