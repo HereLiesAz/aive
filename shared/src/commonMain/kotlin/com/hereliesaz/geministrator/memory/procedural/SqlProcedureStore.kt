@@ -4,6 +4,7 @@ import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.db.SqlDriver
 import com.hereliesaz.geministrator.memory.memoryBankKey
+import com.hereliesaz.geministrator.memory.MemoryEpisodeId
 import com.hereliesaz.geministrator.memory.procedural.db.ProcedureDatabase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -43,10 +44,70 @@ class SqlProcedureStore(
             queries.deleteEvidence()
             queries.deleteTraces()
             queries.deleteDefinitions()
+            queries.deleteArtifacts()
             queries.setRevision((current.revision + 1).toString())
             cleared = true
         }
         cleared
+    }
+
+    override suspend fun replace(expectedRevision: Long, replacement: ProcedureSnapshot): Boolean = mutex.withLock {
+        var written = false
+        database.transaction {
+            val current = readUnlocked()
+            if (current.revision != expectedRevision) return@transaction
+            val validator = InMemoryProcedureStore(workflowId, current)
+            check(validator.replace(expectedRevision, replacement))
+            rewrite(validator.read())
+            written = true
+        }
+        written
+    }
+
+    override suspend fun forgetEpisode(
+        expectedRevision: Long,
+        episodeId: MemoryEpisodeId,
+        receiptKeys: Set<String>,
+    ): Boolean = mutex.withLock {
+        var written = false
+        database.transaction {
+            val current = readUnlocked()
+            if (current.revision != expectedRevision) return@transaction
+            val validator = InMemoryProcedureStore(workflowId, current)
+            check(validator.forgetEpisode(expectedRevision, episodeId, receiptKeys))
+            rewrite(validator.read())
+            written = true
+        }
+        written
+    }
+
+    /** Used only for rare import/erasure operations; normal commits remain append-only. */
+    private suspend fun rewrite(next: ProcedureSnapshot) {
+        queries.deleteEvidence()
+        queries.deleteTraces()
+        queries.deleteDefinitions()
+        queries.deleteArtifacts()
+        next.definitions.forEach { definition ->
+            queries.insertDefinition(
+                "${definition.ref.name}@${definition.ref.version}",
+                json.encodeToString(ProcedureDefinition.serializer(), definition),
+            )
+        }
+        next.evidence.forEach { evidence ->
+            queries.insertEvidence(
+                evidence.id,
+                "${evidence.procedure.name}@${evidence.procedure.version}",
+                evidence.receiptId,
+                json.encodeToString(ProcedureEvidence.serializer(), evidence),
+            )
+        }
+        next.traces.forEach { trace ->
+            queries.insertTrace(trace.receiptKey, json.encodeToString(ProcedureTrace.serializer(), trace))
+        }
+        next.artifacts.forEach { artifact ->
+            queries.insertArtifact(artifact.digest, json.encodeToString(ProcedureArtifact.serializer(), artifact))
+        }
+        queries.setRevision(next.revision.toString())
     }
 
     override suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean =
@@ -82,6 +143,9 @@ class SqlProcedureStore(
                         json.encodeToString(ProcedureTrace.serializer(), trace),
                     )
                 }
+                mutation.artifactsToAdd.forEach { artifact ->
+                    queries.insertArtifact(artifact.digest, json.encodeToString(ProcedureArtifact.serializer(), artifact))
+                }
                 queries.setRevision(next.revision.toString())
                 committed = true
             }
@@ -101,10 +165,14 @@ class SqlProcedureStore(
                 traces = queries.allTraces().awaitAsList().map {
                     json.decodeFromString(ProcedureTrace.serializer(), it)
                 },
+                artifacts = queries.allArtifacts().awaitAsList().map {
+                    json.decodeFromString(ProcedureArtifact.serializer(), it)
+                },
             )
             // Decode without trust: an invalid, foreign or dangling record makes the bank
             // unreadable instead of silently activating or filtering part of the catalog.
             InMemoryProcedureStore(workflowId, snapshot)
+            snapshot.artifacts.forEach { it.verify() }
             return snapshot
         } catch (cancelled: CancellationException) {
             throw cancelled
