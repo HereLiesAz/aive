@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
 import com.hereliesaz.geministrator.memory.procedural.ProcedureBankCatalog
 import com.hereliesaz.geministrator.memory.procedural.ProcedureMutation
+import com.hereliesaz.geministrator.memory.procedural.ProcedureArchives
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
@@ -448,6 +449,31 @@ class MemoryLayerController(
         drainSoon()
     }
 
+    /** Export only the selected workflow's procedural bank; ancestors remain in their own banks. */
+    suspend fun exportProceduresJson(): String {
+        val workflow = selectedWorkflow() ?: error("No memory bank selected")
+        val catalog = procedureCatalog ?: error("Procedural memory is unavailable")
+        return ProcedureArchives.export(workflow, catalog.own(workflow).read())
+    }
+
+    /** A deliberate, validated, non-executable procedure import. No cross-project re-homing. */
+    suspend fun importProceduresJson(serialized: String) {
+        drainMutex.withLock {
+            val workflow = selectedWorkflow() ?: error("No memory bank selected")
+            val catalog = procedureCatalog ?: error("Procedural memory is unavailable")
+            val sources = (listOf(workflow) + lineage.ancestorsOf(workflow)).flatMap { bank ->
+                banks.store(bank).read().episodes.map { it.id }
+            }.toSet()
+            val imported = ProcedureArchives.decode(serialized, workflow, sources)
+            val own = catalog.own(workflow)
+            while (true) {
+                val current = own.read()
+                if (own.replace(current.revision, imported)) break
+            }
+        }
+        publish()
+    }
+
     /** Clears the selected workflow's own records. Ancestors' and other workflows' banks are untouched. */
     suspend fun clearAll() {
         drainMutex.withLock {
@@ -473,7 +499,22 @@ class MemoryLayerController(
     suspend fun forgetEpisode(episodeId: MemoryEpisodeId) {
         drainMutex.withLock {
             val store = selectedOwnStore() ?: return@withLock
-            store.replace(store.read().without(episodeId))
+            val workflow = selectedWorkflow() ?: return@withLock
+            val contextual = store.read()
+            val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
+            // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
+            procedureCatalog?.own(workflow)?.let { bank ->
+                while (true) {
+                    val current = bank.read()
+                    val receiptKeys = current.traces.mapNotNull { trace ->
+                        trace.receiptKey.takeIf { key ->
+                            sourceEpisode?.userPrompt?.startsWith("Execution receipt $key: ") == true
+                        }
+                    }.toSet()
+                    if (bank.forgetEpisode(current.revision, episodeId, receiptKeys)) break
+                }
+            }
+            store.replace(contextual.without(episodeId))
             resetLayers()
         }
         publish()
