@@ -70,4 +70,50 @@ class ProcedureControllerLifecycleTest {
         assertTrue(episodes.read().episodes.isEmpty())
         assertFailsWith<IllegalArgumentException> { controller.importProceduresJson(exported) }
     }
+
+    @Test
+    fun forgettingAncestorPhysicallyErasesDescendantProcedures() = runBlocking {
+        val rootMemories = InMemoryMemoryStore()
+        val lineage = MemoryLineage()
+        lineage.registerWorkflow("root", "project", atEpochMillis = 1L)
+        lineage.registerWorkflow("child", "project", parents = listOf("root"), atEpochMillis = 2L)
+        val catalog = ProcedureBankCatalog(lineage)
+        val episodeId = MemoryConsolidationQueue(rootMemories).enqueueSession(
+            MemorySessionEnvelope(
+                sourceSessionId = "root-session",
+                projectId = "project",
+                workflowRunId = "root",
+                userPrompt = "Check root build",
+                parts = emptyList(),
+                closedAtEpochMillis = 3L,
+            ),
+        ).episodeId
+        val artifact = ProcedureArtifact.fromSource("child", "reflex inherited from root context")
+        val candidate = ProcedureDefinition(
+            ref = ProcedureReference("child", "root-check", 1),
+            kind = ProcedureKind.Reflex,
+            summary = "Reusable root check",
+            contentDigest = artifact.digest,
+            sourceEpisodeIds = setOf(episodeId),
+            parameters = emptyList(),
+            steps = listOf(ProcedureStep("check", "TestRunner", "test", ProcedureSideEffect.ReadOnly)),
+            createdAtEpochMillis = 3L,
+        )
+        assertTrue(catalog.own("child").commit(0, ProcedureMutation(
+            definitionsToAdd = listOf(candidate),
+            artifactsToAdd = listOf(artifact),
+        )))
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("root" to rootMemories)),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            lineage = lineage,
+            procedureCatalog = catalog,
+        )
+        controller.selectBank("root")
+        controller.forgetEpisode(episodeId)
+        assertTrue(catalog.own("child").read().definitions.isEmpty())
+        assertTrue(catalog.own("child").read().artifacts.isEmpty())
+    }
 }
