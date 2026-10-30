@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.memory.procedural
 
 import com.hereliesaz.geministrator.memory.MemoryLineage
+import com.hereliesaz.geministrator.memory.MemoryEpisodeId
 import com.hereliesaz.geministrator.memory.memoryBankKey
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,6 +19,7 @@ data class ProcedureSnapshot(
     val evidence: List<ProcedureEvidence> = emptyList(),
     /** Bounded, source-redacted execution receipts, independent of summarized contextual memory. */
     val traces: List<ProcedureTrace> = emptyList(),
+    val artifacts: List<ProcedureArtifact> = emptyList(),
 )
 
 @Serializable
@@ -25,6 +27,7 @@ data class ProcedureMutation(
     val definitionsToAdd: List<ProcedureDefinition> = emptyList(),
     val evidenceToAdd: List<ProcedureEvidence> = emptyList(),
     val tracesToAdd: List<ProcedureTrace> = emptyList(),
+    val artifactsToAdd: List<ProcedureArtifact> = emptyList(),
 )
 
 /** Revisions prevent one candidate writer from overwriting another writer's evidence. */
@@ -34,6 +37,10 @@ interface ProcedureStore {
     suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean
     /** Explicit privacy erasure; its revision is advanced so old writers cannot restore data. */
     suspend fun clear(expectedRevision: Long): Boolean
+    /** Atomic, revision-checked replacement for validated imports. Never copy imported revisions. */
+    suspend fun replace(expectedRevision: Long, snapshot: ProcedureSnapshot): Boolean
+    /** Erase an episode's derived candidates, evidence and exact trace receipts. */
+    suspend fun forgetEpisode(expectedRevision: Long, episodeId: MemoryEpisodeId, receiptKeys: Set<String> = emptySet()): Boolean
 }
 
 /**
@@ -60,14 +67,46 @@ class InMemoryProcedureStore(
         true
     }
 
+    override suspend fun replace(expectedRevision: Long, replacement: ProcedureSnapshot): Boolean = mutex.withLock {
+        if (snapshot.revision != expectedRevision) return@withLock false
+        val next = replacement.copy(revision = snapshot.revision + 1)
+        validateInitial(next)
+        next.artifacts.forEach { it.verify() }
+        snapshot = next
+        true
+    }
+
+    override suspend fun forgetEpisode(
+        expectedRevision: Long,
+        episodeId: MemoryEpisodeId,
+        receiptKeys: Set<String>,
+    ): Boolean = mutex.withLock {
+        if (snapshot.revision != expectedRevision) return@withLock false
+        val retainedDefinitions = snapshot.definitions.filterNot { episodeId in it.sourceEpisodeIds }
+        val refs = retainedDefinitions.mapTo(hashSetOf()) { it.ref }
+        val retainedEvidence = snapshot.evidence.filter { it.sourceEpisodeId != episodeId && it.procedure in refs }
+        val retainedTraces = snapshot.traces.filterNot { it.receiptKey in receiptKeys }
+        val usedDigests = retainedDefinitions.mapTo(hashSetOf()) { it.contentDigest }
+        val retainedArtifacts = snapshot.artifacts.filter { it.digest in usedDigests }
+        snapshot = ProcedureSnapshot(
+            revision = snapshot.revision + 1,
+            definitions = retainedDefinitions,
+            evidence = retainedEvidence,
+            traces = retainedTraces,
+            artifacts = retainedArtifacts,
+        )
+        true
+    }
+
     override suspend fun commit(expectedRevision: Long, mutation: ProcedureMutation): Boolean = mutex.withLock {
         if (snapshot.revision != expectedRevision) return@withLock false
-        require(mutation.definitionsToAdd.isNotEmpty() || mutation.evidenceToAdd.isNotEmpty() || mutation.tracesToAdd.isNotEmpty()) {
+        require(mutation.definitionsToAdd.isNotEmpty() || mutation.evidenceToAdd.isNotEmpty() || mutation.tracesToAdd.isNotEmpty() || mutation.artifactsToAdd.isNotEmpty()) {
             "Empty procedural memory mutation"
         }
         val newDefinitions = snapshot.definitions + mutation.definitionsToAdd
         val newEvidence = snapshot.evidence + mutation.evidenceToAdd
         val newTraces = snapshot.traces + mutation.tracesToAdd
+        val newArtifacts = snapshot.artifacts + mutation.artifactsToAdd
         require(newDefinitions.all { it.ref.workflowId == workflowId }) {
             "Cannot write a procedure belonging to another workflow bank"
         }
@@ -93,7 +132,10 @@ class InMemoryProcedureStore(
         require(newTraces.map { it.receiptKey }.distinct().size == newTraces.size) {
             "An execution receipt can be stored only once per workflow and attempt"
         }
-        snapshot = ProcedureSnapshot(snapshot.revision + 1, newDefinitions, newEvidence, newTraces)
+        require(newArtifacts.all { it.workflowId == workflowId }) { "Cannot store another workflow's procedure artifact" }
+        require(newArtifacts.map { it.digest }.distinct().size == newArtifacts.size) { "Duplicate procedure artifact digest" }
+        mutation.artifactsToAdd.forEach { it.verify() }
+        snapshot = ProcedureSnapshot(snapshot.revision + 1, newDefinitions, newEvidence, newTraces, newArtifacts)
         true
     }
 
@@ -108,6 +150,8 @@ class InMemoryProcedureStore(
         require(initial.evidence.all { it.procedure in refs })
         require(initial.traces.all { it.workflowId == workflowId })
         require(initial.traces.map { it.receiptKey }.distinct().size == initial.traces.size)
+        require(initial.artifacts.all { it.workflowId == workflowId })
+        require(initial.artifacts.map { it.digest }.distinct().size == initial.artifacts.size)
     }
 }
 
