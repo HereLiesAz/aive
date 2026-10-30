@@ -396,10 +396,13 @@ class MemoryLayerController(
             }
             val selected = rawPurgeSelection(episodes, retention, nowEpochMillis())
             if (selected.isEmpty()) return@forEach
-            stores.values.forEach { store ->
+            stores.forEach { (workflow, store) ->
                 val snapshot = store.read()
                 val mine = snapshot.episodes.map { it.id }.filter { it in selected }.toSet()
                 if (mine.isNotEmpty()) {
+                    snapshot.episodes.filter { it.id in mine }.forEach { source ->
+                        eraseDerivedProcedures(workflow, source.id, source)
+                    }
                     store.replace(snapshot.purgeRaw(mine, retention, scope, nowEpochMillis()))
                     purged += mine
                 }
@@ -503,29 +506,36 @@ class MemoryLayerController(
             val contextual = store.read()
             val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
             // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
-            procedureCatalog?.let { catalog ->
-                // A descendant can own a procedure derived from this ancestor's episode.
-                // Erase those physical records too, not merely hide them at recall.
-                val descendants = lineage.log().workflows.map { it.workflowId }.distinct()
-                    .filter { it == workflow || workflow in lineage.ancestorsOf(it) }
-                for (owner in descendants) {
-                    val bank = catalog.own(owner)
-                    while (true) {
-                        val current = bank.read()
-                        val receiptKeys = current.traces.mapNotNull { trace ->
-                            trace.receiptKey.takeIf { key ->
-                                owner == workflow &&
-                                    sourceEpisode?.userPrompt?.startsWith("Execution receipt $key: ") == true
-                            }
-                        }.toSet()
-                        if (bank.forgetEpisode(current.revision, episodeId, receiptKeys)) break
-                    }
-                }
-            }
+            eraseDerivedProcedures(workflow, episodeId, sourceEpisode)
             store.replace(contextual.without(episodeId))
             resetLayers()
         }
         publish()
+    }
+
+    /** Both explicit forgetting and raw-retention purging erase executable-source candidates. */
+    private suspend fun eraseDerivedProcedures(
+        workflow: String,
+        episodeId: MemoryEpisodeId,
+        sourceEpisode: MemoryEpisode?,
+    ) {
+        val catalog = procedureCatalog ?: return
+        // A descendant may store a version derived from an ancestor episode. Delete it physically.
+        val descendants = (lineage.log().workflows.map { it.workflowId } + workflow).distinct()
+            .filter { it == workflow || workflow in lineage.ancestorsOf(it) }
+        for (owner in descendants) {
+            val bank = catalog.own(owner)
+            while (true) {
+                val current = bank.read()
+                val receiptKeys = current.traces.mapNotNull { trace ->
+                    trace.receiptKey.takeIf { key ->
+                        owner == workflow &&
+                            sourceEpisode?.userPrompt?.startsWith("Execution receipt $key: ") == true
+                    }
+                }.toSet()
+                if (bank.forgetEpisode(current.revision, episodeId, receiptKeys)) break
+            }
+        }
     }
 
     // ---- banking and recall -----------------------------------------------------------------------
