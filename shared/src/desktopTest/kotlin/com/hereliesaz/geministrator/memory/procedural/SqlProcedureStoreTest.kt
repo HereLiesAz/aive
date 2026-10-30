@@ -138,6 +138,47 @@ class SqlProcedureStoreTest {
     }
 
     @Test
+    fun sourceArtifactPersistsAndIsRemovedWithDependentEpisode() = runBlocking {
+        val dir = directory()
+        val store = desktopSqlProcedureStore("root", dir)
+        val source = ProcedureArtifact.fromSource("root", "console.log('tested')")
+        val def = definition().copy(contentDigest = source.digest)
+        assertTrue(store.commit(0, ProcedureMutation(
+            definitionsToAdd = listOf(def),
+            artifactsToAdd = listOf(source),
+            tracesToAdd = listOf(trace()),
+        )))
+        assertEquals(listOf(source), desktopSqlProcedureStore("root", dir).read().artifacts)
+        assertTrue(store.forgetEpisode(1, MemoryEpisodeId("source"), setOf(trace().receiptKey)))
+        val reopened = desktopSqlProcedureStore("root", dir)
+        assertEquals(2L, reopened.read().revision)
+        assertTrue(reopened.read().definitions.isEmpty())
+        assertTrue(reopened.read().artifacts.isEmpty())
+        assertTrue(reopened.read().traces.isEmpty())
+    }
+
+    @Test
+    fun importedArchiveReplacesStoredVersionsWithoutRewindingRevision() = runBlocking<Unit> {
+        val dir = directory()
+        val store = desktopSqlProcedureStore("root", dir)
+        val artifact = ProcedureArtifact.fromSource("root", "verified baseline")
+        val def = definition().copy(contentDigest = artifact.digest)
+        val archive = ProcedureArchives.export("root", ProcedureSnapshot(
+            revision = 400,
+            definitions = listOf(def),
+            artifacts = listOf(artifact),
+        ))
+        val decoded = ProcedureArchives.decode(archive, "root", setOf(MemoryEpisodeId("source")))
+        assertTrue(store.replace(0, decoded))
+        assertEquals(1L, desktopSqlProcedureStore("root", dir).read().revision)
+        assertEquals(artifact, desktopSqlProcedureStore("root", dir).read().artifacts.single())
+        assertFalse(store.replace(0, decoded))
+        val malicious = decoded.copy(artifacts = listOf(artifact.copy(source = "tampered")))
+        assertFailsWith<IllegalArgumentException> { store.replace(1, malicious) }
+        assertEquals(1L, store.read().revision)
+    }
+
+    @Test
     fun invalidTraceIsNotRecordedAndDoesNotBumpRevision() = runBlocking {
         val dir = directory()
         val store = desktopSqlProcedureStore("root", dir)
