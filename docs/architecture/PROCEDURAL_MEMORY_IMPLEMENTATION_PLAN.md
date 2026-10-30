@@ -95,6 +95,16 @@ Platform adapters are `androidSqlProcedureCatalog`, `desktopSqlProcedureCatalog`
 
 **Remaining before this milestone is complete:** stable content-addressed code/blob storage, bounded export/import, explicit deletion of proposals derived from individually forgotten or raw-purged episodes, cross-process multi-writer benchmark, migrations for later schema versions, and user-facing procedure-library management. No procedure is executable; even an evidence entry claiming `Verified` remains only a report. Until verification/promotion exists, candidates remain inspection-only.
 
+### Content-addressed source and lifecycle (implemented)
+
+The procedure sidecar now accepts explicitly supplied, bounded (64 KiB UTF-8) `ProcedureArtifact` source strings, computes SHA-256 content addresses with the installed multiplatform cryptography provider, and verifies digests before writes, reads, and import. A SQLDelight migration adds the dedicated artifact table without modifying contextual memory tables. The source remains private to the workflow's procedure bank and never automatically enters GRIP or a provider prompt. This is **storage, not execution**.
+
+`ProcedureArchives` exports the selected workflow's metadata, evidence, receipts, and source as one strict, size-limited versioned JSON archive. Import checks scope, provenance episode availability (self or ancestors), exact digests, and required source before atomic compare-and-swap replacement; the imported revision is not allowed to rewind the live bank. `MemoryLayerController` exposes `exportProceduresJson()` and `importProceduresJson(...)`. There is no automatic MCP import or remote execution.
+
+Individual `forgetEpisode` performs revision-checked physical deletion of dependent definitions, evidence, associated execution receipts and unreferenced script sources in the selected workflow **and any registered descendants** before removing contextual source evidence. `clearAll` continues erasing the entire selected procedure sidecar. Tests cover SHA-256 known vectors, digest tampering, archive tampering, stale imports, SQLite reload and erasure, lineage isolation, and cross-lineage provenance invalidation.
+
+**Known limits:** This slice does not capture raw script text automatically (by design), inspect/approve imports in a dedicated UI, implement transport-level signed artifact exchange, expose verified executor invocations, or define automatic procedure promotion. No macro invoker exists. Cross-database memory/procedure erasure is ordered to fail closed, not a distributed ACID transaction.
+
 ## Milestone 3 — candidate discovery and generalization
 
 **Proposed files:** `ProcedureCandidateExtractor.kt`, `ProcedureParameterizer.kt`, `ProcedureCompatibility.kt`.
