@@ -503,15 +503,23 @@ class MemoryLayerController(
             val contextual = store.read()
             val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
             // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
-            procedureCatalog?.own(workflow)?.let { bank ->
-                while (true) {
-                    val current = bank.read()
-                    val receiptKeys = current.traces.mapNotNull { trace ->
-                        trace.receiptKey.takeIf { key ->
-                            sourceEpisode?.userPrompt?.startsWith("Execution receipt $key: ") == true
-                        }
-                    }.toSet()
-                    if (bank.forgetEpisode(current.revision, episodeId, receiptKeys)) break
+            procedureCatalog?.let { catalog ->
+                // A descendant can own a procedure derived from this ancestor's episode.
+                // Erase those physical records too, not merely hide them at recall.
+                val descendants = lineage.log().workflows.map { it.workflowId }.distinct()
+                    .filter { it == workflow || workflow in lineage.ancestorsOf(it) }
+                for (owner in descendants) {
+                    val bank = catalog.own(owner)
+                    while (true) {
+                        val current = bank.read()
+                        val receiptKeys = current.traces.mapNotNull { trace ->
+                            trace.receiptKey.takeIf { key ->
+                                owner == workflow &&
+                                    sourceEpisode?.userPrompt?.startsWith("Execution receipt $key: ") == true
+                            }
+                        }.toSet()
+                        if (bank.forgetEpisode(current.revision, episodeId, receiptKeys)) break
+                    }
                 }
             }
             store.replace(contextual.without(episodeId))
