@@ -1,5 +1,5 @@
 [versions]
-play-billing = "8.3.0"
+play-billing = "9.1.0"
 # Retain the 5.13 line for Android API 26; newer JGit lines need a device-tested migration.
 # JGit 7.8 reads loose refs through InputStream.readNBytes (Android API 33).
 # Java compilation targets do not backport that API; core-library desugaring is not configured.
