@@ -71,7 +71,7 @@ internal fun HiveEdge(
                 // Only the name, rarity and price: what a breed is like is learned by keeping it.
                 val price = prices[breed.id] ?: "$" + breed.price.toString().let { if (it.substringAfter('.').length < 2) it + "0" else it }
                 val buy: (() -> Unit)? = if (purchases != null && breed.id in prices && host != null) {
-                    { scope.launch { if (runCatching { purchases.buy(breed.id) }.getOrDefault(false)) host.bought(breed.id) } }
+                    { scope.launch { host.claim(purchases, runCatching { purchases.buy(breed.id) }.getOrDefault(emptyList())) } }
                 } else {
                     null
                 }

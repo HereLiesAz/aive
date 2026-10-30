@@ -54,13 +54,7 @@ sites differ.
 
 ## Decision
 
-Migrated (Android, desktop). The web remains on Settings while it is a preview; move it to the
-SQL store over the browser worker driver before it ships as 1.0. Originally:
-
-Do not migrate until one of the trigger conditions above is met and measured on a real run.
-Settings-backed storage is reliable, requires no schema migrations beyond the existing
-JSON versioning, and adds no dependencies. Premature migration adds complexity without
-a measurable user benefit.
-
-When migration is triggered: implement the SQL backend behind `WorkflowPersistence`
-and run the existing persistence tests against both implementations before shipping.
+Migrated (Android, desktop): the 500 KB trigger was met (see Measurement). The web remains on
+Settings while it is a preview; move it to the SQL store over the browser worker driver before it
+ships as 1.0, behind `WorkflowPersistence`, and run the existing persistence tests against both
+implementations before shipping.

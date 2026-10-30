@@ -3,12 +3,12 @@ package com.hereliesaz.geministrator
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -24,13 +24,20 @@ import kotlinx.serialization.json.putJsonObject
 /**
  * Where The Aive keeps the transcripts of its runs for Entire, one JSONL file per session
  * (docs/Entire.md). Each line is one record: `session`, `prompt`, `response`, `files` or `usage`.
+ * Transcripts untouched for [retention] are deleted when the next session begins: by then Entire
+ * has long since copied what it needs into its checkpoint.
  */
-internal class AiveEntireSessions(val directory: File = defaultDirectory()) {
+internal class AiveEntireSessions(
+    val directory: File = defaultDirectory(),
+    private val retention: Duration = DEFAULT_RETENTION,
+    private val now: () -> Instant = Instant::now,
+) {
     fun file(sessionId: String): File = File(directory, "${safeSessionId(sessionId)}.jsonl")
 
-    /** Starts [sessionId]'s transcript, replacing any earlier one. */
+    /** Starts [sessionId]'s transcript, replacing any earlier one, and prunes old transcripts. */
     fun begin(sessionId: String, repoPath: String, model: String?) {
         directory.mkdirs()
+        prune(keep = file(sessionId))
         file(sessionId).writeText("")
         append(sessionId, record("session") {
             put("session_id", sessionId)
@@ -58,6 +65,14 @@ internal class AiveEntireSessions(val directory: File = defaultDirectory()) {
         })
     }
 
+    /** Deletes transcripts (`*.jsonl` here) last written more than [retention] ago, except [keep]. */
+    fun prune(keep: File? = null) {
+        val cutoff = now().minus(retention).toEpochMilli()
+        directory.listFiles { file -> file.isFile && file.name.endsWith(".jsonl") }.orEmpty()
+            .filter { it != keep && it.lastModified() < cutoff }
+            .forEach { runCatching { it.delete() } }
+    }
+
     private fun append(sessionId: String, line: JsonObject) {
         file(sessionId).appendText(line.toString() + "\n")
     }
@@ -74,6 +89,9 @@ internal class AiveEntireSessions(val directory: File = defaultDirectory()) {
             ?: File(System.getProperty("user.home"), ".aive/entire/sessions")
 
         const val DIRECTORY_VARIABLE = "AIVE_ENTIRE_SESSIONS"
+
+        /** How long a transcript is kept after it was last written. */
+        val DEFAULT_RETENTION: Duration = Duration.ofDays(30)
 
         /** Session IDs name files: only letters, digits, `-`, `_` and `.` survive, never a leading dot. */
         fun safeSessionId(raw: String): String =
@@ -145,14 +163,17 @@ internal fun runEntireAgentPlugin(
                     put("repo_path", head?.string("repo_path").orEmpty())
                     put("session_ref", file.absolutePath)
                     put("start_time", head?.string("timestamp") ?: Instant.now().toString())
-                    put("native_data", JsonNull)
+                    // The transcript itself, base64 (as Entire's Go side encodes bytes), so that
+                    // write-session can put it back on `entire session resume`.
+                    put("native_data", Base64.getEncoder().encodeToString(file.readBytes()))
                     put("modified_files", files.flatMap { it.strings("modified") }.distinct().toJsonArray())
                     put("new_files", files.flatMap { it.strings("new") }.distinct().toJsonArray())
                     put("deleted_files", files.flatMap { it.strings("deleted") }.distinct().toJsonArray())
                 })
             }
             "write-session" -> {
-                // Restoring a session (`entire session resume`): put its transcript back where it was.
+                // Restoring a session (`entire session resume`): put the transcript read-session
+                // gave as native_data back where it was, inside the sessions folder only.
                 val session = input()
                 val target = session.string("session_ref")?.let(::File)
                 val native = session.string("native_data")

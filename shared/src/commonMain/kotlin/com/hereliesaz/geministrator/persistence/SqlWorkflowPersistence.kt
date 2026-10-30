@@ -34,6 +34,11 @@ import kotlinx.serialization.json.Json
  *
  * One writer at a time, as before: every operation holds [mutex], and multi-row changes are one
  * transaction.
+ *
+ * A row that cannot be decoded is quarantined, not fatal: reads skip it (a lookup by ID finds
+ * nothing), its payload is copied into `meta` under a `quarantine:` key so a later write to the same
+ * ID cannot lose it, and it is listed in [quarantinedRecords]. One bad row therefore never reports
+ * the whole store as corrupt, which would offer [recoverFromCorruption] and clear every record.
  */
 class SqlWorkflowPersistence(
     driver: SqlDriver,
@@ -50,12 +55,16 @@ class SqlWorkflowPersistence(
     override var lastCorruptionError: Throwable? = null
         private set
 
+    /** Rows skipped because they could not be decoded, in the order they were found this process. */
+    var quarantinedRecords: List<QuarantinedRecord> = emptyList()
+        private set
+
     override val projects: ProjectRepository = object : ProjectRepository {
         override suspend fun put(project: Project) = locked { writeProject(project) }
         override suspend fun get(id: ProjectId): Project? =
             locked { queries.project(id.value).awaitAsOneOrNull()?.decode(Project.serializer()) }
         override suspend fun all(): List<Project> =
-            locked { queries.allProjects().awaitAsList().map { it.decode(Project.serializer()) } }
+            locked { queries.allProjects().awaitAsList().mapNotNull { it.decode(Project.serializer()) } }
     }
 
     override val definitions: WorkflowDefinitionRepository = object : WorkflowDefinitionRepository {
@@ -63,7 +72,7 @@ class SqlWorkflowPersistence(
         override suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition? =
             locked { queries.definition(id.value).awaitAsOneOrNull()?.decode(WorkflowDefinition.serializer()) }
         override suspend fun all(): List<WorkflowDefinition> =
-            locked { queries.allDefinitions().awaitAsList().map { it.decode(WorkflowDefinition.serializer()) } }
+            locked { queries.allDefinitions().awaitAsList().mapNotNull { it.decode(WorkflowDefinition.serializer()) } }
     }
 
     override val runs: WorkflowRunRepository = object : WorkflowRunRepository {
@@ -71,14 +80,14 @@ class SqlWorkflowPersistence(
         override suspend fun get(id: WorkflowRunId): WorkflowRun? =
             locked { queries.run(id.value).awaitAsOneOrNull()?.decode(WorkflowRun.serializer()) }
         override suspend fun byProject(projectId: ProjectId): List<WorkflowRun> = locked {
-            queries.runsByProject(projectId.value).awaitAsList().map { it.decode(WorkflowRun.serializer()) }
+            queries.runsByProject(projectId.value).awaitAsList().mapNotNull { it.decode(WorkflowRun.serializer()) }
         }
     }
 
     override val events: WorkflowEventRepository = object : WorkflowEventRepository {
         override suspend fun append(event: WorkflowEvent) = locked { writeEvent(event) }
         override suspend fun forRun(workflowRunId: WorkflowRunId): List<WorkflowEvent> = locked {
-            queries.eventsForRun(workflowRunId.value).awaitAsList().map { it.decode(WorkflowEvent.serializer()) }
+            queries.eventsForRun(workflowRunId.value).awaitAsList().mapNotNull { it.decode(WorkflowEvent.serializer()) }
         }
     }
 
@@ -87,7 +96,7 @@ class SqlWorkflowPersistence(
         override suspend fun get(id: RoleDefinitionId): RoleDefinition? =
             locked { queries.role(id.value).awaitAsOneOrNull()?.decode(RoleDefinition.serializer()) }
         override suspend fun all(): List<RoleDefinition> =
-            locked { queries.allRoles().awaitAsList().map { it.decode(RoleDefinition.serializer()) } }
+            locked { queries.allRoles().awaitAsList().mapNotNull { it.decode(RoleDefinition.serializer()) } }
     }
 
     override val artifacts: ArtifactRepository = object : ArtifactRepository {
@@ -98,7 +107,7 @@ class SqlWorkflowPersistence(
             run.taskRuns.values.map { it.id }.distinct()
                 .flatMap { taskRunId -> queries.artifactsForTaskRun(taskRunId.value).awaitAsList() }
                 .sortedBy { it.created_at }
-                .map { it.payload.decode(ArtifactRef.serializer()) }
+                .mapNotNull { it.payload.decode(ArtifactRef.serializer()) }
         }
     }
 
@@ -107,7 +116,7 @@ class SqlWorkflowPersistence(
         override suspend fun get(id: ApprovalGateId): ApprovalGate? =
             locked { queries.gate(id.value).awaitAsOneOrNull()?.decode(ApprovalGate.serializer()) }
         override suspend fun unresolved(workflowRunId: WorkflowRunId): List<ApprovalGate> = locked {
-            queries.openGatesForRun(workflowRunId.value).awaitAsList().map { it.decode(ApprovalGate.serializer()) }
+            queries.openGatesForRun(workflowRunId.value).awaitAsList().mapNotNull { it.decode(ApprovalGate.serializer()) }
         }
     }
 
@@ -242,13 +251,13 @@ class SqlWorkflowPersistence(
 
     private suspend fun snapshotUnlocked(): PersistenceSnapshot = PersistenceSnapshot(
         version = SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION,
-        projects = queries.allProjects().awaitAsList().map { it.decode(Project.serializer()) },
-        definitions = queries.allDefinitions().awaitAsList().map { it.decode(WorkflowDefinition.serializer()) },
-        runs = queries.allRuns().awaitAsList().map { it.decode(WorkflowRun.serializer()) },
-        events = queries.allEvents().awaitAsList().map { it.decode(WorkflowEvent.serializer()) },
-        roles = queries.allRoles().awaitAsList().map { it.decode(RoleDefinition.serializer()) },
-        artifacts = queries.allArtifacts().awaitAsList().map { it.decode(ArtifactRef.serializer()) },
-        approvalGates = queries.allGates().awaitAsList().map { it.decode(ApprovalGate.serializer()) },
+        projects = queries.allProjects().awaitAsList().mapNotNull { it.decode(Project.serializer()) },
+        definitions = queries.allDefinitions().awaitAsList().mapNotNull { it.decode(WorkflowDefinition.serializer()) },
+        runs = queries.allRuns().awaitAsList().mapNotNull { it.decode(WorkflowRun.serializer()) },
+        events = queries.allEvents().awaitAsList().mapNotNull { it.decode(WorkflowEvent.serializer()) },
+        roles = queries.allRoles().awaitAsList().mapNotNull { it.decode(RoleDefinition.serializer()) },
+        artifacts = queries.allArtifacts().awaitAsList().mapNotNull { it.decode(ArtifactRef.serializer()) },
+        approvalGates = queries.allGates().awaitAsList().mapNotNull { it.decode(ApprovalGate.serializer()) },
     )
 
     private suspend fun writeSnapshot(snapshot: PersistenceSnapshot) {
@@ -307,15 +316,17 @@ class SqlWorkflowPersistence(
 
     private fun <T> T.encode(serializer: KSerializer<T>): String = json.encodeToString(serializer, this)
 
-    private fun <T> String.decode(serializer: KSerializer<T>): T = try {
+    /** The decoded row, or null after quarantining a row that cannot be decoded. */
+    private suspend fun <T> String.decode(serializer: KSerializer<T>): T? = try {
         json.decodeFromString(serializer, this)
     } catch (failure: Exception) {
-        lastCorruptionError = failure
-        throw PersistenceCorruptionException(
-            "Workflow persistence data is unreadable and must be recovered. " +
-                "Call recoverFromCorruption() to clear corrupted state.",
-            failure,
-        )
+        val kind = serializer.descriptor.serialName.substringAfterLast('.')
+        val key = "$QUARANTINE_PREFIX$kind:${hashCode().toUInt().toString(16)}"
+        queries.putMeta(key, this)
+        if (quarantinedRecords.none { it.key == key }) {
+            quarantinedRecords = quarantinedRecords + QuarantinedRecord(key, kind, failure.message.orEmpty())
+        }
+        null
     }
 
     private fun PersistenceSnapshot.hasContent(): Boolean =
@@ -324,8 +335,12 @@ class SqlWorkflowPersistence(
 
     private companion object {
         const val MIGRATED_FROM_SETTINGS = "migrated-from-settings"
+        const val QUARANTINE_PREFIX = "quarantine:"
     }
 }
+
+/** An unreadable row: [key] holds its payload in the `meta` table; [kind] is the record type. */
+data class QuarantinedRecord(val key: String, val kind: String, val reason: String)
 
 /** The Settings store a [SqlWorkflowPersistence] replaces, and where its pre-move export is kept. */
 class LegacySettingsMigration(

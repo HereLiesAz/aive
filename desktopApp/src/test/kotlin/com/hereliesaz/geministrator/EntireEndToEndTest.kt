@@ -6,15 +6,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import org.junit.Assume
 
 /**
- * An Aive run recorded as an Entire checkpoint, against the real `entire` CLI. Skipped where
- * Entire isn't installed.
+ * An Aive run recorded as an Entire checkpoint, against the real `entire` CLI. Reported as skipped
+ * where Entire isn't installed; `EntireRecorderTest` covers the same path against a fake `entire`.
  */
 class EntireEndToEndTest {
     @Test
     fun aRunCommittedInAWorktreeGainsAnEntireCheckpoint() = runBlocking {
-        val cli = EntireCli.locate() ?: return@runBlocking
+        val cli = EntireCli.locate()
+        if (cli == null) println("EntireEndToEndTest skipped: no `entire` on PATH")
+        Assume.assumeTrue("`entire` is not installed", cli != null)
+        cli!!
         val root = Files.createTempDirectory("aive-entire-repo").toFile()
         val sessions = AiveEntireSessions(Files.createTempDirectory("aive-entire-sessions").toFile())
         fun git(dir: File, vararg args: String): String {

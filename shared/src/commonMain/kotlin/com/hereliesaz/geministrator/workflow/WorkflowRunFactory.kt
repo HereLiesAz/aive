@@ -6,7 +6,9 @@ import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskCondition
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -19,6 +21,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
+    const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
 
     fun create(
         definition: WorkflowDefinition,
@@ -130,7 +133,20 @@ object WorkflowRunFactory {
             } else {
                 conditionSettled && !conditionMet
             }
+            // A repository mutation runs only after a person approved it. The validator demands an
+            // approval ancestor, but a skipped or cancelled approval also settles as "terminal", so
+            // check that one was actually granted before releasing the mutation.
+            val mutationWithoutApproval = conditionMet &&
+                (task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation)?.isMutation() == true &&
+                !hasGrantedApprovalAncestor(taskId, definitionsById, run)
             when {
+                mutationWithoutApproval -> taskRun.copy(
+                    status = TaskRunStatus.Cancelled,
+                    blockingReason = BlockingReason(
+                        code = APPROVAL_NOT_GRANTED,
+                        message = "No human approval was granted for this repository change; it will not run.",
+                    ),
+                )
                 conditionMet -> taskRun.copy(
                     status = TaskRunStatus.Ready,
                     blockingReason = null,
@@ -153,6 +169,26 @@ object WorkflowRunFactory {
             taskRuns = refreshed,
             updatedAtEpochMillis = nowEpochMillis,
         )
+    }
+
+    /** Whether a human-approval task upstream of [taskId] (through dependsOn) completed, i.e. was approved. */
+    private fun hasGrantedApprovalAncestor(
+        taskId: TaskDefinitionId,
+        definitionsById: Map<TaskDefinitionId, TaskDefinition>,
+        run: WorkflowRun,
+    ): Boolean {
+        val visited = mutableSetOf<TaskDefinitionId>()
+        fun visit(id: TaskDefinitionId): Boolean {
+            if (!visited.add(id)) return false
+            val task = definitionsById[id] ?: return false
+            return task.dependsOn.any { dependencyId ->
+                val dependency = definitionsById[dependencyId] ?: return@any false
+                (dependency.executor is TaskExecutor.HumanApproval &&
+                    run.taskRuns[dependencyId]?.status == TaskRunStatus.Completed) ||
+                    visit(dependencyId)
+            }
+        }
+        return visit(taskId)
     }
 
     private fun TaskRun.isSkippedBranch() =

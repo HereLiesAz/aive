@@ -56,6 +56,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Provider artifacts are stored as opaque `ArtifactRef` values. The runtime never executes their content.
 - Provider completion requires explicit reconciliation. A provider claiming immediate success returns `Completed` only after the runtime polls and confirms.
 - Acceptance criteria are authored by the workflow definition, not the provider.
+- A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
 
@@ -151,15 +152,41 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 
 **Threats**
 - A generated patch escapes the repository, modifies Git control files, or triggers hooks.
-- Repository code executes on the desktop host.
+- Repository code executes on the desktop host, for example through hooks (including a tracked `core.hooksPath` such as `.husky`) or a configured fsmonitor command.
 - A patch clobbers the user's uncommitted work.
 
 **Mitigations in place**
 - The model never gets shell access. It receives a bounded snapshot (up to 28 files and 180,000 characters) and returns a unified diff.
-- Diff paths are validated. Absolute paths, `.git/`, `..` segments, `.gitattributes`, and `.gitmodules` are rejected. The diff must pass `git apply --check` before it is applied.
-- The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts.
-- Commits run with `core.hooksPath` set to an empty temporary directory, so repository hooks do not execute.
-- Repository code is never executed on the host. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+- Diff paths are validated as Git parses them: `git apply --numstat -z` on the patch and on its reverse lists both sides of every file, including rename/copy targets, quoted (octal-escaped) names and traditional `---`/`+++` sections. Absolute paths, `.git/` and `..` segments, and `.gitattributes`/`.gitmodules` (compared case-insensitively) are rejected, as is any patch Git cannot parse. The diff must then pass `git apply --check` before it is applied.
+- The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `haive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
+- `git worktree add` (post-checkout) and `git commit` run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
+- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+
+**Residual risks**
+- Git still honours the user's own Git configuration while checking out and committing. A clean/smudge filter or other driver that the user configured (for example Git LFS, or a filter that runs a tracked script) runs for paths the repository's existing `.gitattributes` select.
+- When Entire recording is on, `entire session attach` amends the commit in the worktree with Entire's own process, which does not get the hooks override.
+
+### Entire checkpoints and the `entire` CLI (desktop)
+
+See `docs/Entire.md`.
+
+**Threats**
+- Checkpoint text (another agent's prompt, intent and summary, or a commit message) is attacker-controlled and flows into a Local Git run's planning prompt: prompt injection that steers the plan or the diff.
+- The `entire` binary runs on the host with the keeper's permissions. A binary planted on `PATH`, or a compromised install, runs whatever it likes.
+- `entire` runs `entire-agent-aive`, which reads transcripts; a crafted session reference could read files outside the sessions folder, or `write-session` could write outside it.
+- Transcripts (prompts, plans, diffs) are committed into checkpoints in the repository's git history, so once that history is pushed they reach everyone who can read the repository.
+
+**Mitigations in place**
+- Checkpoint context is bounded (at most eight checkpoints, the newest three with intent and summary, each field truncated) and only informs the plan: the model still returns a diff that passes the Local Git agent's path validation and `git apply --check`, in an isolated worktree with hooks disabled, and nothing runs on the host.
+- `entire` is located on absolute `PATH` entries or its installers' fixed folders, never resolved against a repository, and always run with a fixed argument list, never through a shell; `GIT_*` variables are cleared and every call has a timeout.
+- The plugin refuses any transcript, session reference or restore target outside the sessions folder, and session ids are reduced to safe file names.
+- External agents are allowed only in the run's temporary worktree's untracked `.entire/settings.local.json`; the keeper's own settings are never changed.
+- Recording is off until the keeper turns it on, and only applies where the repository already has Entire set up.
+
+**Remaining gaps**
+- Prompt injection through checkpoint text is mitigated by the diff pipeline, not prevented: a plan can still be steered toward a harmful but well-formed patch, which is why the branch is left for review.
+- The Aive does not verify the `entire` binary's signature or origin.
+- Recorded transcripts cannot be withdrawn from a pushed checkpoint by The Aive.
 
 ### Repository operations
 
@@ -331,16 +358,20 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 
 **Threats**
 - Malicious import: an exported run bundle contains crafted events that corrupt workflow state or inject false history.
+- Forged approvals: a crafted `.ive` project file carries a workflow that skips `HumanApproval`, a run whose approval task is already `Completed`, pre-approved gates, or a `Ready` repository operation. The app imports a detected `.ive` file on first launch and opens its latest run.
 - Credential leakage: provider tokens stored in Settings are included in exported bundles.
 
 **Mitigations in place**
 - Credentials are stored separately from workflow persistence and are never serialized into run state or exported bundles.
   - **Android:** AES-GCM with an Android Keystore key; ciphertext in SharedPreferences.
-  - **Desktop:** macOS Keychain, Linux Secret Service, or Windows DPAPI. Storage is refused when none is available.
+  - **Desktop:** macOS Keychain, Linux Secret Service, or Windows DPAPI. Storage is refused when none is available. The OS tools run as fixed argument lists (never a shell string) with a 20-second bound and stderr discarded, so a locked keyring cannot hang the app; account ids that are not plain catalog-style ids are never passed to them.
 - Schema migrations validate field types and reject unknown executor kinds.
+- `.ive` project files are untrusted input (`decodeProjectFile`, used by every backend). Every workflow definition in the file must pass `WorkflowGraphValidator`, or the import is refused and nothing is written. Imported runs arrive as history: a run that had not finished is imported `Cancelled` (unfinished tasks cancelled, finished ones kept), and every pending or applying gate is imported `Rejected`. Nothing from the file resumes or executes on its own, including after the first-launch auto-import; continuing the work takes a new run that a person starts and approves.
 
 **Remaining gaps**
 - Imported run bundles are not cryptographically signed. A tampered bundle is accepted if it passes schema validation.
+- An imported `.ive` file's history (finished runs, their approved gates and artifacts) is shown as the file states it; it is not evidence that those approvals happened.
+- Whole-store JSON restore (`importJson`) is treated as the user's own backup and is not re-validated.
 - The web build encrypts credentials in `localStorage` with a non-extractable AES-GCM key held in IndexedDB (`credential-vault.js`). That defeats copied or dumped storage, not script running on the origin, which can still ask the key to decrypt. Browsers without Web Crypto or IndexedDB (for example, plain-http origins) fall back to plaintext.
 
 ## Invariants

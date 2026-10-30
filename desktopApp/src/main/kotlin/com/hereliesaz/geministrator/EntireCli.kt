@@ -1,9 +1,14 @@
 package com.hereliesaz.geministrator
 
 import java.io.File
-import java.util.concurrent.CompletableFuture
+import java.io.InputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -29,32 +34,69 @@ internal class EntireCli(val binary: File) {
         directory: File? = null,
         environment: Map<String, String> = emptyMap(),
         timeoutSeconds: Long = PROCESS_TIMEOUT_SECONDS,
-    ): Result = withContext(Dispatchers.IO) {
-        try {
-            val builder = ProcessBuilder(listOf(binary.absolutePath) + args)
-            directory?.let(builder::directory)
-            val env = builder.environment()
-            env.keys.filter { it.startsWith("GIT_", ignoreCase = true) }.toList().forEach(env::remove)
-            env["GIT_TERMINAL_PROMPT"] = "0"
-            env.putAll(environment)
-            val process = builder.start()
-            runCatching { process.outputStream.close() }
-            val out = CompletableFuture.supplyAsync { process.inputStream.bufferedReader().use { it.readText() } }
-            val err = CompletableFuture.supplyAsync { process.errorStream.bufferedReader().use { it.readText() } }
-            val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
-            if (!finished) {
-                runCatching { process.toHandle().descendants().forEach { it.destroyForcibly() } }
-                process.destroyForcibly()
+    ): Result {
+        val process = try {
+            withContext(Dispatchers.IO) {
+                val builder = ProcessBuilder(listOf(binary.absolutePath) + args)
+                directory?.let(builder::directory)
+                sanitizeGitEnvironment(builder)
+                builder.environment().putAll(environment)
+                builder.start().also { runCatching { it.outputStream.close() } }
             }
-            Result(
-                exitCode = if (finished) process.exitValue() else -1,
-                output = runCatching { out.get(10, TimeUnit.SECONDS) }.getOrDefault(""),
-                error = runCatching { err.get(10, TimeUnit.SECONDS) }.getOrDefault("")
-                    .let { if (finished) it else "entire timed out. $it" },
-            )
+        } catch (failure: CancellationException) {
+            throw failure
         } catch (failure: Exception) {
-            Result(-1, "", failure.message ?: "Unable to run entire")
+            return Result(-1, "", failure.message ?: "Unable to run entire")
         }
+        // Each stream gets its own thread: a shared pool that is busy elsewhere would leave a pipe
+        // undrained, and the child would block on a full pipe until the timeout.
+        val out = drain(process.inputStream, "entire-stdout")
+        val err = drain(process.errorStream, "entire-stderr")
+        val finished = try {
+            runInterruptible(Dispatchers.IO) { process.waitFor(timeoutSeconds, TimeUnit.SECONDS) }
+        } catch (failure: CancellationException) {
+            destroyTree(process)
+            throw failure
+        }
+        if (!finished) destroyTree(process)
+        return Result(
+            exitCode = if (finished) process.exitValue() else -1,
+            output = out.await(),
+            error = err.await().let { if (finished) it else "entire timed out. $it" },
+        )
+    }
+
+    private class Drain(private val thread: Thread, private val text: () -> String) {
+        /** What the stream produced; waits briefly for the reader to reach end of stream. */
+        fun await(): String {
+            thread.join(TimeUnit.SECONDS.toMillis(10))
+            return text()
+        }
+    }
+
+    private fun drain(stream: InputStream, name: String): Drain {
+        val text = StringBuffer()
+        val thread = Thread({
+            runCatching {
+                stream.bufferedReader().use { reader ->
+                    val buffer = CharArray(8_192)
+                    while (true) {
+                        val read = reader.read(buffer)
+                        if (read < 0) break
+                        text.append(buffer, 0, read)
+                    }
+                }
+            }
+        }, name).apply {
+            isDaemon = true
+            start()
+        }
+        return Drain(thread) { text.toString() }
+    }
+
+    private fun destroyTree(process: Process) {
+        runCatching { process.toHandle().descendants().forEach { it.destroyForcibly() } }
+        process.destroyForcibly()
     }
 
     suspend fun version(): String? = run(listOf("--version"), timeoutSeconds = 20)
@@ -110,25 +152,47 @@ internal class EntireCli(val binary: File) {
 /**
  * Installs `entire-agent-aive` in `~/.aive/bin`: a small launcher that starts this same app with
  * `entire-agent <subcommand>` (see DesktopLauncher), so Entire can read The Aive's transcripts.
- * Rewritten on every call, so it always points at the running installation. Returns its folder,
+ * Checked on every call, so it always points at the running installation. Returns its folder,
  * which Aive puts first on PATH when it runs `entire`.
  */
 internal fun installEntireAgentLauncher(): File? = runCatching {
     val dir = File(System.getProperty("user.home"), ".aive/bin").apply { mkdirs() }
     val windows = System.getProperty("os.name").lowercase().contains("win")
     val command = entireAgentCommand() ?: return null
-    if (windows) {
-        File(dir, "entire-agent-aive.cmd").writeText(
-            "@echo off\r\n" + command.joinToString(" ") { "\"$it\"" } + " %*\r\n",
-        )
-    } else {
-        File(dir, "entire-agent-aive").apply {
-            writeText("#!/bin/sh\nexec " + command.joinToString(" ") { it.shellQuoted() } + " \"\$@\"\n")
-            setExecutable(true, true)
-        }
-    }
+    writeEntireAgentLauncher(dir, command, windows)
     dir
 }.getOrNull()
+
+/**
+ * Writes the launcher into [dir] for [command]. An unchanged launcher is left alone; a changed one is
+ * written beside it and moved into place, so a concurrent `entire` never runs a half-written script.
+ */
+internal fun writeEntireAgentLauncher(dir: File, command: List<String>, windows: Boolean): File {
+    val (launcher, content) = if (windows) {
+        File(dir, "entire-agent-aive.cmd") to
+            "@echo off\r\n" + command.joinToString(" ") { "\"$it\"" } + " %*\r\n"
+    } else {
+        File(dir, "entire-agent-aive") to
+            "#!/bin/sh\nexec " + command.joinToString(" ") { it.shellQuoted() } + " \"\$@\"\n"
+    }
+    val current = runCatching { launcher.takeIf(File::isFile)?.readText() }.getOrNull()
+    if (current != content) {
+        val staged = Files.createTempFile(dir.toPath(), ".${launcher.name}-", ".tmp")
+        try {
+            Files.writeString(staged, content)
+            if (!windows) staged.toFile().setExecutable(true, true)
+            try {
+                Files.move(staged, launcher.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(staged, launcher.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(staged)
+        }
+    }
+    if (!windows && !launcher.canExecute()) launcher.setExecutable(true, true)
+    return launcher
+}
 
 /** How to start this app as the plugin: its native launcher, or the JVM with this classpath. */
 private fun entireAgentCommand(): List<String>? {

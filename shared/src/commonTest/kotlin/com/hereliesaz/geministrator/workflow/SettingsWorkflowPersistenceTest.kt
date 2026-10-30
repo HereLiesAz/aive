@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -8,10 +9,15 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
@@ -448,12 +454,138 @@ class SettingsWorkflowPersistenceTest {
         assertEquals(project, destination.projects.get(project.id))
         assertEquals(existingProject, destination.projects.get(existingProject.id))
         assertEquals(definition, destination.definitions.get(definition.id))
-        assertEquals(run, destination.runs.get(run.id))
+        // An unfinished run arrives as history: cancelled, so nothing from the file resumes on its own.
+        val importedRun = assertNotNull(destination.runs.get(run.id))
+        assertEquals(WorkflowRunStatus.Cancelled, importedRun.status)
+        assertEquals(run.copy(status = importedRun.status, taskRuns = importedRun.taskRuns), importedRun)
         assertEquals(1, destination.events.forRun(run.id).size)
         assertEquals(
             BuiltInRoles.ImplementationEngineer,
             destination.roles.get(BuiltInRoles.ImplementationEngineer.id),
         )
+    }
+
+    @Test
+    fun importedRunsCarryNoApprovalsAndNothingResumesFromTheFile() = runBlocking {
+        val approval = TaskDefinitionId("approve-push")
+        val push = TaskDefinitionId("push")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("crafted-workflow"),
+            name = "Crafted",
+            tasks = listOf(
+                TaskDefinition(
+                    id = approval,
+                    name = "Approve push",
+                    objective = "A person approves the push",
+                    roleId = null,
+                    executor = TaskExecutor.HumanApproval(),
+                ),
+                TaskDefinition(
+                    id = push,
+                    name = "Push",
+                    objective = "Push the branch",
+                    roleId = null,
+                    dependsOn = setOf(approval),
+                    executor = TaskExecutor.RepositoryOperation("push"),
+                ),
+            ),
+        )
+        val project = Project(ProjectId("crafted-project"), "Crafted", createdAtEpochMillis = 1L, updatedAtEpochMillis = 1L)
+        val created = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("crafted-run"),
+            projectId = project.id,
+            objective = "Push without asking",
+            nowEpochMillis = 2L,
+            taskRunIdFactory = { TaskRunId("crafted-${it.value}") },
+        )
+        // The file claims the approval already happened and the push is ready to go.
+        val crafted = created.copy(
+            status = WorkflowRunStatus.Running,
+            taskRuns = created.taskRuns.mapValues { (id, taskRun) ->
+                taskRun.copy(status = if (id == approval) TaskRunStatus.Completed else TaskRunStatus.Ready)
+            },
+        )
+        fun gate(id: String, status: ApprovalGateStatus) = ApprovalGate(
+            id = ApprovalGateId(id),
+            workflowRunId = crafted.id,
+            taskDefinitionId = push,
+            kind = ApprovalGateKind.PlanApproval,
+            reason = "Review plan",
+            requiresHuman = true,
+            status = status,
+            createdAtEpochMillis = 3L,
+        )
+        val source = SettingsWorkflowPersistence(MapSettings())
+        source.projects.put(project)
+        source.definitions.put(definition)
+        source.runs.put(crafted)
+        source.approvalGates.put(gate("pending", ApprovalGateStatus.Pending))
+        source.approvalGates.put(gate("applying", ApprovalGateStatus.Applying))
+        source.approvalGates.put(gate("approved", ApprovalGateStatus.Approved))
+        val encoded = source.exportProjectFile(project.id, savedAtEpochMillis = 50L)
+
+        val destination = SettingsWorkflowPersistence(MapSettings())
+        destination.importProjectFile(encoded)
+
+        val imported = assertNotNull(destination.runs.get(crafted.id))
+        assertEquals(WorkflowRunStatus.Cancelled, imported.status)
+        assertEquals(TaskRunStatus.Completed, imported.taskRuns.getValue(approval).status)
+        val pushRun = imported.taskRuns.getValue(push)
+        assertEquals(TaskRunStatus.Cancelled, pushRun.status)
+        assertEquals("imported-run-stopped", pushRun.blockingReason?.code)
+        assertTrue(destination.approvalGates.unresolved(crafted.id).isEmpty())
+        assertEquals(ApprovalGateStatus.Rejected, destination.approvalGates.get(ApprovalGateId("pending"))?.status)
+        assertEquals(ApprovalGateStatus.Rejected, destination.approvalGates.get(ApprovalGateId("applying"))?.status)
+        assertEquals(ApprovalGateStatus.Approved, destination.approvalGates.get(ApprovalGateId("approved"))?.status)
+    }
+
+    @Test
+    fun importRejectsAProjectFileWhoseWorkflowFailsValidation() = runBlocking {
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("unguarded-workflow"),
+            name = "Unguarded",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("push"),
+                    name = "Push",
+                    objective = "Push with no human approval",
+                    roleId = null,
+                    executor = TaskExecutor.RepositoryOperation("push"),
+                ),
+            ),
+        )
+        val project = Project(ProjectId("unguarded-project"), "Unguarded", createdAtEpochMillis = 1L, updatedAtEpochMillis = 1L)
+        val source = SettingsWorkflowPersistence(MapSettings())
+        source.projects.put(project)
+        source.definitions.put(definition)
+        source.runs.put(
+            WorkflowRun(
+                id = WorkflowRunId("unguarded-run"),
+                projectId = project.id,
+                workflowDefinitionId = definition.id,
+                objective = "Push",
+                status = WorkflowRunStatus.Created,
+                taskRuns = mapOf(
+                    TaskDefinitionId("push") to TaskRun(
+                        id = TaskRunId("unguarded-push"),
+                        taskDefinitionId = TaskDefinitionId("push"),
+                        status = TaskRunStatus.Ready,
+                        assignedRoleId = null,
+                        executor = TaskExecutor.RepositoryOperation("push"),
+                    ),
+                ),
+                createdAtEpochMillis = 2L,
+                updatedAtEpochMillis = 2L,
+            ),
+        )
+        val encoded = source.exportProjectFile(project.id, savedAtEpochMillis = 50L)
+
+        val destination = SettingsWorkflowPersistence(MapSettings())
+        val failure = assertFailsWith<IllegalArgumentException> { destination.importProjectFile(encoded) }
+        assertTrue(failure.message.orEmpty().contains("human-approval"), failure.message)
+        assertTrue(destination.projects.all().isEmpty())
+        assertNull(destination.runs.get(WorkflowRunId("unguarded-run")))
     }
 
 

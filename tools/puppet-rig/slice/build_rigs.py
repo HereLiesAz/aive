@@ -33,7 +33,6 @@ import json
 import math
 import os
 import re
-import subprocess
 import sys
 
 import numpy as np
@@ -68,21 +67,18 @@ def load_sheet(parts_dir: str):
     return meta, imgs
 
 
-def sheet_time(d: str, f: str) -> float:
-    """Timestamp of a sheet: from the 'ChatGPT Image <date>, <time>' name, else its git commit time."""
+def sheet_order(f: str):
+    """Sort key of a sheet within its role, from its file name alone (so slugs never depend on git
+    history or checkout times): sheets named 'ChatGPT Image <date>, <time>' by that time, oldest
+    first, then every other sheet by name; ties by name."""
     m = re.search(r"(\w{3}) (\d+), (\d{4}), (\d+)_(\d+)_(\d+) (AM|PM)", f)
     if m:
         import datetime as dt
         mon, day, yr, hh, mm, ss, ap = m.groups()
         h = int(hh) % 12 + (12 if ap == "PM" else 0)
         t = dt.datetime.strptime(f"{mon} {day} {yr} {h}:{mm}:{ss}", "%b %d %Y %H:%M:%S")
-        return t.timestamp()
-    try:
-        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", os.path.join(CHAR_ROOT, d, f)],
-                             cwd=REPO, capture_output=True, text=True).stdout.strip()
-        return float(out or 0)
-    except Exception:
-        return 0.0
+        return (0, t.toordinal() * 86400 + t.hour * 3600 + t.minute * 60 + t.second, f)
+    return (1, 0, f)
 
 
 def references(d: str):
@@ -697,7 +693,7 @@ def build_rig(slug, meta, imgs, ov, ref):
             "id": p.id, "parent": p.parent, "z": p.z,
             "rect": {"x": x, "y": y, "w": w, "h": h},
             "size": {"w": w, "h": h},
-            "pivot": {"x": r2(min(1.2, max(-0.2, pv[0])) * 1000 / 1000), "y": r2(min(1.2, max(-0.2, pv[1])))},
+            "pivot": {"x": r2(min(1.2, max(-0.2, pv[0]))), "y": r2(min(1.2, max(-0.2, pv[1])))},
             "rest": {"x": r2(lx), "y": r2(ly), "rotation": r2(angdiff(p.rot - prot, 0)), "scaleX": 1, "scaleY": 1, "alpha": 1},
         })
     sp_ = {p["id"]: p for p in parts}
@@ -773,17 +769,26 @@ def evaluate(rig, state, phase):
         r = p.get("rest", {})
         tx = r.get("x", 0) + ch(pid, "x")
         ty = r.get("y", 0) + ch(pid, "y")
-        th = math.radians(r.get("rotation", 0) + ch(pid, "rotation"))
+        # A limb never rotates: its rotation channel is its bend (bend = 2 x rotation).
+        turn = ch(pid, "rotation")
+        bend = 2 * turn if is_limb(p) else 0.0
+        follow = 0.0
+        parent = byid.get(p.get("parent")) if p.get("parent") else None
+        if parent is not None and is_limb(parent):
+            # On a bent limb, a child rides the curve: placed on it, turned with it.
+            tx, ty, ang = place_on_limb(parent, tx, ty, w(parent["id"])[2])
+            follow = math.degrees(ang)
+        th = math.radians(r.get("rotation", 0) + follow + (0 if is_limb(p) else turn))
         sx = r.get("scaleX", 1) * ch(pid, "scaleX")
         sy = r.get("scaleY", 1) * ch(pid, "scaleY")
         a = r.get("alpha", 1) * ch(pid, "alpha")
-        L = np.array([[math.cos(th) * sx, -math.sin(th) * sy, tx], [math.sin(th) * sx, math.cos(th) * sy, ty], [0, 0, 1]])
-        if p.get("parent"):
-            PM, pa = w(p["parent"])
+        L = trs(tx, ty, th, sx, sy)
+        if parent is not None:
+            PM, pa, _ = w(parent["id"])
             M, al = PM @ L, pa * a
         else:
             M, al = L, a
-        world[pid] = (M, min(1, max(0, al)))
+        world[pid] = (M, min(1, max(0, al)), bend)
         return world[pid]
 
     for p in rig["parts"]:
@@ -791,30 +796,119 @@ def evaluate(rig, state, phase):
     return world
 
 
+# Limbs bend and stretch, never rotate (docs/architecture/PUPPET_RIG_FORMAT.md, Limbs). Mirrors
+# isLimb / limbAxis / placeOnLimb in rig-core.js and LimbBend.kt.
+LIMB_ID = re.compile(r"^(tendril|tail)(\.(\d+|base|mid|lower|upper))*$")
+LIMB_SLICES = 24
+
+
+def is_limb(p) -> bool:
+    kind = p.get("kind") or "other"
+    return kind in ("tendril", "tail") or (kind == "other" and bool(LIMB_ID.match(p["id"])))
+
+
+def trs(x, y, th, sx=1.0, sy=1.0):
+    return np.array([[math.cos(th) * sx, -math.sin(th) * sy, x], [math.sin(th) * sx, math.cos(th) * sy, y], [0, 0, 1]])
+
+
+def part_size(p):
+    r = p.get("rect") or {}
+    sz = p.get("size") or {}
+    w, h = sz.get("w", r.get("w", 0)), sz.get("h", r.get("h", 0))
+    st = p.get("stretch") if p.get("kind") in ("tail", "tendril") else None
+    if st:
+        w = st["length"] if st["axis"] == "x" else w
+        h = st["length"] if st["axis"] == "y" else h
+    return w, h
+
+
+def limb_axis(p):
+    """The limb's unit axis in part-local px, pivot to tip (the pivot reflected through the box centre), and its length."""
+    w, h = part_size(p)
+    pv = p.get("pivot") or {"x": 0.5, "y": 0.5}
+    x, y = (1 - 2 * pv["x"]) * w, (1 - 2 * pv["y"]) * h
+    length = math.hypot(x, y)
+    return (x / length, y / length, length) if length > 0 else (1.0, 0.0, 0.0)
+
+
+def place_on_limb(p, x, y, bend_deg):
+    """Where part-local point (x, y) of limb p lands bent by bend_deg: (x, y, curve direction in radians)."""
+    ax, ay, length = limb_axis(p)
+    if length <= 0:
+        return x, y, 0.0
+    along, across = x * ax + y * ay, -x * ay + y * ax
+    px, py = -ay, ax
+    theta = math.radians(bend_deg)
+    if along <= 0 or abs(theta) < 1e-4:
+        return along * ax + across * px, along * ay + across * py, 0.0
+    k = theta / length
+    phi = k * along
+    cx = math.sin(phi) / k - across * math.sin(phi)
+    cy = (1 - math.cos(phi)) / k + across * math.cos(phi)
+    return cx * ax + cy * px, cx * ay + cy * py, phi
+
+
+def _composite(out, layer, al, mask=None):
+    if al < 1 or mask is not None:
+        a = np.asarray(layer).copy()
+        alpha = a[..., 3].astype(np.float32) * al
+        if mask is not None:
+            alpha *= mask
+        a[..., 3] = np.clip(alpha, 0, 255).astype(np.uint8)
+        layer = Image.fromarray(a)
+    out.alpha_composite(layer)
+
+
 def render(rig, atlas: Image.Image, state, phase, scale=1.0):
     W, H = int(math.ceil(rig["canvas"]["width"] * scale)), int(math.ceil(rig["canvas"]["height"] * scale))
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     world = evaluate(rig, state, phase)
     order = sorted(enumerate(rig["parts"]), key=lambda t: (t[1].get("z", 0), t[0]))
+    S = np.diag([scale, scale, 1])
     for _, p in order:
         if "rect" not in p:
             continue
-        M, al = world[p["id"]]
+        M, al, bend = world[p["id"]]
         r = p["rect"]
-        sz = p.get("size") or {"w": r["w"], "h": r["h"]}
+        sw, sh = part_size(p)
         pv = p.get("pivot") or {"x": 0.5, "y": 0.5}
         crop = atlas.crop((r["x"], r["y"], r["x"] + r["w"], r["y"] + r["h"]))
         # source pixel (u, v) -> local (u * w / rw - px * w, ...) -> world (M) -> out (scale)
-        A = np.array([[sz["w"] / r["w"], 0, -pv["x"] * sz["w"]], [0, sz["h"] / r["h"], -pv["y"] * sz["h"]], [0, 0, 1]])
-        T = np.diag([scale, scale, 1]) @ M @ A
-        Ti = np.linalg.inv(T)
+        A = np.array([[sw / r["w"], 0, -pv["x"] * sw], [0, sh / r["h"], -pv["y"] * sh], [0, 0, 1]])
+        if is_limb(p) and abs(bend) > 0.01:
+            _render_bent_limb(out, crop, p, S @ M, A, al, bend, sw, sh, pv)
+            continue
+        Ti = np.linalg.inv(S @ M @ A)
         layer = crop.transform((W, H), Image.AFFINE, data=tuple(Ti[:2].ravel()), resample=Image.BICUBIC)
-        if al < 1:
-            a = np.asarray(layer).copy()
-            a[..., 3] = (a[..., 3] * al).astype(np.uint8)
-            layer = Image.fromarray(a)
-        out.alpha_composite(layer)
+        _composite(out, layer, al)
     return out
+
+
+def _render_bent_limb(out, crop, p, SM, A, al, bend, sw, sh, pv):
+    """A limb bent along its arc, as the editor's drawBentLimb draws it: the sprite in thin slices
+    across its axis, each placed on the curve and turned with it."""
+    W, H = out.size
+    ax, ay, _ = limb_axis(p)
+    left, top = -pv["x"] * sw, -pv["y"] * sh
+    along = [x * ax + y * ay for x, y in ((left, top), (left + sw, top), (left, top + sh), (left + sw, top + sh))]
+    lo, hi = min(along), max(along)
+    step = (hi - lo) / LIMB_SLICES
+    gy, gx = np.mgrid[0:H, 0:W].astype(np.float32) + 0.5
+    for k in range(LIMB_SLICES):
+        mid = lo + (k + 0.5) * step
+        qx, qy, ang = place_on_limb(p, mid * ax, mid * ay, bend)
+        # The slice's frame: on the curve, turned by its direction there; the sprite shifted so
+        # the slice's middle sits at the frame's origin.
+        F = SM @ trs(qx, qy, ang)
+        Ti = np.linalg.inv(F @ np.array([[1, 0, -mid * ax], [0, 1, -mid * ay], [0, 0, 1]]) @ A)
+        layer = crop.transform((W, H), Image.AFFINE, data=tuple(Ti[:2].ravel()), resample=Image.BICUBIC)
+        # Keep only this slice (perpendicular to the axis), with a hair of overlap so no seam shows.
+        Fi = np.linalg.inv(F)
+        lx = Fi[0, 0] * gx + Fi[0, 1] * gy + Fi[0, 2]
+        ly = Fi[1, 0] * gx + Fi[1, 1] * gy + Fi[1, 2]
+        u = lx * ax + ly * ay
+        mask = ((u >= -step / 2 - 0.6) & (u <= step / 2 + 0.6)).astype(np.float32)
+        _composite(out, layer, al, mask)
 
 
 def compare(rig, atlas, ref_path, out_path, title):
@@ -862,7 +956,7 @@ def plan_slugs(sheets, ov_all):
     plan = []
     for d, lst in by_dir.items():
         role = sp.role_slug(d) if d else ""
-        lst.sort(key=lambda t: sheet_time(t[0], t[1]))
+        lst.sort(key=lambda t: sheet_order(t[1]))
         newest = lst[-1][1]
         for i, (dd, f, pdir) in enumerate(lst):
             if role == "generic":

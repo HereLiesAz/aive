@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -599,12 +600,10 @@ class WorkflowRuntimeCoordinator(
                 continue
             }
             val integration = executorIntegrations.integrationFor(executor, project) ?: continue
-            next = applyExecution(
-                run = next,
-                id = id,
-                previous = taskRun,
-                executor = executor,
-                execution = integration.dispatch(
+            // A throwing integration fails its own task (through the normal retry/escalation path)
+            // instead of escaping the cycle and leaving the task Ready forever.
+            val execution = try {
+                integration.dispatch(
                     TaskExecutorContext(
                         project = project,
                         definition = definition,
@@ -615,9 +614,27 @@ class WorkflowRuntimeCoordinator(
                         nowEpochMillis = now,
                         role = engine.roleDefinition(next, task.roleId),
                     ),
-                ),
+                )
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Throwable) {
+                TaskExecutorExecution(
+                    status = TaskRunStatus.Failed,
+                    progressMessage = failure.message?.takeIf(String::isNotBlank)
+                        ?: "${executor.displayLabel()} dispatch failed",
+                )
+            }
+            next = applyExecution(
+                run = next,
+                id = id,
+                previous = taskRun,
+                executor = executor,
+                execution = execution,
                 now = now,
             )
+            // Record each started external run at once, so nothing later in this cycle can lose it
+            // and cause the same run to be dispatched again.
+            persistence.runs.put(next)
         }
         return next
     }

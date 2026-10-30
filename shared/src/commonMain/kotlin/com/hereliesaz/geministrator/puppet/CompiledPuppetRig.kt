@@ -174,9 +174,10 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             // On a bent limb, a child rides the curve: placed on it, turned with it.
             val p = parentIndex[i]
             if (p >= 0 && limb[p]) {
+                // The parent's whole drawn arc, every segment of a reach included, as its mesh and attachments.
                 LimbBend.place(
                     x * axisX[p] + y * axisY[p], -x * axisY[p] + y * axisX[p], axisX[p], axisY[p], limbLength[p],
-                    out.bend[p], out.stretch[p], 1, 0f, bent,
+                    out.bend[p], out.stretch[p], out.segments[p], 0f, bent,
                 )
                 x = bent[0]
                 y = bent[1]
@@ -286,8 +287,15 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         }
     }
 
-    /** The parts named `tail…`: the limb that carries the egg. */
-    val tailParts: IntArray = rig.parts.indices.filter { rig.parts[it].id.startsWith("tail") }.toIntArray()
+    /**
+     * The tail limbs ([isLimb] of kind `tail`, or named `tail…` in rigs from before kinds): the
+     * limb that carries the egg. The egg and its pods (`tail.egg`, `tail.pod.N`) are not limbs, so
+     * an inherited tail never replaces them.
+     */
+    val tailParts: IntArray = rig.parts.indices.filter {
+        val part = rig.parts[it]
+        part.isLimb && (part.kind == "tail" || part.id.startsWith("tail"))
+    }.toIntArray()
 
     /**
      * A slice of light travelling a tendril: [at] runs 0 (base) to 1 (tip, across every segment).
@@ -342,7 +350,12 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         drawContext.canvas.restore()
     }
 
+    /**
+     * One shader per atlas drawn: this rig's, and a bred creature's donors'. Bounded, since the
+     * donors change with whichever creature wears this rig.
+     */
     private val shaders = HashMap<ImageBitmap, androidx.compose.ui.graphics.Shader>()
+    private val meshScratch = LimbMeshScratch()
 
     /** Copy [j] of limb [i], bent and stretched along its curve ([drawLimbMesh]). */
     private fun drawLimb(
@@ -354,6 +367,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         j: Int,
         sprite: PuppetPart,
     ) {
+        if (atlas !in shaders && shaders.size >= MAX_SHADERS) shaders.clear()
         val shader = shaders.getOrPut(atlas) { androidx.compose.ui.graphics.ImageShader(atlas) }
         scope.drawLimbMesh(
             atlas = atlas,
@@ -368,6 +382,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             segments = pose.segments[i],
             shift = j.toFloat(),
             shader = shader,
+            scratch = meshScratch,
         )
     }
 
@@ -428,6 +443,8 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         private const val DEG = (PI / 180.0).toFloat()
         /** A tendril curls shorter than its sprite down to this, no further. */
         private const val MIN_REACH = 0.7f
+        /** Atlases a rig keeps shaders for: its own and a bred creature's two donors, with room. */
+        private const val MAX_SHADERS = 4
         private val CHANNELS = listOf(
             PuppetChannel.X, PuppetChannel.Y, PuppetChannel.Rotation,
             PuppetChannel.ScaleX, PuppetChannel.ScaleY, PuppetChannel.Alpha,

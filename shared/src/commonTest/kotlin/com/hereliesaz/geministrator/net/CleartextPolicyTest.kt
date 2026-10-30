@@ -32,4 +32,30 @@ class CleartextPolicyTest {
             "file:///etc/passwd",
         ).forEach { assertFalse(CleartextPolicy.allowsSecret(it), it) }
     }
+
+    @Test
+    fun theHostIsReadFromTheAuthorityAloneNotFromAFragmentQueryOrPath() {
+        listOf(
+            // The client connects to evil.example; the private-looking part is a fragment, query or path.
+            "http://evil.example#@192.168.0.1/v1",
+            "http://evil.example?@10.0.0.1",
+            "http://evil.example/@127.0.0.1",
+            "http://evil.example\\@192.168.0.1/v1",
+            "http://evil.com#.local",
+            "http://evil.com?x=.local",
+            "http://evil.com/.local",
+            "http://evil.com:8080#localhost",
+            "http://10.0.0.1.evil.com",
+            "http://",
+            "http://@",
+        ).forEach { assertFalse(CleartextPolicy.allowsSecret(it), it) }
+        listOf(
+            // Userinfo before the host is not the host.
+            "http://user:pass@192.168.0.1:8080/v1",
+            "http://evil.example@localhost/v1",
+            "http://my-box.local#section",
+            "http://127.0.0.1?debug=1",
+            "http://[::1]#x",
+        ).forEach { assertTrue(CleartextPolicy.allowsSecret(it), it) }
+    }
 }

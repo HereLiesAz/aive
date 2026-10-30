@@ -51,8 +51,8 @@ Work is autosaved to IndexedDB. Use **New** to start over. Pan with Shift-drag, 
 Copy both files into `shared/src/commonMain/composeResources/files/rigs/` and use them as follows:
 
 ```kotlin
-val loaded = rememberPuppetRig("ux-designer")
-if (loaded != null) RiggedPuppetSurface(loaded.rig, loaded.atlas, state.name, motionPhase, Modifier.size(96.dp))
+val loaded = rememberCreatureRig("ux-designer")
+if (loaded != null) RiggedCreatureSurface(loaded, state, { motionPhase }, Modifier.size(96.dp))
 ```
 
 ## Files

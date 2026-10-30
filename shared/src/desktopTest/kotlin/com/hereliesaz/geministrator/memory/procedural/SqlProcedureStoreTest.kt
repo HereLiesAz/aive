@@ -122,7 +122,7 @@ class SqlProcedureStoreTest {
     }
 
     @Test
-    fun malformedPersistedCandidateFailsClosedOnReopen() = runBlocking {
+    fun malformedPersistedCandidateFailsClosedOnReopen() = runBlocking<Unit> {
         val dir = directory()
         val store = desktopSqlProcedureStore("root", dir)
         assertTrue(store.commit(0, ProcedureMutation(definitionsToAdd = listOf(definition()))))

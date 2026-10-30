@@ -94,6 +94,8 @@ internal data class Stable(
     /** Runs already counted, so a run is counted once. */
     val counted: List<String> = emptyList(),
     val lastHatching: Hatching? = null,
+    /** Store purchase tokens granted here but not yet consumed, so a purchase is granted once. */
+    val granted: List<String> = emptyList(),
 ) {
     fun creatureOf(role: RoleDefinitionId): String? = assignments[role.value] ?: starter
 
