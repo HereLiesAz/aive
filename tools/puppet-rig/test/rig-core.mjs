@@ -1,6 +1,6 @@
 // Pure format/evaluator regression checks. Run: node tools/puppet-rig/test/rig-core.mjs
 import assert from 'node:assert/strict';
-import { evaluate, validateRig, isLimb } from '../rig-core.js';
+import { evaluate, validateRig, isLimb, placeOnLimb, unbendOnLimb } from '../rig-core.js';
 
 const rig = {
   format: 'aive-puppet-rig', version: 1, role: 'test', canvas: { width: 100, height: 100 },
@@ -77,4 +77,12 @@ assert.equal(bp.byId['tendril.0'].bend, 60);
 const chord = (Math.atan2(-(bp.attachments.tip.x - 50), bp.attachments.tip.y - 50) * 180) / Math.PI;
 assert.ok(Math.abs(chord - 30) < 0.05, `chord ${chord}`);
 assert.ok(!isLimb({ id: 'tail.egg' }) && isLimb({ id: 'tail.1' }));
+// Unbending is the exact inverse of bending, so the editor can hit-test a bent limb where it is drawn.
+for (const bendDeg of [-140, -60, 25, 90, 170]) {
+  for (const [x, y] of [[0, 1], [-4, 20], [3, 39], [0, 40]]) {
+    const q = placeOnLimb(bent.parts[0], x, y, bendDeg);
+    const back = unbendOnLimb(bent.parts[0], q.x, q.y, bendDeg);
+    assert.ok(Math.hypot(back.x - x, back.y - y) < 1e-6, `unbend ${bendDeg} (${x},${y}) -> (${back.x},${back.y})`);
+  }
+}
 console.log('puppet-rig limbs: bend checks passed');

@@ -875,7 +875,8 @@ def render(rig, atlas: Image.Image, state, phase, scale=1.0):
         crop = atlas.crop((r["x"], r["y"], r["x"] + r["w"], r["y"] + r["h"]))
         # source pixel (u, v) -> local (u * w / rw - px * w, ...) -> world (M) -> out (scale)
         A = np.array([[sw / r["w"], 0, -pv["x"] * sw], [0, sh / r["h"], -pv["y"] * sh], [0, 0, 1]])
-        if is_limb(p) and abs(bend) > 0.01:
+        # A limb with no axis to bend along (a centred pivot) is drawn whole, like the app does.
+        if is_limb(p) and abs(bend) > 0.01 and limb_axis(p)[2] > 0:
             _render_bent_limb(out, crop, p, S @ M, A, al, bend, sw, sh, pv)
             continue
         Ti = np.linalg.inv(S @ M @ A)

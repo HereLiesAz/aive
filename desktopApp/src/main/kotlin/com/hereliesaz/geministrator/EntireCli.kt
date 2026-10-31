@@ -6,6 +6,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
@@ -35,15 +36,19 @@ internal class EntireCli(val binary: File) {
         environment: Map<String, String> = emptyMap(),
         timeoutSeconds: Long = PROCESS_TIMEOUT_SECONDS,
     ): Result {
+        // Held outside the start's suspension: a cancellation as it resumes would otherwise drop a
+        // process that is already running, and leave it unsupervised.
+        val started = AtomicReference<Process?>()
         val process = try {
             withContext(Dispatchers.IO) {
                 val builder = ProcessBuilder(listOf(binary.absolutePath) + args)
                 directory?.let(builder::directory)
                 sanitizeGitEnvironment(builder)
                 builder.environment().putAll(environment)
-                builder.start().also { runCatching { it.outputStream.close() } }
+                builder.start().also { started.set(it); runCatching { it.outputStream.close() } }
             }
         } catch (failure: CancellationException) {
+            started.get()?.let(::destroyTree)
             throw failure
         } catch (failure: Exception) {
             return Result(-1, "", failure.message ?: "Unable to run entire")

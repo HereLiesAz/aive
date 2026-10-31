@@ -227,10 +227,13 @@ internal fun MindMapRunScreen(
             // A first launch opens on the hive (docs/Keepers-Room.md, stage 2): the creature, and one step to feed it.
             val firstLaunch = runtimeState is ApplicationRuntimeState.NoProject
             val stableHost = LocalStableHost.current
-            var pickedStarter by remember(stableHost) { mutableStateOf(stableHost?.catalog?.starters?.firstOrNull()?.id) }
+            // The keeper's pick, else the first starter: read live, since the catalog can load after this
+            // screen composes, and Feed it must keep a creature either way.
+            var explicitStarter by remember(stableHost) { mutableStateOf<String?>(null) }
+            val pickedStarter = explicitStarter ?: stableHost?.catalog?.starters?.firstOrNull()?.id
             if (firstLaunch) {
                 Text(stringResource(Res.string.first_hive), style = if (compact) AzphaltType.section else AzphaltType.hero, color = azphaltOnSurface())
-                FirstCreature(picked = pickedStarter, onPick = { pickedStarter = it })
+                FirstCreature(picked = pickedStarter, onPick = { explicitStarter = it })
                 Text(stringResource(Res.string.first_hive_hint), style = AzphaltType.body, color = azphaltOnSurface())
             } else {
                 RuntimeStateRecord(runtimeState, compact)

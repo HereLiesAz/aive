@@ -73,6 +73,7 @@ import com.hereliesaz.geministrator.resources.nav_runtime_no_project
 import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
 import com.hereliesaz.geministrator.resources.crumb_here
+import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.crumb_hive
 import com.hereliesaz.geministrator.resources.crumb_label
 import com.hereliesaz.geministrator.resources.nav_the_aive
@@ -203,8 +204,12 @@ fun ControlRoom(
     // The Keeper's room's open part, held here so the breadcrumb can name it.
     val keeperSectionName = rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
     val keeperOpen = rememberDurableBooleanState("keeper.open")
+    // The hive on screen: a resting hive when one is open (it shows even while another run is live),
+    // else the live run's. The breadcrumb and the panel follow what is shown.
+    val restingShown = restingHive.value.isNotBlank()
     val inspectorVisible = selectedTaskId != null &&
         liveWorkflow != null &&
+        !restingShown &&
         destination == ControlRoomDestination.Overview &&
         !district.value
     // Out to the district: the creature panel belongs to a hive, so it closes on the way.
@@ -259,7 +264,14 @@ fun ControlRoom(
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
-        hiveName = liveWorkflow?.definition?.name ?: restingDefinition?.name,
+        // A hive with no run yet still has a name, so "Hive" above it stays a way out to the district.
+        hiveName = when {
+            restingShown -> restingDefinition?.name
+            liveWorkflow != null -> liveWorkflow.definition.name
+            runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.name
+            runtimeState is ApplicationRuntimeState.NoProject -> stringResource(Res.string.first_hive)
+            else -> null
+        },
         creatureName = selectedTaskId?.takeIf { inspectorVisible }?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
         creatureTab = creatureTab.takeIf { inspectorVisible }?.label(),
         keeperPart = KeeperSection.entries.firstOrNull { it.name == keeperSectionName.value }

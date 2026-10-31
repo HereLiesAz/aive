@@ -280,7 +280,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         for (i in drawOrder) {
             val (sheet, sprite) = donor?.invoke(i) ?: (atlas to rig.parts[i])
             if (limb[i]) {
-                for (j in pose.segments[i] - 1 downTo 0) drawLimb(scope, sheet, pose, fit, i, j, sprite)
+                for (j in pose.segments[i] - 1 downTo 0) drawLimb(scope, sheet, pose, fit, scratch, i, j, sprite)
             } else {
                 drawPart(scope, sheet, pose, fit, scratch, i, 0, sprite)
             }
@@ -332,7 +332,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
         for (j in 0 until n) {
             val sheet = sprite?.first ?: atlas
             val drawn = sprite?.second ?: rig.parts[part]
-            if (limb[part]) drawLimb(this, sheet, pose, fit, part, j, drawn) else drawPart(this, sheet, pose, fit, scratch, part, j, drawn)
+            if (limb[part]) drawLimb(this, sheet, pose, fit, scratch, part, j, drawn) else drawPart(this, sheet, pose, fit, scratch, part, j, drawn)
         }
         drawCircle(
             // An energy pulse: white-hot at its core, burning out through the knot's colour.
@@ -357,19 +357,23 @@ class CompiledPuppetRig(val rig: PuppetRig) {
     private val shaders = HashMap<ImageBitmap, androidx.compose.ui.graphics.Shader>()
     private val meshScratch = LimbMeshScratch()
 
-    /** Copy [j] of limb [i], bent and stretched along its curve ([drawLimbMesh]). */
+    /**
+     * Copy [j] of limb [i], bent and stretched along its curve ([drawLimbMesh]); a limb with no axis
+     * to bend along (a centred pivot) is drawn whole, like any other part, rather than not at all.
+     */
     private fun drawLimb(
         scope: DrawScope,
         atlas: ImageBitmap,
         pose: PuppetPoseBuffer,
         fit: PuppetFit,
+        scratch: Matrix,
         i: Int,
         j: Int,
         sprite: PuppetPart,
     ) {
         if (atlas !in shaders && shaders.size >= MAX_SHADERS) shaders.clear()
         val shader = shaders.getOrPut(atlas) { androidx.compose.ui.graphics.ImageShader(atlas) }
-        scope.drawLimbMesh(
+        val drawn = scope.drawLimbMesh(
             atlas = atlas,
             sprite = sprite,
             part = rig.parts[i],
@@ -384,6 +388,7 @@ class CompiledPuppetRig(val rig: PuppetRig) {
             shader = shader,
             scratch = meshScratch,
         )
+        if (!drawn) drawPart(scope, atlas, pose, fit, scratch, i, j, sprite)
     }
 
     private fun drawPart(

@@ -186,6 +186,29 @@ class LocalWorkspaceAgentProviderTest {
     }
 
     @Test
+    fun gitWhitespaceWarningsCannotDisguiseAControlFileInThePathListing() = withGitRepository { root ->
+        // A tracked .gitattributes whose line has whitespace errors: git warns about them on stderr
+        // while listing the patch's paths, and a warning must never be read as part of a path.
+        root.resolve(".gitattributes").writeText("*\t\tfilter=old  \n")
+        git(root, "add", ".gitattributes")
+        git(root, "commit", "-m", "Attributes")
+        val patch = """
+            diff --git a/.gitattributes b/.gitattributes
+            --- a/.gitattributes
+            +++ b/.gitattributes
+            @@ -1 +1 @@
+            -*\t\tfilter=old  
+            +*\t\tfilter=evil  
+        """.trimIndent().replace("\\t", "\t") + "\n"
+
+        val events = runPatch(root, TaskRunId("whitespace-warning"), patch)
+
+        assertTrue(events.filterIsInstance<AgentEvent.Failed>().isNotEmpty(), "the patch was not rejected: $events")
+        assertTrue(events.none { it is AgentEvent.ArtifactProduced })
+        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+    }
+
+    @Test
     fun repositoryHooksNeverRunDuringWorktreeCreationOrCommit() = withGitRepository { root ->
         val marker = root.resolveSibling("${root.fileName}-hook-ran")
         try {

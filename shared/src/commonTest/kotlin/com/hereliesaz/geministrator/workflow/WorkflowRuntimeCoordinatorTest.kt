@@ -30,6 +30,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNotEquals
 import kotlin.test.assertFailsWith
 
 class WorkflowRuntimeCoordinatorTest {
@@ -366,6 +368,31 @@ class WorkflowRuntimeCoordinatorTest {
             artifactIdFactory = ::artifactId,
         )
         assertEquals(1, integration.dispatchesOf("ok.yml"))
+    }
+
+    @Test
+    fun aDispatchFailureIsNeverSavedBeforeItsRetryPolicyRuns() = runBlocking {
+        val (definition, run) = twoGitHubActionRun()
+        // The first dispatch fails; the second then stops the cycle before the failure policy runs.
+        val integration = FakeSystemExecutorIntegration(
+            throwOn = mapOf(
+                "ok.yml" to IllegalStateException("network down"),
+                "boom.yml" to kotlinx.coroutines.CancellationException("stopped"),
+            ),
+        )
+        val fixture = fixture(integrations = TaskExecutorIntegrationRegistry(listOf(integration)))
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> {
+            fixture.coordinator.cycle(project(), definition, WorkflowRuntimeState(run), 20L, ::artifactId)
+        }
+        val saved = assertNotNull(fixture.persistence.runs.get(run.id))
+        assertNotEquals(TaskRunStatus.Failed, saved.taskRuns[TaskDefinitionId("first")]?.status)
+
+        // The next cycle still gets to retry it, rather than finding a failure no policy ever saw.
+        integration.throwOn = emptyMap()
+        val next = fixture.coordinator.cycle(project(), definition, WorkflowRuntimeState(saved), 30L, ::artifactId)
+        assertNotEquals(WorkflowRunStatus.Failed, next.run.status)
+        assertEquals(2, integration.dispatchesOf("ok.yml"))
     }
 
     private fun twoGitHubActionRun(): Pair<WorkflowDefinition, WorkflowRun> {

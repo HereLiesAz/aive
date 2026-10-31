@@ -78,6 +78,29 @@ export function placeOnLimb(p, x, y, bendDeg, stretch = 1, segments = 1, shift =
   return { x: cx * ax.x + cy * px, y: cx * ax.y + cy * py, angle: phi };
 }
 
+/**
+ * The inverse of placeOnLimb (one copy, unstretched): the part-local point that bending limb p by
+ * bendDeg carries to (x, y). The arc is circular, so this is exact; the editor uses it to hit-test
+ * what it draws bent.
+ */
+export function unbendOnLimb(p, x, y, bendDeg) {
+  const ax = limbAxis(p);
+  const theta = (bendDeg * Math.PI) / 180;
+  if (ax.length <= 0 || Math.abs(theta) < 1e-4) return { x, y };
+  const px = -ax.y, py = ax.x;
+  // Into the (axis, right) frame the curve is laid in.
+  const a = x * ax.x + y * ax.y, c = x * px + y * py;
+  const k = theta / ax.length, r0 = 1 / k;
+  // A point bent from s > 0 sits on a circle about (0, 1/k): radius R = 1/k - across, turned phi = k s.
+  const dx = a, dy = r0 - c;
+  const R = Math.sign(r0) * Math.hypot(dx, dy);
+  const phi = Math.atan2(dx / R, dy / R);
+  const s = phi / k;
+  if (s <= 0) return { x, y }; // before the base the limb is straight
+  const along = s, across = r0 - R;
+  return { x: along * ax.x + across * px, y: along * ax.y + across * py };
+}
+
 export function attachmentOffset(p, a) {
   const { w, h } = partSize(p);
   const pivot = p.pivot || { x: 0.5, y: 0.5 };

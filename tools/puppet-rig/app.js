@@ -563,7 +563,7 @@ function drawRig(dpr) {
     if (!c || e.alpha <= 0) continue;
     const m = core.mul(view, e.m);
     ctx.globalAlpha = e.alpha;
-    if (core.isLimb(e.part) && Math.abs(e.bend) > 0.01) drawBentLimb(c, e, m);
+    if (core.isLimb(e.part) && Math.abs(e.bend) > 0.01 && core.limbAxis(e.part).length > 0) drawBentLimb(c, e, m);
     else {
       ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
       ctx.drawImage(c, e.boxLeft, e.boxTop, e.w, e.h);
@@ -678,7 +678,9 @@ function hitPart(pose, w) {
   for (let i = pose.parts.length - 1; i >= 0; i--) {
     const e = pose.parts[i];
     if (!e.part.cut) continue;
-    const l = core.apply(core.invert(e.m), w.x, w.y);
+    let l = core.apply(core.invert(e.m), w.x, w.y);
+    // A bent limb is drawn along its curve: unbend the point, then test the sprite's own box.
+    if (core.isLimb(e.part) && Math.abs(e.bend) > 0.01) l = core.unbendOnLimb(e.part, l.x, l.y, e.bend);
     if (l.x >= e.boxLeft && l.x <= e.boxLeft + e.w && l.y >= e.boxTop && l.y <= e.boxTop + e.h) return e;
   }
   return null;

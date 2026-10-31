@@ -249,8 +249,13 @@ private fun MascotNodeTerrarium(
         // socket facing the partner) use the silhouette-edge anchor below.
         // The body each agent wears: the keeper's creature when there is a stable, else its role's.
         val keptRig = LocalCreatureRig.current
+        val programmatic = LocalProgrammaticNodes.current
         val rigSlugs = subjects.associate { subject ->
-            subject.node.id to (keptRig(subject.node.label)?.substringBefore('+') ?: CreatureRigMapping.slugFor(subject.node.label))
+            subject.node.id to (
+                rigOverrideFor(subject.node.id, programmatic)
+                    ?: keptRig(subject.node.label)?.substringBefore('+')
+                    ?: CreatureRigMapping.slugFor(subject.node.label)
+                )
         }
         LaunchedEffect(rigSlugs) {
             rigSlugs.values.toSet().forEach { slug -> launch { CreatureRigCache.get(slug) } }
@@ -625,6 +630,7 @@ private fun MascotNodeTerrarium(
                     motionPhase = { motionPhase() },
                     modifier = Modifier.fillMaxSize(),
                     reach = { tendrilReach(node.id) },
+                    rigOverride = rigOverrideFor(node.id, LocalProgrammaticNodes.current),
                 )
                 H2g2SwarmAdornmentLayer(
                     adornments = adornments[node.id].orEmpty(),
