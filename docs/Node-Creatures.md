@@ -22,8 +22,8 @@ Everything below is grounded in the domain model (`TaskDefinition`, `TaskRun`, `
 | **Myelin** | a sheen along a well-used tail | prompt reuse/cache (`PromptReusePolicy`): signals travel faster |
 | **Synaptic plasticity** | tethers thicken with use across runs | memory: paths the swarm has used successfully before are stronger |
 | **Metabolism** | body fullness, glow | budget: tokens and cost spent; a starving creature thins |
-| **Reflex arc** | a creature with no nucleus, a simple tendril loop | deterministic executors (`Script`, `TestRunner`, `Deployment`, `RepositoryOperation`, `GitHubAction`): no agent mind, just stimulus to response |
-| **Sensory organ** | a tendril reaching out of the water | `ExternalService` visits and the user's own input (`HumanApproval`) |
+| **Reflex arc** | the neuron: no nucleus, dendrites in, an axon out | programmatic steps (`Script`, `TestRunner`, `Deployment`, `RepositoryOperation`, `NestedWorkflow`, `GitHubAction`, `ExternalService`): no agent mind, just stimulus to response, each its own node in the flow |
+| **Sensory organ** | a tendril reaching out of the water | the user's own input (`HumanApproval`), worn by the creature it gates |
 | **Glia (microglia)** | the adversarial roles | immune cells: they inspect, attack and prune damaged work. That's why adversaries go after other creatures and their eggs |
 | **Pacemaker** | the Orchestrator | sets the rhythm; its pulse is the run's heartbeat |
 

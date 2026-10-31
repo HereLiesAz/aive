@@ -85,6 +85,38 @@ class EntireRecorderTest {
     }
 
     @Test
+    fun aSymlinkedSettingsPathInTheWorktreeIsNeverWrittenThrough() = runBlocking {
+        Assume.assumeTrue("needs a POSIX shell", !windows)
+        val tmp = Files.createTempDirectory("aive-entire-fake").toFile()
+        val root = File(tmp, "repo").apply { mkdirs() }
+        File(root, ".entire").mkdirs()
+        val outside = File(tmp, "keeper-settings.json").apply { writeText("precious") }
+        val outsideDir = File(tmp, "elsewhere").apply { mkdirs() }
+        val cli = fakeEntire(tmp)
+        val home = System.getProperty("user.home")
+        System.setProperty("user.home", File(tmp, "home").absolutePath)
+        try {
+            // The repository tracks the settings file, then the whole directory, as a link out.
+            val fileLinked = File(tmp, "worktree-file").apply { mkdirs() }
+            File(fileLinked, ".entire").mkdirs()
+            Files.createSymbolicLink(File(fileLinked, ".entire/settings.local.json").toPath(), outside.toPath())
+            val dirLinked = File(tmp, "worktree-dir").apply { mkdirs() }
+            Files.createSymbolicLink(File(dirLinked, ".entire").toPath(), outsideDir.toPath())
+
+            listOf(fileLinked, dirLinked).forEach { workspace ->
+                val result = EntireRecorder(locate = { cli }, sessions = AiveEntireSessions(File(tmp, "sessions")))
+                    .attach(cli, root, workspace, "run-${workspace.name}")
+                assertTrue(result?.ok == false, "${workspace.name} was written through: ${result?.message}")
+            }
+            assertEquals("precious", outside.readText())
+            assertTrue(outsideDir.listFiles().isNullOrEmpty(), "something was written outside the worktree")
+            assertTrue("session attach" !in File(tmp, "args.log").readText())
+        } finally {
+            System.setProperty("user.home", home)
+        }
+    }
+
+    @Test
     fun checkpointsAreReadWithTheirIntentAndSummary() = runBlocking {
         Assume.assumeTrue("needs a POSIX shell", !windows)
         val tmp = Files.createTempDirectory("aive-entire-fake").toFile()

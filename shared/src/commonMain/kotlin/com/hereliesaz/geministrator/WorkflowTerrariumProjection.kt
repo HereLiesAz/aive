@@ -32,8 +32,11 @@ internal data class WorkflowTerrariumProjection(
     val adornments: Map<String, List<H2g2SwarmAdornment>>,
     /** External/non-resident services that physically visit the terrarium and leave again. */
     val serviceVisits: List<H2g2TerrariumServiceVisit>,
-    /** Labels of the creatures doing programmatic work: they wear the neuron, whatever they are called. */
-    val programmaticLabels: Set<String> = emptySet(),
+    /**
+     * Ids of the nodes doing programmatic work: they wear the neuron. By node, never by label: an
+     * agent and a programmatic step can share a role, and so a label.
+     */
+    val programmaticNodeIds: Set<String> = emptySet(),
 )
 
 /**
@@ -190,9 +193,9 @@ internal fun projectWorkflowTerrarium(
         relationships = relationships.values.toList(),
         adornments = adornments.mapValues { (_, values) -> values.distinctBy(H2g2SwarmAdornment::dependencyId) },
         serviceVisits = emptyList(),
-        programmaticLabels = agentTasks
+        programmaticNodeIds = agentTasks
             .filterNot { task -> (run.taskRuns[task.id]?.executor ?: task.effectiveExecutor()).isAgent() }
-            .mapNotNullTo(hashSetOf()) { task -> subjects.firstOrNull { it.node.id == task.id.value }?.node?.label },
+            .mapTo(hashSetOf()) { it.id.value },
     )
 }
 

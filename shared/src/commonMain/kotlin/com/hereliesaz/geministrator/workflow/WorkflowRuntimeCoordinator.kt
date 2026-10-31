@@ -587,6 +587,9 @@ class WorkflowRuntimeCoordinator(
         now: Long,
     ): WorkflowRun {
         var next = run
+        // What may be saved mid-loop: the dispatches that started, never a failure the retry and
+        // escalation policy has not yet seen (the cycle saves those once it has applied it).
+        var durable = run
         val tasks = definition.tasks.associateBy { it.id }
         for ((id, original) in run.taskRuns) {
             val task = tasks[id] ?: continue
@@ -634,7 +637,10 @@ class WorkflowRuntimeCoordinator(
             )
             // Record each started external run at once, so nothing later in this cycle can lose it
             // and cause the same run to be dispatched again.
-            persistence.runs.put(next)
+            if (execution.status != TaskRunStatus.Failed) {
+                durable = applyExecution(run = durable, id = id, previous = taskRun, executor = executor, execution = execution, now = now)
+                persistence.runs.put(durable)
+            }
         }
         return next
     }

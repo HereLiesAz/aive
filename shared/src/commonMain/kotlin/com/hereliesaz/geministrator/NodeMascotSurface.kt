@@ -30,10 +30,12 @@ internal fun NodeMascotSurface(
     modifier: Modifier = Modifier,
     /** Where its tendrils reach, in this box's px (RiggedCreatureSurface). */
     reach: () -> List<TendrilReach> = { emptyList() },
+    /** A body this node wears whatever its role: the neuron, for programmatic work. */
+    rigOverride: String? = null,
 ) {
     // The keeper's creature for this agent (docs/Node-Creature-Genome.md, Breeds); the role only
     // decides the look before a stable exists.
-    val kept = LocalCreatureRig.current(roleLabel)
+    val kept = rigOverride ?: LocalCreatureRig.current(roleLabel)
     // A bred creature's key is "body+tendrils+tail": one rig, wearing two others' limbs.
     val limbs = (kept ?: remember(roleLabel) { CreatureRigMapping.slugFor(roleLabel) }).split('+')
     val slug = limbs[0]
@@ -82,3 +84,10 @@ internal fun CreatureRigPlaceholder(
         }
     }
 }
+
+/** Ids of the nodes in view doing programmatic work, which wear the neuron (WorkflowTerrariumProjection). */
+internal val LocalProgrammaticNodes = androidx.compose.runtime.compositionLocalOf<Set<String>> { emptySet() }
+
+/** The neuron for a programmatic node; null leaves the node to its role or kept creature. */
+internal fun rigOverrideFor(nodeId: String, programmatic: Set<String>): String? =
+    if (nodeId in programmatic) CreatureRigMapping.PROGRAMMATIC_RIG else null

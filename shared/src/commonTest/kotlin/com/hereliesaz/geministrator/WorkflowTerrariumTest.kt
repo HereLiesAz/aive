@@ -105,7 +105,7 @@ class WorkflowTerrariumTest {
 
         assertNotNull(projection.subjects.singleOrNull { it.node.id == "ci" })
         assertNotNull(projection.subjects.singleOrNull { it.node.id == "notify" })
-        assertEquals(setOf("GitHub Action", "Slack"), projection.programmaticLabels)
+        assertEquals(setOf("ci", "notify"), projection.programmaticNodeIds)
         assertTrue(projection.serviceVisits.isEmpty())
         listOf("implement" to "ci", "ci" to "notify", "notify" to "verify").forEach { (from, to) ->
             assertTrue(
@@ -114,6 +114,26 @@ class WorkflowTerrariumTest {
                 },
             )
         }
+    }
+
+    @Test
+    fun anAgentAndAProgrammaticStepSharingARoleAreToldApartByNode() {
+        // Same role, so the same label: only the test runner wears the neuron.
+        val review = agentTask(id = "review", roleId = BuiltInRoles.QaEngineer.id)
+        val tests = TaskDefinition(
+            id = TaskDefinitionId("tests"),
+            name = "Run tests",
+            objective = "Run them",
+            roleId = BuiltInRoles.QaEngineer.id,
+            dependsOn = setOf(review.id),
+            executor = TaskExecutor.TestRunner("./gradlew test"),
+        )
+        val definition = workflow(review, tests)
+        val projection = projectWorkflowTerrarium(definition, runFor(definition), listOf(BuiltInRoles.QaEngineer))
+
+        val labels = projection.subjects.filter { it.node.id in setOf("review", "tests") }.map { it.node.label }.toSet()
+        assertEquals(1, labels.size, "the two share a label")
+        assertEquals(setOf("tests"), projection.programmaticNodeIds)
     }
 
     @Test

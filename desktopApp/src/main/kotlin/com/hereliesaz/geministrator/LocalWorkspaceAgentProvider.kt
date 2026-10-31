@@ -20,6 +20,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import com.hereliesaz.geministrator.workflow.approvedEnginePlan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +79,8 @@ internal class LocalWorkspaceAgentProvider(
         val exitCode: Int,
         val output: String,
         val timedOut: Boolean = false,
+        /** Diagnostics, kept apart only when the caller parses [output] as machine-readable data. */
+        val errorOutput: String = "",
     )
 
     private data class WorkspaceOutcome(
@@ -304,6 +307,7 @@ internal class LocalWorkspaceAgentProvider(
                 plan = approvedPlan,
                 generation = session.generation,
                 onThinking = { emit(AgentEvent.Thinking(runId, it)) },
+                planUsage = session.planUsage,
             )
 
             outcome.artifacts.forEach { artifact -> emit(AgentEvent.ArtifactProduced(runId, artifact)) }
@@ -416,6 +420,8 @@ internal class LocalWorkspaceAgentProvider(
         plan: WorkspacePlan,
         generation: InterruptibleGeneration,
         onThinking: suspend (String) -> Unit,
+        /** The planning request's usage, when this run planned for itself: recorded as its own call. */
+        planUsage: TextGenerationResult? = null,
     ): WorkspaceOutcome {
         val branch = workspaceBranch(request)
         val workspace = withContext(Dispatchers.IO) {
@@ -452,6 +458,8 @@ internal class LocalWorkspaceAgentProvider(
                     entire?.sessions?.begin(sessionId, root.absolutePath, displayName)
                     entire?.sessions?.prompt(sessionId, request.objective.trim())
                     entire?.sessions?.response(sessionId, plan.text)
+                    // Two requests, two usage records, so Entire's totals and call count match the app's.
+                    planUsage?.let { entire?.sessions?.usage(sessionId, it.inputTokens, it.outputTokens) }
                 }
             }
             val generated = generation.run(patchPrompt(request, plan, trackedFiles, snapshot), onThinking)
@@ -802,7 +810,13 @@ internal class LocalWorkspaceAgentProvider(
             arrayOf("apply", "--numstat", "-z", "-"),
             arrayOf("apply", "--numstat", "-z", "-R", "-"),
         ).flatMapTo(linkedSetOf()) { args ->
-            parseNumstatPaths(gitWithInput(workspace, patch, *args).requireSuccess("parse generated patch").output)
+            // stderr apart: git's whitespace warnings must never be read as part of a path.
+            val listing = runProcess(
+                listOf("git", "-C", workspace.absolutePath, "-c", "core.fsmonitor=false") + args,
+                stdin = patch,
+                separateErrors = true,
+            ).requireSuccess("parse generated patch")
+            parseNumstatPaths(listing.output)
         }
         require(paths.isNotEmpty()) { "Generated diff names no files" }
         paths.forEach(::requireAllowedPatchPath)
@@ -814,9 +828,14 @@ internal class LocalWorkspaceAgentProvider(
         .map { record ->
             // `<added>\t<deleted>\t<path>`; the path is raw (unquoted) with -z and may itself hold tabs.
             val fields = record.split('\t', limit = 3)
-            require(fields.size == 3 && fields[2].isNotEmpty()) { "Generated diff contains an unparseable file entry" }
+            require(
+                fields.size == 3 && fields[2].isNotEmpty() && fields[0].isNumstatCount() && fields[1].isNumstatCount(),
+            ) { "Generated diff contains an unparseable file entry" }
             fields[2]
         }
+
+    // A line count, or "-" for a binary file: anything else means the record is not what git wrote.
+    private fun String.isNumstatCount(): Boolean = this == "-" || (isNotEmpty() && all(Char::isDigit))
 
     private fun requireAllowedPatchPath(path: String) {
         require(path.isNotBlank()) { "Generated diff contains an empty path" }
@@ -852,13 +871,28 @@ internal class LocalWorkspaceAgentProvider(
         directory: File? = null,
         stdin: String? = null,
         timeoutMinutes: Long? = null,
+        /** Keep stderr out of [ProcessResult.output], verbatim and untrimmed, for output that is parsed. */
+        separateErrors: Boolean = false,
     ): ProcessResult = coroutineScope {
-        val process = withContext(Dispatchers.IO) {
-            ProcessBuilder(command)
-                .apply { if (directory != null) this.directory(directory) }
-                .apply { sanitizeGitEnvironment(this) }
-                .redirectErrorStream(true)
-                .start()
+        // Held outside the start's suspension, so a cancellation as it resumes still stops the process.
+        val started = AtomicReference<Process?>()
+        val process = try {
+            withContext(Dispatchers.IO) {
+                ProcessBuilder(command)
+                    .apply { if (directory != null) this.directory(directory) }
+                    .apply { sanitizeGitEnvironment(this) }
+                    .redirectErrorStream(!separateErrors)
+                    .start()
+                    .also(started::set)
+            }
+        } catch (failure: CancellationException) {
+            started.get()?.let(::destroyProcessTree)
+            throw failure
+        }
+        val errors = if (separateErrors) {
+            async(Dispatchers.IO) { process.errorStream.bufferedReader().use { it.readText() } }
+        } else {
+            null
         }
         if (stdin != null) {
             withContext(Dispatchers.IO) {
@@ -880,10 +914,12 @@ internal class LocalWorkspaceAgentProvider(
         if (!finished) {
             destroyProcessTree(process)
         }
+        val stdout = output.await()
         ProcessResult(
             exitCode = if (finished) process.exitValue() else -1,
-            output = output.await().trim(),
+            output = if (separateErrors) stdout else stdout.trim(),
             timedOut = !finished,
+            errorOutput = errors?.await()?.trim().orEmpty(),
         )
     }
 
@@ -900,7 +936,7 @@ internal class LocalWorkspaceAgentProvider(
     private fun ProcessResult.requireSuccess(operation: String): ProcessResult {
         require(!timedOut) { "Unable to $operation: command timed out" }
         require(exitCode == 0) {
-            "Unable to $operation: ${output.take(4_000).ifBlank { "exit code $exitCode" }}"
+            "Unable to $operation: ${(errorOutput.ifBlank { output }).take(4_000).ifBlank { "exit code $exitCode" }}"
         }
         return this
     }

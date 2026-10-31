@@ -1,6 +1,6 @@
 // Offline app shell: cache-first for the editor's own files, network for everything else.
 // Bump VERSION whenever a shell file changes so clients pick up the new copy.
-const VERSION = 'puppet-rig-v3';
+const VERSION = 'puppet-rig-v4';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rig-core.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

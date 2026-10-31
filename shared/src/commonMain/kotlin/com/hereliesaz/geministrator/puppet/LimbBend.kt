@@ -177,9 +177,10 @@ internal fun DrawScope.drawLimbMesh(
     shift: Float,
     shader: androidx.compose.ui.graphics.Shader,
     scratch: LimbMeshScratch = LimbMeshScratch(),
-) {
-    if (alpha <= 0f) return
-    if (!layLimbMesh(sprite, part, worldArray, offset, fit, bendDeg, stretch, segments, shift, scratch)) return
+): Boolean {
+    if (alpha <= 0f) return true
+    // No axis to lay a mesh along (a centred pivot): the caller draws the sprite whole instead.
+    if (!layLimbMesh(sprite, part, worldArray, offset, fit, bendDeg, stretch, segments, shift, scratch)) return false
     val paint = scratch.paint.apply {
         this.shader = shader
         this.alpha = alpha
@@ -189,6 +190,7 @@ internal fun DrawScope.drawLimbMesh(
         BlendMode.Modulate,
         paint,
     )
+    return true
 }
 
 /**

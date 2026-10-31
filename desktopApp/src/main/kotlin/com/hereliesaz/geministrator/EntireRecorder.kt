@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
 import java.util.prefs.Preferences
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -28,7 +31,7 @@ internal class EntireRecorder(
         if (!cli.enabled(root)) return null
         val launcherDir = installEntireAgentLauncher()
             ?: return EntireCli.Result(-1, "", "Could not install entire-agent-aive in ~/.aive/bin")
-        prepareWorktreeSettings(root, workspace)
+        prepareWorktreeSettings(root, workspace)?.let { refusal -> return EntireCli.Result(-1, "", refusal) }
         val path = launcherDir.absolutePath + File.pathSeparator + System.getenv("PATH").orEmpty()
         return cli.run(
             listOf("session", "attach", sessionId, "--agent", "aive", "--force"),
@@ -52,15 +55,39 @@ internal class EntireRecorder(
      * keeper's untracked ones. Copy them in, and allow external agents there (only there: the
      * keeper's own checkout is left alone) so `entire session attach --agent aive` finds this app.
      */
-    private fun prepareWorktreeSettings(root: File, workspace: File) {
-        val source = File(root, ".entire")
-        val target = File(workspace, ".entire").apply { mkdirs() }
-        File(source, "settings.json").takeIf { it.isFile && !File(target, "settings.json").exists() }
-            ?.copyTo(File(target, "settings.json"))
-        val local = File(source, "settings.local.json").takeIf(File::isFile)?.readText()?.let {
-            with(EntireCli) { it.parseObject() }
-        } ?: JsonObject(emptyMap())
-        File(target, "settings.local.json").writeText(JsonObject(local + ("external_agents" to JsonPrimitive(true))).toString())
+    private fun prepareWorktreeSettings(root: File, workspace: File): String? {
+        // The worktree is the repository's content: it can track `.entire`, or a file in it, as a
+        // symlink. Writing through one would land outside the worktree (the keeper's own settings, or
+        // anywhere writable), so nothing here follows a link. Null when ready, else why not.
+        val worktree = workspace.toPath().toRealPath()
+        val target = worktree.resolve(".entire")
+        val refusal = "Not recording: the repository's .entire settings are a symlink"
+        if (Files.isSymbolicLink(target)) return refusal
+        if (Files.exists(target, LinkOption.NOFOLLOW_LINKS) && !Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) return refusal
+        Files.createDirectories(target)
+        if (!target.toRealPath().startsWith(worktree)) return refusal
+        val settings = target.resolve("settings.json")
+        val localSettings = target.resolve("settings.local.json")
+        if (Files.isSymbolicLink(settings) || Files.isSymbolicLink(localSettings)) return refusal
+        // The keeper's own settings, read only when they are plain files.
+        val source = root.toPath().resolve(".entire")
+        source.resolve("settings.json")
+            .takeIf { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) && !Files.exists(settings, LinkOption.NOFOLLOW_LINKS) }
+            ?.let { Files.copy(it, settings, LinkOption.NOFOLLOW_LINKS) }
+        val local = source.resolve("settings.local.json")
+            .takeIf { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }
+            ?.let { Files.readString(it) }
+            ?.let { with(EntireCli) { it.parseObject() } }
+            ?: JsonObject(emptyMap())
+        Files.writeString(
+            localSettings,
+            JsonObject(local + ("external_agents" to JsonPrimitive(true))).toString(),
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING,
+            StandardOpenOption.WRITE,
+            LinkOption.NOFOLLOW_LINKS,
+        )
+        return null
     }
 }
 
