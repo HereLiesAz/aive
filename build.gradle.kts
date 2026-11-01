@@ -42,15 +42,25 @@ val useMavenLocalH2g2 = providers.gradleProperty("haive.useMavenLocalH2g2")
     ?: isolatedWebBuild
 
 if (useMavenLocalH2g2) {
+    // Each library publishes to Maven Local under the version in its own version.properties.
+    fun localVersion(dir: String): String = java.util.Properties().run {
+        file("$dir/version.properties").inputStream().use { load(it) }
+        listOf("versionMajor", "versionMinor", "versionPatch", "versionBuild")
+            .joinToString(".") { getProperty(it).trim() }
+    }
+    val h2g2Local = localVersion("vendor/conveyance-h2g2")
+    val conveyanceLocal = localVersion("vendor/conveyance-h2g2/vendor/Conveyance")
+    // The Conveyance coordinate h2g2 requests (its build.gradle.kts: conveyanceRevision).
+    val conveyanceRevision = "0.5.0"
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {
                 substitute(module("com.github.HereLiesAz:conveyance-h2g2:b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa"))
-                    .using(module("com.hereliesaz.conveyance:conveyance-h2g2:0.1.0"))
-                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:653122cd8ec79a4b3ceadd44d99fe80f66c9905d"))
-                    .using(module("com.hereliesaz.conveyance:conveyance-core:0.1.0"))
-                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-compose:653122cd8ec79a4b3ceadd44d99fe80f66c9905d"))
-                    .using(module("com.hereliesaz.conveyance:conveyance-compose:0.1.0"))
+                    .using(module("com.hereliesaz.conveyance:conveyance-h2g2:$h2g2Local"))
+                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:$conveyanceRevision"))
+                    .using(module("com.hereliesaz.conveyance:conveyance-core:$conveyanceLocal"))
+                substitute(module("com.github.HereLiesAz.Conveyance:conveyance-compose:$conveyanceRevision"))
+                    .using(module("com.hereliesaz.conveyance:conveyance-compose:$conveyanceLocal"))
             }
         }
     }
