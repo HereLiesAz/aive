@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Keeper's room › Appearance has an **Always show labels** switch for creature labels, stored on this device. A hive of more than 12 creatures normally keeps only the selected creature's label; with the switch on, every creature keeps its label.
 - Keeper's room › Appearance has a **Reduce motion** switch, stored on this device. It holds the creatures and other looping movement still, adds to the device's own reduced-motion setting rather than replacing it (so it can turn motion off but never back on), and gives desktop a way to reduce motion without an environment variable.
 - Keeper's room › Appearance now shows the six grounds as swatches, the current one selected, instead of one pill that cycled to the next. Each swatch is a radio button named for its ground; the choice is still remembered on this device.
 - A creature's Mind tab now queues proposed changes to its role's instructions, drafted from its past work: a failure that keeps recurring, a task that failed repeatedly before it passed, or the same kind of correction you sent its agent more than once. Each shows the current and proposed text and why. **Approve and apply** saves it to the role; **Dismiss** drops it for good. Nothing changes without your approval, and the Mind tab shows how many wait.
