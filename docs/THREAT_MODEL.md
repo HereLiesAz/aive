@@ -21,6 +21,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Device ↔ Local Git (desktop) | Snapshot reads, isolated worktrees, commits, bounded Git commands | Both (local) |
 | Device ↔ Compute relay ↔ Pool devices | Node descriptors, task lease envelopes, progress, results | Both |
 | Device ↔ Crash relay (Android GitHub flavor; opt-in) | Crash/ANR reports → public GitHub issues | Outbound |
+| Device ↔ OTLP collector (opt-in) | Run traces: structure, timing, ids, tokens, cost; content only with a second opt-in | Outbound |
 | Device ↔ Gemini app (Android GitHub flavor, opt-in) | Prompt typed into Gemini, reply read from screen/clipboard | Both (on-device) |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
@@ -354,6 +355,26 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 - A relay operator can drop or delay frames (denial of service) and sees connection metadata.
 - The relay's shared client-token model means a leaked code cannot be told apart from its owner.
 
+### Trace export (OpenTelemetry)
+
+**Threats**
+- Prompts, outputs or secrets in them leak to a collector, or to whoever operates it.
+- Traces are sent without consent, or history is backfilled when export is turned on.
+- Collector headers (API keys) leak, or traces go over cleartext.
+- A slow or failing collector stalls the workflow engine.
+
+**Mitigations in place**
+- Off by default (`TraceExportSettings.enabled = false`) and disclosed in `docs/PRIVACY.md`. There is no default collector.
+- Content (objective, artifact names and text, failure, approval and escalation reasons) is excluded unless a second, separate toggle is on; the builder never reads it otherwise (`TraceContentPolicy`). Executors are exported by kind only, never a script's source.
+- Runs that ended before export was turned on are never sent; each run is sent at most once.
+- `https://` is required, except for a loopback collector. URLs with user info, a query or a fragment are refused. Credentials never enter workflow state or spans.
+- Export reads the persisted journal after a run ends, in its own coroutine; the queue is bounded, never suspends the caller and drops the oldest spans when full. Failed batches are retried with backoff and then dropped.
+- The settings key is not in the setup-file allowlist, so headers are never exported in a `.aivesetup` file.
+
+**Residual risks**
+- Collector headers are stored in the app's local settings, not the platform credential store. Users are told to use a trace-only ingest key.
+- Ids exported by default (project, run, task, role, workflow definition, provider session) and token counts can still reveal activity patterns to the collector.
+
 ### Persistence
 
 **Threats**
@@ -395,6 +416,7 @@ The following invariants must hold regardless of the integration used:
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.
 - Deciding plan approvals and failure escalations inside nested child runs from the parent node.
 - Web credential protection against same-origin script (for example, a passphrase-derived key).
+- Trace export headers in the platform credential store instead of app settings.
 
 ### Accepted risks
 

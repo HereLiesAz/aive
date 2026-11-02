@@ -70,7 +70,7 @@
     <string name="keeper_appearance">Appearance</string>
     <string name="keeper_appearance_lead">The ground everything sits on.</string>
     <string name="keeper_about">About and privacy</string>
-    <string name="keeper_about_lead">Crash reports and diagnostics.</string>
+    <string name="keeper_about_lead">Crash reports, trace export and diagnostics.</string>
     <string name="keeper_repositories">Repositories</string>
     <string name="keeper_add_provider">Add a provider</string>
     <string name="keeper_local_git_note">Local Git folders need no account: pick one when you launch.</string>
@@ -777,6 +777,18 @@
     <string name="settings_remote_access_description">Let your own IDEaz (the companion Android coding app from the same developer) on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
     <string name="settings_remote_access_on">Remote access: ON</string>
     <string name="settings_remote_access_off">Remote access: OFF</string>
+    <string name="settings_trace_export">Trace export (OpenTelemetry)</string>
+    <string name="settings_trace_export_intro">Off unless you turn it on. When on, each hive that finishes is sent as a trace to the OpenTelemetry collector you name here, over OTLP/HTTP: the run, each creature's attempts and each provider report, with token counts and cost. Prompts, outputs and failure reasons are left out. Hives that finished before you turned it on are not sent.</string>
+    <string name="settings_trace_export_endpoint">Collector endpoint</string>
+    <string name="settings_trace_export_endpoint_invalid">Use an https:// address with no query or user name. Plain http:// works only for a collector on this device (localhost).</string>
+    <string name="settings_trace_export_headers">Headers (name=value, separated by commas)</string>
+    <string name="settings_trace_export_headers_invalid">Write each header as name=value, separated by commas. Content-Type and Host are set by the app.</string>
+    <string name="settings_trace_export_headers_note">Headers are kept in this device's app settings, not its credential store, and are never put in a setup file. Use a key made only for sending traces.</string>
+    <string name="settings_trace_export_on">Trace export: ON</string>
+    <string name="settings_trace_export_off">Trace export: OFF</string>
+    <string name="settings_trace_export_content_on">Include prompts and outputs: ON</string>
+    <string name="settings_trace_export_content_off">Include prompts and outputs: OFF</string>
+    <string name="settings_trace_export_content_warning">Turning this on adds each hive's objective, its artifacts' text and its failure and approval reasons to the traces. They can hold code, secrets and personal data, and the collector keeps whatever it receives.</string>
     <string name="settings_remote_access_relay_url">Relay URL</string>
     <string name="settings_remote_access_pairing_code">Pairing code</string>
     <string name="settings_remote_access_warning">Anyone with this code can run prompts on your linked AI providers and start workflows. Treat it like a password. Turn off to revoke.</string>

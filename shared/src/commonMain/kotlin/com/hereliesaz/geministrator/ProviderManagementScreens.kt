@@ -654,6 +654,7 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        TraceExportSettingsSection()
 
       }
 

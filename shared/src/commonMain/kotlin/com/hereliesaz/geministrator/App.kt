@@ -153,6 +153,7 @@ fun App(
                 contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
+                traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))

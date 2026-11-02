@@ -11,7 +11,7 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Appearance** | the ground | Settings › Appearance |
-| | **About and privacy** | crash reports, diagnostics | Settings › Crash Reports, Diagnostics |
+| | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
 

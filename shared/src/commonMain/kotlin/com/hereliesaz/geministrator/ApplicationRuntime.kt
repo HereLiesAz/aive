@@ -73,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -793,6 +794,8 @@ class ApplicationRuntime private constructor(
                 com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource),
                 ),
+            /** Opt-in OTLP trace export of finished runs (docs/architecture/OBSERVABILITY.md); null exports nothing. */
+            traceExport: com.hereliesaz.geministrator.telemetry.WorkflowTraceExport? = null,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
@@ -873,6 +876,11 @@ class ApplicationRuntime private constructor(
                 }
             }
 
+            traceExport?.attach(
+                scope = runtimeScope,
+                runs = runtime.state.map { (it as? ApplicationRuntimeState.Live)?.presentation?.run },
+                events = persistence.events,
+            )
             if (runtime.state.value == ApplicationRuntimeState.Loading) {
                 runtime.loadLatest()
             }
