@@ -67,4 +67,13 @@ class AzphaltAccessibilityTest {
         assertFalse(shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = false))
         assertFalse(shouldReduceMotion(animatorDurationScale = 0.5f, systemPrefersReduced = false))
     }
+
+    @Test
+    fun keeperSwitchCanOnlyTurnMotionOff() {
+        assertFalse(effectiveReduceMotion(platformReduceMotion = false, keeperReduceMotion = false))
+        assertTrue(effectiveReduceMotion(platformReduceMotion = false, keeperReduceMotion = true))
+        // The switch off never brings motion back against the platform.
+        assertTrue(effectiveReduceMotion(platformReduceMotion = true, keeperReduceMotion = false))
+        assertTrue(effectiveReduceMotion(platformReduceMotion = true, keeperReduceMotion = true))
+    }
 }
