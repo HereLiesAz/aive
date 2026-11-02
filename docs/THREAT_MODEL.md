@@ -22,6 +22,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Device ↔ Compute relay ↔ Pool devices | Node descriptors, task lease envelopes, progress, results | Both |
 | Device ↔ Crash relay (Android GitHub flavor; opt-in) | Crash/ANR reports → public GitHub issues | Outbound |
 | Device ↔ Gemini app (Android GitHub flavor, opt-in) | Prompt typed into Gemini, reply read from screen/clipboard | Both (on-device) |
+| Device ↔ MCP servers (keeper-configured) | Model-written tool arguments out; tool lists and results in; on desktop, a local server process | Both |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
 | Haive ↔ User | Workflow definitions, task approval decisions, escalation responses | Both |
@@ -187,6 +188,30 @@ See `docs/Entire.md`.
 - Prompt injection through checkpoint text is mitigated by the diff pipeline, not prevented: a plan can still be steered toward a harmful but well-formed patch, which is why the branch is left for review.
 - The Aive does not verify the `entire` binary's signature or origin.
 - Recorded transcripts cannot be withdrawn from a pushed checkpoint by The Aive.
+
+### MCP servers (MCP host)
+
+The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOST.md`). Text providers that can call functions (Anthropic, OpenAI-compatible, Gemini) offer those servers' tools to the model, and The Aive executes the calls.
+
+**Threats**
+- Tool results contain prompt injection aimed at the model, or try to pass as The Aive's own text.
+- A model steered by injection calls a tool to send task content to a server, or to act through the server (for example, writing to a repository with the server's credentials).
+- A server's tool descriptions or annotations lie about what the tool does.
+- A local (stdio) server runs arbitrary code on the desktop.
+- A bearer token is sent to the wrong host or over cleartext.
+
+**Mitigations in place**
+- Every server needs the keeper's consent. Either it is **Always allow**, or the first call per server per run stops at an approval gate that shows the tool, the server and the arguments. An unanswered gate is a refusal, and a refused call is never sent. Reaching a server or listing its tools is not consent.
+- Results are fenced as external content, and the model is told to treat them as data. A result cannot close its own fence. Answers written with them carry `contentProvenance=external-tool-results` and the list of calls. The runtime never executes them.
+- Calls are bounded: 8 rounds, 8 calls per round, 64 tools per run, 4 MB per response, 120 s per request. Results are truncated at 20,000 characters.
+- MCP calls are not repository operations and never receive The Aive's repository credentials. Workspace agents, which write branches, get no MCP tools. Runs behind a provider-side plan gate get no tools, so no tool runs before approval.
+- Addresses must be HTTPS, or HTTP to this device or a private network. They may not embed credentials, and redirects are not followed. Tokens live in the platform credential store, as other connection secrets do, and are excluded from Android backup.
+- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell. The client declares no capabilities, so a server cannot ask for sampling, elicitation or roots.
+
+**Residual risks**
+- After consent, a server sees whatever arguments the model writes, which may include task content. A server allowed always is never asked about again.
+- A local server runs with the keeper's own permissions; The Aive does not sandbox it.
+- Tool descriptions are shown to the model as the server wrote them.
 
 ### Repository operations
 

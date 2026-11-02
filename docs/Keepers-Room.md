@@ -27,6 +27,8 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching.
 
+**MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`).
+
 ## Navigation
 
 There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):

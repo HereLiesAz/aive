@@ -74,6 +74,37 @@
     <string name="keeper_repositories">Repositories</string>
     <string name="keeper_add_provider">Add a provider</string>
     <string name="keeper_local_git_note">Local Git folders need no account: pick one when you launch.</string>
+    <string name="mcp_servers">MCP servers</string>
+    <string name="mcp_servers_lead">Tool servers your agents can call while they work. Each server's tools run only after you allow them, once per run or always.</string>
+    <string name="mcp_add_server">Add an MCP server</string>
+    <string name="mcp_add_server_hint">By address, or by command on this computer</string>
+    <string name="mcp_add_server_hint_remote">By address</string>
+    <string name="mcp_server_name">Name</string>
+    <string name="mcp_server_url">Address (https://…)</string>
+    <string name="mcp_server_token">Bearer token (optional)</string>
+    <string name="mcp_server_command">Command that starts it</string>
+    <string name="mcp_server_command_note">Runs on this computer with your permissions, without a shell. Add only servers you trust.</string>
+    <string name="mcp_by_address">By address</string>
+    <string name="mcp_by_command">By command</string>
+    <string name="mcp_add">Add</string>
+    <string name="mcp_check">Check</string>
+    <string name="mcp_checking">Checking…</string>
+    <string name="mcp_tool_count">%1$d tools</string>
+    <string name="mcp_check_failed">Could not reach it: %1$s</string>
+    <string name="mcp_always_allow">Always allow</string>
+    <string name="mcp_ask_each_run">Ask each run</string>
+    <string name="mcp_status_allowed">Allowed</string>
+    <string name="mcp_status_asks">Asks</string>
+    <string name="mcp_remove_title">Remove %1$s?</string>
+    <string name="mcp_remove_body">Agents lose its tools, and its token is deleted from this device.</string>
+    <string name="mcp_consent_title">Let agents use %1$s?</string>
+    <string name="mcp_consent_body">An agent wants to call %1$s on %2$s (%3$s) with:
+%4$s
+
+What the server returns is treated as outside content, not instructions.</string>
+    <string name="mcp_consent_allow_run">Allow for this run</string>
+    <string name="mcp_consent_allow_always">Always allow</string>
+    <string name="mcp_consent_deny">Don't allow</string>
     <string name="common_dismiss">Dismiss</string>
     <string name="common_inbox">INBOX</string>
     <string name="common_reject">Reject</string>

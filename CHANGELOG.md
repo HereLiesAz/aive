@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Agents can now use tools from MCP servers. Add a server under Keeper's room › Connections › MCP servers, by address and optional bearer token, or by command on desktop. Claude, Gemini and OpenAI-compatible providers are offered its tools, and The Aive runs the calls and returns the results. Each server's tools run only after you allow them, once per run or always. Results are marked as outside content. See docs/architecture/MCP_HOST.md.
 - On Android and desktop, one unreadable workflow record no longer marks the whole store as corrupt (whose recovery clears everything). The record is skipped, its contents are kept aside in the database, and it is listed as quarantined; everything else loads as usual.
 - Retrying a repository operation (for example after approving a failure escalation) runs it again; each attempt now has its own run record instead of replaying the first attempt's failure. On desktop, two starts of the same Local Git operation can no longer both run Git, and its run record is replaced in one atomic step.
 - An executor (GitHub Action, script, test runner, deployment, external service) that throws while starting now fails only its own task, which then follows its retry or escalation policy, instead of stopping the whole cycle with the task stuck Ready. Each started external run is saved as soon as it starts, so a later failure in the same cycle cannot cause it to be started twice.

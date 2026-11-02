@@ -150,3 +150,5 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 ### Agent-to-agent communication
 
 [`architecture/DUPLEX_MCP.md`](architecture/DUPLEX_MCP.md) defines the opt-in, agent-neutral full-duplex MCP peer, its bounded messaging semantics, and its governed connection to live Aive task sessions and memory.
+
+[`architecture/MCP_HOST.md`](architecture/MCP_HOST.md) defines the MCP host: keeper-configured MCP servers, the dual-era client, the tool-use loop for function-calling providers, and per-server, per-run consent.

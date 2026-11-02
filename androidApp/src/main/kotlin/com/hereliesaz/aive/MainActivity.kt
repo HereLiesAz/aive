@@ -112,6 +112,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    // MCP servers the keeper connects (docs/architecture/MCP_HOST.md): Streamable HTTP only here.
+    private val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    private val mcpHost by lazy {
+        com.hereliesaz.geministrator.mcp.McpHost(
+            store = com.hereliesaz.geministrator.mcp.McpServerStore(),
+            vault = AndroidMcpCredentialStore(this),
+            transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(repositoryHttpClient),
+            consent = mcpConsent,
+        )
+    }
     /** Local Git folders, imported into app storage and worked on through JGit. */
     private val localRepositories by lazy { AndroidLocalRepositoryStore(applicationContext) }
     private val azphaltHost by lazy { AndroidAzphaltHost(this, repositoryHttpClient) }
@@ -308,6 +318,7 @@ class MainActivity : ComponentActivity() {
                         repositoryCredentials = repositoryCredentials,
                         repositoryHttpClient = repositoryHttpClient,
                         installedGeminiApi = installedGeminiApi,
+                        mcpTools = mcpHost,
                     )
                 }
                 // Hosted memory stages use whichever provider each stage names, with current credentials.
@@ -462,6 +473,8 @@ class MainActivity : ComponentActivity() {
                     )
                     else -> App(
                         breedPurchases = breedPurchases,
+                        mcpHost = mcpHost,
+                        mcpConsent = mcpConsent,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -723,10 +736,12 @@ internal fun configuredAndroidProviders(
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
     installedGeminiApi: TextGenerationApi? = null,
+    /** MCP tools for the text providers; workspace agents get none. */
+    mcpTools: com.hereliesaz.geministrator.mcp.McpToolSource? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
-    addAll(HostedLlmProviders.configured(credentials))
+    addAll(HostedLlmProviders.configured(credentials, mcpTools))
     // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
     // model, no key; needs only the linked GitHub token.
     if (githubToken != null && repositoryHttpClient != null) {
@@ -738,7 +753,7 @@ internal fun configuredAndroidProviders(
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(OpenAiProvider(keyProvider))
+        add(OpenAiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "openai-gitlab-workspace",
             displayName = "OpenAI / GitLab Workspace",
@@ -749,7 +764,7 @@ internal fun configuredAndroidProviders(
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(AnthropicProvider(keyProvider))
+        add(AnthropicProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "anthropic-gitlab-workspace",
             displayName = "Claude / GitLab Workspace",
@@ -769,7 +784,7 @@ internal fun configuredAndroidProviders(
             ),
         )
     } else if (geminiKey != null) {
-        add(GeminiProvider(LlmApiKeyProvider { geminiKey }))
+        add(GeminiProvider(LlmApiKeyProvider { geminiKey }, tools = mcpTools))
     }
     geminiKey?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
@@ -784,7 +799,7 @@ internal fun configuredAndroidProviders(
 
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(XaiProvider(keyProvider))
+        add(XaiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "xai-gitlab-workspace",
             displayName = "Grok / GitLab Workspace",

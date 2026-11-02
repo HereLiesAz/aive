@@ -97,6 +97,18 @@ fun main() {
     }
     val initialComputeToken = computeCredentialStore.readToken()
     val httpClient = HttpClient(CIO)
+    // MCP servers the keeper connects (docs/architecture/MCP_HOST.md); local ones run as processes.
+    val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    val mcpHost = com.hereliesaz.geministrator.mcp.McpHost(
+        store = com.hereliesaz.geministrator.mcp.McpServerStore(),
+        vault = DesktopMcpCredentialStore(),
+        transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(
+            httpClient,
+            com.hereliesaz.geministrator.mcp.DesktopMcpStdioLauncher,
+        ),
+        consent = mcpConsent,
+        stdioSupported = true,
+    )
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
@@ -138,7 +150,7 @@ fun main() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 val providers = remember(credentials, repositoryCredentials) {
-                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder)
+                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder, mcpHost)
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -347,6 +359,8 @@ fun main() {
                     )
                     else -> App(
                         entire = desktopEntire,
+                        mcpHost = mcpHost,
+                        mcpConsent = mcpConsent,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -433,6 +447,8 @@ fun main() {
         orchestrationSpecialistExecutor.reset()
         orchestrationDecisionModel.close()
         localPlanner.close()
+        // Stops local MCP server processes.
+        kotlinx.coroutines.runBlocking { mcpHost.close() }
         httpClient.close()
     }
 }
@@ -442,10 +458,12 @@ internal fun configuredDesktopProviders(
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
     entireRecorder: EntireRecorder? = null,
+    /** MCP tools for the text providers; workspace agents get none. */
+    mcpTools: com.hereliesaz.geministrator.mcp.McpToolSource? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
-    addAll(HostedLlmProviders.configured(credentials))
+    addAll(HostedLlmProviders.configured(credentials, mcpTools))
     // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
     // model, no key; needs only the linked GitHub token.
     if (githubToken != null && repositoryHttpClient != null) {
@@ -457,7 +475,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(OpenAiProvider(keyProvider))
+        add(OpenAiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("openai-local-workspace"),
@@ -476,7 +494,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(AnthropicProvider(keyProvider))
+        add(AnthropicProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("anthropic-local-workspace"),
@@ -495,7 +513,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(GeminiProvider(keyProvider))
+        add(GeminiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("gemini-local-workspace"),
@@ -514,7 +532,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(XaiProvider(keyProvider))
+        add(XaiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("xai-local-workspace"),
