@@ -638,11 +638,12 @@ private fun MascotNodeTerrarium(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                // Packed like cells, creatures carry no names until tapped: the selected one shows its
-                // job on the state's colour. The full state is always in the semantics.
+                // Every creature wears its job (docs/Node-Creatures.md: labelled with its task and state),
+                // on its state's colour; only a crowded hive keeps names for the one tapped, so packed
+                // cells stay legible. The full state is always in the semantics.
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
-                if (isSelected) Text(
+                if (isSelected || subjects.size <= NAMED_CREATURE_LIMIT) Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -652,7 +653,7 @@ private fun MascotNodeTerrarium(
                         .align(if (carriesEgg) Alignment.TopCenter else Alignment.BottomCenter)
                         .widthIn(max = creatureSize)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(stateColor)
+                        .background(if (isSelected) stateColor else stateColor.copy(alpha = 0.82f))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
             }
@@ -818,3 +819,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
 /** Clasp glows: luminous on the dark tissue. */
 private val ClaspGreen = Color(0xFF6BE04A)
 private val ClaspRed = Color(0xFFFF3B30)
+
+/** Up to this many creatures, every one wears its name; more, and only the tapped one does. */
+private const val NAMED_CREATURE_LIMIT = 12

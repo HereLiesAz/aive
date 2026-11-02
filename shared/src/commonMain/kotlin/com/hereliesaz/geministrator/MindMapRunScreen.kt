@@ -721,9 +721,11 @@ internal fun MindMapRunScreen(
                                 seed = "made-${artifact.id.value}",
                                 eyebrow = stringResource(Res.string.hive_what_it_made),
                                 title = artifact.label,
-                                body = artifact.textContent.orEmpty().trim().let { text ->
-                                    if (text.length > MADE_PREVIEW_CHARS) text.take(MADE_PREVIEW_CHARS).trimEnd() + "…" else text
-                                },
+                                richBody = markdownLite(
+                                    artifact.textContent.orEmpty().trim().let { text ->
+                                        if (text.length > MADE_PREVIEW_CHARS) text.take(MADE_PREVIEW_CHARS).trimEnd() + "…" else text
+                                    },
+                                ),
                             )
                         }
                     }
