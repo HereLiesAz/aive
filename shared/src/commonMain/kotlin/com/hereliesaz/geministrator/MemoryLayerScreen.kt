@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,10 +32,19 @@ import com.hereliesaz.geministrator.memory.MemoryRawRetention
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
-import com.hereliesaz.geministrator.memory.MemoryQueueStatus
 import com.hereliesaz.geministrator.memory.MemoryStageEngine
 import com.hereliesaz.geministrator.memory.parked
+import com.hereliesaz.geministrator.memory.ConsolidateNowState
+import com.hereliesaz.geministrator.memory.MemoryActivity
+import com.hereliesaz.geministrator.memory.MemoryElapsedUnit
+import com.hereliesaz.geministrator.memory.MemorySnapshot
+import com.hereliesaz.geministrator.memory.consolidateNowState
+import com.hereliesaz.geministrator.memory.memoryElapsed
+import com.hereliesaz.geministrator.memory.waitingToConsolidate
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.memory_swarm_lead
 import com.hereliesaz.geministrator.resources.common_cancel
@@ -67,6 +77,19 @@ import com.hereliesaz.geministrator.resources.memory_consolidated_memory_never_d
 import com.hereliesaz.geministrator.resources.memory_consolidation
 import com.hereliesaz.geministrator.resources.memory_consolidation_paused
 import com.hereliesaz.geministrator.resources.memory_consolidation_running
+import com.hereliesaz.geministrator.resources.memory_consolidate_now
+import com.hereliesaz.geministrator.resources.memory_consolidate_now_off
+import com.hereliesaz.geministrator.resources.memory_consolidate_now_paused
+import com.hereliesaz.geministrator.resources.memory_consolidate_now_working
+import com.hereliesaz.geministrator.resources.memory_status_eyebrow
+import com.hereliesaz.geministrator.resources.memory_status_last_days
+import com.hereliesaz.geministrator.resources.memory_status_last_hours
+import com.hereliesaz.geministrator.resources.memory_status_last_just_now
+import com.hereliesaz.geministrator.resources.memory_status_last_minutes
+import com.hereliesaz.geministrator.resources.memory_status_last_none
+import com.hereliesaz.geministrator.resources.memory_status_proposals
+import com.hereliesaz.geministrator.resources.memory_status_since_this_start
+import com.hereliesaz.geministrator.resources.memory_status_waiting
 import com.hereliesaz.geministrator.resources.memory_counted_since_this_bank_s_layer
 import com.hereliesaz.geministrator.resources.memory_default_provider
 import com.hereliesaz.geministrator.resources.memory_defaults
@@ -236,6 +259,8 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
             }
         }
     }
+    // When consolidation last worked, what waits, and Consolidate now, just above the switches it obeys.
+    MemoryStatusLine(controller, settings, snapshot, activity)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
             if (settings.enabled) stringResource(Res.string.memory_memory_on) else stringResource(Res.string.memory_memory_off),
@@ -301,6 +326,61 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
     TuningSection(settings, onApply = { policy -> update { it.copy(policy = policy) } })
     ModelsSection(controller)
     DataSection(controller)
+}
+
+/**
+ * The Memory swarm's status line: when consolidation last did work (since this start: the time is
+ * kept in memory only), how much waits in the selected bank's queue, how many role-instruction
+ * proposals wait across every role, and **Consolidate now**. When memory is off or consolidation
+ * paused, the reason takes the button's place and points at the switch just below.
+ */
+@OptIn(ExperimentalTime::class)
+@Composable
+private fun MemoryStatusLine(
+    controller: MemoryLayerController,
+    settings: MemoryLayerSettings,
+    snapshot: MemorySnapshot,
+    activity: MemoryActivity,
+) {
+    val proposals by RoleInstructionProposalsHost.ledger.state.collectAsState()
+    var now by remember { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = Clock.System.now().toEpochMilliseconds()
+        }
+    }
+    val last = activity.lastConsolidatedAtEpochMillis?.let { memoryElapsed(it, maxOf(now, it)) }
+    val title = if (last == null) stringResource(Res.string.memory_status_last_none) else when (last.unit) {
+        MemoryElapsedUnit.JustNow -> stringResource(Res.string.memory_status_last_just_now)
+        MemoryElapsedUnit.Minutes -> stringResource(Res.string.memory_status_last_minutes, last.amount)
+        MemoryElapsedUnit.Hours -> stringResource(Res.string.memory_status_last_hours, last.amount)
+        MemoryElapsedUnit.Days -> stringResource(Res.string.memory_status_last_days, last.amount)
+    }
+    val state = consolidateNowState(settings, activity)
+    AzphaltRecord(
+        seed = "memory-status",
+        eyebrow = stringResource(Res.string.memory_status_eyebrow),
+        title = title,
+        body = stringResource(Res.string.memory_status_waiting, snapshot.waitingToConsolidate()) +
+            stringResource(Res.string.memory_status_proposals, proposals.pendingCount) +
+            stringResource(Res.string.memory_status_since_this_start),
+        well = {
+            when (state) {
+                ConsolidateNowState.Ready -> AzphaltPill(
+                    stringResource(Res.string.memory_consolidate_now),
+                    "memory-consolidate-now",
+                    onClick = { controller.consolidateNow() },
+                )
+                ConsolidateNowState.Working ->
+                    Text(stringResource(Res.string.memory_consolidate_now_working), style = AzphaltType.body, color = azphaltOnSurface())
+                ConsolidateNowState.Paused ->
+                    Text(stringResource(Res.string.memory_consolidate_now_paused), style = AzphaltType.body, color = azphaltOnSurface())
+                ConsolidateNowState.Off ->
+                    Text(stringResource(Res.string.memory_consolidate_now_off), style = AzphaltType.body, color = azphaltOnSurface())
+            }
+        },
+    )
 }
 
 @Composable
@@ -394,7 +474,7 @@ private fun QueueSection(controller: MemoryLayerController, settings: MemoryLaye
     val scope = rememberCoroutineScope()
     val snapshot by controller.snapshot.collectAsState()
     val parked = snapshot.parked(settings.policy)
-    val waiting = snapshot.queue.count { it.status == MemoryQueueStatus.Pending || it.status == MemoryQueueStatus.Processing }
+    val waiting = snapshot.waitingToConsolidate()
     MemorySectionLabel(stringResource(Res.string.memory_queue))
     AzphaltRecord(
         seed = "memory-queue",

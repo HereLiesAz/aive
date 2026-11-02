@@ -77,7 +77,7 @@ fun main() {
     // File choosers are Swing; without this they draw in Swing's own Metal theme instead of the
     // operating system's, which clashes with both the app and the desktop.
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
-    AzphaltMotion.reduceMotion = shouldReduceMotion(
+    AzphaltMotion.platformReduceMotion = shouldReduceMotion(
         animatorDurationScale = null,
         systemPrefersReduced = desktopPrefersReducedMotion(),
     )

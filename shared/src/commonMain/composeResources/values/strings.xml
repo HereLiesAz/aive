@@ -261,6 +261,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_github_actions">GitHub Actions</string>
     <string name="inspector_inline_evidence">inline evidence</string>
     <string name="inspector_inputs">INPUTS</string>
+    <string name="inspector_fed_by">FED BY</string>
+    <string name="inspector_feeds">FEEDS</string>
+    <string name="inspector_took_its_output">took its output</string>
+    <string name="inspector_not_taken_yet">has not taken it yet</string>
     <string name="inspector_input_objective">Objective</string>
     <string name="inspector_external_inputs">EXTERNAL INPUTS</string>
     <string name="inspector_hint_external_inputs">This task can change things, and some of what it reads came from outside your control: %1$s. Approve only if you trust that content to steer it.</string>
@@ -277,8 +281,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_message_agent">Message agent</string>
     <string name="inspector_no_run_is_loaded">No run is loaded.</string>
     <string name="inspector_now">NOW</string>
+    <string name="inspector_open_trace">Open its trace</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
     <string name="inspector_plan">PLAN</string>
+    <string name="inspector_plan_place">%1$s of %2$s</string>
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
     <string name="inspector_provider">PROVIDER</string>
@@ -406,6 +412,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_fed_by">%1$s IS FED BY</string>
     <string name="build_add_connection">FEED IT FROM</string>
     <string name="build_pick_a_creature">Tap a creature to wire it.</string>
+    <string name="build_add_creature">Add creature</string>
+    <string name="build_add_hint">It joins unwired. Tap it to wire it.</string>
+    <string name="build_add_from_swarm">FROM THE SWARM</string>
+    <string name="build_add_from_steps">A STEP, NO AGENT</string>
+    <string name="build_step_tests">Run tests</string>
+    <string name="build_step_repo_status">Repository status</string>
+    <string name="build_step_repo_fetch">Fetch repository</string>
     <string name="swarm_token_budget">Token budget per run</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
@@ -527,6 +540,19 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_consolidation">Consolidation</string>
     <string name="memory_consolidation_paused">Consolidation: paused</string>
     <string name="memory_consolidation_running">Consolidation: running</string>
+    <string name="memory_status_eyebrow">Status</string>
+    <string name="memory_status_last_just_now">Last consolidated just now</string>
+    <string name="memory_status_last_minutes">Last consolidated %1$s min ago</string>
+    <string name="memory_status_last_hours">Last consolidated %1$s h ago</string>
+    <string name="memory_status_last_days">Last consolidated %1$s days ago</string>
+    <string name="memory_status_last_none">Nothing consolidated since this start</string>
+    <string name="memory_status_waiting">%1$s waiting in this bank</string>
+    <string name="memory_status_proposals"> · %1$s instruction proposals wait on creatures' Mind tabs</string>
+    <string name="memory_status_since_this_start">\nTimes count from this start only.</string>
+    <string name="memory_consolidate_now">Consolidate now</string>
+    <string name="memory_consolidate_now_working">Consolidating now…</string>
+    <string name="memory_consolidate_now_paused">Consolidation is paused. Resume it below to consolidate now.</string>
+    <string name="memory_consolidate_now_off">Memory is off. Turn it on below to consolidate now.</string>
     <string name="memory_counted_since_this_bank_s_layer">\nCounted since this bank's layer was last built (a settings change rebuilds it).</string>
     <string name="memory_default_provider">Default provider</string>
     <string name="memory_defaults">Defaults</string>
@@ -642,6 +668,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="overview_invalid">Invalid</string>
     <string name="overview_jump_to_active">Jump to active</string>
     <string name="overview_doing_now">%1$s · DOING NOW</string>
+    <string name="overview_doing_now_feeds">%1$s · feeds %2$s</string>
     <string name="overview_link_repository">LINK REPOSITORY</string>
     <string name="overview_loading_runtime">Waking the hive…</string>
     <string name="overview_local_git_folder_path">Local Git folder path</string>
@@ -834,7 +861,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_ai_providers">AI Providers</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_ground">Ground</string>
-    <string name="settings_ground_explain">Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_ground_explain">Pick the ground everything sits on; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_motion">Motion</string>
+    <string name="settings_reduce_motion_explain">Holds the creatures still and stops other looping movement. Remembered on this device.</string>
+    <string name="settings_reduce_motion_on">Reduce motion: ON</string>
+    <string name="settings_reduce_motion_off">Reduce motion: OFF</string>
+    <string name="settings_reduce_motion_by_device">This device already asks for less motion, so motion stays reduced whatever this switch says.</string>
+    <string name="settings_creature_labels">Creature labels</string>
+    <string name="settings_creature_labels_explain">A hive of more than %1$d creatures shows only the selected one's label, so packed cells stay readable. Turn this on to keep every creature's label, its task on its state's colour. Remembered on this device.</string>
+    <string name="settings_creature_labels_always">Always show labels: ON</string>
+    <string name="settings_creature_labels_crowded">Always show labels: OFF</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>
@@ -1260,6 +1296,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_workflow_file_or_id">Workflow file or ID</string>
     <string name="swarm_workflow_policies">Workflow policies</string>
     <string name="swarm_working">Working</string>
+    <string name="swarm_filter_all">All</string>
+    <string name="swarm_filter_producers">Producers</string>
+    <string name="swarm_filter_reviewers">Reviewers</string>
+    <string name="swarm_filter_none">No role in the swarm fits this filter.</string>
 
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage workflow edit.</string>
     <string name="terrarium_draft_wiring_staged_now_depends">Draft wiring staged: %1$s now depends on %2$s.</string>
@@ -1271,6 +1311,10 @@ What the server returns is treated as outside content, not instructions.</string
     <plurals name="inspector_activity_earlier">
         <item quantity="one">Show %1$d earlier line</item>
         <item quantity="other">Show %1$d earlier lines</item>
+    </plurals>
+    <plurals name="swarm_in_hives">
+        <item quantity="one">in %1$d hive</item>
+        <item quantity="other">in %1$d hives</item>
     </plurals>
     <plurals name="district_creatures">
         <item quantity="one">%1$d creature</item>

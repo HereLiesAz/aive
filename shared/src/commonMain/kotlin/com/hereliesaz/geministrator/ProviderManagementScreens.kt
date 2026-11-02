@@ -99,8 +99,6 @@ import com.hereliesaz.geministrator.resources.settings_appearance
 import com.hereliesaz.geministrator.resources.settings_automatic_crash_reports_off
 import com.hereliesaz.geministrator.resources.settings_automatic_crash_reports_on
 import com.hereliesaz.geministrator.resources.settings_available
-import com.hereliesaz.geministrator.resources.settings_ground
-import com.hereliesaz.geministrator.resources.settings_ground_explain
 import com.hereliesaz.geministrator.resources.settings_battery_use_allowed
 import com.hereliesaz.geministrator.resources.settings_check_provider_health
 import com.hereliesaz.geministrator.resources.settings_choose_ive_file_from_another_location
@@ -729,21 +727,9 @@ internal fun ProviderSettingsScreen(
       }
 
         // Appearance: the page colour ("ground"). It lives here, not in the header, so every shell
-        // (Android, Desktop, Web) offers it in one place. The pill and its text take their colours
-        // from the surfaces they sit on like every other control.
+        // (Android, Desktop, Web) offers it in one place (KeeperAppearance.kt).
       if (section == KeeperSection.Appearance) {
-        Text(
-            stringResource(Res.string.settings_ground_explain),
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-        AzphaltPill(
-            label = stringResource(Res.string.settings_ground),
-            seed = "settings-ground",
-            endCap = Azphalt.currentGround.name,
-            onClick = { Azphalt.rerollGround() },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        KeeperAppearance()
       }
 
       if (section == KeeperSection.About) {

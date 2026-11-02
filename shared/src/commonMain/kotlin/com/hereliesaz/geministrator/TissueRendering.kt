@@ -8,7 +8,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
+import kotlin.math.atan2
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 
 private val TissueCore = Color(0xFF2A231E)
@@ -22,6 +26,8 @@ internal fun DrawScope.drawTissueGround(
     phase: Float = 0f,
     /** Whether a creature is working now: its provider's blood flows. */
     isFlowing: (String) -> Boolean = { false },
+    /** Writes each provider's name along its capillary; null draws the vessels alone. */
+    textMeasurer: TextMeasurer? = null,
     creatureCentre: (String) -> Offset? = { null },
 ) {
     drawRect(
@@ -33,13 +39,14 @@ internal fun DrawScope.drawTissueGround(
     )
     // Each provider's vascular tree, from its edge of the field to the creatures it feeds.
     val minWidth = 1.6.dp.toPx() * zoom
-    tissue.capillaries.forEachIndexed { index, capillary ->
-        val fed = tissue.providerOf.filterValues { it == capillary.providerId }.keys.sorted()
-        val centres = fed.mapNotNull(creatureCentre)
-        if (centres.isEmpty()) return@forEachIndexed
-        val towards = Offset(centres.map { it.x }.average().toFloat(), centres.map { it.y }.average().toFloat())
+    val courses = tissue.capillaryCourses(size.width, size.height, creatureCentre)
+    courses.forEach { course ->
+        val capillary = course.capillary
+        val fed = course.fed
+        val centres = course.centres
+        val towards = course.towards
         val seed = capillary.providerId.hashCode()
-        val entry = vesselEntry(index, towards, size.width, size.height)
+        val entry = course.entry
         val vessels = VesselCache.get(capillary.providerId, entry, centres, creatureRadius, size, zoom) {
             grownVasculature(
                 entry = entry,
@@ -53,7 +60,77 @@ internal fun DrawScope.drawTissueGround(
         }
         drawVasculature(vessels, flowing = fed.any(isFlowing), phase = phase, cell = 2.dp.toPx() * zoom)
     }
+    // Names go on after every vessel, so no provider's tree covers another's name.
+    if (textMeasurer != null) courses.forEach { course -> drawCapillaryName(course, textMeasurer) }
 }
+
+/** One provider's capillary as laid on the field: where it enters and the creatures it reaches. */
+internal data class CapillaryCourse(
+    val capillary: TissueCapillary,
+    /** The creatures it feeds, in id order. */
+    val fed: List<String>,
+    /** Where those of them on the field are, on screen. */
+    val centres: List<Offset>,
+    val entry: Offset,
+    /** The centre of the creatures it feeds. */
+    val towards: Offset,
+) {
+    /** Where its name sits: part way from the edge toward its creatures. */
+    val labelAt: Offset get() = entry + (towards - entry) * CAPILLARY_LABEL_AT
+}
+
+/**
+ * Every capillary that reaches a creature on the field, in the order they are drawn. Shared by the
+ * vessels, their names and the semantics overlay, so all three agree on where each one runs.
+ */
+internal fun TissueScene.capillaryCourses(
+    width: Float,
+    height: Float,
+    creatureCentre: (String) -> Offset?,
+): List<CapillaryCourse> = capillaries.mapIndexedNotNull { index, capillary ->
+    val fed = fedBy(capillary.providerId)
+    val centres = fed.mapNotNull(creatureCentre)
+    if (centres.isEmpty()) return@mapIndexedNotNull null
+    val towards = Offset(centres.map { it.x }.average().toFloat(), centres.map { it.y }.average().toFloat())
+    CapillaryCourse(
+        capillary = capillary,
+        fed = fed,
+        centres = centres,
+        entry = vesselEntry(index, towards, width, height),
+        towards = towards,
+    )
+}
+
+/** The provider's name, written along its capillary's course on a dark band so it reads on the tissue. */
+private fun DrawScope.drawCapillaryName(course: CapillaryCourse, textMeasurer: TextMeasurer) {
+    val run = course.towards - course.entry
+    if (run.getDistance() < 1f) return
+    val measured = textMeasurer.measure(
+        text = capillaryName(course.capillary.providerId).uppercase(),
+        style = AzphaltType.endCap.copy(color = CapillaryNameInk),
+        maxLines = 1,
+    )
+    val at = course.labelAt
+    val degrees = radiansToDegrees(atan2(run.y, run.x))
+    val padX = 6.dp.toPx()
+    val padY = 2.dp.toPx()
+    val w = measured.size.width.toFloat()
+    val h = measured.size.height.toFloat()
+    rotate(capillaryLabelAngle(degrees), pivot = at) {
+        drawRoundRect(
+            color = TissueEdge.copy(alpha = 0.72f),
+            topLeft = Offset(at.x - w / 2f - padX, at.y - h / 2f - padY),
+            size = Size(w + padX * 2f, h + padY * 2f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h),
+        )
+        drawText(measured, topLeft = Offset(at.x - w / 2f, at.y - h / 2f))
+    }
+}
+
+private fun radiansToDegrees(radians: Float): Float = radians * (180f / kotlin.math.PI.toFloat())
+
+/** The vessels' pale sheen, so a capillary's name reads as part of it on the dark tissue. */
+private val CapillaryNameInk = Color(0xFFF2C9C2)
 
 /**
  * The run as an egg. Every task being worked on feeds it through a tail from its creature; it swells
