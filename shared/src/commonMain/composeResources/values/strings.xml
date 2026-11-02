@@ -279,6 +279,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_now">NOW</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
     <string name="inspector_plan">PLAN</string>
+    <string name="inspector_plan_place">%1$s of %2$s</string>
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
     <string name="inspector_provider">PROVIDER</string>

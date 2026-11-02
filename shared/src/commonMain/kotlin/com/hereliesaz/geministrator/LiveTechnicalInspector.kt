@@ -100,6 +100,7 @@ import com.hereliesaz.geministrator.resources.inspector_no_run_is_loaded
 import com.hereliesaz.geministrator.resources.inspector_now
 import com.hereliesaz.geministrator.resources.inspector_payload_context
 import com.hereliesaz.geministrator.resources.inspector_plan
+import com.hereliesaz.geministrator.resources.inspector_plan_place
 import com.hereliesaz.geministrator.resources.inspector_proceed
 import com.hereliesaz.geministrator.resources.inspector_progress
 import com.hereliesaz.geministrator.resources.inspector_provider
@@ -198,6 +199,18 @@ internal fun TechnicalInspector(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
+        // One line under its name: its state, its provider, and its place in the plan ("3 of 5").
+        val place = planPlace(liveWorkflow.definition.tasks, taskId)
+        Text(
+            creatureHeaderLine(
+                state = taskRun.status.label(),
+                provider = taskRun.assignedProviderId?.value?.let(::providerDisplayName),
+                place = place?.let { stringResource(Res.string.inspector_plan_place, it.position, it.of) },
+            ),
+            style = AzphaltType.eyebrow,
+            color = azphaltOnSurface(),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         CreatureTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
         confirmingStop?.let { isStop ->
