@@ -3,7 +3,7 @@
 The Aive speaks Google's [Agent2Agent protocol](https://a2a-protocol.org) over its JSON-RPC binding, in both directions:
 
 - **Client:** a role can delegate its task to a remote A2A agent.
-- **Server (desktop only, on by default, this computer only):** other agents on the same computer that hold its token can start workflows in The Aive.
+- **Server (desktop only, on by default, this computer only):** other agents on the same computer that hold its token can start workflows in The Aive. **Open to this network** (off by default) lets allowed computers on the local network do the same.
 
 The Aive writes the current specification (1.0): `SendMessage`/`GetTask`/`CancelTask`, ProtoJSON enums such as `TASK_STATE_COMPLETED`, and parts without `kind`. It reads both 1.0 and the widely deployed 0.3 (`message/send`, `tasks/get`, `tasks/cancel`, lowercase states, `kind` members). The codec is `shared/.../a2a/A2aProtocol.kt`.
 
@@ -61,6 +61,18 @@ It runs on desktop unless the keeper turns it off in **Keeper's room › This de
 | `GET /.well-known/agent-card.json` (also `/.well-known/agent.json`) | none | The Agent Card (1.0 shape) |
 | `POST /a2a` JSON-RPC | `Authorization: Bearer <token>` | See below; `401` with `WWW-Authenticate: Bearer` otherwise |
 
+### Open to this network
+
+Under the A2A server row, **Open to this network** is off by default, even though the server itself is on. The switch is kept once pressed (preferences key `lan`; `a2aServerOpenToNetwork`). Turning it on or off restarts the server on the other address; a launch still queued at that moment fails, as when the server is turned off.
+
+- **Binding.** While on, the server binds every IPv4 interface (`0.0.0.0`) on the same port. This computer still reaches it at `127.0.0.1`. The row lists the Agent Card URL on each of this computer's IPv4 addresses (up, not loopback, not link-local), re-read every 30 seconds. IPv6 is not served. A single chosen interface is not offered yet.
+- **Host check.** A request's `Host` must still be a loopback name, or one of this computer's own addresses as an IP literal. Host names are refused, so DNS rebinding still fails.
+- **Who may call.** A caller from another computer needs the bearer token *and* its IP address on the keeper's allowlist (preferences key `lan-allowed`). A caller with the right token whose address is not listed gets `403` and appears on the row as "`<address>` has the token and wants to send work", with **Allow**. Allowed addresses are listed with **Remove**. A caller without the token gets `401` and is never listed, so scanners cannot fill the list. At most 8 waiting addresses are shown, newest first. Callers on this computer need no entry. While the switch is off, every non-loopback caller is refused, card included.
+- **Why an allowlist and not an Inbox approval.** Approval in the hive's Needs/Inbox would need a new kind of wait that belongs to no run, plus a pending-client queue across restarts. The allowlist is deny-by-default, needs one keeper action per computer, is decided where the switch lives, and the "wants to send work" line gives the same first-contact prompt without new Inbox plumbing. It is keyed by address, not identity: see the threat model's residual risks.
+- **Rate limit.** `SendMessage` is limited to 6 calls a minute per client (each network address; this computer counts as one client), whether or not the launch is accepted. Over the limit the answer is HTTP `429` with `Retry-After` in seconds. `GetTask` and `CancelTask` are not limited.
+- **Agent Card.** A caller that reached the server at a network address gets a card whose interface URL is `http://<that address>:<port>/a2a`. A caller on loopback gets the loopback URL. With the switch off the card never names a network address. The card is public, as A2A discovery expects, so anyone on the network can read it while the switch is on.
+- **No encryption.** It is plain HTTP. TLS is not offered: the JDK has no public way to make a certificate, and A2A clients would reject a self-signed one without pinning that they do not offer. The token and everything sent travel in clear text, and anyone else on the network can read them. The row says so beside the switch. Use it only on a trusted network, and press **New token** after using it on one you do not trust.
+
 **The card** names one `JSONRPC` interface at `/a2a`, protocol version `1.0`, and declares an HTTP Bearer scheme (`securitySchemes.bearer.httpAuthSecurityScheme`). Streaming and push notifications are `false`. Its skills are `hive` ("Run a hive") followed by one `role:<id>` skill per enabled role in the swarm. The roles describe who the planner can staff; every message is planned the same way.
 
 **Methods.** 1.0 names are answered in 1.0 shapes and 0.3 names in 0.3 shapes. A request with an `A2A-Version` header other than `0.3` or `1.0` gets `-32009`.
@@ -87,6 +99,7 @@ It runs on desktop unless the keeper turns it off in **Keeper's room › This de
 - `shared/src/commonTest/.../a2a/A2aProtocolTest.kt`: card JSON shape, both message/task shapes, state and method mapping.
 - `A2aServerTest.kt`: auth refusal, Host check, launch/get/cancel, legacy names, busy rejection, error codes.
 - `A2aServerSettingTest.kt`: on by default, an explicit choice kept.
-- `desktopApp/src/test/.../DesktopA2aServerTest.kt`: binds loopback on a free port, serves the card, refuses calls without the token, keeps the token across starts, reports a port in use.
+- `desktopApp/src/test/.../DesktopA2aServerTest.kt`: binds loopback on a free port, serves the card, refuses calls without the token, keeps the token across starts, reports a port in use; open to the network it binds every interface and advertises the network URL, closing it rebinds loopback, an older switch change cannot undo a newer one, and only addresses can be allowed.
+- `A2aServerLanTest.kt`: network callers refused while closed, the card's URL per caller, Host checks, the allowlist and waiting list, the per-client `SendMessage` limit, address normalization.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
 - `providers/llm/src/commonTest/.../A2aAgentProviderTest.kt`: the client against a mock agent, including the token-origin rule.

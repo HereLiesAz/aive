@@ -977,6 +977,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_a2a_server_warning">Anyone with the token can start workflows on your linked AI providers. Treat it like a password. Reset it to lock out everyone who has it.</string>
     <string name="settings_a2a_server_copy_token">Copy token</string>
     <string name="settings_a2a_server_reset_token">New token</string>
+    <string name="settings_a2a_lan_on">Open to this network: ON</string>
+    <string name="settings_a2a_lan_off">Open to this network: OFF</string>
+    <string name="settings_a2a_lan_warning">Off unless you turn it on. When on, other computers on this network can reach the A2A server. Each needs the token, and you must allow it here first. The connection is not encrypted: the token and the work sent travel as plain text, so anyone else on this network can read them. Use it only on a network you trust. Each computer can start at most 6 workflows a minute.</string>
+    <string name="settings_a2a_lan_card_url">Agent Card URL on this network</string>
+    <string name="settings_a2a_lan_no_address">This computer has no network address right now.</string>
+    <string name="settings_a2a_lan_waiting">%1$s has the token and wants to send work. It is refused until you allow it.</string>
+    <string name="settings_a2a_lan_allow">Allow %1$s</string>
+    <string name="settings_a2a_lan_allowed">Allowed: %1$s</string>
+    <string name="settings_a2a_lan_remove">Remove</string>
+    <string name="settings_a2a_lan_none_allowed">No other computer is allowed yet. One that tries with the token shows up here.</string>
     <string name="settings_a2a_server_temporary_token">This computer has no keychain to keep the token in, so it changes every time The Aive starts.</string>
     <string name="settings_remote_access_description">Let your own IDEaz (the companion Android coding app from the same developer) on another device run prompts on your linked AI providers and start workflows here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
     <string name="settings_remote_access_on">Remote access: ON</string>

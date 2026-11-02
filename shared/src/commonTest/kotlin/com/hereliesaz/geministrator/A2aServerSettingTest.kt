@@ -35,4 +35,12 @@ class A2aServerSettingTest {
         // Older builds wrote the key only when the keeper pressed the switch.
         assertFalse(a2aServerEnabled(parseA2aServerChoice("false")))
     }
+
+    @Test
+    fun theNetworkStaysClosedUnlessTheKeeperOpensIt() {
+        assertFalse(a2aServerOpenToNetwork(storedChoice = null))
+        assertFalse(a2aServerOpenToNetwork(parseA2aServerChoice("garbage")))
+        assertFalse(a2aServerOpenToNetwork(storedChoice = false))
+        assertTrue(a2aServerOpenToNetwork(storedChoice = true))
+    }
 }
