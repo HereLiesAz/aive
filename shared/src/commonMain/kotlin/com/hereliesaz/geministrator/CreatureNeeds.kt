@@ -57,7 +57,7 @@ internal val REVIEWER_KINDS = setOf(
 /** Whether a role, by its name, is a reviewer (see [REVIEWER_KINDS]). */
 internal fun isReviewerRoleName(roleName: String): Boolean = classifyNodeCreatureRole(roleName) in REVIEWER_KINDS
 
-private val TAKEN_UP = setOf(
+internal val TAKEN_UP = setOf(
     TaskRunStatus.Planning,
     TaskRunStatus.AwaitingApproval,
     TaskRunStatus.Running,
