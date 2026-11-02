@@ -23,6 +23,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Device ↔ Crash relay (Android GitHub flavor; opt-in) | Crash/ANR reports → public GitHub issues | Outbound |
 | Device ↔ Gemini app (Android GitHub flavor, opt-in) | Prompt typed into Gemini, reply read from screen/clipboard | Both (on-device) |
 | Device ↔ MCP servers (keeper-configured) | Model-written tool arguments out; tool lists and results in; on desktop, a local server process | Both |
+| MCP host ↔ script sandbox (desktop, opt-in) | A model-written script in; bridged tool calls and their results; the script's final value out | Both (in-process WebAssembly guest) |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
 | Haive ↔ User | Workflow definitions, task approval decisions, escalation responses | Both |
@@ -198,6 +199,7 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - A model steered by injection calls a tool to send task content to a server, or to act through the server (for example, writing to a repository with the server's credentials).
 - A server's tool descriptions or annotations lie about what the tool does.
 - A local (stdio) server runs arbitrary code on the desktop.
+- Code execution (desktop, opt-in): a model steered by injection writes a script that escapes the sandbox, exhausts the device (an endless loop, unbounded memory or output), or calls tools in bulk without the keeper seeing each call.
 - A bearer token is sent to the wrong host or over cleartext.
 
 **Mitigations in place**
@@ -207,11 +209,16 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - MCP calls are not repository operations and never receive The Aive's repository credentials. Workspace agents, which write branches, get no MCP tools. Runs behind a provider-side plan gate get no tools, so no tool runs before approval.
 - Addresses must be HTTPS, or HTTP to this device or a private network. They may not embed credentials, and redirects are not followed. Tokens live in the platform credential store, as other connection secrets do, and are excluded from Android backup.
 - Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell. The client declares no capabilities, so a server cannot ask for sampling, elicitation or roots.
+- Code execution is off until the keeper turns on **Script sandbox**, and exists only on the desktop. The script runs as JavaScript in QuickJS compiled to WebAssembly, on a pure-Java WebAssembly runtime (Endive): it is never handed to a shell, a JVM scripting engine or the host process. The guest has no filesystem, network, environment or process access; its only effective import is the bridge, and every bridged call is an ordinary call through the host's consent gate for the same run, so the sandbox adds no authority: it can do only what the model could already do with direct calls. It cannot call itself, nor tools the run was not offered.
+- A script is bounded: 20,000 characters, 16 tool calls, 10 s of computing time, 12 minutes in all, 64 MB of memory, 4,000 characters of console output and a 16,000-character result, and it stops when the run is cancelled. Its final value is fenced as external content naming the tools it used, and the answer carries the same provenance as any tool use.
+- Invariant 3 holds: the script is a tool argument the model wrote, not artifact content, and The Aive's runtime does not execute it; only the capability-less guest interpreter does. Nothing a script or tool returns is executed.
 
 **Residual risks**
 - After consent, a server sees whatever arguments the model writes, which may include task content. A server allowed always is never asked about again.
 - A local server runs with the keeper's own permissions; The Aive does not sandbox it.
 - Tool descriptions are shown to the model as the server wrote them.
+- With a server allowed always, a script can make its 16 calls to that server without a question per call, as the model could across turns. The keeper sees one progress line for the script, not one per bridged call.
+- The sandbox's isolation rests on the WebAssembly runtime and the QuickJS build (quickjs4j); a bug there could reach the JVM. The guest still holds no credentials, and its thread holds only the bridge. Time is bounded by interruption, not instruction metering, so a guest stuck in a host call ends only when that call ends or the total time runs out.
 
 ### Repository operations
 

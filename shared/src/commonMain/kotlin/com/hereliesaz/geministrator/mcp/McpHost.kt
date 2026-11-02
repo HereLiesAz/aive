@@ -30,6 +30,12 @@ data class McpToolOutcome(
     val toolName: String,
     val text: String,
     val isError: Boolean,
+    /**
+     * The same content without the fence, for a caller inside The Aive that fences it again
+     * itself: the code-execution sandbox hands it to the script it runs ([CodeExecutionToolSource]).
+     * Never given to a model unfenced.
+     */
+    val rawText: String = text,
 )
 
 /** The tools one run may offer its model, and the way to call them under the run's consent. */
@@ -171,13 +177,14 @@ class McpHost(
         override suspend fun call(offerName: String, arguments: JsonObject): McpToolOutcome {
             val offer = byName[offerName]
                 ?: return McpToolOutcome(offerName, "", "", offerName, "No tool named $offerName was offered.", isError = true)
-            fun outcome(text: String, isError: Boolean) = McpToolOutcome(
+            fun outcome(text: String, isError: Boolean, rawText: String = text) = McpToolOutcome(
                 offerName = offer.name,
                 serverId = offer.serverId,
                 serverName = offer.serverName,
                 toolName = offer.toolName,
                 text = text,
                 isError = isError,
+                rawText = rawText,
             )
             val server = _servers.value.firstOrNull { it.id == offer.serverId }
                 ?: return outcome("The MCP server ${offer.serverName} was removed.", isError = true)
@@ -186,7 +193,8 @@ class McpHost(
             }
             return try {
                 val result = client(server).callTool(offer.toolName, arguments)
-                outcome(fenceExternal(server, offer.toolName, result.renderText()), result.isError)
+                val rendered = result.renderText()
+                outcome(fenceExternal(server, offer.toolName, rendered), result.isError, rawText = rendered)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {

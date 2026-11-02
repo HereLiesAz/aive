@@ -109,6 +109,13 @@ fun main() {
         consent = mcpConsent,
         stdioSupported = true,
     )
+    // Code execution with MCP: a script sandbox over the same tools and consent, off until the
+    // keeper turns it on (docs/architecture/MCP_HOST.md, "Code execution").
+    val codeExecution = com.hereliesaz.geministrator.mcp.CodeExecutionToolSource(
+        inner = mcpHost,
+        runtime = com.hereliesaz.geministrator.mcp.QuickJsScriptSandbox(),
+        settings = com.hereliesaz.geministrator.mcp.CodeExecutionSettings(),
+    )
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
@@ -150,7 +157,7 @@ fun main() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 val providers = remember(credentials, repositoryCredentials) {
-                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder, mcpHost)
+                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder, codeExecution)
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -361,6 +368,7 @@ fun main() {
                         entire = desktopEntire,
                         mcpHost = mcpHost,
                         mcpConsent = mcpConsent,
+                        codeExecution = codeExecution,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
