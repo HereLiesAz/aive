@@ -62,6 +62,11 @@ data class AgentOrchestrationContext(
     val roleId: RoleDefinitionId? = null,
     /** The run's parent runs ([com.hereliesaz.geministrator.domain.WorkflowRun.parentWorkflowRunIds]). */
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /**
+     * The task's name ([com.hereliesaz.geministrator.domain.TaskDefinition.name]), null when the
+     * workflow redacts objectives. Local Git checkpoints name it in their commit message.
+     */
+    val taskName: String? = null,
 )
 
 data class AgentTaskRequest(

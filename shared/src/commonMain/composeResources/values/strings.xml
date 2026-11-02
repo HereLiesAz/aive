@@ -157,6 +157,7 @@
     <string name="inspector_artifacts">ARTIFACTS</string>
     <string name="inspector_attempt">ATTEMPT</string>
     <string name="inspector_blocked">BLOCKED</string>
+    <string name="inspector_checkpoint">CHECKPOINT</string>
     <string name="inspector_context_artifacts_sent">\nContext artifacts: %1$s sent</string>
     <string name="inspector_default_runner">default runner</string>
     <string name="inspector_executor">EXECUTOR</string>

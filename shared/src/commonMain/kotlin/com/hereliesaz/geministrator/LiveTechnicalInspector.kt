@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.CHECKPOINT_COMMIT_METADATA_KEY
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -44,6 +46,7 @@ import com.hereliesaz.geministrator.resources.inspector_artifact
 import com.hereliesaz.geministrator.resources.inspector_artifacts
 import com.hereliesaz.geministrator.resources.inspector_attempt
 import com.hereliesaz.geministrator.resources.inspector_blocked
+import com.hereliesaz.geministrator.resources.inspector_checkpoint
 import com.hereliesaz.geministrator.resources.inspector_context_artifacts_sent
 import com.hereliesaz.geministrator.resources.inspector_default_runner
 import com.hereliesaz.geministrator.resources.inspector_executor
@@ -285,6 +288,10 @@ internal fun TechnicalInspector(
                 taskRun.blockingReason?.let {
                     LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
                 }
+                // Its Git checkpoint: the commit its own changes became (Local Git, Desktop).
+                checkpointSummary(taskRun.artifacts)?.let {
+                    LiveInspectorLine(stringResource(Res.string.inspector_checkpoint), it)
+                }
                 // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
                 taskRun.artifacts.forEach { artifact ->
@@ -378,6 +385,17 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.ExternalService -> listOfNotNull(service, operation).joinToString(" · ")
     is TaskExecutor.NestedWorkflow -> workflowDefinitionId.value
     is TaskExecutor.Distributed -> label ?: (stringResource(Res.string.inspector_remote) + delegate.displayName())
+}
+
+/**
+ * The commit a task run checkpointed its changes as, shortened, with the branch holding it: from its
+ * latest artifact carrying [CHECKPOINT_COMMIT_METADATA_KEY]. Null when the task made no checkpoint.
+ */
+internal fun checkpointSummary(artifacts: List<ArtifactRef>): String? {
+    val artifact = artifacts.lastOrNull { !it.metadata[CHECKPOINT_COMMIT_METADATA_KEY].isNullOrBlank() } ?: return null
+    val commit = artifact.metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY).trim().take(12)
+    val branch = artifact.metadata["branch"]?.trim()?.takeIf(String::isNotEmpty)
+    return if (branch == null) commit else "$commit · $branch"
 }
 
 @Composable
