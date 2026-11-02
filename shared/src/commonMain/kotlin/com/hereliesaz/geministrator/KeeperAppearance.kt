@@ -22,6 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.settings_creature_labels
+import com.hereliesaz.geministrator.resources.settings_creature_labels_always
+import com.hereliesaz.geministrator.resources.settings_creature_labels_crowded
+import com.hereliesaz.geministrator.resources.settings_creature_labels_explain
 import com.hereliesaz.geministrator.resources.settings_ground
 import com.hereliesaz.geministrator.resources.settings_ground_explain
 import com.hereliesaz.geministrator.resources.settings_motion
@@ -34,7 +38,7 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * Keeper's room › Appearance. The ground is chosen from its six swatches, the current one
  * selected; every shell (Android, Desktop, Web) offers it here and nowhere else. Below it, the
- * keeper's Reduce motion switch.
+ * keeper's Reduce motion and Always show creature labels switches.
  */
 @Composable
 internal fun KeeperAppearance() {
@@ -49,6 +53,27 @@ internal fun KeeperAppearance() {
         onSelect = { Azphalt.setGround(it.name) },
     )
     ReduceMotionSwitch()
+    CreatureLabelsSwitch()
+}
+
+/** Lifts the [NAMED_CREATURE_LIMIT] so every creature keeps its label however full the hive is. */
+@Composable
+private fun CreatureLabelsSwitch() {
+    val on = CreatureLabels.alwaysShow
+    ProviderSectionLabel(stringResource(Res.string.settings_creature_labels))
+    Text(
+        stringResource(Res.string.settings_creature_labels_explain, NAMED_CREATURE_LIMIT),
+        style = AzphaltType.body,
+        color = azphaltOnSurface(),
+    )
+    AzphaltPill(
+        label = stringResource(if (on) Res.string.settings_creature_labels_always else Res.string.settings_creature_labels_crowded),
+        seed = "creature-labels-toggle",
+        selected = on,
+        role = Role.Switch,
+        onClick = { CreatureLabels.updateAlwaysShow(!on) },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /**
