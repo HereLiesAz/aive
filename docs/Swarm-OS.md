@@ -45,7 +45,7 @@ Pinch moves between distances; double-tap dives one level, two-finger tap surfac
 - **The lineage is the family tree** of everyone who lived: kin, rarity, how hard each line is to breed. *(Replaces the Swarm roster.)*
 - **The Store is where drifters come from.** Workflows from the Store arrive as new hives; agents arrive as drifters at the hive's edge. **Import** is the cure for the clone trap, and the Store should say so. *(Replaces the Store tab.)*
 - **Memory is the tissue's tone.** Its clarity is how much the swarm remembers; its tint is whose voice fills it. Consolidation is sleep. *(Replaces Memory.)*
-- **The machinery is the vasculature.** Providers are capillaries, budget is perfusion, compute is the heartbeat. Swipe up from a capillary to reach its settings. *(Replaces Settings, Repositories, Compute.)*
+- **The machinery is the vasculature.** Providers are capillaries, budget is perfusion, compute is the heartbeat. Swipe up from a capillary to reach its settings. Each capillary carries its provider's name along its course, and a screen reader hears it with the creatures it feeds ("Claude, feeding Architect, Engineer"). *(Replaces Settings, Repositories, Compute.)*
 
 ## Care: the keeper's tools
 
@@ -72,7 +72,7 @@ Each tool is a real control (see the ledger). One sits in the creature's needs p
 
 ## Accessibility
 
-Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove; the tide has Undo and Redo; every creature, synapse, egg and comb is a labelled semantics node; every distance is reachable from the rim.
+Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove (outside Build, the creature's Work already lists fed by and feeds, read only, with whether each fed creature took its output); the tide has Undo and Redo; every creature, synapse, egg and comb is a labelled semantics node; every distance is reachable from the rim.
 
 ## Build order
 

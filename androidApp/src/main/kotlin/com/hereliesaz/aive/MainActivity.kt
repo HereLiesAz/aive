@@ -733,7 +733,7 @@ class MainActivity : ComponentActivity() {
                 android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
             )
         }.getOrNull()
-        AzphaltMotion.reduceMotion = shouldReduceMotion(animatorDurationScale = scale, systemPrefersReduced = false)
+        AzphaltMotion.platformReduceMotion = shouldReduceMotion(animatorDurationScale = scale, systemPrefersReduced = false)
     }
 
     /**
