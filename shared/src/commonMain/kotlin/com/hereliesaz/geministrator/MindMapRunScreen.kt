@@ -78,7 +78,6 @@ import com.hereliesaz.geministrator.resources.overview_repository_search_unavail
 import com.hereliesaz.geministrator.resources.overview_required
 import com.hereliesaz.geministrator.resources.overview_resume_failed
 import com.hereliesaz.geministrator.resources.overview_retry_runtime
-import com.hereliesaz.geministrator.resources.overview_runtime
 import com.hereliesaz.geministrator.resources.overview_runtime_disconnected
 import com.hereliesaz.geministrator.resources.overview_runtime_is_advancing_without_human_intervention
 import com.hereliesaz.geministrator.resources.overview_search_github_repositories_or_paste_url
@@ -104,6 +103,11 @@ import com.hereliesaz.geministrator.resources.first_hive_options
 import com.hereliesaz.geministrator.resources.first_hive_connect_hint
 import com.hereliesaz.geministrator.resources.first_hive_connect
 import com.hereliesaz.geministrator.resources.first_hive_feed
+import com.hereliesaz.geministrator.resources.credential_keyless_hint
+import com.hereliesaz.geministrator.resources.feed_gate_own_key
+import com.hereliesaz.geministrator.resources.feed_gate_repository
+import com.hereliesaz.geministrator.resources.feed_gate_use_free
+import com.hereliesaz.geministrator.resources.feed_gate_unsupported_repository
 import com.hereliesaz.geministrator.resources.first_hive_objective
 import com.hereliesaz.geministrator.resources.first_hive_hint
 import com.hereliesaz.geministrator.resources.first_hive
@@ -132,8 +136,13 @@ internal fun MindMapRunScreen(
     compact: Boolean,
     onSurface: (() -> Unit)? = null,
     runtimeState: ApplicationRuntimeState,
-    /** Whether any AI provider is connected; a first launch asks for one first when not. */
-    hasProvider: Boolean = true,
+    /** Where the connected agents can work; feeding is gated on it (docs/Keepers-Room.md, First launch). */
+    providerReach: ProviderReach = ProviderReach.Unknown,
+    /** Links a keyless provider in one tap: the gate's resolution, in place. */
+    onConnectFreeProvider: (String) -> Unit = {},
+    /** Why the last launch did not start; shown beside Feed it until the next edit or launch. */
+    launchError: String? = null,
+    onDismissLaunchError: () -> Unit = {},
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val scope = rememberCoroutineScope()
@@ -211,7 +220,9 @@ internal fun MindMapRunScreen(
                 repositorySuggestions = suggestions
             },
             onFailure = { failure ->
-                repositorySearchError = failure.message?.take(120) ?: getString(Res.string.overview_repository_search_unavailable)
+                // The raw reply (an HTTP body) is no help here: say what still works.
+                platformDebugLog("AiveLaunch", "Repository search failed: ${failure.message}")
+                repositorySearchError = getString(Res.string.overview_repository_search_unavailable)
             },
         )
     }
@@ -343,33 +354,34 @@ internal fun MindMapRunScreen(
                 }
                 if (!firstLaunch) projectFields()
 
-                OutlinedTextField(
-                    colors = azphaltTextFieldColors(),
-                    value = objective,
-                    onValueChange = { objective = it },
-                    label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
-                    minLines = if (compact) 2 else 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                AzphaltPill(
-                    label = stringResource(if (firstLaunch) Res.string.first_hive_options else Res.string.overview_options),
-                    seed = "launch-options",
-                    selected = optionsOpen,
-                    onClick = { optionsOpen = !optionsOpen },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (optionsOpen) {
-                if (firstLaunch) projectFields()
+                // What feeding still needs, and where it is resolved (Conveyance: a Gate knows where it lives).
+                val chosenSource = repositorySource.takeIf { repositoryLocator.isNotBlank() }
+                val gate = providerReach.gateFor(chosenSource)
+                val repositoryGated = gate is FeedGate.Repository || gate is FeedGate.UnsupportedRepository
+                // A repository the agents can't use is swapped for one they can, before anything is typed.
+                LaunchedEffect(gate) {
+                    launchFieldsError = null
+                    val usable = (gate as? FeedGate.Repository)?.sources.orEmpty()
+                    if (usable.isNotEmpty() && repositorySource !in usable && repositoryLocator.isBlank()) {
+                        selectableRepositorySources.firstOrNull { it in usable }?.let { repositorySourceName = it.name }
+                    }
+                }
+                val repositoryFields: @Composable () -> Unit = {
                 Text(
                     stringResource(Res.string.overview_link_repository),
                     style = AzphaltType.eyebrow,
                     color = azphaltOnSurface(),
                 )
-                Row(
+                // Gated, only the kinds the agents work in; one kind needs no choice at all.
+                val shownSources = (gate as? FeedGate.Repository)?.sources
+                    ?.let { usable -> selectableRepositorySources.filter { it in usable } }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: selectableRepositorySources
+                if (shownSources.size > 1) Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    selectableRepositorySources.forEach { source ->
+                    shownSources.forEach { source ->
                         AzphaltPill(
                             label = source.displayName(),
                             seed = "repository-source-${source.name}",
@@ -498,7 +510,7 @@ internal fun MindMapRunScreen(
                         },
                     )
                 }
-                OutlinedTextField(
+                if (!repositoryGated) OutlinedTextField(
                     colors = azphaltTextFieldColors(),
                     value = defaultBranch,
                     onValueChange = { defaultBranch = it },
@@ -506,7 +518,7 @@ internal fun MindMapRunScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text(
+                if (!repositoryGated) Text(
                     when {
                         repositorySource == RepositorySource.Local ->
                             stringResource(Res.string.overview_this_runtime_can_link_the_selected)
@@ -518,6 +530,28 @@ internal fun MindMapRunScreen(
                     style = AzphaltType.body,
                     color = azphaltOnSurface(),
                 )
+                }
+                OutlinedTextField(
+                    colors = azphaltTextFieldColors(),
+                    value = objective,
+                    onValueChange = {
+                        objective = it
+                        onDismissLaunchError()
+                    },
+                    label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
+                    minLines = if (compact) 2 else 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltPill(
+                    label = stringResource(if (firstLaunch) Res.string.first_hive_options else Res.string.overview_options),
+                    seed = "launch-options",
+                    selected = optionsOpen,
+                    onClick = { optionsOpen = !optionsOpen },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (optionsOpen) {
+                if (firstLaunch) projectFields()
+                if (!repositoryGated) repositoryFields()
                 LaunchLineagePicker(
                     state = lineage,
                     runs = launchableRuns,
@@ -527,20 +561,51 @@ internal fun MindMapRunScreen(
                     },
                 )
                 }
-                // Before anything can think, a provider: the first hive's first step when none is connected.
-                val needsProvider = firstLaunch && !hasProvider
-                if (needsProvider) {
-                    Text(stringResource(Res.string.first_hive_connect_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                // The gate sits right above Feed it, with its resolution in place: a provider to connect,
+                // or the repository the agents need, its fields open here rather than under Options.
+                val sourceNames = { sources: Set<RepositorySource> ->
+                    sources.sortedBy { it.ordinal }.joinToString(" / ") { it.displayName() }
+                }
+                val gateMessage = when (gate) {
+                    FeedGate.Open -> null
+                    FeedGate.Provider -> stringResource(Res.string.first_hive_connect_hint)
+                    is FeedGate.Repository -> stringResource(Res.string.feed_gate_repository, sourceNames(gate.sources))
+                    is FeedGate.UnsupportedRepository -> stringResource(
+                        Res.string.feed_gate_unsupported_repository,
+                        gate.source.displayName(),
+                        sourceNames(gate.sources),
+                    )
+                }
+                gateMessage?.let { message ->
+                    Text(message, style = AzphaltType.body, color = azphaltOnSurface())
+                }
+                if (repositoryGated) repositoryFields()
+                if (gate == FeedGate.Provider || gate is FeedGate.Repository) {
+                    // Something to think with, in one tap: the free gateways right here, the rest
+                    // (your own key) in the Keeper's room.
+                    val free = ProviderCatalog.builtInEntries.filter { it.keyOptional }.take(3)
+                    free.forEachIndexed { index, entry ->
+                        AzphaltPill(
+                            tone = if (index == 0 && gate == FeedGate.Provider) PillTone.Primary else PillTone.Quiet,
+                            label = stringResource(Res.string.feed_gate_use_free, entry.displayName),
+                            seed = "first-hive-free-${entry.id}",
+                            onClick = { onConnectFreeProvider(entry.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    if (free.isNotEmpty()) {
+                        Text(stringResource(Res.string.credential_keyless_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                    }
                     AzphaltPill(
-                        tone = PillTone.Primary,
-                        label = stringResource(Res.string.first_hive_connect),
+                        tone = PillTone.Quiet,
+                        label = stringResource(Res.string.feed_gate_own_key),
                         seed = "first-hive-connect",
                         onClick = onOpenSettings,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 AzphaltPill(
-                    tone = if (needsProvider) PillTone.Quiet else PillTone.Primary,
+                    tone = if (gate == FeedGate.Provider) PillTone.Quiet else PillTone.Primary,
                     label = when {
                         firstLaunch -> stringResource(Res.string.first_hive_feed)
                         runtimeState is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_start_run)
@@ -549,6 +614,13 @@ internal fun MindMapRunScreen(
                     seed = "project-start-run",
                     selected = (firstLaunch || projectName.isNotBlank()) && objective.isNotBlank(),
                     onClick = {
+                        onDismissLaunchError()
+                        // A gated Feed it escorts to what is missing rather than starting work no agent can take.
+                        if (gate != FeedGate.Open) {
+                            launchFieldsError = gateMessage
+                            platformDebugLog("AiveLaunch", "Launch gated: $gate")
+                            return@AzphaltPill
+                        }
                         val locator = repositoryLocator.trim()
                         // A first hive needs no name to start: it takes one from what it was fed, once
                         // it has been fed (an empty tap must not name it "First hive" for good).
@@ -606,7 +678,7 @@ internal fun MindMapRunScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                launchFieldsError?.let { message ->
+                (launchFieldsError ?: launchError)?.let { message ->
                     Text(
                         message,
                         style = AzphaltType.body,
@@ -739,19 +811,14 @@ private fun RuntimeStateRecord(state: ApplicationRuntimeState, compact: Boolean)
             if (state.isCorrupted) state.message else friendlyErrorMessage(state.message)
         is ApplicationRuntimeState.Live -> return
     }
+    // One block, in plain words: what happened, then what to do (the actions follow it).
     Text(
         title,
-        style = if (compact) AzphaltType.section else AzphaltType.hero,
+        style = AzphaltType.section,
         color = azphaltOnSurface(),
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
-    AzphaltRecord(
-        seed = "runtime-state-$title",
-        eyebrow = stringResource(Res.string.overview_runtime),
-        title = title.lowercase().replaceFirstChar(Char::uppercase),
-        body = body,
-        endCap = null,
-    )
+    Text(body, style = AzphaltType.body, color = azphaltOnSurface())
     val rawDetails = when {
         state is ApplicationRuntimeState.Disconnected -> state.message
         state is ApplicationRuntimeState.ResumeFailed && !state.isCorrupted -> state.message

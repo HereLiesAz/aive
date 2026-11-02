@@ -12,6 +12,8 @@ internal class DesktopProviderCredentialStore {
         val secure = readFromKeychain(providerId)
             ?: readWindowsDpapi(providerId)
         if (secure != null) return secure
+        // A keyless link holds no secret, so it needs no keychain: it works where none exists.
+        if (fallback.get(keylessKey(providerId), null) != null) return ProviderCatalog.ANONYMOUS_CREDENTIAL
 
         val legacy = fallback.get(providerId, null)?.trim()?.takeIf(String::isNotEmpty) ?: return null
         fallback.remove(providerId)
@@ -34,6 +36,13 @@ internal class DesktopProviderCredentialStore {
         require(CredentialTool.isSafeAccountId(providerId)) { "Unsupported provider id $providerId" }
         val clean = apiKey.trim()
         require(clean.isNotEmpty()) { "API key is required" }
+        if (clean == ProviderCatalog.ANONYMOUS_CREDENTIAL) {
+            deleteFromKeychain(providerId)
+            fallback.put(keylessKey(providerId), "1")
+            fallback.flush()
+            return
+        }
+        fallback.remove(keylessKey(providerId))
         require(writeSecure(providerId, clean)) {
             "No protected credential backend is available for this desktop platform"
         }
@@ -46,10 +55,13 @@ internal class DesktopProviderCredentialStore {
         if (CredentialTool.isSafeAccountId(providerId)) deleteFromKeychain(providerId)
         if (os.contains("win")) fallback.remove(windowsDpapiKey(providerId))
         fallback.remove(providerId)
+        fallback.remove(keylessKey(providerId))
         fallback.flush()
     }
 
     private companion object {
+        fun keylessKey(providerId: String): String = "__keyless__:$providerId"
+
         const val PREFERENCES_NODE = "com/hereliesaz/haive/provider-credentials"
         const val KEYCHAIN_SERVICE = "com.hereliesaz.haive"
         const val DPAPI_PREFIX = "__dpapi__:"

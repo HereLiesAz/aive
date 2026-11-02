@@ -65,7 +65,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     // Offer the planner only roles a linked provider can staff: a step for any other role could
     // never be dispatched. With nothing staffable, keep them all so the failure names the gap.
     val plannerRoles = launchRoles
-        .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired) }
+        .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired, normalizedRepository) }
         .ifEmpty { launchRoles }
     val packet = OrchestrationPacket(
         objective = cleanObjective,

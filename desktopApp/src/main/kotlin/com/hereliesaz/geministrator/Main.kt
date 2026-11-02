@@ -366,6 +366,10 @@ fun main() {
                             )
                         },
                         onReconfigureProvider = { configuringProviderId = it },
+                        onConnectFreeProvider = { freeProviderId ->
+                            providerCredentialStore.write(freeProviderId, ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                            credentials = readDesktopProviderCredentials(providerCredentialStore)
+                        },
                         onDisconnectProvider = { disconnectedProviderId ->
                             providerCredentialStore.clear(disconnectedProviderId)
                             credentials = readDesktopProviderCredentials(providerCredentialStore)

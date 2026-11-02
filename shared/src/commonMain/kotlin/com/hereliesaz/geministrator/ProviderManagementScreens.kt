@@ -510,7 +510,8 @@ internal fun ProviderSettingsScreen(
     ) {
       if (section == KeeperSection.Connections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
-        if (connectedProviderIds.isEmpty()) {
+        // No AI provider yet (a linked GitHub's OpenCode is no brain for a hive without a repository).
+        if (ProviderCatalog.entries.none { it.id in connectedProviderIds }) {
             Text(
                 stringResource(Res.string.settings_connect_as_many_providers_as_you),
                 style = AzphaltType.body,
@@ -546,7 +547,8 @@ internal fun ProviderSettingsScreen(
                 ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
             }
         }
-        val unconnected = ProviderCatalog.entries.filter { it.id !in connectedProviderIds }
+        // Free, keyless ones first (docs/Keepers-Room.md, Connections).
+        val unconnected = ProviderCatalog.entries.filter { it.id !in connectedProviderIds }.sortedBy { !it.keyOptional }
         if (unconnected.isNotEmpty()) {
             AddConnectionRow(
                 label = stringResource(Res.string.keeper_add_provider),
@@ -569,11 +571,13 @@ internal fun ProviderSettingsScreen(
                             onClick = { onConfigureProvider(entry.id) },
                             tone = PillTone.Primary,
                         )
-                        AzphaltPill(
-                            stringResource(Res.string.settings_get_api_key),
-                            "get-key-${entry.id}",
-                            onClick = { uriHandler.openUri(entry.apiKeyUrl) },
-                        )
+                        if (!entry.keyOptional) {
+                            AzphaltPill(
+                                stringResource(Res.string.settings_get_api_key),
+                                "get-key-${entry.id}",
+                                onClick = { uriHandler.openUri(entry.apiKeyUrl) },
+                            )
+                        }
                     }
                 }
             }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -93,6 +94,8 @@ fun App(
     onConfigureRepositoryService: (String) -> Unit = {},
     onDisconnectRepositoryService: (String) -> Unit = {},
     onReconfigureProvider: (String) -> Unit = {},
+    /** Links a keyless provider at once, with no key (the feed screen's one-tap free start). */
+    onConnectFreeProvider: ((String) -> Unit)? = null,
     onDisconnectProvider: (String) -> Unit = {},
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
@@ -125,6 +128,10 @@ fun App(
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
     var launching by remember { mutableStateOf(false) }
+    // Why the last launch did not start. It stays beside Feed it with what was typed, rather than
+    // replacing the screen with a runtime failure (Conveyance: one element carries an act to its end).
+    var launchError by remember { mutableStateOf<String?>(null) }
+    val providerReach by produceState(ProviderReach.Unknown, providers) { value = providerReach(providers) }
     val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
     val launchStepRows by launchSteps.rows.collectAsState()
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
@@ -243,6 +250,7 @@ fun App(
             return
         }
         launching = true
+        launchError = null
         launchSteps.clear()
         scope.launch(LaunchProgress(launchSteps::push)) {
             try {
@@ -278,7 +286,7 @@ fun App(
                 // OutOfMemoryError are Errors and previously escaped this handler,
                 // leaving the launch button silently doing nothing.
                 platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
-                runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_workflow_launch_failed))
+                launchError = failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_workflow_launch_failed)
                 onFinished(failure)
             } finally {
                 launching = false
@@ -762,6 +770,10 @@ fun App(
                         contentPadding = paddingValues,
                         runtimeState = runtimeState,
                         connectedProviderIds = providers.map { it.id.value }.toSet(),
+                        providerReach = providerReach,
+                        onConnectFreeProvider = onConnectFreeProvider ?: onReconfigureProvider,
+                        launchError = launchError,
+                        onDismissLaunchError = { launchError = null },
                     )
                 }
                 if (launching) {

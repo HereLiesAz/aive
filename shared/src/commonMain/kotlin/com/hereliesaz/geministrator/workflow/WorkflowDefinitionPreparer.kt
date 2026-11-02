@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 
@@ -27,7 +28,16 @@ class WorkflowDefinitionPreparer(
         definition: WorkflowDefinition,
         repository: RepositoryRef? = null,
     ): WorkflowDefinition {
-        val withTestDesign = WorkflowDefinitionExpander.expand(definition, activeRoles)
+        // Test steps are added only when an agent can write tests here (a poem with no repository,
+        // on a text-only agent, gets none): an added step no one can take would sink the run.
+        val testsStaffable = activeRoles.any { role ->
+            RoleAuthority.AuthorTests in role.authorities &&
+                providerRegistry.canStaff(role.capabilitiesRequired, repository)
+        }
+        val withTestDesign = WorkflowDefinitionExpander.expand(
+            if (testsStaffable) definition else definition.copy(testDesignPolicy = TestDesignPolicy.None),
+            activeRoles,
+        )
         val withSelectedInferenceTopology = ResourceAwareCompoundInferencePolicyResolver.resolve(
             definition = withTestDesign,
             roles = activeRoles,
