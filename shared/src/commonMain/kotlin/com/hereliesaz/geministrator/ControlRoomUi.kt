@@ -846,6 +846,7 @@ private fun MainDestination(
                     onResetRoleCollection = onResetRoleCollection,
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
+                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                 )
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
                 ControlRoomDestination.Memory -> MemoryLayerScreen(

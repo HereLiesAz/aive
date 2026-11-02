@@ -16,8 +16,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -37,6 +39,7 @@ import com.hereliesaz.geministrator.domain.SqlDatabaseSource
 import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
@@ -185,6 +188,12 @@ import com.hereliesaz.geministrator.resources.swarm_warnings
 import com.hereliesaz.geministrator.resources.swarm_workflow_file_or_id
 import com.hereliesaz.geministrator.resources.swarm_workflow_policies
 import com.hereliesaz.geministrator.resources.swarm_working
+import com.hereliesaz.geministrator.resources.swarm_filter_all
+import com.hereliesaz.geministrator.resources.swarm_filter_producers
+import com.hereliesaz.geministrator.resources.swarm_filter_reviewers
+import com.hereliesaz.geministrator.resources.swarm_filter_none
+import com.hereliesaz.geministrator.resources.swarm_in_hives
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -201,6 +210,8 @@ internal fun CustomCompanyProviderScreen(
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
     modifier: Modifier = Modifier,
     focusRole: RoleDefinitionId? = null,
+    /** The saved hives, read to show how many use each role; null shows no count. */
+    onLoadWorkflowDefinitions: (suspend () -> List<WorkflowDefinition>)? = null,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val runtimeRoles = liveWorkflow?.roles
@@ -247,6 +258,21 @@ internal fun CustomCompanyProviderScreen(
         initialValue = emptySet(),
     )
     var resetConfirm by remember { mutableStateOf(false) }
+    var roleFilterValue by rememberDurableStringState(COMPANY_ROLE_FILTER_KEY, SwarmRoleFilter.All.name)
+    val roleFilter = SwarmRoleFilter.entries.firstOrNull { it.name == roleFilterValue } ?: SwarmRoleFilter.All
+    // How many hives use each role, read from the saved hives; until read (or if they cannot be),
+    // no count is shown rather than a guessed one.
+    var hiveCounts by remember { mutableStateOf<Map<RoleDefinitionId, Int>?>(null) }
+    // Read once on arrival and again when the runtime changes shape (a project opened, a run began),
+    // not on every recomposition: the loader is a fresh lambda each time the app recomposes.
+    val loadDefinitions by rememberUpdatedState(onLoadWorkflowDefinitions)
+    LaunchedEffect(focusRole, runtimeState::class) {
+        val load = loadDefinitions
+        if (load == null || focusRole != null) return@LaunchedEffect
+        runCatching { load() }
+            .onSuccess { hiveCounts = roleHiveCounts(it) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+    }
     val roleSurfacePickerScope = rememberCoroutineScope()
 
     LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
@@ -804,12 +830,40 @@ internal fun CustomCompanyProviderScreen(
                 color = azphaltOnSurface(),
             )
         }
+        if (draftRoles.isNotEmpty()) {
+            // All / Producers / Reviewers: reviewers are the kinds Echo counts as reviews (CreatureNeeds).
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SwarmRoleFilter.entries.forEach { filter ->
+                    AzphaltPill(
+                        label = when (filter) {
+                            SwarmRoleFilter.All -> stringResource(Res.string.swarm_filter_all)
+                            SwarmRoleFilter.Producers -> stringResource(Res.string.swarm_filter_producers)
+                            SwarmRoleFilter.Reviewers -> stringResource(Res.string.swarm_filter_reviewers)
+                        },
+                        seed = "company-role-filter-${filter.name}",
+                        selected = filter == roleFilter,
+                        role = Role.RadioButton,
+                        onClick = { roleFilterValue = filter.name },
+                    )
+                }
+            }
+            if (draftRoles.none(roleFilter::admits)) {
+                Text(
+                    stringResource(Res.string.swarm_filter_none),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
+        }
         draftRoles.forEachIndexed { index, role ->
+            if (!roleFilter.admits(role)) return@forEachIndexed
             val assigned = role.preferredProviderId?.value
             val providerLabel = assigned?.let { ProviderCatalog.entry(it)?.displayName ?: it } ?: stringResource(Res.string.swarm_auto)
+            val hives = hiveCounts?.let { it[role.id] ?: 0 }
+            val department = role.companyDepartment()
             AzphaltRecord(
                 seed = "custom-company-role-${role.id.value}",
-                eyebrow = role.companyDepartment(),
+                eyebrow = hives?.let { "$department · ${pluralStringResource(Res.plurals.swarm_in_hives, it, it)}" } ?: department,
                 title = role.name,
                 body = buildString {
                     append(role.description)
@@ -847,7 +901,8 @@ internal fun CustomCompanyProviderScreen(
                                 tone = PillTone.Danger,
                             )
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // The order is the whole swarm's, so it moves only while every role is shown.
+                        if (roleFilter == SwarmRoleFilter.All) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AzphaltPill(
                                 label = stringResource(Res.string.swarm_move_up),
                                 seed = "company-up-${role.id.value}",
@@ -1544,6 +1599,7 @@ private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-so
 private const val COMPANY_ROLE_SURFACES_KEY = "company.role.surfaces"
 private const val COMPANY_ROLE_CAPABILITIES_KEY = "company.role.capabilities"
 private const val COMPANY_ROLE_AUTHORITIES_KEY = "company.role.authorities"
+private const val COMPANY_ROLE_FILTER_KEY = "company.role-filter"
 
 private fun <T> Set<T>.toggle(value: T): Set<T> = if (value in this) this - value else this + value
 

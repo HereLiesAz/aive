@@ -1249,6 +1249,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_workflow_file_or_id">Workflow file or ID</string>
     <string name="swarm_workflow_policies">Workflow policies</string>
     <string name="swarm_working">Working</string>
+    <string name="swarm_filter_all">All</string>
+    <string name="swarm_filter_producers">Producers</string>
+    <string name="swarm_filter_reviewers">Reviewers</string>
+    <string name="swarm_filter_none">No role in the swarm fits this filter.</string>
 
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage workflow edit.</string>
     <string name="terrarium_draft_wiring_staged_now_depends">Draft wiring staged: %1$s now depends on %2$s.</string>
@@ -1260,6 +1264,10 @@ What the server returns is treated as outside content, not instructions.</string
     <plurals name="inspector_activity_earlier">
         <item quantity="one">Show %1$d earlier line</item>
         <item quantity="other">Show %1$d earlier lines</item>
+    </plurals>
+    <plurals name="swarm_in_hives">
+        <item quantity="one">in %1$d hive</item>
+        <item quantity="other">in %1$d hives</item>
     </plurals>
     <plurals name="district_creatures">
         <item quantity="one">%1$d creature</item>
