@@ -668,6 +668,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="overview_invalid">Invalid</string>
     <string name="overview_jump_to_active">Jump to active</string>
     <string name="overview_doing_now">%1$s · DOING NOW</string>
+    <string name="overview_doing_now_feeds">%1$s · feeds %2$s</string>
     <string name="overview_link_repository">LINK REPOSITORY</string>
     <string name="overview_loading_runtime">Waking the hive…</string>
     <string name="overview_local_git_folder_path">Local Git folder path</string>
