@@ -281,6 +281,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_message_agent">Message agent</string>
     <string name="inspector_no_run_is_loaded">No run is loaded.</string>
     <string name="inspector_now">NOW</string>
+    <string name="inspector_open_trace">Open its trace</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
     <string name="inspector_plan">PLAN</string>
     <string name="inspector_plan_place">%1$s of %2$s</string>
