@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.net.CleartextPolicy
+import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -38,6 +39,13 @@ class OpenAiCompatibleChatApi(
 ) : TextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
     private val client = client.config { followRedirects = false }
+
+    /**
+     * Services that cache prompt prefixes do so automatically. Cache hits are read from
+     * `prompt_tokens_details.cached_tokens` (DeepSeek: `prompt_cache_hit_tokens`) and reported only
+     * when the response carries one.
+     */
+    override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
 
     init {
         require(model.isNotBlank()) { "model must not be blank" }
@@ -90,6 +98,7 @@ class OpenAiCompatibleChatApi(
             text = text,
             inputTokens = payload.usage?.promptTokens,
             outputTokens = payload.usage?.completionTokens,
+            cachedInputTokens = payload.usage?.cachedTokens(),
         )
     }
 
@@ -158,6 +167,7 @@ class OpenAiCompatibleChatApi(
                 inputTokens = usage?.promptTokens,
                 outputTokens = usage?.completionTokens,
                 thinking = reasoning.toString().trim().ifEmpty { null },
+                cachedInputTokens = usage?.cachedTokens(),
             )
         }
     }
@@ -248,4 +258,12 @@ private data class CompatibleChatResponseMessage(
 private data class CompatibleChatUsage(
     @SerialName("prompt_tokens") val promptTokens: Long? = null,
     @SerialName("completion_tokens") val completionTokens: Long? = null,
+    @SerialName("prompt_tokens_details") val promptTokensDetails: CompatiblePromptTokensDetails? = null,
+    /** DeepSeek's count of prompt tokens served from its context cache. */
+    @SerialName("prompt_cache_hit_tokens") val promptCacheHitTokens: Long? = null,
 )
+
+@Serializable
+private data class CompatiblePromptTokensDetails(@SerialName("cached_tokens") val cachedTokens: Long? = null)
+
+private fun CompatibleChatUsage.cachedTokens(): Long? = promptTokensDetails?.cachedTokens ?: promptCacheHitTokens

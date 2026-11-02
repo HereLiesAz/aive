@@ -169,7 +169,14 @@ class InterruptibleGeneration(
         true
     }
 
-    suspend fun run(prompt: String, onThinking: suspend (String) -> Unit): TextGenerationResult {
+    suspend fun run(prompt: String, onThinking: suspend (String) -> Unit): TextGenerationResult =
+        run(CacheablePrompt(dynamicSuffix = prompt), onThinking)
+
+    /**
+     * Runs a prefix-structured prompt. A memory continuation extends only the dynamic part, so the
+     * stable prefix (and any provider cache of it) is the same on every attempt.
+     */
+    suspend fun run(prompt: CacheablePrompt, onThinking: suspend (String) -> Unit): TextGenerationResult {
         mutex.withLock { active = true }
         try {
             var attemptPrompt = prompt
@@ -225,7 +232,10 @@ class InterruptibleGeneration(
     /** Thrown from inside the stream callback to abandon the stream; caught by [run] alone. */
     private class MemoryInterrupt(val recalls: List<String>) : RuntimeException("memory interrupt")
 
-    private fun continuation(prompt: String, reasoning: String, answer: String, recalls: List<String>): String = buildString {
+    private fun continuation(prompt: CacheablePrompt, reasoning: String, answer: String, recalls: List<String>): CacheablePrompt =
+        prompt.copy(dynamicSuffix = continuationText(prompt.dynamicSuffix, reasoning, answer, recalls))
+
+    private fun continuationText(prompt: String, reasoning: String, answer: String, recalls: List<String>): String = buildString {
         append(prompt)
         append("\n\n")
         if (reasoning.isNotBlank()) {
