@@ -617,6 +617,10 @@ internal class AndroidMemoryLayerRuntime(
         modelAdapter = AndroidEpoch8EmbeddingAdapter(installer),
     )
 
+    /** Small text tasks on the memory clerks' installed instruct model (see AndroidOnDeviceTextGenerator). */
+    val onDeviceTextGenerator: com.hereliesaz.geministrator.providers.OnDeviceTextGenerator =
+        AndroidOnDeviceTextGenerator(installer, sessionManager)
+
     /**
      * Answers hosted memory stages: (providerId or null for the default, model or null, prompt) to
      * text. Set by the activity once provider credentials are known; unset means hosted stages fail

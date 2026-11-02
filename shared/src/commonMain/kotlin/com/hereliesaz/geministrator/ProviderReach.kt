@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 
 /**
  * Where the connected agents can work: with no repository at all, and inside which kinds of
@@ -47,7 +48,8 @@ sealed interface FeedGate {
 }
 
 internal suspend fun providerReach(providers: Collection<AgentProvider>): ProviderReach {
-    val usable = providers.filterNot { it.explicitOnly }
+    // The on-device provider takes only small text tasks; it does not feed a hive by itself.
+    val usable = providers.filterNot { it.explicitOnly || it is OnDeviceTextAgentProvider }
     suspend fun works(repository: RepositoryRef?) =
         usable.any { provider -> runCatching { provider.supportsRepository(repository) }.getOrDefault(false) }
     return ProviderReach(

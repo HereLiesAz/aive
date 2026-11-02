@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -76,6 +77,13 @@ class WorkflowEngineRepositorySelectionTest {
         assertEquals(
             setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite),
             gateway.lastSelection?.requiredCapabilities,
+        )
+        // The task's input size goes with it, for on-device routing of small tasks.
+        assertEquals(
+            OnDeviceTextAgentProvider.estimateTokens(
+                task.objective.length + BuiltInRoles.ImplementationEngineer.instructions.length,
+            ),
+            gateway.lastSelection?.estimatedInputTokens,
         )
     }
 }

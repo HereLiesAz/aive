@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import com.hereliesaz.geministrator.orchestration.VerificationPlanningInput
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import kotlinx.serialization.json.Json
@@ -83,7 +84,7 @@ internal fun buildProviderTaskRequest(
                     ContextProvenance.KeeperWritten,
                 ),
                 PromptContextBlock(
-                    "Role",
+                    OnDeviceTextAgentProvider.ROLE_BLOCK_LABEL,
                     if (redaction.redactRoleInstructions) "[redacted]" else role.instructions,
                     ContextProvenance.KeeperWritten,
                 ),
@@ -117,6 +118,30 @@ internal fun buildProviderTaskRequest(
             taskName = if (redaction.redactObjective) null else task.name,
         ),
     )
+}
+
+/**
+ * Rough input size of [task] as the on-device provider would render it
+ * ([OnDeviceTextAgentProvider.renderTask]): the role's instructions, the objective, its acceptance
+ * criteria and the released upstream artifacts' text. Used before dispatch, when no request exists yet.
+ */
+internal fun estimateTaskInputTokens(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    task: TaskDefinition,
+    role: RoleDefinition,
+): Int {
+    val redaction = definition.payloadRedactionPolicy
+    val artifactChars = definition.releasedDependencies(task)
+        .mapNotNull(run.taskRuns::get)
+        .flatMap(TaskRun::artifacts)
+        .filter { it.kind !in redaction.excludedArtifactKinds }
+        .sumOf { artifact -> artifact.textContent?.let { artifact.label.length + it.length } ?: 0 }
+    val chars = task.objective.length +
+        role.instructions.length +
+        task.acceptanceCriteria.sumOf { it.description.length } +
+        artifactChars
+    return OnDeviceTextAgentProvider.estimateTokens(chars)
 }
 
 private fun buildUtilityPromptBlocks(

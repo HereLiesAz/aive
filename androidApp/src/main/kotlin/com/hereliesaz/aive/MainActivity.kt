@@ -41,6 +41,8 @@ import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
+import com.hereliesaz.geministrator.OnDeviceSmallTaskPreference
+import com.hereliesaz.geministrator.OnDeviceSmallTaskSetting
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.SetupSecretStore
 import com.hereliesaz.geministrator.SetupSecrets
@@ -53,6 +55,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
 import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
@@ -299,16 +302,22 @@ class MainActivity : ComponentActivity() {
                 }
                 val remoteLaunchRequests by AiveRemoteBridge.pendingLaunches.collectAsState()
                 val remoteEventWatchers by AiveRemoteBridge.eventWatchers.collectAsState()
+                val onDeviceSmallTaskPreference = remember { OnDeviceSmallTaskPreference() }
+                var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
                 val providers = remember(
                     credentials,
                     repositoryCredentials,
                     installedGeminiApi,
+                    onDeviceSmallTasksEnabled,
                 ) {
                     configuredAndroidProviders(
                         credentials = credentials,
                         repositoryCredentials = repositoryCredentials,
                         repositoryHttpClient = repositoryHttpClient,
                         installedGeminiApi = installedGeminiApi,
+                    ) + listOfNotNull(
+                        // Small text tasks on the memory clerks' installed model, when the keeper turns it on.
+                        onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, memoryRuntime.onDeviceTextGenerator),
                     )
                 }
                 // Hosted memory stages use whichever provider each stage names, with current credentials.
@@ -555,6 +564,14 @@ class MainActivity : ComponentActivity() {
                         },
                         memoryLayer = memoryRuntime.controller,
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
+                        onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
+                            enabled = onDeviceSmallTasksEnabled,
+                            modelInstalled = memoryRuntime.onDeviceTextGenerator.isReady(),
+                            onEnabledChange = { enabled ->
+                                onDeviceSmallTaskPreference.enabled = enabled
+                                onDeviceSmallTasksEnabled = enabled
+                            },
+                        ),
                         crashReportingSetting = if (CrashReporting.isSupported) {
                             CrashReportingSetting(crashReportingEnabled) { enabled ->
                                 CrashReporting.setEnabled(this, enabled)
