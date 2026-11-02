@@ -54,7 +54,7 @@ There is no navigation row. One header sits over every screen, wide and on a pho
 - **The breadcrumb**: Hive › a hive › a creature › its tab, or Hive › a place opened from it (Swarm, the Keeper's room › its part). The last step is where you are and is not a button; any earlier step goes back up to it, popping rather than stacking. Hive is the district, every hive at once; from a place opened off the hive, Hive returns to the hive you came from. A creature's step closes its panel. It replaces the page titles. On a phone it takes its own line and scrolls to keep where you are in view.
 - **The Inbox** badge and **the Keeper's room** gear.
 
-Once there is a hive, resting or live, one row holds its places: its Swarm, the Memory swarm and the Store. It is hidden on a first launch and while the hive is waking or stopped. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
+Once there is a hive, one row holds its places: Hives (the district: every hive, New hive, the Stable and drifters at the edge), its Swarm, the Stable, the Memory swarm and the Store. It is hidden only on a first launch; a waking or stopped hive keeps it, so nothing is out of reach while the hive is in trouble. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
 
 ## A creature's panel
 
