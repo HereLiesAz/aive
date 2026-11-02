@@ -155,6 +155,7 @@ class ProcedureCandidateExtractorTest {
         assertEquals(ProcedureEvidenceOutcome.Completed, snapshot.evidence.single().outcome)
         assertEquals("test-runner.check", snapshot.definitions.single().steps.single().operationId)
         assertEquals("module", snapshot.definitions.single().parameters.single().name)
+        assertEquals(mapOf("module" to "module"), snapshot.definitions.single().steps.single().parameterBindings)
         assertFalse(ProcedureCandidate(snapshot.definitions.single(), inherited = false).executable)
         assertEquals(ref, service.propose("wf", pattern, "build-check", mapOf("compile" to operation), 100L))
         assertEquals(1, procedures.own("wf").read().definitions.size)
