@@ -718,6 +718,7 @@ class MainActivity : ComponentActivity() {
     private fun remoteProblemSummary(raw: String): String = getString(
         when (com.hereliesaz.geministrator.classifyError(raw)) {
             com.hereliesaz.geministrator.ErrorKind.KeyRejected -> R.string.remote_problem_key_rejected
+            com.hereliesaz.geministrator.ErrorKind.OutOfCredit -> R.string.remote_problem_out_of_credit
             com.hereliesaz.geministrator.ErrorKind.RateLimited -> R.string.remote_problem_rate_limited
             com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
             com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out

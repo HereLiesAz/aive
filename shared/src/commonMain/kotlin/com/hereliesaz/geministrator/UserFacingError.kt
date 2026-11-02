@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.resources.error_key_rejected
 import com.hereliesaz.geministrator.resources.error_no_agent
 import com.hereliesaz.geministrator.resources.error_offline
 import com.hereliesaz.geministrator.resources.error_other
+import com.hereliesaz.geministrator.resources.error_out_of_credit
 import com.hereliesaz.geministrator.resources.error_rate_limited
 import com.hereliesaz.geministrator.resources.error_timed_out
 import org.jetbrains.compose.resources.StringResource
@@ -25,9 +26,10 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, RateLimited, Offline, TimedOut, NoAgent, Other }
+enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, NoAgent, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
+private val paymentRequiredCode = Regex("""(^|[^0-9])402([^0-9]|$)""")
 private val rateLimitCode = Regex("""(^|[^0-9])429([^0-9]|$)""")
 
 /** Pure classifier from a raw exception or HTTP error message to an [ErrorKind]. */
@@ -44,6 +46,12 @@ fun classifyError(raw: String?): ErrorKind {
             "unauthorized" in text || "forbidden" in text || "invalid api key" in text ||
             "invalid_api_key" in text || "incorrect api key" in text || "authentication" in text ||
             "permission denied" in text -> ErrorKind.KeyRejected
+
+        // Before the rate limit: a spent balance often names its "quota", but waiting will not fix it.
+        paymentRequiredCode.containsMatchIn(text) ||
+            "payment required" in text || "payment_required" in text || "insufficient_quota" in text ||
+            "insufficient balance" in text || "insufficient credit" in text || "credit balance" in text ||
+            "out of credit" in text || "billing" in text -> ErrorKind.OutOfCredit
 
         rateLimitCode.containsMatchIn(text) ||
             "rate limit" in text || "rate-limit" in text || "ratelimit" in text ||
@@ -62,6 +70,7 @@ fun classifyError(raw: String?): ErrorKind {
 
 internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.KeyRejected -> Res.string.error_key_rejected
+    ErrorKind.OutOfCredit -> Res.string.error_out_of_credit
     ErrorKind.RateLimited -> Res.string.error_rate_limited
     ErrorKind.Offline -> Res.string.error_offline
     ErrorKind.TimedOut -> Res.string.error_timed_out
