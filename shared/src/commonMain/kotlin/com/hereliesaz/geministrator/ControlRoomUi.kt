@@ -772,6 +772,9 @@ private fun MainDestination(
                                     runKey = live.run.id.value + live.run.updatedAtEpochMillis,
                                     onLoadTimeline = onLoadRunTimeline,
                                     modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    taskName = { id -> live.definition.tasks.firstOrNull { it.id == id }?.name ?: id.value },
+                                    selectedTaskId = selectedTaskId,
+                                    onTaskSelected = onTaskSelected,
                                 )
                             } else {
         MindMapRunScreen(
