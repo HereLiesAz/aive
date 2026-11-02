@@ -69,6 +69,10 @@ data class DistributedComputeUiState(
     val connected: Boolean = false,
     val onlineNodes: List<ComputeNodeDescriptor> = emptyList(),
     val lastError: String? = null,
+    /** Every node enrolled with the pool, as the relay reports them; the keeper can revoke any but this one. */
+    val enrolledNodes: List<EnrolledComputeNode> = emptyList(),
+    /** This device's own identity was revoked by another pool member. */
+    val revoked: Boolean = false,
 ) {
     val ready: Boolean
         get() = configuration.configured && tokenConfigured

@@ -12,11 +12,13 @@ import android.os.BatteryManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
+import com.hereliesaz.geministrator.distributed.ComputeNodeSigner
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeExecutorIntegration
 import com.hereliesaz.geministrator.distributed.DistributedComputeWorker
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeClient
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeGateway
+import com.hereliesaz.geministrator.distributed.SettingsComputeNodeEnrolmentLedger
 import com.hereliesaz.geministrator.distributed.SystemExecutorDistributedWorkloadRunner
 import com.hereliesaz.geministrator.domain.ComputeAccelerator
 import com.hereliesaz.geministrator.domain.ComputePlatform
@@ -36,6 +38,8 @@ internal class AndroidDistributedComputeSession(
     token: String,
     baseIntegrations: TaskExecutorIntegrationRegistry,
     private val supportedExecutorKinds: Set<String>,
+    /** This device's Keystore-held identity; the pool token only enrols it. */
+    signer: ComputeNodeSigner,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -60,6 +64,8 @@ internal class AndroidDistributedComputeSession(
         poolId = configuration.poolId,
         bearerToken = token,
         initialNode = currentNode,
+        signer = signer,
+        enrolmentLedger = SettingsComputeNodeEnrolmentLedger(),
     )
 
     private val gateway = RelayDistributedComputeGateway(client, currentNode.nodeId)

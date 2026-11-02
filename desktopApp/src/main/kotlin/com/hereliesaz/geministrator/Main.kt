@@ -98,6 +98,12 @@ fun main() {
         computeConfigurationStore.write(initialComputeConfiguration)
     }
     val initialComputeToken = computeCredentialStore.readToken()
+    // The compute node's signing key, read from (or created in) the OS credential store once.
+    val computeNodeSigner = lazy {
+        runCatching {
+            DesktopComputeNodeSigner.loadOrCreate(DesktopDistributedComputeCredentialStore.forNodeIdentity())
+        }.getOrNull()
+    }
     val httpClient = HttpClient(CIO)
     // MCP servers the keeper connects (docs/architecture/MCP_HOST.md); local ones run as processes.
     val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
@@ -187,12 +193,18 @@ fun main() {
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
-                    if (computeConfiguration.configured && token != null) {
+                    val signer = if (computeConfiguration.configured && token != null) {
+                        computeNodeSigner.value
+                    } else {
+                        null
+                    }
+                    if (signer != null && token != null) {
                         DesktopDistributedComputeSession(
                             configuration = computeConfiguration,
                             token = token,
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = desktopDistributedExecutorKinds(repositoryCredentials),
+                            signer = signer,
                         )
                     } else {
                         null
@@ -201,6 +213,10 @@ fun main() {
                 var computeConnected by remember(computeSession) { mutableStateOf(false) }
                 var computeOnlineNodes by remember(computeSession) { mutableStateOf(emptyList<ComputeNodeDescriptor>()) }
                 var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                var computeEnrolledNodes by remember(computeSession) {
+                    mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.EnrolledComputeNode>())
+                }
+                var computeRevoked by remember(computeSession) { mutableStateOf(false) }
                 DisposableEffect(computeSession) {
                     computeSession?.start()
                     onDispose { computeSession?.close() }
@@ -222,6 +238,12 @@ fun main() {
                         session.client.errors.collectLatest { error ->
                             computeError = error.message
                         }
+                    }
+                    launch {
+                        session.client.enrolledNodes.collectLatest { computeEnrolledNodes = it }
+                    }
+                    launch {
+                        session.client.revoked.collectLatest { computeRevoked = it }
                     }
                 }
                 // The test runner runs repository code on this computer, so it is added only here,
@@ -418,7 +440,17 @@ fun main() {
                             connected = computeConnected,
                             onlineNodes = computeOnlineNodes,
                             lastError = computeError,
+                            enrolledNodes = computeEnrolledNodes,
+                            revoked = computeRevoked,
                         ),
+                        onRevokeComputeNode = { nodeId ->
+                            computeSession?.let { session ->
+                                uiScope.launch {
+                                    runCatching { session.client.revokeNode(nodeId) }
+                                        .onFailure { computeError = it.message }
+                                }
+                            }
+                        },
                         onSaveDistributedCompute = { configuration, token ->
                             computeConfigurationStore.write(configuration)
                             computeConfiguration = configuration

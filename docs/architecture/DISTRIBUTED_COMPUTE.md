@@ -6,19 +6,39 @@ Code: `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/distributed/` (
 
 ## Availability
 
-The Android Play build does not offer distributed compute for 1.0: the Compute screen is hidden and no relay session starts (`DISTRIBUTED_COMPUTE_AVAILABLE` in `androidApp/src/play`). The Android GitHub release build, desktop and web keep it.
+The Android Play build does not offer distributed compute for 1.0: the Compute screen is hidden and no relay session starts (`DISTRIBUTED_COMPUTE_AVAILABLE` in `androidApp/src/play`). The Android GitHub release build, desktop and web keep it. This is a store-policy choice, not a security gap: per-node identity (below) did not change it.
 
 ## Topology
 
 - **Relay** — `computeRelay/` is a standalone Ktor (CIO) WebSocket server. Nodes connect to `/v1/compute/{poolId}`. Pools are created on demand and removed once they have no nodes and no leases.
 - **Nodes** — Android and Desktop builds connect as nodes. A node can publish leases (origin) and, when sharing is enabled, claim leases published by other nodes (worker). Web builds do not host a node.
-- **Protocol** — JSON messages versioned by `DISTRIBUTED_COMPUTE_PROTOCOL_VERSION` (currently `1`). The first frame must be `register`; a version mismatch is rejected and the connection closed.
+- **Protocol** — JSON messages versioned by `DISTRIBUTED_COMPUTE_PROTOCOL_VERSION` (currently `2`; version 2 added per-node identity, so version 1 clients cannot connect). The first frame must be `register`; a version mismatch is rejected and the connection closed.
 
-## Tokens and configuration
+## Tokens, node identity and configuration
 
-The relay reads a single shared bearer token from `AIVE_RELAY_TOKEN` (`HAIVE_RELAY_TOKEN` is accepted for compatibility) and its port from `PORT`, `AIVE_RELAY_PORT`, or `HAIVE_RELAY_PORT` (default `8080`). Connections without `Authorization: Bearer <token>` are closed as unauthorized. Any holder of the token can join any pool ID on that relay.
+The relay reads a shared pool token from `AIVE_RELAY_TOKEN` (`HAIVE_RELAY_TOKEN` is accepted for compatibility) and its port from `PORT`, `AIVE_RELAY_PORT`, or `HAIVE_RELAY_PORT` (default `8080`). The pool token is used **only to enrol** a node; it no longer opens a session.
 
-Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `haive.distributed-compute.configuration.v1`. The token is stored separately:
+Each node has its own key pair (ECDSA P-256 / SHA-256, `ES256`; `ComputeNodeSigner`, protocol in `ComputeNodeIdentity.kt`):
+
+- Android — generated inside the Android Keystore (alias `aive.distributed-compute.node-identity`), not exportable.
+- Desktop — generated with JCA and kept in the OS credential store (account `node-signing-key`, Windows file `distributed-compute-node-key.dpapi`), with the same plaintext-preferences fallback as the token when no store works.
+
+Enrolment, once per relay, pool, node ID and key (remembered under `haive.distributed-compute.enrolment.v1`):
+
+~~~
+POST /v1/compute/{poolId}/enrol
+Authorization: Bearer <pool token>
+{"protocolVersion":2,"nodeId":…,"displayName":…,"algorithm":"ES256","publicKey":<SPKI, Base64>,
+ "timestampEpochMillis":…,"signature":<proof of possession>}
+~~~
+
+The signature covers the pool, node ID, display name, key and timestamp, so the request proves the node holds the key. Enrolling the same key again only updates the name. A different key for an enrolled node ID is refused (`node-id-taken`), and so is any key for a revoked one (`node-revoked`); either way the device needs a new device ID. A pool holds at most 256 node identities.
+
+Every session then opens with a short-lived signed request. The WebSocket upgrade carries `X-Aive-Node-Id`, `X-Aive-Node-Timestamp`, `X-Aive-Node-Nonce` and `X-Aive-Node-Signature`, the signature covering pool, node ID, timestamp and nonce. The relay accepts it only if the node is enrolled and not revoked, the timestamp is within 5 minutes of the relay clock, the nonce has not been seen in that window, and the signature verifies against the enrolled key. The `register` frame must then name the same node ID. A relay that has lost a node's record answers `node-not-enrolled`, and the client enrols again.
+
+Any enrolled node can list the pool's nodes (`list_enrolled_nodes`; the relay also sends `enrolled_nodes` on register and on every change) and revoke another node (`revoke_node`; not itself). Revocation closes that node's live session, cancels the leases it published, requeues the leases it held, and stops its key and node ID for good. The Keeper's room Compute part lists the enrolled devices with key fingerprint and work counts, and offers Revoke for each other device while this one is connected. A revoked client stops reconnecting. Revocation does not take the pool token from the device, so a device that may still know it could enrol afresh under a new ID: change the relay token too.
+
+Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `haive.distributed-compute.configuration.v1`. The pool token is stored separately:
 
 - Android — encrypted with an Android Keystore AES-GCM key in private SharedPreferences.
 - Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store: macOS `security`, Linux `secret-tool`, and on Windows a per-user file under `%LOCALAPPDATA%\Aive` encrypted with DPAPI (`ConvertFrom-SecureString`), written and read through PowerShell with the token on stdin/stdout, never on a command line. When no store works (for example, no `secret-tool`), or the stored token does not read back, the token falls back to **plaintext** Java user preferences (`com/hereliesaz/haive/distributed-compute`).
@@ -47,10 +67,18 @@ Clients store relay URL, pool ID, node ID, display name, sharing flag, max paral
 
 Clients also send a node heartbeat every 15 s and reconnect with exponential backoff (1 s to 15 s).
 The origin maps replayed/current lease phases back onto the `TaskRun`; a cancelled lease reports as
-`Failed`. A node ID cannot be taken over while its connection is live: a second registration for it
-gets `node-id-in-use` and is closed (code 1013), so a node that reconnects is accepted only once the
-relay has seen its old socket close (at most the 45 s WebSocket timeout). State changes are also
-fenced by peer identity, so a stale socket cannot unregister the node or act for it.
+`Failed`. A node ID belongs to the key enrolled for it, and a session to the node that signed its
+request. Even its own holder cannot open a second live session: a second registration gets
+`node-id-in-use` and is closed (code 1013), so a node that reconnects is accepted only once the relay
+has seen its old socket close (at most the 45 s WebSocket timeout). State changes are also fenced by
+peer identity, so a stale socket cannot unregister the node or act for it.
+
+## Attribution
+
+Every lease is attributed to the node that ran it, as the relay saw it: the `workerNodeId` of a claim,
+progress and completion is the authenticated session's node, never a value the worker sends. The
+terminal lease record keeps that node (and replays it to the origin), the node's identity record counts
+its completed and failed leases, and the origin's task run ends with "(ran on <node>)".
 
 ## Relay process-restart persistence
 
@@ -58,7 +86,11 @@ By default the relay keeps lease state only in memory. Set `AIVE_RELAY_STATE_DIR
 `HAIVE_RELAY_STATE_DIR` is accepted) to make lease state survive relay-process restarts. Each pool is
 stored in its own opaque hashed filename. The file payload is AES-256-GCM encrypted; the encryption key
 is domain-separated and derived from the relay bearer token, and the pool ID is authenticated as GCM
-associated data.
+associated data. Enrolled node identities, their revocations and work counts are kept in a second file per
+pool (`<hash>.nodes`, associated data `nodes:<pool>`). Without `AIVE_RELAY_STATE_DIR` they live only in
+memory: a relay restart then forgets every enrolment and revocation, nodes enrol again with the pool
+token, and a revoked device that still knows the token could too. A pool with enrolled nodes is never
+dropped from memory by the idle sweep.
 
 Persistence records only lease transport state (envelope, origin, last known worker for terminal
 history, progress/result and completion time). Live sockets are never persisted. On restart, unfinished
