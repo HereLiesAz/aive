@@ -555,6 +555,7 @@ private fun OverviewSectionTabs(
     compact: Boolean,
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    trailing: @Composable () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
@@ -570,6 +571,7 @@ private fun OverviewSectionTabs(
                 },
             )
         }
+        trailing()
     }
 }
 
@@ -642,21 +644,49 @@ private fun MainDestination(
     keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
     keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
+    // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
+    var showTimeline by rememberDurableBooleanState("overview.timeline")
+    val hiveHost = LocalWorkflowLibraryHost.current
+    val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive, nor while
         // the hive is stopped or waking (its trouble and the way out come first).
         val hasHive = runtimeState is ApplicationRuntimeState.Live || runtimeState is ApplicationRuntimeState.NoRun
         if (destination.navigationItem == ControlRoomDestination.Overview && hasHive) {
-            OverviewSectionTabs(compact, destination, onDestinationSelected)
+            val liveHive = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+                ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
+            OverviewSectionTabs(compact, destination, onDestinationSelected) {
+                // One row of places: the hive's own come after Swarm, Memory swarm and the Store.
+                liveHive?.let { live ->
+                    AzphaltPill(
+                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
+                        seed = "hive-timeline",
+                        selected = showTimeline,
+                        onClick = { showTimeline = !showTimeline },
+                    )
+                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
+                    AzphaltPill(
+                        label = stringResource(Res.string.hive_more_editing),
+                        seed = "hive-more-editing",
+                        onClick = {
+                            hiveScope.launch {
+                                val id = live.run.workflowDefinitionId.value
+                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
+                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
+                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+                                }
+                                onDestinationSelected(ControlRoomDestination.Workflows)
+                            }
+                        },
+                    )
+                }
+            }
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
                 ControlRoomDestination.Overview -> {
                     var inDistrict by district
                     var restingHiveId by restingHive
-                    var showTimeline by rememberDurableBooleanState("overview.timeline")
-                    val hiveHost = LocalWorkflowLibraryHost.current
-                    val hiveScope = rememberCoroutineScope()
                     if (inDistrict) {
                         DistrictScreen(
                             onLoadDefinitions = onLoadWorkflowDefinitions,
@@ -725,37 +755,6 @@ private fun MainDestination(
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-                            androidx.compose.foundation.layout.FlowRow(
-                                modifier = Modifier.padding(horizontal = hiveGutter(compact)),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                // Out to the district is the breadcrumb's first step.
-                                if (live != null) {
-                                    AzphaltPill(
-                                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
-                                        seed = "hive-timeline",
-                                        selected = showTimeline,
-                                        onClick = { showTimeline = !showTimeline },
-                                    )
-                                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
-                                    AzphaltPill(
-                                        label = stringResource(Res.string.hive_more_editing),
-                                        seed = "hive-more-editing",
-                                        onClick = {
-                                            hiveScope.launch {
-                                                val id = live.run.workflowDefinitionId.value
-                                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
-                                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
-                                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
-                                                }
-                                                onDestinationSelected(ControlRoomDestination.Workflows)
-                                            }
-                                        },
-                                    )
-                                }
-                            }
                             live?.let {
                                 // The hive's combs: its finished swarms. Opening one switches to it.
                                 RunScars(
