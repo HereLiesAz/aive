@@ -337,14 +337,14 @@
     <string name="library_pinned_clear">Clear</string>
     <string name="tab_position">Tab %1$d of %2$d</string>
 
-    <string name="lineage_a_new_run_that_reads_this">A new run that reads this run's memory and adds to its own.</string>
+    <string name="lineage_a_new_run_that_reads_this">It keeps what it learned here and builds on it.</string>
     <string name="lineage_cancel_continue">Cancel continue</string>
-    <string name="lineage_continue_this_run">Continue this run</string>
+    <string name="lineage_continue_this_run">Feed it more</string>
     <string name="lineage_lineage">LINEAGE</string>
     <string name="lineage_loading_runs">Loading runs…</string>
-    <string name="lineage_next_objective">Next objective</string>
+    <string name="lineage_next_objective">What next?</string>
     <string name="lineage_no_earlier_runs_yet">No earlier runs yet.</string>
-    <string name="lineage_start_continuation">Start continuation</string>
+    <string name="lineage_start_continuation">Feed it</string>
     <string name="lineage_starts_a_new_line_of_work">Starts a new line of work with its own memory.</string>
     <string name="lineage_the_new_run_reads_every_chosen">The new run reads every chosen run's memory; where they disagree, both answers are kept.</string>
     <string name="lineage_the_new_run_reads_the_chosen">The new run reads the chosen run's memory and adds to its own.</string>
@@ -497,6 +497,7 @@
     <string name="hive_gone">This hive is gone. Hive, above, leads back to the rest.</string>
     <string name="district_loading">Gathering the hives…</string>
     <string name="district_load_failed">The hives could not be read: %1$s</string>
+    <string name="hive_what_it_made">What it made</string>
     <string name="first_hive_options">Options: name, repository, saved projects</string>
     <string name="first_hive_connect">Connect a provider</string>
     <string name="first_hive_connect_hint">First, what it thinks with: connect an AI provider. Some are free and need no key.</string>
@@ -514,7 +515,7 @@
     <string name="overview_provider_settings">Connections</string>
     <string name="overview_reading_persisted_workflow_state">Reading persisted workflow state.</string>
     <string name="overview_recover_clear_corrupted_data">Recover — clear corrupted data</string>
-    <string name="overview_repository_search_unavailable">Search isn\'t available right now. Paste the repository\'s address instead.</string>
+    <string name="overview_repository_search_unavailable">Search isn't available right now. Paste the repository's address instead.</string>
     <string name="overview_required">Required</string>
     <string name="overview_resume_failed">The hive stopped</string>
     <string name="overview_retry_runtime">Try again</string>

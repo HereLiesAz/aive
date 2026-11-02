@@ -796,7 +796,8 @@ private fun MainDestination(
                             onDismissLaunchError = onDismissLaunchError,
                         )
                             }
-                            live?.let { HiveLaunchBar(it.definition) }
+                            // No second launcher under a live hive: a finished one offers "Feed it more"
+                            // above (one Heroic act per screen, Conveyance §11).
                         }
                     }
                 }
