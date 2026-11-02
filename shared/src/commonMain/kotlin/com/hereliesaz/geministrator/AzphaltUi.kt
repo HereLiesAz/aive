@@ -209,7 +209,7 @@ internal object AzphaltType {
  * living things (creatures, hives); controls are calm.
  */
 internal enum class PillTone {
-    /** Most controls: outlined in the surface's content colour. */
+    /** Most controls: filled with the pill's own hue, from its seed. */
     Quiet,
     /** The one main action in view: filled. */
     Primary,
@@ -235,15 +235,22 @@ internal fun AzphaltPill(
     stateDescription: String? = null,
     tone: PillTone = PillTone.Quiet,
 ) {
-    // Selected and primary fill with the surface's strong colour; danger fills red; the rest are outlined.
-    val filled = selected || tone != PillTone.Quiet
+    // Every pill wears its own colour: a hue from its seed, with an end cap in the same family.
+    // Selected sits on Ink (Yellow when its surface is Ink, so it never vanishes); the one main
+    // action fills with the surface's strong colour; danger fills red.
+    val onInk = azphaltSurface() == Azphalt.Ink
     val fill = when {
-        tone == PillTone.Danger && !selected -> AzphaltDanger
-        filled -> azphaltStrong()
-        else -> Color.Transparent
+        selected -> if (onInk) Azphalt.Yellow else Azphalt.Ink
+        tone == PillTone.Danger -> AzphaltDanger
+        tone == PillTone.Primary -> azphaltStrong()
+        else -> Azphalt.hue(seed)
     }
-    val line = azphaltOnSurface()
-    val content = if (filled) fill.onOpposite() else line
+    val content = fill.onOpposite()
+    val cap = when {
+        selected -> if (onInk) Azphalt.Ink else Azphalt.Yellow
+        tone == PillTone.Quiet -> Azphalt.cap(seed)
+        else -> content
+    }
     val pillRole = role
     Row(
         modifier = modifier
@@ -257,7 +264,6 @@ internal fun AzphaltPill(
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
             .background(fill)
-            .then(if (filled) Modifier else Modifier.border(2.dp, line, RoundedCornerShape(999.dp)))
             .clickable(onClick = onClick)
             .padding(start = 16.dp, top = 9.dp, bottom = 9.dp, end = if (endCap == null) 16.dp else 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -265,14 +271,13 @@ internal fun AzphaltPill(
     ) {
         Text(label.uppercase(), style = AzphaltType.capsule, color = content)
         if (endCap != null) {
-            // The cap is the pill's opposite: a small chip of the content colour.
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(content)
+                    .background(cap)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(endCap.uppercase(), style = AzphaltType.endCap, color = content.onOpposite())
+                Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
             }
         }
     }
