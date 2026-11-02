@@ -45,6 +45,7 @@
     <string name="update_error_body">The Aive could not check for updates. Try again later.</string>
     <string name="update_dismiss">Dismiss</string>
     <string name="remote_problem_key_rejected">Key rejected. Check the relay address and reconnect.</string>
+    <string name="remote_problem_out_of_credit">Out of credit with the relay provider. Add credit there, or use another provider.</string>
     <string name="remote_problem_rate_limited">The relay is rate limiting you. Wait a minute and try again.</string>
     <string name="remote_problem_offline">Can\'t reach the relay. Check your internet connection and try again.</string>
     <string name="remote_problem_timed_out">The relay took too long to answer. Try again.</string>
