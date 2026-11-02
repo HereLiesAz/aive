@@ -42,7 +42,7 @@ class RelayNodeIdentityTest {
     private var now = 1_000_000L
 
     @Test
-    fun enrolmentRecordsTheKeyAndRepeatingItWithTheSameKeyIsHarmless() = runBlocking {
+    fun enrolmentRecordsTheKeyAndRepeatingItWithTheSameKeyIsHarmless(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         val desk = TestSigner()
 
@@ -57,7 +57,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun anEnrolledNodeIdCannotBeTakenOverWithAnotherKey() = runBlocking {
+    fun anEnrolledNodeIdCannotBeTakenOverWithAnotherKey(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         relay.enrol(enrolment(TestSigner(), "desk"))
 
@@ -66,7 +66,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun enrolmentWithoutProofOfTheKeyIsRefused() = runBlocking {
+    fun enrolmentWithoutProofOfTheKeyIsRefused(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         val claimed = TestSigner()
         // Signed by a different key than the one it asks to enrol.
@@ -78,7 +78,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun aStaleEnrolmentIsRefused() = runBlocking {
+    fun aStaleEnrolmentIsRefused(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         val request = enrolment(TestSigner(), "desk", at = now - ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS - 1)
 
@@ -87,7 +87,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun onlyAValidFreshSignatureByTheEnrolledKeyAuthenticates() = runBlocking {
+    fun onlyAValidFreshSignatureByTheEnrolledKeyAuthenticates(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         val desk = TestSigner()
         relay.enrol(enrolment(desk, "desk"))
@@ -110,7 +110,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun aRevokedNodeIsRejectedAndCannotEnrolAgain() = runBlocking {
+    fun aRevokedNodeIsRejectedAndCannotEnrolAgain(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         val keeper = TestSigner()
         val rogue = TestSigner()
@@ -143,7 +143,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun revokingAWorkerRequeuesItsLeaseAndRevokingAnOriginCancelsItsLeases() = runBlocking {
+    fun revokingAWorkerRequeuesItsLeaseAndRevokingAnOriginCancelsItsLeases(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         listOf("keeper", "worker", "other").forEach { relay.enrol(enrolment(TestSigner(), it)) }
         val keeper = RecordingPeer()
@@ -169,7 +169,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun aCompletedLeaseIsAttributedToTheNodeThatRanIt() = runBlocking {
+    fun aCompletedLeaseIsAttributedToTheNodeThatRanIt(): Unit = runBlocking {
         val relay = RelayPool(pool, nowEpochMillis = { now })
         listOf("origin", "worker").forEach { relay.enrol(enrolment(TestSigner(), it)) }
         val origin = RecordingPeer()
@@ -203,7 +203,7 @@ class RelayNodeIdentityTest {
     }
 
     @Test
-    fun enrolmentsAndRevocationsSurviveARelayRestartWithSavedState() = runBlocking {
+    fun enrolmentsAndRevocationsSurviveARelayRestartWithSavedState(): Unit = runBlocking {
         val directory = Files.createTempDirectory("relay-identity")
         val keeper = TestSigner()
         val rogue = TestSigner()
