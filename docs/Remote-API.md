@@ -18,7 +18,7 @@ The service uses `android.os.Messenger`. Each request sets `replyTo` and puts it
 |---|---|---|---|
 | Prompt | 1 | `requestId`; `promptFd`; optional `providerId`, `model` | `RESULT` (101) with `text`, or `ERROR` (102) with `error` |
 | Launch workflow | 2 | `requestId`, `projectName`, `objective`; optional `repositoryUrl` | `RESULT` with `launchId` when queued, or `ERROR` |
-| Watch run | 3 | `requestId` | `RUN_STATUS` (103) and `LAUNCH_OUTCOME` (104), sent repeatedly |
+| Watch run | 3 | `requestId`; optional `events`, `runId`, `afterSeq` | `RUN_STATUS` (103) and `LAUNCH_OUTCOME` (104), sent repeatedly; with `events` true also `RUN_EVENT` (105) |
 
 Field details:
 
@@ -26,6 +26,7 @@ Field details:
 - **`repositoryUrl`** must be `https://github.com/owner/name`.
 - **`LAUNCH_OUTCOME`** carries `launchId`, `launchStarted` (boolean) and, when the launch did not start, `error`.
 - **`RUN_STATUS`** carries `runId`, `objective`, `runStatus` (a `WorkflowRunStatus` name), `tasksTotal`, `tasksDone` and `progressMessage`.
+- **`events`** (boolean) asks for the run's events; **`runId`** and **`afterSeq`** (long) resume after the last event the client saw. **`RUN_EVENT`** carries one event's fields (see Run events) as Bundle values.
 
 ## Behavior
 
@@ -37,6 +38,29 @@ Field details:
   - The queue lives in memory only. It is lost if Android kills The Aive's process, holds at most 10 requests (further requests get `ERROR`), and a request still queued an hour after it arrived expires with a failed `LAUNCH_OUTCOME` instead of launching.
 - **Watching** reports whichever run The Aive is currently showing, plus the outcomes of queued launches (the 10 most recent are replayed when watching starts). Updates continue until the client unbinds, dies, or sends another watch request.
 - Version 2 added `launchId` and `LAUNCH_OUTCOME`; version 1 clients can ignore both.
+- Version 3 added run events. A client gets them only when it watches with `events` true, so version 1 and 2 clients receive exactly what they did before (only the `version` value in replies changes).
+
+## Run events
+
+A watching client that asks for `events` receives the typed, ordered events of the run The Aive is showing, modelled on AG-UI's event categories (run lifecycle, steps, interrupts, state) but in this API's flat field format. `RUN_STATUS` / `run_status` remains the state snapshot; events say what changed.
+
+Every event has `type`, `runId`, `eventSeq` (long) and `at` (epoch milliseconds). `eventSeq` is the event's 1-based position in the run's timeline: it only grows within a run, has gaps where a timeline entry tells a client nothing (executor routing), and starts again at 1 for another run. On its first watch a client gets the newest 200 retained events, or, when it passes `runId` and `afterSeq` for the run still showing, only the later ones; after that each event arrives once, in order.
+
+| `type` | From | Fields |
+|---|---|---|
+| `run_started` | `WorkflowCreated` | optional `objective` |
+| `task` | task events | `taskId`, optional `taskName`; `change` (`ready`, `assigned`, `started`, `verification_failed`, `retry_scheduled`, `escalated`, `completed`, `failed`, `cancelled`); optional `status` (the `TaskRunStatus` name it leaves), `attempt`, `roleId`, `reason` |
+| `gate_waiting` | `ApprovalRequired`, `HumanDecisionRequired` | `need` (`approval` or `decision`), `reason`; optional `gateId`, `taskId`, `taskName`, `planPreview` with `planTruncated` |
+| `gate_decided` | `ApprovalDecisionReceived` | `gateId`, `approved`; optional `taskId` |
+| `artifact` | `ArtifactCreated` | `taskId`, `artifactId`, `kind`, `label`, `truncated`; optional `taskName`, `mediaType`, `sizeBytes` (of the whole text), `preview`, `withheld` |
+| `usage` | `ProviderUsageRecorded` | `taskId`, `providerId`; optional `inputTokens`, `outputTokens`, `costUsd` (one report, not a total) |
+| `run_finished` | `WorkflowCompleted`, `WorkflowFailed`, `WorkflowCancelled` | `status` (a `WorkflowRunStatus` name); optional `reason` |
+
+Limits: `preview` and `planPreview` hold at most 4,096 UTF-8 bytes, `reason` and `objective` 1,024, names and labels 256, never splitting a character. Artifact URIs are not sent. A task that holds its output sends no preview (`withheld` true).
+
+The stream is read-only. Gates are approved or rejected only on the device: a remote client cannot decide one, because the pairing code is a bearer secret that cannot be told apart from its owner (see `docs/THREAT_MODEL.md`).
+
+The Aive reads the run's timeline only while some client watches events, so it costs nothing otherwise. The constants are in `RemoteRunEvents.kt` (`RemoteRunEventFields`, `RemoteRunEventLimits`).
 
 ## Relay
 
@@ -105,7 +129,7 @@ A receiver silently drops (no reply) a frame whose tag or associated data does n
 |---|---|---|
 | `prompt` | `id`, `prompt`; optional `providerId`, `model` | `result` or `error` |
 | `launch` | `id`, `projectName`, `objective`; optional `repositoryUrl` | `launched` or `error` |
-| `watch` | `id` | `run_status` now (if a run is showing) and whenever it changes, and `launch_outcome` for queued launches |
+| `watch` | `id`; optional `events` (boolean), `runId`, `afterSeq` | `run_status` now (if a run is showing) and whenever it changes, and `launch_outcome` for queued launches; with `events` true also `run_events` |
 | `ping` | `id` | `pong` |
 
 **Host to client:**
@@ -117,9 +141,10 @@ A receiver silently drops (no reply) a frame whose tag or associated data does n
 | `launched` | `id`, `launchId` |
 | `launch_outcome` | `launchId`, `started`, optional `error` |
 | `run_status` | `runId`, `objective`, `runStatus`, `tasksTotal`, `tasksDone`, optional `progressMessage` |
+| `run_events` | `events`: an array of run events (see Run events), oldest first |
 | `pong` | `id` |
 
-The messages mean the same as the Messenger ones above, and run through the same code (`AiveRemoteHandler`, `AiveRemoteBridge`), so a prompt is never sent to an unlinked keyless provider on this path either. Relay-specific limits: a prompt over 500,000 UTF-8 bytes gets an `error`; at most 4 prompts run at once per host (more get an `error`); a reply that cannot fit in 600,000 bytes becomes an `error`. `watch` subscriptions last until the client's connection ends (the host keeps at most 16 watching clients).
+The messages mean the same as the Messenger ones above, and run through the same code (`AiveRemoteHandler`, `AiveRemoteBridge`), so a prompt is never sent to an unlinked keyless provider on this path either. Relay-specific limits: a prompt over 500,000 UTF-8 bytes gets an `error`; at most 4 prompts run at once per host (more get an `error`); a reply that cannot fit in 600,000 bytes becomes an `error`. `watch` subscriptions last until the client's connection ends (the host keeps at most 16 watching clients). Run events are batched, as many as fit in about 256,000 bytes per `run_events` message, so a backlog does not trip the relay's frame-rate limit; a later `watch` without `events` stops them.
 
 ### Opt-in and the foreground service
 

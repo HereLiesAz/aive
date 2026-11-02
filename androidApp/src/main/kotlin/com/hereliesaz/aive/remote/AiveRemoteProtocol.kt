@@ -8,8 +8,11 @@ package com.hereliesaz.aive.remote
  * See docs/Remote-API.md.
  */
 object AiveRemoteProtocol {
-    /** 2 added [KEY_LAUNCH_ID] and [MSG_LAUNCH_OUTCOME]; version 1 clients keep working. */
-    const val VERSION = 2
+    /**
+     * 2 added [KEY_LAUNCH_ID] and [MSG_LAUNCH_OUTCOME]; 3 added run events ([KEY_EVENTS],
+     * [MSG_RUN_EVENT]). Older clients keep working: they never ask for events, so never get any.
+     */
+    const val VERSION = 3
 
     /** Bind with this action and the target package set. */
     const val ACTION_BIND = "com.hereliesaz.aive.action.REMOTE"
@@ -29,7 +32,11 @@ object AiveRemoteProtocol {
      * carries [KEY_LAUNCH_ID]; watchers later get a [MSG_LAUNCH_OUTCOME] for it.
      */
     const val MSG_LAUNCH_WORKFLOW = 2
-    /** Stream the status of the workflow run Aive is showing until the client unbinds. */
+    /**
+     * Stream the status of the workflow run Aive is showing until the client unbinds. With
+     * [KEY_EVENTS] true it also streams that run's events ([MSG_RUN_EVENT]); [KEY_RUN_ID] and
+     * [KEY_AFTER_SEQ] resume after the last event a client saw.
+     */
     const val MSG_WATCH_RUN = 3
 
     // Replies (Aive -> client).
@@ -38,6 +45,12 @@ object AiveRemoteProtocol {
     const val MSG_RUN_STATUS = 103
     /** To watchers: a queued launch started ([KEY_LAUNCH_STARTED]) or failed ([KEY_ERROR]). */
     const val MSG_LAUNCH_OUTCOME = 104
+    /**
+     * To watchers that asked for [KEY_EVENTS]: one run event, its fields named by
+     * [RemoteRunEventFields] (`type`, `runId`, `eventSeq`, `at`, ...). Read-only; gates are
+     * decided on the device.
+     */
+    const val MSG_RUN_EVENT = 105
 
     const val KEY_VERSION = "version"
     const val KEY_REQUEST_ID = "requestId"
@@ -62,6 +75,10 @@ object AiveRemoteProtocol {
     const val KEY_TASKS_TOTAL = "tasksTotal"
     const val KEY_TASKS_DONE = "tasksDone"
     const val KEY_PROGRESS_MESSAGE = "progressMessage"
+    /** Boolean on [MSG_WATCH_RUN]: also stream run events. Absent (version 1 and 2 clients) is false. */
+    const val KEY_EVENTS = "events"
+    /** Long on [MSG_WATCH_RUN]: with [KEY_RUN_ID], send only that run's events after this `eventSeq`. */
+    const val KEY_AFTER_SEQ = "afterSeq"
 
     /** Upper bound on a prompt read from the pipe. */
     const val MAX_PROMPT_BYTES = 4 * 1024 * 1024

@@ -33,8 +33,11 @@ class AiveRemoteService : Service() {
     private val messenger by lazy { Messenger(Handler(Looper.getMainLooper(), ::handle)) }
     private val handler by lazy { AiveRemoteHandler(this) }
 
-    /** A watching client's stream and the death link that ends it when the client dies. */
-    private class Watcher(val job: Job, val deathRecipient: IBinder.DeathRecipient)
+    /**
+     * A watching client's stream, the death link that ends it when the client dies, and the hold
+     * on run events it releases when it stops (a no-op when it did not ask for events).
+     */
+    private class Watcher(val job: Job, val deathRecipient: IBinder.DeathRecipient, val releaseEvents: () -> Unit)
 
     override fun onBind(intent: Intent): IBinder = messenger.binder
 
@@ -57,7 +60,7 @@ class AiveRemoteService : Service() {
         when (message.what) {
             P.MSG_PROMPT -> prompt(replyTo, requestId, data)
             P.MSG_LAUNCH_WORKFLOW -> launchWorkflow(replyTo, requestId, data)
-            P.MSG_WATCH_RUN -> watchRun(replyTo, requestId)
+            P.MSG_WATCH_RUN -> watchRun(replyTo, requestId, data)
             else -> reply(replyTo, P.MSG_ERROR, requestId) { putString(P.KEY_ERROR, "Unknown request ${message.what}") }
         }
         return true
@@ -99,10 +102,11 @@ class AiveRemoteService : Service() {
     }
 
     /**
-     * Streams [AiveRemoteBridge.runStatus] and launch outcomes until the client's binder dies, it
-     * watches again, or every client unbinds.
+     * Streams [AiveRemoteBridge.runStatus] and launch outcomes, plus [AiveRemoteBridge.runEvents]
+     * when the client asks with [P.KEY_EVENTS], until the client's binder dies, it watches again,
+     * or every client unbinds.
      */
-    private fun watchRun(replyTo: Messenger, requestId: Long) {
+    private fun watchRun(replyTo: Messenger, requestId: Long, data: Bundle) {
         val binder = replyTo.binder
         stopWatching(binder)
         val job = Job(scope.coroutineContext[Job])
@@ -129,6 +133,25 @@ class AiveRemoteService : Service() {
                 if (!delivered) job.cancel()
             }
         }
+        val releaseEvents: () -> Unit = if (data.getBoolean(P.KEY_EVENTS, false)) {
+            val cursor = RemoteRunEventCursor(
+                resumeRunId = data.getString(P.KEY_RUN_ID),
+                resumeAfterSeq = data.getLong(P.KEY_AFTER_SEQ, 0L),
+            )
+            scope.launch(job) {
+                AiveRemoteBridge.runEvents.collect { log ->
+                    for (event in cursor.take(log)) {
+                        if (!reply(replyTo, P.MSG_RUN_EVENT, requestId) { putRunEvent(event) }) {
+                            job.cancel()
+                            return@collect
+                        }
+                    }
+                }
+            }
+            AiveRemoteBridge.holdEventWatch()
+        } else {
+            {}
+        }
         // The client can die without unbinding cleanly and before anything is sent to it, so a
         // failed reply alone would never notice; the death link does.
         val deathRecipient = IBinder.DeathRecipient { scope.launch { stopWatching(binder) } }
@@ -136,16 +159,31 @@ class AiveRemoteService : Service() {
             binder.linkToDeath(deathRecipient, 0)
         } catch (_: RemoteException) {
             job.cancel()
+            releaseEvents()
             return
         }
-        watchers[binder] = Watcher(job, deathRecipient)
+        watchers[binder] = Watcher(job, deathRecipient, releaseEvents)
         job.invokeOnCompletion { scope.launch { if (watchers[binder]?.job === job) stopWatching(binder) } }
     }
 
     private fun stopWatching(binder: IBinder) {
         val watcher = watchers.remove(binder) ?: return
         watcher.job.cancel()
+        watcher.releaseEvents()
         runCatching { binder.unlinkToDeath(watcher.deathRecipient, 0) }
+    }
+
+    private fun Bundle.putRunEvent(event: RemoteRunEvent) {
+        event.fields().forEach { (name, value) ->
+            when (value) {
+                is String -> putString(name, value)
+                is Int -> putInt(name, value)
+                is Long -> putLong(name, value)
+                is Boolean -> putBoolean(name, value)
+                is Double -> putDouble(name, value)
+                else -> putString(name, value.toString())
+            }
+        }
     }
 
     private fun readPrompt(fd: ParcelFileDescriptor): String =

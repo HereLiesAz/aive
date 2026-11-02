@@ -298,6 +298,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val remoteLaunchRequests by AiveRemoteBridge.pendingLaunches.collectAsState()
+                val remoteEventWatchers by AiveRemoteBridge.eventWatchers.collectAsState()
                 val providers = remember(
                     credentials,
                     repositoryCredentials,
@@ -475,6 +476,7 @@ class MainActivity : ComponentActivity() {
                         externalWorkflowLaunchRequests = remoteLaunchRequests,
                         onExternalWorkflowLaunchHandled = AiveRemoteBridge::complete,
                         onRuntimeStateChanged = AiveRemoteBridge::publish,
+                        onRunTimelineChanged = if (remoteEventWatchers > 0) AiveRemoteBridge::publishTimeline else null,
                         setupSecretStore = object : SetupSecretStore {
                             override fun read(): SetupSecrets = SetupSecrets(
                                 providerCredentials = providerCredentialStore.readAll(),

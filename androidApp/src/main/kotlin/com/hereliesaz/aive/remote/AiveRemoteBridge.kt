@@ -2,12 +2,15 @@ package com.hereliesaz.aive.remote
 
 import com.hereliesaz.geministrator.ApplicationRuntimeState
 import com.hereliesaz.geministrator.ExternalWorkflowLaunchRequest
+import com.hereliesaz.geministrator.LiveWorkflowPresentation
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
+import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -27,6 +30,9 @@ import kotlinx.coroutines.flow.update
  * The queue lives in memory only: it is lost with the process, holds at most [MAX_PENDING]
  * requests, and a request still queued [PENDING_TTL_MILLIS] after it arrived is dropped as expired
  * rather than launched long after the client asked. Every request ends in one [RemoteLaunchOutcome].
+ *
+ * While at least one client watches run events ([holdEventWatch]), the UI also hands over the
+ * shown run's timeline ([publishTimeline]), which becomes the ordered [runEvents] log.
  */
 internal object AiveRemoteBridge {
     const val MAX_PENDING = 10
@@ -42,11 +48,21 @@ internal object AiveRemoteBridge {
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
+    private val shown = MutableStateFlow<LiveWorkflowPresentation?>(null)
+    private val events = MutableStateFlow(RemoteRunEventLog.EMPTY)
+    private val eventWatchCount = MutableStateFlow(0)
+
     /** Launch requests not yet handed to the runtime, oldest first. */
     val pendingLaunches: StateFlow<List<ExternalWorkflowLaunchRequest>> = pending.asStateFlow()
 
     /** The run the UI's runtime currently shows; null before any run is live. */
     val runStatus: StateFlow<RemoteRunStatus?> = status.asStateFlow()
+
+    /** The typed, ordered events of the shown run, newest [RemoteRunEventLimits.RETAINED_EVENTS]. */
+    val runEvents: StateFlow<RemoteRunEventLog> = events.asStateFlow()
+
+    /** How many clients watch [runEvents]; the UI loads the run's timeline only while this is > 0. */
+    val eventWatchers: StateFlow<Int> = eventWatchCount.asStateFlow()
 
     /** How queued launches ended; replays the most recent [MAX_PENDING] to new collectors. */
     val outcomes: SharedFlow<RemoteLaunchOutcome> = outcomeEvents.asSharedFlow()
@@ -97,6 +113,7 @@ internal object AiveRemoteBridge {
 
     fun publish(state: ApplicationRuntimeState) {
         val live = state as? ApplicationRuntimeState.Live ?: return
+        shown.value = live.presentation
         val run = live.presentation.run
         val tasks = run.taskRuns.values
         status.value = RemoteRunStatus(
@@ -107,6 +124,25 @@ internal object AiveRemoteBridge {
             tasksDone = tasks.count { it.status.isTerminal() },
             progressMessage = tasks.lastOrNull { it.status == TaskRunStatus.Running }?.progressMessage,
         )
+    }
+
+    /**
+     * The shown run's event [timeline], in order. A timeline of another run (the UI moved on
+     * while it loaded) is ignored; the next state change brings the right one.
+     */
+    fun publishTimeline(timeline: List<WorkflowEvent>) {
+        synchronized(lock) {
+            val presentation = shown.value ?: return
+            if (timeline.none { it.workflowRunId == presentation.run.id }) return
+            events.value = events.value.advance(presentation.run, presentation.definition, timeline)
+        }
+    }
+
+    /** Marks one client as watching [runEvents]; call the returned function, once, when it stops. */
+    fun holdEventWatch(): () -> Unit {
+        eventWatchCount.update { it + 1 }
+        val released = AtomicBoolean(false)
+        return { if (released.compareAndSet(false, true)) eventWatchCount.update { it - 1 } }
     }
 }
 
