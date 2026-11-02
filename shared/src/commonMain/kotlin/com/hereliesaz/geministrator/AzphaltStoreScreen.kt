@@ -177,7 +177,7 @@ private suspend fun storeLoadFailureMessage(failure: Throwable, fallback: String
     if (failure is CancellationException) throw failure
     val kind = classifyError(storeFailureDetails(failure))
     val summary = when (kind) {
-        ErrorKind.Offline, ErrorKind.TimedOut, ErrorKind.RateLimited -> getString(kind.messageResource())
+        ErrorKind.Offline, ErrorKind.TimedOut, ErrorKind.RateLimited, ErrorKind.OutOfCredit -> getString(kind.messageResource())
         else -> getString(fallback)
     }
     val step = (failure as? AzphaltStoreStepException)?.step ?: return summary

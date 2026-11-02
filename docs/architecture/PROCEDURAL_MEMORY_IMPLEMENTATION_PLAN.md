@@ -119,6 +119,18 @@ Individual `forgetEpisode` performs revision-checked physical deletion of depend
 
 **Gate:** Candidate procedures are reproducible *as proposals*, not yet executable.
 
+### Candidate discovery implementation (provisional only)
+
+`ProcedureCandidateExtractor` now recognizes evidence-backed, metadata-only **reflex patterns** from successful terminal dispatch/reconciliation records grouped by task definition/executor, deduplicating each run attempt and rejecting any attempt with a conflicting failure. Every accepted trace must match the exact contextual executor-receipt episode and workflow/project/task lineage; missing, tampered or purged source context is never counted.
+
+A **habit pattern** can be suggested only when the bank contains 2–8 different task definitions with distinct observation timestamps. Its order is explicitly *observed chronology*, **not** inferred causal dependencies. Traces capture no command body, arguments or verified postconditions, so discovery never invents these.
+
+`ProcedureParameterizer` generalizes **explicit typed adapter declarations**, not redacted argument values, and rejects conflicting parameter types, unsafe command/secret slots and unbounded schemas. `ProcedureCompatibility` requires host-provided symbolic operation descriptors matching the observed executor kinds; this first stage accepts read-only operations only. `ProcedureCandidateProposalService` rechecks the live evidence before committing a versioned `ProcedureDefinition`, a SHA-256-addressed declarative JSON manifest and attributed **Completed (not Verified)** evidence to the existing workflow-scoped `ProcedureStore`. Repeated identical proposals return the same version, while differing sources or templates create new versions.
+
+`MemoryLayerController.discoverProceduralPatterns()` and `proposeProceduralCandidate(...)` expose read-only discovery and explicit proposal entry points without new background execution or automatic model access. All resulting definitions still have `ProcedureCandidate.executable == false`. Tests exercise duplicates, tampered/foreign source episodes, conflicting reported outcomes, chronological habits, typed schema contradictions, privileged-operation rejection, deduplication, and stale evidence.
+
+**Not included here:** capturing provider-internal tool calls that lack a typed adapter, validated causal dependency graphs, independent verification, approval/promotion policies, macro invocation, dynamic replay or duplex MCP dispatch. These remain gated by the later milestones.
+
 ## Milestone 4 — verification, approval and promotion
 
 **Proposed files:** `ProcedureValidator.kt`, `ProcedurePromotionPolicy.kt`, `ProcedureLifecycle.kt`, `ProcedureApprovalEvidence.kt`.
