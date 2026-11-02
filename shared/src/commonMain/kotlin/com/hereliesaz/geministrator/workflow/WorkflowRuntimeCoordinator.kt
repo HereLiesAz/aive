@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.SpendCapKind
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -44,12 +45,16 @@ class WorkflowRuntimeCoordinator(
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
     private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
+    /** The keeper's spend caps, read every cycle so a change in the Keeper's room applies at once. */
+    private val spendCaps: () -> SpendCaps = { SpendCaps() },
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
         RepositoryWorkflowEventSink(persistence.events),
     )
     private val cycleMutex = Mutex()
+    /** When the hourly spend was last summed; it is summed again when this run's cost rises. */
+    private var lastHourlySpendCheckAtMillis: Long? = null
 
     suspend fun persist(
         project: Project,
@@ -157,11 +162,19 @@ class WorkflowRuntimeCoordinator(
             cancelSessions(state.run, state.handles)
             return state.copy(handles = emptyMap())
         }
+        if (state.run.spendPause != null) {
+            // Stopped by a spend cap: nothing runs or starts until the keeper lifts the stop.
+            if (state.handles.isEmpty()) return state
+            cancelSessions(state.run, state.handles)
+            return state.copy(handles = emptyMap())
+        }
 
         var nextRun = reconcileResolvedApprovalGates(definition, state.run, nowEpochMillis)
         if (nextRun.status.isTerminal()) {
             return terminate(project, definition, nextRun, state.handles, nowEpochMillis)
         }
+        // A role whose budget the keeper raised (or cleared) takes work again.
+        nextRun = engine.releaseRoleBudgetHolds(nextRun, nowEpochMillis)
 
         nextRun = recoverAvailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
         nextRun = reconcileRemoteCompute(project, definition, nextRun, nowEpochMillis)
@@ -261,6 +274,11 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Retrying,
                 TaskRunStatus.Escalated,
             )
+        }
+
+        // Spend circuit breakers: a reached cap stops the whole run before anything else starts.
+        spendCapTrip(previous = state.run, run = nextRun, nowEpochMillis = nowEpochMillis)?.let { trip ->
+            return stopForSpendCap(project, definition, nextRun, nextHandles, trip, nowEpochMillis)
         }
 
         nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
@@ -458,6 +476,41 @@ class WorkflowRuntimeCoordinator(
         val terminalState = WorkflowRuntimeState(closed, emptyMap())
         persist(project, definition, terminalState)
         return terminalState
+    }
+
+    /**
+     * The spend cap [run] has reached, or null. The run's own cost is checked every cycle; the
+     * hourly spend across runs is summed when this run's known cost rises, and at least once a
+     * minute otherwise. A Hall Monitor pause is left to its own review.
+     */
+    private suspend fun spendCapTrip(previous: WorkflowRun, run: WorkflowRun, nowEpochMillis: Long): SpendCapTrip? {
+        if (run.globalPause != null || run.spendPause != null) return null
+        val caps = spendCaps()
+        runCostTrip(run, caps)?.let { return it }
+        val hourlyCap = caps.hourlySpendCapUsd ?: return null
+        val lastCheck = lastHourlySpendCheckAtMillis
+        val costRose = run.knownCostUsd() > previous.knownCostUsd()
+        if (!costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
+        lastHourlySpendCheckAtMillis = nowEpochMillis
+        val spent = hourlySpendUsd(persistence, nowEpochMillis, alsoRunId = run.id)
+        return if (spent >= hourlyCap) SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent) else null
+    }
+
+    /** Cancels the run's live provider sessions and parks it under a spend stop the keeper lifts. */
+    private suspend fun stopForSpendCap(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        trip: SpendCapTrip,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState {
+        val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status?.isActiveProviderStatus() == true }
+        cancelSessions(run, live)
+        val stopped = pauseRunForSpendCap(run, trip, cancelledTaskIds = live.keys, nowEpochMillis = nowEpochMillis)
+        val stoppedState = WorkflowRuntimeState(stopped, emptyMap())
+        persist(project, definition, stoppedState)
+        return stoppedState
     }
 
     /** Best effort: a session that already finished, or a provider that is unreachable, is not an error here. */
@@ -1246,6 +1299,7 @@ class WorkflowRuntimeCoordinator(
             TaskRunStatus.Failed,
             TaskRunStatus.Cancelled,
         )
+        const val HOURLY_SPEND_RECHECK_MILLIS: Long = 60_000L
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

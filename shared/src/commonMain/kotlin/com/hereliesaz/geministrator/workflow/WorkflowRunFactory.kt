@@ -92,6 +92,9 @@ object WorkflowRunFactory {
         val refreshed = run.taskRuns.mapValues { (taskId, taskRun) ->
             if (taskRun.status != TaskRunStatus.Blocked) return@mapValues taskRun
             if (taskRun.blockingReason?.code == EXECUTOR_INTEGRATION_UNAVAILABLE) return@mapValues taskRun
+            // Held by a spend circuit breaker, not by its dependencies: only that breaker releases it.
+            if (taskRun.blockingReason?.code == ROLE_BUDGET_SPENT) return@mapValues taskRun
+            if (taskRun.blockingReason?.code == SPEND_CAP_STOP) return@mapValues taskRun
 
             val task = definitionsById[taskId] ?: return@mapValues taskRun
             val dependencyRuns = task.dependsOn.mapNotNull(run.taskRuns::get)

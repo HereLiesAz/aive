@@ -55,6 +55,7 @@ import com.hereliesaz.geministrator.resources.app_clear_failed
 import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
 import com.hereliesaz.geministrator.resources.app_plan_rejection_failed
+import com.hereliesaz.geministrator.resources.app_lift_spend_stop_failed
 import com.hereliesaz.geministrator.resources.app_provider_message_failed
 import com.hereliesaz.geministrator.resources.app_reachable_capabilities
 import com.hereliesaz.geministrator.resources.app_recovery_failed
@@ -132,6 +133,8 @@ fun App(
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
+    // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
+    val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
@@ -161,6 +164,7 @@ fun App(
                 contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
+                spendCaps = { spendCapStore.caps },
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
@@ -584,6 +588,17 @@ fun App(
                                     throw failure
                                 } catch (failure: Exception) {
                                     runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_plan_rejection_failed))
+                                }
+                            }
+                        },
+                        onLiftSpendStop = {
+                            scope.launch {
+                                try {
+                                    runtime?.liftSpendStop()
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_lift_spend_stop_failed))
                                 }
                             }
                         },

@@ -52,6 +52,8 @@ import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
+import com.hereliesaz.geministrator.workflow.SpendCaps
+import com.hereliesaz.geministrator.workflow.liftSpendPause
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.TaskRerunPlanner
@@ -500,6 +502,25 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /**
+     * Lifts the active run's spend cap stop: its tasks return to where they were and stopped
+     * sessions start again as a new attempt. A cap still reached stops the run again at its next check.
+     */
+    suspend fun liftSpendStop() {
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val live = snapshot.state.run
+            val run = persistence.runs.get(live.id)
+                ?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis }
+                ?: live
+            if (run.spendPause == null || run.status.isTerminal()) return@withLock
+            val lifted = liftSpendPause(run, maxOf(nowEpochMillis(), run.updatedAtEpochMillis + 1))
+            persistence.runs.put(lifted)
+            replaceCurrent(snapshot.copy(state = WorkflowRuntimeState(lifted, emptyMap())))
+            publishCurrent()
+        }
+    }
+
     fun close() {
         cycleJob?.cancel()
         cycleJob = null
@@ -893,6 +914,8 @@ class ApplicationRuntime private constructor(
                 com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource),
                 ),
+            /** The keeper's spend caps (Keeper's room, This device); none unless provided. */
+            spendCaps: () -> SpendCaps = { SpendCaps() },
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
@@ -937,6 +960,7 @@ class ApplicationRuntime private constructor(
                     executorIntegrations = runtimeIntegrations,
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
+                    spendCaps = spendCaps,
                 )
                 val nestedWorkflows = WorkflowRunNestedWorkflowClient(
                     persistence = persistence,
