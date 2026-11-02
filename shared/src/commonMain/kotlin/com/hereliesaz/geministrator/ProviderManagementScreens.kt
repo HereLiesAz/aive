@@ -49,6 +49,16 @@ import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent_hint
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_allow
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_allowed
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_card_url
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_no_address
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_none_allowed
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_off
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_on
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_remove
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_waiting
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_warning
 import com.hereliesaz.geministrator.resources.settings_a2a_server
 import com.hereliesaz.geministrator.resources.settings_a2a_server_card_url
 import com.hereliesaz.geministrator.resources.settings_a2a_server_copy_token
@@ -57,6 +67,7 @@ import com.hereliesaz.geministrator.resources.settings_a2a_server_failed
 import com.hereliesaz.geministrator.resources.settings_a2a_server_listening
 import com.hereliesaz.geministrator.resources.settings_a2a_server_off
 import com.hereliesaz.geministrator.resources.settings_a2a_server_on
+import com.hereliesaz.geministrator.resources.settings_a2a_server_port_in_use
 import com.hereliesaz.geministrator.resources.settings_a2a_server_reset_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_temporary_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
@@ -859,6 +870,7 @@ internal fun ProviderSettingsScreen(
             val a2aStatus = when (val status = setting.status) {
                 A2aServerStatus.Off -> null
                 is A2aServerStatus.Listening -> stringResource(Res.string.settings_a2a_server_listening, status.address)
+                is A2aServerStatus.PortInUse -> stringResource(Res.string.settings_a2a_server_port_in_use, status.port.toString())
                 is A2aServerStatus.Failed -> stringResource(Res.string.settings_a2a_server_failed)
             }
             a2aStatus?.let { status ->
@@ -902,6 +914,7 @@ internal fun ProviderSettingsScreen(
                     )
                 }
             }
+            setting.lan?.takeIf { setting.enabled }?.let { lan -> A2aLanControls(lan) }
         }
 
         localPlannerSetting?.let { setting ->
@@ -1550,3 +1563,71 @@ private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -
     platformDebugLog("AiveSettings", "$label failed: ${failure::class.simpleName}: ${failure.message}")
     null
 }
+
+/** **Open to this network** under the A2A server (docs/A2A.md); the cleartext warning sits beside the switch. */
+@Composable
+private fun A2aLanControls(lan: A2aLanSetting) {
+    AzphaltPill(
+        if (lan.enabled) stringResource(Res.string.settings_a2a_lan_on) else stringResource(Res.string.settings_a2a_lan_off),
+        "a2a-lan-toggle",
+        selected = lan.enabled,
+        onClick = { lan.onEnabledChange(!lan.enabled) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        stringResource(Res.string.settings_a2a_lan_warning),
+        style = AzphaltType.body,
+        color = azphaltOnSurface(),
+    )
+    if (!lan.enabled) return
+    if (lan.agentCardUrls.isEmpty()) {
+        Text(
+            stringResource(Res.string.settings_a2a_lan_no_address),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+    }
+    lan.agentCardUrls.forEach { url ->
+        AzphaltTextField(
+            value = url,
+            onValueChange = {},
+            readOnly = true,
+            label = stringResource(Res.string.settings_a2a_lan_card_url),
+        )
+    }
+    lan.waitingClients.forEach { address ->
+        Text(
+            stringResource(Res.string.settings_a2a_lan_waiting, address),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        AzphaltPill(
+            stringResource(Res.string.settings_a2a_lan_allow, address),
+            "a2a-lan-allow-$address",
+            onClick = { lan.onAllowClient(address) },
+        )
+    }
+    if (lan.allowedClients.isEmpty()) {
+        Text(
+            stringResource(Res.string.settings_a2a_lan_none_allowed),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+    }
+    lan.allowedClients.forEach { address ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(Res.string.settings_a2a_lan_allowed, address),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            AzphaltPill(
+                stringResource(Res.string.settings_a2a_lan_remove),
+                "a2a-lan-remove-$address",
+                onClick = { lan.onForgetClient(address) },
+            )
+        }
+    }
+}
+
