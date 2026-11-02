@@ -349,6 +349,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_edge_drifter_no_swarm">The swarm is not awake yet. Open a hive, then let it in.</string>
     <string name="hive_edge_drifter_send_away_title">Send %1$s away?</string>
     <string name="hive_edge_drifter_send_away_body">It leaves the swarm, and any token saved for it is removed from this device. Bringing it back takes its address again.</string>
+    <string name="hive_edge_drifter_seed">A public agent, run by %1$s. Its card is read when you let it in.</string>
     <string name="hive_edge_drifter_full">The hive holds as many drifters as it can. Send one away first.</string>
     <string name="stable_choose">Your first creature</string>
     <string name="stable_choose_hint">Pick one. It is yours without limit. Every other breed you hatch or buy, one at a time.</string>

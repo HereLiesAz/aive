@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.a2a.A2aDrifter
+import com.hereliesaz.geministrator.a2a.A2aDrifterSeeds
 import com.hereliesaz.geministrator.a2a.A2aDrifters
 import com.hereliesaz.geministrator.a2a.DrifterTrouble
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -49,6 +51,7 @@ import com.hereliesaz.geministrator.resources.hive_edge_drifter_reading
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_send_away
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_send_away_body
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_send_away_title
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_seed
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_skills
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_unreachable
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_wants_token
@@ -89,10 +92,12 @@ internal fun A2aDrifterShelf(
     var sendingAway by remember { mutableStateOf<A2aAgentConnection?>(null) }
     val noSwarm = stringResource(Res.string.hive_edge_drifter_no_swarm)
     val full = stringResource(Res.string.hive_edge_drifter_full)
+    // Seeded public agents wait at the edge from the first launch, unread, until let in or dismissed.
+    LaunchedEffect(Unit) { A2aDrifters.offerSeeds() }
     val residentUrls = residents.mapTo(hashSetOf()) { it.cardUrl }
     val atTheEdge = waiting.filterNot { it.cardUrl in residentUrls }
     // One Heroic act: letting in the newest drifter that can come in.
-    val hero = atTheEdge.firstOrNull { it.canBeLetIn }?.cardUrl
+    val hero = atTheEdge.firstOrNull { it.canBeLetIn || it.isUnreadSeed }?.cardUrl
 
     fun letIn(drifter: A2aDrifter) {
         val card = drifter.card ?: return
@@ -147,18 +152,30 @@ internal fun A2aDrifterShelf(
                 drifter = drifter,
                 trouble = letInTrouble[drifter.cardUrl] ?: troubleText(drifter),
             ) {
-                if (drifter.canBeLetIn) {
+                if (drifter.canBeLetIn || drifter.isUnreadSeed) {
                     AzphaltPill(
                         label = stringResource(Res.string.hive_edge_drifter_let_in),
                         seed = "edge-let-in-${drifter.cardUrl}",
                         tone = if (drifter.cardUrl == hero) PillTone.Primary else PillTone.Quiet,
-                        onClick = { letIn(drifter) },
+                        onClick = {
+                            if (drifter.canBeLetIn) {
+                                letIn(drifter)
+                            } else {
+                                // A seed's card is read only now; whatever goes wrong lands on it.
+                                scope.launch {
+                                    val read = A2aDrifters.bringIn(drifter.cardUrl, seeded = true)
+                                    if (read.canBeLetIn) letIn(read)
+                                }
+                            }
+                        },
                     )
                 }
                 AzphaltPill(
                     label = stringResource(Res.string.hive_edge_drifter_send_away),
                     seed = "edge-send-away-${drifter.cardUrl}",
                     onClick = {
+                        // A seed sent away does not come back on this device.
+                        if (drifter.seeded) A2aDrifterSeeds.dismiss(drifter.cardUrl)
                         A2aDrifters.sendAway(drifter.cardUrl)
                         letInTrouble = letInTrouble - drifter.cardUrl
                     },
@@ -201,6 +218,7 @@ internal fun A2aDrifterShelf(
                 sendingAway = null
                 if (resident.providerId in connectedProviderIds) onDisconnect(resident.providerId)
                 A2aAgentConnections.remove(resident.providerId)
+                A2aDrifterSeeds.dismiss(resident.cardUrl)
                 if (swarmRoles.isNotEmpty()) onSaveRoles(A2aDrifters.swarmWithout(swarmRoles, resident.providerId))
             },
             onDismissRequest = { sendingAway = null },
@@ -244,8 +262,13 @@ private fun DrifterRow(drifter: A2aDrifter, trouble: String?, actions: @Composab
             if (drifter.looking) {
                 Text(stringResource(Res.string.hive_edge_drifter_reading), style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
             }
-            A2aDrifters.descriptionOf(drifter.card).takeIf(String::isNotEmpty)?.let { about ->
+            (A2aDrifters.descriptionOf(drifter.card).ifEmpty { drifter.blurb.orEmpty() }).takeIf(String::isNotEmpty)?.let { about ->
                 Text(about, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.85f))
+            }
+            if (drifter.isUnreadSeed) {
+                A2aDrifterSeeds.seedFor(drifter.cardUrl)?.let { seed ->
+                    Text(stringResource(Res.string.hive_edge_drifter_seed, seed.runBy), style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
+                }
             }
             A2aDrifters.skillsOf(drifter.card).takeIf { it.isNotEmpty() }?.let { skills ->
                 Text(
