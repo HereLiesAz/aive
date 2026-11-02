@@ -73,7 +73,6 @@
     <string name="keeper_appearance_lead">The ground everything sits on.</string>
     <string name="keeper_about">About and privacy</string>
     <string name="keeper_about_lead">Crash reports, trace export and diagnostics.</string>
-    <string name="keeper_about_lead">Crash reports and diagnostics.</string>
     <string name="keeper_delegations">Delegations</string>
     <string name="keeper_delegations_lead">Gates you let a creature pass without asking you. Only gates that can't write, deploy or reach outside The Aive are ever offered.</string>
     <string name="delegation_offer_title">Let %1$s proceed without asking for %2$s?</string>

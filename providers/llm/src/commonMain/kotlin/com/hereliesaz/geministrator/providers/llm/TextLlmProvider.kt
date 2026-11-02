@@ -222,7 +222,7 @@ open class TextLlmProvider(
             try {
                 val outcome = McpToolLoop().run(
                     api = api,
-                    prompt = renderPrompt(session.request) + "\n\n" + McpToolLoop.TOOL_GUIDANCE,
+                    prompt = renderPrompt(session.request).text + "\n\n" + McpToolLoop.TOOL_GUIDANCE,
                     toolbox = toolbox,
                 ) { call ->
                     val offer = toolbox.offers.firstOrNull { it.name == call.name }

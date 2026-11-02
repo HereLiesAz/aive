@@ -9,6 +9,9 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.AgentAssigned
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
+import com.hereliesaz.geministrator.events.TaskRerunRequested
+import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
@@ -370,6 +373,8 @@ internal fun WorkflowEvent.toRemoteRunEvent(
         )
         is TaskBecameReady -> task(taskDefinitionId, "ready", TaskRunStatus.Ready)
         is ExecutorAssigned -> null
+        // Not part of the remote event contract (docs: remote events); clients read them from the run.
+        is ExternalRunCancelFailed, is TaskRerunRequested, is PolicyDecisionRecorded -> null
         is AgentAssigned -> task(taskDefinitionId, "assigned", status = null, roleId = roleId.value)
         is TaskStarted -> task(taskDefinitionId, "started", TaskRunStatus.Running, attempt = attempt)
         is ApprovalRequired -> {

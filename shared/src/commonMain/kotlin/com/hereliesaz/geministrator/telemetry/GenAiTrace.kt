@@ -5,6 +5,9 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.events.AgentAssigned
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
+import com.hereliesaz.geministrator.events.TaskRerunRequested
+import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
@@ -220,6 +223,7 @@ object WorkflowTraceBuilder {
                     objective = event.objective
                 }
                 is TaskBecameReady -> Unit
+                is ExternalRunCancelFailed, is PolicyDecisionRecorded, is TaskRerunRequested -> Unit
                 is ExecutorAssigned -> pendingExecutor[event.taskDefinitionId] = event.executor.traceKind()
                 is AgentAssigned -> pendingRole[event.taskDefinitionId] = event.roleId.value
                 is TaskStarted -> {
