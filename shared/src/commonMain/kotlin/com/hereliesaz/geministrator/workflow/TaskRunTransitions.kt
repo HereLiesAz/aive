@@ -28,6 +28,8 @@ object TaskRunTransitions {
             TaskRunStatus.Cancelled,
         ),
         TaskRunStatus.Planning to setOf(
+            // Parked mid-plan when its role spends its token budget (ROLE_BUDGET_SPENT).
+            TaskRunStatus.Blocked,
             TaskRunStatus.AwaitingApproval,
             TaskRunStatus.Running,
             TaskRunStatus.Failed,

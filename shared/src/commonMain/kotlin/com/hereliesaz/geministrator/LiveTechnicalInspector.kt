@@ -26,6 +26,10 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
+import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
+import com.hereliesaz.geministrator.workflow.roleTokensSpent
+import com.hereliesaz.geministrator.resources.inspector_budget_spent
+import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
@@ -215,6 +219,21 @@ internal fun TechnicalInspector(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                if (taskRun.isHeldForRoleBudget()) {
+                    // The token budget circuit breaker: its role spent its budget in this run.
+                    val spent = taskRun.assignedRoleId?.let { liveWorkflow.run.roleTokensSpent(it) } ?: 0L
+                    Text(
+                        stringResource(Res.string.inspector_budget_spent, spent.toString()),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_raise_budget),
+                        seed = "raise-budget-$selectedTaskId",
+                        onClick = { onTabChange(CreatureTab.Mind) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
                     Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
                 }
@@ -397,11 +416,12 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
  */
 enum class CreatureTab { Needs, Work, Mind }
 
-/** Whether this creature is waiting on the keeper: a plan or task to approve, or an escalation. */
+/** Whether this creature is waiting on the keeper: a plan or task to approve, an escalation, or a spent budget. */
 internal fun creatureNeedsYou(taskRun: TaskRun): Boolean =
     taskRun.status == TaskRunStatus.AwaitingApproval ||
         taskRun.status == TaskRunStatus.Escalated ||
-        taskRun.awaitsNestedHumanApproval()
+        taskRun.awaitsNestedHumanApproval() ||
+        taskRun.isHeldForRoleBudget()
 
 /** The tab a creature opens on: Needs when it is waiting on you, else its Work. */
 internal fun openingTab(taskRun: TaskRun?): CreatureTab =

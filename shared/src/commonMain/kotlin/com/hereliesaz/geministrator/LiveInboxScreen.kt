@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.workflow.isTerminal
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.inbox_loading_runtime
@@ -27,10 +28,17 @@ internal fun LiveInboxScreen(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onLiftSpendStop: () -> Unit = {},
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         val presentation = runtimeState.presentation
         when {
+            presentation.run.spendPause != null && !presentation.run.status.isTerminal() -> SpendStopInboxScreen(
+                presentation = presentation,
+                onLiftSpendStop = onLiftSpendStop,
+                modifier = modifier,
+            )
+
             presentation.run.globalPause != null -> HallMonitorPauseInboxScreen(
                 presentation = presentation,
                 onTestSolution = { findingId, solutionIndex ->

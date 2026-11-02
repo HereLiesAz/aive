@@ -142,6 +142,7 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onLiftSpendStop: () -> Unit = {},
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
@@ -249,7 +250,7 @@ fun ControlRoom(
         if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
     }
     val openInbox = {
-        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || isHallMonitorTrial(it) }
+        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || it.run.spendPause != null || isHallMonitorTrial(it) }
             ?.let { live -> firstCreatureNeedingYou(live, unseen = { key -> key !in inboxReadLog.read }) }
         if (waiting != null) {
             district.value = false
@@ -331,6 +332,7 @@ fun ControlRoom(
                 onApproveTask = onApproveTask,
                 onRejectPlan = onRejectPlan,
                 onResolveEscalation = onResolveEscalation,
+                onLiftSpendStop = onLiftSpendStop,
                 onMessageAgent = onMessageAgent,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
@@ -583,6 +585,7 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onLiftSpendStop: () -> Unit,
     onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
@@ -817,7 +820,7 @@ private fun MainDestination(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
                 )
-                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
                     connectedProviderIds = connectedProviderIds,

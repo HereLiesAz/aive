@@ -245,6 +245,8 @@ data class WorkflowRun(
      * combines lineages. Empty for a root run. Memory derives its lineage banks from these.
      */
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /** Set while a keeper's spend cap has stopped this run; the keeper lifts it. */
+    val spendPause: WorkflowSpendPause? = null,
 ) {
     init {
         require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }

@@ -658,6 +658,8 @@ internal fun ProviderSettingsScreen(
       }
 
       if (section == KeeperSection.Device) {
+        SpendCapsSettings()
+
         remoteAccessSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
             Text(

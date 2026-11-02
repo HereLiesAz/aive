@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.inbox_badge_none
 import com.hereliesaz.geministrator.resources.inbox_badge_unread
@@ -51,8 +52,9 @@ private const val INBOX_READ_SEPARATOR = '\n'
 
 /**
  * Stable identities of the things the Inbox lists for [run]: the run's Hall Monitor pause when it
- * has one (the Inbox shows only that report while the run is paused), otherwise each task waiting
- * on a human, a plan approval or a failure escalation.
+ * has one (the Inbox shows only that report while the run is paused), else its spend cap stop,
+ * otherwise each task waiting on a human: a plan approval, a failure escalation, or a role whose
+ * token budget is spent.
  *
  * A key names the item, not just the task: the attempt and the kind are part of it, so a task that
  * escalates again after a retry is a new, unread item.
@@ -61,6 +63,10 @@ internal fun inboxItemKeys(run: WorkflowRun): List<String> {
     val pause = run.globalPause
     if (pause != null) {
         return listOf(inboxKey("pause", run.id.value, pause.reportArtifactId.value))
+    }
+    val spendStop = run.spendPause
+    if (spendStop != null) {
+        return listOf(inboxKey("spend-stop", run.id.value, spendStop.pausedAtEpochMillis.toString()))
     }
     return run.taskRuns.values
         .filter(::creatureNeedsYou)
@@ -79,6 +85,7 @@ private fun inboxKey(run: WorkflowRun, taskRun: com.hereliesaz.geministrator.dom
     val kind = when {
         taskRun.status == TaskRunStatus.AwaitingApproval -> "approval"
         taskRun.status == TaskRunStatus.Escalated -> "escalation"
+        taskRun.isHeldForRoleBudget() -> "budget"
         else -> "nested-approval"
     }
     return inboxKey(kind, run.id.value, taskRun.taskDefinitionId.value, taskRun.attempt.toString())

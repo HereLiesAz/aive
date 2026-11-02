@@ -18,6 +18,7 @@
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
     <string name="app_import_failed">Import failed</string>
+    <string name="app_lift_spend_stop_failed">Lifting the spend stop failed</string>
     <string name="app_launch_already_in_progress">Another workflow is launching. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
     <string name="app_provider_message_failed">Provider message failed</string>
@@ -66,7 +67,7 @@
     <string name="keeper_projects">Projects and data</string>
     <string name="keeper_projects_lead">Save, load, move or delete what The Aive keeps.</string>
     <string name="keeper_device">This device</string>
-    <string name="keeper_device_lead">Models that run here, and reaching this device from another.</string>
+    <string name="keeper_device_lead">Spend caps, models that run here, and reaching this device from another.</string>
     <string name="keeper_appearance">Appearance</string>
     <string name="keeper_appearance_lead">The ground everything sits on.</string>
     <string name="keeper_about">About and privacy</string>
@@ -181,6 +182,8 @@
     <string name="inspector_remote">Remote · </string>
     <string name="inspector_responsible_role">RESPONSIBLE ROLE</string>
     <string name="inspector_retry_task">Retry task</string>
+    <string name="inspector_budget_spent">Budget spent: its role used %1$s tokens in this run, all of its budget. It takes no more work until you raise the budget.</string>
+    <string name="inspector_raise_budget">Raise its budget</string>
     <string name="inspector_role">Role: %1$s</string>
     <string name="inspector_role_instructions_redacted_by_policy">\nRole instructions: [redacted by policy]</string>
     <string name="inspector_send">Send</string>
@@ -714,6 +717,18 @@
     <string name="settings_local_orchestration">Local Orchestration</string>
     <string name="settings_local_orchestration_2">Local orchestration</string>
     <string name="settings_local_planner">Local Planner</string>
+    <string name="settings_spend_caps">Spend caps</string>
+    <string name="settings_spend_caps_description">Stop the hive when known spend reaches a cap. Only cost a provider reports counts: keyless and free providers, and ones that report tokens only, never trip a cap. Leave a cap blank for none. A creature's token budget is set on its Mind.</string>
+    <string name="settings_spend_run_cap">Cost cap per run (USD)</string>
+    <string name="settings_spend_hourly_cap">Spend cap per hour, across runs (USD)</string>
+    <string name="settings_spend_cap_invalid">Enter a dollar amount above zero, or leave it blank.</string>
+    <string name="spend_stop_eyebrow">SPEND CAP</string>
+    <string name="spend_stop_title_run">This run reached its cost cap</string>
+    <string name="spend_stop_title_hourly">The hive reached its hourly spend cap</string>
+    <string name="spend_stop_spent">%1$s of %2$s in known cost. Every creature is parked and no session is running.</string>
+    <string name="spend_stop_how_to_lift">Raise or clear the cap in the Keeper's room, under This device, then lift the stop. If the cap is still reached, the hive stops again.</string>
+    <string name="spend_stop_stopped">STOPPED</string>
+    <string name="spend_stop_lift">Lift the stop</string>
     <string name="settings_local_planner_2">Local planner</string>
     <string name="settings_local_planner_installed_remove">Local planner installed: remove</string>
     <string name="settings_local_specialists_installed_remove">Decision model installed: remove</string>
