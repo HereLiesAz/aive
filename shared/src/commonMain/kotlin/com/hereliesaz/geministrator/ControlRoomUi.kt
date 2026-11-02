@@ -327,6 +327,38 @@ fun ControlRoom(
         onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
     )
 
+    // The creature's panel: in a sheet on a phone, docked beside the page on wide screens.
+    val creaturePanel: @Composable (String, Modifier, Boolean) -> Unit = { taskId, panelModifier, docked ->
+        AzphaltThemedSurface(Azphalt.Ink) {
+            TechnicalInspector(
+                selectedTaskId = taskId,
+                liveWorkflow = liveWorkflow,
+                onApproveTask = onApproveTask,
+                onRejectPlan = onRejectPlan,
+                onResolveEscalation = onResolveEscalation,
+                onMessageAgent = onMessageAgent,
+                onRerunFromTask = onRerunFromTask,
+                onAnswerKeeperQuestion = onAnswerKeeperQuestion,
+                tab = creatureTab,
+                onTabChange = { creatureTabName = it.name },
+                onSaveRoleCollection = onSaveRoleCollection,
+                connectedProviderIds = connectedProviderIds,
+                roleSurfaceFilePicker = roleSurfaceFilePicker,
+                // Closes the panel onto the hive's Timeline, this creature still selected there.
+                onOpenTrace = {
+                    showTimeline.value = true
+                    panelSetAside = taskId
+                },
+                onClose = if (docked) ({ onTaskSelected(taskId) }) else null,
+                modifier = panelModifier,
+            )
+        }
+    }
+    // A docked panel has no sheet to dismiss: Back closes it first.
+    PlatformBackHandler(enabled = inspectorVisible && !compact) { selectedTaskId?.let(onTaskSelected) }
+    // An objective queued in the feed bar starts once its swarm finishes, wherever the keeper is.
+    QueuedFeedLauncher(liveWorkflow, onLaunchWorkflow)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -347,6 +379,8 @@ fun ControlRoom(
                 },
                 compact = compact,
             )
+            // Wide: the creature panel docks beside the page instead of rising as a sheet.
+            Row(Modifier.weight(1f).fillMaxWidth()) {
             MainDestination(
                 destination = destination,
                 onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
@@ -421,12 +455,22 @@ fun ControlRoom(
                 showTimelineState = showTimeline,
                 runtimeState = runtimeState,
             )
+            if (inspectorVisible && !compact) selectedTaskId?.let { taskId ->
+                Box(
+                    Modifier
+                        .padding(end = hiveGutter(compact), bottom = 16.dp)
+                        .width(DockedCreaturePanelWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(19.dp)),
+                ) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
+            }
+            }
         }
 
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
-        if (inspectorVisible) {
+        if (inspectorVisible && compact) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
                     onDismissRequest = { onTaskSelected(taskId) },
@@ -434,31 +478,13 @@ fun ControlRoom(
                     contentColor = Azphalt.Ink.onOpposite(),
                     dragHandle = { BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
                 ) {
-                    AzphaltThemedSurface(Azphalt.Ink) {
-                    TechnicalInspector(
-                        selectedTaskId = taskId,
-                        liveWorkflow = liveWorkflow,
-                        onApproveTask = onApproveTask,
-                        onRejectPlan = onRejectPlan,
-                        onResolveEscalation = onResolveEscalation,
-                        onMessageAgent = onMessageAgent,
-                        onRerunFromTask = onRerunFromTask,
-                        onAnswerKeeperQuestion = onAnswerKeeperQuestion,
-                        tab = creatureTab,
-                        onTabChange = { creatureTabName = it.name },
-                        onSaveRoleCollection = onSaveRoleCollection,
-                        connectedProviderIds = connectedProviderIds,
-                        roleSurfaceFilePicker = roleSurfaceFilePicker,
-                        // Closes the panel onto the hive's Timeline, this creature still selected there.
-                        onOpenTrace = {
-                            showTimeline.value = true
-                            panelSetAside = taskId
-                        },
-                        modifier = Modifier
+                    creaturePanel(
+                        taskId,
+                        Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(if (compact) 0.72f else 0.62f),
+                            .fillMaxHeight(0.72f),
+                        false,
                     )
-                    }
                 }
             }
         }
@@ -857,6 +883,7 @@ private fun MainDestination(
                             compact = compact,
                             onSurface = onZoomOut,
                             runtimeState = runtimeState,
+                            onLoadRuns = { onLoadRunHistory().flatMap { it.second } },
                             providerReach = providerReach,
                             onConnectFreeProvider = onConnectFreeProvider,
                             launchError = launchError,

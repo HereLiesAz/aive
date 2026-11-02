@@ -329,6 +329,46 @@ class HiveScreenshotTest {
         shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
     }
 
+    /** The wide hive page (Figma desktop): title row, framed hive with its feed bar, and the docked creature panel. */
+    @Test
+    fun shootsTheWorkspace() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
+        val live = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, liveRun, roles))
+        val fresh = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { runBlocking { it.load() } }
+        fun page(selected: String?, tab: CreatureTab = CreatureTab.Needs, state: ApplicationRuntimeState = live) = @androidx.compose.runtime.Composable {
+            DurableUiState.store.putBoolean("overview.zoom.district", false)
+            DurableUiState.store.putBoolean("overview.timeline", false)
+            DurableUiState.store.putString("overview.resting-hive", "")
+            DurableUiState.store.putString("creature.panel.tab", tab.name)
+            DurableUiState.store.putString("creature.panel.task", selected.orEmpty())
+            androidx.compose.runtime.CompositionLocalProvider(LocalStableHost provides fresh) {
+                ControlRoom(
+                    destination = ControlRoomDestination.Overview,
+                    onDestinationSelected = {},
+                    selectedTaskId = selected,
+                    onTaskSelected = {},
+                    onLaunchWorkflow = { _, _, _, _ -> },
+                    onApproveTask = {},
+                    onRejectPlan = {},
+                    onResolveEscalation = { _, _ -> },
+                    onRecoverFromCorruption = {},
+                    onLoadWorkflowDefinitions = { listOf(definition) },
+                    onLoadRunHistory = { listOf(project to listOf(liveRun)) },
+                    compact = false,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(),
+                    runtimeState = state,
+                )
+            }
+        }
+        shoot("36-workspace-live", 2880, 1800) { page(null)() }
+        shoot("37-workspace-creature-needs", 2880, 1800) { page("build", CreatureTab.Needs)() }
+        shoot("38-workspace-creature-mind", 2880, 1800) { page("build", CreatureTab.Mind)() }
+        shoot("39-workspace-creature-gated", 1900, 1500) { page("review", CreatureTab.Needs)() }
+        val finished = liveRun.copy(status = WorkflowRunStatus.Completed, taskRuns = liveRun.taskRuns.mapValues { (_, r) -> r.copy(status = TaskRunStatus.Completed) })
+        shoot("40-workspace-finished", 2880, 1800) { page(null, state = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, finished, roles)))() }
+    }
+
     /** A creature's panel (docs/Keepers-Room.md, stage 3): its Needs, its Work, its Mind. */
     @Test
     fun shootsTheCreaturePanel() {

@@ -105,6 +105,8 @@ internal fun PlatformNodeTerrarium(
     onTetherDrawn: ((String, String) -> Unit)? = null,
     onTetherSliced: ((String, String) -> Unit)? = null,
     onSurface: (() -> Unit)? = null,
+    /** Zoom and focus held outside, for a controls bar that drives them; its own zoom buttons hide. */
+    camera: TerrariumCamera? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -122,6 +124,7 @@ internal fun PlatformNodeTerrarium(
         onTetherDrawn = onTetherDrawn,
         onTetherSliced = onTetherSliced,
         onSurface = onSurface,
+        camera = camera,
     )
 }
 
@@ -142,6 +145,7 @@ private fun MascotNodeTerrarium(
     onTetherDrawn: ((String, String) -> Unit)?,
     onTetherSliced: ((String, String) -> Unit)?,
     onSurface: (() -> Unit)?,
+    camera: TerrariumCamera?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -153,8 +157,10 @@ private fun MascotNodeTerrarium(
     var tetherFromId by remember { mutableStateOf<String?>(null) }
     var tetherEnd by remember { mutableStateOf(Offset.Zero) }
     var sliceTrail by remember { mutableStateOf<List<Offset>>(emptyList()) }
-    var zoomTarget by remember { mutableStateOf(1f) }
-    var focusTarget by remember { mutableStateOf(Offset(0.5f, 0.5f)) }
+    val ownCamera = remember { TerrariumCamera() }
+    val view = camera ?: ownCamera
+    var zoomTarget by view::zoom
+    var focusTarget by view::focus
 
     LaunchedEffect(subjectPositions) {
         if (draggingId == null) workingPositions = subjectPositions
@@ -716,7 +722,7 @@ private fun MascotNodeTerrarium(
             }
         }
 
-        TerrariumZoomControls(
+        if (camera == null) TerrariumZoomControls(
             zoom = zoomTarget,
             onZoomIn = { zoomTarget = (zoomTarget + 0.20f).coerceAtMost(2.4f) },
             // Zooming out from the widest view surfaces, the rim-button equivalent of pinching out.
@@ -843,7 +849,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
 }
 
 /** Clasp glows: luminous on the dark tissue. */
-private val ClaspGreen = Color(0xFF6BE04A)
+internal val ClaspGreen = Color(0xFF6BE04A)
 private val ClaspRed = Color(0xFFFF3B30)
 
 /** Up to this many creatures, every one wears its name; more, and only the tapped one does. */

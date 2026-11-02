@@ -169,6 +169,8 @@ internal fun TechnicalInspector(
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
     /** Closes the panel onto the hive's Timeline with this creature selected; null where there is none. */
     onOpenTrace: (() -> Unit)? = null,
+    /** Docked beside the hive on wide screens (HiveWorkspace.kt): its own head, card and close. Null in a sheet. */
+    onClose: (() -> Unit)? = null,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -202,24 +204,41 @@ internal fun TechnicalInspector(
         modifier = modifier
             .background(Azphalt.Ink)
             .verticalScroll(rememberScrollState())
-            .padding(18.dp),
+            .padding(if (onClose != null) 20.dp else 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        val place = planPlace(liveWorkflow.definition.tasks, taskId)
+        val providerName = taskRun.assignedProviderId?.value?.let(::providerDisplayName)
+        if (onClose != null) {
+            // Docked: which creature of how many and its job, then the creature itself on its card.
+            DockedCreatureHead(place?.position, place?.of ?: 0, task.name.ifBlank { identity }, onClose)
+            DockedCreatureCard(
+                roleLabel = identity,
+                hueSeed = "${role?.id?.value ?: task.roleId?.value ?: executor.displayName()}:${task.id.value}",
+                status = taskRun.status,
+                provider = providerName,
+                rigOverride = if (executor.isAgentWork()) null else CreatureRigMapping.PROGRAMMATIC_RIG,
+            )
+        } else {
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
         // One line under its name: its state, its provider, and its place in the plan ("3 of 5").
-        val place = planPlace(liveWorkflow.definition.tasks, taskId)
         Text(
             creatureHeaderLine(
                 state = taskRun.status.label(),
-                provider = taskRun.assignedProviderId?.value?.let(::providerDisplayName),
+                provider = providerName,
                 place = place?.let { stringResource(Res.string.inspector_plan_place, it.position, it.of) },
             ),
             style = AzphaltType.eyebrow,
             color = azphaltOnSurface(),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
+        }
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
-        CreatureTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
+        if (onClose != null) {
+            CreatureUnderlineTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
+        } else {
+            CreatureTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
+        }
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
@@ -508,6 +527,8 @@ internal fun TechnicalInspector(
                 }
             }
             CreatureTab.Mind -> {
+                // Docked, its mind opens as a plain list of what it is; the editors follow.
+                if (onClose != null) MindDefinitionList(identity, providerName, role)
                 // Programmatic roles wear the neuron and never a kept creature: they only connect.
                 role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
                     ?.let { CreaturePicker(it.id) }
@@ -705,4 +726,11 @@ private fun TaskCondition.conditionTargetOrNull(): TaskDefinitionId? = when (thi
     is TaskCondition.Always -> null
     is TaskCondition.OnAnyOutcome -> ofTask
     is TaskCondition.OnFailure -> ofTask
+}
+
+/** Whether this work is done by an agent (a creature) rather than a programmatic step (the neuron). */
+private fun TaskExecutor.isAgentWork(): Boolean = when (this) {
+    is TaskExecutor.RoleAgent -> true
+    is TaskExecutor.Distributed -> delegate.isAgentWork()
+    else -> false
 }

@@ -49,6 +49,8 @@ internal fun GeministratorWorkflowTerrarium(
     onSurface: (() -> Unit)? = null,
     /** Opens in Build instead of Live; for a hive that has never run, and for screenshots. */
     startInBuild: Boolean = false,
+    /** On wide screens, the hive in one frame: controls bar, tissue, legend and feed bar (HiveWorkspace.kt). */
+    frame: HiveFrame? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -145,13 +147,45 @@ internal fun GeministratorWorkflowTerrarium(
     // While grouping, taps gather creatures instead of selecting one.
     var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
 
+    // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
+    val camera = remember(definition.id) { TerrariumCamera() }
+    val undo = {
+        val back = tide.undo()
+        scope.launch {
+            runCatching { stageDefinition(back.present) }
+                .onSuccess { persisted -> tide = back.copy(present = persisted) }
+                .onFailure { failure -> authoringMessage = failure.message }
+        }
+        Unit
+    }
+    val redo = {
+        val forward = tide.redo()
+        scope.launch {
+            runCatching { stageDefinition(forward.present) }
+                .onSuccess { persisted -> tide = forward.copy(present = persisted) }
+                .onFailure { failure -> authoringMessage = failure.message }
+        }
+        Unit
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
-        TerrariumModeToggle(building = building, onBuildingChange = { building = it })
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (compact) 470.dp else 620.dp),
-        ) {
+        if (frame == null) {
+            TerrariumModeToggle(building = building, onBuildingChange = { building = it })
+        } else {
+            HiveControlsBar(
+                building = building,
+                onBuildingChange = { building = it },
+                status = frame.status,
+                onStatusClick = frame.onStatusClick,
+                camera = camera,
+                onSurface = onSurface,
+                canUndo = tide.canUndo,
+                canRedo = tide.canRedo,
+                onUndo = undo,
+                onRedo = redo,
+            )
+        }
+        val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
           androidx.compose.runtime.CompositionLocalProvider(LocalProgrammaticNodes provides projection.programmaticNodeIds) {
             PlatformNodeTerrarium(
@@ -195,8 +229,15 @@ internal fun GeministratorWorkflowTerrarium(
                     null
                 },
                 modifier = Modifier.fillMaxSize(),
+                camera = camera.takeIf { frame != null },
             )
           }
+        }
+        if (frame == null) {
+            Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { field() }
+        } else {
+            HiveTissueFrame(height = frame.tissueHeight, building = building) { field() }
+            frame.feedBar()
         }
 
         if (building) {
@@ -224,22 +265,8 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 onEdit = ::applyEdit,
                 roles = roles,
-                onUndo = {
-                    val back = tide.undo()
-                    scope.launch {
-                        runCatching { stageDefinition(back.present) }
-                            .onSuccess { persisted -> tide = back.copy(present = persisted) }
-                            .onFailure { failure -> authoringMessage = failure.message }
-                    }
-                },
-                onRedo = {
-                    val forward = tide.redo()
-                    scope.launch {
-                        runCatching { stageDefinition(forward.present) }
-                            .onSuccess { persisted -> tide = forward.copy(present = persisted) }
-                            .onFailure { failure -> authoringMessage = failure.message }
-                    }
-                },
+                onUndo = undo,
+                onRedo = redo,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
