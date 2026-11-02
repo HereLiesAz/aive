@@ -42,11 +42,33 @@ data class PersistedRelayLease(
     val acceptedAtEpochMillis: Long? = null,
 )
 
+/**
+ * A node enrolled with a pool: its public key, revocation and the work attributed to it. Kept apart
+ * from lease state because it must outlive every lease: a revocation that a restart forgot would let
+ * the revoked device enrol again with the pool token.
+ */
+@Serializable
+data class PersistedRelayNode(
+    val nodeId: String,
+    val displayName: String,
+    /** Base64 X.509 SubjectPublicKeyInfo, P-256. */
+    val publicKey: String,
+    val enrolledAtEpochMillis: Long,
+    val lastSeenAtEpochMillis: Long? = null,
+    val revokedAtEpochMillis: Long? = null,
+    val revokedByNodeId: String? = null,
+    val leasesCompleted: Int = 0,
+    val leasesFailed: Int = 0,
+)
+
 /** Persistence boundary for one relay deployment. Implementations must be crash-safe. */
 interface RelayStateStore {
     fun load(poolId: String): List<PersistedRelayLease>
     fun save(poolId: String, leases: List<PersistedRelayLease>)
     fun delete(poolId: String)
+
+    fun loadNodes(poolId: String): List<PersistedRelayNode> = emptyList()
+    fun saveNodes(poolId: String, nodes: List<PersistedRelayNode>) = Unit
 }
 
 object NoopRelayStateStore : RelayStateStore {
@@ -109,8 +131,36 @@ class EncryptedFileRelayStateStore(
     }
 
     override fun load(poolId: String): List<PersistedRelayLease> {
-        val path = pathFor(poolId)
-        if (!Files.exists(path)) return emptyList()
+        val plaintext = readSealed(pathFor(poolId), "pool:" + poolId) ?: return emptyList()
+        return json.decodeFromString(
+            ListSerializer(PersistedRelayLease.serializer()),
+            plaintext.toString(StandardCharsets.UTF_8),
+        )
+    }
+
+    override fun loadNodes(poolId: String): List<PersistedRelayNode> {
+        val plaintext = readSealed(nodesPathFor(poolId), "nodes:" + poolId) ?: return emptyList()
+        return json.decodeFromString(
+            ListSerializer(PersistedRelayNode.serializer()),
+            plaintext.toString(StandardCharsets.UTF_8),
+        )
+    }
+
+    override fun saveNodes(poolId: String, nodes: List<PersistedRelayNode>) {
+        if (nodes.isEmpty()) {
+            if (Files.deleteIfExists(nodesPathFor(poolId))) forceDirectoryMetadata()
+            return
+        }
+        writeSealed(
+            nodesPathFor(poolId),
+            "nodes:" + poolId,
+            json.encodeToString(ListSerializer(PersistedRelayNode.serializer()), nodes)
+                .toByteArray(StandardCharsets.UTF_8),
+        )
+    }
+
+    private fun readSealed(path: Path, associatedData: String): ByteArray? {
+        if (!Files.exists(path)) return null
         val bytes = Files.readAllBytes(path)
         require(bytes.size >= MAGIC.size + NONCE_BYTES + 16) { "Relay state file is truncated" }
         require(bytes.copyOfRange(0, MAGIC.size).contentEquals(MAGIC)) {
@@ -118,19 +168,15 @@ class EncryptedFileRelayStateStore(
         }
         val nonce = bytes.copyOfRange(MAGIC.size, MAGIC.size + NONCE_BYTES)
         val ciphertext = bytes.copyOfRange(MAGIC.size + NONCE_BYTES, bytes.size)
-        val plaintext = try {
-            cipher(Cipher.DECRYPT_MODE, nonce, poolId, key).doFinal(ciphertext)
+        return try {
+            cipher(Cipher.DECRYPT_MODE, nonce, associatedData, key).doFinal(ciphertext)
         } catch (current: javax.crypto.AEADBadTagException) {
             try {
-                cipher(Cipher.DECRYPT_MODE, nonce, poolId, legacyKey).doFinal(ciphertext)
+                cipher(Cipher.DECRYPT_MODE, nonce, associatedData, legacyKey).doFinal(ciphertext)
             } catch (_: javax.crypto.AEADBadTagException) {
                 throw current
             }
         }
-        return json.decodeFromString(
-            ListSerializer(PersistedRelayLease.serializer()),
-            plaintext.toString(StandardCharsets.UTF_8),
-        )
     }
 
     override fun save(poolId: String, leases: List<PersistedRelayLease>) {
@@ -138,20 +184,26 @@ class EncryptedFileRelayStateStore(
             delete(poolId)
             return
         }
+        writeSealed(
+            pathFor(poolId),
+            "pool:" + poolId,
+            json.encodeToString(
+                ListSerializer(PersistedRelayLease.serializer()),
+                leases,
+            ).toByteArray(StandardCharsets.UTF_8),
+        )
+    }
+
+    private fun writeSealed(target: Path, associatedData: String, plaintext: ByteArray) {
         Files.createDirectories(directory)
         val nonce = ByteArray(NONCE_BYTES).also(random::nextBytes)
-        val plaintext = json.encodeToString(
-            ListSerializer(PersistedRelayLease.serializer()),
-            leases,
-        ).toByteArray(StandardCharsets.UTF_8)
-        val ciphertext = cipher(Cipher.ENCRYPT_MODE, nonce, poolId, key).doFinal(plaintext)
+        val ciphertext = cipher(Cipher.ENCRYPT_MODE, nonce, associatedData, key).doFinal(plaintext)
         val payload = ByteBuffer.allocate(MAGIC.size + nonce.size + ciphertext.size)
             .put(MAGIC)
             .put(nonce)
             .put(ciphertext)
             .array()
 
-        val target = pathFor(poolId)
         val temp = Files.createTempFile(directory, target.fileName.toString(), ".tmp")
         try {
             Files.write(temp, payload)
@@ -184,18 +236,23 @@ class EncryptedFileRelayStateStore(
 
     fun stateFile(poolId: String): Path = pathFor(poolId)
 
-    private fun cipher(mode: Int, nonce: ByteArray, poolId: String, key: SecretKeySpec): Cipher =
+    fun nodesFile(poolId: String): Path = nodesPathFor(poolId)
+
+    private fun cipher(mode: Int, nonce: ByteArray, associatedData: String, key: SecretKeySpec): Cipher =
         Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(mode, key, GCMParameterSpec(128, nonce))
-            updateAAD(("pool:" + poolId).toByteArray(StandardCharsets.UTF_8))
+            updateAAD(associatedData.toByteArray(StandardCharsets.UTF_8))
         }
 
-    private fun pathFor(poolId: String): Path {
+    private fun pathFor(poolId: String): Path = directory.resolve(poolDigest(poolId) + ".relay")
+
+    private fun nodesPathFor(poolId: String): Path = directory.resolve(poolDigest(poolId) + ".nodes")
+
+    private fun poolDigest(poolId: String): String {
         require(poolId.isNotBlank()) { "poolId must not be blank" }
-        val digest = MessageDigest.getInstance("SHA-256")
+        return MessageDigest.getInstance("SHA-256")
             .digest(poolId.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-        return directory.resolve("$digest.relay")
     }
 
     private fun forceDirectoryMetadata() {

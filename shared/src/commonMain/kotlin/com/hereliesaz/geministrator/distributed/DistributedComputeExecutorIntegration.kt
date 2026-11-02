@@ -92,7 +92,7 @@ class DistributedComputeExecutorIntegration(
                 externalRunId = leaseId,
                 artifacts = state.artifacts,
                 progress = 1f,
-                progressMessage = state.progressMessage ?: "Remote execution completed",
+                progressMessage = attributed(state.progressMessage ?: "Remote execution completed", state.workerNodeId),
             )
 
             DistributedLeasePhase.Failed -> TaskExecutorExecution(
@@ -100,7 +100,10 @@ class DistributedComputeExecutorIntegration(
                 externalRunId = leaseId,
                 artifacts = state.artifacts,
                 progress = state.progress,
-                progressMessage = state.failureMessage ?: state.progressMessage ?: "Remote execution failed",
+                progressMessage = attributed(
+                    state.failureMessage ?: state.progressMessage ?: "Remote execution failed",
+                    state.workerNodeId,
+                ),
             )
 
             DistributedLeasePhase.Cancelled -> TaskExecutorExecution(
@@ -111,6 +114,10 @@ class DistributedComputeExecutorIntegration(
             )
         }
     }
+
+    /** Names the node that ran the lease. The relay reports it from that node's authenticated session. */
+    private fun attributed(message: String, workerNodeId: String?): String =
+        if (workerNodeId.isNullOrBlank()) message else "$message (ran on $workerNodeId)"
 
     private fun leaseId(context: TaskExecutorContext): String =
         listOf(

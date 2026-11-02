@@ -37,7 +37,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - **Repository write abuse**: An executor or integration that performs repository operations (branch, commit, PR/MR, push) is tricked into writing malicious content or granting access.
 - **Prompt injection via context**: User-controlled content (project name, objective text, imported artifacts) propagates into provider prompts and attempts to redirect agent behavior.
 - **Stale/replayed run**: An old or duplicate GitHub Actions run is incorrectly credited as current task completion, bypassing work.
-- **Rogue pool member**: Any party holding a compute pool's relay token publishes leases, claims leases, or impersonates a node.
+- **Rogue pool member**: Any party holding a compute pool's relay token enrols a node, then publishes leases, claims leases, or tries to impersonate another node.
 - **Compromised update/package source**: A tampered APK, model, or Azphalt package is offered for installation.
 
 ## Attack Surface by Integration
@@ -234,20 +234,24 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 
 ### Distributed compute relay and executor
 
-`TaskExecutor.Distributed` wraps another executor and sends it as a lease through a self-hosted relay (`computeRelay/`, protocol version 1) to a device in the same pool. Workers run only system executors (GitHub Actions, script, repository operation, and similar), using their own local integrations and credentials.
+`TaskExecutor.Distributed` wraps another executor and sends it as a lease through a self-hosted relay (`computeRelay/`, protocol version 2) to a device in the same pool. Workers run only system executors (GitHub Actions, script, repository operation, and similar), using their own local integrations and credentials.
 
 **Threats**
-- Anyone holding the pool's shared bearer token can join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
+- Anyone holding the pool's shared token can enrol a new node, join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
 - A rogue member can publish leases that try to make sharing devices run repository operations or dispatch GitHub Actions with those devices' credentials.
-- A rogue member can register a node ID that is not currently connected and so act as that node (receive its replayed leases, cancel its leases).
+- A rogue member can try to act as another node (receive its replayed leases, cancel its leases, take credit for work).
+- Any enrolled member can revoke other members.
 - A worker can return fabricated results.
 - The relay can be reached over plain `ws://`.
 
 **Mitigations in place**
 - Distributed compute has no default relay and is off until configured. Accepting new work also requires `sharingEnabled`, and can additionally require an unmetered network and external power. Android re-evaluates and republishes those conditions when network/power state changes, and its worker checks each offer against the same live descriptor.
 - A node advertises only the executor kinds its credentials support. The relay offers leases only to nodes that satisfy the lease's requirements. The worker re-checks those requirements and a per-node parallel-lease cap.
-- The relay requires `Authorization: Bearer <token>`, compared in constant time. It rejects mismatched protocol versions and caps frames at 8 MiB.
-- A node ID held by a live connection cannot be registered again until that connection closes.
+- Per-node identity. The shared token (`Authorization: Bearer`, compared in constant time) only enrols a node's P-256 public key, with proof of possession. Every session opens with a request signed by that key: node ID, timestamp within 5 minutes, and a nonce the relay refuses to see twice. The session is bound to the signing node, and `register` must name it. Keys are generated in the Android Keystore (not exportable) or kept in the desktop OS credential store.
+- An enrolled node ID cannot be taken over with another key, and a node ID held by a live connection cannot be registered again until that connection closes.
+- Any enrolled node can revoke another from the Keeper's room. Revocation closes its session, cancels the leases it published, requeues the leases it held, and refuses its key and node ID from then on.
+- Lease attribution comes from the authenticated session: progress, completion and the per-node work counts name the node that really ran the lease.
+- The relay rejects mismatched protocol versions and caps frames at 8 MiB and enrolment bodies at 64 KiB.
 - Lease duration (10 minutes), unfinished leases per origin (64) and leases per pool (512) are capped, and an unfinished lease is dropped 24 hours after the relay accepted it.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued. Workers continuously watch relay ownership while executing; cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine rather than allowing stale work to continue.
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
@@ -256,7 +260,9 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - Origin disconnect does not destroy accepted work. The relay retains unfinished leases until they complete, are cancelled or reach the 24-hour cap; terminal results have a 24-hour replay window. When `AIVE_RELAY_STATE_DIR` is configured, those lease records survive relay-process restarts in AES-256-GCM-encrypted files keyed from the relay bearer secret. Expired terminal records are removed when an active/persisted pool is swept or loaded; an untouched encrypted pool snapshot can remain until it is accessed or explicitly removed by the operator.
 
 **Remaining gaps**
-- There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state.
+- There is still a single shared enrolment token per relay. Any holder can enrol a new node and join; revocation stops a key and node ID, not the token, so a revoked device that may still know the token has to be shut out by rotating it. Any enrolled node can revoke others (a rogue member can disrupt, and honest members can revoke it back). Without `AIVE_RELAY_STATE_DIR`, enrolments and revocations are lost when the relay restarts. Desktop keys fall back to plaintext preferences when no OS credential store works. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state (an unreadable node record starts the pool with no enrolments; nodes enrol again under the new token).
+- Signed requests authenticate the session, not each frame; frames inside the session rely on the transport (see `wss://` below).
+- The Play build hides distributed compute as a store-policy choice; it is not a mitigation and per-node identity does not change it.
 - Envelopes are not end-to-end encrypted in transit through the relay, so the relay operator sees them while processing. Optional process-restart persistence encrypts lease files at rest with AES-256-GCM and opaque pool filenames, but the relay process itself necessarily holds plaintext while routing work.
 - A pool member can forge a run that claims its approval gate completed. Without signed approvals the worker cannot verify that, so remote workers run only read-only repository operations (`status`, `fetch`); a mutation placed on another device fails there and has to run on the origin device.
 - Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
@@ -391,7 +397,7 @@ The following invariants must hold regardless of the integration used:
 - Cryptographic signing of exported run bundles.
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Per-session provider response content hashing to detect replay.
-- Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and signed approvals so workers can verify gates rather than trust the submitted run.
+- Distributed compute: end-to-end envelope encryption, enforced `wss://`, signed approvals so workers can verify gates rather than trust the submitted run, and an enrolment step that the shared token alone cannot pass (for example, approval of new nodes by an enrolled one).
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.
 - Deciding plan approvals and failure escalations inside nested child runs from the parent node.
 - Web credential protection against same-origin script (for example, a passphrase-derived key).

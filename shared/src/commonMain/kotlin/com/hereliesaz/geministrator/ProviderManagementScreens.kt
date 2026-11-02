@@ -129,6 +129,17 @@ import com.hereliesaz.geministrator.resources.settings_ok
 import com.hereliesaz.geministrator.resources.settings_online
 import com.hereliesaz.geministrator.resources.settings_online_2
 import com.hereliesaz.geministrator.resources.settings_online_compute_nodes
+import com.hereliesaz.geministrator.resources.settings_compute_node_active
+import com.hereliesaz.geministrator.resources.settings_compute_node_jobs
+import com.hereliesaz.geministrator.resources.settings_compute_node_key
+import com.hereliesaz.geministrator.resources.settings_compute_node_revoke
+import com.hereliesaz.geministrator.resources.settings_compute_node_revoke_body
+import com.hereliesaz.geministrator.resources.settings_compute_node_revoke_title
+import com.hereliesaz.geministrator.resources.settings_compute_node_revoked
+import com.hereliesaz.geministrator.resources.settings_compute_node_this_device
+import com.hereliesaz.geministrator.resources.settings_compute_this_device_revoked
+import com.hereliesaz.geministrator.resources.settings_enrolled_compute_nodes
+import com.hereliesaz.geministrator.resources.settings_enrolled_compute_nodes_lead
 import com.hereliesaz.geministrator.resources.settings_paste_exported_json
 import com.hereliesaz.geministrator.resources.settings_permanently_removes_all_projects_runs_events
 import com.hereliesaz.geministrator.resources.settings_plans_workflows_on_this_computer_instead
@@ -435,6 +446,7 @@ internal fun ProviderSettingsScreen(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    onRevokeComputeNode: (String) -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
@@ -454,6 +466,7 @@ internal fun ProviderSettingsScreen(
     var importMode by rememberDurableBooleanState("settings.import-json.open")
     var clearConfirm by remember { mutableStateOf(false) }
     var disconnectProviderId by remember { mutableStateOf<String?>(null) }
+    var revokeComputeNodeId by remember { mutableStateOf<String?>(null) }
     var resetPairingConfirm by remember { mutableStateOf(false) }
     var relayAdvancedOpen by remember { mutableStateOf(false) }
     var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
@@ -1017,6 +1030,58 @@ internal fun ProviderSettingsScreen(
                     endCap = if (node.acceptsWork) stringResource(Res.string.settings_available) else stringResource(Res.string.settings_observe_only),
                 )
             }
+        }
+        if (distributedComputeState.revoked) {
+            Text(
+                stringResource(Res.string.settings_compute_this_device_revoked),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+                modifier = Modifier.azphaltLiveRegion(),
+            )
+        }
+        if (distributedComputeState.enrolledNodes.isNotEmpty()) {
+            Text(stringResource(Res.string.settings_enrolled_compute_nodes), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+            Text(stringResource(Res.string.settings_enrolled_compute_nodes_lead), style = AzphaltType.body, color = azphaltOnSurface())
+            distributedComputeState.enrolledNodes
+                .sortedWith(compareBy({ it.revoked }, { it.displayName }))
+                .forEach { enrolled ->
+                    val isThisDevice = enrolled.nodeId == computeConfiguration.nodeId
+                    AzphaltRecord(
+                        seed = "compute-enrolled-" + enrolled.nodeId,
+                        eyebrow = if (isThisDevice) stringResource(Res.string.settings_compute_node_this_device) else enrolled.nodeId,
+                        title = enrolled.displayName,
+                        body = stringResource(Res.string.settings_compute_node_key, enrolled.publicKeyFingerprint) + "\n" +
+                            stringResource(Res.string.settings_compute_node_jobs, enrolled.leasesCompleted, enrolled.leasesFailed),
+                        endCap = if (enrolled.revoked) {
+                            stringResource(Res.string.settings_compute_node_revoked)
+                        } else {
+                            stringResource(Res.string.settings_compute_node_active)
+                        },
+                    )
+                    // Revocation goes through this device's live, authenticated session.
+                    if (!enrolled.revoked && !isThisDevice && distributedComputeState.connected) {
+                        AzphaltPill(
+                            stringResource(Res.string.settings_compute_node_revoke),
+                            "compute-revoke-" + enrolled.nodeId,
+                            onClick = { revokeComputeNodeId = enrolled.nodeId },
+                            tone = PillTone.Danger,
+                        )
+                    }
+                }
+        }
+        revokeComputeNodeId?.let { id ->
+            val name = distributedComputeState.enrolledNodes.firstOrNull { it.nodeId == id }?.displayName ?: id
+            AzphaltAlertDialog(
+                title = stringResource(Res.string.settings_compute_node_revoke_title, name),
+                text = stringResource(Res.string.settings_compute_node_revoke_body),
+                confirmLabel = stringResource(Res.string.settings_compute_node_revoke),
+                onConfirm = {
+                    revokeComputeNodeId = null
+                    onRevokeComputeNode(id)
+                },
+                onDismissRequest = { revokeComputeNodeId = null },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
+            )
         }
 
       }

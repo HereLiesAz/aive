@@ -15,7 +15,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val DISTRIBUTED_COMPUTE_PROTOCOL_VERSION: Int = 1
+/** 2: sessions authenticate with a per-node signature; the pool token only enrols ([ComputeNodeAuth]). */
+const val DISTRIBUTED_COMPUTE_PROTOCOL_VERSION: Int = 2
 
 @Serializable
 data class ComputeNodeDescriptor(
@@ -193,6 +194,16 @@ sealed interface ComputeRelayClientMessage {
     @Serializable
     @SerialName("node_heartbeat")
     data object NodeHeartbeat : ComputeRelayClientMessage
+
+    /** Asks for the pool's enrolled nodes; answered with [ComputeRelayServerMessage.EnrolledNodes]. */
+    @Serializable
+    @SerialName("list_enrolled_nodes")
+    data object ListEnrolledNodes : ComputeRelayClientMessage
+
+    /** Revokes another node's identity: its key stops working and its node ID cannot enrol again. */
+    @Serializable
+    @SerialName("revoke_node")
+    data class RevokeNode(val nodeId: String) : ComputeRelayClientMessage
 }
 
 @Serializable
@@ -262,6 +273,11 @@ sealed interface ComputeRelayServerMessage {
         val leaseId: String,
         val reason: String? = null,
     ) : ComputeRelayServerMessage
+
+    /** The pool's enrolled nodes, revoked ones included; sent on register and whenever they change. */
+    @Serializable
+    @SerialName("enrolled_nodes")
+    data class EnrolledNodes(val nodes: List<EnrolledComputeNode>) : ComputeRelayServerMessage
 
     @Serializable
     @SerialName("error")

@@ -351,13 +351,20 @@ class MainActivity : ComponentActivity() {
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
-                    if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
+                    // The node's signing key lives in the Android Keystore; without it there is no session.
+                    val signer = if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
+                        runCatching { AndroidComputeNodeSigner.loadOrCreate() }.getOrNull()
+                    } else {
+                        null
+                    }
+                    if (signer != null && token != null) {
                         AndroidDistributedComputeSession(
                             context = this,
                             configuration = computeConfiguration,
                             token = token,
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = androidDistributedExecutorKinds(repositoryCredentials),
+                            signer = signer,
                         )
                     } else {
                         null
@@ -368,6 +375,10 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor>())
                 }
                 var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                var computeEnrolledNodes by remember(computeSession) {
+                    mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.EnrolledComputeNode>())
+                }
+                var computeRevoked by remember(computeSession) { mutableStateOf(false) }
                 DisposableEffect(computeSession) {
                     computeSession?.start()
                     onDispose { computeSession?.close() }
@@ -389,6 +400,12 @@ class MainActivity : ComponentActivity() {
                         session.client.errors.collectLatest { error ->
                             computeError = error.message
                         }
+                    }
+                    launch {
+                        session.client.enrolledNodes.collectLatest { computeEnrolledNodes = it }
+                    }
+                    launch {
+                        session.client.revoked.collectLatest { computeRevoked = it }
                     }
                 }
                 val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
@@ -537,7 +554,17 @@ class MainActivity : ComponentActivity() {
                             connected = computeConnected,
                             onlineNodes = computeOnlineNodes,
                             lastError = computeError,
+                            enrolledNodes = computeEnrolledNodes,
+                            revoked = computeRevoked,
                         ),
+                        onRevokeComputeNode = { nodeId ->
+                            computeSession?.let { session ->
+                                uiScope.launch {
+                                    runCatching { session.client.revokeNode(nodeId) }
+                                        .onFailure { computeError = it.message }
+                                }
+                            }
+                        },
                         onSaveDistributedCompute = { configuration, token ->
                             computeConfigurationStore.write(configuration)
                             computeConfiguration = configuration

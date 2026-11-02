@@ -733,6 +733,17 @@
     <string name="settings_online"> online</string>
     <string name="settings_online_2">Online</string>
     <string name="settings_online_compute_nodes">ONLINE COMPUTE NODES</string>
+    <string name="settings_enrolled_compute_nodes">ENROLLED DEVICES</string>
+    <string name="settings_enrolled_compute_nodes_lead">Each device uses the relay token once, to enrol its own key, and signs in with that key from then on. Revoking a device stops its key and its device ID for good. If it could still know the relay token, change the token on the relay as well.</string>
+    <string name="settings_compute_node_this_device">This device</string>
+    <string name="settings_compute_node_active">Active</string>
+    <string name="settings_compute_node_revoked">Revoked</string>
+    <string name="settings_compute_node_key">Key %1$s</string>
+    <string name="settings_compute_node_jobs">Ran %1$d jobs, %2$d failed</string>
+    <string name="settings_compute_node_revoke">Revoke</string>
+    <string name="settings_compute_node_revoke_title">Revoke %1$s?</string>
+    <string name="settings_compute_node_revoke_body">Its key stops working at once. Work it is running goes back to the queue and work it sent out is cancelled. It cannot rejoin the pool under the same device ID.</string>
+    <string name="settings_compute_this_device_revoked">Another device in the pool revoked this one. To rejoin, give it a new device ID.</string>
     <string name="settings_paste_exported_json">Paste exported JSON</string>
     <string name="settings_permanently_removes_all_projects_runs_events">Permanently removes all projects, runs, events, and artifacts from this device. Provider credentials are managed separately.</string>
     <string name="settings_plans_workflows_on_this_computer_instead">Plans workflows on this computer instead of the linked LLM. Needs a </string>
