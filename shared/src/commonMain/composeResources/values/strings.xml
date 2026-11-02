@@ -261,6 +261,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_github_actions">GitHub Actions</string>
     <string name="inspector_inline_evidence">inline evidence</string>
     <string name="inspector_inputs">INPUTS</string>
+    <string name="inspector_fed_by">FED BY</string>
+    <string name="inspector_feeds">FEEDS</string>
+    <string name="inspector_took_its_output">took its output</string>
+    <string name="inspector_not_taken_yet">has not taken it yet</string>
     <string name="inspector_input_objective">Objective</string>
     <string name="inspector_external_inputs">EXTERNAL INPUTS</string>
     <string name="inspector_hint_external_inputs">This task can change things, and some of what it reads came from outside your control: %1$s. Approve only if you trust that content to steer it.</string>
@@ -277,8 +281,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_message_agent">Message agent</string>
     <string name="inspector_no_run_is_loaded">No run is loaded.</string>
     <string name="inspector_now">NOW</string>
+    <string name="inspector_open_trace">Open its trace</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
     <string name="inspector_plan">PLAN</string>
+    <string name="inspector_plan_place">%1$s of %2$s</string>
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
     <string name="inspector_provider">PROVIDER</string>
