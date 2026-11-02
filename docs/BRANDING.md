@@ -64,8 +64,9 @@ calm, so colour on them always says something (`AzphaltUi.kt`):
 ## Ground and the shell header
 
 The page colour (the "ground": Mustard, Maroon, Navy, Cerulean, Teal, Pink) is chosen in
-**Keeper's room > Appearance > Ground**, on every platform. It is persisted on the device and cycles to
-the next ground on each press. The header and sidebar carry no ground control.
+**Keeper's room > Appearance > Ground**, on every platform, from six swatches: one radio group, each
+swatch filled with its ground and named under it, the current one ringed. It is persisted on the
+device. The header and sidebar carry no ground control.
 
 In its place the header (compact layout) and the top of the sidebar (wide layout) carry the inbox
 button. At zero unread it is only the inbox glyph on the page, drawn in the page's opposite colour.

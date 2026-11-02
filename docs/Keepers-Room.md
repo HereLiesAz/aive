@@ -11,7 +11,7 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | spend caps, remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
-| | **Appearance** | the ground | Settings › Appearance |
+| | **Appearance** | the ground, chosen from six swatches; Reduce motion; Always show creature labels | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
@@ -38,6 +38,12 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 **MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`).
 **MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`). On desktop, **Script sandbox** (off by default) lets agents call these tools from one short sandboxed script and receive only its result; the approvals still apply.
 
+## Appearance
+
+**Ground** is one radio group of six swatches, the current one ringed (`docs/BRANDING.md`, Ground and the shell header). **Reduce motion** (off by default, stored on this device as `aive.appearance.reduce-motion.v1`) holds the creatures and other looping movement still. It is OR-ed with the platform's own signal (Android's animator scale at 0, the browser's `prefers-reduced-motion`, or `AIVE_REDUCE_MOTION` on desktop), so it can turn motion off but never back on against the system; when the device already asks for less motion, the part says so.
+
+**Creature labels** (off by default, stored on this device as `aive.appearance.always-show-creature-labels.v1`): a hive of more than 12 creatures normally shows only the selected creature's label so packed cells stay readable; turned on, every creature keeps its label however full the hive is (`docs/Node-Creatures.md`).
+
 ## Navigation
 
 There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):
@@ -50,10 +56,10 @@ Once there is a hive, resting or live, one row holds its places: its Swarm, the 
 
 ## A creature's panel
 
-Selecting a creature opens its panel, in three tabs (`TechnicalInspector`, `CreatureTab`); the breadcrumb ends on the open one (Hive › a hive › a creature › Mind):
+Selecting a creature opens its panel, in three tabs (`TechnicalInspector`, `CreatureTab`); the breadcrumb ends on the open one (Hive › a hive › a creature › Mind). Under its name, one line gives its state, its provider (when it has one) and its place in the plan, such as "Running · Claude · 3 of 5" (`creatureHeaderLine`, `planPlace`):
 
 - **Needs:** its needs, and what it waits on you for: a plan or task to approve, an escalation, a nested gate, a spent token budget (with **Raise its budget**, which opens its Mind), a question its agent asked you (drawn from the host catalog, `Agent-UI.md`), and messages to its agent. This was the Inbox.
-- **Work:** what it's doing, live: its thinking and tool/progress steps for its current provider session, newest last, the latest six shown and older ones collapsed behind **Show N earlier lines**; then the field for messages to its agent, apart from that activity; then its state, executor and provider, progress, what it was sent, and its artifacts, each opening on its contents. This was Artifacts. Once its run has completed, failed or been cancelled, **Run again from here** (`RerunFromTaskPanel`) starts a new run in the same lineage where this creature and everything after it work again and the work before it keeps its results; the finished run stays as it was. It asks what the creature should work on, prefilled with its objective, to change it first. When the creature made text and something follows it, **Change what it made** instead keeps the creature's place with the keeper's text as its work and runs only what follows. See `docs/architecture/ARCHITECTURE.md`, Running again from a task.
+- **Work:** what it's doing, live: its thinking and tool/progress steps for its current provider session, newest last, the latest six shown and older ones collapsed behind **Show N earlier lines**; **Open its trace**, which closes the panel onto the hive's Timeline with this creature still selected (tapping it there, or on the hive, opens its panel again); then the field for messages to its agent, apart from that activity; then its state, executor and provider, progress, what it was sent, its Connections (**Fed by**, the creatures it reads from; **Feeds**, the creatures that read from it, each marked whether it took its output, the same reading as Output used; `creatureConnections`), and its artifacts, each opening on its contents. This was Artifacts. Once its run has completed, failed or been cancelled, **Run again from here** (`RerunFromTaskPanel`) starts a new run in the same lineage where this creature and everything after it work again and the work before it keeps its results; the finished run stays as it was. It asks what the creature should work on, prefilled with its objective, to change it first. When the creature made text and something follows it, **Change what it made** instead keeps the creature's place with the keeper's text as its work and runs only what follows. See `docs/architecture/ARCHITECTURE.md`, Running again from a task.
 - **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles. Above the form sit any **proposed changes to its instructions**, drafted from its past work (recurring failures, failures then a fix, your repeated corrections): the current and proposed text with why, and **Approve and apply** or **Dismiss**. Nothing changes until you approve; the Mind tab shows how many wait (`RoleInstructionProposalPanel`, [Procedural memory §10](architecture/PROCEDURAL_MEMORY.md)).
 - **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles.
 
@@ -101,6 +107,8 @@ A live hive's **Timeline** pill swaps the hive for its run's timeline, in two vi
 
 - **Waterfall** (the default): one row per creature, one bar per attempt, on a shared time axis, so work running in parallel overlaps. Each bar is coloured by phase: Planning, Waiting on you (drawn as a thin pause line: a gate), Running, Verifying, Retrying. A white tick ends a finished attempt, a red one a failed attempt; a bar still going runs to now. Hovering or tapping a bar shows its phases and usage (tokens, cost); tapping also selects its creature. Each bar is one labelled button for screen readers. The bars unroll once on arrival and, while the run lives, grow once a second; with reduced motion they do neither and move only when new events arrive.
 - **Events:** the run's events in order.
+
+A creature's Work reaches it too: **Open its trace** turns the Timeline on and closes the panel, leaving that creature selected on it.
 
 The waterfall is a pure function of the run's event journal (`runWaterfall` in `RunWaterfall.kt`, tested in `RunWaterfallTest`):
 

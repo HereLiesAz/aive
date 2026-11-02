@@ -53,7 +53,8 @@ private val REVIEWER_KINDS = setOf(
     NodeCreatureRoleKind.ComplianceOfficer,
 )
 
-private val TAKEN_UP = setOf(
+/** A downstream creature in one of these has taken its upstream's output. */
+internal val TAKEN_UP = setOf(
     TaskRunStatus.Planning,
     TaskRunStatus.AwaitingApproval,
     TaskRunStatus.Running,
