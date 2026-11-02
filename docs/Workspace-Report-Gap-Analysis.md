@@ -20,10 +20,11 @@ Paths are repo-relative. `S/` stands for `shared/src/commonMain/kotlin/com/herel
 
 | Recommendation | Status | Evidence | Note |
 |---|---|---|---|
-| MCP host: agents call tools from MCP servers | Missing | Only `S/duplex/DuplexMcpPeer.kt`, a peer message bus over MCP `tools/call` (`docs/architecture/DUPLEX_MCP.md`). `AzphaltStoreService` refuses `mcp` blocks in `llm` packages. | Tools reach agents only through provider-side agents (OpenCode, workspace agents). |
+| Full-duplex agent-to-agent channel | Done (opt-in) | `S/duplex/DuplexMcpPeer.kt` (equal peer `/mcp/a` or `/mcp/b` on an MCPServed Duplex broker over authenticated Streamable HTTP: `duplex_send`, `duplex_receive`, `duplex_ack`, `duplex_status`, SSE notifications), `DuplexAgentBus.kt`, `DuplexManagedSessionBridge.kt` and `DuplexTaskSessionAttachment.kt` bind it to one running task (`docs/architecture/DUPLEX_MCP.md`) | The Aive is a peer, not the broker (MCPServed is). No default pairing; a live Aive ↔ MCPServed acceptance test is still open. |
+| MCP host: agents call tools from MCP servers | Missing | The duplex peer above carries messages between agents, not tool calls. `AzphaltStoreService` refuses `mcp` blocks in `llm` packages. | Tools reach agents only through provider-side agents (OpenCode, workspace agents). |
 | MCP 2026-07-28 stateless `_meta`, Elicitation, Tasks | Missing | — | Depends on an MCP host. Approval gates and persisted `externalRunId`s already cover the same needs internally. Spec details not verified. |
 | Code execution with MCP in a WASM sandbox | Missing | JS role scripts run in AndroidX JavaScriptEngine (`androidApp/.../AndroidJavaScriptExecutorIntegration.kt`, `docs/architecture/ROLE_EXECUTION_SOURCES.md`) | Pointless without an MCP host. The Aive does not use azphalt `runtime-wasm`. |
-| A2A v1.0 Agent Cards for roles and workflows | Missing | External entry points are the signature-gated `AiveRemoteService` and the relay (`docs/Remote-API.md`) | IDEaz is the only client, so the payoff is low. |
+| A2A v1.0 (Google's Agent2Agent: Agent Cards, its task/message wire format) | Missing | Agent-to-agent messaging exists as the duplex channel above, in its own MCPServed wire contract; external entry points are the signature-gated `AiveRemoteService` and the relay (`docs/Remote-API.md`) | Speaking A2A would mean publishing Agent Cards and mapping duplex frames to A2A tasks; worth it only for agents outside this ecosystem. |
 | Align azphalt manifests with UHP | Doesn't fit | — | Unverifiable spec. Azphalt conformance already lives in `S/azphalt/AzphaltRoleConformance.kt` and `AzphaltWorkflowConformance.kt`. |
 | MHS hardware abstraction | Doesn't fit | — | No hardware in scope. Unverifiable spec. |
 
