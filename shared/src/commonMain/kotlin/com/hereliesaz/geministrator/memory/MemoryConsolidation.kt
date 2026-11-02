@@ -288,11 +288,18 @@ class MemoryConsolidator(
 
             // Tag keywords are the engine's, not the clerk's: every new noun/verb tag gets its WordNet
             // trigger keywords once, here, whichever clerk engine named it.
-            val batch = if (entry.stage == MemoryConsolidationStage.Tags) {
+            val keyworded = if (entry.stage == MemoryConsolidationStage.Tags) {
                 val wordNet = runCatching { MemoryLanguageResources.get().wordNet }.getOrNull()
                 validated.copy(nodesToAdd = MemoryTagKeywords.withKeywords(validated.nodesToAdd, wordNet))
             } else {
                 validated
+            }
+            // Valid time is the engine's too: an extracted memory became true when its source says it
+            // happened, if the source carries a time. A condensed version's is set when it is fitted.
+            val batch = if (entry.stage == MemoryConsolidationStage.Condensation) {
+                keyworded
+            } else {
+                keyworded.copy(nodesToAdd = MemoryValidTime.stampExtracted(snapshot, keyworded.nodesToAdd))
             }
 
             while (true) {
@@ -708,7 +715,12 @@ class MemoryConsolidator(
         val generalized = batch.nodesToAdd.singleOrNull() ?: return batch
         val sources = plan.packet.items.map { MemoryNodeId(it.id) }
         val fitted = MemoryRewrite.fit(snapshot, generalized.text, sources)
-        val version = generalized.copy(text = fitted.text, metadata = generalized.metadata + MemoryRewrite.versionMetadata(snapshot, sources))
+        val version = generalized.copy(
+            text = fitted.text,
+            metadata = generalized.metadata + MemoryRewrite.versionMetadata(snapshot, sources),
+            // It restates its sources, so it holds once all of them do; they stop at that time.
+            validFromEpochMillis = MemoryValidTime.versionValidFrom(snapshot, sources) ?: generalized.validFromEpochMillis,
+        )
         val spill = MemoryRewrite.spillFor(version, fitted.dropped)
         return batch.copy(
             nodesToAdd = listOfNotNull(version, spill?.first),
@@ -722,7 +734,8 @@ class MemoryConsolidator(
      * - `Supersedes` from the generalized memory to every source: consolidation rewrites. The members
      *   are the same memory (similar, never contrasting: a contrasting cluster is never offered), so the
      *   generalized memory is the new current version and the sources become history, kept and
-     *   reachable through `CondensedFrom`, faded from default recall.
+     *   reachable through `CondensedFrom`, faded from default recall. Each edge records when its source
+     *   stopped being valid ([MEMORY_VALID_UNTIL]): the version's valid-from.
      * - The sources' divergence markers and variant attestations, carried over to the generalized
      *   memory (its sources agree, so it states what they state), so recalling it still brings the
      *   contrasting partners.
@@ -736,6 +749,7 @@ class MemoryConsolidator(
         if (stage != MemoryConsolidationStage.Condensation) return emptyList()
         val generalized = batch.nodesToAdd.singleOrNull() ?: return emptyList()
         val sourceIds = plan.packet.items.mapTo(hashSetOf()) { MemoryNodeId(it.id) }
+        val validUntil = MemoryValidTime.versionValidFrom(snapshot, sourceIds) ?: generalized.validFromEpochMillis
         val existing = snapshot.edges.mapTo(hashSetOf()) { it.id }
         val inherited = linkedMapOf<MemoryEdgeId, MemoryEdge>()
         snapshot.edges.forEach { edge ->
@@ -778,7 +792,7 @@ class MemoryConsolidator(
                     to = MemoryNodeId(item.id),
                     relation = MemoryRelationKind.Supersedes,
                     createdAtEpochMillis = generalized.createdAtEpochMillis,
-                    metadata = mapOf("basis" to "condensation"),
+                    metadata = mapOf("basis" to "condensation", MEMORY_VALID_UNTIL to validUntil.toString()),
                 )
             }
     }
@@ -907,6 +921,7 @@ private fun MemorySessionEnvelope.toEpisode(
         userPrompt = userPrompt,
         chunks = chunks,
         createdAtEpochMillis = closedAtEpochMillis,
+        occurredAtEpochMillis = occurredAtEpochMillis,
     )
 }
 
@@ -936,6 +951,7 @@ private fun MemoryBankRequest.toEpisode(
         userPrompt = text,
         chunks = chunks,
         createdAtEpochMillis = bankedAtEpochMillis,
+        occurredAtEpochMillis = occurredAtEpochMillis,
     )
 }
 

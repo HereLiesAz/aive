@@ -82,8 +82,11 @@ class GraphMemoryTool(
     /** The embedding space [vectors] belong to; when the embedder's space changes they are dropped. */
     private var vectorSpace: String? = null
 
-    private suspend fun index(): MemoryRecallIndex {
+    private suspend fun index(validAtEpochMillis: Long? = null): MemoryRecallIndex {
         val snapshot = store.read()
+        // As of a time: memories valid then, superseded ones included. Built per call and lexical only
+        // (the vector cache follows current memories).
+        if (validAtEpochMillis != null) return MemoryRecallIndex(snapshot, validAtEpochMillis)
         cachedIndex?.takeIf { it.snapshot === snapshot }?.let { return it }
         return MemoryRecallIndex(snapshot).also { index ->
             index.semantic = embedder?.let { semanticIndex(it, index.active) }
@@ -192,7 +195,7 @@ class GraphMemoryTool(
     }
 
     override suspend fun grip(query: MemoryQuery): MemoryRecallBundle {
-        val index = index()
+        val index = index(query.validAtEpochMillis)
         val active = index.activeNodes(query)
         if (active.isEmpty()) return MemoryRecallBundle(query, emptyList())
 
@@ -263,7 +266,7 @@ class GraphMemoryTool(
 
     override suspend fun grip(query: MemoryTagQuery): MemoryRecallBundle {
         val normalizedQuery = query.asMemoryQuery()
-        val index = index()
+        val index = index(normalizedQuery.validAtEpochMillis)
         val active = index.activeNodes(normalizedQuery)
         if (active.isEmpty()) return MemoryRecallBundle(normalizedQuery, emptyList())
 
@@ -315,6 +318,7 @@ class GraphMemoryTool(
                         score = path.score,
                         conflicts = if (includeConflicts) index.conflictsFor(id) else emptyList(),
                         deliberations = if (includeConflicts) index.deliberationsFor(id) else emptyList(),
+                        validUntilEpochMillis = index.validUntil[id],
                     )
                 }
             }
@@ -336,7 +340,11 @@ private val semanticCueKinds = setOf(
  * Everything GRIP derives from one snapshot: lookups, the superseded set, traversal adjacency, and
  * each node's lexical terms. Node text is immutable, so none of it changes until the next commit.
  */
-private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
+private class MemoryRecallIndex(
+    val snapshot: MemorySnapshot,
+    /** As of this time ([MemoryQuery.validAtEpochMillis]); null for current memories. */
+    validAtEpochMillis: Long? = null,
+) {
     /** Similarity search over [active], when the tool has an embedder. */
     var semantic: VectorIndex? = null
     val nodesById: Map<MemoryNodeId, MemoryNode> = snapshot.nodes.associateBy(MemoryNode::id)
@@ -344,8 +352,18 @@ private class MemoryRecallIndex(val snapshot: MemorySnapshot) {
     private val superseded: Set<MemoryNodeId> = snapshot.edges
         .filter { it.relation == MemoryRelationKind.Supersedes }
         .mapTo(hashSetOf()) { it.to }
-    /** Recallable memories: clerk-made and not superseded. Register and deliberation records surface only with a divergence unit. */
-    val active: List<MemoryNode> = snapshot.nodes.filter { it.kind.isClerkMemory && it.id !in superseded }
+    /**
+     * Recallable memories: clerk-made and not superseded, or, as of a time, clerk-made and valid then
+     * ([MemoryValidTime.validAt]). Register and deliberation records surface only with a divergence unit.
+     */
+    val active: List<MemoryNode> = if (validAtEpochMillis == null) {
+        snapshot.nodes.filter { it.kind.isClerkMemory && it.id !in superseded }
+    } else {
+        MemoryValidTime.validAt(snapshot, validAtEpochMillis).filter { it.kind.isClerkMemory }
+    }
+
+    /** When each superseded memory stopped being valid ([MemoryValidTime]). */
+    val validUntil: Map<MemoryNodeId, Long> by lazy { MemoryValidTime.validUntilByNode(snapshot) }
     val activeIds: Set<MemoryNodeId> = active.mapTo(hashSetOf(), MemoryNode::id)
     val graph: MemoryRecallGraph by lazy { snapshot.recallGraph() }
     val bm25: MemoryBm25Index by lazy { MemoryBm25Index(active) }
@@ -523,6 +541,7 @@ private fun MemoryRecallIndex.recallFromSeeds(
                 conflicts = if (query.includeConflicts) conflictsFor(node.id) else emptyList(),
                 deliberations = if (query.includeConflicts) deliberationsFor(node.id) else emptyList(),
                 resolution = resolutionFor(node),
+                validUntilEpochMillis = validUntil[node.id],
             )
         }
 
@@ -624,6 +643,7 @@ private fun MemoryTagQuery.asMemoryQuery(): MemoryQuery = MemoryQuery(
     taskRunId = scope.taskRunId,
     taskDefinitionId = scope.taskDefinitionId,
     roleId = scope.roleId,
+    validAtEpochMillis = validAtEpochMillis,
 )
 
 private fun MemoryResolution.nodeKinds(): Set<MemoryNodeKind> = when (this) {

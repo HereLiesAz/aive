@@ -70,6 +70,9 @@ internal object MemoryDeliberationAbsorber {
                 DELIBERATION_CHOSEN to chosen.id.value,
                 NOT_CHOSEN to notChosen.joinToString(",") { it.id.value },
             ) + MemoryRewrite.versionMetadata(snapshot, predecessors),
+            // It restates the chosen memory, valid since that memory was. The deliberation judges which
+            // is right, not when anything stopped holding, so its Supersedes edges end no valid time.
+            validFromEpochMillis = chosen.validFromEpochMillis,
         )
         val edges = buildList {
             listOf(chosen.id, deliberation.id).forEach { source ->

@@ -74,8 +74,8 @@ class AgentMemoryLayer private constructor(
      * Returns the active derived temporal index. Building it is deterministic and non-destructive;
      * no model call or persistence mutation is required.
      */
-    suspend fun temporalIndex(): MemoryTemporalIndex =
-        MemoryTemporalIndex.build(store.read().episodes)
+    suspend fun temporalIndex(axis: MemoryTimeAxis = MemoryTimeAxis.Ingest): MemoryTemporalIndex =
+        MemoryTemporalIndex.build(store.read().episodes, axis)
 
     suspend fun pendingEpisodes(): List<MemoryQueueEntry> = store.read().queue
         .filter { it.status != MemoryQueueStatus.Complete }

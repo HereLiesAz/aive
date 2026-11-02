@@ -253,6 +253,7 @@ internal object MemoryRewrite {
             sourceEpisodeIds = version.sourceEpisodeIds,
             createdAtEpochMillis = version.createdAtEpochMillis,
             metadata = mapOf("detailOf" to version.id.value),
+            validFromEpochMillis = version.validFromEpochMillis,
         )
         return spill to MemoryEdge(
             MemoryEdgeId("${spill.id.value}:associated:${version.id.value}"), spill.id, version.id, MemoryRelationKind.AssociatedWith,
