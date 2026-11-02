@@ -16,6 +16,26 @@ data class A2aServerSetting(
     val onCopyToken: () -> Unit,
     /** Replaces the token; clients holding the old one are refused from then on. */
     val onResetToken: () -> Unit,
+    /** **Open to this network**; null where the platform cannot offer it. */
+    val lan: A2aLanSetting? = null,
+)
+
+/**
+ * **Open to this network** (docs/A2A.md): off by default even while the server is on. While on,
+ * other computers can reach the server, each needing the token and the keeper's allowance.
+ * Traffic is plain HTTP, so the warning beside the switch is always shown.
+ */
+data class A2aLanSetting(
+    val enabled: Boolean,
+    /** Agent Card URLs on this computer's network addresses; empty while off or with no network. */
+    val agentCardUrls: List<String>,
+    /** Addresses the keeper allowed. */
+    val allowedClients: List<String>,
+    /** Addresses that presented the token but are not allowed yet, newest first. */
+    val waitingClients: List<String>,
+    val onEnabledChange: (Boolean) -> Unit,
+    val onAllowClient: (String) -> Unit,
+    val onForgetClient: (String) -> Unit,
 )
 
 sealed interface A2aServerStatus {
@@ -39,6 +59,12 @@ fun a2aServerEnabled(storedChoice: Boolean?): Boolean = storedChoice ?: A2A_SERV
 
 /** The server runs unless the keeper turned it off; it is reachable only on this computer by default. */
 const val A2A_SERVER_ENABLED_BY_DEFAULT: Boolean = true
+
+/**
+ * Whether the server is open to the local network, from the keeper's stored choice: only an
+ * explicit on opens it. Turning the server on never opens it to the network.
+ */
+fun a2aServerOpenToNetwork(storedChoice: Boolean?): Boolean = storedChoice ?: false
 
 /** Reads a stored switch value written as `true`/`false`; anything else counts as never chosen. */
 fun parseA2aServerChoice(stored: String?): Boolean? = when (stored?.trim()?.lowercase()) {

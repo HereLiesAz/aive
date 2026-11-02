@@ -17,6 +17,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Device ↔ Provider (hosted LLMs, keyless gateways, OpenCode) | Task objectives, role instructions, context artifacts, acceptance criteria, repository snapshots (workspace agents) | Outbound, responses inbound |
 | Device ↔ Remote A2A agent | Task objective, role instructions, approved context, optional bearer token; task status and artifacts back | Outbound, responses inbound |
 | Local agent ↔ A2A server (desktop, on by default) | Objectives that launch workflows; run status and final artifacts | Inbound on loopback |
+| Other computer on the local network ↔ A2A server (desktop, "Open to this network", off by default) | Bearer token and objectives in clear text; run status and final artifacts back; the public Agent Card | Inbound on every IPv4 interface |
 | Device ↔ GitHub API | Workflow dispatch and inputs, run status, check runs, artifact downloads, workflow-file installs, repository operations | Both |
 | Device ↔ GitLab API | Repository tree/file reads, workspace-agent commits, repository operations | Both |
 | GitHub runner ↔ Agent/script | Prompt or script source, repository checkout, job token (runner only) | Inside the user's repository's Actions |
@@ -466,6 +467,7 @@ The Aive delegates a role's task to a remote A2A agent, and on desktop can accep
 - A web page in the user's browser reaches the loopback server (CSRF, DNS rebinding).
 - A local process or agent holding the token floods The Aive with launches, or replaces the user's running work.
 - Because the server is on by default, any local process can reach the port and read the public Agent Card without the keeper having done anything.
+- Open to the network: another computer on the network sniffs the token from cleartext traffic and replays it; scans the port; spoofs or takes over an allowed computer's address; floods `SendMessage`; or reaches the server through a DNS name it controls.
 - A remote agent is used for confidential work it should not see.
 
 **Mitigations in place**
@@ -473,12 +475,16 @@ The Aive delegates a role's task to a remote A2A agent, and on desktop can accep
 - Card and endpoint URLs must pass `CleartextPolicy`. With a token set, the endpoint must share the card's origin. Redirects are not followed, and the card is fetched without the token.
 - A remote task completes only when a `GetTask` poll reads `completed` (or the agent answers with a final message). `unknown` and unrecognized states are never success. Artifacts are stored as opaque text and links; inline file bytes are dropped.
 - The server is on by default on desktop, but only on loopback: other machines cannot reach it. A local process needs the token, which only the keeper hands out (**Copy token**), so default-on adds a listening port, not a client. The keeper can turn it off, and that choice is kept. It refuses requests whose `Host` is not a loopback name. It sends no CORS headers, so a browser cannot attach the `Authorization` header cross-origin. Every JSON-RPC call needs the bearer token, compared in constant time; the card is public, as A2A discovery expects. Bodies are capped at 1 MB and objectives at 20,000 characters.
+- Opening to the network is a separate switch, off by default and never turned on by enabling the server. While it is off the server binds loopback and refuses every non-loopback caller, card included. While it is on, a network caller needs the token and an allowlisted IP address; one with the token but not listed is refused and shown to the keeper to allow, and one without the token is never listed. The `Host` check accepts only loopback names and this computer's own addresses as IP literals, so DNS rebinding still fails. `SendMessage` is limited to 6 calls a minute per client address (HTTP `429`). The Agent Card names a network URL only to callers that reached it on a network address. The cleartext warning is shown beside the switch at all times.
 - The server never approves a plan, task or gate, picks a provider or touches a repository. It only queues a launch through the same path as the launch form. It refuses a launch while a run is unfinished or another launch is queued, so it cannot replace the user's work. Cancel reaches only the run its own task started.
 
 **Residual risks**
 - Anyone with the server token is a full client until the token is reset; there is no per-client identity or spend cap.
 - On by default, every desktop install has a loopback listener. A local process without the token can read the Agent Card (version, enabled role names) and can hold the port so the server fails to start; a process that already runs as the user can read the keychain item anyway.
 - Without an OS keychain the server token is regenerated on every start and held only in memory.
+- Open to the network, traffic is plain HTTP: the token, objectives, status and artifacts can be read by anyone on the network path, and a sniffed token can be replayed from an allowed address. TLS is not offered. The keeper is told beside the switch; **New token** recovers.
+- The allowlist is keyed by IP address. On a network with DHCP churn, shared NAT or an attacker who can take over an address (ARP spoofing), an allowlisted address is not one identity. Combined with the cleartext token, a capable attacker on the same network can launch workflows. Launches still wait at every gate for the person at The Aive (invariant 4 unchanged), cannot replace an unfinished run, and are rate-limited.
+- Anyone on the network can read the Agent Card (version, enabled role names) and probe the port while the switch is on. Card reads are not rate-limited.
 - Remote A2A agents see the task content they are sent; whether they retain it is up to their operator.
 
 ### Remote access and relay (Android)
