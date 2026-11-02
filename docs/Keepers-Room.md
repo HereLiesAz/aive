@@ -103,6 +103,8 @@ A hive that stopped reads **The hive stopped**; one that cannot reach its agents
 
 A completed hive shows **What it made** under its run's status: the text artifacts of its final tasks (those nothing depends on), selectable. Once its run has completed, failed or been cancelled, its one follow-up is **Feed it more**, which asks what next and launches a continuation in the same project (`ContinueRunPanel`). A resting hive keeps its objective bar (`HiveLaunchBar`); a live one has none.
 
+A new hive (the district's **New hive**, mockup H6) opens empty and in Build (`RestingHive`, `NewHive.kt`). Its head is a pill naming it that surfaces to the district, with Live and Build beside it as one control; the field says "An empty hive. Bring creatures in from below, then draw strands from tail to tail." Under the field, **Name this hive…** and **Save** rename the hive's workflow through the workflow library, and the tray below holds the swarm's switched-on roles as creatures: a tap brings one into the hive unwired, as Add creature does, and Undo takes it back out. Edits keep the name given. The objective bar appears once the hive has a creature. Any hive opened with no creatures opens this way.
+
 ## The hive's timeline
 
 A live hive's **Timeline** pill swaps the hive for its run's timeline, in two views (remembered, `overview.timeline.view`):

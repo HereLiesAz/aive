@@ -377,6 +377,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="scar_withered">Lost</string>
     <string name="hive_new">New hive</string>
     <string name="hive_new_name">New hive</string>
+    <string name="hive_new_empty">An empty hive. Bring creatures in from below, then draw strands from tail to tail.</string>
+    <string name="hive_new_surface">%1$s. Surface to the district</string>
+    <string name="hive_new_name_field">Name this hive…</string>
+    <string name="hive_new_save">Save</string>
+    <string name="hive_new_saved">Named %1$s</string>
+    <string name="hive_new_tray">Creatures to bring in</string>
+    <string name="hive_new_bring_in">Bring in %1$s</string>
     <string name="hive_not_yet_run">Not yet run</string>
     <string name="hive_objective">Objective for the next swarm</string>
     <string name="hive_repository">Repository: owner/repo or URL</string>
