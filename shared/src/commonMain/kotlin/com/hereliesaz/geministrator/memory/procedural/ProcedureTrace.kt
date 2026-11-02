@@ -40,3 +40,12 @@ fun interface ProcedureTraceSink {
 object NoOpProcedureTraceSink : ProcedureTraceSink {
     override suspend fun record(trace: ProcedureTrace) = Unit
 }
+
+/** Read-only view of a workflow bank's recorded receipts; empty when capture or memory is off. */
+fun interface ProcedureTraceReader {
+    suspend fun traces(workflowId: String): List<ProcedureTrace>
+}
+
+object NoOpProcedureTraceReader : ProcedureTraceReader {
+    override suspend fun traces(workflowId: String): List<ProcedureTrace> = emptyList()
+}

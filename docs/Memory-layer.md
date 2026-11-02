@@ -222,6 +222,12 @@ curator and keeps the thinker away from memory: the inverse of this layer.
 - **Prose over schema.** Free-form pages cannot be validated; every clerk answer here is a typed,
   add-only mutation checked before it is stored, and clerks see bounded packets, never the whole store.
 
+The one place run history can change how an agent is instructed is outside this layer and its clerks:
+deterministic heuristics over failures, fixes and the keeper's corrections propose an edit of a role's
+instructions, shown as current and proposed text with its evidence on the creature's Mind tab, and
+applied only when the keeper approves it ([Procedural memory §10](architecture/PROCEDURAL_MEMORY.md)).
+Memories themselves are never rewritten.
+
 ## Workflow banks and lineage
 
 Memory is organised like version-control history.

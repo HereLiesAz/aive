@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceReader
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
 import com.hereliesaz.geministrator.memory.procedural.ProcedureBankCatalog
 import com.hereliesaz.geministrator.memory.procedural.ProcedureMutation
@@ -654,6 +655,24 @@ class MemoryLayerController(
         }
     }
 
+    /**
+     * Read-only receipts of one workflow bank, for role-instruction proposals. Empty while memory or
+     * procedural capture is off; a bank that cannot be read reads as empty.
+     */
+    val procedureTraceReader: ProcedureTraceReader = ProcedureTraceReader { workflowId ->
+        if (!active || !settings.value.proceduralTraceCaptureEnabled || memoryBankKey(workflowId) == null) {
+            emptyList()
+        } else {
+            try {
+                procedureCatalog?.own(workflowId)?.read()?.traces.orEmpty()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
@@ -1050,6 +1069,7 @@ class MemoryLayerController(
         MemoryRuntimeBridge.observer = observer
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
+        MemoryRuntimeBridge.procedureTraceReader = procedureTraceReader
         drainSoon()
     }
 

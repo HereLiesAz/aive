@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.TaskRun
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
@@ -152,7 +153,7 @@ internal fun TechnicalInspector(
     ) {
         Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
         Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
-        CreatureTabs(tab, onTabChange)
+        CreatureTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
@@ -349,6 +350,12 @@ internal fun TechnicalInspector(
                 // Inside the creature (docs/Swarm-OS.md): its config, changed here (docs/Keepers-Room.md,
                 // stage 3). Its genes never change; changing its mind hatches a new config.
                 role?.let { mind ->
+                    // Proposed edits of its instructions, each applied only when the keeper approves.
+                    RoleInstructionProposalPanel(
+                        roleId = mind.id,
+                        roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
+                        onSaveRoleCollection = onSaveRoleCollection,
+                    )
                     CustomCompanyProviderScreen(
                         runtimeState = ApplicationRuntimeState.Live(liveWorkflow),
                         connectedProviderIds = connectedProviderIds,
@@ -417,13 +424,15 @@ internal fun CreatureTab.label(): String = stringResource(
 )
 
 @Composable
-private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit) {
+private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit, pendingProposals: Int = 0) {
     Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CreatureTab.entries.forEach { entry ->
             AzphaltPill(
                 label = entry.label(),
                 seed = "creature-tab-${entry.name}",
                 selected = entry == tab,
+                // Mind counts the proposed instruction edits waiting on the keeper.
+                endCap = if (entry == CreatureTab.Mind && pendingProposals > 0) pendingProposals.toString() else null,
                 role = Role.Tab,
                 onClick = { onTabChange(entry) },
             )
