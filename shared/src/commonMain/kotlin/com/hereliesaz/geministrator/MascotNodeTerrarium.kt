@@ -27,9 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.russhwolf.settings.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +50,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -68,6 +71,7 @@ import kotlin.math.roundToInt
 import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.semantics_capillary
 import com.hereliesaz.geministrator.resources.semantics_move_node_down
 import com.hereliesaz.geministrator.resources.semantics_move_node_left
 import com.hereliesaz.geministrator.resources.semantics_move_node_right
@@ -238,6 +242,7 @@ private fun MascotNodeTerrarium(
         }
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val onGround = azphaltOnSurface()
+        val capillaryText = rememberTextMeasurer()
 
         fun screenCenter(position: H2g2TerrariumPosition): Offset = Offset(
             x = widthPx * 0.5f + (position.x - focusX) * widthPx * zoom,
@@ -415,6 +420,7 @@ private fun MascotNodeTerrarium(
                     creatureRadius = creatureSizePx * zoom * 0.42f,
                     phase = linkPulse(),
                     isFlowing = { id -> subjectById[id]?.node?.state == H2g2WorkflowState.Active },
+                    textMeasurer = capillaryText,
                 ) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             } else {
                 drawRect(Azphalt.Ink.copy(alpha = 0.025f))
@@ -640,10 +646,11 @@ private fun MascotNodeTerrarium(
 
                 // Every creature wears its job (docs/Node-Creatures.md: labelled with its task and state),
                 // on its state's colour; only a crowded hive keeps names for the one tapped, so packed
-                // cells stay legible. The full state is always in the semantics.
+                // cells stay legible, unless the keeper asked to always show them (Keeper's room ›
+                // Appearance). The full state is always in the semantics.
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
-                if (isSelected || subjects.size <= NAMED_CREATURE_LIMIT) Text(
+                if (creatureWearsLabel(isSelected, subjects.size, CreatureLabels.alwaysShow)) Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -658,6 +665,25 @@ private fun MascotNodeTerrarium(
                 )
             }
         }
+
+        // Each capillary is named where its name is written, for those who hear the field: the
+        // provider and the creatures it feeds. It only speaks; touches pass through to the tissue.
+        tissue?.capillaryCourses(widthPx, heightPx) { id ->
+            (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) }
+        }?.forEach { course -> key(course.capillary.providerId) {
+            val description = stringResource(
+                Res.string.semantics_capillary,
+                capillaryName(course.capillary.providerId),
+                capillaryFeeds(course.fed.map { id -> subjectById[id]?.node?.label ?: id }),
+            )
+            val half = with(density) { (AzphaltMinTouchTarget / 2).toPx() }
+            Box(
+                Modifier
+                    .offset { IntOffset((course.labelAt.x - half).roundToInt(), (course.labelAt.y - half).roundToInt()) }
+                    .size(AzphaltMinTouchTarget)
+                    .semantics(mergeDescendants = true) { contentDescription = description },
+            )
+        } }
 
         // Each clasp glows by how the upstream work came out: green succeeded, red failed or blocked.
         Canvas(Modifier.fillMaxSize()) {
@@ -821,4 +847,26 @@ private val ClaspGreen = Color(0xFF6BE04A)
 private val ClaspRed = Color(0xFFFF3B30)
 
 /** Up to this many creatures, every one wears its name; more, and only the tapped one does. */
-private const val NAMED_CREATURE_LIMIT = 12
+internal const val NAMED_CREATURE_LIMIT = 12
+
+/**
+ * Whether a creature wears its label on the field: always when it is selected or the keeper asked
+ * to always show labels, otherwise only while the hive has at most [NAMED_CREATURE_LIMIT] creatures.
+ */
+internal fun creatureWearsLabel(selected: Boolean, creatureCount: Int, alwaysShowLabels: Boolean): Boolean =
+    selected || alwaysShowLabels || creatureCount <= NAMED_CREATURE_LIMIT
+
+/** The keeper's "Always show creature labels" switch (Keeper's room › Appearance), stored on this device. */
+internal object CreatureLabels {
+    private val settings by lazy { Settings() }
+
+    var alwaysShow: Boolean by mutableStateOf(settings.getBoolean(ALWAYS_SHOW_KEY, false))
+        private set
+
+    fun updateAlwaysShow(on: Boolean) {
+        alwaysShow = on
+        settings.putBoolean(ALWAYS_SHOW_KEY, on)
+    }
+
+    private const val ALWAYS_SHOW_KEY = "aive.appearance.always-show-creature-labels.v1"
+}

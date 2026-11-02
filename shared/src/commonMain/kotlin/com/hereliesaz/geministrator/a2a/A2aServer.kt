@@ -9,6 +9,7 @@ import com.hereliesaz.geministrator.domain.isTerminal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -46,10 +47,12 @@ data class A2aHttpResponse(
  * and a token-protected JSON-RPC endpoint where `SendMessage` launches a workflow (through the
  * same queue as other apps' launches), `GetTask` reports its run and `CancelTask` stops it.
  *
- * Platform-neutral; the desktop serves it over HTTP on loopback. Every JSON-RPC call needs
- * `Authorization: Bearer <token>`; the card is public, as A2A discovery expects. Nothing here
- * approves a gate or touches a provider: a launched run waits at its gates for the person at
- * the keyboard, like any other run.
+ * Platform-neutral; the desktop serves it over HTTP on loopback, and on the local network only
+ * when the keeper opens it there. Every JSON-RPC call needs `Authorization: Bearer <token>`; a
+ * caller from another computer also needs its address on the keeper's allowlist, and until then
+ * it is refused and listed in [waitingClients]. `SendMessage` is rate-limited per client. The card
+ * is public, as A2A discovery expects. Nothing here approves a gate or touches a provider: a
+ * launched run waits at its gates for the person at the keyboard, like any other run.
  */
 class A2aServer(
     private val host: A2aWorkflowHost,
@@ -58,10 +61,22 @@ class A2aServer(
     /** `http://127.0.0.1:41241`, without a trailing slash. */
     private val baseUrl: () -> String,
     private val agentVersion: String,
-    /** When true, a request whose Host header is not a loopback name is refused (DNS rebinding). */
+    /**
+     * When true, a request whose Host header is neither a loopback name nor one of [lanHosts] is
+     * refused (DNS rebinding).
+     */
     private val loopbackOnly: Boolean = true,
     private val nowIso: () -> String = { "" },
     private val idFactory: () -> String = ::randomServerId,
+    /** Whether the server is open to the local network; while false, every non-loopback caller is refused. */
+    private val lanOpen: () -> Boolean = { false },
+    /** This computer's own network addresses (IP literals) that a LAN request's Host header may name. */
+    private val lanHosts: () -> Set<String> = { emptySet() },
+    /** The base URL to advertise to a caller that reached the server at [lanHosts] address `host`. */
+    private val lanBaseUrl: (host: String) -> String? = { null },
+    /** Whether a non-loopback client address (normalized) is on the keeper's allowlist. */
+    private val isAllowedClient: (address: String) -> Boolean = { false },
+    private val sendLimiter: A2aRateLimiter = A2aRateLimiter(),
 ) {
     private class Record(
         val taskId: String,
@@ -84,6 +99,19 @@ class A2aServer(
 
     /** Launches waiting for the UI's runtime; App takes them as `externalWorkflowLaunchRequests`. */
     val pendingLaunches: StateFlow<List<ExternalWorkflowLaunchRequest>> = pending.asStateFlow()
+
+    private val waiting = MutableStateFlow<List<String>>(emptyList())
+
+    /**
+     * Network addresses that presented the right token but are not on the allowlist yet, newest
+     * first (at most [MAX_WAITING_CLIENTS]). The Keeper's room offers to allow each one.
+     */
+    val waitingClients: StateFlow<List<String>> = waiting.asStateFlow()
+
+    /** Drops [address] from [waitingClients] (the keeper allowed or dismissed it). */
+    fun forgetWaitingClient(address: String) {
+        waiting.update { list -> list.filterNot { it == address } }
+    }
 
     /** The id of the run the runtime shows now; the host reports it whenever it changes. */
     suspend fun runtimeShowsRun(runId: String?) = mutex.withLock { lastKnownRunId = runId }
@@ -125,7 +153,9 @@ class A2aServer(
         }
     }
 
-    suspend fun card(): A2aAgentCard {
+    /** The Agent Card; [lanHost] is the network address the caller reached, null for this computer. */
+    suspend fun card(lanHost: String? = null): A2aAgentCard {
+        val base = lanHost?.let(lanBaseUrl) ?: baseUrl()
         val roles = runCatching { host.roles() }.getOrDefault(emptyList()).filter { it.enabled }
         return A2aAgentCard(
             name = "The Aive",
@@ -133,7 +163,7 @@ class A2aServer(
                 "The Aive plans a workflow, staffs it with the roles below and returns what it made. " +
                 "Approvals stay with the person at The Aive.",
             version = agentVersion,
-            interfaces = listOf(A2aAgentInterface(url = baseUrl() + RPC_PATH)),
+            interfaces = listOf(A2aAgentInterface(url = base + RPC_PATH)),
             skills = listOf(
                 A2aSkill(
                     id = HIVE_SKILL_ID,
@@ -157,19 +187,29 @@ class A2aServer(
     }
 
     /**
-     * One HTTP request. [headers] keys are compared case-insensitively. Bodies over
+     * One HTTP request from [caller]. [headers] keys are compared case-insensitively. Bodies over
      * [MAX_BODY_BYTES] are refused by the platform layer before they get here.
      */
-    suspend fun handle(method: String, path: String, headers: Map<String, String>, body: String): A2aHttpResponse {
+    suspend fun handle(
+        method: String,
+        path: String,
+        headers: Map<String, String>,
+        body: String,
+        caller: A2aCaller = A2aCaller.Loopback,
+    ): A2aHttpResponse {
         val header = { name: String -> headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value }
-        if (loopbackOnly && !isLoopbackHost(header("Host"))) {
+        val open = lanOpen()
+        if (!caller.isLoopback && !open) return A2aHttpResponse(403, """{"error":"forbidden"}""")
+        val requestHost = a2aHostOf(header("Host"))
+        val lanHost = requestHost?.takeIf { open && !isLoopbackHost(header("Host")) && it in lanHosts() }
+        if (loopbackOnly && !isLoopbackHost(header("Host")) && lanHost == null) {
             return A2aHttpResponse(403, """{"error":"forbidden"}""")
         }
         val route = path.substringBefore('?')
         return when (route) {
             A2aCodec.WELL_KNOWN_CARD_PATH, A2aCodec.LEGACY_WELL_KNOWN_CARD_PATH ->
                 if (method.equals("GET", ignoreCase = true)) {
-                    A2aHttpResponse(200, A2aCodec.encodeCard(card()).toString())
+                    A2aHttpResponse(200, A2aCodec.encodeCard(card(lanHost)).toString())
                 } else {
                     A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "GET"))
                 }
@@ -178,12 +218,27 @@ class A2aServer(
                     A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "POST"))
                 !authorized(header("Authorization")) ->
                     A2aHttpResponse(401, """{"error":"unauthorized"}""", headers = mapOf("WWW-Authenticate" to "Bearer"))
+                !caller.isLoopback && !clientAllowed(caller) ->
+                    A2aHttpResponse(403, """{"error":"not allowed yet: the keeper must allow this computer in The Aive"}""")
                 body.encodeToByteArray().size > MAX_BODY_BYTES ->
                     A2aHttpResponse(413, """{"error":"request too large"}""")
-                else -> A2aHttpResponse(200, rpc(body, header(A2A_VERSION_HEADER)).toString())
+                else -> try {
+                    A2aHttpResponse(200, rpc(body, header(A2A_VERSION_HEADER), caller).toString())
+                } catch (limited: A2aRateLimited) {
+                    val seconds = (limited.retryAfterMillis + 999) / 1000
+                    A2aHttpResponse(429, """{"error":"too many requests"}""", headers = mapOf("Retry-After" to seconds.toString()))
+                }
             }
             else -> A2aHttpResponse(404, """{"error":"not found"}""")
         }
+    }
+
+    /** An allowed network client; one that is not is remembered for the keeper (it holds the token). */
+    private fun clientAllowed(caller: A2aCaller): Boolean {
+        val address = normalizeA2aClientAddress(caller.address) ?: return false
+        if (isAllowedClient(address)) return true
+        waiting.update { list -> (listOf(address) + list.filterNot { it == address }).take(MAX_WAITING_CLIENTS) }
+        return false
     }
 
     private fun authorized(authorization: String?): Boolean {
@@ -193,7 +248,7 @@ class A2aServer(
         return constantTimeEquals(presented, expected)
     }
 
-    private suspend fun rpc(body: String, versionHeader: String?): JsonObject {
+    private suspend fun rpc(body: String, versionHeader: String?, caller: A2aCaller): JsonObject {
         val element = try {
             Json.parseToJsonElement(body)
         } catch (_: Exception) {
@@ -209,6 +264,9 @@ class A2aServer(
             ?: return A2aCodec.rpcError(id, A2aErrorCodes.METHOD_NOT_FOUND, "Unknown method $methodName")
         if (versionHeader != null && versionHeader.trim() !in SUPPORTED_VERSIONS) {
             return A2aCodec.rpcError(id, A2aErrorCodes.VERSION_NOT_SUPPORTED, "A2A version ${versionHeader.trim()} is not supported")
+        }
+        if (operation == A2aOperation.SendMessage) {
+            mutex.withLock { sendLimiter.tryAcquire(caller.clientKey) }?.let { throw A2aRateLimited(it) }
         }
         val params = request["params"] as? JsonObject ?: JsonObject(emptyMap())
         return try {
@@ -368,6 +426,7 @@ class A2aServer(
         const val MAX_BODY_BYTES = 1_000_000
         const val MAX_OBJECTIVE_CHARS = 20_000
         const val MAX_TASKS = 64
+        const val MAX_WAITING_CLIENTS = 8
         val SUPPORTED_VERSIONS = setOf("0.3", "1.0")
 
         fun projectNameFor(objective: String): String {
@@ -376,8 +435,7 @@ class A2aServer(
         }
 
         fun isLoopbackHost(hostHeader: String?): Boolean {
-            val value = hostHeader?.trim()?.lowercase() ?: return false
-            val host = if (value.startsWith("[")) value.substringBefore(']').removePrefix("[") else value.substringBefore(':')
+            val host = a2aHostOf(hostHeader) ?: return false
             return host == "localhost" || host == "127.0.0.1" || host == "::1"
         }
 

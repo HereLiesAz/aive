@@ -226,7 +226,21 @@ fun ControlRoom(
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
     val restingShown = restingHive.value.isNotBlank()
+    // The hive's Timeline, held here so a creature's "Open its trace" can open it.
+    val showTimeline = rememberDurableBooleanState("overview.timeline")
+    // A creature whose panel was set aside for its trace: still selected on the Timeline, its panel
+    // closed. Selecting another creature (or none) forgets it; tapping it again reopens its panel.
+    var panelSetAside by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(selectedTaskId) { panelSetAside = setAsideAfterSelection(selectedTaskId, panelSetAside) }
+    val selectCreature: (String) -> Unit = { id ->
+        if (reopensSetAsidePanel(id, panelSetAside)) {
+            panelSetAside = null
+        } else {
+            onTaskSelected(id)
+        }
+    }
     val inspectorVisible = selectedTaskId != null &&
+        selectedTaskId != panelSetAside &&
         liveWorkflow != null &&
         !restingShown &&
         destination == ControlRoomDestination.Overview &&
@@ -267,6 +281,7 @@ fun ControlRoom(
         if (waiting != null) {
             district.value = false
             if (selectedTaskId != waiting) onTaskSelected(waiting)
+            panelSetAside = null
             creatureTabName = CreatureTab.Needs.name
             creatureTabTask = waiting
             onDestinationSelected(ControlRoomDestination.Overview)
@@ -338,7 +353,7 @@ fun ControlRoom(
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onDestinationSelected = onDestinationSelected,
                 selectedTaskId = selectedTaskId,
-                onTaskSelected = onTaskSelected,
+                onTaskSelected = selectCreature,
                 onLaunchWorkflow = onLaunchWorkflow,
                 onLoadLaunchableRuns = onLoadLaunchableRuns,
                 onApproveTask = onApproveTask,
@@ -403,6 +418,7 @@ fun ControlRoom(
                 onZoomOut = zoomOut,
                 keeperSectionName = keeperSectionName,
                 keeperOpen = keeperOpen,
+                showTimelineState = showTimeline,
                 runtimeState = runtimeState,
             )
         }
@@ -433,6 +449,11 @@ fun ControlRoom(
                         onSaveRoleCollection = onSaveRoleCollection,
                         connectedProviderIds = connectedProviderIds,
                         roleSurfaceFilePicker = roleSurfaceFilePicker,
+                        // Closes the panel onto the hive's Timeline, this creature still selected there.
+                        onOpenTrace = {
+                            showTimeline.value = true
+                            panelSetAside = taskId
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .fillMaxHeight(if (compact) 0.72f else 0.62f),
@@ -671,11 +692,10 @@ private fun MainDestination(
     onZoomOut: () -> Unit = { district.value = true },
     keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
     keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
+    showTimelineState: MutableState<Boolean> = rememberDurableBooleanState("overview.timeline"),
 ) {
     // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
-    var showTimeline by rememberDurableBooleanState("overview.timeline")
-    // The hive edge's "Bring in a drifter" form is open (A2aDrifterShelf).
-    var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
+    var showTimeline by showTimelineState
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
@@ -861,6 +881,7 @@ private fun MainDestination(
                     onResetRoleCollection = onResetRoleCollection,
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
+                    onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                 )
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
                 ControlRoomDestination.Memory -> MemoryLayerScreen(

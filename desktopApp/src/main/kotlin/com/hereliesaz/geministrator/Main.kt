@@ -77,7 +77,7 @@ fun main() {
     // File choosers are Swing; without this they draw in Swing's own Metal theme instead of the
     // operating system's, which clashes with both the app and the desktop.
     runCatching { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()) }
-    AzphaltMotion.reduceMotion = shouldReduceMotion(
+    AzphaltMotion.platformReduceMotion = shouldReduceMotion(
         animatorDurationScale = null,
         systemPrefersReduced = desktopPrefersReducedMotion(),
     )
@@ -158,7 +158,8 @@ fun main() {
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
     val testRunner = LocalTestRunnerClient()
-    // Agent2Agent server (docs/A2A.md): off until turned on in the Keeper's room; loopback only.
+    // Agent2Agent server (docs/A2A.md): on unless the keeper turned it off; loopback unless the
+    // keeper opens it to the network, where callers also need to be allowed.
     val a2aServer = DesktopA2aServer()
 
     try {
@@ -384,20 +385,18 @@ fun main() {
                 var a2aEnabled by remember { mutableStateOf(a2aServer.enabledPreference) }
                 var a2aStatus by remember { mutableStateOf<A2aServerStatus>(A2aServerStatus.Off) }
                 var a2aTokenTemporary by remember { mutableStateOf(false) }
-                DisposableEffect(a2aEnabled) {
-                    val started = a2aEnabled
-                    if (started) {
-                        a2aStatus = try {
-                            a2aServer.start()
-                            A2aServerStatus.Listening(a2aServer.baseUrl)
-                        } catch (failure: Exception) {
-                            A2aServerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
-                        }
-                        a2aTokenTemporary = a2aServer.tokenIsTemporary
-                    } else {
-                        a2aStatus = A2aServerStatus.Off
-                    }
-                    onDispose { if (started) a2aServer.stop() }
+                var a2aLan by remember { mutableStateOf(a2aServer.lanPreference) }
+                var a2aAllowedClients by remember { mutableStateOf(a2aServer.allowedClients().sorted()) }
+                val a2aWaitingClients by a2aServer.core.waitingClients.collectAsState()
+                // Applied off the UI thread: reading or creating the keychain token runs a tool
+                // that can take seconds, and it happens on every launch. A port in use only shows
+                // on the Keeper's room row; the rest of The Aive keeps working. Switching the
+                // network option restarts the server on the other address. Calls apply in the
+                // order the switches changed, so a slow start cannot undo a later switch.
+                LaunchedEffect(a2aEnabled, a2aLan) {
+                    val order = System.nanoTime()
+                    a2aStatus = withContext(Dispatchers.IO) { a2aServer.apply(a2aEnabled, a2aLan, order) }
+                    a2aTokenTemporary = a2aServer.tokenIsTemporary
                 }
                 val a2aPendingLaunches by a2aServer.core.pendingLaunches.collectAsState()
                 val a2aServerSetting = A2aServerSetting(
@@ -420,6 +419,24 @@ fun main() {
                         a2aServer.resetToken()
                         a2aTokenTemporary = a2aServer.tokenIsTemporary
                     },
+                    lan = A2aLanSetting(
+                        enabled = a2aLan,
+                        agentCardUrls = if (a2aStatus is A2aServerStatus.Listening) a2aServer.lanAgentCardUrls() else emptyList(),
+                        allowedClients = a2aAllowedClients,
+                        waitingClients = a2aWaitingClients,
+                        onEnabledChange = { open ->
+                            a2aServer.lanPreference = open
+                            a2aLan = open
+                        },
+                        onAllowClient = { address ->
+                            a2aServer.allowClient(address)
+                            a2aAllowedClients = a2aServer.allowedClients().sorted()
+                        },
+                        onForgetClient = { address ->
+                            a2aServer.forgetClient(address)
+                            a2aAllowedClients = a2aServer.allowedClients().sorted()
+                        },
+                    ),
                 )
 
                 val repositoryServiceId = configuringRepositoryServiceId
