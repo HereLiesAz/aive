@@ -128,8 +128,10 @@ compose.desktop {
             packageVersion = nativePackageVersion
             description = "The Aive — agentic workflow orchestration"
             copyright = "© 2026 HereLiesAz"
-            // The opt-in A2A server (docs/A2A.md) uses the JDK's built-in HTTP server.
-            modules("jdk.httpserver")
+            // The whole JDK is bundled: a hand-kept module list missed java.sql (DriverManager) and
+            // the installed app could not start its JVM. Includes jdk.httpserver for the A2A server
+            // (docs/A2A.md).
+            includeAllModules = true
 
             linux {
                 iconFile.set(generatedDesktopBrandDir.get().file("haive-icon-color.png").asFile)
