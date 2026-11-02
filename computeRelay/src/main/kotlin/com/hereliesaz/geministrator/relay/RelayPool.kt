@@ -265,7 +265,7 @@ class RelayPool(
         seenNonces[nonceKey] = timestampEpochMillis + ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS
         enrolments[nodeId] = enrolment.copy(record = enrolment.record.copy(lastSeenAtEpochMillis = now))
         persistNodesLocked()
-        NodeAuthentication.Authenticated
+        return NodeAuthentication.Authenticated
     }
 
     suspend fun enrolledNodes(): List<EnrolledComputeNode> = mutex.withLock { enrolledNodesLocked() }
