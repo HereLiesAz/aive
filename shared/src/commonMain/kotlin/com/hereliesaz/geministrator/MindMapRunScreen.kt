@@ -59,6 +59,7 @@ import com.hereliesaz.geministrator.resources.overview_gitlab_url_or_group_repos
 import com.hereliesaz.geministrator.resources.overview_invalid
 import com.hereliesaz.geministrator.resources.overview_jump_to_active
 import com.hereliesaz.geministrator.resources.overview_doing_now
+import com.hereliesaz.geministrator.resources.overview_doing_now_feeds
 import androidx.compose.runtime.collectAsState
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
@@ -801,7 +802,10 @@ internal fun MindMapRunScreen(
                     ?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId }?.name }
                     ?: liveWorkflow.definition.tasks.firstOrNull { it.id == activeRun.taskDefinitionId }?.name
                     ?: activeTaskId
-                CreatureDoingNow(activeRun, name, activity)
+                val waitingOnIt = remember(liveWorkflow.definition, run, liveWorkflow.roles) {
+                    creaturesWaitingOn(activeRun.taskDefinitionId, liveWorkflow.definition, run, liveWorkflow.roles)
+                }
+                CreatureDoingNow(activeRun, name, waitingOnIt, activity)
             }
         }
         GeministratorWorkflowMindMap(
@@ -844,16 +848,24 @@ internal fun MindMapRunScreen(
     }
 }
 
-/** One short line: what the active creature is doing now, its newest thought or step. */
+/**
+ * One short line: what the active creature is doing now, its newest thought or step, and the
+ * creatures waiting on its output ("· feeds Engineer").
+ */
 @Composable
-private fun CreatureDoingNow(taskRun: TaskRun, name: String, activity: SessionActivityFeeds) {
+private fun CreatureDoingNow(taskRun: TaskRun, name: String, waitingOnIt: List<String>, activity: SessionActivityFeeds) {
     val providerRunId = taskRun.providerRunId ?: return
     val feeds by activity.feeds.collectAsState()
     val latest = feeds[SessionActivityKey(taskRun.id, providerRunId)]?.lastOrNull() ?: return
+    val doing = latest.doingNowText()
     AzphaltNote(
         seed = "doing-now-${taskRun.id.value}",
         label = stringResource(Res.string.overview_doing_now, name),
-        value = latest.doingNowText(),
+        value = if (waitingOnIt.isEmpty()) {
+            doing
+        } else {
+            stringResource(Res.string.overview_doing_now_feeds, doing, waitingOnIt.joinToString(", "))
+        },
     )
 }
 

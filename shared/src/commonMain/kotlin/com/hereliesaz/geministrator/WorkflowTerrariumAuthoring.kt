@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.toTaskExecutor
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.humanReadable
 
@@ -177,6 +178,75 @@ internal fun budTerrariumCreature(definition: WorkflowDefinition, taskId: TaskDe
     val budId = generateSequence(2) { it + 1 }.map { "${taskId.value}-$it" }.first { it !in taken }
     val bud = source.copy(id = TaskDefinitionId(budId), name = "${source.name} (bud)")
     val candidate = definition.copy(tasks = definition.tasks + bud)
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumDependencyEditResult.Applied(candidate)
+}
+
+/**
+ * A creature that can join a hive in Build (docs/Swarm-OS.md: add and release creatures): a role
+ * from the swarm, or a programmatic step that wears the neuron. Only steps that run as they are, with
+ * nothing to configure, are offered; a repository change is not, since alone it would have no
+ * approval ahead of it (THREAT_MODEL.md, invariant 4).
+ */
+internal sealed interface TerrariumNewcomer {
+    data class FromRole(val role: com.hereliesaz.geministrator.domain.RoleDefinition) : TerrariumNewcomer
+    data class Step(val step: TerrariumStep) : TerrariumNewcomer
+}
+
+/** The programmatic steps Add creature offers, each a ready [com.hereliesaz.geministrator.domain.TaskExecutor]. */
+internal enum class TerrariumStep(
+    val idStem: String,
+    val taskName: String,
+    val objective: String,
+    val executor: com.hereliesaz.geministrator.domain.TaskExecutor,
+) {
+    Tests("tests", "Run tests", "Run the project's tests.", com.hereliesaz.geministrator.domain.TaskExecutor.TestRunner()),
+    RepositoryStatus("repo-status", "Repository status", "Read the repository's status.", com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("status")),
+    RepositoryFetch("repo-fetch", "Fetch repository", "Fetch the repository's latest changes.", com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("fetch")),
+}
+
+/** The roles a keeper can add from: those switched on in the swarm, by name. */
+internal fun terrariumAddableRoles(
+    roles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition>,
+): List<com.hereliesaz.geministrator.domain.RoleDefinition> = roles.filter { it.enabled }.sortedBy { it.name.lowercase() }
+
+/** The new task's id: [stem] itself, else the first free `stem-2`, `stem-3`, ... */
+private fun freshTerrariumTaskId(definition: WorkflowDefinition, stem: String): TaskDefinitionId {
+    val taken = definition.tasks.mapTo(mutableSetOf()) { it.id.value }
+    val base = stem.ifBlank { "creature" }
+    if (base !in taken) return TaskDefinitionId(base)
+    return TaskDefinitionId(generateSequence(2) { it + 1 }.map { "$base-$it" }.first { it !in taken })
+}
+
+/**
+ * Add creature: [newcomer] joins the hive as a new task, unwired. Nothing feeds it and nothing
+ * depends on it until the keeper wires it. A role's task runs on the role's own execution source,
+ * so a role that runs a script or an action wears the neuron too. The result is validated like
+ * every other edit and is rejected rather than partially applied.
+ */
+internal fun addTerrariumCreature(definition: WorkflowDefinition, newcomer: TerrariumNewcomer): TerrariumDependencyEditResult {
+    val task = when (newcomer) {
+        is TerrariumNewcomer.FromRole -> {
+            val role = newcomer.role
+            if (!role.enabled) return TerrariumDependencyEditResult.Rejected("${role.name} is switched off in the swarm")
+            com.hereliesaz.geministrator.domain.TaskDefinition(
+                id = freshTerrariumTaskId(definition, role.id.value),
+                name = role.name,
+                objective = role.description.ifBlank { role.name },
+                roleId = role.id,
+                executor = role.executionSource.toTaskExecutor(role.id),
+            )
+        }
+        is TerrariumNewcomer.Step -> com.hereliesaz.geministrator.domain.TaskDefinition(
+            id = freshTerrariumTaskId(definition, newcomer.step.idStem),
+            name = newcomer.step.taskName,
+            objective = newcomer.step.objective,
+            roleId = null,
+            executor = newcomer.step.executor,
+        )
+    }
+    val candidate = definition.copy(tasks = definition.tasks + task)
     val errors = WorkflowGraphValidator.validate(candidate)
     if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
     return TerrariumDependencyEditResult.Applied(candidate)
