@@ -71,7 +71,7 @@ Each tool is a real control (see the ledger). One sits in the creature's needs p
 
 ## Accessibility
 
-Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove; the tide has Undo and Redo; every creature, synapse, egg and comb is a labelled semantics node; every distance is reachable from the rim.
+Every gesture has a plain equivalent. Each needs panel has a **Connections** list (fed by, feeds, knot) with add, change and remove (outside Build, the creature's Work already lists fed by and feeds, read only, with whether each fed creature took its output); the tide has Undo and Redo; every creature, synapse, egg and comb is a labelled semantics node; every distance is reachable from the rim.
 
 ## Build order
 
