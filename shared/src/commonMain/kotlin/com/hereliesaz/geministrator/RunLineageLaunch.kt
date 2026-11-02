@@ -10,9 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
@@ -25,10 +27,23 @@ import com.hereliesaz.geministrator.resources.lineage_lineage
 import com.hereliesaz.geministrator.resources.lineage_loading_runs
 import com.hereliesaz.geministrator.resources.lineage_next_objective
 import com.hereliesaz.geministrator.resources.lineage_no_earlier_runs_yet
+import com.hereliesaz.geministrator.resources.lineage_rerun_change_objective
+import com.hereliesaz.geministrator.resources.lineage_rerun_change_output
+import com.hereliesaz.geministrator.resources.lineage_rerun_from_here
+import com.hereliesaz.geministrator.resources.lineage_rerun_hint
+import com.hereliesaz.geministrator.resources.lineage_rerun_objective
+import com.hereliesaz.geministrator.resources.lineage_rerun_objective_required
+import com.hereliesaz.geministrator.resources.lineage_rerun_output
+import com.hereliesaz.geministrator.resources.lineage_rerun_output_hint
+import com.hereliesaz.geministrator.resources.lineage_rerun_output_required
+import com.hereliesaz.geministrator.resources.lineage_rerun_start
+import com.hereliesaz.geministrator.resources.lineage_rerun_start_following
 import com.hereliesaz.geministrator.resources.lineage_start_continuation
 import com.hereliesaz.geministrator.resources.lineage_starts_a_new_line_of_work
 import com.hereliesaz.geministrator.resources.lineage_the_new_run_reads_every_chosen
 import com.hereliesaz.geministrator.resources.lineage_the_new_run_reads_the_chosen
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -226,5 +241,120 @@ internal fun ContinueRunPanel(
             modifier = Modifier.fillMaxWidth(),
         )
         error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+    }
+}
+
+/**
+ * "Run again from here" on a finished run's creature (its panel's Work): a new run in the same
+ * lineage where this creature and everything after it work again (`TaskRerunPlanner`). The keeper
+ * may change what it's asked first, or, when it made text and something follows it, change what it
+ * made and run only what follows. [output] is that text, or null when it can't be changed.
+ */
+@Composable
+internal fun RerunFromTaskPanel(
+    runId: WorkflowRunId,
+    taskId: TaskDefinitionId,
+    objective: String,
+    output: String?,
+    onRerun: suspend (TaskRerunRequest) -> String?,
+    modifier: Modifier = Modifier,
+) {
+    val key = "${runId.value}/${taskId.value}"
+    var open by remember(key) { mutableStateOf(false) }
+    var changingOutput by remember(key) { mutableStateOf(false) }
+    var objectiveDraft by remember(key, objective) { mutableStateOf(objective) }
+    var outputDraft by remember(key, output) { mutableStateOf(output.orEmpty()) }
+    var error by remember(key) { mutableStateOf<String?>(null) }
+    var working by remember(key) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val objectiveRequired = stringResource(Res.string.lineage_rerun_objective_required)
+    val outputRequired = stringResource(Res.string.lineage_rerun_output_required)
+    fun submit(request: TaskRerunRequest) {
+        if (working) return
+        working = true
+        error = null
+        scope.launch {
+            val failure = onRerun(request)
+            working = false
+            if (failure == null) open = false else error = failure
+        }
+    }
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AzphaltPill(
+            label = if (open) stringResource(Res.string.lineage_cancel_continue) else stringResource(Res.string.lineage_rerun_from_here),
+            seed = "rerun-$key",
+            selected = open,
+            onClick = { open = !open; error = null },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (!open) return@Column
+        Text(stringResource(Res.string.lineage_rerun_hint), style = AzphaltType.body, color = azphaltOnSurface())
+        if (output != null) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = stringResource(Res.string.lineage_rerun_change_objective),
+                    seed = "rerun-objective-$key",
+                    selected = !changingOutput,
+                    onClick = { changingOutput = false; error = null },
+                    modifier = Modifier.weight(1f),
+                )
+                AzphaltPill(
+                    label = stringResource(Res.string.lineage_rerun_change_output),
+                    seed = "rerun-output-$key",
+                    selected = changingOutput,
+                    onClick = { changingOutput = true; error = null },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (changingOutput && output != null) {
+            Text(stringResource(Res.string.lineage_rerun_output_hint), style = AzphaltType.body, color = azphaltOnSurface())
+            OutlinedTextField(
+                value = outputDraft,
+                onValueChange = { outputDraft = it; error = null },
+                label = { Text(stringResource(Res.string.lineage_rerun_output)) },
+                minLines = 3,
+                enabled = !working,
+                colors = azphaltTextFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AzphaltPill(
+                label = stringResource(Res.string.lineage_rerun_start_following),
+                seed = "rerun-following-start-$key",
+                tone = PillTone.Primary,
+                onClick = {
+                    if (outputDraft.isBlank()) {
+                        error = outputRequired
+                    } else {
+                        submit(TaskRerunRequest(taskId, replacementOutput = outputDraft))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            OutlinedTextField(
+                value = objectiveDraft,
+                onValueChange = { objectiveDraft = it; error = null },
+                label = { Text(stringResource(Res.string.lineage_rerun_objective)) },
+                minLines = 2,
+                enabled = !working,
+                colors = azphaltTextFieldColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AzphaltPill(
+                label = stringResource(Res.string.lineage_rerun_start),
+                seed = "rerun-start-$key",
+                tone = PillTone.Primary,
+                onClick = {
+                    if (objectiveDraft.isBlank()) {
+                        error = objectiveRequired
+                    } else {
+                        submit(TaskRerunRequest(taskId, editedObjective = objectiveDraft.trim()))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
     }
 }

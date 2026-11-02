@@ -98,6 +98,17 @@ Roles are data. They carry responsibility, instructions, capabilities, and autho
 
 `WorkflowRun` and `TaskRun` carry status, attempts, resolved executor, responsibility assignment, provider/external run identifiers, artifacts, blocking reasons, and progress.
 
+### Running again from a task
+
+A finished run (completed, failed or cancelled) can be run again from one of its tasks (`ApplicationRuntime.rerunFromTask`, planned by `TaskRerunPlanner` in `shared/.../workflow/TaskRerunPlanner.kt`). The finished run is never reopened: its tasks are terminal (`TaskRunTransitions`) and its journal says it ended. Instead a new run in the same project continues it (`parentWorkflowRunIds = [the finished run]`):
+
+- The chosen task and everything downstream of it (through `dependsOn` and condition targets) start fresh: not started, attempt 1 in the new run, no artifacts. Earlier attempts and their artifacts stay in the finished run as history.
+- Every other task that completed (or was skipped as a branch not taken) and is fed only by such tasks keeps its result. Its task run and artifacts are copied under the new run's ids, each artifact marked `carriedFrom` with the original's id, so the two runs never share a stored artifact. Work that had not finished runs again.
+- An edited objective is written into a copy of the definition under a new id; the finished run keeps showing the definition it ran. An unchanged objective reuses the definition.
+- Instead of an objective, the keeper may replace a completed task's text output (`TaskRerunRequest.replacementOutput`). The task keeps its place, its text artifacts are replaced by one artifact marked `editedBy: keeper` and `replaces`, and only what follows it runs again.
+- A repository change that runs again always waits for a fresh approval: if no unconditional `HumanApproval` ancestor of it runs again, its approvals and what follows them run again too. Replacing an output that sits behind such an approval is refused.
+- The new run's journal starts with `WorkflowCreated` and `TaskRerunRequested` (the task, the run it came from, the tasks that run again, any edited objective, whether the output was replaced). The new run becomes the active run; a live run it replaces is cancelled, as on a launch.
+
 The engine owns:
 
 - DAG validation, including the requirement that every task has an executable path
@@ -127,6 +138,8 @@ This makes the same UI capable of representing both a provider activity like “
 Workflow events are executor-neutral. `ExecutorAssigned` records the concrete executor plus optional responsibility role for every task. Role-backed agent work may additionally emit the legacy/specialized `AgentAssigned` event where provider-agent history is useful, but agent assignment is no longer the universal workflow concept.
 
 Task start, completion, failure, retry, escalation, approval, artifact, and workflow terminal events remain independent of executor type.
+
+`TaskRerunRequested` opens the journal of a run started by running a finished run again from a task (above).
 
 ## Plan approval
 

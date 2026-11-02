@@ -267,6 +267,7 @@ Memory is organised like version-control history.
 | A launch given two or more runs in `continuesWorkflowRunIds` | those runs, first = primary, duplicates collapsed | merge |
 | A nested workflow node starting its child run (`WorkflowRunNestedWorkflowClient`) | the dispatching run | continuation |
 | A Hall Monitor solution trial (counterfactual of a paused run) | the paused source run | continuation |
+| Running a finished run again from a task (`ApplicationRuntime.rerunFromTask`, `TaskRerunPlanner`) | the finished run | continuation |
 | A plan repair after a failure escalation | the run's own parents, unchanged (the same run, rebuilt) | — |
 | Resume after restart, task retry, approve/reject, pause/resume | unchanged (the same run) | — |
 | An inlined sub-workflow (`WorkflowComposer.inline`) | none: it becomes part of the parent's definition and runs in the parent run | — |

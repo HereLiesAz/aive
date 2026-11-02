@@ -22,6 +22,8 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
+    /** A task skipped because its condition was not met: a branch not taken, not a failure. */
+    const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
 
     fun create(
         definition: WorkflowDefinition,
@@ -193,6 +195,4 @@ object WorkflowRunFactory {
 
     private fun TaskRun.isSkippedBranch() =
         status == TaskRunStatus.Cancelled && blockingReason?.code == CONDITION_NOT_MET
-
-    private const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
 }

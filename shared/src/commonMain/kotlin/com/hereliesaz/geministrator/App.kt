@@ -61,6 +61,7 @@ import com.hereliesaz.geministrator.resources.app_reset_swarm_failed
 import com.hereliesaz.geministrator.resources.app_retry_failed
 import com.hereliesaz.geministrator.resources.app_role_delegation_failed
 import com.hereliesaz.geministrator.resources.app_runtime_bootstrap_failed
+import com.hereliesaz.geministrator.resources.app_rerun_failed
 import com.hereliesaz.geministrator.resources.app_runtime_is_unavailable
 import com.hereliesaz.geministrator.resources.app_save_swarm_failed
 import com.hereliesaz.geministrator.resources.app_switch_run_failed
@@ -645,6 +646,21 @@ fun App(
                                 throw failure
                             } catch (failure: Exception) {
                                 failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_provider_message_failed)
+                            }
+                        },
+                        onRerunFromTask = { runId, request ->
+                            try {
+                                val activeRuntime = runtime
+                                if (activeRuntime == null) {
+                                    getString(Res.string.app_runtime_is_unavailable)
+                                } else {
+                                    activeRuntime.rerunFromTask(runId, request)
+                                    null
+                                }
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_rerun_failed)
                             }
                         },
                         onRecoverFromCorruption = {
