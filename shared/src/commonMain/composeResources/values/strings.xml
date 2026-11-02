@@ -834,7 +834,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_ai_providers">AI Providers</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_ground">Ground</string>
-    <string name="settings_ground_explain">Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_ground_explain">Pick the ground everything sits on; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>

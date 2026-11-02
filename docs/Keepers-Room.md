@@ -11,7 +11,7 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | spend caps, remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
-| | **Appearance** | the ground | Settings › Appearance |
+| | **Appearance** | the ground, chosen from six swatches | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
