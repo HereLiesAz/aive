@@ -11,8 +11,6 @@ import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentRunHandle
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
-import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
-import com.hereliesaz.geministrator.providers.PromptCacheMode
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
@@ -60,7 +58,7 @@ open class TextLlmProvider(
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
         ),
-        promptCaching = PromptCacheCapabilities(modes = setOf(PromptCacheMode.Unsupported)),
+        promptCaching = api.promptCaching,
     )
 
     /**
@@ -70,9 +68,13 @@ open class TextLlmProvider(
      * with this provider's reason.
      */
     override suspend fun draftPlan(request: AgentTaskRequest): String {
-        val prompt = renderPrompt(request) +
-            "PLAN ONLY\nReply with a short numbered plan for this task: the steps you will take and what each " +
-            "produces. Do not perform the task yet; it starts once the plan is approved.\n"
+        val rendered = renderPrompt(request)
+        // Appended to the dynamic part: the plan draft shares the stable prefix the run will reuse.
+        val prompt = rendered.copy(
+            dynamicSuffix = rendered.dynamicSuffix +
+                "PLAN ONLY\nReply with a short numbered plan for this task: the steps you will take and what each " +
+                "produces. Do not perform the task yet; it starts once the plan is approved.\n",
+        )
         val draft = try {
             api.generate(prompt).text
         } catch (cancelled: CancellationException) {
@@ -153,9 +155,7 @@ open class TextLlmProvider(
             val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
             if (cancelledDuringGeneration(runId, session)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
-            if (result.inputTokens != null || result.outputTokens != null) {
-                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
-            }
+            emitUsage(runId, result)
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
@@ -165,12 +165,23 @@ open class TextLlmProvider(
             val result = generateOrFail(runId, session) ?: return@flow
             if (cancelledDuringGeneration(runId, session)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
-            if (result.inputTokens != null || result.outputTokens != null) {
-                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
-            }
+            emitUsage(runId, result)
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
+    }
+
+    /** Token counts and, where the API reported cached input, the prompt-cache hit fraction. */
+    private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult) {
+        if (result.inputTokens == null && result.outputTokens == null) return
+        emit(
+            AgentEvent.UsageReported(
+                runId = runId,
+                inputTokens = result.inputTokens,
+                outputTokens = result.outputTokens,
+                cacheHitFraction = result.cacheHitFraction,
+            ),
+        )
     }
 
     /**
@@ -263,7 +274,17 @@ open class TextLlmProvider(
         )
     }
 
-    private fun renderPrompt(request: AgentTaskRequest): String = buildString {
+    /**
+     * Role instructions and the stable prompt blocks come first, as the cacheable prefix; the task,
+     * dynamic blocks, repository and artifacts follow. [CacheablePrompt.text] is the whole prompt.
+     */
+    private fun renderPrompt(request: AgentTaskRequest): CacheablePrompt = CacheablePrompt(
+        stablePrefix = renderStablePrefix(request),
+        dynamicSuffix = renderDynamicSuffix(request),
+        reusePolicy = request.promptContext.reusePolicy,
+    )
+
+    private fun renderStablePrefix(request: AgentTaskRequest): String = buildString {
         append("ROLE INSTRUCTIONS\n")
         append(request.roleInstructions.trim())
         append("\n\n")
@@ -273,6 +294,9 @@ open class TextLlmProvider(
             append(block.content.trim())
             append("\n\n")
         }
+    }
+
+    private fun renderDynamicSuffix(request: AgentTaskRequest): String = buildString {
         append("TASK\n")
         append(request.objective.trim())
         append("\n\n")
@@ -308,7 +332,7 @@ open class TextLlmProvider(
             append("\n\n")
         }
         append("Return only the concrete work product for this assigned role. Do not claim repository access, shell execution, tests, or changes you did not actually perform.")
-    }.trim()
+    }
 
     /**
      * The artifact kind for a text response: the task's declared artifact contract first, then the

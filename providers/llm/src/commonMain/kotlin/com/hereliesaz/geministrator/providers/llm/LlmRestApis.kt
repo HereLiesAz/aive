@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.domain.PromptReusePolicy
+import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
+import com.hereliesaz.geministrator.providers.PromptCacheMode
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -27,10 +30,53 @@ data class TextGenerationResult(
     val outputTokens: Long? = null,
     /** The model's visible reasoning, when the API returned any. */
     val thinking: String? = null,
+    /**
+     * Of [inputTokens], how many the provider served from its prompt cache; null when the response
+     * did not say. [inputTokens] always counts the whole prompt, cached or not.
+     */
+    val cachedInputTokens: Long? = null,
+) {
+    /** [cachedInputTokens] over [inputTokens], normalized 0f..1f; null when either is unknown. */
+    val cacheHitFraction: Float?
+        get() {
+            val cached = cachedInputTokens ?: return null
+            val total = inputTokens?.takeIf { it > 0 } ?: return null
+            return (cached.toDouble() / total).coerceIn(0.0, 1.0).toFloat()
+        }
+}
+
+/**
+ * A prompt in two ordered regions: [stablePrefix], expected to repeat across calls (role
+ * instructions, standing context), then [dynamicSuffix], the volatile rest. [text] is the whole
+ * prompt with the prefix first, which is all an API without cache controls needs; one with explicit
+ * breakpoints marks the end of the prefix when [reusePolicy] asks for reuse.
+ */
+data class CacheablePrompt(
+    val stablePrefix: String = "",
+    val dynamicSuffix: String,
+    val reusePolicy: PromptReusePolicy = PromptReusePolicy.ProviderDefault,
+) {
+    val text: String get() = (stablePrefix + dynamicSuffix).trim()
+}
+
+/** Automatic provider-side prefix caching, reported when the response carries a cached-token count. */
+internal val IMPLICIT_PREFIX_CACHING = PromptCacheCapabilities(
+    modes = setOf(PromptCacheMode.ImplicitPrefix),
+    reportsCacheUsage = true,
 )
 
 interface TextGenerationApi {
+    /** The prompt-cache mechanisms this API uses; none unless it says otherwise. */
+    val promptCaching: PromptCacheCapabilities get() = PromptCacheCapabilities()
+
     suspend fun generate(prompt: String): TextGenerationResult
+
+    /** Generates from a prefix-structured prompt; APIs without cache controls send [CacheablePrompt.text]. */
+    suspend fun generate(prompt: CacheablePrompt): TextGenerationResult = generate(prompt.text)
+
+    /** Streams a prefix-structured prompt; APIs without cache controls send [CacheablePrompt.text]. */
+    suspend fun stream(prompt: CacheablePrompt, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
+        stream(prompt.text, onChunk)
 
     /**
      * Streams the generation: reasoning and answer text reach [onChunk] as they arrive, and the
@@ -90,6 +136,9 @@ class OpenAiResponsesApi(
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
 
+    /** OpenAI caches long prompt prefixes automatically and reports `input_tokens_details.cached_tokens`. */
+    override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
+
     override suspend fun generate(prompt: String): TextGenerationResult {
         val response = client.post("$baseUrl/responses") {
             bearer(apiKeyProvider)
@@ -117,6 +166,7 @@ class OpenAiResponsesApi(
             text = text,
             inputTokens = payload.usage?.inputTokens,
             outputTokens = payload.usage?.outputTokens,
+            cachedInputTokens = payload.usage?.inputTokensDetails?.cachedTokens,
         )
     }
 
@@ -177,6 +227,7 @@ class OpenAiResponsesApi(
                 inputTokens = usage?.inputTokens,
                 outputTokens = usage?.outputTokens,
                 thinking = thinking.toString().trim().ifEmpty { null },
+                cachedInputTokens = usage?.inputTokensDetails?.cachedTokens,
             )
         }
 }
@@ -194,6 +245,8 @@ class XaiResponsesApi(
         client = client,
     )
 
+    override val promptCaching: PromptCacheCapabilities get() = delegate.promptCaching
+
     override suspend fun generate(prompt: String): TextGenerationResult = delegate.generate(prompt)
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
@@ -208,19 +261,21 @@ class AnthropicMessagesApi(
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
 
-    override suspend fun generate(prompt: String): TextGenerationResult {
+    /** A `cache_control` breakpoint ends the stable prefix; usage reports cache reads and writes. */
+    override val promptCaching: PromptCacheCapabilities = PromptCacheCapabilities(
+        modes = setOf(PromptCacheMode.ExplicitBreakpoints),
+        reportsCacheUsage = true,
+    )
+
+    override suspend fun generate(prompt: String): TextGenerationResult = generate(CacheablePrompt(dynamicSuffix = prompt))
+
+    override suspend fun generate(prompt: CacheablePrompt): TextGenerationResult {
         val response = client.post("$baseUrl/messages") {
             val key = apiKeyProvider.requireKey("Anthropic")
             header("x-api-key", key)
             header("anthropic-version", "2023-06-01")
             contentType(ContentType.Application.Json)
-            setBody(
-                AnthropicMessageRequest(
-                    model = model,
-                    maxTokens = 8_192,
-                    messages = listOf(AnthropicInputMessage(role = "user", content = prompt)),
-                ),
-            )
+            setBody(messageRequest(prompt, maxTokens = 8_192))
         }
         response.requireSuccess("generate Claude response")
         val payload = response.body<AnthropicMessageResponse>()
@@ -233,8 +288,46 @@ class AnthropicMessagesApi(
             ?: error("Claude response did not contain text")
         return TextGenerationResult(
             text = text,
-            inputTokens = payload.usage?.inputTokens,
+            inputTokens = payload.usage?.promptTokens(),
             outputTokens = payload.usage?.outputTokens,
+            cachedInputTokens = payload.usage?.cacheReadInputTokens,
+        )
+    }
+
+    /**
+     * The stable prefix goes in `system`, ahead of the task in the user turn, so it is the cached
+     * prefix. Under [PromptReusePolicy.PreferCache] the prefix block carries an ephemeral
+     * `cache_control` breakpoint; otherwise the request has the same shape without one, and
+     * Anthropic caches nothing. A prompt without both regions is sent as one user message.
+     */
+    private fun messageRequest(
+        prompt: CacheablePrompt,
+        maxTokens: Int,
+        stream: Boolean? = null,
+        thinking: AnthropicThinking? = null,
+    ): AnthropicMessageRequest {
+        val prefix = prompt.stablePrefix.trim()
+        val rest = prompt.dynamicSuffix.trim()
+        if (prefix.isEmpty() || rest.isEmpty()) {
+            return AnthropicMessageRequest(
+                model = model,
+                maxTokens = maxTokens,
+                messages = listOf(AnthropicInputMessage(role = "user", content = prompt.text)),
+                stream = stream,
+                thinking = thinking,
+            )
+        }
+        val cacheControl = when (prompt.reusePolicy) {
+            PromptReusePolicy.PreferCache -> AnthropicCacheControl(type = "ephemeral")
+            PromptReusePolicy.ProviderDefault, PromptReusePolicy.DisableCache -> null
+        }
+        return AnthropicMessageRequest(
+            model = model,
+            maxTokens = maxTokens,
+            system = listOf(AnthropicTextBlock(type = "text", text = prefix, cacheControl = cacheControl)),
+            messages = listOf(AnthropicInputMessage(role = "user", content = rest)),
+            stream = stream,
+            thinking = thinking,
         )
     }
 
@@ -244,7 +337,10 @@ class AnthropicMessagesApi(
      */
     private var thinkingMode = 0
 
-    override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
+    override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
+        stream(CacheablePrompt(dynamicSuffix = prompt), onChunk)
+
+    override suspend fun stream(prompt: CacheablePrompt, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
         while (true) {
             val mode = THINKING_MODES.getOrNull(thinkingMode)
             try {
@@ -257,13 +353,13 @@ class AnthropicMessagesApi(
     }
 
     private suspend fun streamOnce(
-        prompt: String,
+        prompt: CacheablePrompt,
         thinking: AnthropicThinking?,
         onChunk: suspend (TextGenerationChunk) -> Unit,
     ): TextGenerationResult {
         val text = StringBuilder()
         val reasoning = StringBuilder()
-        var inputTokens: Long? = null
+        var inputUsage: AnthropicUsage? = null
         var outputTokens: Long? = null
         var stopReason: String? = null
         var stopped = false
@@ -274,20 +370,12 @@ class AnthropicMessagesApi(
                 header("x-api-key", apiKeyProvider.requireKey("Anthropic"))
                 header("anthropic-version", "2023-06-01")
                 contentType(ContentType.Application.Json)
-                setBody(
-                    AnthropicMessageRequest(
-                        model = model,
-                        maxTokens = STREAM_MAX_TOKENS,
-                        messages = listOf(AnthropicInputMessage(role = "user", content = prompt)),
-                        stream = true,
-                        thinking = thinking,
-                    ),
-                )
+                setBody(messageRequest(prompt, maxTokens = STREAM_MAX_TOKENS, stream = true, thinking = thinking))
             },
         ) { _, data ->
             val event = streamJson.decodeFromString<AnthropicStreamEvent>(data)
             when (event.type) {
-                "message_start" -> inputTokens = event.message?.usage?.inputTokens
+                "message_start" -> inputUsage = event.message?.usage
                 "content_block_start" -> if (event.contentBlock?.type == "thinking" && reasoning.isNotEmpty()) {
                     reasoning.append("\n\n")
                     onChunk(TextGenerationChunk.Thinking("\n\n"))
@@ -318,9 +406,10 @@ class AnthropicMessagesApi(
         if (text.isBlank()) error("Claude response did not contain text")
         return TextGenerationResult(
             text = text.toString(),
-            inputTokens = inputTokens,
+            inputTokens = inputUsage?.promptTokens(),
             outputTokens = outputTokens,
             thinking = reasoning.toString().trim().ifEmpty { null },
+            cachedInputTokens = inputUsage?.cacheReadInputTokens,
         )
     }
 
@@ -340,6 +429,9 @@ class GeminiGenerateContentApi(
     client: HttpClient = defaultClient(),
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
+
+    /** Gemini caches repeated prompt prefixes implicitly and reports `cachedContentTokenCount`. */
+    override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
 
     init {
         // The model id becomes a URL path segment, so it may not carry '/', '?', '#' or '..'.
@@ -373,6 +465,7 @@ class GeminiGenerateContentApi(
             text = text,
             inputTokens = payload.usageMetadata?.promptTokenCount,
             outputTokens = payload.usageMetadata?.candidatesTokenCount,
+            cachedInputTokens = payload.usageMetadata?.cachedContentTokenCount,
         )
     }
 
@@ -423,6 +516,7 @@ class GeminiGenerateContentApi(
                 inputTokens = usage?.promptTokenCount,
                 outputTokens = usage?.candidatesTokenCount,
                 thinking = reasoning.toString().trim().ifEmpty { null },
+                cachedInputTokens = usage?.cachedContentTokenCount,
             )
         }
 }
@@ -508,16 +602,32 @@ private data class OpenAiOutputContent(
 private data class OpenAiUsage(
     @SerialName("input_tokens") val inputTokens: Long? = null,
     @SerialName("output_tokens") val outputTokens: Long? = null,
+    @SerialName("input_tokens_details") val inputTokensDetails: OpenAiInputTokensDetails? = null,
 )
+
+@Serializable
+private data class OpenAiInputTokensDetails(@SerialName("cached_tokens") val cachedTokens: Long? = null)
 
 @Serializable
 private data class AnthropicMessageRequest(
     val model: String,
     @SerialName("max_tokens") val maxTokens: Int,
     val messages: List<AnthropicInputMessage>,
+    val system: List<AnthropicTextBlock>? = null,
     val stream: Boolean? = null,
     val thinking: AnthropicThinking? = null,
 )
+
+/** A text content block. `type` has no default value, so it is always encoded. */
+@Serializable
+private data class AnthropicTextBlock(
+    val type: String,
+    val text: String,
+    @SerialName("cache_control") val cacheControl: AnthropicCacheControl? = null,
+)
+
+@Serializable
+private data class AnthropicCacheControl(val type: String)
 
 @Serializable
 private data class AnthropicThinking(
@@ -571,9 +681,16 @@ private data class AnthropicContentBlock(
 
 @Serializable
 private data class AnthropicUsage(
+    /** Input after the last cache breakpoint only; cache reads and writes are counted apart. */
     @SerialName("input_tokens") val inputTokens: Long? = null,
     @SerialName("output_tokens") val outputTokens: Long? = null,
+    @SerialName("cache_creation_input_tokens") val cacheCreationInputTokens: Long? = null,
+    @SerialName("cache_read_input_tokens") val cacheReadInputTokens: Long? = null,
 )
+
+/** The whole prompt: uncached input plus the tokens written to and read from the cache. */
+private fun AnthropicUsage.promptTokens(): Long? =
+    inputTokens?.let { it + (cacheCreationInputTokens ?: 0L) + (cacheReadInputTokens ?: 0L) }
 
 @Serializable
 private data class GeminiGenerateContentRequest(
@@ -625,6 +742,8 @@ private fun requireCompleteGeminiFinish(finishReason: String) {
 
 @Serializable
 private data class GeminiUsageMetadata(
+    /** The whole prompt, [cachedContentTokenCount] included. */
     val promptTokenCount: Long? = null,
     val candidatesTokenCount: Long? = null,
+    val cachedContentTokenCount: Long? = null,
 )
