@@ -20,7 +20,10 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
@@ -114,6 +117,8 @@ internal fun TechnicalInspector(
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     connectedProviderIds: Set<String> = emptySet(),
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
+    /** Runs a finished run again from this creature; returns why it could not, or null. */
+    onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -311,6 +316,25 @@ internal fun TechnicalInspector(
                         } else null,
                     )
                 }
+                // Time travel (docs/Keepers-Room.md): a finished run runs again from this creature.
+                if (liveWorkflow.run.status.isFinished()) {
+                    val runId = liveWorkflow.run.id
+                    val hasDependents = liveWorkflow.definition.tasks.any { other ->
+                        taskId in other.dependsOn || other.condition.conditionTargetOrNull() == taskId
+                    }
+                    val output = taskRun.artifacts
+                        .mapNotNull { it.textContent }
+                        .takeIf { it.isNotEmpty() && hasDependents && taskRun.status == TaskRunStatus.Completed }
+                        ?.takeIf { task.executor !is TaskExecutor.HumanApproval }
+                        ?.joinToString("\n\n")
+                    RerunFromTaskPanel(
+                        runId = runId,
+                        taskId = taskId,
+                        objective = task.objective,
+                        output = output,
+                        onRerun = { request -> onRerunFromTask(runId, request) },
+                    )
+                }
                 val roleForPayload = role
                     ?: task.roleId?.let { rid -> liveWorkflow.roles.firstOrNull { it.id == rid } }
                 val isAgentTask = executor is TaskExecutor.RoleAgent || task.roleId != null
@@ -429,4 +453,10 @@ private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit) {
             )
         }
     }
+}
+
+private fun TaskCondition.conditionTargetOrNull(): TaskDefinitionId? = when (this) {
+    is TaskCondition.Always -> null
+    is TaskCondition.OnAnyOutcome -> ofTask
+    is TaskCondition.OnFailure -> ofTask
 }

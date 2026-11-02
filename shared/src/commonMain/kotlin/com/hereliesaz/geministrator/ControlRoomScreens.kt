@@ -64,6 +64,7 @@ import com.hereliesaz.geministrator.events.TaskCancelled
 import com.hereliesaz.geministrator.events.TaskCompleted
 import com.hereliesaz.geministrator.events.TaskEscalated
 import com.hereliesaz.geministrator.events.TaskFailed
+import com.hereliesaz.geministrator.events.TaskRerunRequested
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.events.VerificationFailed
 import com.hereliesaz.geministrator.events.WorkflowCancelled
@@ -116,6 +117,7 @@ import com.hereliesaz.geministrator.resources.runs_running
 import com.hereliesaz.geministrator.resources.runs_security_risk
 import com.hereliesaz.geministrator.resources.runs_stop
 import com.hereliesaz.geministrator.resources.runs_task_cancelled
+import com.hereliesaz.geministrator.resources.runs_task_rerun
 import com.hereliesaz.geministrator.resources.runs_task_completed
 import com.hereliesaz.geministrator.resources.runs_task_escalated
 import com.hereliesaz.geministrator.resources.runs_task_failed
@@ -476,6 +478,7 @@ internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when
     is TaskFailed -> event.taskDefinitionId
     is HumanDecisionRequired -> event.taskDefinitionId
     is TaskCancelled -> event.taskDefinitionId
+    is TaskRerunRequested -> event.taskDefinitionId
     is WorkflowCreated, is WorkflowCompleted, is WorkflowFailed, is WorkflowCancelled -> null
     is ProviderUsageRecorded -> null
 }
@@ -500,6 +503,7 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is WorkflowFailed -> stringResource(Res.string.runs_workflow_failed)
     is WorkflowCancelled -> stringResource(Res.string.runs_workflow_cancelled)
     is TaskCancelled -> stringResource(Res.string.runs_task_cancelled)
+    is TaskRerunRequested -> stringResource(Res.string.runs_task_rerun)
     is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
 }
 
@@ -516,6 +520,7 @@ internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is HumanDecisionRequired -> event.reason.take(80)
     is ExecutorAssigned -> event.executor::class.simpleName ?: "executor"
     is AgentAssigned -> event.roleId.value
+    is TaskRerunRequested -> event.editedObjective?.take(80) ?: event.fromWorkflowRunId.value.takeLast(8)
     else -> event.workflowRunId.value.takeLast(8)
 }
 

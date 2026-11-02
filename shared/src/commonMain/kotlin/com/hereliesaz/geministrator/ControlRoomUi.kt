@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -143,6 +144,8 @@ fun ControlRoom(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
+    onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -405,6 +408,7 @@ fun ControlRoom(
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
                         onMessageAgent = onMessageAgent,
+                        onRerunFromTask = onRerunFromTask,
                         tab = creatureTab,
                         onTabChange = { creatureTabName = it.name },
                         onSaveRoleCollection = onSaveRoleCollection,

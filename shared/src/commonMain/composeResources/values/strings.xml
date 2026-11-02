@@ -17,6 +17,7 @@
     <string name="app_approval_failed">Approval failed</string>
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
+    <string name="app_rerun_failed">Couldn't run it again</string>
     <string name="app_import_failed">Import failed</string>
     <string name="app_launch_already_in_progress">Another workflow is launching. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
@@ -348,6 +349,17 @@
     <string name="lineage_starts_a_new_line_of_work">Starts a new line of work with its own memory.</string>
     <string name="lineage_the_new_run_reads_every_chosen">The new run reads every chosen run's memory; where they disagree, both answers are kept.</string>
     <string name="lineage_the_new_run_reads_the_chosen">The new run reads the chosen run's memory and adds to its own.</string>
+    <string name="lineage_rerun_from_here">Run again from here</string>
+    <string name="lineage_rerun_hint">A new run starts from this creature. The work before it keeps its results; this creature and everything after it work again. This run stays as it was.</string>
+    <string name="lineage_rerun_change_objective">Change what it's asked</string>
+    <string name="lineage_rerun_change_output">Change what it made</string>
+    <string name="lineage_rerun_objective">What should it work on?</string>
+    <string name="lineage_rerun_objective_required">Enter what it should work on.</string>
+    <string name="lineage_rerun_start">Run it again</string>
+    <string name="lineage_rerun_output">What it made</string>
+    <string name="lineage_rerun_output_hint">It keeps this as its work, and only what follows it works again.</string>
+    <string name="lineage_rerun_output_required">Enter what it made.</string>
+    <string name="lineage_rerun_start_following">Run what follows</string>
 
     <string name="memory_chunks">%1$s chunks</string>
     <string name="memory_episodes">%1$s episodes</string>
@@ -649,6 +661,7 @@
     <string name="runs_security_risk">Security risk</string>
     <string name="runs_stop">Stop</string>
     <string name="runs_task_cancelled">Task cancelled</string>
+    <string name="runs_task_rerun">Run again from a task</string>
     <string name="runs_task_completed">Task completed</string>
     <string name="runs_task_escalated">Task escalated</string>
     <string name="runs_task_failed">Task failed</string>

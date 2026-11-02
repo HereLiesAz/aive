@@ -25,6 +25,7 @@ import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.domain.roleCollectionEntries
 import com.hereliesaz.geministrator.domain.requireStarterRoleCoverage
+import com.hereliesaz.geministrator.events.WorkflowCreated
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.inference.LocalModelLibrary
 import com.hereliesaz.geministrator.memory.MemoryEpoch8LocalModelLibrary
@@ -53,6 +54,8 @@ import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import com.hereliesaz.geministrator.workflow.TaskRerunPlanner
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
 import com.hereliesaz.geministrator.workflow.isHeldAtEnginePlanGate
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
@@ -297,6 +300,65 @@ class ApplicationRuntime private constructor(
                 }
             }
             replaceCurrent(Current(project, prepared, runtimeState))
+            publishCurrent()
+            startCycling()
+        }
+    }
+
+    /**
+     * Runs a finished run again from one of its tasks ([TaskRerunPlanner]): a new run in the same
+     * project continues [sourceRunId]; the task (or, when [TaskRerunRequest.replacementOutput] is
+     * given, only what follows it) and everything downstream start fresh, every other finished task
+     * keeps its result, and the source run stays as it was. The new run becomes the active one.
+     */
+    suspend fun rerunFromTask(sourceRunId: WorkflowRunId, request: TaskRerunRequest) {
+        runtimeMutex.withLock {
+            val source = persistence.runs.get(sourceRunId)
+                ?: error("Run ${sourceRunId.value} was not found")
+            val storedProject = persistence.projects.get(source.projectId)
+                ?: error("Project ${source.projectId.value} was not found")
+            val definition = persistence.definitions.get(source.workflowDefinitionId)
+                ?: error("Workflow definition ${source.workflowDefinitionId.value} was not found")
+            val now = nowEpochMillis()
+            val fork = TaskRerunPlanner.fork(
+                definition = definition,
+                source = source,
+                request = request,
+                workflowRunId = WorkflowRunId("run-$now"),
+                nowEpochMillis = now,
+                taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+                editedDefinitionId = WorkflowDefinitionId("workflow-$now"),
+            )
+            val project = storedProject.copy(updatedAtEpochMillis = now)
+            persistence.projects.put(project)
+            if (fork.definition.id != definition.id) persistence.definitions.put(fork.definition)
+            persistence.runs.put(fork.run)
+            fork.run.taskRuns.values.flatMap(TaskRun::artifacts).forEach { persistence.artifacts.put(it) }
+            val eventSink = RepositoryWorkflowEventSink(persistence.events)
+            eventSink.append(
+                WorkflowCreated(
+                    workflowRunId = fork.run.id,
+                    projectId = fork.run.projectId,
+                    workflowDefinitionId = fork.run.workflowDefinitionId,
+                    objective = fork.run.objective,
+                    occurredAtEpochMillis = now,
+                ),
+            )
+            eventSink.append(fork.event)
+
+            // As with a launch, one run is active at a time: a live one being replaced is cancelled,
+            // best effort, rather than left Running with its sessions still open.
+            current?.takeUnless { it.state.run.status.isTerminal() }?.let { previous ->
+                try {
+                    coordinator.cancel(previous.project, previous.definition, previous.state, now)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    // The rerun still starts; the old run stays as persisted.
+                }
+            }
+            val runProject = project.copy(repository = fork.run.repositorySnapshot ?: project.repository)
+            replaceCurrent(Current(runProject, fork.definition, WorkflowRuntimeState(fork.run)))
             publishCurrent()
             startCycling()
         }

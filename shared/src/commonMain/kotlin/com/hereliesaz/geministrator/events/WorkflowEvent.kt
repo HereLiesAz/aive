@@ -185,6 +185,23 @@ data class TaskCancelled(
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent
 
+/**
+ * The keeper ran a finished run again from one of its tasks ([taskDefinitionId]). Recorded on the
+ * new run, which continues [fromWorkflowRunId]: [rerunTaskIds] start fresh there, every other task
+ * keeps the result it had. [editedObjective] is the task's new objective when the keeper changed it;
+ * [outputReplaced] means the task itself kept its place but its output text is the keeper's.
+ */
+@Serializable
+data class TaskRerunRequested(
+    override val workflowRunId: WorkflowRunId,
+    val taskDefinitionId: TaskDefinitionId,
+    val fromWorkflowRunId: WorkflowRunId,
+    val rerunTaskIds: List<TaskDefinitionId>,
+    val editedObjective: String? = null,
+    val outputReplaced: Boolean = false,
+    override val occurredAtEpochMillis: Long,
+) : WorkflowEvent
+
 /** Opportunistic telemetry from providers that expose usage data. Never affects run state. */
 @Serializable
 data class ProviderUsageRecorded(

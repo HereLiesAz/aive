@@ -201,6 +201,7 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 - Operation strings are parsed into a fixed vocabulary. Remote operations are REST calls. Local operations are fixed `ProcessBuilder` argument lists, not shell commands.
 - Branch names are validated: they cannot be empty, cannot start with `-`, and cannot contain NUL or newline characters.
 - `WorkflowGraphValidator` rejects any `RepositoryOperation` task other than `status` or `fetch` that lacks a `HumanApproval` ancestor, including one placed on another device through `TaskExecutor.Distributed`.
+- Running a finished run again from a task (`TaskRerunPlanner`) never reuses an earlier approval for a repository change that runs again: when no unconditional `HumanApproval` ancestor of the change runs again, its approvals run again too, and replacing an output behind such an approval is refused. The finished run is not reopened; the rerun is a new run whose carried results came from tasks that completed, and output the keeper wrote is marked `editedBy: keeper`.
 - No remote operation merges, deletes, or force-pushes.
 - Remote repository credentials are scoped to `github.com` and `gitlab.com`.
 - Failures are normalized into failed tasks and follow the workflow's retry/escalation policy.
