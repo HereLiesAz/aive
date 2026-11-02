@@ -77,6 +77,9 @@ object ProcedureCompatibility {
                 executorKind = descriptor.executorKind,
                 operationId = descriptor.operationId,
                 sideEffect = descriptor.sideEffect,
+                // Bind only the declared typed slots. No literal arguments or command strings.
+                parameterBindings = descriptor.parameterSchemas.flatten()
+                    .map { it.name }.distinct().associateWith { it },
             )
         }
         return steps to commonParameters
