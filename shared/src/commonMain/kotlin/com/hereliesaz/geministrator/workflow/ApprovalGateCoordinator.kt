@@ -92,9 +92,14 @@ class ApprovalGateCoordinator(
         decidedByRoleId: RoleDefinitionId?,
         note: String?,
         nowEpochMillis: Long,
+        /** Approved without asking, under a keeper's delegation (ProgressiveDelegation.kt). */
+        byDelegation: Boolean = false,
     ): ApprovalGate = mutex.withLock {
         val current = requireNotNull(repository.get(id)) {
             "Approval gate ${id.value} does not exist"
+        }
+        require(!byDelegation || (approved && current.kind == ApprovalGateKind.PlanApproval)) {
+            "Only an approved plan gate can be decided by delegation"
         }
         require(current.status == ApprovalGateStatus.Pending || current.status == ApprovalGateStatus.Applying) {
             "Approval gate ${id.value} is already resolved"
@@ -114,6 +119,7 @@ class ApprovalGateCoordinator(
                 approved = approved,
                 decidedByRoleId = decidedByRoleId,
                 occurredAtEpochMillis = nowEpochMillis,
+                byDelegation = byDelegation,
             ),
         )
         decided

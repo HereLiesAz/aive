@@ -100,6 +100,8 @@ data class ApprovalDecisionReceived(
     val approved: Boolean,
     val decidedByRoleId: RoleDefinitionId?,
     override val occurredAtEpochMillis: Long,
+    /** Approved without asking, because the keeper delegated this gate (workflow/ProgressiveDelegation.kt). */
+    val byDelegation: Boolean = false,
 ) : WorkflowEvent
 
 @Serializable

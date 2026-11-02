@@ -124,6 +124,8 @@ fun App(
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
+    // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
+    val delegations = remember { com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore.createDefault() }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
@@ -153,6 +155,7 @@ fun App(
                 contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
+                delegations = delegations,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
@@ -763,6 +766,7 @@ fun App(
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         memoryLayer = memoryLayer,
+                        delegations = delegations,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
                         onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,

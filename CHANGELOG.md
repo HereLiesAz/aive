@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Progressive delegation: after you approve the same creature's plan on the same provider 5 times in a row (adjustable), The Aive asks once whether to stop asking. Only creatures that cannot write to a repository, deploy or write elsewhere qualify; `HumanApproval` tasks and every other gate always ask. Gates passed this way are recorded as approved by delegation, a rejection ends it, and the Keeper's room's new Delegations part lists each one with Revoke.
 - On Android and desktop, one unreadable workflow record no longer marks the whole store as corrupt (whose recovery clears everything). The record is skipped, its contents are kept aside in the database, and it is listed as quarantined; everything else loads as usual.
 - Retrying a repository operation (for example after approving a failure escalation) runs it again; each attempt now has its own run record instead of replaying the first attempt's failure. On desktop, two starts of the same Local Git operation can no longer both run Git, and its run record is replaced in one atomic step.
 - An executor (GitHub Action, script, test runner, deployment, external service) that throws while starting now fails only its own task, which then follows its retry or escalation policy, instead of stopping the whole cycle with the task stuck Ready. Each started external run is saved as soon as it starts, so a later failure in the same cycle cannot cause it to be started twice.

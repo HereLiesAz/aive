@@ -31,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
+import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -181,6 +183,8 @@ fun ControlRoom(
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
+    /** The keeper's approval habits; null hides the Delegations part and never offers delegation. */
+    delegations: ProgressiveDelegationStore? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -370,6 +374,7 @@ fun ControlRoom(
                 localPlannerSetting = localPlannerSetting,
                 localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                 memoryLayer = memoryLayer,
+                delegations = delegations,
                 azphaltStoreService = azphaltStoreService,
                 azphaltPackageImportRequest = azphaltPackageImportRequest,
                 onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -388,6 +393,9 @@ fun ControlRoom(
                 runtimeState = runtimeState,
             )
         }
+
+        // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
+        delegations?.let { DelegationOfferDialog(it) }
 
         if (inspectorVisible) {
             selectedTaskId?.let { taskId ->
@@ -622,6 +630,7 @@ private fun MainDestination(
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
+    delegations: ProgressiveDelegationStore? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -836,7 +845,8 @@ private fun MainDestination(
                 ControlRoomDestination.Settings,
                 ControlRoomDestination.Compute -> KeeperRoom(
                     sections = KeeperSection.entries.filter {
-                        it != KeeperSection.Compute || computeAvailable
+                        (it != KeeperSection.Compute || computeAvailable) &&
+                            (it != KeeperSection.Delegations || delegations != null)
                     },
                     opening = KeeperSection.of(place),
                     selectedName = keeperSectionName,
@@ -846,6 +856,9 @@ private fun MainDestination(
                         when (section) {
                             KeeperSection.Connections -> keeperCount(connectedProviderIds.size + connectedRepositoryServiceIds.size)
                             KeeperSection.Compute -> if (distributedComputeState.connected) null else keeperCount(0)
+                            KeeperSection.Delegations -> delegations?.let { store ->
+                                keeperCount(store.state.collectAsState().value.delegations.size)
+                            }
                             else -> null
                         }
                     },
@@ -888,6 +901,7 @@ private fun MainDestination(
                                             onAssignTask = onAssignTaskCompute,
                                             embedded = true,
                                         )
+                                        KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
                                         else -> Unit
                                     }
                                 },
