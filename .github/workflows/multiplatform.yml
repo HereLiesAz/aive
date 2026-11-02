@@ -234,6 +234,13 @@ jobs:
       - name: Publish pinned h2g2 for isolated web builds
         run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
+      # Three builds (root 4g, Conveyance 3g, h2g2 2g heaps) leave their Gradle and Kotlin
+      # daemons alive; with webpack on top the runner runs out of memory and is shut down.
+      - name: Free memory before web bundles
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+
       - name: Build Web JS
         run: ./gradlew :webApp:jsBrowserProductionWebpack
 
