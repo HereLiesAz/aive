@@ -107,6 +107,8 @@ fun App(
     distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    /** The desktop's A2A server switch (docs/A2A.md); null where there is none. */
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
@@ -129,6 +131,8 @@ fun App(
      * outside the UI (Android remote clients watching run events). Null, the default, loads nothing.
      */
     onRunTimelineChanged: ((List<com.hereliesaz.geministrator.events.WorkflowEvent>) -> Unit)? = null,
+    /** The runtime once it exists (null while it is replaced), for hosts outside the UI (the desktop A2A server). */
+    onRuntimeAvailable: (ApplicationRuntime?) -> Unit = {},
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
     /** The MCP host and its approval gate (docs/architecture/MCP_HOST.md); null where there is none. */
@@ -379,6 +383,7 @@ fun App(
         }
         observer(timeline)
     }
+    LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
 
     // Requests whose launch finished here. The host drops them from its queue asynchronously, so
     // this keeps a finished request from being launched twice in the meantime.
@@ -888,6 +893,7 @@ fun App(
                         onRevokeComputeNode = onRevokeComputeNode,
                         crashReportingSetting = crashReportingSetting,
                         remoteAccessSetting = remoteAccessSetting,
+                        a2aServerSetting = a2aServerSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,

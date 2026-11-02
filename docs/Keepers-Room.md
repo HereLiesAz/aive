@@ -6,13 +6,14 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 
 | Group | Part | Holds | Was |
 |---|---|---|---|
-| Feeds the hive | **Connections** | AI providers, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
+| Feeds the hive | **Connections** | AI providers, remote A2A agents, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | remote access, the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **This device** | spend caps, remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
 | | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **This device** | remote access, the A2A server (desktop), the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Appearance** | the ground | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
@@ -32,7 +33,7 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 ## Connections
 
-One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching.
+One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching. **Add an A2A agent** takes an Agent Card URL and then an optional token; such an agent runs only for roles that prefer it (`A2A.md`).
 
 ## This device
 

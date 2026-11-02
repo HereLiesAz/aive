@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,8 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.TestRunnerExecutorIntegration
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.util.UUID
 import javax.swing.JFileChooser
 import javax.swing.UIManager
@@ -155,6 +158,8 @@ fun main() {
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
     val testRunner = LocalTestRunnerClient()
+    // Agent2Agent server (docs/A2A.md): off until turned on in the Keeper's room; loopback only.
+    val a2aServer = DesktopA2aServer()
 
     try {
         application {
@@ -376,6 +381,47 @@ fun main() {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
                 }
 
+                var a2aEnabled by remember { mutableStateOf(a2aServer.enabledPreference) }
+                var a2aStatus by remember { mutableStateOf<A2aServerStatus>(A2aServerStatus.Off) }
+                var a2aTokenTemporary by remember { mutableStateOf(false) }
+                DisposableEffect(a2aEnabled) {
+                    val started = a2aEnabled
+                    if (started) {
+                        a2aStatus = try {
+                            a2aServer.start()
+                            A2aServerStatus.Listening(a2aServer.baseUrl)
+                        } catch (failure: Exception) {
+                            A2aServerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                        }
+                        a2aTokenTemporary = a2aServer.tokenIsTemporary
+                    } else {
+                        a2aStatus = A2aServerStatus.Off
+                    }
+                    onDispose { if (started) a2aServer.stop() }
+                }
+                val a2aPendingLaunches by a2aServer.core.pendingLaunches.collectAsState()
+                val a2aServerSetting = A2aServerSetting(
+                    enabled = a2aEnabled,
+                    agentCardUrl = a2aServer.agentCardUrl.takeIf { a2aStatus is A2aServerStatus.Listening },
+                    status = a2aStatus,
+                    tokenIsTemporary = a2aTokenTemporary,
+                    onEnabledChange = { enabled ->
+                        a2aServer.enabledPreference = enabled
+                        a2aEnabled = enabled
+                    },
+                    onCopyToken = {
+                        a2aServer.currentToken()?.let { token ->
+                            runCatching {
+                                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(token), null)
+                            }
+                        }
+                    },
+                    onResetToken = {
+                        a2aServer.resetToken()
+                        a2aTokenTemporary = a2aServer.tokenIsTemporary
+                    },
+                )
+
                 val repositoryServiceId = configuringRepositoryServiceId
                 val providerId = configuringProviderId
                 when {
@@ -465,6 +511,18 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
+                        a2aServerSetting = a2aServerSetting,
+                        externalWorkflowLaunchRequests = a2aPendingLaunches,
+                        onExternalWorkflowLaunchHandled = { requestId, failure ->
+                            // Read now: right after a launch the runtime shows its new run.
+                            val runIdAfter = a2aServer.shownRunId()
+                            uiScope.launch { a2aServer.core.launchHandled(requestId, failure, runIdAfter) }
+                        },
+                        onRuntimeStateChanged = { state ->
+                            val shown = (state as? ApplicationRuntimeState.Live)?.presentation?.run?.id?.value
+                            uiScope.launch { a2aServer.core.runtimeShowsRun(shown) }
+                        },
+                        onRuntimeAvailable = a2aServer::attachRuntime,
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
                         onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
                             enabled = onDeviceSmallTasksEnabled,
@@ -506,6 +564,7 @@ fun main() {
         }
     } finally {
         testRunner.close()
+        runCatching { a2aServer.stop() }
         memoryLayer.detach()
         memoryScope.cancel()
         memorySessions.close()

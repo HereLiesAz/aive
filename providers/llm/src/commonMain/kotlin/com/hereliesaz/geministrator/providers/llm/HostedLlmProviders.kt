@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.mcp.McpToolSource
@@ -182,9 +183,24 @@ object HostedLlmProviders {
      * last, after the keyless built-ins, for the same reason those do.
      */
     val entries: List<HostedLlmProviderSpec>
-        get() = builtInEntries + storeEntries()
+        get() = builtInEntries + storeEntries() + a2aEntries()
 
-    fun entry(id: String): HostedLlmProviderSpec? = builtInById[id] ?: storeEntries().firstOrNull { it.id == id }
+    fun entry(id: String): HostedLlmProviderSpec? =
+        builtInById[id] ?: storeEntries().firstOrNull { it.id == id } ?: a2aEntries().firstOrNull { it.id == id }
+
+    /** Remote A2A agents connected by Agent Card; [baseUrl] is the card's URL (docs/A2A.md). */
+    private fun a2aEntries(): List<HostedLlmProviderSpec> = A2aAgentConnections.all().map { agent ->
+        HostedLlmProviderSpec(
+            id = agent.providerId,
+            displayName = agent.name,
+            baseUrl = agent.cardUrl,
+            defaultModel = "",
+            protocols = listOf(A2A_PROTOCOL),
+            keyOptional = true,
+        )
+    }
+
+    const val A2A_PROTOCOL = "a2a"
 
     private fun storeEntries(): List<HostedLlmProviderSpec> = StoreLlmProviders.all().map { llm ->
         HostedLlmProviderSpec(
@@ -204,6 +220,14 @@ object HostedLlmProviders {
         /** MCP tools for runs on this provider (docs/architecture/MCP_HOST.md); null offers none. */
         tools: McpToolSource? = null,
     ): AgentProvider = when {
+        A2A_PROTOCOL in spec.protocols -> A2aAgentProvider(
+            id = AgentProviderId(spec.id),
+            displayName = spec.displayName,
+            cardUrl = spec.baseUrl,
+            bearerToken = credential.trim().takeUnless {
+                it.isEmpty() || it == ProviderCatalog.ANONYMOUS_CREDENTIAL
+            },
+        )
         "moyai-session" in spec.protocols -> MoyaiProvider(
             id = AgentProviderId(spec.id),
             displayName = spec.displayName,
