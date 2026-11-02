@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Build mode can now add a creature: **Add creature**, beside Duplicate, lists the swarm's switched-on roles and three steps with no agent (run tests, repository status, fetch repository), which wear the neuron. The new creature joins unwired, and Undo takes it back out. Repository changes are not offered, since alone they would have no approval ahead of them.
 - The hive field now names its capillaries: each provider's name is written along its blood supply, and each capillary is a screen-reader node naming the provider and the creatures it feeds ("Claude, feeding Architect, Engineer").
 - The Swarm's role list now says how many saved hives use each role ("in N hives"), and **All / Producers / Reviewers** above it filters the list. Reviewers are the roles whose kind reviews others' work (QA, code and adversarial review, compliance and the like); every other role is a producer.
 - The Memory swarm now opens with a status line: when consolidation last did work since this start, how much waits in the selected bank's queue, how many instruction proposals wait across all roles, and **Consolidate now**. While memory is off or consolidation is paused, the button is replaced by the reason and the switch that resolves it sits just below.

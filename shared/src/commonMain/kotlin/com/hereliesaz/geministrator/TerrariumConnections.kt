@@ -8,13 +8,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_add_connection
+import com.hereliesaz.geministrator.resources.build_add_creature
+import com.hereliesaz.geministrator.resources.build_add_from_steps
+import com.hereliesaz.geministrator.resources.build_add_from_swarm
+import com.hereliesaz.geministrator.resources.build_add_hint
+import com.hereliesaz.geministrator.resources.build_step_repo_fetch
+import com.hereliesaz.geministrator.resources.build_step_repo_status
+import com.hereliesaz.geministrator.resources.build_step_tests
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_bud
 import com.hereliesaz.geministrator.resources.build_cut
@@ -78,8 +90,20 @@ internal fun TerrariumConnections(
     grouping: Set<String>? = null,
     onGroupingChange: (Set<String>?) -> Unit = {},
     onFold: (Set<String>) -> Unit = {},
+    /** The swarm's roles, offered by Add creature. */
+    roles: Collection<RoleDefinition> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
+    // Add creature: open, it lists what can join; a pick joins unwired and closes the list.
+    var adding by remember(definition.id) { mutableStateOf(false) }
+    val addPill: @Composable () -> Unit = {
+        AzphaltPill(
+            label = stringResource(Res.string.build_add_creature),
+            seed = "add-creature",
+            selected = adding,
+            onClick = { adding = !adding },
+        )
+    }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(label = stringResource(Res.string.build_rehearse), seed = "rehearse", onClick = onRehearse)
@@ -107,10 +131,12 @@ internal fun TerrariumConnections(
         val selected = definition.tasks.firstOrNull { it.id.value == selectedTaskId }
         if (selected == null) {
             Text(stringResource(Res.string.build_pick_a_creature), style = AzphaltType.body, color = azphaltOnSurface())
+            addPill()
+            if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
             return@Column
         }
         val names = definition.tasks.associate { it.id to it.name }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(
                 label = stringResource(Res.string.build_detach),
                 seed = "detach-${selected.id.value}",
@@ -127,7 +153,9 @@ internal fun TerrariumConnections(
                 seed = "bud-${selected.id.value}",
                 onClick = { onEdit(budTerrariumCreature(definition, selected.id)) },
             )
+            addPill()
         }
+        if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
         Text(stringResource(Res.string.build_fed_by, selected.name), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             selected.dependsOn.sortedBy { it.value }.forEach { upstream ->
@@ -167,6 +195,48 @@ internal fun TerrariumConnections(
                         onClick = { onEdit(addTerrariumDependency(definition, selected.id, TaskDefinitionId(upstream.id.value))) },
                     )
                 }
+            }
+        }
+    }
+}
+
+/** What Add creature can bring in: the swarm's roles, then the steps that wear the neuron. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TerrariumAddCreature(
+    definition: WorkflowDefinition,
+    roles: Collection<RoleDefinition>,
+    onEdit: (TerrariumDependencyEditResult) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.build_add_hint), style = AzphaltType.body, color = azphaltOnSurface())
+        val addable = terrariumAddableRoles(roles)
+        if (addable.isNotEmpty()) {
+            Text(stringResource(Res.string.build_add_from_swarm), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                addable.forEach { role ->
+                    AzphaltPill(
+                        label = role.name,
+                        seed = "add-role-${role.id.value}",
+                        onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromRole(role))) },
+                    )
+                }
+            }
+        }
+        Text(stringResource(Res.string.build_add_from_steps), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TerrariumStep.entries.forEach { step ->
+                AzphaltPill(
+                    label = stringResource(
+                        when (step) {
+                            TerrariumStep.Tests -> Res.string.build_step_tests
+                            TerrariumStep.RepositoryStatus -> Res.string.build_step_repo_status
+                            TerrariumStep.RepositoryFetch -> Res.string.build_step_repo_fetch
+                        },
+                    ),
+                    seed = "add-step-${step.idStem}",
+                    onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.Step(step))) },
+                )
             }
         }
     }

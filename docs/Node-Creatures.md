@@ -55,7 +55,7 @@ Work done programmatically rather than by an agent wears one body: **the neuron*
 - roles that run a script or an action instead of an agent (`RoleExecutionSource` other than `Agent`);
 - memory stages running without a model (the memory swarm).
 
-The neuron only connects. It takes its place in the swarm, wired to what feeds it and what it feeds, so the swarm doubles as a standing flowchart of the workflow, every step visible. Its work counts toward a run like any other, but it has no genes: it is never a parent of a hatch, never sways a generation's mutation, and is never in the stable or the Store. A programmatic role has no creature to choose.
+The neuron only connects. It takes its place in the swarm, wired to what feeds it and what it feeds, so the swarm doubles as a standing flowchart of the workflow, every step visible. Its work counts toward a run like any other, but it has no genes: it is never a parent of a hatch, never sways a generation's mutation, and is never in the stable or the Store. A programmatic role has no creature to choose. In Build, **Add creature** brings in a step that wears the neuron, or a role whose own execution source is a script or an action, which wears it too (`docs/Swarm-OS.md`).
 
 ## Birth, breeding, mutation, death
 
