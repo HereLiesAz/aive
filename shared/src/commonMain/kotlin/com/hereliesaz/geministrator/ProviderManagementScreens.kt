@@ -57,6 +57,7 @@ import com.hereliesaz.geministrator.resources.settings_a2a_server_failed
 import com.hereliesaz.geministrator.resources.settings_a2a_server_listening
 import com.hereliesaz.geministrator.resources.settings_a2a_server_off
 import com.hereliesaz.geministrator.resources.settings_a2a_server_on
+import com.hereliesaz.geministrator.resources.settings_a2a_server_port_in_use
 import com.hereliesaz.geministrator.resources.settings_a2a_server_reset_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_temporary_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
@@ -873,6 +874,7 @@ internal fun ProviderSettingsScreen(
             val a2aStatus = when (val status = setting.status) {
                 A2aServerStatus.Off -> null
                 is A2aServerStatus.Listening -> stringResource(Res.string.settings_a2a_server_listening, status.address)
+                is A2aServerStatus.PortInUse -> stringResource(Res.string.settings_a2a_server_port_in_use, status.port.toString())
                 is A2aServerStatus.Failed -> stringResource(Res.string.settings_a2a_server_failed)
             }
             a2aStatus?.let { status ->

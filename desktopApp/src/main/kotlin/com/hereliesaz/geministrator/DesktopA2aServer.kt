@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.io.File
+import java.net.BindException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.security.SecureRandom
@@ -25,16 +26,21 @@ import java.util.prefs.Preferences
 import kotlinx.coroutines.runBlocking
 
 /**
- * The Aive's A2A server on the desktop (docs/A2A.md). Off by default; when on, it listens on
- * loopback only (127.0.0.1) and serves [A2aServer]: a public Agent Card, and a JSON-RPC endpoint
- * that needs the bearer token kept in [DesktopA2aServerTokenStore].
+ * The Aive's A2A server on the desktop (docs/A2A.md). On by default (the keeper can turn it off);
+ * it listens on loopback only (127.0.0.1) and serves [A2aServer]: a public Agent Card, and a
+ * JSON-RPC endpoint that needs the bearer token kept in [DesktopA2aServerTokenStore]. The token is
+ * never written to a log or shown on screen.
  */
 internal class DesktopA2aServer(
     private val tokenStore: DesktopA2aServerTokenStore = DesktopA2aServerTokenStore(),
+    /** The configured port; 0 picks a free one (tests). */
+    val port: Int = configuredPort(),
+    preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
 ) {
-    private val preferences = Preferences.userRoot().node(PREFERENCES_NODE)
+    private val preferences by lazy(preferencesNode)
     private val runtime = AtomicReference<ApplicationRuntime?>(null)
     private val token = AtomicReference<String?>(null)
+    @Volatile
     private var http: HttpServer? = null
     private var executor: ExecutorService? = null
 
@@ -43,9 +49,13 @@ internal class DesktopA2aServer(
     var tokenIsTemporary: Boolean = false
         private set
 
-    val port: Int = System.getenv("AIVE_A2A_PORT")?.trim()?.toIntOrNull()?.takeIf { it in 1024..65535 } ?: DEFAULT_PORT
+    /** The socket address it listens on; null while stopped. */
+    val listeningAddress: InetSocketAddress? get() = http?.address
 
-    val baseUrl: String get() = "http://127.0.0.1:$port"
+    /** The port it listens on while running (differs from [port] only when that is 0). */
+    val boundPort: Int get() = http?.address?.port ?: port
+
+    val baseUrl: String get() = "http://127.0.0.1:$boundPort"
 
     val agentCardUrl: String get() = baseUrl + A2aCodec.WELL_KNOWN_CARD_PATH
 
@@ -75,11 +85,17 @@ internal class DesktopA2aServer(
         nowIso = { Instant.now().toString() },
     )
 
+    /**
+     * The keeper's switch. Never pressed: on ([a2aServerEnabled]). The key is written only when the
+     * keeper presses it, so an explicit off (also from builds where off was the default) is kept.
+     */
     var enabledPreference: Boolean
-        get() = preferences.getBoolean(ENABLED_KEY, false)
+        get() = a2aServerEnabled(parseA2aServerChoice(runCatching { preferences.get(ENABLED_KEY, null) }.getOrNull()))
         set(value) {
-            preferences.putBoolean(ENABLED_KEY, value)
-            preferences.flush()
+            runCatching {
+                preferences.putBoolean(ENABLED_KEY, value)
+                preferences.flush()
+            }
         }
 
     fun attachRuntime(value: ApplicationRuntime?) = runtime.set(value)
@@ -88,7 +104,20 @@ internal class DesktopA2aServer(
     fun shownRunId(): String? =
         (runtime.get()?.state?.value as? ApplicationRuntimeState.Live)?.presentation?.run?.id?.value
 
-    /** Starts listening; throws when the port is taken. */
+    /**
+     * Starts listening and reports how that went, for the Keeper's room. Never throws: a port in
+     * use or any other failure leaves the server off and the rest of The Aive running.
+     */
+    fun startForStatus(): A2aServerStatus = try {
+        start()
+        A2aServerStatus.Listening(baseUrl)
+    } catch (_: BindException) {
+        A2aServerStatus.PortInUse(port)
+    } catch (failure: Exception) {
+        A2aServerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+    }
+
+    /** Starts listening; throws [BindException] when the port is taken. */
     @Synchronized
     fun start() {
         if (http != null) return
@@ -104,11 +133,12 @@ internal class DesktopA2aServer(
 
     @Synchronized
     fun stop() {
+        val wasRunning = http != null
         http?.stop(0)
         http = null
         executor?.shutdownNow()
         executor = null
-        runBlocking { core.failPending("The A2A server was turned off before the launch started") }
+        if (wasRunning) runBlocking { core.failPending("The A2A server was turned off before the launch started") }
     }
 
     /** A new token: clients holding the old one are refused from now on. */
@@ -164,6 +194,10 @@ internal class DesktopA2aServer(
         private const val ENABLED_KEY = "enabled"
         private val random = SecureRandom()
 
+        /** `AIVE_A2A_PORT` when it is a valid unprivileged port, else [DEFAULT_PORT]. */
+        fun configuredPort(): Int =
+            System.getenv("AIVE_A2A_PORT")?.trim()?.toIntOrNull()?.takeIf { it in 1024..65535 } ?: DEFAULT_PORT
+
         /** 32 random bytes, base64url without padding. */
         fun newToken(): String {
             val bytes = ByteArray(32).also(random::nextBytes)
@@ -177,8 +211,8 @@ internal class DesktopA2aServer(
  * DPAPI). Never in plain preferences: without a keychain the token is kept in memory for the
  * session only, and the Keeper's room says so.
  */
-internal class DesktopA2aServerTokenStore {
-    fun read(): String? = runCatching {
+internal open class DesktopA2aServerTokenStore {
+    open fun read(): String? = runCatching {
         val os = System.getProperty("os.name", "").lowercase()
         val result = when {
             os.contains("mac") -> CredentialTool.run(listOf("security", "find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"))
@@ -200,7 +234,7 @@ internal class DesktopA2aServerTokenStore {
     }.getOrNull()
 
     /** True when the OS store holds [token] afterwards. */
-    fun write(token: String): Boolean {
+    open fun write(token: String): Boolean {
         val os = System.getProperty("os.name", "").lowercase()
         val stored = runCatching {
             when {

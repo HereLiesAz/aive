@@ -3,7 +3,7 @@
 The Aive speaks Google's [Agent2Agent protocol](https://a2a-protocol.org) over its JSON-RPC binding, in both directions:
 
 - **Client:** a role can delegate its task to a remote A2A agent.
-- **Server (desktop only, opt-in):** other agents can start workflows in The Aive.
+- **Server (desktop only, on by default, this computer only):** other agents on the same computer that hold its token can start workflows in The Aive.
 
 The Aive writes the current specification (1.0): `SendMessage`/`GetTask`/`CancelTask`, ProtoJSON enums such as `TASK_STATE_COMPLETED`, and parts without `kind`. It reads both 1.0 and the widely deployed 0.3 (`message/send`, `tasks/get`, `tasks/cancel`, lowercase states, `kind` members). The codec is `shared/.../a2a/A2aProtocol.kt`.
 
@@ -48,11 +48,13 @@ If the agent answers `SendMessage` with a message instead of a task, that messag
 
 ## Server: The Aive as an A2A agent (desktop)
 
-Turn it on in **Keeper's room › This device › A2A server**. It is off by default and remembers the switch.
+It runs on desktop unless the keeper turns it off in **Keeper's room › This device › A2A server**. That row shows the address it listens on, and has **Copy token** and **New token**.
 
+- **On by default, and the choice is kept.** The switch is stored only when the keeper presses it (Java preferences node `com/hereliesaz/haive/a2a-server`, key `enabled`). A device that never pressed it, including one installed while the default was off, gets the server on. A keeper who turned it off keeps it off. The default lives in `a2aServerEnabled` (`A2aServerSetting.kt`).
 - **Address.** It listens on loopback only, `http://127.0.0.1:41241`. Set `AIVE_A2A_PORT` to use a different port (1024 to 65535).
+- **Port in use.** If another program holds the port, the server stays off for this session and the row says so in plain words. The rest of The Aive works as usual. It starts off the UI thread, so a slow keychain does not hold up the window.
 - **Requests from browsers.** Requests whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` are refused, against DNS rebinding. No CORS headers are sent.
-- **Token.** 32 random bytes, base64url. It lives in the OS keychain (macOS Keychain, Secret Service, Windows DPAPI). Without one, the token exists in memory only, changes on every start, and the room says so. **Copy token** puts it on the clipboard and it is never shown. **New token** locks out every holder of the old one.
+- **Token.** 32 random bytes, base64url, made on the first start and kept in the OS keychain (macOS Keychain, Secret Service, Windows DPAPI). It is never written to a log, shown on screen or put in the Agent Card. Without one, the token exists in memory only, changes on every start, and the room says so. **Copy token** puts it on the clipboard and it is never shown. **New token** locks out every holder of the old one.
 
 | Request | Auth | Result |
 |---|---|---|
@@ -84,5 +86,7 @@ Turn it on in **Keeper's room › This device › A2A server**. It is off by def
 
 - `shared/src/commonTest/.../a2a/A2aProtocolTest.kt`: card JSON shape, both message/task shapes, state and method mapping.
 - `A2aServerTest.kt`: auth refusal, Host check, launch/get/cancel, legacy names, busy rejection, error codes.
+- `A2aServerSettingTest.kt`: on by default, an explicit choice kept.
+- `desktopApp/src/test/.../DesktopA2aServerTest.kt`: binds loopback on a free port, serves the card, refuses calls without the token, keeps the token across starts, reports a port in use.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
 - `providers/llm/src/commonTest/.../A2aAgentProviderTest.kt`: the client against a mock agent, including the token-origin rule.

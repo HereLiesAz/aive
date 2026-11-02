@@ -70,6 +70,7 @@ import com.hereliesaz.geministrator.memory.desktopSqlMemoryBanks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
 
@@ -158,7 +159,7 @@ fun main() {
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
     val testRunner = LocalTestRunnerClient()
-    // Agent2Agent server (docs/A2A.md): off until turned on in the Keeper's room; loopback only.
+    // Agent2Agent server (docs/A2A.md): on unless the keeper turned it off; loopback only.
     val a2aServer = DesktopA2aServer()
 
     try {
@@ -384,20 +385,21 @@ fun main() {
                 var a2aEnabled by remember { mutableStateOf(a2aServer.enabledPreference) }
                 var a2aStatus by remember { mutableStateOf<A2aServerStatus>(A2aServerStatus.Off) }
                 var a2aTokenTemporary by remember { mutableStateOf(false) }
-                DisposableEffect(a2aEnabled) {
-                    val started = a2aEnabled
-                    if (started) {
-                        a2aStatus = try {
-                            a2aServer.start()
-                            A2aServerStatus.Listening(a2aServer.baseUrl)
-                        } catch (failure: Exception) {
-                            A2aServerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
-                        }
-                        a2aTokenTemporary = a2aServer.tokenIsTemporary
-                    } else {
+                // Started off the UI thread: reading or creating the keychain token runs a tool
+                // that can take seconds, and it now happens on every launch. A port in use only
+                // shows on the Keeper's room row; the rest of The Aive keeps working.
+                LaunchedEffect(a2aEnabled) {
+                    if (!a2aEnabled) {
                         a2aStatus = A2aServerStatus.Off
+                        return@LaunchedEffect
                     }
-                    onDispose { if (started) a2aServer.stop() }
+                    try {
+                        a2aStatus = withContext(Dispatchers.IO) { a2aServer.startForStatus() }
+                        a2aTokenTemporary = a2aServer.tokenIsTemporary
+                        awaitCancellation()
+                    } finally {
+                        a2aServer.stop()
+                    }
                 }
                 val a2aPendingLaunches by a2aServer.core.pendingLaunches.collectAsState()
                 val a2aServerSetting = A2aServerSetting(

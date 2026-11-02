@@ -967,11 +967,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_refresh_health">Refresh health</string>
     <string name="settings_remote_access">Remote Access</string>
     <string name="settings_a2a_server">A2A server</string>
-    <string name="settings_a2a_server_description">Let other agents on this computer start workflows here over the Agent2Agent protocol. Off by default. It listens only on this computer, and every call needs the token. Runs it starts still wait for your approvals.</string>
+    <string name="settings_a2a_server_description">Lets other agents on this computer start workflows here over the Agent2Agent protocol. On unless you turn it off. It listens only on this computer, and every call needs the token. Runs it starts still wait for your approvals.</string>
     <string name="settings_a2a_server_on">A2A server: ON</string>
     <string name="settings_a2a_server_off">A2A server: OFF</string>
     <string name="settings_a2a_server_card_url">Agent Card URL</string>
     <string name="settings_a2a_server_listening">Listening on %1$s</string>
+    <string name="settings_a2a_server_port_in_use">Another program is using port %1$s, so the A2A server is not running. Everything else works. Close that program, or set AIVE_A2A_PORT to another port and restart The Aive.</string>
     <string name="settings_a2a_server_failed">The A2A server could not start. Another program may be using its port.</string>
     <string name="settings_a2a_server_warning">Anyone with the token can start workflows on your linked AI providers. Treat it like a password. Reset it to lock out everyone who has it.</string>
     <string name="settings_a2a_server_copy_token">Copy token</string>
