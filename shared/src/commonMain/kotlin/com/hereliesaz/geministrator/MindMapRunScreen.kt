@@ -58,6 +58,12 @@ import com.hereliesaz.geministrator.resources.overview_github_url_or_owner_repos
 import com.hereliesaz.geministrator.resources.overview_gitlab_url_or_group_repository
 import com.hereliesaz.geministrator.resources.overview_invalid
 import com.hereliesaz.geministrator.resources.overview_jump_to_active
+import com.hereliesaz.geministrator.resources.overview_doing_now
+import androidx.compose.runtime.collectAsState
+import com.hereliesaz.geministrator.domain.TaskRun
+import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
+import com.hereliesaz.geministrator.workflow.SessionActivityKey
+import com.hereliesaz.geministrator.workflow.doingNowText
 import com.hereliesaz.geministrator.resources.overview_link_repository
 import com.hereliesaz.geministrator.resources.overview_loading_runtime
 import com.hereliesaz.geministrator.resources.overview_local_git_folder_path
@@ -144,6 +150,8 @@ internal fun MindMapRunScreen(
     /** Why the last launch did not start; shown beside Feed it until the next edit or launch. */
     launchError: String? = null,
     onDismissLaunchError: () -> Unit = {},
+    /** Live thinking and steps of each provider session; the active creature's newest is its "doing now". */
+    activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val scope = rememberCoroutineScope()
@@ -786,6 +794,13 @@ internal fun MindMapRunScreen(
                 // Opens the working creature; never closes it if it is already open.
                 onClick = { if (selectedTaskId != activeTaskId) onTaskSelected(activeTaskId) },
             )
+            run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == activeTaskId }?.let { activeRun ->
+                val name = activeRun.assignedRoleId
+                    ?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId }?.name }
+                    ?: liveWorkflow.definition.tasks.firstOrNull { it.id == activeRun.taskDefinitionId }?.name
+                    ?: activeTaskId
+                CreatureDoingNow(activeRun, name, activity)
+            }
         }
         GeministratorWorkflowMindMap(
             definition = liveWorkflow.definition,
@@ -825,6 +840,19 @@ internal fun MindMapRunScreen(
         }
         Spacer(Modifier.height(24.dp))
     }
+}
+
+/** One short line: what the active creature is doing now, its newest thought or step. */
+@Composable
+private fun CreatureDoingNow(taskRun: TaskRun, name: String, activity: SessionActivityFeeds) {
+    val providerRunId = taskRun.providerRunId ?: return
+    val feeds by activity.feeds.collectAsState()
+    val latest = feeds[SessionActivityKey(taskRun.id, providerRunId)]?.lastOrNull() ?: return
+    AzphaltNote(
+        seed = "doing-now-${taskRun.id.value}",
+        label = stringResource(Res.string.overview_doing_now, name),
+        value = latest.doingNowText(),
+    )
 }
 
 @Composable

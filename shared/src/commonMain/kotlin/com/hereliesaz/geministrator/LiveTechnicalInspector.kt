@@ -32,7 +32,19 @@ import androidx.compose.ui.semantics.Role
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
+import androidx.compose.ui.text.style.TextOverflow
+import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
+import com.hereliesaz.geministrator.workflow.SessionActivityKey
+import com.hereliesaz.geministrator.workflow.SessionActivityKind
+import com.hereliesaz.geministrator.workflow.activityWindow
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.inspector_activity
+import com.hereliesaz.geministrator.resources.inspector_activity_earlier
+import com.hereliesaz.geministrator.resources.inspector_activity_show_fewer
+import com.hereliesaz.geministrator.resources.inspector_activity_step
+import com.hereliesaz.geministrator.resources.inspector_activity_thinking
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_reject
 import com.hereliesaz.geministrator.resources.inspector_excluded_by_redaction_policy
@@ -114,6 +126,7 @@ internal fun TechnicalInspector(
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     connectedProviderIds: Set<String> = emptySet(),
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
+    activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -220,6 +233,8 @@ internal fun TechnicalInspector(
                 }
             }
             CreatureTab.Work -> {
+                // What it is doing, live: its own thinking and steps, apart from what you tell it.
+                CreatureActivity(taskRun, activity)
                 // Talking to its agent is part of its work, not something it needs from you.
                 if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
                     OutlinedTextField(
@@ -378,6 +393,64 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.ExternalService -> listOfNotNull(service, operation).joinToString(" · ")
     is TaskExecutor.NestedWorkflow -> workflowDefinitionId.value
     is TaskExecutor.Distributed -> label ?: (stringResource(Res.string.inspector_remote) + delegate.displayName())
+}
+
+/** Lines of a creature's activity shown before the older ones collapse. */
+private const val ACTIVITY_VISIBLE_LINES = 6
+
+/**
+ * A creature's live activity (its thinking and tool/progress steps, newest last) for its current
+ * provider session, from the in-memory [SessionActivityFeeds]. Older lines collapse behind one pill.
+ * Steering messages are not shown here: they have their own field below.
+ */
+@Composable
+private fun CreatureActivity(taskRun: TaskRun, activity: SessionActivityFeeds) {
+    val providerRunId = taskRun.providerRunId ?: return
+    val feeds by activity.feeds.collectAsState()
+    val lines = feeds[SessionActivityKey(taskRun.id, providerRunId)].orEmpty()
+    if (lines.isEmpty()) return
+    var expanded by remember(taskRun.id, providerRunId) { mutableStateOf(false) }
+    val window = lines.activityWindow(ACTIVITY_VISIBLE_LINES, expanded)
+    // Not a live region: reasoning streams in pieces, and announcing each would drown the panel.
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.inspector_activity), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        if (window.collapsed > 0) {
+            AzphaltPill(
+                label = pluralStringResource(Res.plurals.inspector_activity_earlier, window.collapsed, window.collapsed),
+                seed = "activity-earlier-${taskRun.id.value}",
+                onClick = { expanded = true },
+            )
+        } else if (expanded && lines.size > ACTIVITY_VISIBLE_LINES) {
+            AzphaltPill(
+                label = stringResource(Res.string.inspector_activity_show_fewer),
+                seed = "activity-fewer-${taskRun.id.value}",
+                onClick = { expanded = false },
+            )
+        }
+        window.shown.forEach { line ->
+            key(line.id) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(
+                            when (line.kind) {
+                                SessionActivityKind.Thinking -> Res.string.inspector_activity_thinking
+                                SessionActivityKind.Progress -> Res.string.inspector_activity_step
+                            },
+                        ),
+                        style = AzphaltType.eyebrow,
+                        color = azphaltOnSurface(),
+                    )
+                    Text(
+                        line.text,
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

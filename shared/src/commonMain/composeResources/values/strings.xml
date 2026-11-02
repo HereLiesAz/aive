@@ -155,6 +155,10 @@
     <string name="inspector_approve_task">Approve task</string>
     <string name="inspector_artifact">ARTIFACT %1$s · %2$s</string>
     <string name="inspector_artifacts">ARTIFACTS</string>
+    <string name="inspector_activity">WHAT IT'S DOING</string>
+    <string name="inspector_activity_thinking">THINKING</string>
+    <string name="inspector_activity_step">STEP</string>
+    <string name="inspector_activity_show_fewer">Show only the latest</string>
     <string name="inspector_attempt">ATTEMPT</string>
     <string name="inspector_blocked">BLOCKED</string>
     <string name="inspector_context_artifacts_sent">\nContext artifacts: %1$s sent</string>
@@ -483,6 +487,7 @@
     <string name="overview_gitlab_url_or_group_repository">GitLab URL or group/repository</string>
     <string name="overview_invalid">Invalid</string>
     <string name="overview_jump_to_active">Jump to active</string>
+    <string name="overview_doing_now">%1$s · DOING NOW</string>
     <string name="overview_link_repository">LINK REPOSITORY</string>
     <string name="overview_loading_runtime">Waking the hive…</string>
     <string name="overview_local_git_folder_path">Local Git folder path</string>
@@ -1042,6 +1047,10 @@
     <string name="terrarium_zoom_out">Zoom out</string>
 
     <!-- Count-dependent text -->
+    <plurals name="inspector_activity_earlier">
+        <item quantity="one">Show %1$d earlier line</item>
+        <item quantity="other">Show %1$d earlier lines</item>
+    </plurals>
     <plurals name="district_creatures">
         <item quantity="one">%1$d creature</item>
         <item quantity="other">%1$d creatures</item>
