@@ -35,6 +35,9 @@ import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.events.WorkflowEventSink
 import com.hereliesaz.geministrator.events.WorkflowFailed
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.recordPolicyDecision
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -71,6 +74,23 @@ class WorkflowEngine(
         return run.roleSnapshot.firstOrNull { it.id == id } ?: rolesById[id]
     }
 
+    /**
+     * [WorkflowRunFactory.refreshReadiness] that records each non-allow policy decision it makes
+     * (a repository mutation cancelled without a granted approval) on this engine's event sink.
+     */
+    suspend fun refreshReadiness(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val decisions = mutableListOf<Pair<PolicyRequest, PolicyDecision>>()
+        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis) { request, decision ->
+            decisions += request to decision
+        }
+        decisions.forEach { (request, decision) -> eventSink.recordPolicyDecision(request, decision, nowEpochMillis) }
+        return refreshed
+    }
+
     data class DispatchResult(
         val run: WorkflowRun,
         val handles: Map<TaskDefinitionId, ManagedSessionHandle>,
@@ -85,7 +105,7 @@ class WorkflowEngine(
     ): DispatchResult {
         if (run.status.isTerminal()) return DispatchResult(run, existingHandles)
 
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis)
+        val refreshed = refreshReadiness(definition, run, nowEpochMillis)
         val activeCount = refreshed.taskRuns.values.count { it.status.isActive() }
         var remainingSlots = (definition.concurrencyPolicy.maxConcurrentTasks - activeCount).coerceAtLeast(0)
         if (remainingSlots == 0) return DispatchResult(refreshed, existingHandles)
@@ -422,7 +442,7 @@ class WorkflowEngine(
             ),
             updatedAtEpochMillis = nowEpochMillis,
         )
-        nextRun = WorkflowRunFactory.refreshReadiness(definition, nextRun, nowEpochMillis)
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
         val status = deriveWorkflowStatus(nextRun)
         if (status == WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
@@ -533,7 +553,7 @@ class WorkflowEngine(
             )
         }
 
-        nextRun = WorkflowRunFactory.refreshReadiness(definition, nextRun, nowEpochMillis)
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
         val workflowStatus = deriveWorkflowStatus(nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))

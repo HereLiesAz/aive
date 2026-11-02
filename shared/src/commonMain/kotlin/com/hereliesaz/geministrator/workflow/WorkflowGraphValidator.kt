@@ -5,6 +5,14 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.policy.ApprovalEvidence
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isDenied
 
 sealed interface WorkflowValidationError {
     data class DuplicateTaskId(val taskId: TaskDefinitionId) : WorkflowValidationError
@@ -93,13 +101,28 @@ object WorkflowGraphValidator {
             }
 
             // A repository operation placed on another device is still a repository operation.
+            // Invariant 4 is decided by the policy decision point: statically, a declared approval
+            // ancestor gates the mutation, and its absence denies it.
             val repositoryOperation = task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation
-            if (
-                repositoryOperation != null &&
-                repositoryOperation.isMutation() &&
-                !hasHumanApprovalAncestor(task.id)
-            ) {
-                errors += WorkflowValidationError.MissingRepositoryMutationApproval(task.id)
+            if (repositoryOperation != null) {
+                val decision = InProcessPolicyDecisionPoint.decide(
+                    PolicyRequest(
+                        subject = PolicySubject.System,
+                        action = PolicyAction.RunRepositoryOperation(repositoryOperation.operation),
+                        resource = PolicyResource.task(task.id),
+                        context = PolicyContext(
+                            taskDefinitionId = task.id,
+                            approval = if (repositoryOperation.isMutation() && hasHumanApprovalAncestor(task.id)) {
+                                ApprovalEvidence.Declared
+                            } else {
+                                ApprovalEvidence.None
+                            },
+                        ),
+                    ),
+                )
+                if (decision.isDenied) {
+                    errors += WorkflowValidationError.MissingRepositoryMutationApproval(task.id)
+                }
             }
         }
 

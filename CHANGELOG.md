@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Authority checks (who may decide a gate, what an approval policy requires, add-on host permissions, role authority for reasoning stages, and the rule that repository changes need a person's approval) are now answered by one in-process policy decision point, with the same outcomes as before. A refused gate decider, an opened plan gate and a repository change cancelled for lack of approval now appear on the run timeline as policy decisions. See docs/architecture/POLICY.md.
 - On Android and desktop, one unreadable workflow record no longer marks the whole store as corrupt (whose recovery clears everything). The record is skipped, its contents are kept aside in the database, and it is listed as quarantined; everything else loads as usual.
 - Retrying a repository operation (for example after approving a failure escalation) runs it again; each attempt now has its own run record instead of replaying the first attempt's failure. On desktop, two starts of the same Local Git operation can no longer both run Git, and its run record is replaced in one atomic step.
 - An executor (GitHub Action, script, test runner, deployment, external service) that throws while starting now fails only its own task, which then follows its retry or escalation policy, instead of stopping the whole cycle with the task stuck Ready. Each started external run is saved as soon as it starts, so a later failure in the same cycle cannot cause it to be started twice.

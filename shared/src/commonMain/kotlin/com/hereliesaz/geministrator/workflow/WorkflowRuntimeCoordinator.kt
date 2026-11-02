@@ -1,7 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ApprovalGateId
-import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
@@ -20,6 +19,13 @@ import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestratio
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -502,18 +508,30 @@ class WorkflowRuntimeCoordinator(
             val gateId = ApprovalGateId("plan:${run.id.value}:${taskId.value}:${taskRun.attempt}")
             if (persistence.approvalGates.get(gateId) != null) continue
 
+            // The task already stopped for approval, so ask the policy decision point who must
+            // decide. A task with no approval policy only stops here when its provider insists on
+            // one (e.g. committing a workflow file to the default branch), which is a person's call.
+            val request = PolicyRequest(
+                subject = PolicySubject.System,
+                action = PolicyAction.ProceedPastPlan(task.approvalPolicy, providerRequested = true),
+                resource = PolicyResource.task(taskId),
+                context = PolicyContext(workflowRunId = run.id, taskDefinitionId = taskId),
+            )
+            val decision = InProcessPolicyDecisionPoint.decide(request)
+            val requiresHuman = when (decision) {
+                is PolicyDecision.RequireApproval -> decision.requiresHuman
+                is PolicyDecision.Allow, is PolicyDecision.Deny -> false
+            }
             gateCoordinator.open(
                 id = gateId,
                 workflowRunId = run.id,
                 taskDefinitionId = taskId,
                 kind = ApprovalGateKind.PlanApproval,
                 reason = "Plan approval required for '${task.name}'",
-                // A task with no approval policy only stops here when its provider insists on one
-                // (e.g. committing a workflow file to the default branch), which is a person's call.
-                requiresHuman = task.approvalPolicy is ApprovalPolicy.HumanApproval ||
-                    task.approvalPolicy == ApprovalPolicy.None,
+                requiresHuman = requiresHuman,
                 nowEpochMillis = now,
             )
+            gateCoordinator.recordPolicyDecision(request, decision, now)
         }
     }
 
@@ -686,12 +704,12 @@ class WorkflowRuntimeCoordinator(
         return next
     }
 
-    private fun refreshAfterSystemExecution(
+    private suspend fun refreshAfterSystemExecution(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
     ): WorkflowRun {
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, now)
+        val refreshed = engine.refreshReadiness(definition, run, now)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }
@@ -853,7 +871,7 @@ class WorkflowRuntimeCoordinator(
                 updatedAtEpochMillis = now,
             )
         }
-        return WorkflowRunFactory.refreshReadiness(definition, next, now)
+        return engine.refreshReadiness(definition, next, now)
     }
 
     private fun com.hereliesaz.geministrator.domain.ComputePlacementPolicy.allowsLocalFallback(): Boolean =

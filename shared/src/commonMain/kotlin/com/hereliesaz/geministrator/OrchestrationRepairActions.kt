@@ -7,6 +7,8 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.activeRoles
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
+import com.hereliesaz.geministrator.events.WorkflowEvent
+import com.hereliesaz.geministrator.policy.auditEvent
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationFailure
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
@@ -161,6 +163,7 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
             else -> freshTaskRun
         }
     }
+    val policyEvents = mutableListOf<WorkflowEvent>()
     val repairedRun = WorkflowRunFactory.refreshReadiness(
         definition = preparedDefinition,
         run = freshRun.copy(
@@ -170,9 +173,11 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
             updatedAtEpochMillis = now,
         ),
         nowEpochMillis = now,
+        onPolicyDecision = { request, decision -> request.auditEvent(decision, now)?.let(policyEvents::add) },
     ).copy(status = WorkflowRunStatus.Running)
 
     persistence.definitions.put(preparedDefinition)
     persistence.runs.put(repairedRun)
+    policyEvents.forEach { persistence.events.append(it) }
     refresh()
 }

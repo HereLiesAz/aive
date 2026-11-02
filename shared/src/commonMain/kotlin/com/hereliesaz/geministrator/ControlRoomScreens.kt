@@ -57,6 +57,8 @@ import com.hereliesaz.geministrator.events.ApprovalRequired
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
+import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
+import com.hereliesaz.geministrator.policy.PolicyEffect
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskBecameReady
@@ -106,6 +108,9 @@ import com.hereliesaz.geministrator.resources.runs_no_pending_decisions
 import com.hereliesaz.geministrator.resources.runs_no_projects_yet
 import com.hereliesaz.geministrator.resources.runs_no_runs
 import com.hereliesaz.geministrator.resources.runs_plan_approval
+import com.hereliesaz.geministrator.resources.runs_policy_allowed
+import com.hereliesaz.geministrator.resources.runs_policy_denied
+import com.hereliesaz.geministrator.resources.runs_policy_requires_approval
 import com.hereliesaz.geministrator.resources.runs_reject_reassigns_to
 import com.hereliesaz.geministrator.resources.runs_reject_stops_the_workflow
 import com.hereliesaz.geministrator.resources.runs_rejected
@@ -478,6 +483,7 @@ internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when
     is TaskCancelled -> event.taskDefinitionId
     is WorkflowCreated, is WorkflowCompleted, is WorkflowFailed, is WorkflowCancelled -> null
     is ProviderUsageRecorded -> null
+    is PolicyDecisionRecorded -> event.taskDefinitionId
 }
 
 @Composable
@@ -501,6 +507,11 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is WorkflowCancelled -> stringResource(Res.string.runs_workflow_cancelled)
     is TaskCancelled -> stringResource(Res.string.runs_task_cancelled)
     is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
+    is PolicyDecisionRecorded -> when (event.effect) {
+        PolicyEffect.Allow -> stringResource(Res.string.runs_policy_allowed)
+        PolicyEffect.Deny -> stringResource(Res.string.runs_policy_denied)
+        PolicyEffect.RequireApproval -> stringResource(Res.string.runs_policy_requires_approval)
+    }
 }
 
 internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
@@ -514,6 +525,7 @@ internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is TaskFailed -> event.reason.take(80)
     is WorkflowFailed -> event.reason.take(80)
     is HumanDecisionRequired -> event.reason.take(80)
+    is PolicyDecisionRecorded -> event.reason.take(80)
     is ExecutorAssigned -> event.executor::class.simpleName ?: "executor"
     is AgentAssigned -> event.roleId.value
     else -> event.workflowRunId.value.takeLast(8)

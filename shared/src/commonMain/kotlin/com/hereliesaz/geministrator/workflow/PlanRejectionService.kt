@@ -23,9 +23,7 @@ class PlanRejectionService(
         require(gate.kind == ApprovalGateKind.PlanApproval) {
             "Approval gate ${gateId.value} is not a plan gate"
         }
-        require(gate.requiredRoleId == null || gate.requiredRoleId == decidedByRoleId) {
-            "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
-        }
+        gateCoordinator.requireDecider(gate, decidedByRoleId, nowEpochMillis)
         require(gate.status == ApprovalGateStatus.Pending) {
             "Approval gate ${gateId.value} cannot be rejected while ${gate.status}"
         }
