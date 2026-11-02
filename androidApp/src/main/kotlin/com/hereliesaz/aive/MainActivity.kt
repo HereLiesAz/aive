@@ -117,12 +117,14 @@ class MainActivity : ComponentActivity() {
     }
     // MCP servers the keeper connects (docs/architecture/MCP_HOST.md): Streamable HTTP only here.
     private val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    private val mcpElicitation = com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate()
     private val mcpHost by lazy {
         com.hereliesaz.geministrator.mcp.McpHost(
             store = com.hereliesaz.geministrator.mcp.McpServerStore(),
             vault = AndroidMcpCredentialStore(this),
             transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(repositoryHttpClient),
             consent = mcpConsent,
+            elicitation = mcpElicitation,
         )
     }
     /** Local Git folders, imported into app storage and worked on through JGit. */
@@ -485,6 +487,7 @@ class MainActivity : ComponentActivity() {
                         breedPurchases = breedPurchases,
                         mcpHost = mcpHost,
                         mcpConsent = mcpConsent,
+                        mcpElicitation = mcpElicitation,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,

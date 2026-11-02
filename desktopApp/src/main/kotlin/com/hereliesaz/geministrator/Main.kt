@@ -101,6 +101,7 @@ fun main() {
     val httpClient = HttpClient(CIO)
     // MCP servers the keeper connects (docs/architecture/MCP_HOST.md); local ones run as processes.
     val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    val mcpElicitation = com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate()
     val mcpHost = com.hereliesaz.geministrator.mcp.McpHost(
         store = com.hereliesaz.geministrator.mcp.McpServerStore(),
         vault = DesktopMcpCredentialStore(),
@@ -110,6 +111,7 @@ fun main() {
         ),
         consent = mcpConsent,
         stdioSupported = true,
+        elicitation = mcpElicitation,
     )
     // Code execution with MCP: a script sandbox over the same tools and consent, off until the
     // keeper turns it on (docs/architecture/MCP_HOST.md, "Code execution").
@@ -382,6 +384,7 @@ fun main() {
                         mcpHost = mcpHost,
                         mcpConsent = mcpConsent,
                         codeExecution = codeExecution,
+                        mcpElicitation = mcpElicitation,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,

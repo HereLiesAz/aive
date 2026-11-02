@@ -234,6 +234,8 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - A local (stdio) server runs arbitrary code on the desktop.
 - Code execution (desktop, opt-in): a model steered by injection writes a script that escapes the sandbox, exhausts the device (an endless loop, unbounded memory or output), or calls tools in bulk without the keeper seeing each call.
 - A bearer token is sent to the wrong host or over cleartext.
+- A server uses elicitation to phish: it asks the keeper for a password or token in a form, or sends a look-alike URL.
+- A server keeps a call open forever (endless input requests, a task that never ends) or leaves work running after the keeper cancels.
 
 **Mitigations in place**
 - Every server needs the keeper's consent. Either it is **Always allow**, or the first call per server per run stops at an approval gate that shows the tool, the server and the arguments. An unanswered gate is a refusal, and a refused call is never sent. Reaching a server or listing its tools is not consent.
@@ -245,6 +247,9 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - Code execution is off until the keeper turns on **Script sandbox**, and exists only on the desktop. The script runs as JavaScript in QuickJS compiled to WebAssembly, on a pure-Java WebAssembly runtime (Endive): it is never handed to a shell, a JVM scripting engine or the host process. The guest has no filesystem, network, environment or process access; its only effective import is the bridge, and every bridged call is an ordinary call through the host's consent gate for the same run, so the sandbox adds no authority: it can do only what the model could already do with direct calls. It cannot call itself, nor tools the run was not offered.
 - A script is bounded: 20,000 characters, 16 tool calls, 10 s of computing time, 12 minutes in all, 64 MB of memory, 4,000 characters of console output and a 16,000-character result, and it stops when the run is cancelled. Its final value is fenced as external content naming the tools it used, and the answer carries the same provenance as any tool use.
 - Invariant 3 holds: the script is a tool argument the model wrote, not artifact content, and The Aive's runtime does not execute it; only the capability-less guest interpreter does. Nothing a script or tool returns is executed.
+- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell.
+- The client never declares sampling or roots. It declares elicitation only on a call the keeper already allowed, and only where a keeper can be asked. Each request is titled with the server's name, warns against entering secrets (and flags secret-looking fields), and is validated against its flat schema before anything is sent. A URL is shown in full as plain text, with its host set apart and look-alikes (Punycode, embedded names, cleartext) flagged; only `http(s)` is accepted, and it is opened in the system browser only on the keeper's tap, never fetched. Declining, cancelling or 10 minutes of silence sends no data. The Aive sends answers to that server only, never to the model or run artifacts; a result that repeats them is fenced like any other.
+- Input rounds are bounded (4 retries, 8 requests each). Tasks are polled with backoff, capped at 30 minutes and 1,000 polls, and cancelled with `tasks/cancel` when the run is cancelled or the wait ends.
 
 **Residual risks**
 - After consent, a server sees whatever arguments the model writes, which may include task content. A server allowed always is never asked about again.
@@ -252,6 +257,7 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - Tool descriptions are shown to the model as the server wrote them.
 - With a server allowed always, a script can make its 16 calls to that server without a question per call, as the model could across turns. The keeper sees one progress line for the script, not one per bridged call.
 - The sandbox's isolation rests on the WebAssembly runtime and the QuickJS build (quickjs4j); a bug there could reach the JVM. The guest still holds no credentials, and its thread holds only the bridge. Time is bounded by interruption, not instruction metering, so a guest stuck in a host call ends only when that call ends or the total time runs out.
+- A keeper can still type a secret into a form, or complete a phishing page opened from a URL request; the warnings do not prevent it. A task the keeper cancels may still finish on the server.
 
 ### Repository operations
 

@@ -34,6 +34,13 @@ object McpProtocol {
     const val HEADER_SESSION_ID = "Mcp-Session-Id"
     const val HEADER_PARAM_PREFIX = "Mcp-Param-"
 
+    /** The Tasks extension (SEP-2663): a `tools/call` may come back as a task to poll. */
+    const val EXTENSION_TASKS = "io.modelcontextprotocol/tasks"
+
+    const val RESULT_COMPLETE = "complete"
+    const val RESULT_INPUT_REQUIRED = "input_required"
+    const val RESULT_TASK = "task"
+
     const val HEADER_MISMATCH = -32020
     const val MISSING_REQUIRED_CLIENT_CAPABILITY = -32021
     const val UNSUPPORTED_PROTOCOL_VERSION = -32022
@@ -52,12 +59,15 @@ class McpRpcException(val code: Int, message: String, val data: JsonElement? = n
 open class McpProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * The server asked for input (an elicitation, a sampling call or roots) before it can finish. The
- * host declares no such client capability yet, so this ends the call; [result] is the server's
- * `InputRequiredResult` for a later Elicitation layer to answer.
+ * The server asked for input The Aive cannot give: a sampling call or roots (never declared), an
+ * elicitation on a call made without a keeper to ask, or one request too many. [result] is the
+ * server's `InputRequiredResult` (or the task carrying the requests).
  */
 class McpInputRequiredException(val result: JsonObject) :
-    McpProtocolException("The MCP server asked for input The Aive cannot give yet")
+    McpProtocolException("The MCP server asked for input The Aive cannot give")
+
+/** A task-augmented call ended without a result: failed, cancelled, or not done in time. */
+class McpTaskException(message: String) : McpProtocolException(message)
 
 /** JSON-RPC 2.0 framing for MCP messages. */
 object McpJsonRpc {

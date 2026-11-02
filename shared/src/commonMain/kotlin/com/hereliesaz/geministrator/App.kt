@@ -135,6 +135,8 @@ fun App(
     mcpConsent: com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate? = null,
     /** The script sandbox over [mcpHost], where the platform has one (desktop); its opt-in is in Connections. */
     codeExecution: com.hereliesaz.geministrator.mcp.CodeExecutionToolSource? = null,
+    /** Where MCP servers' requests for input are shown; null where no keeper can be asked. */
+    mcpElicitation: com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -545,6 +547,7 @@ fun App(
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
                 mcpConsent?.let { McpConsentDialog(it) }
+                mcpElicitation?.let { McpElicitationDialog(it) }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,
