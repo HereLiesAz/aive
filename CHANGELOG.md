@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Cancelling a run now stops the work it started elsewhere too: its GitHub Actions runs are cancelled on GitHub, its nested workflow child runs are cancelled (with their own sessions, external runs and children), and its distributed leases are cancelled on the relay. These remote cancels are best effort. One that fails is listed in the run's events as "Remote run not cancelled", and the run is still cancelled.
 - On Android and desktop, one unreadable workflow record no longer marks the whole store as corrupt (whose recovery clears everything). The record is skipped, its contents are kept aside in the database, and it is listed as quarantined; everything else loads as usual.
 - Retrying a repository operation (for example after approving a failure escalation) runs it again; each attempt now has its own run record instead of replaying the first attempt's failure. On desktop, two starts of the same Local Git operation can no longer both run Git, and its run record is replaced in one atomic step.
 - An executor (GitHub Action, script, test runner, deployment, external service) that throws while starting now fails only its own task, which then follows its retry or escalation policy, instead of stopping the whole cycle with the task stuck Ready. Each started external run is saved as soon as it starts, so a later failure in the same cycle cannot cause it to be started twice.

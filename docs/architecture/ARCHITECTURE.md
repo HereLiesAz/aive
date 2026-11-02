@@ -68,6 +68,8 @@ Non-agent execution does not require a fabricated employee role. A GitHub Action
 
 `TaskRun` persists the resolved executor independently from `assignedRoleId`, `assignedProviderId`, `providerRunId`, and `externalRunId`. The workflow engine dispatches provider-backed work through the provider/session boundary, moves human executors into explicit approval state, and exposes `completeTask` for externally driven system executors to report artifacts, external run IDs, and completion without pretending to be agent sessions.
 
+Cancelling a run (`WorkflowRuntimeCoordinator.cancel`) cascades. The run and its unfinished tasks are cancelled and persisted, and its provider sessions are stopped. Then, for every unfinished system-executor task that holds an `externalRunId`, the coordinator calls `TaskExecutorIntegration.cancel` (default: no-op). GitHub Actions cancels the workflow run (`POST /repos/{owner}/{repo}/actions/runs/{id}/cancel`; a `409` for a finished run counts as done). A nested workflow cancels its child run through the child's own coordinator, which repeats the cascade down the tree. A distributed task cancels its relay lease. An external service task calls `ExternalServiceClient.cancel`. Remote cancels are best effort and idempotent, and they run after the local cancellation, outside the cycle lock. One that throws is recorded as an `ExternalRunCancelFailed` event, and the rest still run. Tasks owned by the compute mesh (`RemoteComputeCoordinator`) are not covered.
+
 ## Swarm model
 
 Built-in responsibilities include:

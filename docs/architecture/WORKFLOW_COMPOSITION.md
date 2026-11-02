@@ -41,7 +41,8 @@ Use nesting when the child should preserve its own run boundary, lifecycle, arti
 - starts a child `WorkflowRun` of the referenced definition, in the node's `projectId` when set and otherwise in the parent's project. The child uses the stored definition as-is and the parent run's role snapshot;
 - stores the child run ID as the task run's `externalRunId`. The ID is derived from the parent task run and attempt (`nested-d<depth>-<taskRunId>-a<attempt>`), so a repeated dispatch or a reconcile after restart reattaches to the same child run and never starts a duplicate;
 - advances the child one cycle on each parent reconcile, through a coordinator owned by that child, and reports the fraction of child tasks done as progress;
-- completes when the child completes and fails when the child fails or is cancelled. The parent task's own retry and escalation policy then applies.
+- completes when the child completes and fails when the child fails or is cancelled. The parent task's own retry and escalation policy then applies;
+- is cancelled with its parent. Cancelling the parent run cancels the child run through its own coordinator. That cancels the child's provider sessions, its external runs and its own nested children, recursively. A child that has already finished is left as it is.
 
 Safeguards:
 

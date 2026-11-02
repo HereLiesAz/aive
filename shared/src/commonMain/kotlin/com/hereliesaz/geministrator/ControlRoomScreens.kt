@@ -56,6 +56,7 @@ import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.events.RetryScheduled
@@ -116,6 +117,7 @@ import com.hereliesaz.geministrator.resources.runs_running
 import com.hereliesaz.geministrator.resources.runs_security_risk
 import com.hereliesaz.geministrator.resources.runs_stop
 import com.hereliesaz.geministrator.resources.runs_task_cancelled
+import com.hereliesaz.geministrator.resources.runs_external_cancel_failed
 import com.hereliesaz.geministrator.resources.runs_task_completed
 import com.hereliesaz.geministrator.resources.runs_task_escalated
 import com.hereliesaz.geministrator.resources.runs_task_failed
@@ -476,6 +478,7 @@ internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when
     is TaskFailed -> event.taskDefinitionId
     is HumanDecisionRequired -> event.taskDefinitionId
     is TaskCancelled -> event.taskDefinitionId
+    is ExternalRunCancelFailed -> event.taskDefinitionId
     is WorkflowCreated, is WorkflowCompleted, is WorkflowFailed, is WorkflowCancelled -> null
     is ProviderUsageRecorded -> null
 }
@@ -500,6 +503,7 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is WorkflowFailed -> stringResource(Res.string.runs_workflow_failed)
     is WorkflowCancelled -> stringResource(Res.string.runs_workflow_cancelled)
     is TaskCancelled -> stringResource(Res.string.runs_task_cancelled)
+    is ExternalRunCancelFailed -> stringResource(Res.string.runs_external_cancel_failed)
     is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
 }
 
@@ -514,6 +518,7 @@ internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is TaskFailed -> event.reason.take(80)
     is WorkflowFailed -> event.reason.take(80)
     is HumanDecisionRequired -> event.reason.take(80)
+    is ExternalRunCancelFailed -> event.reason.take(80)
     is ExecutorAssigned -> event.executor::class.simpleName ?: "executor"
     is AgentAssigned -> event.roleId.value
     else -> event.workflowRunId.value.takeLast(8)

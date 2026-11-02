@@ -185,6 +185,20 @@ data class TaskCancelled(
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent
 
+/**
+ * Cancelling the remote work behind a task (a GitHub Actions run, a nested child run, a
+ * distributed lease, an external service run) failed while its workflow run was being cancelled.
+ * The local cancellation still stands; the remote work may keep running until it ends on its own.
+ */
+@Serializable
+data class ExternalRunCancelFailed(
+    override val workflowRunId: WorkflowRunId,
+    val taskDefinitionId: TaskDefinitionId,
+    val externalRunId: String,
+    val reason: String,
+    override val occurredAtEpochMillis: Long,
+) : WorkflowEvent
+
 /** Opportunistic telemetry from providers that expose usage data. Never affects run state. */
 @Serializable
 data class ProviderUsageRecorded(

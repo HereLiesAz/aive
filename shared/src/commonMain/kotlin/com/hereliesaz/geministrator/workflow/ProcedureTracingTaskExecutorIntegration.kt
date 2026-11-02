@@ -31,6 +31,9 @@ class ProcedureTracingTaskExecutorIntegration(
         context, ProcedureTracePhase.Reconcile,
     ) { delegate.reconcile(context) }
 
+    /** Cancellation is not a procedure step; it passes straight through without a trace. */
+    override suspend fun cancel(context: TaskExecutorContext) = delegate.cancel(context)
+
     private suspend fun record(
         context: TaskExecutorContext,
         phase: ProcedureTracePhase,

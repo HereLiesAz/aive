@@ -112,6 +112,12 @@ class DistributedComputeExecutorIntegration(
         }
     }
 
+    /** Only the lease's origin may cancel it, and this node is that origin. Cancelling twice is harmless. */
+    override suspend fun cancel(context: TaskExecutorContext) {
+        val leaseId = context.taskRun.externalRunId ?: return
+        gateway.cancel(leaseId, "Workflow run ${context.run.id.value} was cancelled")
+    }
+
     private fun leaseId(context: TaskExecutorContext): String =
         listOf(
             "distributed",

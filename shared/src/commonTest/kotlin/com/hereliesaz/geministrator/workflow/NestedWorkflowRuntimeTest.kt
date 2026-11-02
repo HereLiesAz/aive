@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
@@ -151,6 +152,82 @@ class NestedWorkflowRuntimeTest {
         assertEquals(WorkflowRunStatus.Completed, fixture.persistence.runs.get(childRunId)?.status)
         assertEquals(WorkflowRunStatus.Completed, state.run.status)
         assertFalse(fixture.client.approvePendingHumanApproval(childRunId.value))
+    }
+
+    @Test
+    fun cancellingTheParentCancelsTheNestedChildAndItsExternalRun() = runBlocking {
+        val fixture = Fixture()
+        val parent = fixture.parentDefinition(childDefinition())
+        fixture.persistence.definitions.put(childDefinition())
+        var state = fixture.launch(parent)
+        repeat(2) { state = fixture.cycle(parent, state) }
+        val childRunId = WorkflowRunId(assertNotNull(state.run.taskRuns.getValue(parentTask).externalRunId))
+        assertEquals(TaskRunStatus.Running, fixture.persistence.runs.get(childRunId)?.taskRuns?.getValue(childTask)?.status)
+
+        val cancelled = fixture.coordinator.cancel(project, parent, state, 500L)
+
+        assertEquals(WorkflowRunStatus.Cancelled, cancelled.run.status)
+        val child = assertNotNull(fixture.persistence.runs.get(childRunId))
+        assertEquals(WorkflowRunStatus.Cancelled, child.status)
+        assertEquals(TaskRunStatus.Cancelled, child.taskRuns.getValue(childTask).status)
+        // The child's own external run (a deployment) was cancelled through its integration.
+        assertEquals(listOf("deploy-1"), fixture.deployments.cancelled)
+        assertTrue(fixture.persistence.events.forRun(cancelled.run.id).none { it is ExternalRunCancelFailed })
+
+        // Cancelling again is a no-op: nothing more is sent to the remote side.
+        fixture.coordinator.cancel(project, parent, cancelled, 600L)
+        fixture.client.cancel(project, childRunId.value)
+        assertEquals(listOf("deploy-1"), fixture.deployments.cancelled)
+    }
+
+    @Test
+    fun aThrowingRemoteCancelIsRecordedAndDoesNotStopTheOthers() = runBlocking {
+        val fixture = Fixture()
+        fixture.deployments.failCancelFor = setOf("deploy-1")
+        fixture.persistence.definitions.put(childDefinition())
+        val parent = WorkflowDefinition(
+            id = WorkflowDefinitionId("parent"),
+            name = "Parent",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("release"),
+                    name = "Release",
+                    objective = "Release",
+                    roleId = null,
+                    executor = TaskExecutor.Deployment("production"),
+                    retryPolicy = RetryPolicy(maxAttempts = 1),
+                ),
+                TaskDefinition(
+                    id = parentTask,
+                    name = "Nest",
+                    objective = "Run the child workflow",
+                    roleId = null,
+                    executor = TaskExecutor.NestedWorkflow(WorkflowDefinitionId("child")),
+                    retryPolicy = RetryPolicy(maxAttempts = 1),
+                ),
+            ),
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        var state = fixture.launch(parent)
+        repeat(2) { state = fixture.cycle(parent, state) }
+        assertEquals("deploy-1", state.run.taskRuns.getValue(TaskDefinitionId("release")).externalRunId)
+        val childRunId = WorkflowRunId(assertNotNull(state.run.taskRuns.getValue(parentTask).externalRunId))
+        assertEquals(2, fixture.deployments.dispatches)
+
+        val cancelled = fixture.coordinator.cancel(project, parent, state, 500L)
+
+        // The local cancellation stands even though one remote cancel threw.
+        assertEquals(WorkflowRunStatus.Cancelled, cancelled.run.status)
+        assertEquals(WorkflowRunStatus.Cancelled, fixture.persistence.runs.get(cancelled.run.id)?.status)
+        // The nested child, and through it its own deployment, was still cancelled.
+        assertEquals(WorkflowRunStatus.Cancelled, fixture.persistence.runs.get(childRunId)?.status)
+        assertEquals(listOf("deploy-1", "deploy-2"), fixture.deployments.cancelled.sorted())
+        val failure = fixture.persistence.events.forRun(cancelled.run.id)
+            .filterIsInstance<ExternalRunCancelFailed>()
+            .single()
+        assertEquals(TaskDefinitionId("release"), failure.taskDefinitionId)
+        assertEquals("deploy-1", failure.externalRunId)
+        assertEquals("Deployment API unreachable", failure.reason)
     }
 
     @Test
@@ -290,6 +367,8 @@ class NestedWorkflowRuntimeTest {
 private class ControllableDeploymentIntegration : TaskExecutorIntegration {
     var dispatches = 0
     var outcome: TaskRunStatus = TaskRunStatus.Running
+    val cancelled = mutableListOf<String>()
+    var failCancelFor: Set<String> = emptySet()
 
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.Deployment
 
@@ -300,6 +379,12 @@ private class ControllableDeploymentIntegration : TaskExecutorIntegration {
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution =
         TaskExecutorExecution(outcome, externalRunId = context.taskRun.externalRunId)
+
+    override suspend fun cancel(context: TaskExecutorContext) {
+        val runId = context.taskRun.externalRunId ?: return
+        cancelled += runId
+        if (runId in failCancelFor) error("Deployment API unreachable")
+    }
 }
 
 private class NestedNoopGateway : ManagedSessionGateway {

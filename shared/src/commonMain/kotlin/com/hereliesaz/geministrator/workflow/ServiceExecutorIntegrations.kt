@@ -83,6 +83,9 @@ class RepositoryOperationExecutorIntegration(
 interface ExternalServiceClient {
     suspend fun start(project: Project, service: String, operation: String?): ExternalExecutionRun
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
+
+    /** Stop [runId], best effort and idempotent. The default does nothing, for services with no cancel API. */
+    suspend fun cancel(project: Project, runId: String) = Unit
 }
 
 class ExternalServiceExecutorIntegration(
@@ -101,6 +104,11 @@ class ExternalServiceExecutorIntegration(
         }
         return client.getRun(context.project, runId).toTaskExecution()
     }
+
+    override suspend fun cancel(context: TaskExecutorContext) {
+        val runId = context.taskRun.externalRunId ?: return
+        client.cancel(context.project, runId)
+    }
 }
 
 interface NestedWorkflowClient {
@@ -118,6 +126,13 @@ interface NestedWorkflowClient {
     ): ExternalExecutionRun = start(context.project, workflowDefinitionId, targetProjectId)
 
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
+
+    /**
+     * Cancel child run [runId] and, through it, everything it still runs (provider sessions,
+     * external runs and its own nested children). Best effort and idempotent: a finished or
+     * already cancelled child is left as it is. The default does nothing.
+     */
+    suspend fun cancel(project: Project, runId: String) = Unit
 }
 
 class NestedWorkflowExecutorIntegration(
@@ -148,5 +163,10 @@ class NestedWorkflowExecutorIntegration(
             "Nested workflow task ${context.task.id.value} is missing its external run ID"
         }
         return client.getRun(context.project, runId).toTaskExecution()
+    }
+
+    override suspend fun cancel(context: TaskExecutorContext) {
+        val runId = context.taskRun.externalRunId ?: return
+        client.cancel(context.project, runId)
     }
 }
