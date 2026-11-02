@@ -16,6 +16,24 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 - The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`.
 - Disconnecting an agent forgets both.
 
+**Drifters at the hive's edge.** The other way in is the hive's edge (`Swarm-OS.md`): **Bring in a drifter** takes the same Agent Card address and reads the card, without a token and without following redirects (`A2aDrifters.read`). The drifter waits at the edge, drawn as a creature picked by a stable hash of its card URL, with its name, description and skill names (one bounded line each; the card is remote text). What went wrong lands on it in plain words: not an address it can be reached at, nothing answered (with the HTTP status or error kind), no Agent Card there (404/410), not an Agent Card, or a card with no `JSONRPC` interface. Waiting drifters last for the session.
+
+- **Let it in** adds the card to `A2aAgentConnections` (the same list the Keeper's room shows; nothing is duplicated), names it after the card, and adds a role `drifter-<host>` to the swarm. The role prefers the drifter's `a2a:<host>` provider, needs only `Research`, and has no authorities, so it can never approve a plan, gate or release. Its description quotes the card's description and skills, bounded and on one line.
+- A card with no bearer scheme is linked keyless at once. One that declares `Bearer` comes in waiting for its token: **Give it its token** opens the same credential step as the Keeper's room, which keeps it in the platform credential store under `a2a:<host>`.
+- **Send it away** on a waiting drifter just drops it. On one already in, it unlinks the provider, forgets the connection and takes its role out of the swarm.
+- Nothing can be let in while no runtime is awake; the drifter says so.
+
+**Seeded drifters.** A few public A2A agents wait at the edge from the first launch, with no setup (`a2a/A2aDrifterSeeds.kt`, `SEEDS`). They are third-party agents, not The Aive's. Until the keeper acts they show only the seed's own name, a line about them and who runs them: their card is read only on **Let it in**, so nothing is fetched from them before then, and a failure then lands on the seed. **Send it away** dismisses a seed for good on this device (Settings key `aive.a2a.drifters.dismissed-seeds.v1`); so does sending away a seed that was let in. A seed already let in is not offered again.
+
+A seed must need no key, serve its JSON-RPC endpoint on its card's origin, and answer `SendMessage` with something useful for free. Each entry records when and how it was checked. Current seeds, checked 2026-11-02 by reading the card without a token (no security schemes) and sending one real `SendMessage`; both were listed as reachable and passing by [a2aregistry.org](https://a2aregistry.org/):
+
+| Seed | Card | Run by | Check |
+|---|---|---|---|
+| World Bank Indicators | `https://agentbazaar.tech/a2a/connectors/worldbank/.well-known/agent.json` | AgentBazaar (JNK Corp.), not affiliated with the World Bank | JSON-RPC 1.0 and 0.3; "GDP of France" completed with a World Bank API recipe |
+| The Moorish Times | `https://mcp.moorish.cloud/.well-known/agent-card.json` | The Moorish Times | JSON-RPC 1.0; "latest news" answered with linked news briefs |
+
+No official a2aproject agent is hosted publicly; its samples run locally. Public agents come and go: if a seed stops answering, its failure shows on it, and it should be taken out of `SEEDS`.
+
 **When it runs.** `A2aAgentProvider` is `explicitOnly`. The router never picks it on its own; it runs only for roles that prefer it, or tasks that require it by id. Choose it as the role's provider in the swarm. It offers `PlanGeneration`, `PlanApproval` (through the engine-owned plan gate), `Messaging` and `Research`, and no repository access.
 
 **A task's life:**
@@ -45,6 +63,7 @@ If the agent answers `SendMessage` with a message instead of a task, that messag
 - When a token is set, the endpoint must be on the card's origin. A card cannot send the token anywhere else.
 - Redirects are not followed, and the card is fetched without the token.
 - Remote output is opaque text and links. The runtime never executes it.
+- Remote output is external content (`THREAT_MODEL.md`, Context provenance). The provider labels its artifacts `ExternalContent`, and the runtime labels whatever an `a2a:` provider produced `ExternalContent` whatever the role (`outputProvenanceOnProvider`). A task that can change things and reads it waits at a context-taint gate for a person.
 
 ## Server: The Aive as an A2A agent (desktop)
 
@@ -102,4 +121,7 @@ Under the A2A server row, **Open to this network** is off by default, even thoug
 - `desktopApp/src/test/.../DesktopA2aServerTest.kt`: binds loopback on a free port, serves the card, refuses calls without the token, keeps the token across starts, reports a port in use; open to the network it binds every interface and advertises the network URL, closing it rebinds loopback, an older switch change cannot undo a newer one, and only addresses can be allowed.
 - `A2aServerLanTest.kt`: network callers refused while closed, the card's URL per caller, Host checks, the allowlist and waiting list, the per-client `SendMessage` limit, address normalization.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
+- `A2aDrifterSeedsTest.kt`: every seed is a normalized https card with its check written down, seeds wait unread, dismissal persists, a connected seed is not offered.
+- `A2aDriftersTest.kt`: reading a card and each failure, the stable creature, the waiting list, and the role a drifter takes (prefers its provider, `Research` only, no authority).
+- `workflow/ContextTaintTest.kt`: an `a2a:` provider's output is external whatever its role.
 - `providers/llm/src/commonTest/.../A2aAgentProviderTest.kt`: the client against a mock agent, including the token-origin rule.

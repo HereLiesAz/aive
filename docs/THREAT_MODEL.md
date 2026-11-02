@@ -291,7 +291,7 @@ Every artifact a task receives is labelled with where it came from, in `Artifact
 | `KeeperWritten` | Objective, task and role text, the runtime's own control summaries, human-approval output |
 | `AgentArtifact` | Output of an agent, GitHub Action, script or test runner |
 | `RepositoryContent` | Repository-operation output; retrieved repository files |
-| `ExternalContent` | Output of a role with the `Research` capability, an external service, a deployment, or anything returned by another pool device |
+| `ExternalContent` | Output of a role with the `Research` capability, a remote A2A agent (any `a2a:` provider, whatever the role), an external service, a deployment, or anything returned by another pool device |
 | `MemoryRecall` | Blocks recalled from the memory layer |
 | `Unknown` | Anything without a label, including artifacts stored before labelling. Treated as external. |
 
@@ -308,6 +308,7 @@ Every artifact a task receives is labelled with where it came from, in `Artifact
 - The creature's Work tab lists each input with its label. Its Needs tab shows the gate's reason.
 
 **Remaining gaps**
+- A drifter's role description quotes its Agent Card (description and skill names, bounded to one line each) and reaches the planner as role text. The keeper reads it at the hive's edge before **Let it in**, and the role can only research: it holds no authority and no mutating capability.
 - Recalled memory, which can hold content from earlier runs, and role-surface data (including HTTPS spreadsheets) enter agent prompts after the check, so neither triggers the gate. Role-surface blocks are unlabelled.
 - A gate inside a nested child run is named on the parent node but, like plan approvals, cannot be decided from it.
 - Labels are not signed. A tampered store or imported bundle can relabel artifacts (see Persistence).

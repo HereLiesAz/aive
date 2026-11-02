@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.ContextProvenance
@@ -88,6 +90,18 @@ fun TaskExecutor.outputProvenance(role: RoleDefinition?): ContextProvenance? = w
     is TaskExecutor.HumanApproval -> ContextProvenance.KeeperWritten
     is TaskExecutor.NestedWorkflow -> null
 }
+
+/**
+ * The label for what an agent produced on [providerId]: a remote A2A agent's output is
+ * [ContextProvenance.ExternalContent] whatever its role says (docs/A2A.md), since it was made
+ * outside the keeper's control. Any other provider keeps [assigned].
+ */
+fun outputProvenanceOnProvider(assigned: ContextProvenance?, providerId: AgentProviderId?): ContextProvenance? =
+    if (providerId != null && providerId.value.startsWith(A2aAgentConnection.PROVIDER_ID_PREFIX)) {
+        ContextProvenance.ExternalContent
+    } else {
+        assigned
+    }
 
 /** Labels [artifacts] made by [task] with [assigned], flagging them when the task read untrusted input. */
 fun WorkflowDefinition.labelTaskOutputs(

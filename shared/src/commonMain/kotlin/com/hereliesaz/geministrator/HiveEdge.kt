@@ -27,8 +27,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /**
  * The hive's edge (mockup H5): what the Store offers, without leaving the hive. Drifters are
- * agents ("role" packages), hives are workflows. Bring in opens that package's install, where its
- * permissions are approved.
+ * agents: remote A2A agents read from their Agent Card ([a2aDrifters]), then the Store's "role"
+ * packages; hives are workflows. Bring in opens that package's install, where its permissions are
+ * approved.
  */
 @Composable
 internal fun HiveEdge(
@@ -37,14 +38,19 @@ internal fun HiveEdge(
     modifier: Modifier = Modifier,
     limit: Int = 3,
     shelfAtStart: EdgeShelf = EdgeShelf.Drifters,
+    /** The keeper is bringing a drifter in: the Drifters shelf shows. */
+    bringingIn: Boolean = false,
+    /** Remote A2A agents at the edge (A2aDrifterShelf), shown on the Drifters shelf before the Store's. */
+    a2aDrifters: (@Composable () -> Unit)? = null,
 ) {
     var packages by remember { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
     var shelf by remember { mutableStateOf(shelfAtStart) }
     LaunchedEffect(Unit) { packages = runCatching { onLoadPackages() }.getOrDefault(emptyList()) }
+    LaunchedEffect(bringingIn) { if (bringingIn) shelf = EdgeShelf.Drifters }
     val host = LocalStableHost.current
     val purchases = LocalBreedPurchases.current
     val breeds = host?.catalog?.breeds.orEmpty().filter { it.sold }.sortedBy { it.price }
-    if (packages.isEmpty() && breeds.isEmpty()) return
+    if (packages.isEmpty() && breeds.isEmpty() && a2aDrifters == null) return
     val scope = rememberCoroutineScope()
     var prices by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     LaunchedEffect(purchases, breeds.size) {
@@ -83,15 +89,18 @@ internal fun HiveEdge(
                     onBuy = buy,
                 )
             }
-            else -> packages.filter { it.kind == if (shelf == EdgeShelf.Drifters) "role" else "workflow" }.take(limit).forEach { item ->
-                AzphaltRecord(
-                    seed = "edge-${item.id}",
-                    eyebrow = item.author ?: item.kind,
-                    title = item.name,
-                    body = item.description,
-                    endCap = stringResource(Res.string.hive_edge_bring_in),
-                    onClick = { onBringIn(item) },
-                )
+            else -> {
+                if (shelf == EdgeShelf.Drifters) a2aDrifters?.invoke()
+                packages.filter { it.kind == if (shelf == EdgeShelf.Drifters) "role" else "workflow" }.take(limit).forEach { item ->
+                    AzphaltRecord(
+                        seed = "edge-${item.id}",
+                        eyebrow = item.author ?: item.kind,
+                        title = item.name,
+                        body = item.description,
+                        endCap = stringResource(Res.string.hive_edge_bring_in),
+                        onClick = { onBringIn(item) },
+                    )
+                }
             }
         }
     }

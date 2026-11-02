@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -102,11 +104,13 @@ internal fun DistrictScreen(
             loadFailure = failure.message ?: failure::class.simpleName
         }
     }
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(32.dp))
             .background(Brush.radialGradient(listOf(DistrictCore, DistrictEdge)))
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -114,11 +118,15 @@ internal fun DistrictScreen(
             Text(stringResource(Res.string.district_your_swarm), style = AzphaltType.section, color = azphaltOnSurface())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
-                // Drifters come from the Store: the cure for the clone trap.
+                // Drifters arrive at the hive's edge (the Store's agents and remote A2A ones): the
+                // cure for the clone trap. This escorts there, below.
                 AzphaltPill(
                     label = stringResource(Res.string.district_import_agent),
                     seed = "district-import",
-                    onClick = onImportAgent,
+                    onClick = {
+                        onImportAgent()
+                        scope.launch { scroll.animateScrollTo(scroll.maxValue) }
+                    },
                 )
             }
             loadFailure?.let { message ->
