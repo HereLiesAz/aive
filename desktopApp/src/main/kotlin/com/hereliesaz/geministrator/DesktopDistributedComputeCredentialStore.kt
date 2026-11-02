@@ -3,31 +3,40 @@ package com.hereliesaz.geministrator
 import java.io.File
 import java.util.prefs.Preferences
 
-internal class DesktopDistributedComputeCredentialStore {
+/**
+ * One distributed-compute secret in the OS credential store. The default holds the relay (pool)
+ * token; [forNodeIdentity] holds this device's compute node signing key.
+ */
+internal class DesktopDistributedComputeCredentialStore(
+    private val account: String = ACCOUNT,
+    private val windowsFileName: String = WINDOWS_TOKEN_FILE_NAME,
+    /** Only the pool token may also come from the environment. */
+    private val readEnvironment: Boolean = true,
+) {
     private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     fun readToken(): String? =
-        System.getenv("AIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
-            ?: System.getenv("HAIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
-            ?: readFromKeychain()
-            ?: fallback.get(ACCOUNT, null)?.trim()?.takeIf(String::isNotEmpty)
+        (if (readEnvironment) environmentToken() else null)
+            ?: readFromKeychain(account, windowsTokenFile(windowsFileName))
+            ?: fallback.get(account, null)?.trim()?.takeIf(String::isNotEmpty)
 
     fun writeToken(token: String) {
         val clean = token.trim()
         require(clean.isNotEmpty()) { "Relay token is required" }
+        val file = windowsTokenFile(windowsFileName)
         // Only drop the fallback copy once the OS store demonstrably returns the token.
-        if (!writeToKeychain(clean) || readFromKeychain() != clean) {
-            fallback.put(ACCOUNT, clean)
+        if (!writeToKeychain(clean, account, file) || readFromKeychain(account, file) != clean) {
+            fallback.put(account, clean)
             fallback.flush()
         } else {
-            fallback.remove(ACCOUNT)
+            fallback.remove(account)
             fallback.flush()
         }
     }
 
     fun clear() {
-        deleteFromKeychain()
-        fallback.remove(ACCOUNT)
+        deleteFromKeychain(account, windowsTokenFile(windowsFileName))
+        fallback.remove(account)
         fallback.flush()
     }
 
@@ -35,6 +44,17 @@ internal class DesktopDistributedComputeCredentialStore {
         const val PREFERENCES_NODE = "com/hereliesaz/haive/distributed-compute"
         const val KEYCHAIN_SERVICE = "com.hereliesaz.haive.distributed-compute"
         const val ACCOUNT = "relay-token"
+        const val WINDOWS_TOKEN_FILE_NAME = "distributed-compute-relay-token.dpapi"
+
+        fun forNodeIdentity() = DesktopDistributedComputeCredentialStore(
+            account = "node-signing-key",
+            windowsFileName = "distributed-compute-node-key.dpapi",
+            readEnvironment = false,
+        )
+
+        fun environmentToken(): String? =
+            System.getenv("AIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
+                ?: System.getenv("HAIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
 
         /** Environment variable through which the Windows scripts receive the token file path. */
         const val WINDOWS_TOKEN_FILE_ENV = "AIVE_RELAY_TOKEN_FILE"
@@ -58,10 +78,10 @@ internal class DesktopDistributedComputeCredentialStore {
                 "\$secure = ConvertTo-SecureString -String \$sealed; " +
                 "[Console]::Out.Write([System.Net.NetworkCredential]::new('', \$secure).Password)"
 
-        fun windowsTokenFile(): File {
+        fun windowsTokenFile(fileName: String = WINDOWS_TOKEN_FILE_NAME): File {
             val base = System.getenv("LOCALAPPDATA")?.takeIf(String::isNotBlank)
                 ?: File(System.getProperty("user.home"), "AppData/Local").path
-            return File(File(base, "Aive"), "distributed-compute-relay-token.dpapi")
+            return File(File(base, "Aive"), fileName)
         }
 
         fun windowsPowerShell(script: String, tokenFile: File): ProcessBuilder =
@@ -71,18 +91,17 @@ internal class DesktopDistributedComputeCredentialStore {
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
 
-        fun readFromKeychain(): String? = runCatching {
+        fun readFromKeychain(account: String = ACCOUNT, tokenFile: File = windowsTokenFile()): String? = runCatching {
             val result = when {
                 os.contains("mac") -> CredentialTool.run(
                     listOf(
                         "security", "find-generic-password",
                         "-s", KEYCHAIN_SERVICE,
-                        "-a", ACCOUNT,
+                        "-a", account,
                         "-w",
                     ),
                 )
                 os.contains("win") -> {
-                    val tokenFile = windowsTokenFile()
                     if (!tokenFile.isFile) return@runCatching null
                     CredentialTool.run(windowsPowerShell(WINDOWS_READ_SCRIPT, tokenFile))
                 }
@@ -90,7 +109,7 @@ internal class DesktopDistributedComputeCredentialStore {
                     listOf(
                         "secret-tool", "lookup",
                         "service", KEYCHAIN_SERVICE,
-                        "account", ACCOUNT,
+                        "account", account,
                     ),
                 )
                 else -> null
@@ -98,26 +117,26 @@ internal class DesktopDistributedComputeCredentialStore {
             result?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
         }.getOrNull()
 
-        fun writeToKeychain(token: String): Boolean = runCatching {
+        fun writeToKeychain(token: String, account: String = ACCOUNT, tokenFile: File = windowsTokenFile()): Boolean = runCatching {
             when {
                 os.contains("mac") -> {
                     CredentialTool.run(
                         listOf(
                             "security", "delete-generic-password",
                             "-s", KEYCHAIN_SERVICE,
-                            "-a", ACCOUNT,
+                            "-a", account,
                         ),
                     )
-                    MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, ACCOUNT, token)
+                    MacKeychain.addGenericPassword(KEYCHAIN_SERVICE, account, token)
                 }
                 os.contains("win") ->
-                    CredentialTool.run(windowsPowerShell(WINDOWS_WRITE_SCRIPT, windowsTokenFile()), stdin = token)?.ok == true
+                    CredentialTool.run(windowsPowerShell(WINDOWS_WRITE_SCRIPT, tokenFile), stdin = token)?.ok == true
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(
                         "secret-tool", "store",
                         "--label", "Aive distributed compute relay",
                         "service", KEYCHAIN_SERVICE,
-                        "account", ACCOUNT,
+                        "account", account,
                     ),
                     stdin = token,
                 )?.ok == true
@@ -125,25 +144,25 @@ internal class DesktopDistributedComputeCredentialStore {
             }
         }.getOrElse { false }
 
-        fun deleteFromKeychain() = runCatching {
+        fun deleteFromKeychain(account: String = ACCOUNT, tokenFile: File = windowsTokenFile()) = runCatching {
             when {
                 os.contains("mac") -> CredentialTool.run(
                     listOf(
                         "security", "delete-generic-password",
                         "-s", KEYCHAIN_SERVICE,
-                        "-a", ACCOUNT,
+                        "-a", account,
                     ),
                 )
                 os.contains("win") -> {
-                    windowsTokenFile().delete()
+                    tokenFile.delete()
                     // Earlier builds wrote a Credential Manager entry that could never be read back.
-                    CredentialTool.run(CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, ACCOUNT))
+                    CredentialTool.run(CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, account))
                 }
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(
                         "secret-tool", "clear",
                         "service", KEYCHAIN_SERVICE,
-                        "account", ACCOUNT,
+                        "account", account,
                     ),
                 )
                 else -> null

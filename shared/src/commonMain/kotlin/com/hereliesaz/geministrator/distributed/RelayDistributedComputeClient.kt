@@ -4,12 +4,13 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.header
-import io.ktor.http.HttpHeaders
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -24,12 +25,22 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
+/**
+ * One node's session with a compute relay.
+ *
+ * [bearerToken] is the shared pool token and is used only to enrol [signer]'s public key with the
+ * pool, once (remembered in [enrolmentLedger]). Every connection is then opened with a short-lived
+ * request signed by [signer], and the relay binds the session to the node ID that signed it.
+ */
 class RelayDistributedComputeClient(
     private val httpClient: HttpClient,
     private val relayBaseUrl: String,
     private val poolId: String,
     private val bearerToken: String,
     initialNode: ComputeNodeDescriptor,
+    private val signer: ComputeNodeSigner,
+    private val enrolmentLedger: ComputeNodeEnrolmentLedger = InMemoryComputeNodeEnrolmentLedger(),
+    private val nowEpochMillis: () -> Long = ::currentEpochMillis,
     private val json: Json = defaultJson,
 ) {
     private val sessionMutex = Mutex()
@@ -52,6 +63,26 @@ class RelayDistributedComputeClient(
     private val _errors = MutableSharedFlow<ComputeRelayServerMessage.Error>(extraBufferCapacity = 16)
     val errors: SharedFlow<ComputeRelayServerMessage.Error> = _errors
 
+    private val _enrolledNodes = MutableStateFlow<List<EnrolledComputeNode>>(emptyList())
+
+    /** The pool's enrolled nodes as the relay last reported them, revoked ones included. */
+    val enrolledNodes: StateFlow<List<EnrolledComputeNode>> = _enrolledNodes
+
+    private val _revoked = MutableStateFlow(false)
+
+    /** True once the relay has said this node's identity is revoked; the client then stops reconnecting. */
+    val revoked: StateFlow<Boolean> = _revoked
+
+    private val enroller = ComputeNodeEnroller(
+        httpClient = httpClient,
+        relayBaseUrl = relayBaseUrl,
+        poolId = poolId,
+        poolToken = bearerToken,
+        signer = signer,
+        nowEpochMillis = nowEpochMillis,
+        json = json,
+    )
+
     fun start(scope: CoroutineScope) {
         if (loopJob?.isActive == true) return
         loopJob = scope.launch {
@@ -69,6 +100,8 @@ class RelayDistributedComputeClient(
                     }
                     _connected.value = false
                 }
+                // A revoked identity cannot come back by retrying; the keeper has to set it up afresh.
+                if (_revoked.value) break
                 // Only a connection that held for a while resets the backoff: a relay that accepts the
                 // socket and then drops it must not be hammered once a second forever.
                 backoffMillis = if (connectedAt.elapsedNow() >= STABLE_CONNECTION) 1_000L
@@ -127,18 +160,49 @@ class RelayDistributedComputeClient(
         send(ComputeRelayClientMessage.CancelLease(leaseId, reason))
     }
 
+    suspend fun requestEnrolledNodes() {
+        send(ComputeRelayClientMessage.ListEnrolledNodes)
+    }
+
+    /** Revokes another node of the pool. The relay refuses a node revoking itself. */
+    suspend fun revokeNode(nodeId: String) {
+        require(nodeId != node.nodeId) { "A node cannot revoke itself" }
+        send(ComputeRelayClientMessage.RevokeNode(nodeId))
+    }
+
+    /** Enrols this node's key unless the ledger says it already is. Uses the pool token. */
+    internal suspend fun ensureEnrolled() {
+        val fingerprint = ComputeNodeEnrolmentLedger.fingerprint(relayBaseUrl, poolId, node.nodeId, signer.publicKey)
+        if (enrolmentLedger.isEnrolled(fingerprint)) return
+        try {
+            enroller.enrol(node.nodeId, node.displayName)
+        } catch (refused: ComputeNodeEnrolmentException) {
+            if (refused.code == ComputeNodeAuth.ERROR_NODE_REVOKED) _revoked.value = true
+            _errors.emit(ComputeRelayServerMessage.Error(code = refused.code, message = refused.message ?: refused.code))
+            throw refused
+        }
+        enrolmentLedger.recordEnrolled(fingerprint)
+    }
+
     private suspend fun connectOnce(scope: CoroutineScope) {
         require(relayBaseUrl.isNotBlank()) { "relayBaseUrl must not be blank" }
         require(poolId.isNotBlank()) { "poolId must not be blank" }
         require(bearerToken.isNotBlank()) { "bearerToken must not be blank" }
         require(isSecureRelayUrl(relayBaseUrl)) {
-            "The relay bearer token is only sent over wss:// or https:// (plain ws:// and http:// are allowed for localhost only)"
+            "The relay is only reached over wss:// or https:// (plain ws:// and http:// are allowed for localhost only)"
         }
 
+        ensureEnrolled()
+        val signedHeaders = ComputeNodeAuth.signedConnectHeaders(
+            signer = signer,
+            poolId = poolId,
+            nodeId = node.nodeId,
+            timestampEpochMillis = nowEpochMillis(),
+        )
         val socket = httpClient.webSocketSession(
             urlString = relayBaseUrl.trimEnd('/') + "/v1/compute/" + poolId,
         ) {
-            header(HttpHeaders.Authorization, "Bearer $bearerToken")
+            signedHeaders.forEach { (name, value) -> header(name, value) }
         }
         sessionMutex.withLock { session = socket }
         socket.sendSerialized(
@@ -257,7 +321,18 @@ class RelayDistributedComputeClient(
                     ),
                 )
             }
-            is ComputeRelayServerMessage.Error -> _errors.emit(message)
+            is ComputeRelayServerMessage.EnrolledNodes -> {
+                _enrolledNodes.value = message.nodes
+            }
+            is ComputeRelayServerMessage.Error -> {
+                when (message.code) {
+                    // The relay lost its record (for example it restarted without saved state): enrol again.
+                    ComputeNodeAuth.ERROR_NODE_NOT_ENROLLED -> enrolmentLedger.forget()
+                    ComputeNodeAuth.ERROR_NODE_REVOKED -> _revoked.value = true
+                    else -> Unit
+                }
+                _errors.emit(message)
+            }
         }
     }
 
@@ -306,6 +381,9 @@ class RelayDistributedComputeGateway(
 
     override suspend fun cancel(leaseId: String, reason: String?) = client.cancel(leaseId, reason)
 }
+
+@OptIn(ExperimentalTime::class)
+private fun currentEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
 
 /** True for wss/https, or ws/http to a loopback host, where the bearer token cannot cross a network in clear. */
 internal fun isSecureRelayUrl(url: String): Boolean {

@@ -128,6 +128,8 @@ compose.desktop {
             packageVersion = nativePackageVersion
             description = "The Aive — agentic workflow orchestration"
             copyright = "© 2026 HereLiesAz"
+            // The opt-in A2A server (docs/A2A.md) uses the JDK's built-in HTTP server.
+            modules("jdk.httpserver")
 
             linux {
                 iconFile.set(generatedDesktopBrandDir.get().file("haive-icon-color.png").asFile)

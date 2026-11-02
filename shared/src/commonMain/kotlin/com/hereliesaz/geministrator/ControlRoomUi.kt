@@ -31,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
+import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -53,6 +55,7 @@ import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -142,7 +145,12 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onLiftSpendStop: () -> Unit = {},
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
+    onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
+    /** Answers a creature's question to the keeper: task id, question key, answer; null on success. */
+    onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -176,11 +184,16 @@ fun ControlRoom(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    onRevokeComputeNode: (String) -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
+    /** The keeper's approval habits; null hides the Delegations part and never offers delegation. */
+    delegations: ProgressiveDelegationStore? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -249,7 +262,7 @@ fun ControlRoom(
         if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
     }
     val openInbox = {
-        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || isHallMonitorTrial(it) }
+        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || it.run.spendPause != null || isHallMonitorTrial(it) }
             ?.let { live -> firstCreatureNeedingYou(live, unseen = { key -> key !in inboxReadLog.read }) }
         if (waiting != null) {
             district.value = false
@@ -331,6 +344,7 @@ fun ControlRoom(
                 onApproveTask = onApproveTask,
                 onRejectPlan = onRejectPlan,
                 onResolveEscalation = onResolveEscalation,
+                onLiftSpendStop = onLiftSpendStop,
                 onMessageAgent = onMessageAgent,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
@@ -365,11 +379,15 @@ fun ControlRoom(
                 distributedComputeState = distributedComputeState,
                 onSaveDistributedCompute = onSaveDistributedCompute,
                 onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                onRevokeComputeNode = onRevokeComputeNode,
                 crashReportingSetting = crashReportingSetting,
                 remoteAccessSetting = remoteAccessSetting,
+                a2aServerSetting = a2aServerSetting,
                 localPlannerSetting = localPlannerSetting,
                 localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
                 memoryLayer = memoryLayer,
+                delegations = delegations,
                 azphaltStoreService = azphaltStoreService,
                 azphaltPackageImportRequest = azphaltPackageImportRequest,
                 onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
@@ -389,6 +407,9 @@ fun ControlRoom(
             )
         }
 
+        // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
+        delegations?.let { DelegationOfferDialog(it) }
+
         if (inspectorVisible) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
@@ -405,6 +426,8 @@ fun ControlRoom(
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
                         onMessageAgent = onMessageAgent,
+                        onRerunFromTask = onRerunFromTask,
+                        onAnswerKeeperQuestion = onAnswerKeeperQuestion,
                         tab = creatureTab,
                         onTabChange = { creatureTabName = it.name },
                         onSaveRoleCollection = onSaveRoleCollection,
@@ -555,6 +578,7 @@ private fun OverviewSectionTabs(
     compact: Boolean,
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    trailing: @Composable () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
@@ -570,6 +594,7 @@ private fun OverviewSectionTabs(
                 },
             )
         }
+        trailing()
     }
 }
 
@@ -583,6 +608,7 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onLiftSpendStop: () -> Unit,
     onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
@@ -617,11 +643,15 @@ private fun MainDestination(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    onRevokeComputeNode: (String) -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
+    delegations: ProgressiveDelegationStore? = null,
     azphaltStoreService: AzphaltStoreService? = null,
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
@@ -642,21 +672,49 @@ private fun MainDestination(
     keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
     keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
+    // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
+    var showTimeline by rememberDurableBooleanState("overview.timeline")
+    val hiveHost = LocalWorkflowLibraryHost.current
+    val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive, nor while
         // the hive is stopped or waking (its trouble and the way out come first).
         val hasHive = runtimeState is ApplicationRuntimeState.Live || runtimeState is ApplicationRuntimeState.NoRun
         if (destination.navigationItem == ControlRoomDestination.Overview && hasHive) {
-            OverviewSectionTabs(compact, destination, onDestinationSelected)
+            val liveHive = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+                ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
+            OverviewSectionTabs(compact, destination, onDestinationSelected) {
+                // One row of places: the hive's own come after Swarm, Memory swarm and the Store.
+                liveHive?.let { live ->
+                    AzphaltPill(
+                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
+                        seed = "hive-timeline",
+                        selected = showTimeline,
+                        onClick = { showTimeline = !showTimeline },
+                    )
+                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
+                    AzphaltPill(
+                        label = stringResource(Res.string.hive_more_editing),
+                        seed = "hive-more-editing",
+                        onClick = {
+                            hiveScope.launch {
+                                val id = live.run.workflowDefinitionId.value
+                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
+                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
+                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+                                }
+                                onDestinationSelected(ControlRoomDestination.Workflows)
+                            }
+                        },
+                    )
+                }
+            }
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
                 ControlRoomDestination.Overview -> {
                     var inDistrict by district
                     var restingHiveId by restingHive
-                    var showTimeline by rememberDurableBooleanState("overview.timeline")
-                    val hiveHost = LocalWorkflowLibraryHost.current
-                    val hiveScope = rememberCoroutineScope()
                     if (inDistrict) {
                         DistrictScreen(
                             onLoadDefinitions = onLoadWorkflowDefinitions,
@@ -725,37 +783,6 @@ private fun MainDestination(
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-                            androidx.compose.foundation.layout.FlowRow(
-                                modifier = Modifier.padding(horizontal = hiveGutter(compact)),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                // Out to the district is the breadcrumb's first step.
-                                if (live != null) {
-                                    AzphaltPill(
-                                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
-                                        seed = "hive-timeline",
-                                        selected = showTimeline,
-                                        onClick = { showTimeline = !showTimeline },
-                                    )
-                                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
-                                    AzphaltPill(
-                                        label = stringResource(Res.string.hive_more_editing),
-                                        seed = "hive-more-editing",
-                                        onClick = {
-                                            hiveScope.launch {
-                                                val id = live.run.workflowDefinitionId.value
-                                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
-                                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
-                                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
-                                                }
-                                                onDestinationSelected(ControlRoomDestination.Workflows)
-                                            }
-                                        },
-                                    )
-                                }
-                            }
                             live?.let {
                                 // The hive's combs: its finished swarms. Opening one switches to it.
                                 RunScars(
@@ -769,6 +796,9 @@ private fun MainDestination(
                                     runKey = live.run.id.value + live.run.updatedAtEpochMillis,
                                     onLoadTimeline = onLoadRunTimeline,
                                     modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    taskName = { id -> live.definition.tasks.firstOrNull { it.id == id }?.name ?: id.value },
+                                    selectedTaskId = selectedTaskId,
+                                    onTaskSelected = onTaskSelected,
                                 )
                             } else {
         MindMapRunScreen(
@@ -817,7 +847,7 @@ private fun MainDestination(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
                 )
-                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize())
+                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
                     connectedProviderIds = connectedProviderIds,
@@ -836,7 +866,8 @@ private fun MainDestination(
                 ControlRoomDestination.Settings,
                 ControlRoomDestination.Compute -> KeeperRoom(
                     sections = KeeperSection.entries.filter {
-                        it != KeeperSection.Compute || computeAvailable
+                        (it != KeeperSection.Compute || computeAvailable) &&
+                            (it != KeeperSection.Delegations || delegations != null)
                     },
                     opening = KeeperSection.of(place),
                     selectedName = keeperSectionName,
@@ -846,6 +877,9 @@ private fun MainDestination(
                         when (section) {
                             KeeperSection.Connections -> keeperCount(connectedProviderIds.size + connectedRepositoryServiceIds.size)
                             KeeperSection.Compute -> if (distributedComputeState.connected) null else keeperCount(0)
+                            KeeperSection.Delegations -> delegations?.let { store ->
+                                keeperCount(store.state.collectAsState().value.delegations.size)
+                            }
                             else -> null
                         }
                     },
@@ -866,20 +900,26 @@ private fun MainDestination(
                                 distributedComputeState = distributedComputeState,
                                 onSaveDistributedCompute = onSaveDistributedCompute,
                                 onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                                onRevokeComputeNode = onRevokeComputeNode,
                                 crashReportingSetting = crashReportingSetting,
                                 remoteAccessSetting = remoteAccessSetting,
+                                a2aServerSetting = a2aServerSetting,
                                 localPlannerSetting = localPlannerSetting,
                                 localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                                onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
                                 section = section,
                                 compact = compact,
                                 trailing = {
                                     when (section) {
-                                        KeeperSection.Connections -> RepositoryConnections(
-                                            connectedServiceIds = connectedRepositoryServiceIds,
-                                            onConfigureService = onConfigureRepositoryService,
-                                            onDisconnectService = onDisconnectRepositoryService,
-                                            compact = compact,
-                                        )
+                                        KeeperSection.Connections -> {
+                                            RepositoryConnections(
+                                                connectedServiceIds = connectedRepositoryServiceIds,
+                                                onConfigureService = onConfigureRepositoryService,
+                                                onDisconnectService = onDisconnectRepositoryService,
+                                                compact = compact,
+                                            )
+                                            LocalMcpHost.current?.let { host -> McpServerConnections(host, compact) }
+                                        }
                                         KeeperSection.Compute -> ComputeDelegationScreen(
                                             runtimeState = runtimeState,
                                             distributedComputeState = distributedComputeState,
@@ -888,6 +928,7 @@ private fun MainDestination(
                                             onAssignTask = onAssignTaskCompute,
                                             embedded = true,
                                         )
+                                        KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
                                         else -> Unit
                                     }
                                 },

@@ -267,6 +267,7 @@ Memory is organised like version-control history.
 | A launch given two or more runs in `continuesWorkflowRunIds` | those runs, first = primary, duplicates collapsed | merge |
 | A nested workflow node starting its child run (`WorkflowRunNestedWorkflowClient`) | the dispatching run | continuation |
 | A Hall Monitor solution trial (counterfactual of a paused run) | the paused source run | continuation |
+| Running a finished run again from a task (`ApplicationRuntime.rerunFromTask`, `TaskRerunPlanner`) | the finished run | continuation |
 | A plan repair after a failure escalation | the run's own parents, unchanged (the same run, rebuilt) | — |
 | Resume after restart, task retry, approve/reject, pause/resume | unchanged (the same run) | — |
 | An inlined sub-workflow (`WorkflowComposer.inline`) | none: it becomes part of the parent's definition and runs in the parent run | — |
@@ -372,6 +373,29 @@ source episode's time. A consolidated current version carries a time range inste
 union, so ranges only widen. It also carries how many times it happened in that range
 (`occurrences`: the distinct source episodes it was made from, deliberations excluded). Recall shows
 both ("~40 times, 2026-03-02 – 2026-09-28"); exact times come only from the history.
+
+### Valid time
+
+Memory is bitemporal. `createdAtEpochMillis` stays the ingest time (when the layer recorded the
+node); `validFromEpochMillis` is when the fact became true. An episode whose source carries its own
+time (an artifact's or event's time, a commit time) records it as `occurredAtEpochMillis`
+(`MemorySessionEnvelope` and `MemoryBankRequest` take it too), and extraction stamps every node made
+from it with that time; otherwise valid-from is the ingest time. Rows stored before valid time
+existed read the same way (the field defaults to `createdAtEpochMillis` on decode; no schema change).
+A condensed version holds once all its sources do: its valid-from is the latest of theirs. A version
+absorbing a deliberation keeps the chosen memory's valid-from.
+
+A node has no stored end, since nodes are add-only. A memory stops being valid when the consolidator's
+deterministic coverage step supersedes it: each `Supersedes` edge it writes records `validUntil`, the
+version's valid-from (`MemorySnapshot.validUntilOf`; a legacy edge without it uses the version's
+valid-from). A deliberation's `Supersedes` (basis `deliberation`) ends nothing: choosing which
+version is right is not a statement about time, and no model ever sets valid time.
+
+Recall can be asked as of a time: `MemoryQuery.validAtEpochMillis` (and `MemoryTagQuery`) recalls
+only memories valid then, valid-from at or before it and not yet superseded, including memories
+superseded since; memories replaced by an absorbed deliberation stay represented by their version.
+Such hits carry `validUntilEpochMillis`. As-of recall is lexical, keyword and graph; it skips the
+embedding signal. Without it, recall is unchanged: current memories only.
 
 ### Raw history retention is the user's decision
 

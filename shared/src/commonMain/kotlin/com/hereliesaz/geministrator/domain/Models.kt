@@ -219,6 +219,13 @@ data class TaskRun(
     val externalRunId: String? = null,
     /** Tokens and cost the task's provider has reported so far, summed across reports; null if none. */
     val usage: TaskUsage? = null,
+    /**
+     * The message in which the task's agent asked the keeper a question it is waiting on
+     * (docs/Agent-UI.md), or null. Read with `AgentUi.parseStored`; never executed or rendered as markup.
+     */
+    val keeperQuestion: String? = null,
+    /** `AgentUi.questionKey` of the last question the keeper answered, so a replay of it stays answered. */
+    val answeredKeeperQuestion: String? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }
@@ -245,6 +252,8 @@ data class WorkflowRun(
      * combines lineages. Empty for a root run. Memory derives its lineage banks from these.
      */
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /** Set while a keeper's spend cap has stopped this run; the keeper lifts it. */
+    val spendPause: WorkflowSpendPause? = null,
 ) {
     init {
         require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }

@@ -65,6 +65,12 @@ data class MemoryEpisode(
      * untouched.
      */
     val purged: MemoryRawPurge? = null,
+    /**
+     * When what this episode records happened, if its source carries a time (an artifact's or event's
+     * own time, a commit time); null otherwise. Valid time of the memories extracted from it
+     * ([MemoryValidTime]); [createdAtEpochMillis] stays the ingest time.
+     */
+    val occurredAtEpochMillis: Long? = null,
 )
 
 /** The audit record of one raw purge: what, when, why, and by whose setting. */
@@ -152,8 +158,15 @@ data class MemoryNode(
     val sourceSectionIds: Set<MemorySectionId> = emptySet(),
     val salience: Float = 0.5f,
     val confidence: Float = 1f,
+    /** Ingest time: when the memory layer recorded this node. */
     val createdAtEpochMillis: Long,
     val metadata: Map<String, String> = emptyMap(),
+    /**
+     * Valid time: when the fact became true. The source's own time when extraction had one, else the
+     * ingest time; stored rows without it read as [createdAtEpochMillis]. Its end is not stored here
+     * (nodes are add-only): see [MemoryValidTime] and [validUntilOf].
+     */
+    val validFromEpochMillis: Long = createdAtEpochMillis,
 ) {
     init {
         require(text.isNotBlank()) { "Memory node text must not be blank" }
@@ -348,6 +361,8 @@ data class MemorySessionEnvelope(
     val userPrompt: String,
     val parts: List<MemorySessionPart>,
     val closedAtEpochMillis: Long,
+    /** When what the session records happened, if known; the episode's [MemoryEpisode.occurredAtEpochMillis]. */
+    val occurredAtEpochMillis: Long? = null,
 )
 
 /**
@@ -376,6 +391,8 @@ data class MemoryBankRequest(
     val sourceKind: MemorySourceKind = MemorySourceKind.AgentNote,
     val scope: MemoryBankScope = MemoryBankScope(),
     val bankedAtEpochMillis: Long,
+    /** When what is banked happened, if the source says (an event or commit time); else null. */
+    val occurredAtEpochMillis: Long? = null,
 ) {
     init {
         require(sourceSessionId.isNotBlank()) { "Memory bank source session must not be blank" }
@@ -449,6 +466,12 @@ data class MemoryQuery(
      * count at reduced weight and never dilute the caller's own terms.
      */
     val expansionTerms: List<String> = emptyList(),
+    /**
+     * As of: recall only memories valid at this time (epoch millis): already true
+     * ([MemoryNode.validFromEpochMillis] at or before it) and not yet superseded. Memories superseded
+     * since are recallable while they held. Null: current memories, as always.
+     */
+    val validAtEpochMillis: Long? = null,
 ) {
     init {
         require(text.isNotBlank()) { "Memory query must not be blank" }
@@ -468,6 +491,8 @@ data class MemoryTagQuery(
     val maxResults: Int = 12,
     val includeConflicts: Boolean = true,
     val scope: MemoryBankScope = MemoryBankScope(),
+    /** As of, as in [MemoryQuery.validAtEpochMillis]. */
+    val validAtEpochMillis: Long? = null,
 ) {
     init {
         require(tags.isNotEmpty()) { "Memory tag query must contain at least one tag" }
@@ -507,6 +532,8 @@ data class MemoryRecallHit(
      * the paragraph it came from ([MemorySummaryTree]); empty when its episode has no tree.
      */
     val outline: List<MemoryNode> = emptyList(),
+    /** When the hit stopped being valid, for a memory recalled as of a time before it was superseded; else null. */
+    val validUntilEpochMillis: Long? = null,
 )
 
 /** A link delivered with a recall hit and the summary of its two memories together. */

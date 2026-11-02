@@ -20,12 +20,41 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.CHECKPOINT_COMMIT_METADATA_KEY
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
+import com.hereliesaz.geministrator.workflow.CONTEXT_TAINT_BLOCKING_CODE
+import com.hereliesaz.geministrator.workflow.contextInputs
+import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.domain.isUntrustedContext
+import com.hereliesaz.geministrator.domain.madeFromUntrustedInput
+import com.hereliesaz.geministrator.domain.provenance
+import com.hereliesaz.geministrator.resources.inspector_external_inputs
+import com.hereliesaz.geministrator.resources.inspector_hint_external_inputs
+import com.hereliesaz.geministrator.resources.inspector_input_objective
+import com.hereliesaz.geministrator.resources.inspector_inputs
+import com.hereliesaz.geministrator.resources.provenance_agent_artifact
+import com.hereliesaz.geministrator.resources.provenance_external_content
+import com.hereliesaz.geministrator.resources.provenance_keeper_written
+import com.hereliesaz.geministrator.resources.provenance_made_from_external
+import com.hereliesaz.geministrator.resources.provenance_memory_recall
+import com.hereliesaz.geministrator.resources.provenance_repository_content
+import com.hereliesaz.geministrator.resources.provenance_unknown
+import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
+import com.hereliesaz.geministrator.workflow.roleTokensSpent
+import com.hereliesaz.geministrator.resources.inspector_budget_spent
+import com.hereliesaz.geministrator.resources.inspector_raise_budget
+import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
@@ -33,7 +62,19 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.TaskRun
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
+import androidx.compose.ui.text.style.TextOverflow
+import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
+import com.hereliesaz.geministrator.workflow.SessionActivityKey
+import com.hereliesaz.geministrator.workflow.SessionActivityKind
+import com.hereliesaz.geministrator.workflow.activityWindow
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.inspector_activity
+import com.hereliesaz.geministrator.resources.inspector_activity_earlier
+import com.hereliesaz.geministrator.resources.inspector_activity_show_fewer
+import com.hereliesaz.geministrator.resources.inspector_activity_step
+import com.hereliesaz.geministrator.resources.inspector_activity_thinking
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_reject
 import com.hereliesaz.geministrator.resources.inspector_excluded_by_redaction_policy
@@ -45,6 +86,7 @@ import com.hereliesaz.geministrator.resources.inspector_artifact
 import com.hereliesaz.geministrator.resources.inspector_artifacts
 import com.hereliesaz.geministrator.resources.inspector_attempt
 import com.hereliesaz.geministrator.resources.inspector_blocked
+import com.hereliesaz.geministrator.resources.inspector_checkpoint
 import com.hereliesaz.geministrator.resources.inspector_context_artifacts_sent
 import com.hereliesaz.geministrator.resources.inspector_default_runner
 import com.hereliesaz.geministrator.resources.inspector_executor
@@ -109,12 +151,17 @@ internal fun TechnicalInspector(
     onRejectPlan: (String) -> Unit = {},
     onResolveEscalation: (String, Boolean) -> Unit = { _, _ -> },
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    /** Answers the creature's question to the keeper: task id, question key, answer; null on success. */
+    onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     modifier: Modifier = Modifier,
     tab: CreatureTab = CreatureTab.Needs,
     onTabChange: (CreatureTab) -> Unit = {},
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
     connectedProviderIds: Set<String> = emptySet(),
     roleSurfaceFilePicker: RoleSurfaceFilePicker? = null,
+    activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
+    /** Runs a finished run again from this creature; returns why it could not, or null. */
+    onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -171,8 +218,29 @@ internal fun TechnicalInspector(
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
                     ?.let { CreatureNeedsPanel(it, titled = false) }
+                // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
+                taskRun.keeperQuestion?.takeIf { taskRun.awaitsKeeperAnswer() }?.let { question ->
+                    AgentQuestionPanel(
+                        taskId = selectedTaskId,
+                        question = question,
+                        onAnswer = { questionKey, answer -> onAnswerKeeperQuestion(selectedTaskId, questionKey, answer) },
+                    )
+                }
                 if (taskRun.status == TaskRunStatus.AwaitingApproval) {
                     val providerPlan = taskRun.assignedProviderId != null
+                    if (taskRun.isHeldAtContextTaintGate()) {
+                        // The gate's reason: which of its inputs came from outside the keeper's control.
+                        val external = liveWorkflow.definition.contextInputs(liveWorkflow.run, task)
+                            .filter(ArtifactRef::isUntrustedContext)
+                        LiveInspectorLine(
+                            stringResource(Res.string.inspector_external_inputs),
+                            stringResource(
+                                Res.string.inspector_hint_external_inputs,
+                                external.joinToString { "${it.label} (${it.kind.name})" },
+                            ),
+                            live = true,
+                        )
+                    }
                     AzphaltPill(
                         label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
                         seed = "approve-$selectedTaskId",
@@ -216,11 +284,28 @@ internal fun TechnicalInspector(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                if (taskRun.isHeldForRoleBudget()) {
+                    // The token budget circuit breaker: its role spent its budget in this run.
+                    val spent = taskRun.assignedRoleId?.let { liveWorkflow.run.roleTokensSpent(it) } ?: 0L
+                    Text(
+                        stringResource(Res.string.inspector_budget_spent, spent.toString()),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_raise_budget),
+                        seed = "raise-budget-$selectedTaskId",
+                        onClick = { onTabChange(CreatureTab.Mind) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
                     Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
                 }
             }
             CreatureTab.Work -> {
+                // What it is doing, live: its own thinking and steps, apart from what you tell it.
+                CreatureActivity(taskRun, activity)
                 // Talking to its agent is part of its work, not something it needs from you.
                 if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
                     OutlinedTextField(
@@ -284,8 +369,24 @@ internal fun TechnicalInspector(
                     LiveInspectorLine(label, it, live = true)
                 }
                 taskRun.blockingReason?.let {
-                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
+                    val text = if (it.code == CONTEXT_TAINT_BLOCKING_CODE) it.message else "${it.code} · ${it.message}"
+                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), text, live = true)
                 }
+                // Its Git checkpoint: the commit its own changes became (Local Git, Desktop).
+                checkpointSummary(taskRun.artifacts)?.let {
+                    LiveInspectorLine(stringResource(Res.string.inspector_checkpoint), it)
+                }
+                // What it reads, each with where it came from (docs/THREAT_MODEL.md, "Context provenance").
+                val inputs = liveWorkflow.definition.contextInputs(liveWorkflow.run, task)
+                LiveInspectorLine(stringResource(Res.string.inspector_inputs), buildString {
+                    append(stringResource(Res.string.inspector_input_objective))
+                    append(" · ")
+                    append(stringResource(Res.string.provenance_keeper_written))
+                    inputs.forEach { input ->
+                        append("\n${input.label} (${input.kind.name}) · ")
+                        append(input.provenanceLabel())
+                    }
+                })
                 // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
                 taskRun.artifacts.forEach { artifact ->
@@ -310,6 +411,25 @@ internal fun TechnicalInspector(
                                 }
                             }
                         } else null,
+                    )
+                }
+                // Time travel (docs/Keepers-Room.md): a finished run runs again from this creature.
+                if (liveWorkflow.run.status.isFinished()) {
+                    val runId = liveWorkflow.run.id
+                    val hasDependents = liveWorkflow.definition.tasks.any { other ->
+                        taskId in other.dependsOn || other.condition.conditionTargetOrNull() == taskId
+                    }
+                    val output = taskRun.artifacts
+                        .mapNotNull { it.textContent }
+                        .takeIf { it.isNotEmpty() && hasDependents && taskRun.status == TaskRunStatus.Completed }
+                        ?.takeIf { task.executor !is TaskExecutor.HumanApproval }
+                        ?.joinToString("\n\n")
+                    RerunFromTaskPanel(
+                        runId = runId,
+                        taskId = taskId,
+                        objective = task.objective,
+                        output = output,
+                        onRerun = { request -> onRerunFromTask(runId, request) },
                     )
                 }
                 val roleForPayload = role
@@ -387,6 +507,90 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.Distributed -> label ?: (stringResource(Res.string.inspector_remote) + delegate.displayName())
 }
 
+/** Lines of a creature's activity shown before the older ones collapse. */
+private const val ACTIVITY_VISIBLE_LINES = 6
+
+/**
+ * A creature's live activity (its thinking and tool/progress steps, newest last) for its current
+ * provider session, from the in-memory [SessionActivityFeeds]. Older lines collapse behind one pill.
+ * Steering messages are not shown here: they have their own field below.
+ */
+@Composable
+private fun CreatureActivity(taskRun: TaskRun, activity: SessionActivityFeeds) {
+    val providerRunId = taskRun.providerRunId ?: return
+    val feeds by activity.feeds.collectAsState()
+    val lines = feeds[SessionActivityKey(taskRun.id, providerRunId)].orEmpty()
+    if (lines.isEmpty()) return
+    var expanded by remember(taskRun.id, providerRunId) { mutableStateOf(false) }
+    val window = lines.activityWindow(ACTIVITY_VISIBLE_LINES, expanded)
+    // Not a live region: reasoning streams in pieces, and announcing each would drown the panel.
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.inspector_activity), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        if (window.collapsed > 0) {
+            AzphaltPill(
+                label = pluralStringResource(Res.plurals.inspector_activity_earlier, window.collapsed, window.collapsed),
+                seed = "activity-earlier-${taskRun.id.value}",
+                onClick = { expanded = true },
+            )
+        } else if (expanded && lines.size > ACTIVITY_VISIBLE_LINES) {
+            AzphaltPill(
+                label = stringResource(Res.string.inspector_activity_show_fewer),
+                seed = "activity-fewer-${taskRun.id.value}",
+                onClick = { expanded = false },
+            )
+        }
+        window.shown.forEach { line ->
+            key(line.id) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        stringResource(
+                            when (line.kind) {
+                                SessionActivityKind.Thinking -> Res.string.inspector_activity_thinking
+                                SessionActivityKind.Progress -> Res.string.inspector_activity_step
+                            },
+                        ),
+                        style = AzphaltType.eyebrow,
+                        color = azphaltOnSurface(),
+                    )
+                    Text(
+                        line.text,
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The commit a task run checkpointed its changes as, shortened, with the branch holding it: from its
+ * latest artifact carrying [CHECKPOINT_COMMIT_METADATA_KEY]. Null when the task made no checkpoint.
+ */
+internal fun checkpointSummary(artifacts: List<ArtifactRef>): String? {
+    val artifact = artifacts.lastOrNull { !it.metadata[CHECKPOINT_COMMIT_METADATA_KEY].isNullOrBlank() } ?: return null
+    val commit = artifact.metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY).trim().take(12)
+    val branch = artifact.metadata["branch"]?.trim()?.takeIf(String::isNotEmpty)
+    return if (branch == null) commit else "$commit · $branch"
+}
+
+@Composable
+private fun ArtifactRef.provenanceLabel(): String {
+    val source = stringResource(
+        when (provenance) {
+            ContextProvenance.KeeperWritten -> Res.string.provenance_keeper_written
+            ContextProvenance.AgentArtifact -> Res.string.provenance_agent_artifact
+            ContextProvenance.RepositoryContent -> Res.string.provenance_repository_content
+            ContextProvenance.ExternalContent -> Res.string.provenance_external_content
+            ContextProvenance.MemoryRecall -> Res.string.provenance_memory_recall
+            ContextProvenance.Unknown -> Res.string.provenance_unknown
+        },
+    )
+    return if (madeFromUntrustedInput) stringResource(Res.string.provenance_made_from_external, source) else source
+}
+
 @Composable
 private fun LiveInspectorLine(label: String, value: String, live: Boolean = false) {
     Column(
@@ -404,11 +608,13 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
  */
 enum class CreatureTab { Needs, Work, Mind }
 
-/** Whether this creature is waiting on the keeper: a plan or task to approve, or an escalation. */
+/** Whether this creature is waiting on the keeper: a plan or task to approve, an escalation, or a spent budget. */
 internal fun creatureNeedsYou(taskRun: TaskRun): Boolean =
     taskRun.status == TaskRunStatus.AwaitingApproval ||
         taskRun.status == TaskRunStatus.Escalated ||
-        taskRun.awaitsNestedHumanApproval()
+        taskRun.awaitsNestedHumanApproval() ||
+        taskRun.isHeldForRoleBudget() ||
+        taskRun.awaitsKeeperAnswer()
 
 /** The tab a creature opens on: Needs when it is waiting on you, else its Work. */
 internal fun openingTab(taskRun: TaskRun?): CreatureTab =
@@ -438,4 +644,10 @@ private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit, p
             )
         }
     }
+}
+
+private fun TaskCondition.conditionTargetOrNull(): TaskDefinitionId? = when (this) {
+    is TaskCondition.Always -> null
+    is TaskCondition.OnAnyOutcome -> ofTask
+    is TaskCondition.OnFailure -> ofTask
 }

@@ -77,3 +77,7 @@ When trained artifacts land:
 6. Expose `executionReport(modelId)` in diagnostics so UI/debug output reflects observed execution rather than hardware presence.
 
 The generic scheduler, provider selection, fallback, session cache, and reporting do not depend on the final tokenizer, tensor names, or trained weights.
+
+## Small tasks on the same model
+
+The installed shared base also serves small text tasks routed to the device (docs/Orchestration_layer.md, Agent Router). `DesktopOnDeviceTextGenerator` and `AndroidOnDeviceTextGenerator` take the first adapter clerk whose base is installed, open it through the memory layer's session manager with that clerk's own spec (so the cached session is shared), and decode with the existing causal generator. The base graph's LoRA inputs are fed zeros, which leaves the base weights unchanged, so it answers as the plain instruct model. Merged clerks are task-specific and are not used. Nothing is downloaded for this.

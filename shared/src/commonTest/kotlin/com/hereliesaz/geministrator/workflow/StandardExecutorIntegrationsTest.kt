@@ -37,6 +37,21 @@ class StandardExecutorIntegrationsTest {
     }
 
     @Test
+    fun testRunnerDispatchHandsTheClientTheTaskContextAndAsksItAboutTheProject() = runBlocking {
+        val client = ContextTestRunnerClient()
+        val integration = TestRunnerExecutorIntegration(client)
+        val context = context(TaskExecutor.TestRunner("npm test"))
+
+        assertEquals(false, integration.supports(context.executor, context.project))
+        client.supported = true
+        assertEquals(true, integration.supports(context.executor, context.project))
+
+        integration.dispatch(context)
+        assertEquals(context, client.context)
+        assertEquals("npm test", client.command)
+    }
+
+    @Test
     fun deploymentDispatchAndReconcileUseEnvironmentAndRunId() = runBlocking {
         val client = FakeDeploymentClient()
         val integration = DeploymentExecutorIntegration(client)
@@ -163,6 +178,26 @@ private class FakeTestRunnerClient : TestRunnerClient {
         this.runId = runId
         return ExternalExecutionRun(runId, ExternalExecutionStatus.Completed)
     }
+}
+
+private class ContextTestRunnerClient : TestRunnerClient {
+    var supported = false
+    var context: TaskExecutorContext? = null
+    var command: String? = null
+
+    override fun supports(project: Project): Boolean = supported
+
+    override suspend fun start(project: Project, command: String?): ExternalExecutionRun =
+        error("the context-aware start should be used")
+
+    override suspend fun start(context: TaskExecutorContext, command: String?): ExternalExecutionRun {
+        this.context = context
+        this.command = command
+        return ExternalExecutionRun("test-2", ExternalExecutionStatus.Running)
+    }
+
+    override suspend fun getRun(project: Project, runId: String): ExternalExecutionRun =
+        ExternalExecutionRun(runId, ExternalExecutionStatus.Running)
 }
 
 private class FakeDeploymentClient : DeploymentClient {

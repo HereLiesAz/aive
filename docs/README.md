@@ -93,6 +93,10 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`VERSIONING.md`](VERSIONING.md) defines the four-part build identity, immutable exact-build tags, patch-grouped GitHub Releases, centralized release/version policy, desktop package-version mapping, and Google Play versionCode rules.
 
+### Policy decisions
+
+[`architecture/POLICY.md`](architecture/POLICY.md) defines the in-process, AuthZEN-shaped policy decision point that answers gate-decider, approval-policy, add-on host-permission, role-authority and repository-mutation (THREAT_MODEL invariant 4) checks, the `PolicyDecisionRecorded` audit event, and the hook points for MCP tool calls, context taint and delegation.
+
 ### Workflow add-ons
 
 [`architecture/ADDONS.md`](architecture/ADDONS.md) defines the mediated Azphalt workflow/role package boundary, Aive host compatibility rules, catalog discovery behavior, and the capabilities that add-ons can never access.
@@ -104,6 +108,10 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 ### Prompt caching
 
 [`architecture/PROMPT_CACHING.md`](architecture/PROMPT_CACHING.md) defines provider-neutral prompt reuse. Caching is an optimization and never workflow semantics.
+
+### Observability
+
+[`architecture/OBSERVABILITY.md`](architecture/OBSERVABILITY.md) defines the opt-in OpenTelemetry trace export: GenAI spans derived from the workflow event journal and the OTLP/HTTP JSON exporter. Content is excluded unless a separate toggle is on.
 
 ### Repository services
 
@@ -135,6 +143,8 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`Keepers-Room.md`](Keepers-Room.md) describes the Keeper's room, the one place for setup (connections, compute, projects and data, this device, appearance, about), the header and the hive's places, first launch and how feeding is gated, the hive's stopped and finished states, and the plan for consolidating the app into the hive and the Keeper's room.
 
+[`Agent-UI.md`](Agent-UI.md) describes how an agent asks the keeper a question richer than text: the A2UI-shaped subset drawn from the host catalog, what is rejected and shown as plain text, how the question waits in the creature's Needs, the structured answer, and the prompt that tells messaging-capable agents about it.
+
 ### Threat model
 
 [`THREAT_MODEL.md`](THREAT_MODEL.md) identifies trust boundaries, threat actors, attack surfaces by integration, invariants, and open items.
@@ -150,3 +160,6 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 ### Agent-to-agent communication
 
 [`architecture/DUPLEX_MCP.md`](architecture/DUPLEX_MCP.md) defines the opt-in, agent-neutral full-duplex MCP peer, its bounded messaging semantics, and its governed connection to live Aive task sessions and memory.
+
+[`architecture/MCP_HOST.md`](architecture/MCP_HOST.md) defines the MCP host: keeper-configured MCP servers, the dual-era client, the tool-use loop for function-calling providers, and per-server, per-run consent.
+[`A2A.md`](A2A.md) defines The Aive's Agent2Agent support: remote A2A agents as explicit-only providers, and the opt-in, loopback, token-protected desktop A2A server that launches workflows.

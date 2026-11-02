@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -43,8 +45,11 @@ import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegrat
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import com.hereliesaz.geministrator.workflow.TestRunnerExecutorIntegration
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.util.UUID
 import javax.swing.JFileChooser
 import javax.swing.UIManager
@@ -96,7 +101,34 @@ fun main() {
         computeConfigurationStore.write(initialComputeConfiguration)
     }
     val initialComputeToken = computeCredentialStore.readToken()
+    // The compute node's signing key, read from (or created in) the OS credential store once.
+    val computeNodeSigner = lazy {
+        runCatching {
+            DesktopComputeNodeSigner.loadOrCreate(DesktopDistributedComputeCredentialStore.forNodeIdentity())
+        }.getOrNull()
+    }
     val httpClient = HttpClient(CIO)
+    // MCP servers the keeper connects (docs/architecture/MCP_HOST.md); local ones run as processes.
+    val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    val mcpElicitation = com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate()
+    val mcpHost = com.hereliesaz.geministrator.mcp.McpHost(
+        store = com.hereliesaz.geministrator.mcp.McpServerStore(),
+        vault = DesktopMcpCredentialStore(),
+        transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(
+            httpClient,
+            com.hereliesaz.geministrator.mcp.DesktopMcpStdioLauncher,
+        ),
+        consent = mcpConsent,
+        stdioSupported = true,
+        elicitation = mcpElicitation,
+    )
+    // Code execution with MCP: a script sandbox over the same tools and consent, off until the
+    // keeper turns it on (docs/architecture/MCP_HOST.md, "Code execution").
+    val codeExecution = com.hereliesaz.geministrator.mcp.CodeExecutionToolSource(
+        inner = mcpHost,
+        runtime = com.hereliesaz.geministrator.mcp.QuickJsScriptSandbox(),
+        settings = com.hereliesaz.geministrator.mcp.CodeExecutionSettings(),
+    )
     val plannerInstaller = DesktopPlannerModelInstaller(httpClient)
     val localPlanner = DesktopOrchestrationAgentRuntime(plannerInstaller)
     val orchestrationSpecialistInstaller = DesktopOrchestrationSpecialistInstaller(httpClient)
@@ -109,6 +141,9 @@ fun main() {
     val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val memoryModelInstaller = DesktopMemoryModelInstaller(httpClient)
     val memorySessions = DesktopOrtMemorySessionManager()
+    // Small text tasks on the memory clerks' installed instruct model, when the keeper turns it on.
+    val onDeviceTextGenerator = DesktopOnDeviceTextGenerator(memoryModelInstaller, memorySessions)
+    val onDeviceSmallTaskPreference = OnDeviceSmallTaskPreference()
     val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
     val memoryLayer = MemoryLayerController(
         // One SQLite database per workflow run's memory bank; lineage and projects in Settings.
@@ -122,6 +157,9 @@ fun main() {
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
+    val testRunner = LocalTestRunnerClient()
+    // Agent2Agent server (docs/A2A.md): off until turned on in the Keeper's room; loopback only.
+    val a2aServer = DesktopA2aServer()
 
     try {
         application {
@@ -137,8 +175,10 @@ fun main() {
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
-                val providers = remember(credentials, repositoryCredentials) {
-                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder)
+                var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
+                val providers = remember(credentials, repositoryCredentials, onDeviceSmallTasksEnabled) {
+                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder, codeExecution) +
+                        listOfNotNull(onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, onDeviceTextGenerator))
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -158,12 +198,18 @@ fun main() {
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
-                    if (computeConfiguration.configured && token != null) {
+                    val signer = if (computeConfiguration.configured && token != null) {
+                        computeNodeSigner.value
+                    } else {
+                        null
+                    }
+                    if (signer != null && token != null) {
                         DesktopDistributedComputeSession(
                             configuration = computeConfiguration,
                             token = token,
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = desktopDistributedExecutorKinds(repositoryCredentials),
+                            signer = signer,
                         )
                     } else {
                         null
@@ -172,6 +218,10 @@ fun main() {
                 var computeConnected by remember(computeSession) { mutableStateOf(false) }
                 var computeOnlineNodes by remember(computeSession) { mutableStateOf(emptyList<ComputeNodeDescriptor>()) }
                 var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                var computeEnrolledNodes by remember(computeSession) {
+                    mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.EnrolledComputeNode>())
+                }
+                var computeRevoked by remember(computeSession) { mutableStateOf(false) }
                 DisposableEffect(computeSession) {
                     computeSession?.start()
                     onDispose { computeSession?.close() }
@@ -194,8 +244,19 @@ fun main() {
                             computeError = error.message
                         }
                     }
+                    launch {
+                        session.client.enrolledNodes.collectLatest { computeEnrolledNodes = it }
+                    }
+                    launch {
+                        session.client.revoked.collectLatest { computeRevoked = it }
+                    }
                 }
-                val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
+                // The test runner runs repository code on this computer, so it is added only here,
+                // never to the base set that pool leases from other devices run on.
+                val executorIntegrations = remember(computeSession, baseExecutorIntegrations) {
+                    (computeSession?.executorIntegrations ?: baseExecutorIntegrations)
+                        .withIntegration(TestRunnerExecutorIntegration(testRunner))
+                }
                 val uiScope = rememberCoroutineScope()
                 var localPlannerStatus by remember {
                     mutableStateOf<LocalPlannerStatus>(
@@ -320,6 +381,47 @@ fun main() {
                     configuredDesktopRepositoryDiscovery(repositoryCredentials, httpClient)
                 }
 
+                var a2aEnabled by remember { mutableStateOf(a2aServer.enabledPreference) }
+                var a2aStatus by remember { mutableStateOf<A2aServerStatus>(A2aServerStatus.Off) }
+                var a2aTokenTemporary by remember { mutableStateOf(false) }
+                DisposableEffect(a2aEnabled) {
+                    val started = a2aEnabled
+                    if (started) {
+                        a2aStatus = try {
+                            a2aServer.start()
+                            A2aServerStatus.Listening(a2aServer.baseUrl)
+                        } catch (failure: Exception) {
+                            A2aServerStatus.Failed(failure.message ?: failure::class.simpleName.orEmpty())
+                        }
+                        a2aTokenTemporary = a2aServer.tokenIsTemporary
+                    } else {
+                        a2aStatus = A2aServerStatus.Off
+                    }
+                    onDispose { if (started) a2aServer.stop() }
+                }
+                val a2aPendingLaunches by a2aServer.core.pendingLaunches.collectAsState()
+                val a2aServerSetting = A2aServerSetting(
+                    enabled = a2aEnabled,
+                    agentCardUrl = a2aServer.agentCardUrl.takeIf { a2aStatus is A2aServerStatus.Listening },
+                    status = a2aStatus,
+                    tokenIsTemporary = a2aTokenTemporary,
+                    onEnabledChange = { enabled ->
+                        a2aServer.enabledPreference = enabled
+                        a2aEnabled = enabled
+                    },
+                    onCopyToken = {
+                        a2aServer.currentToken()?.let { token ->
+                            runCatching {
+                                Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(token), null)
+                            }
+                        }
+                    },
+                    onResetToken = {
+                        a2aServer.resetToken()
+                        a2aTokenTemporary = a2aServer.tokenIsTemporary
+                    },
+                )
+
                 val repositoryServiceId = configuringRepositoryServiceId
                 val providerId = configuringProviderId
                 when {
@@ -347,6 +449,10 @@ fun main() {
                     )
                     else -> App(
                         entire = desktopEntire,
+                        mcpHost = mcpHost,
+                        mcpConsent = mcpConsent,
+                        codeExecution = codeExecution,
+                        mcpElicitation = mcpElicitation,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -380,7 +486,17 @@ fun main() {
                             connected = computeConnected,
                             onlineNodes = computeOnlineNodes,
                             lastError = computeError,
+                            enrolledNodes = computeEnrolledNodes,
+                            revoked = computeRevoked,
                         ),
+                        onRevokeComputeNode = { nodeId ->
+                            computeSession?.let { session ->
+                                uiScope.launch {
+                                    runCatching { session.client.revokeNode(nodeId) }
+                                        .onFailure { computeError = it.message }
+                                }
+                            }
+                        },
                         onSaveDistributedCompute = { configuration, token ->
                             computeConfigurationStore.write(configuration)
                             computeConfiguration = configuration
@@ -395,7 +511,27 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
+                        a2aServerSetting = a2aServerSetting,
+                        externalWorkflowLaunchRequests = a2aPendingLaunches,
+                        onExternalWorkflowLaunchHandled = { requestId, failure ->
+                            // Read now: right after a launch the runtime shows its new run.
+                            val runIdAfter = a2aServer.shownRunId()
+                            uiScope.launch { a2aServer.core.launchHandled(requestId, failure, runIdAfter) }
+                        },
+                        onRuntimeStateChanged = { state ->
+                            val shown = (state as? ApplicationRuntimeState.Live)?.presentation?.run?.id?.value
+                            uiScope.launch { a2aServer.core.runtimeShowsRun(shown) }
+                        },
+                        onRuntimeAvailable = a2aServer::attachRuntime,
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
+                        onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
+                            enabled = onDeviceSmallTasksEnabled,
+                            modelInstalled = onDeviceTextGenerator.isReady(),
+                            onEnabledChange = { enabled ->
+                                onDeviceSmallTaskPreference.enabled = enabled
+                                onDeviceSmallTasksEnabled = enabled
+                            },
+                        ),
                         memoryLayer = memoryLayer,
                         setupSecretStore = object : SetupSecretStore {
                             // Only stored credentials: keys from environment variables stay there.
@@ -427,12 +563,16 @@ fun main() {
             }
         }
     } finally {
+        testRunner.close()
+        runCatching { a2aServer.stop() }
         memoryLayer.detach()
         memoryScope.cancel()
         memorySessions.close()
         orchestrationSpecialistExecutor.reset()
         orchestrationDecisionModel.close()
         localPlanner.close()
+        // Stops local MCP server processes.
+        kotlinx.coroutines.runBlocking { mcpHost.close() }
         httpClient.close()
     }
 }
@@ -442,10 +582,12 @@ internal fun configuredDesktopProviders(
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
     entireRecorder: EntireRecorder? = null,
+    /** MCP tools for the text providers; workspace agents get none. */
+    mcpTools: com.hereliesaz.geministrator.mcp.McpToolSource? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
-    addAll(HostedLlmProviders.configured(credentials))
+    addAll(HostedLlmProviders.configured(credentials, mcpTools))
     // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
     // model, no key; needs only the linked GitHub token.
     if (githubToken != null && repositoryHttpClient != null) {
@@ -457,7 +599,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(OpenAiProvider(keyProvider))
+        add(OpenAiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("openai-local-workspace"),
@@ -476,7 +618,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(AnthropicProvider(keyProvider))
+        add(AnthropicProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("anthropic-local-workspace"),
@@ -495,7 +637,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(GeminiProvider(keyProvider))
+        add(GeminiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("gemini-local-workspace"),
@@ -514,7 +656,7 @@ internal fun configuredDesktopProviders(
     }
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(XaiProvider(keyProvider))
+        add(XaiProvider(keyProvider, tools = mcpTools))
         add(
             LocalWorkspaceAgentProvider(
                 id = AgentProviderId("xai-local-workspace"),

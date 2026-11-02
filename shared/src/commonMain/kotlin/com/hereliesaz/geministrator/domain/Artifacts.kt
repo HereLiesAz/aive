@@ -47,3 +47,9 @@ data class ArtifactRef(
         require(uri != null || textContent != null) { "ArtifactRef must have at least one of uri or textContent" }
     }
 }
+
+/**
+ * Artifact metadata key: the Git commit a task run checkpointed its own changes as (Local Git, Desktop;
+ * docs/Local-Git-Repository-Operations.md). The artifact's `branch` metadata names the branch holding it.
+ */
+const val CHECKPOINT_COMMIT_METADATA_KEY: String = "checkpointCommit"

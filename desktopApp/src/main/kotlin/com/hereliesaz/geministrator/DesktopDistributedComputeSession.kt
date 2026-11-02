@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeExecutorIntegr
 import com.hereliesaz.geministrator.distributed.DistributedComputeWorker
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeClient
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeGateway
+import com.hereliesaz.geministrator.distributed.SettingsComputeNodeEnrolmentLedger
 import com.hereliesaz.geministrator.distributed.SystemExecutorDistributedWorkloadRunner
 import com.hereliesaz.geministrator.domain.ComputeAccelerator
 import com.hereliesaz.geministrator.domain.ComputePlatform
@@ -23,6 +24,8 @@ internal class DesktopDistributedComputeSession(
     token: String,
     baseIntegrations: TaskExecutorIntegrationRegistry,
     supportedExecutorKinds: Set<String>,
+    /** This device's identity; the pool token only enrols it. */
+    signer: DesktopComputeNodeSigner,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val httpClient = HttpClient(CIO) {
@@ -37,6 +40,8 @@ internal class DesktopDistributedComputeSession(
         poolId = configuration.poolId,
         bearerToken = token,
         initialNode = node,
+        signer = signer,
+        enrolmentLedger = SettingsComputeNodeEnrolmentLedger(),
     )
 
     private val gateway = RelayDistributedComputeGateway(client, node.nodeId)

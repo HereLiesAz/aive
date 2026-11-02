@@ -56,7 +56,10 @@ import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
+import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
+import com.hereliesaz.geministrator.policy.PolicyEffect
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskBecameReady
@@ -64,6 +67,7 @@ import com.hereliesaz.geministrator.events.TaskCancelled
 import com.hereliesaz.geministrator.events.TaskCompleted
 import com.hereliesaz.geministrator.events.TaskEscalated
 import com.hereliesaz.geministrator.events.TaskFailed
+import com.hereliesaz.geministrator.events.TaskRerunRequested
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.events.VerificationFailed
 import com.hereliesaz.geministrator.events.WorkflowCancelled
@@ -81,6 +85,7 @@ import com.hereliesaz.geministrator.resources.runs_agent_assigned
 import com.hereliesaz.geministrator.resources.runs_approval_required
 import com.hereliesaz.geministrator.resources.runs_approve_to_begin_execution
 import com.hereliesaz.geministrator.resources.runs_approved
+import com.hereliesaz.geministrator.resources.runs_approved_by_delegation
 import com.hereliesaz.geministrator.resources.runs_artifact_created
 import com.hereliesaz.geministrator.resources.runs_attempt_of
 import com.hereliesaz.geministrator.resources.runs_authority
@@ -106,6 +111,9 @@ import com.hereliesaz.geministrator.resources.runs_no_pending_decisions
 import com.hereliesaz.geministrator.resources.runs_no_projects_yet
 import com.hereliesaz.geministrator.resources.runs_no_runs
 import com.hereliesaz.geministrator.resources.runs_plan_approval
+import com.hereliesaz.geministrator.resources.runs_policy_allowed
+import com.hereliesaz.geministrator.resources.runs_policy_denied
+import com.hereliesaz.geministrator.resources.runs_policy_requires_approval
 import com.hereliesaz.geministrator.resources.runs_reject_reassigns_to
 import com.hereliesaz.geministrator.resources.runs_reject_stops_the_workflow
 import com.hereliesaz.geministrator.resources.runs_rejected
@@ -116,6 +124,8 @@ import com.hereliesaz.geministrator.resources.runs_running
 import com.hereliesaz.geministrator.resources.runs_security_risk
 import com.hereliesaz.geministrator.resources.runs_stop
 import com.hereliesaz.geministrator.resources.runs_task_cancelled
+import com.hereliesaz.geministrator.resources.runs_external_cancel_failed
+import com.hereliesaz.geministrator.resources.runs_task_rerun
 import com.hereliesaz.geministrator.resources.runs_task_completed
 import com.hereliesaz.geministrator.resources.runs_task_escalated
 import com.hereliesaz.geministrator.resources.runs_task_failed
@@ -476,8 +486,11 @@ internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when
     is TaskFailed -> event.taskDefinitionId
     is HumanDecisionRequired -> event.taskDefinitionId
     is TaskCancelled -> event.taskDefinitionId
+    is ExternalRunCancelFailed -> event.taskDefinitionId
+    is TaskRerunRequested -> event.taskDefinitionId
     is WorkflowCreated, is WorkflowCompleted, is WorkflowFailed, is WorkflowCancelled -> null
     is ProviderUsageRecorded -> null
+    is PolicyDecisionRecorded -> event.taskDefinitionId
 }
 
 @Composable
@@ -488,7 +501,11 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is AgentAssigned -> stringResource(Res.string.runs_agent_assigned)
     is TaskStarted -> stringResource(Res.string.runs_task_started_attempt, event.attempt)
     is ApprovalRequired -> stringResource(Res.string.runs_approval_required)
-    is ApprovalDecisionReceived -> if (event.approved) stringResource(Res.string.runs_approved) else stringResource(Res.string.runs_rejected)
+    is ApprovalDecisionReceived -> when {
+        !event.approved -> stringResource(Res.string.runs_rejected)
+        event.byDelegation -> stringResource(Res.string.runs_approved_by_delegation)
+        else -> stringResource(Res.string.runs_approved)
+    }
     is ArtifactCreated -> stringResource(Res.string.runs_artifact_created, event.artifact.kind.name)
     is VerificationFailed -> stringResource(Res.string.runs_verification_failed)
     is RetryScheduled -> stringResource(Res.string.runs_retry_scheduled_attempt, event.nextAttempt)
@@ -500,7 +517,14 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is WorkflowFailed -> stringResource(Res.string.runs_workflow_failed)
     is WorkflowCancelled -> stringResource(Res.string.runs_workflow_cancelled)
     is TaskCancelled -> stringResource(Res.string.runs_task_cancelled)
+    is ExternalRunCancelFailed -> stringResource(Res.string.runs_external_cancel_failed)
+    is TaskRerunRequested -> stringResource(Res.string.runs_task_rerun)
     is ProviderUsageRecorded -> stringResource(Res.string.runs_usage_recorded)
+    is PolicyDecisionRecorded -> when (event.effect) {
+        PolicyEffect.Allow -> stringResource(Res.string.runs_policy_allowed)
+        PolicyEffect.Deny -> stringResource(Res.string.runs_policy_denied)
+        PolicyEffect.RequireApproval -> stringResource(Res.string.runs_policy_requires_approval)
+    }
 }
 
 internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
@@ -514,8 +538,11 @@ internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is TaskFailed -> event.reason.take(80)
     is WorkflowFailed -> event.reason.take(80)
     is HumanDecisionRequired -> event.reason.take(80)
+    is ExternalRunCancelFailed -> event.reason.take(80)
+    is PolicyDecisionRecorded -> event.reason.take(80)
     is ExecutorAssigned -> event.executor::class.simpleName ?: "executor"
     is AgentAssigned -> event.roleId.value
+    is TaskRerunRequested -> event.editedObjective?.take(80) ?: event.fromWorkflowRunId.value.takeLast(8)
     else -> event.workflowRunId.value.takeLast(8)
 }
 

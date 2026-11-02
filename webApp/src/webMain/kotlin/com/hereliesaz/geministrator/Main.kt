@@ -117,8 +117,21 @@ fun main() {
         DisposableEffect(Unit) {
             onDispose { repositoryHttpClient.close() }
         }
+        // MCP servers the keeper connects (docs/architecture/MCP_HOST.md): Streamable HTTP only, and
+        // only servers whose CORS policy admits this origin.
+        val mcpConsent = remember { com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate() }
+        val mcpElicitation = remember { com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate() }
+        val mcpHost = remember {
+            com.hereliesaz.geministrator.mcp.McpHost(
+                store = com.hereliesaz.geministrator.mcp.McpServerStore(),
+                vault = WebMcpCredentialStore,
+                transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(repositoryHttpClient),
+                consent = mcpConsent,
+                elicitation = mcpElicitation,
+            )
+        }
         val providers = remember(credentials, repositoryCredentials) {
-            configuredWebProviders(credentials, repositoryCredentials)
+            configuredWebProviders(credentials, repositoryCredentials, mcpHost)
         }
         val executorIntegrations = remember(repositoryCredentials, credentials) {
             val configured = configuredWebExecutorIntegrations(
@@ -171,6 +184,9 @@ fun main() {
             )
             else -> App(
                 providers = providers,
+                mcpHost = mcpHost,
+                mcpConsent = mcpConsent,
+                mcpElicitation = mcpElicitation,
                 executorIntegrations = executorIntegrations,
                 connectedRepositoryServiceIds = repositoryCredentials.keys,
                 onSearchRepositories = repositoryDiscovery::search,
@@ -199,12 +215,14 @@ fun main() {
 internal fun configuredWebProviders(
     credentials: Map<String, String>,
     repositoryCredentials: Map<String, String> = emptyMap(),
+    /** MCP tools for the text providers; workspace agents get none. */
+    mcpTools: com.hereliesaz.geministrator.mcp.McpToolSource? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
-    addAll(HostedLlmProviders.configured(credentials))
+    addAll(HostedLlmProviders.configured(credentials, mcpTools))
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(OpenAiProvider(keyProvider))
+        add(OpenAiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "openai-gitlab-workspace",
             displayName = "OpenAI / GitLab Workspace",
@@ -214,7 +232,7 @@ internal fun configuredWebProviders(
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(AnthropicProvider(keyProvider))
+        add(AnthropicProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "anthropic-gitlab-workspace",
             displayName = "Claude / GitLab Workspace",
@@ -224,7 +242,7 @@ internal fun configuredWebProviders(
     }
     credentials.cleanKey(ProviderCatalog.GEMINI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(GeminiProvider(keyProvider))
+        add(GeminiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "gemini-gitlab-workspace",
             displayName = "Gemini / GitLab Workspace",
@@ -234,7 +252,7 @@ internal fun configuredWebProviders(
     }
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(XaiProvider(keyProvider))
+        add(XaiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "xai-gitlab-workspace",
             displayName = "Grok / GitLab Workspace",
@@ -345,3 +363,14 @@ private fun repositoryStorageKey(serviceId: String): String = when (serviceId) {
 
 private fun Map<String, String>.cleanKey(id: String): String? =
     this[id]?.trim()?.takeIf(String::isNotEmpty)
+
+/** MCP server tokens in the same sealed localStorage vault as the other connection secrets. */
+private object WebMcpCredentialStore : com.hereliesaz.geministrator.mcp.McpCredentialVault {
+    private fun key(serverId: String) = "aive.mcp.token.$serverId"
+
+    override suspend fun read(serverId: String): String? = WebCredentialStore.read(key(serverId))
+
+    override suspend fun write(serverId: String, token: String) = WebCredentialStore.write(key(serverId), token)
+
+    override suspend fun clear(serverId: String) = WebCredentialStore.remove(key(serverId))
+}

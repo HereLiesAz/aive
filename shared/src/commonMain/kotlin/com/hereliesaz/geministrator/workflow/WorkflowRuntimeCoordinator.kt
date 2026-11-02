@@ -1,11 +1,13 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ApprovalGateId
-import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BlockingReason
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RetryReason
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.SpendCapKind
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -16,10 +18,18 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -41,12 +51,16 @@ class WorkflowRuntimeCoordinator(
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
     private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
+    /** The keeper's spend caps, read every cycle so a change in the Keeper's room applies at once. */
+    private val spendCaps: () -> SpendCaps = { SpendCaps() },
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
         RepositoryWorkflowEventSink(persistence.events),
     )
     private val cycleMutex = Mutex()
+    /** When the hourly spend was last summed; it is summed again when this run's cost rises. */
+    private var lastHourlySpendCheckAtMillis: Long? = null
 
     suspend fun persist(
         project: Project,
@@ -154,11 +168,19 @@ class WorkflowRuntimeCoordinator(
             cancelSessions(state.run, state.handles)
             return state.copy(handles = emptyMap())
         }
+        if (state.run.spendPause != null) {
+            // Stopped by a spend cap: nothing runs or starts until the keeper lifts the stop.
+            if (state.handles.isEmpty()) return state
+            cancelSessions(state.run, state.handles)
+            return state.copy(handles = emptyMap())
+        }
 
         var nextRun = reconcileResolvedApprovalGates(definition, state.run, nowEpochMillis)
         if (nextRun.status.isTerminal()) {
             return terminate(project, definition, nextRun, state.handles, nowEpochMillis)
         }
+        // A role whose budget the keeper raised (or cleared) takes work again.
+        nextRun = engine.releaseRoleBudgetHolds(nextRun, nowEpochMillis)
 
         nextRun = recoverAvailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
         nextRun = reconcileRemoteCompute(project, definition, nextRun, nowEpochMillis)
@@ -240,6 +262,7 @@ class WorkflowRuntimeCoordinator(
         }
 
         ensureMissingFailureEscalationGates(nextRun, nowEpochMillis)
+        nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
         if (
             nextRun.taskRuns.values.any {
@@ -257,6 +280,11 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Retrying,
                 TaskRunStatus.Escalated,
             )
+        }
+
+        // Spend circuit breakers: a reached cap stops the whole run before anything else starts.
+        spendCapTrip(previous = state.run, run = nextRun, nowEpochMillis = nowEpochMillis)?.let { trip ->
+            return stopForSpendCap(project, definition, nextRun, nextHandles, trip, nowEpochMillis)
         }
 
         nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
@@ -309,6 +337,8 @@ class WorkflowRuntimeCoordinator(
         if (nextRun.status.isTerminal()) {
             return terminate(project, definition, nextRun, nextHandles, nowEpochMillis)
         }
+        // Tasks that system executors made ready in this cycle pass the same gate before agents start.
+        nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
         val dispatched = engine.dispatchReadyTasks(
             project = project,
@@ -330,23 +360,113 @@ class WorkflowRuntimeCoordinator(
     }
 
     /**
-     * Cancels [state]'s run: every unfinished task, and every provider session it still holds.
-     * Used when a run is abandoned, such as a new launch replacing it.
+     * Cancels [state]'s run: every unfinished task, every provider session it still holds, and the
+     * remote work behind every unfinished system-executor task (GitHub Actions runs, nested child
+     * runs, distributed leases, external service runs). Used when a run is abandoned, such as a
+     * new launch replacing it.
+     *
+     * The local cancellation is persisted first. Remote cancels follow, best effort, outside the
+     * cycle lock; one that fails is recorded as [ExternalRunCancelFailed] and the rest still run.
      */
     suspend fun cancel(
         project: Project,
         definition: WorkflowDefinition,
         state: WorkflowRuntimeState,
         nowEpochMillis: Long,
-    ): WorkflowRuntimeState = cycleMutex.withLock {
-        val persistedRun = persistence.runs.get(state.run.id)
-            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
-            ?: state.run
-        if (persistedRun.status.isTerminal()) {
-            cancelSessions(persistedRun, state.handles)
-            return@withLock WorkflowRuntimeState(persistedRun, emptyMap())
+    ): WorkflowRuntimeState {
+        val (cancelled, remote) = cycleMutex.withLock {
+            val persistedRun = persistence.runs.get(state.run.id)
+                ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
+                ?: state.run
+            if (persistedRun.status.isTerminal()) {
+                cancelSessions(persistedRun, state.handles)
+                return@withLock WorkflowRuntimeState(persistedRun, emptyMap()) to emptyList<ExternalRunToCancel>()
+            }
+            val pending = unfinishedExternalRuns(definition, persistedRun)
+            terminate(
+                project,
+                definition,
+                engine.cancelWorkflow(persistedRun, nowEpochMillis),
+                state.handles,
+                nowEpochMillis,
+            ) to pending
         }
-        terminate(project, definition, engine.cancelWorkflow(persistedRun, nowEpochMillis), state.handles, nowEpochMillis)
+        cancelExternalRuns(project, definition, cancelled.run, remote, nowEpochMillis)
+        return cancelled
+    }
+
+    private data class ExternalRunToCancel(
+        val task: TaskDefinition,
+        val taskRun: TaskRun,
+        val executor: TaskExecutor,
+    )
+
+    /** Unfinished system-executor tasks that hold a remote handle, read before the run is cancelled. */
+    private fun unfinishedExternalRuns(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+    ): List<ExternalRunToCancel> {
+        val tasks = definition.tasks.associateBy { it.id }
+        return run.taskRuns.mapNotNull { (id, taskRun) ->
+            if (taskRun.externalRunId == null) return@mapNotNull null
+            if (taskRun.status in TERMINAL_TASK_STATUSES) return@mapNotNull null
+            // The compute mesh owns these handles, not an executor integration.
+            if (remoteComputeCoordinator?.owns(taskRun) == true) return@mapNotNull null
+            val task = tasks[id] ?: return@mapNotNull null
+            val executor = taskRun.executor ?: task.effectiveExecutor()
+            if (!executor.isSystemExecutor()) return@mapNotNull null
+            ExternalRunToCancel(task, taskRun, executor)
+        }
+    }
+
+    /** Best effort: each failure is recorded as an event and never stops the others. */
+    private suspend fun cancelExternalRuns(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        remote: List<ExternalRunToCancel>,
+        nowEpochMillis: Long,
+    ) {
+        if (remote.isEmpty()) return
+        withContext(NonCancellable) {
+            for ((task, taskRun, executor) in remote) {
+                val externalRunId = taskRun.externalRunId ?: continue
+                val failure: Throwable? = try {
+                    executorIntegrations.integrationFor(executor, project)?.cancel(
+                        TaskExecutorContext(
+                            project = project,
+                            definition = definition,
+                            run = run,
+                            task = task,
+                            taskRun = taskRun,
+                            executor = executor,
+                            nowEpochMillis = nowEpochMillis,
+                            role = engine.roleDefinition(run, task.roleId),
+                        ),
+                    )
+                    null
+                } catch (thrown: Throwable) {
+                    // Including a CancellationException from the integration itself: this block is
+                    // NonCancellable, so the remaining remote cancels still go out.
+                    thrown
+                }
+                if (failure == null) continue
+                try {
+                    persistence.events.append(
+                        ExternalRunCancelFailed(
+                            workflowRunId = run.id,
+                            taskDefinitionId = task.id,
+                            externalRunId = externalRunId,
+                            reason = failure.message?.takeIf(String::isNotBlank)
+                                ?: "${executor.displayLabel()} could not be cancelled",
+                            occurredAtEpochMillis = nowEpochMillis,
+                        ),
+                    )
+                } catch (_: Throwable) {
+                    // Recording the failure is itself best effort.
+                }
+            }
+        }
     }
 
     /** Ends a run that has just become terminal: closes its gates, stops its sessions, persists it. */
@@ -362,6 +482,41 @@ class WorkflowRuntimeCoordinator(
         val terminalState = WorkflowRuntimeState(closed, emptyMap())
         persist(project, definition, terminalState)
         return terminalState
+    }
+
+    /**
+     * The spend cap [run] has reached, or null. The run's own cost is checked every cycle; the
+     * hourly spend across runs is summed when this run's known cost rises, and at least once a
+     * minute otherwise. A Hall Monitor pause is left to its own review.
+     */
+    private suspend fun spendCapTrip(previous: WorkflowRun, run: WorkflowRun, nowEpochMillis: Long): SpendCapTrip? {
+        if (run.globalPause != null || run.spendPause != null) return null
+        val caps = spendCaps()
+        runCostTrip(run, caps)?.let { return it }
+        val hourlyCap = caps.hourlySpendCapUsd ?: return null
+        val lastCheck = lastHourlySpendCheckAtMillis
+        val costRose = run.knownCostUsd() > previous.knownCostUsd()
+        if (!costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
+        lastHourlySpendCheckAtMillis = nowEpochMillis
+        val spent = hourlySpendUsd(persistence, nowEpochMillis, alsoRunId = run.id)
+        return if (spent >= hourlyCap) SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent) else null
+    }
+
+    /** Cancels the run's live provider sessions and parks it under a spend stop the keeper lifts. */
+    private suspend fun stopForSpendCap(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        trip: SpendCapTrip,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState {
+        val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status?.isActiveProviderStatus() == true }
+        cancelSessions(run, live)
+        val stopped = pauseRunForSpendCap(run, trip, cancelledTaskIds = live.keys, nowEpochMillis = nowEpochMillis)
+        val stoppedState = WorkflowRuntimeState(stopped, emptyMap())
+        persist(project, definition, stoppedState)
+        return stoppedState
     }
 
     /** Best effort: a session that already finished, or a provider that is unreachable, is not an error here. */
@@ -498,22 +653,38 @@ class WorkflowRuntimeCoordinator(
         for ((taskId, taskRun) in run.taskRuns) {
             if (taskRun.status != TaskRunStatus.AwaitingApproval) continue
             val task = tasks[taskId] ?: continue
+            if (taskRun.isHeldAtContextTaintGate()) {
+                ensureContextTaintGate(run, task, taskRun, taskRun.blockingReason?.message.orEmpty(), now)
+                continue
+            }
 
             val gateId = ApprovalGateId("plan:${run.id.value}:${taskId.value}:${taskRun.attempt}")
             if (persistence.approvalGates.get(gateId) != null) continue
 
+            // The task already stopped for approval, so ask the policy decision point who must
+            // decide. A task with no approval policy only stops here when its provider insists on
+            // one (e.g. committing a workflow file to the default branch), which is a person's call.
+            val request = PolicyRequest(
+                subject = PolicySubject.System,
+                action = PolicyAction.ProceedPastPlan(task.approvalPolicy, providerRequested = true),
+                resource = PolicyResource.task(taskId),
+                context = PolicyContext(workflowRunId = run.id, taskDefinitionId = taskId),
+            )
+            val decision = InProcessPolicyDecisionPoint.decide(request)
+            val requiresHuman = when (decision) {
+                is PolicyDecision.RequireApproval -> decision.requiresHuman
+                is PolicyDecision.Allow, is PolicyDecision.Deny -> false
+            }
             gateCoordinator.open(
                 id = gateId,
                 workflowRunId = run.id,
                 taskDefinitionId = taskId,
                 kind = ApprovalGateKind.PlanApproval,
                 reason = "Plan approval required for '${task.name}'",
-                // A task with no approval policy only stops here when its provider insists on one
-                // (e.g. committing a workflow file to the default branch), which is a person's call.
-                requiresHuman = task.approvalPolicy is ApprovalPolicy.HumanApproval ||
-                    task.approvalPolicy == ApprovalPolicy.None,
+                requiresHuman = requiresHuman,
                 nowEpochMillis = now,
             )
+            gateCoordinator.recordPolicyDecision(request, decision, now)
         }
     }
 
@@ -549,6 +720,44 @@ class WorkflowRuntimeCoordinator(
 
                 TaskRunStatus.AwaitingApproval -> {
                     if (tasks[taskId] == null) continue
+                    if (taskRun.isHeldAtContextTaintGate()) {
+                        val gate = persistence.approvalGates.get(
+                            contextTaintGateId(nextRun.id, taskId, taskRun.attempt),
+                        ) ?: continue
+                        if (
+                            gate.status == ApprovalGateStatus.Pending ||
+                            gate.status == ApprovalGateStatus.Applying
+                        ) {
+                            continue
+                        }
+                        nextRun = if (gate.status == ApprovalGateStatus.Approved) {
+                            // Approved: the task may now run, and a provider may still ask for plan approval.
+                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Ready)
+                            nextRun.copy(
+                                taskRuns = nextRun.taskRuns + (
+                                    taskId to taskRun.copy(
+                                        status = TaskRunStatus.Ready,
+                                        blockingReason = null,
+                                        progressMessage = null,
+                                    )
+                                ),
+                                updatedAtEpochMillis = now,
+                            )
+                        } else {
+                            // Retrying would only meet the same inputs at the same gate.
+                            engine.handleFailure(
+                                definition = definition,
+                                run = nextRun,
+                                taskDefinitionId = taskId,
+                                retryReason = RetryReason.PlanRejected,
+                                reason = "Acting on external inputs was not approved",
+                                nowEpochMillis = now,
+                                allowRetry = false,
+                            )
+                        }
+                        if (nextRun.status.isTerminal()) break
+                        continue
+                    }
                     val gateId = ApprovalGateId(
                         "plan:${nextRun.id.value}:${taskId.value}:${taskRun.attempt}",
                     )
@@ -580,6 +789,91 @@ class WorkflowRuntimeCoordinator(
         return nextRun
     }
 
+    /**
+     * Holds each ready task that can change something and whose inputs include external or unknown
+     * content at a human gate naming those inputs (ContextTaint.kt). An approved gate lets it run.
+     */
+    private suspend fun holdTaintedPrivilegedTasks(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ): WorkflowRun {
+        val tasks = definition.tasks.associateBy { it.id }
+        var next = run
+        for ((id, taskRun) in run.taskRuns) {
+            if (taskRun.status != TaskRunStatus.Ready && taskRun.status != TaskRunStatus.Retrying) continue
+            if (taskRun.externalRunId != null) continue
+            val task = tasks[id] ?: continue
+            val executor = taskRun.executor ?: task.effectiveExecutor()
+            val roleId = (executor.withoutPlacement() as? TaskExecutor.RoleAgent)?.roleId ?: task.roleId
+            val untrusted = definition.untrustedInputsForPrivilegedTask(
+                run = next,
+                task = task,
+                executor = executor,
+                role = engine.roleDefinition(next, roleId),
+            )
+            if (untrusted.isEmpty()) continue
+            val gate = persistence.approvalGates.get(contextTaintGateId(next.id, id, taskRun.attempt))
+            if (gate?.status == ApprovalGateStatus.Approved) continue
+
+            val reason = contextTaintReason(task, untrusted)
+            ensureContextTaintGate(next, task, taskRun, reason, now)
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.AwaitingApproval)
+            next = next.copy(
+                taskRuns = next.taskRuns + (
+                    id to taskRun.copy(
+                        status = TaskRunStatus.AwaitingApproval,
+                        executor = executor,
+                        blockingReason = BlockingReason(CONTEXT_TAINT_BLOCKING_CODE, reason),
+                        progress = null,
+                        progressMessage = null,
+                    )
+                ),
+                updatedAtEpochMillis = now,
+            )
+        }
+        return next
+    }
+
+    private suspend fun ensureContextTaintGate(
+        run: WorkflowRun,
+        task: TaskDefinition,
+        taskRun: TaskRun,
+        reason: String,
+        now: Long,
+    ) {
+        val gateId = contextTaintGateId(run.id, task.id, taskRun.attempt)
+        if (persistence.approvalGates.get(gateId) != null) return
+        gateCoordinator.open(
+            id = gateId,
+            workflowRunId = run.id,
+            taskDefinitionId = task.id,
+            kind = ApprovalGateKind.SecurityRisk,
+            reason = reason.ifBlank { "'${task.name}' can change things and its inputs include external content" },
+            requiresHuman = true,
+            nowEpochMillis = now,
+        )
+    }
+
+    /** Labels what [executor] produced for [task] with where it came from (ContextTaint.kt). */
+    private fun labelOutputs(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        task: TaskDefinition,
+        executor: TaskExecutor,
+        execution: TaskExecutorExecution,
+    ): TaskExecutorExecution {
+        if (execution.artifacts.isEmpty()) return execution
+        return execution.copy(
+            artifacts = definition.labelTaskOutputs(
+                run = run,
+                task = task,
+                assigned = executor.outputProvenance(engine.roleDefinition(run, task.roleId)),
+                artifacts = execution.artifacts,
+            ),
+        )
+    }
+
     private suspend fun dispatchSystemExecutors(
         project: Project,
         definition: WorkflowDefinition,
@@ -605,7 +899,7 @@ class WorkflowRuntimeCoordinator(
             val integration = executorIntegrations.integrationFor(executor, project) ?: continue
             // A throwing integration fails its own task (through the normal retry/escalation path)
             // instead of escaping the cycle and leaving the task Ready forever.
-            val execution = try {
+            val dispatched = try {
                 integration.dispatch(
                     TaskExecutorContext(
                         project = project,
@@ -627,6 +921,7 @@ class WorkflowRuntimeCoordinator(
                         ?: "${executor.displayLabel()} dispatch failed",
                 )
             }
+            val execution = labelOutputs(definition, next, task, executor, dispatched)
             next = applyExecution(
                 run = next,
                 id = id,
@@ -668,16 +963,22 @@ class WorkflowRuntimeCoordinator(
                 id = id,
                 previous = taskRun,
                 executor = executor,
-                execution = integration.reconcile(
-                    TaskExecutorContext(
-                        project = project,
-                        definition = definition,
-                        run = next,
-                        task = task,
-                        taskRun = taskRun,
-                        executor = executor,
-                        nowEpochMillis = now,
-                        role = engine.roleDefinition(next, task.roleId),
+                execution = labelOutputs(
+                    definition = definition,
+                    run = next,
+                    task = task,
+                    executor = executor,
+                    execution = integration.reconcile(
+                        TaskExecutorContext(
+                            project = project,
+                            definition = definition,
+                            run = next,
+                            task = task,
+                            taskRun = taskRun,
+                            executor = executor,
+                            nowEpochMillis = now,
+                            role = engine.roleDefinition(next, task.roleId),
+                        ),
                     ),
                 ),
                 now = now,
@@ -686,12 +987,12 @@ class WorkflowRuntimeCoordinator(
         return next
     }
 
-    private fun refreshAfterSystemExecution(
+    private suspend fun refreshAfterSystemExecution(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
     ): WorkflowRun {
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, now)
+        val refreshed = engine.refreshReadiness(definition, run, now)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }
@@ -837,7 +1138,9 @@ class WorkflowRuntimeCoordinator(
             val mergedArtifacts = if (update.artifacts.isEmpty()) {
                 taskRun.artifacts
             } else {
-                (taskRun.artifacts + update.artifacts).distinctBy { it.id }
+                // Self-attested by whichever pool member ran it: external, whatever it claims.
+                val received = definition.labelTaskOutputs(next, task, ContextProvenance.ExternalContent, update.artifacts)
+                (taskRun.artifacts + received).distinctBy { it.id }
             }
             next = next.copy(
                 taskRuns = next.taskRuns + (
@@ -853,7 +1156,7 @@ class WorkflowRuntimeCoordinator(
                 updatedAtEpochMillis = now,
             )
         }
-        return WorkflowRunFactory.refreshReadiness(definition, next, now)
+        return engine.refreshReadiness(definition, next, now)
     }
 
     private fun com.hereliesaz.geministrator.domain.ComputePlacementPolicy.allowsLocalFallback(): Boolean =
@@ -1009,6 +1312,12 @@ class WorkflowRuntimeCoordinator(
 
     private companion object {
         const val REMOTE_COMPUTE_UNAVAILABLE: String = "remote_compute_unavailable"
+        val TERMINAL_TASK_STATUSES: Set<TaskRunStatus> = setOf(
+            TaskRunStatus.Completed,
+            TaskRunStatus.Failed,
+            TaskRunStatus.Cancelled,
+        )
+        const val HOURLY_SPEND_RECHECK_MILLIS: Long = 60_000L
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

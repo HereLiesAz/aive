@@ -82,6 +82,8 @@ kotlin {
 
         getByName("desktopMain").dependencies {
             implementation(libs.sqldelight.sqlite.driver)
+            // The MCP script sandbox (QuickJsScriptSandbox): QuickJS in WebAssembly on a pure-JVM runtime.
+            implementation(libs.quickjs4j)
             if (isMacHost) {
                 implementation(libs.onnxruntime)
             } else {

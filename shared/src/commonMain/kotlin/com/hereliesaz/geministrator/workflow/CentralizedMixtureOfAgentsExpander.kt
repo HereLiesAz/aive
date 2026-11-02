@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.workflow
 
-import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.BuiltInRoles
@@ -16,6 +15,11 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.VerificationPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyCodes
+import com.hereliesaz.geministrator.policy.decideRole
+import com.hereliesaz.geministrator.policy.isAllowed
 
 const val GENEALOGY_GOVERNANCE_SERVICE: String = "haive.genealogy-governance"
 
@@ -59,10 +63,11 @@ object CentralizedMixtureOfAgentsExpander {
                     }
                 }
                 proposerRoles.forEach { role ->
-                    require(RoleAuthority.Implement !in role.authorities) {
+                    val reasonOnly = InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ReasonOnly)
+                    require(reasonOnly.code != PolicyCodes.HOLDS_IMPLEMENT_AUTHORITY) {
                         "Centralized MoA proposer ${role.name} may not hold implementation authority in the first safe MoA runtime"
                     }
-                    require(AgentCapability.RepositoryWrite !in role.capabilitiesRequired) {
+                    require(reasonOnly.code != PolicyCodes.REQUIRES_REPOSITORY_WRITE) {
                         "Centralized MoA proposer ${role.name} may not require repository-write capability"
                     }
                 }
@@ -235,7 +240,7 @@ private fun TaskDefinition.verifierRole(
         val role = requireNotNull(rolesById[explicitVerifier]) {
             "Centralized MoA verifier role ${explicitVerifier.value} is not registered and enabled"
         }
-        require(RoleAuthority.Verify in role.authorities) {
+        require(InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ExerciseAuthority(RoleAuthority.Verify)).isAllowed) {
             "Centralized MoA verifier ${role.name} does not have Verify authority"
         }
         return role

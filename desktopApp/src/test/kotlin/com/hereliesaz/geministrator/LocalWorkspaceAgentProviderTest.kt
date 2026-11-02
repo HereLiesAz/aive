@@ -1,13 +1,20 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.CHECKPOINT_COMMIT_METADATA_KEY
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationResult
 import java.nio.file.Files
@@ -263,6 +270,106 @@ class LocalWorkspaceAgentProviderTest {
     }
 
     @Test
+    fun eachTaskOfARunCheckpointsItsOwnCommitOnTheRunBranch() = withGitRepository { root ->
+        val base = git(root, "rev-parse", "HEAD").trim()
+        val first = runTask(
+            root,
+            request(root, TaskRunId("write-1"), context = runContext("write", "Write README")),
+            README_PATCH,
+        )
+        assertCompleted(first)
+        val firstChange = first.codeChange()
+        val second = runTask(
+            root,
+            request(
+                root,
+                TaskRunId("polish-1"),
+                context = runContext("polish", "Polish README"),
+                contextArtifacts = listOf(firstChange.asRef(TaskRunId("write-1"))),
+            ),
+            """
+                diff --git a/README.md b/README.md
+                --- a/README.md
+                +++ b/README.md
+                @@ -1 +1 @@
+                -changed
+                +polished
+            """.trimIndent(),
+        )
+        assertCompleted(second)
+        val secondChange = second.codeChange()
+
+        val runBranch = "haive/run-run-7"
+        assertEquals(runBranch, firstChange.metadata.getValue("branch"))
+        assertEquals(runBranch, secondChange.metadata.getValue("branch"))
+        // Two tasks, two commits, one after the other on the run's branch; each sha recorded on its task.
+        assertEquals("2", git(root, "rev-list", "--count", "$base..$runBranch").trim())
+        val firstSha = firstChange.metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY)
+        val secondSha = secondChange.metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY)
+        assertEquals(firstChange.metadata.getValue("headCommit"), firstSha)
+        assertEquals(git(root, "rev-parse", "$runBranch~1").trim(), firstSha)
+        assertEquals(git(root, "rev-parse", runBranch).trim(), secondSha)
+        assertEquals("run-7", secondChange.metadata.getValue("workflowRunId"))
+        assertEquals("Polish README", secondChange.metadata.getValue("taskName"))
+        // Each commit names its task and the run.
+        val firstMessage = git(root, "log", "-1", "--format=%B", firstSha)
+        val secondMessage = git(root, "log", "-1", "--format=%B", secondSha)
+        assertTrue(firstMessage.contains("Haive-Task: Write README (write)"), firstMessage)
+        assertTrue(firstMessage.contains("Haive-Run: run-7"), firstMessage)
+        assertTrue(secondMessage.contains("Haive-Task: Polish README (polish)"), secondMessage)
+        assertTrue(secondMessage.contains("Haive-Run: run-7"), secondMessage)
+        assertEquals("polished", git(root, "show", "$runBranch:README.md").trim())
+        // The task branches are gone once their commits live on the run's branch; the checkout is untouched.
+        assertEquals(runBranch, git(root, "branch", "--list", "haive/*").trim().removePrefix("* ").trim())
+        assertEquals("initial\n", root.resolve("README.md").readText())
+        assertTrue(git(root, "status", "--porcelain").isBlank())
+    }
+
+    @Test
+    fun aTaskThatChangesNothingMakesNoCheckpoint() = withGitRepository { root ->
+        val head = git(root, "rev-parse", "HEAD").trim()
+        val noOp = """
+            diff --git a/README.md b/README.md
+            --- a/README.md
+            +++ b/README.md
+            @@ -1 +1 @@
+            -initial
+            +initial
+        """.trimIndent()
+
+        val events = runTask(root, request(root, TaskRunId("idle-1"), context = runContext("idle", "Idle")), noOp)
+
+        assertCompleted(events)
+        val artifacts = events.filterIsInstance<AgentEvent.ArtifactProduced>().map { it.artifact }
+        assertTrue(artifacts.none { it.kind == ArtifactKind.CodeChange }, "$artifacts")
+        assertTrue(artifacts.none { CHECKPOINT_COMMIT_METADATA_KEY in it.metadata }, "$artifacts")
+        // Later tasks continue from where this one started.
+        assertEquals(head, artifacts.single().metadata.getValue("headCommit"))
+        assertEquals(head, git(root, "rev-parse", "HEAD").trim())
+        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+    }
+
+    @Test
+    fun aParallelTaskWhoseRunBranchMovedOnKeepsItsOwnBranch() = withGitRepository { root ->
+        val first = runTask(root, request(root, TaskRunId("left-1"), context = runContext("left", "Left")), README_PATCH)
+        assertCompleted(first)
+        val second = runTask(
+            root,
+            request(root, TaskRunId("right-1"), context = runContext("right", "Right")),
+            README_PATCH.replace("+changed", "+other"),
+        )
+        assertCompleted(second)
+
+        val runBranch = "haive/run-run-7"
+        assertEquals(runBranch, first.codeChange().metadata.getValue("branch"))
+        val ownBranch = second.codeChange().metadata.getValue("branch")
+        assertTrue(ownBranch.startsWith("haive/right-1-"), ownBranch)
+        assertEquals("changed", git(root, "show", "$runBranch:README.md").trim())
+        assertEquals("other", git(root, "show", "$ownBranch:README.md").trim())
+        assertEquals(second.codeChange().metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY), git(root, "rev-parse", ownBranch).trim())
+    }
+
+    @Test
     fun gitEnvironmentIsStrippedOfInheritedRepositoryOverrides() {
         val environment = mutableMapOf(
             "PATH" to "/usr/bin",
@@ -290,6 +397,37 @@ class LocalWorkspaceAgentProviderTest {
         return runBlocking { provider.observe(handle.providerRunId).toList() }
     }
 
+    private fun runTask(root: Path, request: AgentTaskRequest, patch: String): List<AgentEvent> {
+        val api = QueueTextApi(
+            TextGenerationResult(text = "Change the README.\nFILES:\nREADME.md"),
+            TextGenerationResult(text = patch),
+        )
+        val provider = LocalWorkspaceAgentProvider(AgentProviderId("checkpoint-test"), "Checkpoint test", api)
+        val handle = runBlocking { provider.start(request) }
+        return runBlocking { provider.observe(handle.providerRunId).toList() }
+    }
+
+    private fun runContext(taskId: String, taskName: String) = AgentOrchestrationContext(
+        workflowRunId = WorkflowRunId("run-7"),
+        taskDefinitionId = TaskDefinitionId(taskId),
+        taskName = taskName,
+    )
+
+    private fun List<AgentEvent>.codeChange(): ProviderArtifact = filterIsInstance<AgentEvent.ArtifactProduced>()
+        .map { it.artifact }
+        .single { it.kind == ArtifactKind.CodeChange }
+
+    private fun ProviderArtifact.asRef(taskRunId: TaskRunId) = ArtifactRef(
+        id = ArtifactId("${taskRunId.value}-change"),
+        kind = kind,
+        taskRunId = taskRunId,
+        label = label,
+        textContent = textContent,
+        mediaType = mediaType,
+        metadata = metadata,
+        createdAtEpochMillis = 0L,
+    )
+
     private fun assertCompleted(events: List<AgentEvent>) {
         val failure = events.filterIsInstance<AgentEvent.Failed>().lastOrNull()
         assertTrue(failure == null, failure?.reason ?: "Workspace provider emitted a failure")
@@ -300,11 +438,15 @@ class LocalWorkspaceAgentProviderTest {
         root: Path,
         taskRunId: TaskRunId,
         requirePlanApproval: Boolean = false,
+        context: AgentOrchestrationContext = AgentOrchestrationContext(),
+        contextArtifacts: List<ArtifactRef> = emptyList(),
     ): AgentTaskRequest = AgentTaskRequest(
         taskRunId = taskRunId,
         objective = "Update README",
         roleInstructions = "Implement the requested repository change.",
         acceptanceCriteria = emptyList(),
+        contextArtifacts = contextArtifacts,
+        orchestrationContext = context,
         repository = RepositoryRef(
             owner = "",
             name = root.fileName.toString(),

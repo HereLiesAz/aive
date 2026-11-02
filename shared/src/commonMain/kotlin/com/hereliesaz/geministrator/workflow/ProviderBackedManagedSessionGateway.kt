@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.agentui.AgentUi
+import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -49,6 +52,11 @@ class ProviderBackedManagedSessionGateway(
     private val contextRetriever: ContextRetriever? = SimilarityContextRetriever(listOf(ArtifactChunkSource)),
     /** Opt-in agent-neutral conversation hook; never a substitute for memory or workflow gates. */
     private val duplexAttachment: DuplexSessionAttachment? = null,
+    /**
+     * Each session's live thinking and progress lines for the creature's panel: bounded, in memory,
+     * never persisted into workflow state nor passed to the duplex peer.
+     */
+    private val activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -72,6 +80,11 @@ class ProviderBackedManagedSessionGateway(
         val artifacts: List<ProviderArtifact> = emptyList(),
         val progress: ManagedSessionProgress? = null,
         val pendingUsage: ManagedSessionUsage? = null,
+        /** The agent's open question to the keeper (docs/Agent-UI.md), as the message that asked it. */
+        val keeperQuestion: String? = null,
+        val answeredQuestionKey: String? = null,
+        /** True once this process has seen a question or an answer, so [keeperQuestion] is authoritative. */
+        val questionKnown: Boolean = false,
     )
 
     private val mutex = Mutex()
@@ -96,10 +109,17 @@ class ProviderBackedManagedSessionGateway(
             request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
         )
+        val providerCapabilities = provider.capabilities()
+        // Only an agent the keeper can reply to mid-task is told how to ask the keeper a question.
+        val askingRequest = if (AgentCapability.Messaging in providerCapabilities.supported) {
+            recalledRequest.withKeeperQuestionInstructions()
+        } else {
+            recalledRequest
+        }
         val prepared = inferenceFabric.prepareDispatch(
-            request = recalledRequest,
+            request = askingRequest,
             providerId = provider.id,
-            capabilities = provider.capabilities(),
+            capabilities = providerCapabilities,
         )
         val taskRequest = prepared.request
         var startedProviderRunId: ProviderRunId? = null
@@ -220,7 +240,7 @@ class ProviderBackedManagedSessionGateway(
 
         val blocksById = linkedMapOf<String, PromptContextBlock>()
         val memoryEvidence = recalled.blocks.mapIndexed { index, block ->
-            blocksById["memory-context-$index"] = block
+            blocksById["memory-context-$index"] = block.copy(provenance = block.provenance ?: ContextProvenance.MemoryRecall)
             ContextEvidence(
                 id = "memory-context-$index",
                 estimatedTokens = approximateTokens(block.content),
@@ -231,7 +251,11 @@ class ProviderBackedManagedSessionGateway(
         // Retrieved chunks rank by similarity among themselves and below every memory block.
         val retrievedEvidence = retrieved.mapIndexed { index, hit ->
             val id = "retrieved-context-$index"
-            blocksById[id] = PromptContextBlock(label = hit.chunk.label, content = hit.chunk.text)
+            blocksById[id] = PromptContextBlock(
+                label = hit.chunk.label,
+                content = hit.chunk.text,
+                provenance = ContextProvenance.RepositoryContent,
+            )
             ContextEvidence(
                 id = id,
                 estimatedTokens = approximateTokens(hit.chunk.text),
@@ -258,6 +282,16 @@ class ProviderBackedManagedSessionGateway(
                 genealogy = compoundInference.genealogy.copy(
                     memoryAddresses = compoundInference.genealogy.memoryAddresses + recalled.memoryAddresses,
                 ),
+            ),
+        )
+    }
+
+    /** Adds how to ask the keeper a declarative question ([AgentUi.promptInstruction]) to the role's context. */
+    private fun AgentTaskRequest.withKeeperQuestionInstructions(): AgentTaskRequest {
+        if (promptContext.stablePrefix.any { it.label == AgentUi.PROMPT_LABEL }) return this
+        return copy(
+            promptContext = promptContext.copy(
+                stablePrefix = promptContext.stablePrefix + PromptContextBlock(AgentUi.PROMPT_LABEL, AgentUi.promptInstruction),
             ),
         )
     }
@@ -320,6 +354,33 @@ class ProviderBackedManagedSessionGateway(
             runCatching { memoryObserver.annotateUserMessage(handle, message) }.getOrDefault(message)
         }
         providerFor(handle).sendMessage(handle.providerRunId, outgoing)
+    }
+
+    override suspend fun keeperQuestion(handle: ManagedSessionHandle): KeeperQuestionState? =
+        mutex.withLock {
+            val snapshot = snapshots[handle] ?: return@withLock null
+            if (!snapshot.questionKnown) return@withLock null
+            KeeperQuestionState(pending = snapshot.keeperQuestion, answeredKey = snapshot.answeredQuestionKey)
+        }
+
+    override suspend fun answerKeeperQuestion(
+        handle: ManagedSessionHandle,
+        questionKey: String,
+        answer: String,
+    ): ProviderActionResult = providerOperation("Unable to answer provider session ${handle.providerRunId.value}") {
+        // The answer is structured data for the agent; memory's cue cloud is not added to it.
+        val result = providerFor(handle).sendMessage(handle.providerRunId, answer)
+        if (result is ProviderActionResult.Accepted) {
+            mutex.withLock {
+                val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
+                snapshots[handle] = current.copy(
+                    keeperQuestion = current.keeperQuestion?.takeUnless { AgentUi.questionKey(it) == questionKey },
+                    answeredQuestionKey = questionKey,
+                    questionKnown = true,
+                )
+            }
+        }
+        result
     }
 
     override suspend fun approvePlan(handle: ManagedSessionHandle): ProviderActionResult =
@@ -557,11 +618,21 @@ class ProviderBackedManagedSessionGateway(
                         message = effectiveEvent.message.takeIf { it.isNotBlank() },
                     ),
                 )
-                is AgentEvent.Message, is AgentEvent.Thinking -> current
+                // A message that asks the keeper something becomes the session's open question.
+                is AgentEvent.Message -> if (AgentUi.isRequest(effectiveEvent.content)) {
+                    current.copy(
+                        keeperQuestion = effectiveEvent.content.take(AgentUi.MAX_MESSAGE_CHARS + 1),
+                        questionKnown = true,
+                    )
+                } else {
+                    current
+                }
+                is AgentEvent.Thinking -> current
                 is AgentEvent.ArtifactProduced -> current.copy(
                     artifacts = current.artifacts.upsertArtifact(effectiveEvent.artifact),
                 )
                 is AgentEvent.Completed -> current.copy(
+                    keeperQuestion = null,
                     status = ManagedSessionStatus.Completed,
                     progress = ManagedSessionProgress(
                         fraction = 1f,
@@ -570,6 +641,7 @@ class ProviderBackedManagedSessionGateway(
                 )
                 // Keep the provider's reason; it becomes the task's last status and the failure reason.
                 is AgentEvent.Failed -> current.copy(
+                    keeperQuestion = null,
                     status = ManagedSessionStatus.Failed,
                     progress = ManagedSessionProgress(message = effectiveEvent.reason.takeIf { it.isNotBlank() }),
                 )
@@ -607,6 +679,7 @@ class ProviderBackedManagedSessionGateway(
             )
             else -> Unit
         }
+        activity.record(handle, effectiveEvent)
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->

@@ -4,7 +4,7 @@ package com.hereliesaz.geministrator.memory
  * Programmatic temporal organization for memory episodes.
  *
  * This is a derived index, not another learned memory layer. It is rebuilt deterministically from
- * immutable episode timestamps, so temporal compaction never deletes or rewrites remembered
+ * immutable episode timestamps (ingest time by default, valid time on request: [MemoryTimeAxis]), so temporal compaction never deletes or rewrites remembered
  * experience. Older fine-grained windows simply stop being active retrieval buckets once their
  * episode provenance is represented by a coarser active bucket.
  */
@@ -31,6 +31,24 @@ enum class MemoryTemporalLevel(
         }
 }
 
+/** Which of an episode's times a temporal index buckets it by. */
+enum class MemoryTimeAxis {
+    /** When the memory layer recorded it ([MemoryEpisode.createdAtEpochMillis]). */
+    Ingest,
+
+    /**
+     * When what it records happened ([MemoryEpisode.occurredAtEpochMillis]); an episode whose source
+     * carried no time falls back to its ingest time.
+     */
+    Valid,
+    ;
+
+    fun timeOf(episode: MemoryEpisode): Long = when (this) {
+        Ingest -> episode.createdAtEpochMillis
+        Valid -> episode.occurredAtEpochMillis ?: episode.createdAtEpochMillis
+    }
+}
+
 data class MemoryTemporalBucket(
     val level: MemoryTemporalLevel,
     val startEpochMillis: Long,
@@ -54,7 +72,11 @@ data class MemoryTemporalIndex(
         buckets.filter { episodeId in it.episodeIds }
 
     companion object {
-        fun build(episodes: Collection<MemoryEpisode>): MemoryTemporalIndex {
+        /** Buckets [episodes] by [axis]: ingest time unless valid time is asked for. */
+        fun build(
+            episodes: Collection<MemoryEpisode>,
+            axis: MemoryTimeAxis = MemoryTimeAxis.Ingest,
+        ): MemoryTemporalIndex {
             if (episodes.isEmpty()) return MemoryTemporalIndex(emptyList())
 
             val byLevel = MemoryTemporalLevel.entries.associateWith {
@@ -62,10 +84,10 @@ data class MemoryTemporalIndex(
             }
 
             episodes
-                .sortedWith(compareBy<MemoryEpisode> { it.createdAtEpochMillis }.thenBy { it.id.value })
+                .sortedWith(compareBy<MemoryEpisode> { axis.timeOf(it) }.thenBy { it.id.value })
                 .forEach { episode ->
                     val level = MemoryTemporalLevel.FifteenMinutes
-                    val start = align(episode.createdAtEpochMillis, level.durationMillis)
+                    val start = align(axis.timeOf(episode), level.durationMillis)
                     val bucket = byLevel.getValue(level).getOrPut(start) {
                         MutableTemporalBucket(level, start)
                     }

@@ -29,6 +29,8 @@ class WorkflowApprovalService(
         decidedByRoleId: RoleDefinitionId?,
         note: String?,
         nowEpochMillis: Long,
+        /** The keeper delegated this gate (ProgressiveDelegation.kt); recorded on the decision event. */
+        byDelegation: Boolean = false,
     ): ApprovalGate = planApprovalMutex.withLock {
         val gate = requireNotNull(gateRepository.get(gateId)) {
             "Approval gate ${gateId.value} does not exist"
@@ -36,9 +38,7 @@ class WorkflowApprovalService(
         require(gate.kind == ApprovalGateKind.PlanApproval) {
             "Approval gate ${gateId.value} is not a plan gate"
         }
-        require(gate.requiredRoleId == null || gate.requiredRoleId == decidedByRoleId) {
-            "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
-        }
+        gateCoordinator.requireDecider(gate, decidedByRoleId, nowEpochMillis)
 
         if (handle == null) {
             require(gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
@@ -50,6 +50,7 @@ class WorkflowApprovalService(
                 decidedByRoleId = decidedByRoleId,
                 note = note,
                 nowEpochMillis = nowEpochMillis,
+                byDelegation = byDelegation,
             )
         }
         if (gate.status == ApprovalGateStatus.Applying) {
@@ -77,6 +78,7 @@ class WorkflowApprovalService(
                 decidedByRoleId = decidedByRoleId,
                 note = note,
                 nowEpochMillis = nowEpochMillis,
+                byDelegation = byDelegation,
             )
 
             is ProviderActionResult.Rejected -> {
@@ -172,9 +174,7 @@ class WorkflowApprovalService(
         require(gate.status == ApprovalGateStatus.Pending) {
             "Approval gate ${gateId.value} is already resolved"
         }
-        require(gate.requiredRoleId == null || gate.requiredRoleId == decidedByRoleId) {
-            "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
-        }
+        gateCoordinator.requireDecider(gate, decidedByRoleId, nowEpochMillis)
 
         val taskDefinitionId = requireNotNull(gate.taskDefinitionId) {
             "Failure escalation gate ${gateId.value} has no task"

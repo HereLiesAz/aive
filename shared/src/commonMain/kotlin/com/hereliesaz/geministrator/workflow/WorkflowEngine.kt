@@ -1,9 +1,11 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.agentui.AgentUi
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -35,6 +37,9 @@ import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.events.WorkflowEventSink
 import com.hereliesaz.geministrator.events.WorkflowFailed
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.recordPolicyDecision
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -71,6 +76,66 @@ class WorkflowEngine(
         return run.roleSnapshot.firstOrNull { it.id == id } ?: rolesById[id]
     }
 
+    /**
+     * [roleId]'s token budget for one run. The keeper's current role wins over the run's snapshot,
+     * so raising (or clearing) a budget in the role editor applies to a run already under way.
+     */
+    fun roleTokenBudget(run: WorkflowRun, roleId: RoleDefinitionId): Long? {
+        val current = rolesById[roleId]
+        if (current != null) return current.tokenBudget
+        return run.roleSnapshot.firstOrNull { it.id == roleId }?.tokenBudget
+    }
+
+    /** Whether [roleId] has spent its whole token budget in [run]. False when it has no budget. */
+    fun roleBudgetSpent(run: WorkflowRun, roleId: RoleDefinitionId?): Boolean {
+        val id = roleId ?: return false
+        val budget = roleTokenBudget(run, id) ?: return false
+        return run.roleTokensSpent(id) >= budget
+    }
+
+    /**
+     * Releases tasks parked for a spent role budget once that role has budget again (the keeper
+     * raised or cleared it). A released task is Ready; one that was stopped mid-run was already
+     * moved to a fresh attempt when it was parked.
+     */
+    fun releaseRoleBudgetHolds(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
+        if (run.taskRuns.values.none { it.isHeldForRoleBudget() }) return run
+        var changed = false
+        val released = run.taskRuns.mapValues { (_, taskRun) ->
+            if (!taskRun.isHeldForRoleBudget() || roleBudgetSpent(run, taskRun.assignedRoleId)) {
+                taskRun
+            } else {
+                changed = true
+                TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Ready)
+                taskRun.copy(status = TaskRunStatus.Ready, blockingReason = null, progressMessage = null)
+            }
+        }
+        if (!changed) return run
+        val status = if (run.status == WorkflowRunStatus.AwaitingHuman || run.status.isTerminal()) {
+            run.status
+        } else {
+            WorkflowRunStatus.Running
+        }
+        return run.copy(status = status, taskRuns = released, updatedAtEpochMillis = nowEpochMillis)
+    }
+
+    /**
+     * [WorkflowRunFactory.refreshReadiness] that records each non-allow policy decision it makes
+     * (a repository mutation cancelled without a granted approval) on this engine's event sink.
+     */
+    suspend fun refreshReadiness(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val decisions = mutableListOf<Pair<PolicyRequest, PolicyDecision>>()
+        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis) { request, decision ->
+            decisions += request to decision
+        }
+        decisions.forEach { (request, decision) -> eventSink.recordPolicyDecision(request, decision, nowEpochMillis) }
+        return refreshed
+    }
+
     data class DispatchResult(
         val run: WorkflowRun,
         val handles: Map<TaskDefinitionId, ManagedSessionHandle>,
@@ -85,7 +150,7 @@ class WorkflowEngine(
     ): DispatchResult {
         if (run.status.isTerminal()) return DispatchResult(run, existingHandles)
 
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis)
+        val refreshed = refreshReadiness(definition, run, nowEpochMillis)
         val activeCount = refreshed.taskRuns.values.count { it.status.isActive() }
         var remainingSlots = (definition.concurrencyPolicy.maxConcurrentTasks - activeCount).coerceAtLeast(0)
         if (remainingSlots == 0) return DispatchResult(refreshed, existingHandles)
@@ -128,11 +193,30 @@ class WorkflowEngine(
                     }
                     require(role.enabled) { "Role ${role.name} is disabled" }
 
+                    // Token budget circuit breaker: a role that has spent its budget in this run
+                    // starts no more work until the keeper raises the budget.
+                    val budgetRoleId = taskRun.assignedRoleId ?: task.roleId ?: role.id
+                    if (roleBudgetSpent(nextRun, budgetRoleId)) {
+                        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+                        nextRun = nextRun.copy(
+                            taskRuns = nextRun.taskRuns + (
+                                task.id to taskRun.copy(
+                                    status = TaskRunStatus.Blocked,
+                                    assignedRoleId = budgetRoleId,
+                                    blockingReason = roleBudgetReason(nextRun, budgetRoleId),
+                                )
+                            ),
+                            updatedAtEpochMillis = nowEpochMillis,
+                        )
+                        continue
+                    }
+
                     val selection = ProviderSelectionRequest(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
                         constraints = task.providerConstraints,
                         repository = project.repository,
+                        estimatedInputTokens = estimateTaskInputTokens(definition, nextRun, task, role),
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -323,6 +407,8 @@ class WorkflowEngine(
                             blockingReason = null,
                             progress = null,
                             progressMessage = null,
+                            // A new session has asked nothing yet.
+                            keeperQuestion = null,
                             // An engine-approved plan stays visible on the task it is being executed for.
                             providerPlan = pending.taskRun.approvedEnginePlan(),
                         )
@@ -422,7 +508,7 @@ class WorkflowEngine(
             ),
             updatedAtEpochMillis = nowEpochMillis,
         )
-        nextRun = WorkflowRunFactory.refreshReadiness(definition, nextRun, nowEpochMillis)
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
         val status = deriveWorkflowStatus(nextRun)
         if (status == WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
@@ -471,7 +557,7 @@ class WorkflowEngine(
                 throw cancellation
             } catch (_: Exception) {
             }
-            val durableArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
+            val receivedArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
                 ArtifactRef(
                     id = artifactIdFactory(taskRun, artifact, index),
                     kind = artifact.kind,
@@ -482,6 +568,19 @@ class WorkflowEngine(
                     mediaType = artifact.mediaType,
                     metadata = artifact.metadata,
                     createdAtEpochMillis = nowEpochMillis,
+                )
+            }
+            // Labelled with where they came from (ContextTaint.kt); the provider cannot claim more trust.
+            val producingTask = definition.tasks.firstOrNull { it.id == taskId }
+            val durableArtifacts = if (producingTask == null) {
+                receivedArtifacts
+            } else {
+                definition.labelTaskOutputs(
+                    run = nextRun,
+                    task = producingTask,
+                    assigned = (taskRun.executor ?: producingTask.effectiveExecutor())
+                        .outputProvenance(roleDefinition(nextRun, taskRun.assignedRoleId ?: producingTask.roleId)),
+                    artifacts = receivedArtifacts,
                 )
             }
             val mappedStatus = when (status) {
@@ -499,6 +598,19 @@ class WorkflowEngine(
             } else {
                 taskRun.status
             }
+            // The agent's question to the keeper (docs/Agent-UI.md). A gateway that does not know
+            // keeps what the task holds; an answered question stays answered even when replayed.
+            val questionState = try {
+                sessionGateway.keeperQuestion(handle)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
+            val answeredQuestion = questionState?.answeredKey ?: taskRun.answeredKeeperQuestion
+            val keeperQuestion = (if (questionState == null) taskRun.keeperQuestion else questionState.pending)
+                ?.takeUnless { AgentUi.questionKey(it) == answeredQuestion }
+                ?.takeUnless { safeStatus.isFinishedForQuestions() }
             val mergedArtifacts = mergeArtifacts(taskRun.artifacts, durableArtifacts)
             val previousArtifactIds = taskRun.artifacts.mapTo(mutableSetOf()) { it.id }
             mergedArtifacts
@@ -519,6 +631,8 @@ class WorkflowEngine(
                         },
                         progressMessage = providerProgress?.message ?: taskRun.progressMessage,
                         usage = usageTotal,
+                        keeperQuestion = keeperQuestion,
+                        answeredKeeperQuestion = answeredQuestion,
                         providerPlan = if (
                             safeStatus == TaskRunStatus.AwaitingApproval &&
                             !providerProgress?.message.isNullOrBlank()
@@ -533,7 +647,8 @@ class WorkflowEngine(
             )
         }
 
-        nextRun = WorkflowRunFactory.refreshReadiness(definition, nextRun, nowEpochMillis)
+        nextRun = stopRolesOverBudget(nextRun, handles, nowEpochMillis)
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
         val workflowStatus = deriveWorkflowStatus(nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
@@ -584,6 +699,7 @@ class WorkflowEngine(
                             progress = null,
                             progressMessage = null,
                             providerPlan = null,
+                            keeperQuestion = null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
@@ -718,6 +834,55 @@ class WorkflowEngine(
         )
     }
 
+    /**
+     * Token budget circuit breaker for work under way: the provider session of a task whose role has
+     * spent its budget in this run is cancelled, and the task parked ([ROLE_BUDGET_SPENT]) as a fresh
+     * attempt, so raising the budget dispatches it again ([releaseRoleBudgetHolds]).
+     */
+    private suspend fun stopRolesOverBudget(
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        var nextRun = run
+        for ((taskId, handle) in handles) {
+            val taskRun = nextRun.taskRuns[taskId] ?: continue
+            if (taskRun.status !in BUDGET_STOPPABLE) continue
+            val roleId = taskRun.assignedRoleId ?: continue
+            if (!roleBudgetSpent(nextRun, roleId)) continue
+            // Best effort, like any cancel: the task is parked either way so nothing more is sent.
+            withContext(NonCancellable) { runCatching { sessionGateway.cancel(handle) } }
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+            nextRun = nextRun.copy(
+                taskRuns = nextRun.taskRuns + (
+                    taskId to taskRun.copy(
+                        status = TaskRunStatus.Blocked,
+                        attempt = taskRun.attempt + 1,
+                        assignedProviderId = null,
+                        providerRunId = null,
+                        externalRunId = null,
+                        blockingReason = roleBudgetReason(nextRun, roleId),
+                        progress = null,
+                        progressMessage = null,
+                        providerPlan = null,
+                    )
+                ),
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+        }
+        return nextRun
+    }
+
+    private fun roleBudgetReason(run: WorkflowRun, roleId: RoleDefinitionId): BlockingReason {
+        val name = roleDefinition(run, roleId)?.name ?: roleId.value
+        val budget = roleTokenBudget(run, roleId)
+        return BlockingReason(
+            code = ROLE_BUDGET_SPENT,
+            message = "Budget spent: $name used ${run.roleTokensSpent(roleId)} of its $budget tokens in this run. " +
+                "Raise its budget to let it work again.",
+        )
+    }
+
     private fun deriveWorkflowStatus(run: WorkflowRun): WorkflowRunStatus {
         if (run.status.isTerminal()) return run.status
         val statuses = run.taskRuns.values.map { it.status }
@@ -742,6 +907,16 @@ class WorkflowEngine(
         WorkflowRunStatus.Completed,
         WorkflowRunStatus.Failed,
         WorkflowRunStatus.Cancelled,
+    )
+
+    private companion object {
+        val BUDGET_STOPPABLE = setOf(TaskRunStatus.Planning, TaskRunStatus.Running, TaskRunStatus.Verifying)
+    }
+    /** A task in one of these states has no agent left to answer: its question is dropped. */
+    private fun TaskRunStatus.isFinishedForQuestions() = this in setOf(
+        TaskRunStatus.Completed,
+        TaskRunStatus.Failed,
+        TaskRunStatus.Cancelled,
     )
 
     private fun TaskRunStatus.isActive() = this in setOf(

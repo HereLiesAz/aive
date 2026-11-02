@@ -82,6 +82,29 @@ class InboxBadgeTest {
     }
 
     @Test
+    fun aQuestionFromItsAgentIsAWaitInItsNeeds() {
+        // The same definition of waiting on the keeper: the badge, the panel's Needs and its opening tab.
+        val asking = taskRun("ask", TaskRunStatus.Running).copy(keeperQuestion = "```a2ui\n{}\n```")
+        assertTrue(creatureNeedsYou(asking))
+        assertEquals(CreatureTab.Needs, openingTab(asking))
+        val keys = inboxItemKeys(run(asking, taskRun("busy", TaskRunStatus.Running)))
+        assertEquals(1, keys.size)
+        assertTrue(keys.single().startsWith("question|r1|ask|1|"))
+        assertEquals(keys, inboxItemKeys(run(asking), "ask"))
+
+        // A different question is a new, unread item.
+        val next = asking.copy(keeperQuestion = "```a2ui\n[]\n```")
+        assertEquals(1, unreadInboxCount(inboxItemKeys(run(next)), read = keys.toSet()))
+
+        // A finished task's question waits on no one; nor does a running task without one.
+        val finished = asking.copy(status = TaskRunStatus.Completed)
+        assertFalse(creatureNeedsYou(finished))
+        assertTrue(inboxItemKeys(run(finished)).isEmpty())
+        assertFalse(creatureNeedsYou(taskRun("busy", TaskRunStatus.Running)))
+        assertEquals(CreatureTab.Work, openingTab(taskRun("busy", TaskRunStatus.Running)))
+    }
+
+    @Test
     fun aPausedRunListsOnlyItsPauseReport() {
         val keys = inboxItemKeys(run(taskRun("plan", TaskRunStatus.AwaitingApproval), pause = pause()))
         assertEquals(listOf("pause|r1|report"), keys)

@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.a2a.A2aAgentConnection
+import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
 
@@ -211,12 +213,26 @@ object ProviderCatalog {
 
     /**
      * Built-in providers, then the language models installed from the Azphalt store, which come last
-     * so that planning, which takes the first linked provider, prefers a built-in one.
+     * so that planning, which takes the first linked provider, prefers a built-in one, then the
+     * remote A2A agents connected by Agent Card (docs/A2A.md), which are never chosen automatically.
      */
     val entries: List<ProviderCatalogEntry>
-        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry)
+        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry) + A2aAgentConnections.all().map(::a2aEntry)
+
+    /** True for a remote A2A agent's id ([A2aAgentConnection.providerId]). */
+    fun isA2aAgent(id: String): Boolean = id.startsWith(A2aAgentConnection.PROVIDER_ID_PREFIX)
 
     fun entry(id: String): ProviderCatalogEntry? = entries.firstOrNull { it.id == id }
+
+    private fun a2aEntry(agent: A2aAgentConnection) = ProviderCatalogEntry(
+        id = agent.providerId,
+        displayName = agent.name,
+        apiKeyUrl = agent.cardUrl,
+        credentialLabel = "Bearer token (optional)",
+        description = "A remote agent spoken to over A2A (Agent Card ${agent.cardUrl}). It receives the task, " +
+            "its role instructions and approved context. Used only by roles that prefer it.",
+        keyOptional = true,
+    )
 
     private fun storeEntry(llm: InstalledStoreLlm) = ProviderCatalogEntry(
         id = llm.providerId,

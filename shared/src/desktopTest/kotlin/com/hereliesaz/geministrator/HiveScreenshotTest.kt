@@ -349,6 +349,31 @@ class HiveScreenshotTest {
         shoot("34-creature-mind", 824, 1830) { panel("build", CreatureTab.Mind, true)() }
     }
 
+    /** The timeline as a waterfall: parallel attempts, a plan gate, a retry and a creature still going. */
+    @Test
+    fun shootsTheWaterfall() {
+        val runId = WorkflowRunId("run-waterfall")
+        fun id(task: String) = TaskDefinitionId(task)
+        val events = listOf(
+            com.hereliesaz.geministrator.events.TaskStarted(runId, id("contract"), 1, 0),
+            com.hereliesaz.geministrator.events.ApprovalRequired(runId, id("contract"), com.hereliesaz.geministrator.domain.ApprovalGateId("g"), "Approve the plan", 20_000),
+            com.hereliesaz.geministrator.events.ApprovalDecisionReceived(runId, id("contract"), com.hereliesaz.geministrator.domain.ApprovalGateId("g"), true, null, 50_000),
+            com.hereliesaz.geministrator.events.TaskCompleted(runId, id("contract"), 90_000),
+            com.hereliesaz.geministrator.events.TaskStarted(runId, id("build"), 1, 60_000),
+            com.hereliesaz.geministrator.events.TaskFailed(runId, id("build"), "tests red", 120_000),
+            com.hereliesaz.geministrator.events.RetryScheduled(runId, id("build"), 2, "tests red", 120_000),
+            com.hereliesaz.geministrator.events.TaskStarted(runId, id("build"), 2, 135_000),
+            com.hereliesaz.geministrator.events.ProviderUsageRecorded(runId, id("build"), AgentProviderId("claude"), com.hereliesaz.geministrator.domain.ProviderRunId("p"), inputTokens = 12_400, outputTokens = 2_100, costUsd = 0.21, occurredAtEpochMillis = 150_000),
+            com.hereliesaz.geministrator.events.TaskStarted(runId, id("review"), 1, 95_000),
+            com.hereliesaz.geministrator.events.TaskCompleted(runId, id("review"), 140_000),
+        )
+        val waterfall = runWaterfall(events, nowEpochMillis = 200_000)
+        val names = definition.tasks.associate { it.id to it.name }
+        shoot("35-waterfall", 900, 1100) {
+            RunWaterfallChart(waterfall, taskName = { names[it] ?: it.value }, selectedTaskId = "build", onTaskSelected = {})
+        }
+    }
+
     /** The neuron, the body of programmatic work, in its states. */
     @Test
     fun shootsTheNeuron() {

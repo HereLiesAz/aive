@@ -51,6 +51,14 @@ interface TaskExecutorIntegration {
     suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution
 
     suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution
+
+    /**
+     * Stop the remote work behind [context]'s task run (its `externalRunId`), because the workflow
+     * run that owns it was cancelled. Best effort and idempotent: a run that already finished, or
+     * was already cancelled, is not an error. A throw is recorded by the caller and never blocks
+     * the local cancellation. The default does nothing, for executors with no remote handle.
+     */
+    suspend fun cancel(context: TaskExecutorContext) = Unit
 }
 
 data class TaskExecutorContext(
@@ -321,6 +329,8 @@ private class EvidenceIndexingTaskExecutorIntegration(
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution =
         delegate.reconcile(context).indexEvidence()
+
+    override suspend fun cancel(context: TaskExecutorContext) = delegate.cancel(context)
 
     private suspend fun TaskExecutorExecution.indexEvidence(): TaskExecutorExecution {
         artifacts.forEach { artifact ->

@@ -2,18 +2,23 @@ package com.hereliesaz.aive.remote
 
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.longOrNull
@@ -25,6 +30,11 @@ import kotlinx.serialization.json.put
  * [RemoteActions] the bound service uses) and seals the reply. [send] hands a sealed `data` string
  * for one relay client id to the socket. Frames that fail any check are dropped without a reply,
  * so a stranger learns nothing. Protocol: docs/Remote-API.md, "Sealed frames and messages".
+ *
+ * A `watch` with `"events": true` also streams [runEvents] to that client, in order and each once,
+ * batched into `run_events` messages so a backlog does not trip the relay's frame-rate limit.
+ * While any client here watches events, the router holds [holdEventWatch] (released when it has
+ * none left or its [scope] ends), which is what makes the UI publish the run's timeline.
  */
 internal class RelayHostRouter(
     private val room: String,
@@ -37,6 +47,8 @@ internal class RelayHostRouter(
     private val clock: () -> Long = System::currentTimeMillis,
     random: SecureRandom = SecureRandom(),
     private val guard: RelayReplayGuard = RelayReplayGuard(clock = clock),
+    private val runEvents: StateFlow<RemoteRunEventLog> = MutableStateFlow(RemoteRunEventLog.EMPTY),
+    private val holdEventWatch: () -> (() -> Unit) = { {} },
 ) {
     private val cipher = RelayFrameCipher(key, room, random)
     private val sessionId = randomSessionId(random)
@@ -44,6 +56,15 @@ internal class RelayHostRouter(
     private var nextSeq = 1L
     private val watchers = LinkedHashSet<String>()
     private val promptsRunning = AtomicInteger(0)
+
+    /** Clients watching run events and how far each has got; guarded by [eventLock]. */
+    private val eventCursors = LinkedHashMap<String, RemoteRunEventCursor>()
+    private val eventLock = Mutex()
+    private val eventHold = AtomicReference<(() -> Unit)?>(null)
+
+    init {
+        scope.coroutineContext[Job]?.invokeOnCompletion { eventHold.getAndSet(null)?.invoke() }
+    }
 
     /** Starts fanning run status and launch outcomes out to the clients that sent `watch`. */
     fun start() {
@@ -60,6 +81,13 @@ internal class RelayHostRouter(
                 }
             }
         }
+        scope.launch {
+            runEvents.collect { log ->
+                eventLock.withLock {
+                    eventCursors.toList().forEach { (clientId, cursor) -> sendEvents(clientId, cursor.take(log)) }
+                }
+            }
+        }
     }
 
     /** Handles one relay frame from [clientId]; never throws for a bad frame. */
@@ -71,7 +99,7 @@ internal class RelayHostRouter(
                 put("t", "pong")
                 put("id", id)
             }
-            "watch" -> watch(clientId)
+            "watch" -> watch(clientId, message)
             "launch" -> launch(clientId, id, message)
             "prompt" -> prompt(clientId, id, message)
             else -> sendError(clientId, id, "Unknown message type")
@@ -102,13 +130,69 @@ internal class RelayHostRouter(
         return message
     }
 
-    private suspend fun watch(clientId: String) {
-        synchronized(watchers) {
+    private suspend fun watch(clientId: String, message: JsonObject) {
+        val evicted = synchronized(watchers) {
             watchers.remove(clientId)
-            if (watchers.size >= MAX_WATCHERS) watchers.remove(watchers.first())
+            val oldest = if (watchers.size >= MAX_WATCHERS) watchers.first().also { watchers.remove(it) } else null
             watchers.add(clientId)
+            oldest
+        }
+        // Version 1 and 2 clients never send "events", so they get exactly what they always did.
+        val wantsEvents = message.flag("events")
+        eventLock.withLock {
+            evicted?.let { eventCursors.remove(it) }
+            if (wantsEvents) {
+                eventCursors[clientId] = RemoteRunEventCursor(
+                    resumeRunId = message.text("runId"),
+                    resumeAfterSeq = message.number("afterSeq") ?: 0L,
+                )
+            } else {
+                eventCursors.remove(clientId)
+            }
+            updateEventHoldLocked()
         }
         runStatus.value?.let { status -> deliver(clientId) { putRunStatus(status) } }
+        if (wantsEvents) {
+            eventLock.withLock {
+                eventCursors[clientId]?.let { cursor -> sendEvents(clientId, cursor.take(runEvents.value)) }
+            }
+        }
+    }
+
+    /** Holds the bridge's event watch while any client here watches events; call under [eventLock]. */
+    private fun updateEventHoldLocked() {
+        if (eventCursors.isEmpty()) {
+            eventHold.getAndSet(null)?.invoke()
+        } else if (eventHold.get() == null && scope.coroutineContext[Job]?.isActive != false) {
+            eventHold.set(holdEventWatch())
+            // The connection may have ended meanwhile, after its completion handler already ran.
+            if (scope.coroutineContext[Job]?.isActive == false) eventHold.getAndSet(null)?.invoke()
+        }
+    }
+
+    /** Sends [events] to [clientId] in order, as few `run_events` messages as fit a frame. */
+    private suspend fun sendEvents(clientId: String, events: List<RemoteRunEvent>) {
+        var batch = ArrayList<JsonObject>()
+        var batchBytes = 0
+        for (event in events) {
+            val json = event.toJson()
+            val bytes = json.toString().encodeToByteArray().size + 1
+            if (batch.isNotEmpty() && batchBytes + bytes > MAX_EVENT_BATCH_BYTES) {
+                deliverEvents(clientId, batch)
+                batch = ArrayList()
+                batchBytes = 0
+            }
+            batch += json
+            batchBytes += bytes
+        }
+        if (batch.isNotEmpty()) deliverEvents(clientId, batch)
+    }
+
+    private suspend fun deliverEvents(clientId: String, batch: List<JsonObject>) {
+        deliver(clientId) {
+            put("t", "run_events")
+            put("events", JsonArray(batch))
+        }
     }
 
     private suspend fun launch(clientId: String, id: Long, message: JsonObject) {
@@ -220,8 +304,26 @@ internal class RelayHostRouter(
     private fun JsonObject.number(name: String): Long? =
         (this[name] as? JsonPrimitive)?.takeIf { !it.isString }?.longOrNull
 
+    private fun JsonObject.flag(name: String): Boolean =
+        (this[name] as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull == true
+
     private companion object {
         const val MAX_WATCHERS = 16
         const val MAX_CONCURRENT_PROMPTS = 4
+
+        /** A `run_events` batch stays well under [RelayProtocol.MAX_PLAINTEXT_BYTES]. */
+        const val MAX_EVENT_BATCH_BYTES = 256_000
+    }
+}
+
+/** [this] event as the JSON object a `run_events` message carries. */
+internal fun RemoteRunEvent.toJson(): JsonObject = buildJsonObject {
+    fields().forEach { (name, value) ->
+        when (value) {
+            is String -> put(name, value)
+            is Boolean -> put(name, value)
+            is Number -> put(name, value)
+            else -> put(name, value.toString())
+        }
     }
 }

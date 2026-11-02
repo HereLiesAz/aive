@@ -179,6 +179,7 @@ The hosted text providers (OpenAI, xAI, Claude, Gemini, OpenAI-compatible servic
 
 - **Reasoning is requested** everywhere it can be: Claude adaptive thinking with summarized display (a fixed 8,000-token budget for models that predate adaptive thinking), an OpenAI or xAI reasoning summary, Gemini `includeThoughts`. A model or account that refuses the option (an older model, an OpenAI organization that is not verified) is retried once without it, and not asked again. OpenAI-compatible services have no common switch, so their reasoning is read when it arrives (`reasoning_content`, `reasoning`, or inline `<think>` spans). Requested reasoning is billed as output tokens.
 - **Memory interrupts.** A `⟦memory⟧` reply sent while a generation streams is taken by the provider (any other message is still declined). At the next streamed piece the generation stops and starts again with the original prompt, the reasoning and answer so far, and what memory brought back, and the model continues with the memory in view. At most three times per run; only the last attempt's answer is kept, and usage covers that attempt only.
+- **Shown live, kept nowhere else.** The same pieces appear in the creature's panel under its Work, newest last, from a bounded in-memory feed (`SessionActivityFeeds`, `Keepers-Room.md`); they are not stored in workflow state and not sent to a duplex peer.
 - **Not streamed:** plan drafts, on-device models (their reasoning, if any, arrives with the answer), and OpenCode on GitHub Actions, which reports only its run summary.
 
 ## Durable rule

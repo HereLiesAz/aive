@@ -61,6 +61,8 @@ suspend fun ApplicationRuntime.rejectPlan(taskDefinitionId: TaskDefinitionId) {
         note = "Plan rejected in application",
         nowEpochMillis = now,
     )
+    // Any rejection starts the role's approval streak over (workflow/ProgressiveDelegation.kt).
+    recordPlanRejection(presentation.run, taskDefinitionId)
 
     val resumed = coordinator.resume(presentation.run.id)
     coordinator.cycle(

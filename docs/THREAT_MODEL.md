@@ -15,13 +15,18 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Boundary | What crosses it | Direction |
 |---|---|---|
 | Device ↔ Provider (hosted LLMs, keyless gateways, OpenCode) | Task objectives, role instructions, context artifacts, acceptance criteria, repository snapshots (workspace agents) | Outbound, responses inbound |
+| Device ↔ Remote A2A agent | Task objective, role instructions, approved context, optional bearer token; task status and artifacts back | Outbound, responses inbound |
+| Local agent ↔ A2A server (desktop, opt-in) | Objectives that launch workflows; run status and final artifacts | Inbound on loopback |
 | Device ↔ GitHub API | Workflow dispatch and inputs, run status, check runs, artifact downloads, workflow-file installs, repository operations | Both |
 | Device ↔ GitLab API | Repository tree/file reads, workspace-agent commits, repository operations | Both |
 | GitHub runner ↔ Agent/script | Prompt or script source, repository checkout, job token (runner only) | Inside the user's repository's Actions |
 | Device ↔ Local Git (desktop) | Snapshot reads, isolated worktrees, commits, bounded Git commands | Both (local) |
 | Device ↔ Compute relay ↔ Pool devices | Node descriptors, task lease envelopes, progress, results | Both |
 | Device ↔ Crash relay (Android GitHub flavor; opt-in) | Crash/ANR reports → public GitHub issues | Outbound |
+| Device ↔ OTLP collector (opt-in) | Run traces: structure, timing, ids, tokens, cost; content only with a second opt-in | Outbound |
 | Device ↔ Gemini app (Android GitHub flavor, opt-in) | Prompt typed into Gemini, reply read from screen/clipboard | Both (on-device) |
+| Device ↔ MCP servers (keeper-configured) | Model-written tool arguments out; tool lists and results in; on desktop, a local server process | Both |
+| MCP host ↔ script sandbox (desktop, opt-in) | A model-written script in; bridged tool calls and their results; the script's final value out | Both (in-process WebAssembly guest) |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
 | Haive ↔ User | Workflow definitions, task approval decisions, escalation responses | Both |
@@ -37,7 +42,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - **Repository write abuse**: An executor or integration that performs repository operations (branch, commit, PR/MR, push) is tricked into writing malicious content or granting access.
 - **Prompt injection via context**: User-controlled content (project name, objective text, imported artifacts) propagates into provider prompts and attempts to redirect agent behavior.
 - **Stale/replayed run**: An old or duplicate GitHub Actions run is incorrectly credited as current task completion, bypassing work.
-- **Rogue pool member**: Any party holding a compute pool's relay token publishes leases, claims leases, or impersonates a node.
+- **Rogue pool member**: Any party holding a compute pool's relay token enrols a node, then publishes leases, claims leases, or tries to impersonate another node.
 - **Compromised update/package source**: A tampered APK, model, or Azphalt package is offered for installation.
 
 ## Attack Surface by Integration
@@ -57,8 +62,10 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Provider completion requires explicit reconciliation. A provider claiming immediate success returns `Completed` only after the runtime polls and confirms.
 - Acceptance criteria are authored by the workflow definition, not the provider.
 - Failure reasons and keeper messages can be quoted into a proposed edit of a role's instructions (`RoleInstructionProposals`). Such text may come from a provider or external output, so it is bounded, quoted and shown with its evidence, and it reaches a role only when the keeper approves that exact diff on the Mind tab. Nothing applies it automatically.
+- Context provenance (see "Context provenance" below): provider artifacts are labelled as they are taken in, and a provider cannot label its output as more trusted than the runtime says it is.
 - A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
+- An agent's question to the keeper (`docs/Agent-UI.md`) is rendered only from the host's fixed catalog (text, choices, buttons, short text or number fields, a read-only table), every string as plain text. Unknown components or properties, data bindings without a literal, oversized or deeply nested payloads and broken references are rejected and the message is shown as plain text. Nothing in it is executed, fetched or shown as HTML, a link or an image, and the answer reaches the agent only as a message through its own session.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
 
 **Remaining gaps**
@@ -160,12 +167,39 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 - The model never gets shell access. It receives a bounded snapshot (up to 28 files and 180,000 characters) and returns a unified diff.
 - Diff paths are validated as Git parses them: `git apply --numstat -z` on the patch and on its reverse lists both sides of every file, including rename/copy targets, quoted (octal-escaped) names and traditional `---`/`+++` sections. Absolute paths, `.git/` and `..` segments, and `.gitattributes`/`.gitmodules` (compared case-insensitively) are rejected, as is any patch Git cannot parse. The diff must then pass `git apply --check` before it is applied.
 - The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `haive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
-- `git worktree add` (post-checkout) and `git commit` run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
-- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+- Each task's commit (its checkpoint) then moves the workflow run's `haive/run-...` branch only by compare-and-swap (`git update-ref` with the expected old value): only when that branch does not exist yet or still points at the commit the task started from, and never while it is checked out in any worktree. Otherwise the commit stays on the task's own `haive/...` branch. A task that fails after the move puts the branch back, again by compare-and-swap.
+- `git worktree add` (post-checkout), `git commit` and the `update-ref`/`branch -D` that move or remove Haive's branches (which can run the `reference-transaction` hook) run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
+- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed. Only a separate `TestRunner` task runs the change's tests, and only after a person approves it (see the next section).
 
 **Residual risks**
 - Git still honours the user's own Git configuration while checking out and committing. A clean/smudge filter or other driver that the user configured (for example Git LFS, or a filter that runs a tracked script) runs for paths the repository's existing `.gitattributes` select.
 - When Entire recording is on, `entire session attach` amends the commit in the worktree with Entire's own process, which does not get the hooks override.
+
+### Local test runner (desktop)
+
+`TaskExecutor.TestRunner` on desktop runs a test command for a linked Local Git project (`LocalTestRunnerClient`; see `docs/Local-Git-Repository-Operations.md`). This is the one place The Aive deliberately runs repository code on the host.
+
+**Threats**
+- The test command, or the repository code it runs (build scripts, tests), does harm with the keeper's permissions. A planner or an imported workflow could name any command.
+- A command string smuggles shell syntax (`&&`, `;`, `$(...)`, redirections) so it does something other than what it shows.
+- The test process reads the app's secrets from its environment (provider API keys, tokens).
+- An artifact's metadata points the run at another directory.
+- A pool lease from another device makes this computer run a command.
+- A hung or runaway test never ends, or floods memory with output.
+
+**Mitigations in place**
+- A run starts only when a human-approval task upstream of the test task was approved (completed) in this run; otherwise the task fails. The approval is checked on this device, against this device's run.
+- The command is split into an argument list without a shell. Quotes group words; `$`, backticks, line breaks, NUL, and outside quotes `| & ; < > ( ) * ? [ ] { } ~ ! # \`, a leading `NAME=value` and a leading `-` are refused, never interpreted.
+- The child gets an allowlisted environment (`PATH`, `HOME`, locale, temp folders, `JAVA_HOME`, Gradle/Android SDK locations and the Windows system variables), no `GIT_*` variables, no prompts, and `CI=true`; provider keys and tokens are not passed.
+- It runs in a `worktree-branch` worktree only when the path lies under `<repo>-worktrees/`; otherwise at the newest upstream `headCommit` (validated as a hex commit id) in a temporary detached worktree created with hooks and the fsmonitor disabled and removed afterwards; otherwise in the linked folder.
+- It has a timeout (20 minutes). On timeout, on the app closing, or when its workflow stops polling it for two minutes (cancelled or replaced), the whole process tree is ended. Output is kept to the last 32,000 characters per stream.
+- The integration is registered only for the device's own runs, not in the set that pool leases use, so another device cannot make this one run tests.
+- Exit code 0 completes the task; any other result, including a timeout, fails it. Runs are held in memory and are never replayed after a restart.
+
+**Residual risks**
+- Once approved, the command and the repository code run with the keeper's full permissions; nothing is sandboxed. The approval is the boundary, so a person should read what the test task will run.
+- A process that leaves the process tree (a daemon that detaches, such as a Gradle daemon) can outlive the run.
+- A bare program name is looked up on the app's `PATH`.
 
 ### Entire checkpoints and the `entire` CLI (desktop)
 
@@ -189,6 +223,42 @@ See `docs/Entire.md`.
 - The Aive does not verify the `entire` binary's signature or origin.
 - Recorded transcripts cannot be withdrawn from a pushed checkpoint by The Aive.
 
+### MCP servers (MCP host)
+
+The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOST.md`). Text providers that can call functions (Anthropic, OpenAI-compatible, Gemini) offer those servers' tools to the model, and The Aive executes the calls.
+
+**Threats**
+- Tool results contain prompt injection aimed at the model, or try to pass as The Aive's own text.
+- A model steered by injection calls a tool to send task content to a server, or to act through the server (for example, writing to a repository with the server's credentials).
+- A server's tool descriptions or annotations lie about what the tool does.
+- A local (stdio) server runs arbitrary code on the desktop.
+- Code execution (desktop, opt-in): a model steered by injection writes a script that escapes the sandbox, exhausts the device (an endless loop, unbounded memory or output), or calls tools in bulk without the keeper seeing each call.
+- A bearer token is sent to the wrong host or over cleartext.
+- A server uses elicitation to phish: it asks the keeper for a password or token in a form, or sends a look-alike URL.
+- A server keeps a call open forever (endless input requests, a task that never ends) or leaves work running after the keeper cancels.
+
+**Mitigations in place**
+- Every server needs the keeper's consent. Either it is **Always allow**, or the first call per server per run stops at an approval gate that shows the tool, the server and the arguments. An unanswered gate is a refusal, and a refused call is never sent. Reaching a server or listing its tools is not consent.
+- Results are fenced as external content, and the model is told to treat them as data. A result cannot close its own fence. Answers written with them carry `contentProvenance=external-tool-results` and the list of calls. The runtime never executes them.
+- Calls are bounded: 8 rounds, 8 calls per round, 64 tools per run, 4 MB per response, 120 s per request. Results are truncated at 20,000 characters.
+- MCP calls are not repository operations and never receive The Aive's repository credentials. Workspace agents, which write branches, get no MCP tools. Runs behind a provider-side plan gate get no tools, so no tool runs before approval.
+- Addresses must be HTTPS, or HTTP to this device or a private network. They may not embed credentials, and redirects are not followed. Tokens live in the platform credential store, as other connection secrets do, and are excluded from Android backup.
+- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell. The client declares no capabilities, so a server cannot ask for sampling, elicitation or roots.
+- Code execution is off until the keeper turns on **Script sandbox**, and exists only on the desktop. The script runs as JavaScript in QuickJS compiled to WebAssembly, on a pure-Java WebAssembly runtime (Endive): it is never handed to a shell, a JVM scripting engine or the host process. The guest has no filesystem, network, environment or process access; its only effective import is the bridge, and every bridged call is an ordinary call through the host's consent gate for the same run, so the sandbox adds no authority: it can do only what the model could already do with direct calls. It cannot call itself, nor tools the run was not offered.
+- A script is bounded: 20,000 characters, 16 tool calls, 10 s of computing time, 12 minutes in all, 64 MB of memory, 4,000 characters of console output and a 16,000-character result, and it stops when the run is cancelled. Its final value is fenced as external content naming the tools it used, and the answer carries the same provenance as any tool use.
+- Invariant 3 holds: the script is a tool argument the model wrote, not artifact content, and The Aive's runtime does not execute it; only the capability-less guest interpreter does. Nothing a script or tool returns is executed.
+- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell.
+- The client never declares sampling or roots. It declares elicitation only on a call the keeper already allowed, and only where a keeper can be asked. Each request is titled with the server's name, warns against entering secrets (and flags secret-looking fields), and is validated against its flat schema before anything is sent. A URL is shown in full as plain text, with its host set apart and look-alikes (Punycode, embedded names, cleartext) flagged; only `http(s)` is accepted, and it is opened in the system browser only on the keeper's tap, never fetched. Declining, cancelling or 10 minutes of silence sends no data. The Aive sends answers to that server only, never to the model or run artifacts; a result that repeats them is fenced like any other.
+- Input rounds are bounded (4 retries, 8 requests each). Tasks are polled with backoff, capped at 30 minutes and 1,000 polls, and cancelled with `tasks/cancel` when the run is cancelled or the wait ends.
+
+**Residual risks**
+- After consent, a server sees whatever arguments the model writes, which may include task content. A server allowed always is never asked about again.
+- A local server runs with the keeper's own permissions; The Aive does not sandbox it.
+- Tool descriptions are shown to the model as the server wrote them.
+- With a server allowed always, a script can make its 16 calls to that server without a question per call, as the model could across turns. The keeper sees one progress line for the script, not one per bridged call.
+- The sandbox's isolation rests on the WebAssembly runtime and the QuickJS build (quickjs4j); a bug there could reach the JVM. The guest still holds no credentials, and its thread holds only the bridge. Time is bounded by interruption, not instruction metering, so a guest stuck in a host call ends only when that call ends or the total time runs out.
+- A keeper can still type a secret into a form, or complete a phishing page opened from a URL request; the warnings do not prevent it. A task the keeper cancels may still finish on the server.
+
 ### Repository operations
 
 GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
@@ -202,6 +272,7 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 - Operation strings are parsed into a fixed vocabulary. Remote operations are REST calls. Local operations are fixed `ProcessBuilder` argument lists, not shell commands.
 - Branch names are validated: they cannot be empty, cannot start with `-`, and cannot contain NUL or newline characters.
 - `WorkflowGraphValidator` rejects any `RepositoryOperation` task other than `status` or `fetch` that lacks a `HumanApproval` ancestor, including one placed on another device through `TaskExecutor.Distributed`.
+- Running a finished run again from a task (`TaskRerunPlanner`) never reuses an earlier approval for a repository change that runs again: when no unconditional `HumanApproval` ancestor of the change runs again, its approvals run again too, and replacing an output behind such an approval is refused. The finished run is not reopened; the rerun is a new run whose carried results came from tasks that completed, and output the keeper wrote is marked `editedBy: keeper`.
 - No remote operation merges, deletes, or force-pushes.
 - Remote repository credentials are scoped to `github.com` and `gitlab.com`.
 - Failures are normalized into failed tasks and follow the workflow's retry/escalation policy.
@@ -209,6 +280,54 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 **Remaining gaps**
 - Operations do not reject protected branches up front. They rely on the host's branch protection.
 - Workspace agents (OpenCode, GitLab, Local) write branches without a `HumanApproval` task. Plan approval is optional per task.
+
+### Context provenance
+
+Every artifact a task receives is labelled with where it came from, in `ArtifactRef.metadata["aive.provenance"]` (`ContextProvenance` in `domain/ContextProvenance.kt`; the rule is in `workflow/ContextTaint.kt`). Prompt context blocks carry the same label (`PromptContextBlock.provenance`).
+
+| Label | Given to |
+|---|---|
+| `KeeperWritten` | Objective, task and role text, the runtime's own control summaries, human-approval output |
+| `AgentArtifact` | Output of an agent, GitHub Action, script or test runner |
+| `RepositoryContent` | Repository-operation output; retrieved repository files |
+| `ExternalContent` | Output of a role with the `Research` capability, an external service, a deployment, or anything returned by another pool device |
+| `MemoryRecall` | Blocks recalled from the memory layer |
+| `Unknown` | Anything without a label, including artifacts stored before labelling. Treated as external. |
+
+**Threats**
+- Prompt injection in web research, service responses or pool results steers a task that can write the repository, deploy, call a service or run a script.
+- Injected content is laundered through an intermediate agent whose output looks trusted.
+- A provider or executor labels its own output as keeper-written.
+
+**Mitigations in place**
+- The runtime labels artifacts when it takes them in (`WorkflowEngine.reconcile`, system executor dispatch and reconcile, remote compute). The runtime's label replaces the producer's. A producer can only lower trust: its own `ExternalContent` label and its untrusted-input flag are kept.
+- Taint propagates. Anything made by a task whose inputs include external or unknown content is flagged `aive.provenance.untrustedInput` and counts as external downstream.
+- Before a task runs, `WorkflowRuntimeCoordinator` checks it. If its executor can change something and any of its inputs are external, unknown or flagged, the task is held `AwaitingApproval` at a `SecurityRisk` gate (`taint:<run>:<task>:<attempt>`, human only). The gate names those inputs, and nothing is dispatched until a person approves. Rejecting fails the task without a retry. Executors that can change something: repository operations other than `status`/`fetch`, deployments, external services, GitHub Actions, scripts, test runners, and agents whose role needs `RepositoryWrite`, `PullRequestCreation` or `ShellExecution` (or whose role is unknown). Distributed placements are judged by their delegate.
+- Keeper-written content, the project's own repository and clean agent output never trigger the gate. The gate adds to invariant 4 and never replaces a `HumanApproval` task.
+- The creature's Work tab lists each input with its label. Its Needs tab shows the gate's reason.
+
+**Remaining gaps**
+- Recalled memory, which can hold content from earlier runs, and role-surface data (including HTTPS spreadsheets) enter agent prompts after the check, so neither triggers the gate. Role-surface blocks are unlabelled.
+- A gate inside a nested child run is named on the parent node but, like plan approvals, cannot be decided from it.
+- Labels are not signed. A tampered store or imported bundle can relabel artifacts (see Persistence).
+- Each new attempt opens a new gate, even when the inputs are unchanged.
+### Progressive delegation
+
+After the keeper approves the same role's plan gate on the same provider N times in a row (default 5, 2 to 20, set under the Keeper's room › Delegations), The Aive offers once to stop asking (`workflow/ProgressiveDelegation.kt`). Accepted, later gates of that kind approve themselves; each is recorded as an `ApprovalDecisionReceived` with `byDelegation = true` and shown as "Approved by delegation".
+
+**Threats**
+- Learned auto-approval lets a mutating action through without a person (invariant 4).
+- A forged or imported delegation grants itself.
+- A role or provider gains write access after it was delegated.
+
+**Mitigations in place**
+- One function, `DelegationPolicy.eligibility`, decides eligibility, and only an eligible gate yields a `DelegationKey` (its constructor is internal). Only plan approval (`DelegableGateKind`) can be delegated. Never eligible: `HumanApproval` tasks (including nested ones), repository operations, deployments, external services, executors that run code (GitHub Actions, scripts, test runners), nested and distributed work, roles with `Implement`, `AuthorTests`, `ApproveIntegration` or `ApproveRelease`, tasks exercising those, roles needing or providers offering `RepositoryWrite`, `ShellExecution`, `Testing`, `TestAuthoring` or `PullRequestCreation`, roles with a writable surface, providers whose capabilities are unknown, and gates raised by context taint. The authority and capability classifications are exhaustive `when`s, so a new value must be classified.
+- Eligibility is checked again at every automatic approval; a role or provider that has since gained write access asks again. `ApprovalGateCoordinator.decide` refuses `byDelegation` for anything but an approved plan gate, and the runtime refuses it for `HumanApproval` tasks.
+- The offer is explicit: Keep asking declines it for the rest of the streak. Any plan rejection for the role resets its streak and ends its delegation. Every delegation is listed under the Keeper's room › Delegations with Revoke.
+- Delegations live only in this device's settings store. They are not in the setup file, `.ive` files or exports, so a file cannot grant one.
+
+**Remaining gaps**
+- The Aive has no context-taint signal yet; `GateDelegationContext.raisedByContextTaint` is the hook and is always false today.
 
 ### Nested workflows
 
@@ -235,20 +354,24 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 
 ### Distributed compute relay and executor
 
-`TaskExecutor.Distributed` wraps another executor and sends it as a lease through a self-hosted relay (`computeRelay/`, protocol version 1) to a device in the same pool. Workers run only system executors (GitHub Actions, script, repository operation, and similar), using their own local integrations and credentials.
+`TaskExecutor.Distributed` wraps another executor and sends it as a lease through a self-hosted relay (`computeRelay/`, protocol version 2) to a device in the same pool. Workers run only system executors (GitHub Actions, script, repository operation, and similar), using their own local integrations and credentials.
 
 **Threats**
-- Anyone holding the pool's shared bearer token can join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
+- Anyone holding the pool's shared token can enrol a new node, join the pool and read every lease envelope. An envelope carries the project, definition, run, task, and role.
 - A rogue member can publish leases that try to make sharing devices run repository operations or dispatch GitHub Actions with those devices' credentials.
-- A rogue member can register a node ID that is not currently connected and so act as that node (receive its replayed leases, cancel its leases).
+- A rogue member can try to act as another node (receive its replayed leases, cancel its leases, take credit for work).
+- Any enrolled member can revoke other members.
 - A worker can return fabricated results.
 - The relay can be reached over plain `ws://`.
 
 **Mitigations in place**
 - Distributed compute has no default relay and is off until configured. Accepting new work also requires `sharingEnabled`, and can additionally require an unmetered network and external power. Android re-evaluates and republishes those conditions when network/power state changes, and its worker checks each offer against the same live descriptor.
 - A node advertises only the executor kinds its credentials support. The relay offers leases only to nodes that satisfy the lease's requirements. The worker re-checks those requirements and a per-node parallel-lease cap.
-- The relay requires `Authorization: Bearer <token>`, compared in constant time. It rejects mismatched protocol versions and caps frames at 8 MiB.
-- A node ID held by a live connection cannot be registered again until that connection closes.
+- Per-node identity. The shared token (`Authorization: Bearer`, compared in constant time) only enrols a node's P-256 public key, with proof of possession. Every session opens with a request signed by that key: node ID, timestamp within 5 minutes, and a nonce the relay refuses to see twice. The session is bound to the signing node, and `register` must name it. Keys are generated in the Android Keystore (not exportable) or kept in the desktop OS credential store.
+- An enrolled node ID cannot be taken over with another key, and a node ID held by a live connection cannot be registered again until that connection closes.
+- Any enrolled node can revoke another from the Keeper's room. Revocation closes its session, cancels the leases it published, requeues the leases it held, and refuses its key and node ID from then on.
+- Lease attribution comes from the authenticated session: progress, completion and the per-node work counts name the node that really ran the lease.
+- The relay rejects mismatched protocol versions and caps frames at 8 MiB and enrolment bodies at 64 KiB.
 - Lease duration (10 minutes), unfinished leases per origin (64) and leases per pool (512) are capped, and an unfinished lease is dropped 24 hours after the relay accepted it.
 - Only a lease's origin can cancel it. Only the claiming worker can report its progress or completion. Expired claims are requeued. Workers continuously watch relay ownership while executing; cancellation, requeue/reassignment, or relay disconnect cancels the running coroutine rather than allowing stale work to continue.
 - `HumanApproval` tasks are never delegated. Envelopes must carry the unwrapped executor and the matching role definition.
@@ -257,7 +380,9 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - Origin disconnect does not destroy accepted work. The relay retains unfinished leases until they complete, are cancelled or reach the 24-hour cap; terminal results have a 24-hour replay window. When `AIVE_RELAY_STATE_DIR` is configured, those lease records survive relay-process restarts in AES-256-GCM-encrypted files keyed from the relay bearer secret. Expired terminal records are removed when an active/persisted pool is swept or loaded; an untouched encrypted pool snapshot can remain until it is accessed or explicitly removed by the operator.
 
 **Remaining gaps**
-- There is a single shared token per relay, with no per-node identity or signing. Node IDs are self-asserted. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state.
+- There is still a single shared enrolment token per relay. Any holder can enrol a new node and join; revocation stops a key and node ID, not the token, so a revoked device that may still know the token has to be shut out by rotating it. Any enrolled node can revoke others (a rogue member can disrupt, and honest members can revoke it back). Without `AIVE_RELAY_STATE_DIR`, enrolments and revocations are lost when the relay restarts. Desktop keys fall back to plaintext preferences when no OS credential store works. The same token also derives the optional persisted-state encryption key, so token rotation requires draining/clearing or explicitly migrating saved relay state (an unreadable node record starts the pool with no enrolments; nodes enrol again under the new token).
+- Signed requests authenticate the session, not each frame; frames inside the session rely on the transport (see `wss://` below).
+- The Play build hides distributed compute as a store-policy choice; it is not a mitigation and per-node identity does not change it.
 - Envelopes are not end-to-end encrypted in transit through the relay, so the relay operator sees them while processing. Optional process-restart persistence encrypts lease files at rest with AES-256-GCM and opaque pool filenames, but the relay process itself necessarily holds plaintext while routing work.
 - A pool member can forge a run that claims its approval gate completed. Without signed approvals the worker cannot verify that, so remote workers run only read-only repository operations (`status`, `fetch`); a mutation placed on another device fails there and has to run on the origin device.
 - Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
@@ -327,12 +452,39 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - Azphalt trust keys come from the repository's own index, so a malicious custom repository can vouch for its own packages; revocations match package id plus version rather than key or digest. Installing from a custom repository is an explicit user action.
 - The GitHub release feed is unauthenticated and rate-limited; a failed check is shown as no update, not as an error.
 
+### A2A (Agent2Agent) client and server
+
+The Aive delegates a role's task to a remote A2A agent, and on desktop can accept tasks from local agents. Protocol and behavior: `docs/A2A.md`.
+
+**Assets**
+- A remote agent's optional bearer token (platform credential store, id `a2a:<host>`).
+- The desktop server's bearer token (OS keychain, or memory only when there is none). Whoever holds it can start workflows on the user's linked providers.
+
+**Threats**
+- A malicious or compromised Agent Card points the JSON-RPC endpoint (and so the prompts and token) at another host.
+- A remote agent returns prompt-injection in its artifacts, or claims success it did not reach.
+- A web page in the user's browser reaches the loopback server (CSRF, DNS rebinding).
+- A local process or agent holding the token floods The Aive with launches, or replaces the user's running work.
+- A remote agent is used for confidential work it should not see.
+
+**Mitigations in place**
+- Remote agents are `explicitOnly`: they run only for roles that prefer them or tasks that require them by id, never by automatic routing.
+- Card and endpoint URLs must pass `CleartextPolicy`. With a token set, the endpoint must share the card's origin. Redirects are not followed, and the card is fetched without the token.
+- A remote task completes only when a `GetTask` poll reads `completed` (or the agent answers with a final message). `unknown` and unrecognized states are never success. Artifacts are stored as opaque text and links; inline file bytes are dropped.
+- The server is off by default. It binds to loopback only and refuses requests whose `Host` is not a loopback name. It sends no CORS headers, so a browser cannot attach the `Authorization` header cross-origin. Every JSON-RPC call needs the bearer token, compared in constant time; the card is public, as A2A discovery expects. Bodies are capped at 1 MB and objectives at 20,000 characters.
+- The server never approves a plan, task or gate, picks a provider or touches a repository. It only queues a launch through the same path as the launch form. It refuses a launch while a run is unfinished or another launch is queued, so it cannot replace the user's work. Cancel reaches only the run its own task started.
+
+**Residual risks**
+- Anyone with the server token is a full client until the token is reset; there is no per-client identity or spend cap.
+- Without an OS keychain the server token is regenerated on every start and held only in memory.
+- Remote A2A agents see the task content they are sent; whether they retain it is up to their operator.
+
 ### Remote access and relay (Android)
 
 The Aive can be driven from IDEaz on another device through a relay Worker (`relay/`), or by IDEaz on the same device through the bound service. Protocol: `docs/Remote-API.md`.
 
 **Assets**
-- The pairing code (`aive1:...`). It carries the relay room, the client token and the 256-bit end-to-end key, so it is a bearer secret: whoever holds it can run prompts on the user's linked provider keys and queue workflows.
+- The pairing code (`aive1:...`). It carries the relay room, the client token and the 256-bit end-to-end key, so it is a bearer secret: whoever holds it can run prompts on the user's linked provider keys, queue workflows and read the shown run's events (task changes, gate reasons, plan and artifact previews).
 - The room host token (never leaves the device) and the linked provider/GitHub credentials.
 
 **Threats**
@@ -348,12 +500,33 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 - The relay meters room creation per client address, closes any socket that exceeds a frame-rate token bucket, and caps a frame at 1 MB.
 - Reset pairing, or turning Remote access off, deletes the room and makes the old code useless. The copied pairing code is cleared from the clipboard after 60 seconds. The pairing credentials are excluded from backups.
 - Pairing and relay use are opt-in; the host runs as a foreground service with a visible notification.
+- Run events are read-only: no remote message approves or rejects a gate. Previews are capped (4 KB), artifact URIs are not sent, and tasks that hold their output send no preview.
 
 **Residual risks**
 - Anyone with the pairing code is a full client until the pairing is reset: there is no per-client enrolment, spend cap or revocation of a single device.
 - The replay guard is in memory, so a frame captured shortly before the app restarts can be replayed once after it within the 10-minute window.
 - A relay operator can drop or delay frames (denial of service) and sees connection metadata.
 - The relay's shared client-token model means a leaked code cannot be told apart from its owner.
+
+### Trace export (OpenTelemetry)
+
+**Threats**
+- Prompts, outputs or secrets in them leak to a collector, or to whoever operates it.
+- Traces are sent without consent, or history is backfilled when export is turned on.
+- Collector headers (API keys) leak, or traces go over cleartext.
+- A slow or failing collector stalls the workflow engine.
+
+**Mitigations in place**
+- Off by default (`TraceExportSettings.enabled = false`) and disclosed in `docs/PRIVACY.md`. There is no default collector.
+- Content (objective, artifact names and text, failure, approval and escalation reasons) is excluded unless a second, separate toggle is on; the builder never reads it otherwise (`TraceContentPolicy`). Executors are exported by kind only, never a script's source.
+- Runs that ended before export was turned on are never sent; each run is sent at most once.
+- `https://` is required, except for a loopback collector. URLs with user info, a query or a fragment are refused. Credentials never enter workflow state or spans.
+- Export reads the persisted journal after a run ends, in its own coroutine; the queue is bounded, never suspends the caller and drops the oldest spans when full. Failed batches are retried with backoff and then dropped.
+- The settings key is not in the setup-file allowlist, so headers are never exported in a `.aivesetup` file.
+
+**Residual risks**
+- Collector headers are stored in the app's local settings, not the platform credential store. Users are told to use a trace-only ingest key.
+- Ids exported by default (project, run, task, role, workflow definition, provider session) and token counts can still reveal activity patterns to the collector.
 
 ### Persistence
 
@@ -385,6 +558,10 @@ The following invariants must hold regardless of the integration used:
 4. Every mutating `RepositoryOperation` task (anything other than `status`/`fetch`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents write only to new dedicated branches.
 5. Provider payloads are subject to `PayloadRedactionPolicy` before transmission.
 6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
+7. A task whose executor can change something does not run on external, unknown-provenance or externally derived inputs until a person approves a gate that names those inputs. An artifact without a provenance label counts as external.
+
+Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
+7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
 
 ## Open Items
 
@@ -392,10 +569,11 @@ The following invariants must hold regardless of the integration used:
 - Cryptographic signing of exported run bundles.
 - Verification that a dispatched `workflow_run_id` matches the expected workflow file name.
 - Per-session provider response content hashing to detect replay.
-- Distributed compute: per-node identity, end-to-end envelope encryption, enforced `wss://`, and signed approvals so workers can verify gates rather than trust the submitted run.
+- Distributed compute: end-to-end envelope encryption, enforced `wss://`, signed approvals so workers can verify gates rather than trust the submitted run, and an enrolment step that the shared token alone cannot pass (for example, approval of new nodes by an enrolled one).
 - Block CI configuration files (for example `.gitlab-ci.yml`, `.github/workflows/`) in workspace-agent change sets.
 - Deciding plan approvals and failure escalations inside nested child runs from the parent node.
 - Web credential protection against same-origin script (for example, a passphrase-derived key).
+- Trace export headers in the platform credential store instead of app settings.
 
 ### Accepted risks
 

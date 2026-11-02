@@ -36,6 +36,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -54,6 +55,7 @@ import com.hereliesaz.geministrator.resources.app_clear_failed
 import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
 import com.hereliesaz.geministrator.resources.app_plan_rejection_failed
+import com.hereliesaz.geministrator.resources.app_lift_spend_stop_failed
 import com.hereliesaz.geministrator.resources.app_provider_message_failed
 import com.hereliesaz.geministrator.resources.app_reachable_capabilities
 import com.hereliesaz.geministrator.resources.app_recovery_failed
@@ -61,6 +63,7 @@ import com.hereliesaz.geministrator.resources.app_reset_swarm_failed
 import com.hereliesaz.geministrator.resources.app_retry_failed
 import com.hereliesaz.geministrator.resources.app_role_delegation_failed
 import com.hereliesaz.geministrator.resources.app_runtime_bootstrap_failed
+import com.hereliesaz.geministrator.resources.app_rerun_failed
 import com.hereliesaz.geministrator.resources.app_runtime_is_unavailable
 import com.hereliesaz.geministrator.resources.app_save_swarm_failed
 import com.hereliesaz.geministrator.resources.app_switch_run_failed
@@ -100,11 +103,15 @@ fun App(
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
     onDisconnectDistributedCompute: () -> Unit = {},
+    onRevokeComputeNode: (String) -> Unit = {},
     distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    /** The desktop's A2A server switch (docs/A2A.md); null where there is none. */
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
     /** Extra chunk sources (a connected repository) retrieved from beside upstream artifacts. */
@@ -119,11 +126,29 @@ fun App(
     onExternalWorkflowLaunchHandled: (requestId: Long, failure: String?) -> Unit = { _, _ -> },
     /** Every runtime state, for observers outside the UI (the Android remote service). */
     onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
+    /**
+     * When set, the shown run's event timeline after each runtime state change, for observers
+     * outside the UI (Android remote clients watching run events). Null, the default, loads nothing.
+     */
+    onRunTimelineChanged: ((List<com.hereliesaz.geministrator.events.WorkflowEvent>) -> Unit)? = null,
+    /** The runtime once it exists (null while it is replaced), for hosts outside the UI (the desktop A2A server). */
+    onRuntimeAvailable: (ApplicationRuntime?) -> Unit = {},
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
+    /** The MCP host and its approval gate (docs/architecture/MCP_HOST.md); null where there is none. */
+    mcpHost: com.hereliesaz.geministrator.mcp.McpHost? = null,
+    mcpConsent: com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate? = null,
+    /** The script sandbox over [mcpHost], where the platform has one (desktop); its opt-in is in Connections. */
+    codeExecution: com.hereliesaz.geministrator.mcp.CodeExecutionToolSource? = null,
+    /** Where MCP servers' requests for input are shown; null where no keeper can be asked. */
+    mcpElicitation: com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
+    // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
+    val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
+    val delegations = remember { com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore.createDefault() }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
@@ -153,6 +178,9 @@ fun App(
                 contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
+                spendCaps = { spendCapStore.caps },
+                traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
+                delegations = delegations,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
@@ -342,6 +370,20 @@ fun App(
     }
 
     LaunchedEffect(runtimeState) { onRuntimeStateChanged(runtimeState) }
+    LaunchedEffect(runtimeState, runtime, onRunTimelineChanged) {
+        val observer = onRunTimelineChanged ?: return@LaunchedEffect
+        val activeRuntime = runtime ?: return@LaunchedEffect
+        if (runtimeState !is ApplicationRuntimeState.Live) return@LaunchedEffect
+        val timeline = try {
+            activeRuntime.loadRunTimeline()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            return@LaunchedEffect
+        }
+        observer(timeline)
+    }
+    LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
 
     // Requests whose launch finished here. The host drops them from its queue asynchronously, so
     // this keeps a finished request from being launched twice in the meantime.
@@ -375,7 +417,7 @@ fun App(
             mutableStateOf(
                 ControlRoomSession.destinationName
                     ?: startupControlRoomDestination(
-                        hasConfiguredProvider = providers.isNotEmpty(),
+                        hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider },
                     ).name,
             )
         }
@@ -383,7 +425,7 @@ fun App(
         val destinations = ControlRoomDestination.available(distributedComputeAvailable)
         val destination = destinations
             .firstOrNull { it.name == destinationName }
-            ?: startupControlRoomDestination(hasConfiguredProvider = providers.isNotEmpty())
+            ?: startupControlRoomDestination(hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider })
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
@@ -502,12 +544,16 @@ fun App(
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,
+            LocalMcpHost provides mcpHost,
+            LocalCodeExecution provides codeExecution,
             LocalCreatureRig provides { label ->
                 if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
             },
         ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
+                mcpConsent?.let { McpConsentDialog(it) }
+                mcpElicitation?.let { McpElicitationDialog(it) }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,
@@ -566,6 +612,17 @@ fun App(
                                 }
                             }
                         },
+                        onLiftSpendStop = {
+                            scope.launch {
+                                try {
+                                    runtime?.liftSpendStop()
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_lift_spend_stop_failed))
+                                }
+                            }
+                        },
                         onResolveEscalation = { taskId, approved ->
                             scope.launch {
                                 try {
@@ -621,6 +678,34 @@ fun App(
                                         }
                                         null
                                     }
+                                    is ProviderActionResult.Rejected -> result.reason
+                                }
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_provider_message_failed)
+                            }
+                        },
+                        onRerunFromTask = { runId, request ->
+                            try {
+                                val activeRuntime = runtime
+                                if (activeRuntime == null) {
+                                    getString(Res.string.app_runtime_is_unavailable)
+                                } else {
+                                    activeRuntime.rerunFromTask(runId, request)
+                                    null
+                                }
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_rerun_failed)
+                            }
+                        },
+                        onAnswerKeeperQuestion = { taskId, questionKey, answer ->
+                            try {
+                                when (val result = runtime?.answerKeeperQuestion(TaskDefinitionId(taskId), questionKey, answer)) {
+                                    null -> getString(Res.string.app_runtime_is_unavailable)
+                                    ProviderActionResult.Accepted -> null
                                     is ProviderActionResult.Rejected -> result.reason
                                 }
                             } catch (failure: CancellationException) {
@@ -805,11 +890,15 @@ fun App(
                         distributedComputeState = distributedComputeState,
                         onSaveDistributedCompute = onSaveDistributedCompute,
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
+                        onRevokeComputeNode = onRevokeComputeNode,
                         crashReportingSetting = crashReportingSetting,
                         remoteAccessSetting = remoteAccessSetting,
+                        a2aServerSetting = a2aServerSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                        onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
                         memoryLayer = memoryLayer,
+                        delegations = delegations,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
                         onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,

@@ -1,6 +1,19 @@
 package com.hereliesaz.aive.remote
 
+import com.hereliesaz.geministrator.ApplicationRuntimeState
+import com.hereliesaz.geministrator.LiveWorkflowPresentation
+import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.events.TaskStarted
+import com.hereliesaz.geministrator.events.WorkflowCreated
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -101,6 +114,47 @@ class AiveRemoteBridgeTest {
         assertEquals(7L, queueRemoteLaunch(" P ", "goal", "https://github.com/a/b", enqueue))
         assertEquals(listOf("P"), queued)
         assertFailsWith<IllegalStateException> { queueRemoteLaunch("P", "goal", null) { _, _, _ -> null } }
+    }
+
+    @Test
+    fun eventWatchHoldsAreCountedAndReleasedOnce() {
+        val before = AiveRemoteBridge.eventWatchers.value
+        val first = AiveRemoteBridge.holdEventWatch()
+        val second = AiveRemoteBridge.holdEventWatch()
+        assertEquals(before + 2, AiveRemoteBridge.eventWatchers.value)
+        first()
+        first()
+        assertEquals(before + 1, AiveRemoteBridge.eventWatchers.value)
+        second()
+        assertEquals(before, AiveRemoteBridge.eventWatchers.value)
+    }
+
+    @Test
+    fun theTimelineOfTheShownRunBecomesItsEventLogAndOtherRunsAreIgnored() {
+        val task = TaskDefinition(id = TaskDefinitionId("t"), name = "Task", objective = "do", roleId = null)
+        val definition = WorkflowDefinition(id = WorkflowDefinitionId("wf"), name = "Workflow", tasks = listOf(task))
+        val runId = WorkflowRunId("bridge-run-" + System.nanoTime())
+        val run = WorkflowRun(
+            id = runId,
+            projectId = ProjectId("p"),
+            workflowDefinitionId = definition.id,
+            objective = "Ship",
+            status = WorkflowRunStatus.Running,
+            taskRuns = emptyMap(),
+            createdAtEpochMillis = 1,
+            updatedAtEpochMillis = 1,
+        )
+        val project = Project(id = ProjectId("p"), name = "P", createdAtEpochMillis = 1, updatedAtEpochMillis = 1)
+        AiveRemoteBridge.publish(ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, run, roles = emptyList())))
+
+        AiveRemoteBridge.publishTimeline(listOf(WorkflowCreated(runId, objective = "Ship", occurredAtEpochMillis = 1), TaskStarted(runId, task.id, 1, 2)))
+        val log = AiveRemoteBridge.runEvents.value
+        assertEquals(runId.value, log.runId)
+        assertEquals(listOf("run_started", "task"), log.events.map { it.type })
+
+        // A timeline that belongs to another run (loaded while the UI moved on) changes nothing.
+        AiveRemoteBridge.publishTimeline(listOf(WorkflowCreated(WorkflowRunId("elsewhere"), occurredAtEpochMillis = 1)))
+        assertEquals(log, AiveRemoteBridge.runEvents.value)
     }
 
     /** Empties the process-wide queue left by other tests. */

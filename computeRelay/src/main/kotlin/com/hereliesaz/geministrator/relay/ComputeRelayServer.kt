@@ -1,15 +1,26 @@
 package com.hereliesaz.geministrator.relay
 
+import com.hereliesaz.geministrator.distributed.ComputeNodeAuth
+import com.hereliesaz.geministrator.distributed.ComputeNodeEnrolmentRequest
+import com.hereliesaz.geministrator.distributed.ComputeNodeEnrolmentResponse
 import com.hereliesaz.geministrator.distributed.ComputeRelayClientMessage
+import com.hereliesaz.geministrator.distributed.ComputeRelayHttpError
 import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
 import com.hereliesaz.geministrator.distributed.DISTRIBUTED_COMPUTE_PROTOCOL_VERSION
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.contentLength
+import io.ktor.server.request.receiveText
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.pingPeriod
@@ -78,6 +89,7 @@ class ComputeRelayHub(
 
 private class WebSocketRelayPeer(
     private val sendText: suspend (String) -> Unit,
+    private val closeSession: suspend (String) -> Unit,
 ) : RelayPeer {
     private val sendMutex = Mutex()
 
@@ -85,7 +97,26 @@ private class WebSocketRelayPeer(
         val payload = relayJson.encodeToString(ComputeRelayServerMessage.serializer(), message)
         sendMutex.withLock { sendText(payload) }
     }
+
+    override suspend fun close(reason: String) = closeSession(reason)
 }
+
+private suspend fun ApplicationCall.respondRelayError(status: HttpStatusCode, code: String, message: String) {
+    respondText(
+        relayJson.encodeToString(ComputeRelayHttpError.serializer(), ComputeRelayHttpError(code, message)),
+        ContentType.Application.Json,
+        status,
+    )
+}
+
+private fun enrolmentStatus(code: String): HttpStatusCode = when (code) {
+    ComputeNodeAuth.ERROR_STALE_REQUEST, ComputeNodeAuth.ERROR_BAD_SIGNATURE -> HttpStatusCode.Unauthorized
+    ComputeNodeAuth.ERROR_NODE_REVOKED -> HttpStatusCode.Forbidden
+    ComputeNodeAuth.ERROR_NODE_ID_TAKEN, ComputeNodeAuth.ERROR_POOL_FULL -> HttpStatusCode.Conflict
+    else -> HttpStatusCode.BadRequest
+}
+
+private const val MAX_ENROLMENT_BODY_BYTES: Long = 64L * 1024L
 
 /** Compares the bearer token in constant time, so response timing does not leak the token. */
 internal fun isAuthorized(authorizationHeader: String?, relayToken: String): Boolean {
@@ -117,15 +148,81 @@ fun Application.computeRelayModule(
     }
 
     routing {
+        // Enrolment is the only request the shared pool token authorizes: it records a node's public
+        // key. Sessions are then opened with requests signed by that key (ComputeNodeAuth).
+        post("/v1/compute/{poolId}/enrol") {
+            if (!isAuthorized(call.request.headers[HttpHeaders.Authorization], relayToken)) {
+                call.respondRelayError(HttpStatusCode.Unauthorized, ComputeNodeAuth.ERROR_UNAUTHORIZED, "Unauthorized")
+                return@post
+            }
+            val poolId = call.parameters["poolId"]?.trim().orEmpty()
+            if (!ComputeNodeAuth.isValidField(poolId)) {
+                call.respondRelayError(HttpStatusCode.BadRequest, ComputeNodeAuth.ERROR_BAD_REQUEST, "Missing compute pool")
+                return@post
+            }
+            if ((call.request.contentLength() ?: 0L) > MAX_ENROLMENT_BODY_BYTES) {
+                call.respondRelayError(HttpStatusCode.PayloadTooLarge, ComputeNodeAuth.ERROR_BAD_REQUEST, "Enrolment request is too large")
+                return@post
+            }
+            val body = call.receiveText()
+            val request = runCatching {
+                relayJson.decodeFromString(ComputeNodeEnrolmentRequest.serializer(), body)
+            }.getOrNull()
+            if (request == null || body.length > MAX_ENROLMENT_BODY_BYTES) {
+                call.respondRelayError(HttpStatusCode.BadRequest, ComputeNodeAuth.ERROR_BAD_REQUEST, "Invalid enrolment request")
+                return@post
+            }
+            try {
+                val enrolled = hub.pool(poolId).enrol(request)
+                call.respondText(
+                    relayJson.encodeToString(
+                        ComputeNodeEnrolmentResponse.serializer(),
+                        ComputeNodeEnrolmentResponse(enrolled.nodeId, enrolled.enrolledAtEpochMillis),
+                    ),
+                    ContentType.Application.Json,
+                    HttpStatusCode.OK,
+                )
+            } catch (refused: NodeEnrolmentException) {
+                call.respondRelayError(enrolmentStatus(refused.code), refused.code, refused.message ?: refused.code)
+            }
+        }
+
         webSocket("/v1/compute/{poolId}") {
-            val authorization = call.request.headers[HttpHeaders.Authorization]
-            if (!isAuthorized(authorization, relayToken)) {
+            val poolId = call.parameters["poolId"]?.trim().orEmpty()
+            if (!ComputeNodeAuth.isValidField(poolId)) {
+                close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Missing compute pool"))
+                return@webSocket
+            }
+            val headers = call.request.headers
+            val nodeIdHeader = headers[ComputeNodeAuth.HEADER_NODE_ID]
+            val timestampHeader = headers[ComputeNodeAuth.HEADER_TIMESTAMP]
+            val nonceHeader = headers[ComputeNodeAuth.HEADER_NONCE]
+            val signatureHeader = headers[ComputeNodeAuth.HEADER_SIGNATURE]
+            // Nothing unsigned reaches a pool: the pool token alone no longer opens a session.
+            if (nodeIdHeader == null || timestampHeader == null || nonceHeader == null || signatureHeader == null) {
                 close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
                 return@webSocket
             }
-            val poolId = call.parameters["poolId"]?.trim().orEmpty()
-            if (poolId.isBlank()) {
-                close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Missing compute pool"))
+            val pool = hub.pool(poolId)
+            val authentication = pool.authenticate(nodeIdHeader, timestampHeader, nonceHeader, signatureHeader)
+            if (authentication != NodeAuthentication.Authenticated) {
+                // Not-enrolled and revoked are told to the client so it can enrol again or stop.
+                if (authentication == NodeAuthentication.NotEnrolled || authentication == NodeAuthentication.Revoked) {
+                    send(
+                        relayJson.encodeToString(
+                            ComputeRelayServerMessage.serializer(),
+                            ComputeRelayServerMessage.Error(
+                                code = authentication.errorCode,
+                                message = if (authentication == NodeAuthentication.Revoked) {
+                                    "This device's identity was revoked in this pool"
+                                } else {
+                                    "This device is not enrolled in this pool"
+                                },
+                            ),
+                        ),
+                    )
+                }
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
                 return@webSocket
             }
 
@@ -156,13 +253,38 @@ fun Application.computeRelayModule(
             }
 
             val nodeId = registration.node.nodeId
-            val pool = hub.pool(poolId)
-            val peer = WebSocketRelayPeer { payload -> send(payload) }
+            // The session belongs to the node that signed the request, not to whatever ID it registers.
+            if (nodeId != nodeIdHeader) {
+                send(
+                    relayJson.encodeToString(
+                        ComputeRelayServerMessage.serializer(),
+                        ComputeRelayServerMessage.Error(
+                            code = ComputeNodeAuth.ERROR_UNAUTHORIZED,
+                            message = "The registered node ID does not match the signing node",
+                        ),
+                    ),
+                )
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Node ID mismatch"))
+                return@webSocket
+            }
+            val peer = WebSocketRelayPeer(
+                sendText = { payload -> send(payload) },
+                closeSession = { reason -> close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, reason)) },
+            )
             val online = try {
                 pool.register(registration.node, peer)
             } catch (inUse: NodeIdInUseException) {
                 peer.send(ComputeRelayServerMessage.Error(code = "node-id-in-use", message = inUse.message ?: "Node ID in use"))
                 close(CloseReason(CloseReason.Codes.TRY_AGAIN_LATER, "Node ID in use"))
+                return@webSocket
+            } catch (revoked: NodeRevokedException) {
+                peer.send(
+                    ComputeRelayServerMessage.Error(
+                        code = ComputeNodeAuth.ERROR_NODE_REVOKED,
+                        message = revoked.message ?: "Node revoked",
+                    ),
+                )
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Node revoked"))
                 return@webSocket
             }
             try {
@@ -173,6 +295,7 @@ fun Application.computeRelayModule(
                         onlineNodes = online,
                     ),
                 )
+                peer.send(ComputeRelayServerMessage.EnrolledNodes(pool.enrolledNodes()))
                 pool.replayOriginLeases(nodeId, peer)
 
                 for (frame in incoming) {
@@ -222,6 +345,10 @@ fun Application.computeRelayModule(
                                 pool.cancel(nodeId, message.leaseId, message.reason)
                             }
                             ComputeRelayClientMessage.NodeHeartbeat -> Unit
+                            ComputeRelayClientMessage.ListEnrolledNodes -> {
+                                peer.send(ComputeRelayServerMessage.EnrolledNodes(pool.enrolledNodes()))
+                            }
+                            is ComputeRelayClientMessage.RevokeNode -> pool.revoke(nodeId, message.nodeId)
                         }
                     } catch (e: IllegalArgumentException) {
                         peer.send(

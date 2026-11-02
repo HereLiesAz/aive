@@ -46,6 +46,8 @@ import com.hereliesaz.geministrator.resources.keeper_compute
 import com.hereliesaz.geministrator.resources.keeper_compute_lead
 import com.hereliesaz.geministrator.resources.keeper_connections
 import com.hereliesaz.geministrator.resources.keeper_connections_lead
+import com.hereliesaz.geministrator.resources.keeper_delegations
+import com.hereliesaz.geministrator.resources.keeper_delegations_lead
 import com.hereliesaz.geministrator.resources.keeper_device
 import com.hereliesaz.geministrator.resources.keeper_device_lead
 import com.hereliesaz.geministrator.resources.keeper_feeds_the_hive
@@ -70,6 +72,7 @@ internal enum class KeeperSection(
     Connections(Res.string.keeper_connections, Res.string.keeper_connections_lead, true),
     Compute(Res.string.keeper_compute, Res.string.keeper_compute_lead, true),
     Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false),
+    Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false),
     Device(Res.string.keeper_device, Res.string.keeper_device_lead, false),
     Appearance(Res.string.keeper_appearance, Res.string.keeper_appearance_lead, false),
     About(Res.string.keeper_about, Res.string.keeper_about_lead, false),

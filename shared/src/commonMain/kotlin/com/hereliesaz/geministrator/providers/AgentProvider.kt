@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -40,6 +41,8 @@ data class AgentCapabilities(
 data class PromptContextBlock(
     val label: String,
     val content: String,
+    /** Where this content came from (docs/THREAT_MODEL.md, "Context provenance"); null = unknown. */
+    val provenance: ContextProvenance? = null,
 )
 
 data class PromptContext(
@@ -62,6 +65,11 @@ data class AgentOrchestrationContext(
     val roleId: RoleDefinitionId? = null,
     /** The run's parent runs ([com.hereliesaz.geministrator.domain.WorkflowRun.parentWorkflowRunIds]). */
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /**
+     * The task's name ([com.hereliesaz.geministrator.domain.TaskDefinition.name]), null when the
+     * workflow redacts objectives. Local Git checkpoints name it in their commit message.
+     */
+    val taskName: String? = null,
 )
 
 data class AgentTaskRequest(
@@ -134,7 +142,8 @@ sealed interface AgentEvent {
 
     /**
      * Reasoning the provider streams while it thinks, for providers that expose it (local models,
-     * APIs with visible thinking). Memory watches it for recall triggers; it is not shown as output.
+     * APIs with visible thinking). Memory watches it for recall triggers; it is not shown as output,
+     * only as live activity in the creature's panel (`SessionActivityFeeds`), never persisted there.
      */
     data class Thinking(
         override val runId: ProviderRunId,

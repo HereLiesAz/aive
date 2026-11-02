@@ -6,14 +6,19 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 
 | Group | Part | Holds | Was |
 |---|---|---|---|
-| Feeds the hive | **Connections** | AI providers, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
+| Feeds the hive | **Connections** | AI providers, remote A2A agents, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
-| | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **This device** | spend caps, remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
 | | **Appearance** | the ground | Settings › Appearance |
-| | **About and privacy** | crash reports, diagnostics | Settings › Crash Reports, Diagnostics |
+| | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
+
+## Delegations
+
+When you approve the same creature's plan on the same provider several times in a row (5 by default) and never reject it, a dialog asks once: "Let it proceed without asking for plan approval?". **Let it proceed** delegates that gate; **Keep asking** leaves it for the rest of the streak. A delegated gate approves itself and its run's events show "Approved by delegation". Only a creature that cannot write to a repository, deploy or write anywhere else, on a provider that cannot either, is ever offered; `HumanApproval` tasks and every other gate always ask (`docs/THREAT_MODEL.md`, Progressive delegation). A rejection starts the streak over and ends the delegation. The Delegations part lists each one with **Revoke**. Delegations stay on this device and are never in the setup file or an export.
 
 Memory is not here: it is a swarm of its own, running beside every other, so it lives in the hive (**Memory swarm**, beside Swarm at the top of the hive). Its stages that run without a model wear the neuron (`Node-Creatures.md`, Programmatic work).
 
@@ -25,7 +30,13 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 ## Connections
 
-One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching.
+One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching. **Add an A2A agent** takes an Agent Card URL and then an optional token; such an agent runs only for roles that prefer it (`A2A.md`).
+
+## This device
+
+**Small tasks on this device** (desktop and Android, off by default) sends short text tasks that need no repository access to the instruct model the memory clerks installed (`OnDeviceTextAgentProvider`, docs/Orchestration_layer.md, Agent Router). It downloads nothing: until a memory stage's local model on a shared base is installed from the Memory swarm, the switch is kept but nothing goes to the device. The choice is stored per device (`on-device.small-tasks.enabled`).
+**MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`).
+**MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`). On desktop, **Script sandbox** (off by default) lets agents call these tools from one short sandboxed script and receive only its result; the approvals still apply.
 
 ## Navigation
 
@@ -41,13 +52,17 @@ Once there is a hive, resting or live, one row holds its places: its Swarm, the 
 
 Selecting a creature opens its panel, in three tabs (`TechnicalInspector`, `CreatureTab`); the breadcrumb ends on the open one (Hive › a hive › a creature › Mind):
 
-- **Needs:** its needs, and what it waits on you for: a plan or task to approve, an escalation, a nested gate, and messages to its agent. This was the Inbox.
-- **Work:** its state, executor and provider, progress, what it was sent, and its artifacts, each opening on its contents. This was Artifacts.
+- **Needs:** its needs, and what it waits on you for: a plan or task to approve, an escalation, a nested gate, a spent token budget (with **Raise its budget**, which opens its Mind), a question its agent asked you (drawn from the host catalog, `Agent-UI.md`), and messages to its agent. This was the Inbox.
+- **Work:** what it's doing, live: its thinking and tool/progress steps for its current provider session, newest last, the latest six shown and older ones collapsed behind **Show N earlier lines**; then the field for messages to its agent, apart from that activity; then its state, executor and provider, progress, what it was sent, and its artifacts, each opening on its contents. This was Artifacts. Once its run has completed, failed or been cancelled, **Run again from here** (`RerunFromTaskPanel`) starts a new run in the same lineage where this creature and everything after it work again and the work before it keeps its results; the finished run stays as it was. It asks what the creature should work on, prefilled with its objective, to change it first. When the creature made text and something follows it, **Change what it made** instead keeps the creature's place with the keeper's text as its work and runs only what follows. See `docs/architecture/ARCHITECTURE.md`, Running again from a task.
 - **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles. Above the form sit any **proposed changes to its instructions**, drafted from its past work (recurring failures, failures then a fix, your repeated corrections): the current and proposed text with why, and **Approve and apply** or **Dismiss**. Nothing changes until you approve; the Mind tab shows how many wait (`RoleInstructionProposalPanel`, [Procedural memory §10](architecture/PROCEDURAL_MEMORY.md)).
+- **Mind:** its creature, and its role's form, open from the start, its id fixed; applying it saves the swarm (`CustomCompanyProviderScreen(focusRole = …)`). This was the Swarm's role editor. The Swarm keeps adding, arranging and resetting roles.
 
-A creature opens on Needs when it waits on you, otherwise on Work; the open tab survives a restart while the same creature stays open. Waiting on you means a plan or task to approve, an escalation, or a nested gate, one definition for the badge, the panel and the hive's Owner attention card (shown only then, opening that creature). The header's Inbox badge counts the waits not yet seen and opens the next unseen one, on its Needs; opening a creature's panel marks its wait seen. Only the Hall Monitor's pause, which speaks for the whole hive, keeps a place of its own (`Inbox`).
+A creature opens on Needs when it waits on you, otherwise on Work; the open tab survives a restart while the same creature stays open. Waiting on you means a plan or task to approve, an escalation, a nested gate, or a spent token budget, one definition for the badge, the panel and the hive's Owner attention card (shown only then, opening that creature). The header's Inbox badge counts the waits not yet seen and opens the next unseen one, on its Needs; opening a creature's panel marks its wait seen. Only the Hall Monitor's pause and a spend cap stop, which speak for the whole hive, keep a place of their own (`Inbox`).
+A creature opens on Needs when it waits on you, otherwise on Work; the open tab survives a restart while the same creature stays open. Waiting on you means a plan or task to approve, an escalation, a nested gate, or a question from its agent, one definition for the badge, the panel and the hive's Owner attention card (shown only then, opening that creature). The header's Inbox badge counts the waits not yet seen and opens the next unseen one, on its Needs; opening a creature's panel marks its wait seen. Only the Hall Monitor's pause, which speaks for the whole hive, keeps a place of its own (`Inbox`).
 
-The panel's Needs holds only decisions; messages to its agent sit with its Work. Reject plan and Stop workflow stay quiet; the confirmation is where red appears (`BRANDING.md`).
+The panel's Needs holds only decisions; messages to its agent sit with its Work.
+
+The activity comes from `SessionActivityFeeds` (`workflow/SessionActivityFeeds.kt`): the provider-backed session gateway records each session's `AgentEvent.Thinking` and non-blank `AgentEvent.Progress` there, keyed by task run and provider run (a retry starts a fresh feed). It is in memory only and bounded (60 lines a session, 32 sessions, 600 characters a line); it is never written into workflow state or the event journal (memory banks thinking on its own) and never sent to the duplex peer (`architecture/DUPLEX_MCP.md`). Messages to and from the agent never enter it. On the hive, under **Jump to active**, one short line reads what the active creature is doing now: its newest thought or step. Reject plan and Stop workflow stay quiet; the confirmation is where red appears (`BRANDING.md`).
 
 Back closes the creature panel, then returns through the places opened off the hive, then zooms from a hive out to the district, then leaves the app. Reaching the hive clears the way back.
 
@@ -65,11 +80,41 @@ Feed it is gated on what the connected agents can reach (`ProviderReach`, `FeedG
 
 Pressing a gated Feed it shows the gate's message and starts nothing. A launch that fails stays beside Feed it, the objective still typed, until the next edit or launch.
 
+## Budgets and spend caps
+
+Three circuit breakers stop spending; none estimates, and only what providers report counts (`SpendCircuitBreakers.kt`).
+
+- **A role's token budget** (its Mind, per run): once the tokens reported for every task of that role in the run reach it, its running sessions are cancelled and its tasks parked (`ROLE_BUDGET_SPENT`), a stopped one as a fresh attempt, and its unstarted tasks do not start. Each waits on you, on its Needs. Raising or clearing the budget releases them at the next cycle; the current role wins over the run's snapshot.
+- **A cost cap per run** and **a spend cap per hour across runs** (This device, in US dollars, blank for none; kept on the device, `SpendCapStore`): when the run's known cost, or the known cost reported on this device in the last hour, reaches its cap, every live session is cancelled and the run is stopped (`WorkflowRun.spendPause`, tasks parked as `SPEND_CAP_STOP`). The Inbox shows the stop and **Lift the stop**, which puts every task back where it was; a cancelled session starts again as a new attempt. So raise or clear the cap first: a cap still reached stops the run again (the run cost at its next cycle, the hourly spend when it is next summed: when the run spends, or after a minute).
+
+Cost a provider does not report (keyless and free providers, or ones that report tokens only) never trips a cap.
+
 ## The hive's state
 
 A hive that stopped reads **The hive stopped**; one that cannot reach its agents, **The hive can't reach its agents**. Both offer **Try again** and **Connections**; a hive stopped by corrupted data offers only **Delete all projects and runs to recover**. Work no connected agent can take fails as "No connected agent can do this work", with what to connect (`UserFacingError`, `ErrorKind.NoAgent`).
 
 A completed hive shows **What it made** under its run's status: the text artifacts of its final tasks (those nothing depends on), selectable. Once its run has completed, failed or been cancelled, its one follow-up is **Feed it more**, which asks what next and launches a continuation in the same project (`ContinueRunPanel`). A resting hive keeps its objective bar (`HiveLaunchBar`); a live one has none.
+
+## The hive's timeline
+
+A live hive's **Timeline** pill swaps the hive for its run's timeline, in two views (remembered, `overview.timeline.view`):
+
+- **Waterfall** (the default): one row per creature, one bar per attempt, on a shared time axis, so work running in parallel overlaps. Each bar is coloured by phase: Planning, Waiting on you (drawn as a thin pause line: a gate), Running, Verifying, Retrying. A white tick ends a finished attempt, a red one a failed attempt; a bar still going runs to now. Hovering or tapping a bar shows its phases and usage (tokens, cost); tapping also selects its creature. Each bar is one labelled button for screen readers. The bars unroll once on arrival and, while the run lives, grow once a second; with reduced motion they do neither and move only when new events arrive.
+- **Events:** the run's events in order.
+
+The waterfall is a pure function of the run's event journal (`runWaterfall` in `RunWaterfall.kt`, tested in `RunWaterfallTest`):
+
+~~~
+TaskStarted                         -> an attempt begins (Running)
+events before it starts             -> it begins early, in Planning
+ApprovalRequired, HumanDecisionRequired -> Waiting on you until the decision
+work before an attempt's first gate -> Planning (a plan gate follows planning)
+ArtifactCreated                     -> Verifying
+VerificationFailed, RetryScheduled  -> Retrying, until the next attempt starts
+TaskCompleted / TaskFailed / TaskCancelled -> it ends
+the run's end                       -> every open bar ends; otherwise they run to now
+ProviderUsageRecorded               -> added to the attempt it fell in
+~~~
 
 ## Consolidation plan
 

@@ -1,14 +1,38 @@
 package com.hereliesaz.geministrator.relay
 
+import com.hereliesaz.geministrator.distributed.COMPUTE_NODE_SIGNATURE_ALGORITHM
+import com.hereliesaz.geministrator.distributed.ComputeNodeAuth
 import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
+import com.hereliesaz.geministrator.distributed.ComputeNodeEnrolmentRequest
 import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
+import com.hereliesaz.geministrator.distributed.DISTRIBUTED_COMPUTE_PROTOCOL_VERSION
 import com.hereliesaz.geministrator.distributed.DistributedTaskEnvelope
+import com.hereliesaz.geministrator.distributed.EnrolledComputeNode
+import com.hereliesaz.geministrator.domain.TaskRunStatus
+import java.security.PublicKey
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 fun interface RelayPeer {
     suspend fun send(message: ComputeRelayServerMessage)
+
+    /** Ends the peer's connection; the relay calls it when the node behind it is revoked. */
+    suspend fun close(reason: String) = Unit
 }
+
+/** The outcome of checking a signed connection request against a pool's enrolled nodes. */
+enum class NodeAuthentication(val errorCode: String) {
+    Authenticated(""),
+    Malformed(ComputeNodeAuth.ERROR_UNAUTHORIZED),
+    StaleRequest(ComputeNodeAuth.ERROR_STALE_REQUEST),
+    NotEnrolled(ComputeNodeAuth.ERROR_NODE_NOT_ENROLLED),
+    Revoked(ComputeNodeAuth.ERROR_NODE_REVOKED),
+    BadSignature(ComputeNodeAuth.ERROR_BAD_SIGNATURE),
+    Replayed(ComputeNodeAuth.ERROR_REPLAYED_REQUEST),
+}
+
+/** An enrolment the pool refuses; [code] is one of the `ComputeNodeAuth.ERROR_*` codes. */
+class NodeEnrolmentException(val code: String, message: String) : Exception(message)
 
 class RelayPool(
     private val poolId: String,
@@ -32,8 +56,32 @@ class RelayPool(
         val acceptedAtEpochMillis: Long,
     )
 
+    private data class Enrolment(
+        val record: PersistedRelayNode,
+        val key: PublicKey,
+    ) {
+        val revoked: Boolean get() = record.revokedAtEpochMillis != null
+    }
+
     private val mutex = Mutex()
     private val nodes = linkedMapOf<String, NodeSession>()
+
+    // Enrolled node identities. An unreadable record (sealed under a rotated token, or damaged) starts
+    // the pool with none: every node then enrols again, which needs the current pool token.
+    private val enrolments = linkedMapOf<String, Enrolment>().apply {
+        val restored = try {
+            stateStore.loadNodes(poolId)
+        } catch (_: Exception) {
+            emptyList()
+        }
+        restored.forEach { persisted ->
+            NodeSignatures.decodePublicKey(persisted.publicKey)?.let { key -> put(persisted.nodeId, Enrolment(persisted, key)) }
+        }
+    }
+
+    /** Nonces of accepted connection requests, by node, until their timestamp leaves the skew window. */
+    private val seenNonces = HashMap<String, Long>()
+
     // State written under another token (after a rotation), by a newer relay, or damaged on disk
     // cannot be recovered; the pool starts empty and the unreadable file is dropped, instead of
     // the pool refusing to exist until someone deletes the file by hand.
@@ -85,6 +133,8 @@ class RelayPool(
     suspend fun register(node: ComputeNodeDescriptor, peer: RelayPeer): List<ComputeNodeDescriptor> {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         val online = mutex.withLock {
+            // Revocation can land between a node's signed request being checked and its registration.
+            if (enrolments[node.nodeId]?.revoked == true) throw NodeRevokedException(node.nodeId)
             val current = nodes[node.nodeId]
             if (current != null && current.peer !== peer) throw NodeIdInUseException(node.nodeId)
             nodes[node.nodeId] = NodeSession(node, peer)
@@ -101,6 +151,188 @@ class RelayPool(
         sendAll(outbound)
         offerPendingLeases()
         return online
+    }
+
+    /**
+     * Records [request]'s public key for its node ID. The caller has already checked the shared pool
+     * token. Enrolling the same key again is a no-op apart from the display name; a different key
+     * for an enrolled node ID, or any key for a revoked one, is refused.
+     */
+    suspend fun enrol(request: ComputeNodeEnrolmentRequest): EnrolledComputeNode {
+        val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
+        val enrolled = mutex.withLock {
+            if (request.protocolVersion != DISTRIBUTED_COMPUTE_PROTOCOL_VERSION) {
+                throw NodeEnrolmentException(
+                    ComputeNodeAuth.ERROR_BAD_REQUEST,
+                    "Unsupported protocol version " + request.protocolVersion,
+                )
+            }
+            if (request.algorithm != COMPUTE_NODE_SIGNATURE_ALGORITHM) {
+                throw NodeEnrolmentException(ComputeNodeAuth.ERROR_BAD_REQUEST, "Unsupported signature algorithm")
+            }
+            if (!ComputeNodeAuth.isValidField(request.nodeId) || !ComputeNodeAuth.isValidField(request.displayName)) {
+                throw NodeEnrolmentException(ComputeNodeAuth.ERROR_BAD_REQUEST, "Invalid node ID or display name")
+            }
+            val now = nowEpochMillis()
+            if (!withinSkew(request.timestampEpochMillis, now)) {
+                throw NodeEnrolmentException(ComputeNodeAuth.ERROR_STALE_REQUEST, "Enrolment request is too old or from the future")
+            }
+            val key = NodeSignatures.decodePublicKey(request.publicKey)
+                ?: throw NodeEnrolmentException(ComputeNodeAuth.ERROR_BAD_REQUEST, "The public key must be a P-256 SubjectPublicKeyInfo")
+            val message = runCatching {
+                ComputeNodeAuth.enrolmentMessage(
+                    poolId = poolId,
+                    nodeId = request.nodeId,
+                    displayName = request.displayName,
+                    publicKey = request.publicKey,
+                    timestampEpochMillis = request.timestampEpochMillis,
+                )
+            }.getOrNull() ?: throw NodeEnrolmentException(ComputeNodeAuth.ERROR_BAD_REQUEST, "Invalid enrolment request")
+            if (!NodeSignatures.verify(key, message, request.signature)) {
+                throw NodeEnrolmentException(ComputeNodeAuth.ERROR_BAD_SIGNATURE, "The enrolment signature does not match the key")
+            }
+            val existing = enrolments[request.nodeId]
+            val record = when {
+                existing == null -> {
+                    if (enrolments.size >= MAX_ENROLLED_NODES_PER_POOL) {
+                        throw NodeEnrolmentException(
+                            ComputeNodeAuth.ERROR_POOL_FULL,
+                            "This pool already has $MAX_ENROLLED_NODES_PER_POOL enrolled nodes",
+                        )
+                    }
+                    PersistedRelayNode(
+                        nodeId = request.nodeId,
+                        displayName = request.displayName,
+                        publicKey = request.publicKey,
+                        enrolledAtEpochMillis = now,
+                    )
+                }
+                existing.revoked -> throw NodeEnrolmentException(
+                    ComputeNodeAuth.ERROR_NODE_REVOKED,
+                    "Node ID ${request.nodeId} was revoked in this pool; choose a new device ID",
+                )
+                existing.record.publicKey != request.publicKey -> throw NodeEnrolmentException(
+                    ComputeNodeAuth.ERROR_NODE_ID_TAKEN,
+                    "Node ID ${request.nodeId} is enrolled with another key; choose a new device ID",
+                )
+                else -> existing.record.copy(displayName = request.displayName)
+            }
+            enrolments[request.nodeId] = Enrolment(record, key)
+            persistNodesLocked()
+            val list = enrolledNodesLocked()
+            nodes.values.forEach { outbound += it.peer to ComputeRelayServerMessage.EnrolledNodes(list) }
+            record.toEnrolledNode()
+        }
+        sendAll(outbound)
+        return enrolled
+    }
+
+    /**
+     * Checks a signed connection request: an enrolled, unrevoked node, a timestamp within
+     * [ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS], a nonce not seen before, and a valid signature by that
+     * node's enrolled key. Only [NodeAuthentication.Authenticated] may go on to [register].
+     */
+    suspend fun authenticate(
+        nodeId: String?,
+        timestamp: String?,
+        nonce: String?,
+        signature: String?,
+    ): NodeAuthentication {
+        return mutex.withLock { authenticateLocked(nodeId, timestamp, nonce, signature) }
+    }
+
+    private fun authenticateLocked(
+        nodeId: String?,
+        timestamp: String?,
+        nonce: String?,
+        signature: String?,
+    ): NodeAuthentication {
+        if (nodeId == null || timestamp == null || nonce == null || signature == null) return NodeAuthentication.Malformed
+        val timestampEpochMillis = timestamp.toLongOrNull() ?: return NodeAuthentication.Malformed
+        if (!ComputeNodeAuth.isValidField(nodeId) || !ComputeNodeAuth.isValidNonce(nonce)) return NodeAuthentication.Malformed
+        val now = nowEpochMillis()
+        if (!withinSkew(timestampEpochMillis, now)) return NodeAuthentication.StaleRequest
+        val enrolment = enrolments[nodeId] ?: return NodeAuthentication.NotEnrolled
+        if (enrolment.revoked) return NodeAuthentication.Revoked
+        val message = runCatching {
+            ComputeNodeAuth.connectMessage(poolId, nodeId, timestampEpochMillis, nonce)
+        }.getOrNull() ?: return NodeAuthentication.Malformed
+        if (!NodeSignatures.verify(enrolment.key, message, signature)) return NodeAuthentication.BadSignature
+        seenNonces.entries.removeAll { it.value < now }
+        val nonceKey = nodeId + "\n" + nonce
+        if (seenNonces.containsKey(nonceKey)) return NodeAuthentication.Replayed
+        // Once the timestamp leaves the window the request is refused as stale, so the nonce can go.
+        seenNonces[nonceKey] = timestampEpochMillis + ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS
+        enrolments[nodeId] = enrolment.copy(record = enrolment.record.copy(lastSeenAtEpochMillis = now))
+        persistNodesLocked()
+        NodeAuthentication.Authenticated
+    }
+
+    suspend fun enrolledNodes(): List<EnrolledComputeNode> = mutex.withLock { enrolledNodesLocked() }
+
+    /**
+     * [byNodeId] revokes [targetNodeId]: its key stops opening sessions, its node ID cannot enrol
+     * again, its live session is closed, leases it published are cancelled and leases it holds are
+     * requeued. Revocation is kept with the pool's enrolled nodes.
+     */
+    suspend fun revoke(byNodeId: String, targetNodeId: String) {
+        val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
+        val reoffer = mutableListOf<String>()
+        var revokedPeer: RelayPeer? = null
+        mutex.withLock {
+            val by = enrolments[byNodeId]
+            check(by != null && !by.revoked) { "Only an enrolled node can revoke another" }
+            require(targetNodeId != byNodeId) { "A node cannot revoke itself" }
+            val target = enrolments[targetNodeId]
+                ?: throw IllegalArgumentException("No node $targetNodeId is enrolled in this pool")
+            if (target.revoked) return
+            enrolments[targetNodeId] = target.copy(
+                record = target.record.copy(
+                    revokedAtEpochMillis = nowEpochMillis(),
+                    revokedByNodeId = byNodeId,
+                ),
+            )
+            persistNodesLocked()
+
+            val published = leases.values.filter { it.originNodeId == targetNodeId && it.result == null }
+            if (published.isNotEmpty()) {
+                mutatePersistedLocked { published.forEach { leases.remove(it.envelope.leaseId) } }
+            }
+            published.forEach { lease ->
+                lease.workerNodeId?.let(nodes::get)?.let { worker ->
+                    outbound += worker.peer to ComputeRelayServerMessage.LeaseCancelled(
+                        leaseId = lease.envelope.leaseId,
+                        reason = "The node that published this lease was revoked",
+                    )
+                }
+            }
+            leases.values
+                .filter { it.workerNodeId == targetNodeId && it.result == null }
+                .forEach { lease ->
+                    leases[lease.envelope.leaseId] = lease.copy(workerNodeId = null, expiresAtEpochMillis = null)
+                    nodes[lease.originNodeId]?.let { origin ->
+                        outbound += origin.peer to ComputeRelayServerMessage.LeaseRequeued(
+                            leaseId = lease.envelope.leaseId,
+                            reason = "Worker was revoked",
+                        )
+                    }
+                    reoffer += lease.envelope.leaseId
+                }
+
+            nodes.remove(targetNodeId)?.let { session ->
+                revokedPeer = session.peer
+                outbound += session.peer to ComputeRelayServerMessage.Error(
+                    code = ComputeNodeAuth.ERROR_NODE_REVOKED,
+                    message = "This device's identity was revoked by $byNodeId",
+                )
+                nodes.values.forEach { outbound += it.peer to ComputeRelayServerMessage.NodeLeft(targetNodeId) }
+            }
+            val list = enrolledNodesLocked()
+            nodes.values.forEach { outbound += it.peer to ComputeRelayServerMessage.EnrolledNodes(list) }
+        }
+        sendAll(outbound)
+        revokedPeer?.let { peer -> runCatching { peer.close("Node revoked") } }
+        reoffer.forEach { offerLease(it) }
     }
 
     suspend fun updateNode(nodeId: String, updated: ComputeNodeDescriptor) {
@@ -301,6 +533,21 @@ class RelayPool(
                     completedAtEpochMillis = nowEpochMillis(),
                 )
             }
+            // The lease stays attributed to the worker (its terminal record keeps workerNodeId), and
+            // the worker's identity counts the outcome. workerNodeId is the authenticated session's.
+            enrolments[workerNodeId]?.let { enrolment ->
+                val record = enrolment.record
+                enrolments[workerNodeId] = enrolment.copy(
+                    record = if (result.status == TaskRunStatus.Completed) {
+                        record.copy(leasesCompleted = record.leasesCompleted + 1)
+                    } else {
+                        record.copy(leasesFailed = record.leasesFailed + 1)
+                    },
+                )
+                persistNodesLocked()
+                val list = enrolledNodesLocked()
+                nodes.values.forEach { outbound += it.peer to ComputeRelayServerMessage.EnrolledNodes(list) }
+            }
             val completed = ComputeRelayServerMessage.LeaseCompleted(
                 leaseId = leaseId,
                 workerNodeId = workerNodeId,
@@ -394,7 +641,13 @@ class RelayPool(
 
     suspend fun pendingLeaseCount(): Int = mutex.withLock { leases.values.count { it.result == null } }
 
-    suspend fun isEmpty(): Boolean = mutex.withLock { nodes.isEmpty() && leases.isEmpty() }
+    /** The attribution a terminal lease keeps: the node that ran it, or null while it is unfinished. */
+    suspend fun completedBy(leaseId: String): String? = mutex.withLock {
+        leases[leaseId]?.takeIf { it.result != null }?.workerNodeId
+    }
+
+    /** A pool with enrolled nodes is never empty: dropping it would forget their keys and revocations. */
+    suspend fun isEmpty(): Boolean = mutex.withLock { nodes.isEmpty() && leases.isEmpty() && enrolments.isEmpty() }
 
     private suspend fun offerPendingLeases() {
         val ids = mutex.withLock {
@@ -498,6 +751,32 @@ class RelayPool(
         }
     }
 
+    private fun withinSkew(timestampEpochMillis: Long, now: Long): Boolean =
+        timestampEpochMillis >= now - ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS &&
+            timestampEpochMillis <= now + ComputeNodeAuth.MAX_CLOCK_SKEW_MILLIS
+
+    private fun enrolledNodesLocked(): List<EnrolledComputeNode> = enrolments.values.map { it.record.toEnrolledNode() }
+
+    private fun PersistedRelayNode.toEnrolledNode(): EnrolledComputeNode = EnrolledComputeNode(
+        nodeId = nodeId,
+        displayName = displayName,
+        publicKeyFingerprint = NodeSignatures.fingerprint(publicKey),
+        enrolledAtEpochMillis = enrolledAtEpochMillis,
+        lastSeenAtEpochMillis = lastSeenAtEpochMillis,
+        revokedAtEpochMillis = revokedAtEpochMillis,
+        revokedByNodeId = revokedByNodeId,
+        leasesCompleted = leasesCompleted,
+        leasesFailed = leasesFailed,
+    )
+
+    private fun persistNodesLocked() {
+        // As with leases, a storage failure must not end sessions; the next change tries again.
+        try {
+            stateStore.saveNodes(poolId, enrolments.values.map(Enrolment::record))
+        } catch (_: java.io.IOException) {
+        }
+    }
+
     private suspend fun sendAll(outbound: List<Pair<RelayPeer, ComputeRelayServerMessage>>) {
         outbound.forEach { (peer, message) ->
             runCatching { peer.send(message) }
@@ -520,8 +799,15 @@ class RelayPool(
 
         /** An unfinished lease is cancelled and dropped this long after the relay accepted it. */
         const val MAX_UNFINISHED_LEASE_AGE_MILLIS: Long = 24L * 60L * 60L * 1_000L
+
+        /** Node identities, revoked ones included, one pool may hold. */
+        const val MAX_ENROLLED_NODES_PER_POOL: Int = 256
     }
 }
+
+/** [nodeId] was revoked in this pool and may not register. */
+class NodeRevokedException(val nodeId: String) :
+    IllegalStateException("Node ID $nodeId was revoked in this pool")
 
 /** Another live connection already holds [nodeId] in this pool. */
 class NodeIdInUseException(val nodeId: String) :

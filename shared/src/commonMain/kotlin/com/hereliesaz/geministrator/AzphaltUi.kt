@@ -326,6 +326,8 @@ internal fun AzphaltRecord(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     well: (@Composable () -> Unit)? = null,
+    /** A styled body (an agent's Markdown, read), shown instead of [body]. */
+    richBody: androidx.compose.ui.text.AnnotatedString? = null,
 ) {
     // A card, not a creature: Ink (lifted Ink on a dark surface), and Yellow when selected.
     val hue = recordFill(selected)
@@ -384,7 +386,11 @@ internal fun AzphaltRecord(
         // Body text is the full opposite of the record, not a faded copy of it: a translucent
         // tint of the content colour would drop below 4.5:1 on the mid-tone hues.
         Text(title, style = AzphaltType.lead, color = content)
-        if (body != null) Text(body, style = AzphaltType.body, color = content)
+        if (richBody != null) {
+            Text(richBody, style = AzphaltType.body, color = content)
+        } else if (body != null) {
+            Text(body, style = AzphaltType.body, color = content)
+        }
         AzphaltChildBand(visible = well != null) {
             Box(
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(wellFill(hue)).padding(14.dp),

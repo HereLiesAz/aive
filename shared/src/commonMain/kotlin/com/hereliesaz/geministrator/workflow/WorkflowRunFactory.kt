@@ -18,10 +18,21 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.policy.ApprovalEvidence
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isAllowed
 
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
+    /** A task skipped because its condition was not met: a branch not taken, not a failure. */
+    const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
 
     fun create(
         definition: WorkflowDefinition,
@@ -81,15 +92,24 @@ object WorkflowRunFactory {
         )
     }
 
+    /**
+     * Releases blocked tasks whose dependencies settled. [onPolicyDecision] hears each non-allow
+     * policy decision made here (a repository mutation cancelled for want of a granted approval),
+     * so a caller with an event sink can record it on the run timeline.
+     */
     fun refreshReadiness(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         nowEpochMillis: Long,
+        onPolicyDecision: ((PolicyRequest, PolicyDecision) -> Unit)? = null,
     ): WorkflowRun {
         val definitionsById = definition.tasks.associateBy { it.id }
         val refreshed = run.taskRuns.mapValues { (taskId, taskRun) ->
             if (taskRun.status != TaskRunStatus.Blocked) return@mapValues taskRun
             if (taskRun.blockingReason?.code == EXECUTOR_INTEGRATION_UNAVAILABLE) return@mapValues taskRun
+            // Held by a spend circuit breaker, not by its dependencies: only that breaker releases it.
+            if (taskRun.blockingReason?.code == ROLE_BUDGET_SPENT) return@mapValues taskRun
+            if (taskRun.blockingReason?.code == SPEND_CAP_STOP) return@mapValues taskRun
 
             val task = definitionsById[taskId] ?: return@mapValues taskRun
             val dependencyRuns = task.dependsOn.mapNotNull(run.taskRuns::get)
@@ -135,16 +155,35 @@ object WorkflowRunFactory {
             }
             // A repository mutation runs only after a person approved it. The validator demands an
             // approval ancestor, but a skipped or cancelled approval also settles as "terminal", so
-            // check that one was actually granted before releasing the mutation.
-            val mutationWithoutApproval = conditionMet &&
-                (task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation)?.isMutation() == true &&
-                !hasGrantedApprovalAncestor(taskId, definitionsById, run)
+            // the policy decision point checks that one was actually granted before releasing it.
+            val repositoryOperation = task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation
+            val mutationDenial = if (conditionMet && repositoryOperation != null && repositoryOperation.isMutation()) {
+                val request = PolicyRequest(
+                    subject = PolicySubject.System,
+                    action = PolicyAction.RunRepositoryOperation(repositoryOperation.operation),
+                    resource = PolicyResource.task(taskId, run.repositorySnapshot),
+                    context = PolicyContext(
+                        workflowRunId = run.id,
+                        taskDefinitionId = taskId,
+                        approval = if (hasGrantedApprovalAncestor(taskId, definitionsById, run)) {
+                            ApprovalEvidence.Granted
+                        } else {
+                            ApprovalEvidence.None
+                        },
+                    ),
+                )
+                InProcessPolicyDecisionPoint.decide(request)
+                    .takeUnless { it.isAllowed }
+                    ?.also { onPolicyDecision?.invoke(request, it) }
+            } else {
+                null
+            }
             when {
-                mutationWithoutApproval -> taskRun.copy(
+                mutationDenial != null -> taskRun.copy(
                     status = TaskRunStatus.Cancelled,
                     blockingReason = BlockingReason(
                         code = APPROVAL_NOT_GRANTED,
-                        message = "No human approval was granted for this repository change; it will not run.",
+                        message = mutationDenial.reason,
                     ),
                 )
                 conditionMet -> taskRun.copy(
@@ -193,6 +232,4 @@ object WorkflowRunFactory {
 
     private fun TaskRun.isSkippedBranch() =
         status == TaskRunStatus.Cancelled && blockingReason?.code == CONDITION_NOT_MET
-
-    private const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
 }

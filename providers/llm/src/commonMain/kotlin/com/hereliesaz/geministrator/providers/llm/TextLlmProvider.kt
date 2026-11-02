@@ -6,13 +6,14 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.locationLabel
+import com.hereliesaz.geministrator.mcp.McpToolOutcome
+import com.hereliesaz.geministrator.mcp.McpToolSource
+import com.hereliesaz.geministrator.mcp.McpToolbox
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentRunHandle
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
-import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
-import com.hereliesaz.geministrator.providers.PromptCacheMode
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
@@ -37,6 +38,11 @@ open class TextLlmProvider(
     override val id: AgentProviderId,
     private val displayName: String,
     private val api: TextGenerationApi,
+    /**
+     * The MCP host's tools (docs/architecture/MCP_HOST.md). When [api] can call functions and the
+     * run has tools, the run goes through [McpToolLoop] instead of one streamed generation.
+     */
+    private val tools: McpToolSource? = null,
 ) : AgentProvider {
     private data class Session(
         val request: AgentTaskRequest,
@@ -45,6 +51,8 @@ open class TextLlmProvider(
         var planResult: TextGenerationResult? = null,
         /** Streams the run's generation; memory can interrupt it mid-thought (see [sendMessage]). */
         val generation: InterruptibleGeneration,
+        /** MCP tool calls the run made: their results are external-provenance content. */
+        var toolOutcomes: List<McpToolOutcome> = emptyList(),
     )
 
     private val mutex = Mutex()
@@ -60,7 +68,7 @@ open class TextLlmProvider(
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
         ),
-        promptCaching = PromptCacheCapabilities(modes = setOf(PromptCacheMode.Unsupported)),
+        promptCaching = api.promptCaching,
     )
 
     /**
@@ -70,9 +78,13 @@ open class TextLlmProvider(
      * with this provider's reason.
      */
     override suspend fun draftPlan(request: AgentTaskRequest): String {
-        val prompt = renderPrompt(request) +
-            "PLAN ONLY\nReply with a short numbered plan for this task: the steps you will take and what each " +
-            "produces. Do not perform the task yet; it starts once the plan is approved.\n"
+        val rendered = renderPrompt(request)
+        // Appended to the dynamic part: the plan draft shares the stable prefix the run will reuse.
+        val prompt = rendered.copy(
+            dynamicSuffix = rendered.dynamicSuffix +
+                "PLAN ONLY\nReply with a short numbered plan for this task: the steps you will take and what each " +
+                "produces. Do not perform the task yet; it starts once the plan is approved.\n",
+        )
         val draft = try {
             api.generate(prompt).text
         } catch (cancelled: CancellationException) {
@@ -152,10 +164,8 @@ open class TextLlmProvider(
             // flag, not the generation itself, so it executes exactly once here.
             val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
             if (cancelledDuringGeneration(runId, session)) return@flow
-            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
-            if (result.inputTokens != null || result.outputTokens != null) {
-                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
-            }
+            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
+            emitUsage(runId, result)
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
@@ -164,13 +174,24 @@ open class TextLlmProvider(
             }
             val result = generateOrFail(runId, session) ?: return@flow
             if (cancelledDuringGeneration(runId, session)) return@flow
-            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text)))
-            if (result.inputTokens != null || result.outputTokens != null) {
-                emit(AgentEvent.UsageReported(runId, result.inputTokens, result.outputTokens))
-            }
+            emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
+            emitUsage(runId, result)
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
+    }
+
+    /** Token counts and, where the API reported cached input, the prompt-cache hit fraction. */
+    private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult) {
+        if (result.inputTokens == null && result.outputTokens == null) return
+        emit(
+            AgentEvent.UsageReported(
+                runId = runId,
+                inputTokens = result.inputTokens,
+                outputTokens = result.outputTokens,
+                cacheHitFraction = result.cacheHitFraction,
+            ),
+        )
     }
 
     /**
@@ -196,8 +217,28 @@ open class TextLlmProvider(
         runId: ProviderRunId,
         session: Session,
     ): TextGenerationResult? = try {
+        val toolbox = toolboxFor(session.request)
+        val withTools = if (api is ToolCallingTextGenerationApi && toolbox != null) {
+            try {
+                val outcome = McpToolLoop().run(
+                    api = api,
+                    prompt = renderPrompt(session.request).text + "\n\n" + McpToolLoop.TOOL_GUIDANCE,
+                    toolbox = toolbox,
+                ) { call ->
+                    val offer = toolbox.offers.firstOrNull { it.name == call.name }
+                    emit(AgentEvent.Progress(runId, "Calling ${offer?.toolName ?: call.name} on ${offer?.serverName ?: "an MCP server"}"))
+                }
+                session.toolOutcomes = outcome.calls
+                outcome.result
+            } catch (_: McpToolLoop.ToolOfferRefused) {
+                // A model or service that does not take tools still does the work without them.
+                null
+            }
+        } else {
+            null
+        }
         // Streamed: visible reasoning goes out as Thinking, where memory can answer it mid-thought.
-        session.generation.run(renderPrompt(session.request)) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
+        withTools ?: session.generation.run(renderPrompt(session.request)) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Exception) {
@@ -235,7 +276,30 @@ open class TextLlmProvider(
         return ProviderActionResult.Accepted
     }
 
-    private fun responseArtifact(request: AgentTaskRequest, text: String): ProviderArtifact {
+    /** The run's MCP tools, when there is a host, the API can call functions and a server offers any. */
+    private suspend fun toolboxFor(request: AgentTaskRequest): McpToolbox? {
+        val source = tools ?: return null
+        if (api !is ToolCallingTextGenerationApi) return null
+        // A provider-side plan gate approves a generation made before approval; no tool may run
+        // before a person approves, so such runs get none. The engine's own plan gate drafts the
+        // plan without tools and starts the approved run ungated, which does get them.
+        if (request.requirePlanApproval) return null
+        val runKey = request.orchestrationContext.workflowRunId?.value ?: request.taskRunId.value
+        return try {
+            source.toolbox(runKey)?.takeIf { it.offers.isNotEmpty() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // No tools this run is not a failure of the run.
+            null
+        }
+    }
+
+    private fun responseArtifact(
+        request: AgentTaskRequest,
+        text: String,
+        toolOutcomes: List<McpToolOutcome> = emptyList(),
+    ): ProviderArtifact {
         val kind = inferArtifactKind(request)
         return ProviderArtifact(
             kind = kind,
@@ -245,6 +309,14 @@ open class TextLlmProvider(
             metadata = buildMap {
                 put("provider", id.value)
                 put("taskRunId", request.taskRunId.value)
+                if (toolOutcomes.isNotEmpty()) {
+                    // The answer was written with external content in view (docs/THREAT_MODEL.md).
+                    put(MCP_PROVENANCE_METADATA, "external-tool-results")
+                    put(
+                        MCP_TOOL_CALLS_METADATA,
+                        toolOutcomes.joinToString(", ") { "${it.serverName}/${it.toolName}" + if (it.isError) " (failed)" else "" }.take(1_000),
+                    )
+                }
                 when (kind) {
                     ArtifactKind.HallMonitorReport -> {
                         put(HALL_MONITOR_REPORT_ID_METADATA, request.taskRunId.value)
@@ -263,7 +335,17 @@ open class TextLlmProvider(
         )
     }
 
-    private fun renderPrompt(request: AgentTaskRequest): String = buildString {
+    /**
+     * Role instructions and the stable prompt blocks come first, as the cacheable prefix; the task,
+     * dynamic blocks, repository and artifacts follow. [CacheablePrompt.text] is the whole prompt.
+     */
+    private fun renderPrompt(request: AgentTaskRequest): CacheablePrompt = CacheablePrompt(
+        stablePrefix = renderStablePrefix(request),
+        dynamicSuffix = renderDynamicSuffix(request),
+        reusePolicy = request.promptContext.reusePolicy,
+    )
+
+    private fun renderStablePrefix(request: AgentTaskRequest): String = buildString {
         append("ROLE INSTRUCTIONS\n")
         append(request.roleInstructions.trim())
         append("\n\n")
@@ -273,6 +355,9 @@ open class TextLlmProvider(
             append(block.content.trim())
             append("\n\n")
         }
+    }
+
+    private fun renderDynamicSuffix(request: AgentTaskRequest): String = buildString {
         append("TASK\n")
         append(request.objective.trim())
         append("\n\n")
@@ -308,7 +393,7 @@ open class TextLlmProvider(
             append("\n\n")
         }
         append("Return only the concrete work product for this assigned role. Do not claim repository access, shell execution, tests, or changes you did not actually perform.")
-    }.trim()
+    }
 
     /**
      * The artifact kind for a text response: the task's declared artifact contract first, then the
@@ -347,6 +432,12 @@ open class TextLlmProvider(
         ?.takeIf { it in setOf("pass", "revise", "reject") }
 }
 
+/** Artifact metadata: the response was written with MCP tool results (external content) in view. */
+const val MCP_PROVENANCE_METADATA = "contentProvenance"
+
+/** Artifact metadata: which MCP server tools the run called. */
+const val MCP_TOOL_CALLS_METADATA = "mcpToolCalls"
+
 private val ROLE_ARTIFACT_KINDS: Map<String, ArtifactKind> = mapOf(
     "orchestrator" to ArtifactKind.TaskPlan,
     "product-manager" to ArtifactKind.Requirement,
@@ -364,35 +455,43 @@ private val ROLE_ARTIFACT_KINDS: Map<String, ArtifactKind> = mapOf(
 class OpenAiProvider(
     apiKeyProvider: LlmApiKeyProvider,
     model: String = "gpt-5.6",
+    tools: McpToolSource? = null,
 ) : TextLlmProvider(
     id = AgentProviderId("openai"),
     displayName = "OpenAI / Codex",
     api = OpenAiResponsesApi(apiKeyProvider = apiKeyProvider, model = model),
+    tools = tools,
 )
 
 class AnthropicProvider(
     apiKeyProvider: LlmApiKeyProvider,
     model: String = "claude-sonnet-5",
+    tools: McpToolSource? = null,
 ) : TextLlmProvider(
     id = AgentProviderId("anthropic"),
     displayName = "Claude",
     api = AnthropicMessagesApi(apiKeyProvider = apiKeyProvider, model = model),
+    tools = tools,
 )
 
 class GeminiProvider(
     apiKeyProvider: LlmApiKeyProvider,
     model: String = "gemini-3.8-flash",
+    tools: McpToolSource? = null,
 ) : TextLlmProvider(
     id = AgentProviderId("gemini"),
     displayName = "Gemini",
     api = GeminiGenerateContentApi(apiKeyProvider = apiKeyProvider, model = model),
+    tools = tools,
 )
 
 class XaiProvider(
     apiKeyProvider: LlmApiKeyProvider,
     model: String = "grok-4.6",
+    tools: McpToolSource? = null,
 ) : TextLlmProvider(
     id = AgentProviderId("xai"),
     displayName = "Grok",
     api = XaiResponsesApi(apiKeyProvider = apiKeyProvider, model = model),
+    tools = tools,
 )

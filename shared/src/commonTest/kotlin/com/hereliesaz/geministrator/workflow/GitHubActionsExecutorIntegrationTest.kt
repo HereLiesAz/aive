@@ -383,6 +383,24 @@ class GitHubActionsExecutorIntegrationTest {
         assertEquals("Test: Unit tests (2/3)", execution.progressMessage)
     }
 
+    @Test
+    fun cancelCancelsTheRecordedRunAndSkipsATaskThatNeverStarted() = runBlocking {
+        val client = FakeGitHubActionsClient()
+        val integration = GitHubActionsExecutorIntegration(client)
+        val notStarted = context(TaskExecutor.GitHubAction(workflow = "ci.yml"))
+
+        integration.cancel(notStarted)
+        assertTrue(client.cancelledRunIds.isEmpty())
+
+        val running = notStarted.copy(
+            taskRun = notStarted.taskRun.copy(status = TaskRunStatus.Running, externalRunId = "42"),
+        )
+        integration.cancel(running)
+
+        assertEquals(listOf("42"), client.cancelledRunIds)
+        assertEquals("haive", client.lastRepository?.name)
+    }
+
     private fun context(executor: TaskExecutor): TaskExecutorContext {
         val taskId = TaskDefinitionId("ci")
         val repository = RepositoryRef("HereLiesAz", "haive", defaultBranch = "main")
@@ -463,6 +481,7 @@ private class FakeGitHubActionsClient(
     var lastRepository: RepositoryRef? = null
     var lastRunId: String? = null
     var lastArtifactId: String? = null
+    val cancelledRunIds = mutableListOf<String>()
 
     override suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun {
         lastDispatch = request
@@ -479,6 +498,11 @@ private class FakeGitHubActionsClient(
         lastRepository = repository
         lastArtifactId = artifactId
         return artifactBytes
+    }
+
+    override suspend fun cancel(repository: RepositoryRef, runId: String) {
+        lastRepository = repository
+        cancelledRunIds += runId
     }
 }
 

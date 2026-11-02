@@ -1,5 +1,12 @@
 package com.hereliesaz.geministrator.addons
 
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isAllowed
+
 // Host interfaces injected by Haive core to fulfill Add-on requests securely
 interface HostAppBridge { val version: String }
 interface HostProjectBridge { val currentProjectId: String? }
@@ -57,9 +64,20 @@ class HaiveAddonMediator(
     private val uiBridge: HostUiBridge
 ) : HaiveAddonApi {
 
+    private val policySubject = PolicySubject.Addon(addonId, grantedPermissions)
+
+    // Host permissions are decided by the in-process policy decision point. An add-on call has no
+    // workflow run in context, so a denial is thrown to the add-on rather than put on a timeline.
     private fun checkPermission(permission: HostPermission) {
-        if (!grantedPermissions.contains(permission)) {
-            throw RuntimeException("Add-on $addonId lacks permission $permission")
+        val decision = InProcessPolicyDecisionPoint.decide(
+            PolicyRequest(
+                subject = policySubject,
+                action = PolicyAction.UseHostCapability(permission),
+                resource = PolicyResource.hostApi(permission),
+            ),
+        )
+        if (!decision.isAllowed) {
+            throw RuntimeException(decision.reason)
         }
     }
 

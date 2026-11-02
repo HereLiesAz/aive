@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestratio
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.withLock
 
@@ -29,6 +30,11 @@ data class ProviderSelectionRequest(
     val requiredCapabilities: Set<AgentCapability> = emptySet(),
     val constraints: ProviderConstraints = ProviderConstraints.None,
     val repository: RepositoryRef? = null,
+    /**
+     * Rough size of the task's input ([OnDeviceTextAgentProvider.estimateTokens]); null when unknown.
+     * Only a known size under the on-device provider's limit lets a task go to the device.
+     */
+    val estimatedInputTokens: Int? = null,
 )
 
 class AgentProviderRegistry(
@@ -83,10 +89,13 @@ class AgentProviderRegistry(
 
     fun provider(id: AgentProviderId): AgentProvider? = providersById[id]
 
-    /** Whether a provider [select] may choose on its own supports every capability in [required]. */
+    /**
+     * Whether a provider [select] may choose on its own supports every capability in [required]. The
+     * on-device provider does not count: it takes only small tasks, so it staffs no role by itself.
+     */
     suspend fun canStaff(required: Set<AgentCapability>, repository: RepositoryRef? = null): Boolean =
         providersById.values
-            .filterNot { it.explicitOnly }
+            .filterNot { it.explicitOnly || it is OnDeviceTextAgentProvider }
             .any { it.capabilities().supported.containsAll(required) && it.supportsRepository(repository) }
 
     suspend fun select(request: ProviderSelectionRequest): AgentProvider {
@@ -122,11 +131,23 @@ class AgentProviderRegistry(
             else -> Unit
         }
 
+        // The on-device provider is a candidate only for a small task that needs no repository access
+        // (docs/Orchestration_layer.md, Agent Router); then it goes ahead of every provider but the
+        // role's own preferred one. Otherwise it is left out, even as the role's preferred provider.
+        fun onDeviceFits(provider: AgentProvider): Boolean {
+            if (provider !is OnDeviceTextAgentProvider) return true
+            val estimate = request.estimatedInputTokens ?: return false
+            return !repositoryAccessRequired && estimate <= provider.maxInputTokens && provider.isAvailable()
+        }
+
         // Explicit-only providers join the candidates only as the role's preferred provider.
         val ordered = buildList {
-            request.preferredProviderId?.let { providersById[it] }?.let(::add)
+            request.preferredProviderId?.let { providersById[it] }?.takeIf(::onDeviceFits)?.let(::add)
             providersById.values.forEach { provider ->
-                if (provider !in this && !provider.explicitOnly) add(provider)
+                if (provider is OnDeviceTextAgentProvider && provider !in this && onDeviceFits(provider)) add(provider)
+            }
+            providersById.values.forEach { provider ->
+                if (provider !in this && !provider.explicitOnly && provider !is OnDeviceTextAgentProvider) add(provider)
             }
         }
 
@@ -144,12 +165,13 @@ class AgentProviderRegistry(
             val route = orchestrationUtilities.routeAgent(
                 AgentRoutingInput(
                     requiredCapabilities = required.mapTo(linkedSetOf()) { it.name },
-                    requiredContextTokens = 0,
+                    requiredContextTokens = request.estimatedInputTokens?.coerceAtLeast(0) ?: 0,
                     candidates = eligibleProviders.mapIndexed { index, (provider, capabilities) ->
                         val health = healthOf(provider.id)
                         AgentRouteCandidate(
                             id = provider.id.value,
                             capabilities = capabilities.mapTo(linkedSetOf()) { it.name },
+                            contextLimitTokens = (provider as? OnDeviceTextAgentProvider)?.maxInputTokens ?: Int.MAX_VALUE,
                             // Preserve current preferred/registration ordering unless a specialist router overrides it.
                             preferenceRank = index,
                             consecutiveFailures = health.consecutiveFailures,

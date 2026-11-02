@@ -41,6 +41,8 @@ import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
+import com.hereliesaz.geministrator.OnDeviceSmallTaskPreference
+import com.hereliesaz.geministrator.OnDeviceSmallTaskSetting
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.SetupSecretStore
 import com.hereliesaz.geministrator.SetupSecrets
@@ -53,6 +55,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
 import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
@@ -111,6 +114,18 @@ class MainActivity : ComponentActivity() {
                 socketTimeoutMillis = 120_000L
             }
         }
+    }
+    // MCP servers the keeper connects (docs/architecture/MCP_HOST.md): Streamable HTTP only here.
+    private val mcpConsent = com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate()
+    private val mcpElicitation = com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate()
+    private val mcpHost by lazy {
+        com.hereliesaz.geministrator.mcp.McpHost(
+            store = com.hereliesaz.geministrator.mcp.McpServerStore(),
+            vault = AndroidMcpCredentialStore(this),
+            transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(repositoryHttpClient),
+            consent = mcpConsent,
+            elicitation = mcpElicitation,
+        )
     }
     /** Local Git folders, imported into app storage and worked on through JGit. */
     private val localRepositories by lazy { AndroidLocalRepositoryStore(applicationContext) }
@@ -298,16 +313,24 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val remoteLaunchRequests by AiveRemoteBridge.pendingLaunches.collectAsState()
+                val remoteEventWatchers by AiveRemoteBridge.eventWatchers.collectAsState()
+                val onDeviceSmallTaskPreference = remember { OnDeviceSmallTaskPreference() }
+                var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
                 val providers = remember(
                     credentials,
                     repositoryCredentials,
                     installedGeminiApi,
+                    onDeviceSmallTasksEnabled,
                 ) {
                     configuredAndroidProviders(
                         credentials = credentials,
                         repositoryCredentials = repositoryCredentials,
                         repositoryHttpClient = repositoryHttpClient,
                         installedGeminiApi = installedGeminiApi,
+                        mcpTools = mcpHost,
+                    ) + listOfNotNull(
+                        // Small text tasks on the memory clerks' installed model, when the keeper turns it on.
+                        onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, memoryRuntime.onDeviceTextGenerator),
                     )
                 }
                 // Hosted memory stages use whichever provider each stage names, with current credentials.
@@ -351,13 +374,20 @@ class MainActivity : ComponentActivity() {
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
-                    if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
+                    // The node's signing key lives in the Android Keystore; without it there is no session.
+                    val signer = if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
+                        runCatching { AndroidComputeNodeSigner.loadOrCreate() }.getOrNull()
+                    } else {
+                        null
+                    }
+                    if (signer != null && token != null) {
                         AndroidDistributedComputeSession(
                             context = this,
                             configuration = computeConfiguration,
                             token = token,
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = androidDistributedExecutorKinds(repositoryCredentials),
+                            signer = signer,
                         )
                     } else {
                         null
@@ -368,6 +398,10 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor>())
                 }
                 var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                var computeEnrolledNodes by remember(computeSession) {
+                    mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.EnrolledComputeNode>())
+                }
+                var computeRevoked by remember(computeSession) { mutableStateOf(false) }
                 DisposableEffect(computeSession) {
                     computeSession?.start()
                     onDispose { computeSession?.close() }
@@ -389,6 +423,12 @@ class MainActivity : ComponentActivity() {
                         session.client.errors.collectLatest { error ->
                             computeError = error.message
                         }
+                    }
+                    launch {
+                        session.client.enrolledNodes.collectLatest { computeEnrolledNodes = it }
+                    }
+                    launch {
+                        session.client.revoked.collectLatest { computeRevoked = it }
                     }
                 }
                 val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
@@ -462,6 +502,9 @@ class MainActivity : ComponentActivity() {
                     )
                     else -> App(
                         breedPurchases = breedPurchases,
+                        mcpHost = mcpHost,
+                        mcpConsent = mcpConsent,
+                        mcpElicitation = mcpElicitation,
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -475,6 +518,7 @@ class MainActivity : ComponentActivity() {
                         externalWorkflowLaunchRequests = remoteLaunchRequests,
                         onExternalWorkflowLaunchHandled = AiveRemoteBridge::complete,
                         onRuntimeStateChanged = AiveRemoteBridge::publish,
+                        onRunTimelineChanged = if (remoteEventWatchers > 0) AiveRemoteBridge::publishTimeline else null,
                         setupSecretStore = object : SetupSecretStore {
                             override fun read(): SetupSecrets = SetupSecrets(
                                 providerCredentials = providerCredentialStore.readAll(),
@@ -537,7 +581,17 @@ class MainActivity : ComponentActivity() {
                             connected = computeConnected,
                             onlineNodes = computeOnlineNodes,
                             lastError = computeError,
+                            enrolledNodes = computeEnrolledNodes,
+                            revoked = computeRevoked,
                         ),
+                        onRevokeComputeNode = { nodeId ->
+                            computeSession?.let { session ->
+                                uiScope.launch {
+                                    runCatching { session.client.revokeNode(nodeId) }
+                                        .onFailure { computeError = it.message }
+                                }
+                            }
+                        },
                         onSaveDistributedCompute = { configuration, token ->
                             computeConfigurationStore.write(configuration)
                             computeConfiguration = configuration
@@ -553,6 +607,14 @@ class MainActivity : ComponentActivity() {
                         },
                         memoryLayer = memoryRuntime.controller,
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
+                        onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
+                            enabled = onDeviceSmallTasksEnabled,
+                            modelInstalled = memoryRuntime.onDeviceTextGenerator.isReady(),
+                            onEnabledChange = { enabled ->
+                                onDeviceSmallTaskPreference.enabled = enabled
+                                onDeviceSmallTasksEnabled = enabled
+                            },
+                        ),
                         crashReportingSetting = if (CrashReporting.isSupported) {
                             CrashReportingSetting(crashReportingEnabled) { enabled ->
                                 CrashReporting.setEnabled(this, enabled)
@@ -723,10 +785,12 @@ internal fun configuredAndroidProviders(
     repositoryCredentials: Map<String, String> = emptyMap(),
     repositoryHttpClient: HttpClient? = null,
     installedGeminiApi: TextGenerationApi? = null,
+    /** MCP tools for the text providers; workspace agents get none. */
+    mcpTools: com.hereliesaz.geministrator.mcp.McpToolSource? = null,
 ): List<AgentProvider> = buildList {
     val gitlabToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
     val githubToken = repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
-    addAll(HostedLlmProviders.configured(credentials))
+    addAll(HostedLlmProviders.configured(credentials, mcpTools))
     // OpenCode on GitHub Actions: the automatic coding agent for GitHub repositories. Free Zen
     // model, no key; needs only the linked GitHub token.
     if (githubToken != null && repositoryHttpClient != null) {
@@ -738,7 +802,7 @@ internal fun configuredAndroidProviders(
     }
     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(OpenAiProvider(keyProvider))
+        add(OpenAiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "openai-gitlab-workspace",
             displayName = "OpenAI / GitLab Workspace",
@@ -749,7 +813,7 @@ internal fun configuredAndroidProviders(
     }
     credentials.cleanKey(ProviderCatalog.ANTHROPIC_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(AnthropicProvider(keyProvider))
+        add(AnthropicProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "anthropic-gitlab-workspace",
             displayName = "Claude / GitLab Workspace",
@@ -769,7 +833,7 @@ internal fun configuredAndroidProviders(
             ),
         )
     } else if (geminiKey != null) {
-        add(GeminiProvider(LlmApiKeyProvider { geminiKey }))
+        add(GeminiProvider(LlmApiKeyProvider { geminiKey }, tools = mcpTools))
     }
     geminiKey?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
@@ -784,7 +848,7 @@ internal fun configuredAndroidProviders(
 
     credentials.cleanKey(ProviderCatalog.XAI_ID)?.let { key ->
         val keyProvider = LlmApiKeyProvider { key }
-        add(XaiProvider(keyProvider))
+        add(XaiProvider(keyProvider, tools = mcpTools))
         addGitLabWorkspaceProvider(
             providerId = "xai-gitlab-workspace",
             displayName = "Grok / GitLab Workspace",
