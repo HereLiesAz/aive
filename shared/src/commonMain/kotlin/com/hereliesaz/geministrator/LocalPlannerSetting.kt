@@ -38,3 +38,27 @@ sealed interface LocalOrchestrationSpecialistStatus {
     data object Installed : LocalOrchestrationSpecialistStatus
     data class Failed(val message: String) : LocalOrchestrationSpecialistStatus
 }
+
+/**
+ * Keeper's room hook (This device) for routing small text tasks to the device's own model
+ * ([com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider]). Off until the keeper turns
+ * it on; it takes effect only while [modelInstalled].
+ */
+data class OnDeviceSmallTaskSetting(
+    val enabled: Boolean,
+    val modelInstalled: Boolean,
+    val onEnabledChange: (Boolean) -> Unit,
+)
+
+/** Where the keeper's choice for [OnDeviceSmallTaskSetting] is kept on this device. */
+class OnDeviceSmallTaskPreference(
+    private val settings: com.russhwolf.settings.Settings = com.russhwolf.settings.Settings(),
+) {
+    var enabled: Boolean
+        get() = settings.getBoolean(KEY, false)
+        set(value) = settings.putBoolean(KEY, value)
+
+    private companion object {
+        const val KEY = "on-device.small-tasks.enabled"
+    }
+}

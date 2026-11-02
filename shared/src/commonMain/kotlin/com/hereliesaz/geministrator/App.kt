@@ -36,6 +36,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -105,6 +106,7 @@ fun App(
     remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
     orchestrationUtilities: LocalOrchestrationUtilityFamily = DeterministicLocalOrchestrationUtilities,
     /** Extra chunk sources (a connected repository) retrieved from beside upstream artifacts. */
@@ -351,7 +353,7 @@ fun App(
             mutableStateOf(
                 ControlRoomSession.destinationName
                     ?: startupControlRoomDestination(
-                        hasConfiguredProvider = providers.isNotEmpty(),
+                        hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider },
                     ).name,
             )
         }
@@ -359,7 +361,7 @@ fun App(
         val destinations = ControlRoomDestination.available(distributedComputeAvailable)
         val destination = destinations
             .firstOrNull { it.name == destinationName }
-            ?: startupControlRoomDestination(hasConfiguredProvider = providers.isNotEmpty())
+            ?: startupControlRoomDestination(hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider })
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
@@ -762,6 +764,7 @@ fun App(
                         remoteAccessSetting = remoteAccessSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
+                        onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
                         memoryLayer = memoryLayer,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,

@@ -17,6 +17,7 @@ import com.hereliesaz.geministrator.distributed.ComputeNodeDescriptor
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
@@ -109,6 +110,9 @@ fun main() {
     val memoryScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val memoryModelInstaller = DesktopMemoryModelInstaller(httpClient)
     val memorySessions = DesktopOrtMemorySessionManager()
+    // Small text tasks on the memory clerks' installed instruct model, when the keeper turns it on.
+    val onDeviceTextGenerator = DesktopOnDeviceTextGenerator(memoryModelInstaller, memorySessions)
+    val onDeviceSmallTaskPreference = OnDeviceSmallTaskPreference()
     val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
     val memoryLayer = MemoryLayerController(
         // One SQLite database per workflow run's memory bank; lineage and projects in Settings.
@@ -137,8 +141,10 @@ fun main() {
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
-                val providers = remember(credentials, repositoryCredentials) {
-                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder)
+                var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
+                val providers = remember(credentials, repositoryCredentials, onDeviceSmallTasksEnabled) {
+                    configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder) +
+                        listOfNotNull(onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, onDeviceTextGenerator))
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -396,6 +402,14 @@ fun main() {
                         orchestrationRuntime = planningRuntime,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
+                        onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
+                            enabled = onDeviceSmallTasksEnabled,
+                            modelInstalled = onDeviceTextGenerator.isReady(),
+                            onEnabledChange = { enabled ->
+                                onDeviceSmallTaskPreference.enabled = enabled
+                                onDeviceSmallTasksEnabled = enabled
+                            },
+                        ),
                         memoryLayer = memoryLayer,
                         setupSecretStore = object : SetupSecretStore {
                             // Only stored credentials: keys from environment variables stay there.

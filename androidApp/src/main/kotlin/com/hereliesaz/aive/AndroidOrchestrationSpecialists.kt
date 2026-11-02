@@ -325,7 +325,8 @@ internal class AndroidLocalOrchestrationModelExecutor(
     }
 }
 
-private class AndroidOrchestrationCausalGenerator(
+/** Greedy decoding for a Qwen-layout ONNX export; also runs small tasks on the device (AndroidOnDeviceTextGenerator). */
+internal class AndroidOrchestrationCausalGenerator(
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }

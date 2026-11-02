@@ -9,7 +9,7 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | Feeds the hive | **Connections** | AI providers, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
-| | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **This device** | remote access, the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Appearance** | the ground | Settings › Appearance |
 | | **About and privacy** | crash reports, diagnostics | Settings › Crash Reports, Diagnostics |
 
@@ -26,6 +26,10 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 ## Connections
 
 One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching.
+
+## This device
+
+**Small tasks on this device** (desktop and Android, off by default) sends short text tasks that need no repository access to the instruct model the memory clerks installed (`OnDeviceTextAgentProvider`, docs/Orchestration_layer.md, Agent Router). It downloads nothing: until a memory stage's local model on a shared base is installed from the Memory swarm, the switch is kept but nothing goes to the device. The choice is stored per device (`on-device.small-tasks.enabled`).
 
 ## Navigation
 

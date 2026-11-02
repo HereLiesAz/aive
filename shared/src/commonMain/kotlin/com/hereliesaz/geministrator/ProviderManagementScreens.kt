@@ -110,6 +110,11 @@ import com.hereliesaz.geministrator.resources.settings_loaded
 import com.hereliesaz.geministrator.resources.settings_local_model_s
 import com.hereliesaz.geministrator.resources.settings_local_orchestration
 import com.hereliesaz.geministrator.resources.settings_local_orchestration_2
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_description
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_no_model
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_off
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_on
 import com.hereliesaz.geministrator.resources.settings_local_planner
 import com.hereliesaz.geministrator.resources.settings_local_planner_2
 import com.hereliesaz.geministrator.resources.settings_local_planner_installed_remove
@@ -439,6 +444,7 @@ internal fun ProviderSettingsScreen(
     remoteAccessSetting: RemoteAccessSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
+    onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
     /** The part of the Keeper's room this shows (docs/Keepers-Room.md). */
     section: KeeperSection = KeeperSection.Connections,
     compact: Boolean = false,
@@ -852,6 +858,29 @@ internal fun ProviderSettingsScreen(
                     )
                 }
             }
+        }
+
+        onDeviceSmallTaskSetting?.let { setting ->
+            ProviderSectionLabel(stringResource(Res.string.settings_on_device_small_tasks))
+            Text(
+                stringResource(Res.string.settings_on_device_small_tasks_description),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            if (!setting.modelInstalled) {
+                Text(
+                    stringResource(Res.string.settings_on_device_small_tasks_no_model),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
+            AzphaltPill(
+                if (setting.enabled) stringResource(Res.string.settings_on_device_small_tasks_on) else stringResource(Res.string.settings_on_device_small_tasks_off),
+                "on-device-small-tasks-toggle",
+                selected = setting.enabled,
+                onClick = { setting.onEnabledChange(!setting.enabled) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
 
       }
