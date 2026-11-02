@@ -119,6 +119,11 @@ fun App(
     onExternalWorkflowLaunchHandled: (requestId: Long, failure: String?) -> Unit = { _, _ -> },
     /** Every runtime state, for observers outside the UI (the Android remote service). */
     onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
+    /**
+     * When set, the shown run's event timeline after each runtime state change, for observers
+     * outside the UI (Android remote clients watching run events). Null, the default, loads nothing.
+     */
+    onRunTimelineChanged: ((List<com.hereliesaz.geministrator.events.WorkflowEvent>) -> Unit)? = null,
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
 ) {
@@ -318,6 +323,19 @@ fun App(
     }
 
     LaunchedEffect(runtimeState) { onRuntimeStateChanged(runtimeState) }
+    LaunchedEffect(runtimeState, runtime, onRunTimelineChanged) {
+        val observer = onRunTimelineChanged ?: return@LaunchedEffect
+        val activeRuntime = runtime ?: return@LaunchedEffect
+        if (runtimeState !is ApplicationRuntimeState.Live) return@LaunchedEffect
+        val timeline = try {
+            activeRuntime.loadRunTimeline()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            return@LaunchedEffect
+        }
+        observer(timeline)
+    }
 
     // Requests whose launch finished here. The host drops them from its queue asynchronously, so
     // this keeps a finished request from being launched twice in the meantime.

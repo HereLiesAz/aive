@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -250,6 +251,132 @@ class RelayHostRouterTest {
         val (_, run) = nextMessage()
         assertEquals("run-2", run.str("runId"))
         assertNull(run["progressMessage"])
+    }
+
+    private val runEvents = MutableStateFlow(RemoteRunEventLog.EMPTY)
+    private val eventHolds = java.util.concurrent.atomic.AtomicInteger(0)
+    private val eventRouter = RelayHostRouter(
+        room = room,
+        key = key,
+        actions = actions,
+        scope = scope,
+        send = { clientId, data -> sent.send(clientId to data) },
+        runStatus = status,
+        outcomes = outcomes,
+        clock = { now },
+        runEvents = runEvents,
+        holdEventWatch = {
+            eventHolds.incrementAndGet()
+            val released = java.util.concurrent.atomic.AtomicBoolean(false);
+            { if (released.compareAndSet(false, true)) eventHolds.decrementAndGet() }
+        },
+    )
+
+    private fun started(seq: Long, runId: String = "run-1") =
+        RemoteRunEvent.TaskChanged(runId, seq, atMillis = seq, taskId = "t", taskName = "Task", change = "started", status = "Running", attempt = 1)
+
+    private fun log(generation: Long, vararg events: RemoteRunEvent, runId: String = "run-1") =
+        RemoteRunEventLog(generation, runId, timelineSize = events.maxOfOrNull { it.eventSeq }?.toInt() ?: 0, events = events.toList())
+
+    private fun JsonObject.eventSeqs(): List<Long> =
+        (getValue("events") as JsonArray).map { (it as JsonObject).num("eventSeq") }
+
+    @Test
+    fun oldClientsThatWatchWithoutEventsGetNoRunEvents() = runBlocking<Unit> {
+        runEvents.value = log(1, started(1), started(2))
+        eventRouter.start()
+        runEvents.subscriptionCount.first { it > 0 }
+
+        // A version 2 client: plain watch. No run_status yet, and no run events ever.
+        eventRouter.onFrame("old", client.frame { put("t", "watch"); put("id", 1) })
+        assertNothingSent()
+        assertEquals(0, eventHolds.get(), "a client that never asked for events does not make the UI load the timeline")
+
+        runEvents.value = log(1, started(1), started(2), started(3))
+        status.value = RemoteRunStatus("run-1", "build", "Running", tasksTotal = 1, tasksDone = 0, progressMessage = null)
+        val (to, message) = nextMessage()
+        assertEquals("old", to)
+        assertEquals("run_status", message.str("t"))
+        assertNothingSent()
+    }
+
+    @Test
+    fun eventWatchersGetTheBacklogThenEachNewEventOnceInOrder() = runBlocking<Unit> {
+        runEvents.value = log(1, started(1), started(3))
+        eventRouter.start()
+        runEvents.subscriptionCount.first { it > 0 }
+
+        eventRouter.onFrame("new", client.frame { put("t", "watch"); put("id", 2); put("events", true) })
+        val (to, backlog) = nextMessage()
+        assertEquals("new", to)
+        assertEquals("run_events", backlog.str("t"))
+        assertEquals(listOf(1L, 3L), backlog.eventSeqs())
+        val first = (backlog.getValue("events") as JsonArray)[0] as JsonObject
+        assertEquals("task", first.str("type"))
+        assertEquals("run-1", first.str("runId"))
+        assertEquals("Running", first.str("status"))
+        assertEquals(1, eventHolds.get())
+
+        runEvents.value = log(1, started(1), started(3), started(4), started(5))
+        val (_, live) = nextMessage()
+        assertEquals(listOf(4L, 5L), live.eventSeqs())
+        assertNothingSent()
+
+        // Watching again without events stops them and lets go of the hold.
+        eventRouter.onFrame("new", client.frame { put("t", "watch"); put("id", 3) })
+        assertEquals(0, eventHolds.get())
+        runEvents.value = log(1, started(1), started(3), started(4), started(5), started(6))
+        assertNothingSent()
+    }
+
+    @Test
+    fun aWatcherResumesAfterTheLastEventItSawAndStartsOverOnANewRun() = runBlocking<Unit> {
+        runEvents.value = log(1, started(1), started(2), started(3))
+        eventRouter.start()
+        runEvents.subscriptionCount.first { it > 0 }
+
+        eventRouter.onFrame("c1", client.frame {
+            put("t", "watch"); put("id", 4); put("events", true); put("runId", "run-1"); put("afterSeq", 2)
+        })
+        assertEquals(listOf(3L), nextMessage().second.eventSeqs())
+
+        runEvents.value = log(2, started(1, runId = "run-2"), runId = "run-2")
+        val next = nextMessage().second
+        assertEquals(listOf(1L), next.eventSeqs())
+        assertEquals("run-2", ((next.getValue("events") as JsonArray)[0] as JsonObject).str("runId"))
+    }
+
+    @Test
+    fun aLargeBacklogIsSplitIntoFramesThatFitInOrder() = runBlocking<Unit> {
+        val big = (1L..RemoteRunEventLimits.RETAINED_EVENTS.toLong()).map { seq ->
+            RemoteRunEvent.ArtifactProduced(
+                runId = "run-1", eventSeq = seq, atMillis = seq, taskId = "t", taskName = null,
+                artifactId = "a$seq", kind = "CodeChange", label = "Patch", mediaType = null,
+                sizeBytes = 100_000, preview = "x".repeat(RemoteRunEventLimits.PREVIEW_BYTES), truncated = true, withheld = false,
+            )
+        }
+        runEvents.value = RemoteRunEventLog(1, "run-1", big.size, big)
+        eventRouter.onFrame("c1", client.frame { put("t", "watch"); put("id", 5); put("events", true) })
+        val received = mutableListOf<Long>()
+        var frames = 0
+        while (received.size < big.size) {
+            val (_, message) = nextMessage()
+            assertEquals("run_events", message.str("t"))
+            assertTrue(message.toString().encodeToByteArray().size <= RelayProtocol.MAX_PLAINTEXT_BYTES)
+            received += message.eventSeqs()
+            frames++
+        }
+        assertEquals(big.map { it.eventSeq }, received)
+        assertTrue(frames in 2..10, "a backlog goes in a few frames, not one per event: $frames")
+        assertNothingSent()
+    }
+
+    @Test
+    fun theEventHoldIsReleasedWhenTheConnectionEnds() = runBlocking<Unit> {
+        eventRouter.onFrame("c1", client.frame { put("t", "watch"); put("id", 6); put("events", true) })
+        assertEquals(1, eventHolds.get())
+        scope.cancel()
+        assertEquals(0, eventHolds.get())
     }
 
     /** The reference client side of the protocol: seals client-to-host messages. */

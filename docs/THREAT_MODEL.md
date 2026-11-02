@@ -331,7 +331,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 The Aive can be driven from IDEaz on another device through a relay Worker (`relay/`), or by IDEaz on the same device through the bound service. Protocol: `docs/Remote-API.md`.
 
 **Assets**
-- The pairing code (`aive1:...`). It carries the relay room, the client token and the 256-bit end-to-end key, so it is a bearer secret: whoever holds it can run prompts on the user's linked provider keys and queue workflows.
+- The pairing code (`aive1:...`). It carries the relay room, the client token and the 256-bit end-to-end key, so it is a bearer secret: whoever holds it can run prompts on the user's linked provider keys, queue workflows and read the shown run's events (task changes, gate reasons, plan and artifact previews).
 - The room host token (never leaves the device) and the linked provider/GitHub credentials.
 
 **Threats**
@@ -347,6 +347,7 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 - The relay meters room creation per client address, closes any socket that exceeds a frame-rate token bucket, and caps a frame at 1 MB.
 - Reset pairing, or turning Remote access off, deletes the room and makes the old code useless. The copied pairing code is cleared from the clipboard after 60 seconds. The pairing credentials are excluded from backups.
 - Pairing and relay use are opt-in; the host runs as a foreground service with a visible notification.
+- Run events are read-only: no remote message approves or rejects a gate. Previews are capped (4 KB), artifact URIs are not sent, and tasks that hold their output send no preview.
 
 **Residual risks**
 - Anyone with the pairing code is a full client until the pairing is reset: there is no per-client enrolment, spend cap or revocation of a single device.

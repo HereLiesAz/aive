@@ -114,6 +114,8 @@ internal class RelayHostLink(
                 runStatus = AiveRemoteBridge.runStatus,
                 outcomes = AiveRemoteBridge.outcomes,
                 guard = replayGuard,
+                runEvents = AiveRemoteBridge.runEvents,
+                holdEventWatch = AiveRemoteBridge::holdEventWatch,
             )
             router.start()
             for (frame in socket.incoming) {
