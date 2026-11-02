@@ -38,6 +38,7 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 
 **Small tasks on this device** (desktop and Android, off by default) sends short text tasks that need no repository access to the instruct model the memory clerks installed (`OnDeviceTextAgentProvider`, docs/Orchestration_layer.md, Agent Router). It downloads nothing: until a memory stage's local model on a shared base is installed from the Memory swarm, the switch is kept but nothing goes to the device. The choice is stored per device (`on-device.small-tasks.enabled`).
 **MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`).
+**MCP servers** follow, one row each with **Check**, **Always allow** or **Ask each run**, and **Remove**. **Add an MCP server** takes an address and an optional bearer token, or, on desktop, a command. Until a server is always allowed, the first call to it in each run asks the keeper (`docs/architecture/MCP_HOST.md`). On desktop, **Script sandbox** (off by default) lets agents call these tools from one short sandboxed script and receive only its result; the approvals still apply.
 
 ## Navigation
 

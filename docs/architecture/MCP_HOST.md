@@ -16,6 +16,8 @@ All in `shared/.../mcp/` unless noted.
 | `McpConsentGate`, `PromptingMcpConsentGate` | The approval gate |
 | `McpHost` (`McpToolSource`) | Servers, clients, consent; hands a run its `McpToolbox` of `McpToolOffer`s |
 | `ToolCallingTextGenerationApi`, `McpToolLoop` (`providers/llm`) | The tool-use loop |
+| `CodeExecutionToolSource`, `CodeExecutionSettings`, `ScriptSandboxRuntime` | Code execution: the `run_script` tool over the host's tools, the keeper's opt-in, the sandbox contract |
+| `QuickJsScriptSandbox` (`desktopMain`) | The desktop sandbox: QuickJS in WebAssembly on Endive |
 
 ## Protocol
 
@@ -53,13 +55,26 @@ Keeper's room › Connections › **MCP servers** (`McpServerConnections`). A se
 - **Repository invariant 4 is unchanged.** MCP calls are not `RepositoryOperation` tasks and never receive The Aive's repository credentials. A server that changes a repository with its own credentials is the keeper's explicit choice, gated by the consent above. Workspace agents, which write branches, get no MCP tools.
 - Tool arguments are written by the model from the already redacted task payload (invariant 5); the consent question shows them.
 
+## Code execution
+
+Instead of calling tools turn by turn, a model can write one short script that calls the run's tools as functions; only the script's final value goes back to it. Intermediate results (a long listing, a page of search hits) stay in the sandbox, which saves tokens and rounds.
+
+- **Opt-in.** Keeper's room › Connections › MCP servers › **Script sandbox**, off by default (`CodeExecutionSettings`, `aive.mcp.codeExecution.enabled.v1` in general settings). Shown only where a sandbox exists.
+- **Shape.** `CodeExecutionToolSource` wraps the `McpHost` and is what the desktop hands the text providers. When it is on and the run has at least one MCP tool, it adds `run_script` (first, within the 64-tool cap) with one string argument, `script`. Off, or with no MCP tools, the run sees exactly what the host offers.
+- **Script.** JavaScript, the body of a function: `return` the final value (a string, or anything `JSON.stringify` accepts). Each of the run's other offers is `tools.<offer name>(args)`, synchronous, returning that tool's text (`JSON.parse` it for JSON); a refused or failed call throws. `async`/`await` are not supported. The script cannot call `run_script`.
+- **Bridge, no new authority.** A bridged call is an ordinary `McpToolbox.call` on the host's toolbox for the same run, so the per-server, per-run consent applies unchanged: the first call to a server asks, and a refusal reaches the script as an error and nothing is sent. The script receives the tool's unfenced text (`McpToolOutcome.rawText`); the model never does.
+- **Result.** The final value is fenced as external content (`⟦external tool result · Script sandbox · tools "Server/tool", …⟧`) and cannot close its fence, and the run's answer carries `contentProvenance=external-tool-results` like any other tool use. A failure's console output is fenced the same way.
+- **Limits** (`ScriptLimits`): script 20,000 characters; 16 bridged calls; result 16,000 characters (a longer one is an error, not a truncation); 10 s of computing time, not counting time spent waiting on a server or on the keeper's approval; 12 minutes in all; 64 MB of WebAssembly memory; 4,000 characters of console output, kept only to explain a failure. A run is still bounded by the loop's 8 rounds of 8 calls, so one run makes at most 64 scripts.
+- **Desktop sandbox** (`QuickJsScriptSandbox`): [quickjs4j](https://github.com/roastedroot/quickjs4j) (QuickJS compiled to WebAssembly with Javy, ahead-of-time translated to JVM bytecode) on [Endive](https://github.com/bytecodealliance/endive), formerly Chicory, a pure-Java WebAssembly runtime: no native code, no JNI. The guest gets WASI with stdout and stderr only, into a bounded buffer: no preopened directories, no environment or arguments, and WASI preview 1 has no sockets. Its one host module with an effect is `aive` (`tool_names`, `call`, `finish`). Memory is capped by the memory factory; time by a watchdog that interrupts the guest thread, which Endive's compiled code checks. Endive's compiled mode has no fuel metering, so computing time stands in for an instruction budget. Cancelling the run interrupts the guest.
+- **Android and the web.** No sandbox yet, so the tool is never offered and the opt-in is not shown. quickjs4j is plain JVM bytecode and may run on Android, but it is unmeasured there (class size, memory, start-up). In the browser, a nested WebAssembly QuickJS (for example quickjs-emscripten) would work but is not bundled. `ScriptSandboxRuntime` is the seam for both.
+
 ## Follow-ups
 
 - Elicitation (MRTR `input_required`) and the Tasks extension build on `McpClient` and `McpInputRequiredException`.
-- A code-execution sandbox can be offered as another `McpToolSource`.
+- Code execution on Android and the web (see Code execution), and `async` scripts with parallel bridged calls.
 - Azphalt `kind:"mcp"` packages: the manifest's `mcp` block is untyped (`JsonElement`) and the store refuses it in `llm` packages. Registering servers from a package needs that block specified (transport, address or command, install inputs, signing of the command) before `McpHost` can accept `packageId` entries.
 - Per-role server selection, OpenAI and xAI Responses function calling, and stdio on Android.
 
 ## Verification
 
-`shared/src/commonTest/.../mcp/`: framing and header encoding (`McpJsonRpcTest`); the modern exchange with `_meta`, mirrored headers and SSE, the legacy fallback, and modern-error handling (`McpClientTest`); offers, the consent gate, Always allow persistence and fencing (`McpHostTest`). `providers/llm/.../McpToolLoopTest`: a round trip through `TextLlmProvider`, the bound, Anthropic over HTTP, and the OpenAI-compatible and Gemini wire formats. A live server acceptance test remains to be done.
+`shared/src/commonTest/.../mcp/`: framing and header encoding (`McpJsonRpcTest`); the modern exchange with `_meta`, mirrored headers and SSE, the legacy fallback, and modern-error handling (`McpClientTest`); offers, the consent gate, Always allow persistence and fencing (`McpHostTest`). `providers/llm/.../McpToolLoopTest`: a round trip through `TextLlmProvider`, the bound, Anthropic over HTTP, and the OpenAI-compatible and Gemini wire formats. `CodeExecutionToolSourceTest`: off by default, the offer, result-only return and its fence, the bridged-call bound, recursion and unknown names refused, consent through a real `McpHost`, script and result size limits. `desktopTest/.../QuickJsScriptSandboxTest`: the real sandbox with a fake bridge (values, synchronous tool functions and thrown refusals, no network or process globals, the time limit, bridge waits not counted, the memory cap, script errors). A live server acceptance test remains to be done.

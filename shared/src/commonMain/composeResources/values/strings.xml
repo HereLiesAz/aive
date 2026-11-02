@@ -122,6 +122,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="mcp_consent_allow_run">Allow for this run</string>
     <string name="mcp_consent_allow_always">Always allow</string>
     <string name="mcp_consent_deny">Don't allow</string>
+    <string name="mcp_script_sandbox">Script sandbox</string>
+    <string name="mcp_script_sandbox_detail">Lets agents write a short script that calls these tools in one step, in a sandbox with no network, files or system access. Only the script's final result goes back to the agent. Every tool call still needs your approval for its server.</string>
+    <string name="mcp_script_sandbox_on">On</string>
+    <string name="mcp_script_sandbox_off">Off</string>
+    <string name="mcp_script_sandbox_turn_on">Turn on</string>
+    <string name="mcp_script_sandbox_turn_off">Turn off</string>
     <string name="common_dismiss">Dismiss</string>
     <string name="common_inbox">INBOX</string>
     <string name="common_reject">Reject</string>

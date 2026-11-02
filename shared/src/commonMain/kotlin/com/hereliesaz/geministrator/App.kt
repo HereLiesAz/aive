@@ -133,6 +133,8 @@ fun App(
     /** The MCP host and its approval gate (docs/architecture/MCP_HOST.md); null where there is none. */
     mcpHost: com.hereliesaz.geministrator.mcp.McpHost? = null,
     mcpConsent: com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate? = null,
+    /** The script sandbox over [mcpHost], where the platform has one (desktop); its opt-in is in Connections. */
+    codeExecution: com.hereliesaz.geministrator.mcp.CodeExecutionToolSource? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -535,6 +537,7 @@ fun App(
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,
             LocalMcpHost provides mcpHost,
+            LocalCodeExecution provides codeExecution,
             LocalCreatureRig provides { label ->
                 if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
             },

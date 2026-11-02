@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.mcp.CodeExecutionToolSource
 import com.hereliesaz.geministrator.mcp.McpCommandLine
 import com.hereliesaz.geministrator.mcp.McpConsentDecision
 import com.hereliesaz.geministrator.mcp.McpHost
@@ -50,6 +51,12 @@ import com.hereliesaz.geministrator.resources.mcp_consent_deny
 import com.hereliesaz.geministrator.resources.mcp_consent_title
 import com.hereliesaz.geministrator.resources.mcp_remove_body
 import com.hereliesaz.geministrator.resources.mcp_remove_title
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox_detail
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox_off
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox_on
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox_turn_off
+import com.hereliesaz.geministrator.resources.mcp_script_sandbox_turn_on
 import com.hereliesaz.geministrator.resources.mcp_server_command
 import com.hereliesaz.geministrator.resources.mcp_server_command_note
 import com.hereliesaz.geministrator.resources.mcp_server_name
@@ -67,6 +74,9 @@ import org.jetbrains.compose.resources.stringResource
 
 /** The MCP host, where the platform provides one (docs/architecture/MCP_HOST.md). */
 internal val LocalMcpHost = compositionLocalOf<McpHost?> { null }
+
+/** The script sandbox over the MCP host, where the platform has one (desktop). */
+internal val LocalCodeExecution = compositionLocalOf<CodeExecutionToolSource?> { null }
 
 /**
  * Connections › MCP servers: one row per server, its consent setting, and adding one by address
@@ -127,6 +137,8 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
             )
         }
     }
+
+    LocalCodeExecution.current?.takeIf(CodeExecutionToolSource::available)?.let { CodeExecutionRow(it, compact) }
 
     AddConnectionRow(
         label = stringResource(Res.string.mcp_add_server),
@@ -198,6 +210,28 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
             },
             onDismissRequest = { removeId = null },
             dismissLabel = stringResource(Res.string.confirm_cancel),
+        )
+    }
+}
+
+/**
+ * The keeper's opt-in for code execution with MCP (docs/architecture/MCP_HOST.md, "Code
+ * execution"): off until turned on here.
+ */
+@Composable
+private fun CodeExecutionRow(codeExecution: CodeExecutionToolSource, compact: Boolean) {
+    val enabled by codeExecution.settings.enabled.collectAsState()
+    ConnectionRow(
+        name = stringResource(Res.string.mcp_script_sandbox),
+        detail = stringResource(Res.string.mcp_script_sandbox_detail),
+        status = stringResource(if (enabled) Res.string.mcp_script_sandbox_on else Res.string.mcp_script_sandbox_off),
+        connected = enabled,
+        compact = compact,
+    ) {
+        AzphaltPill(
+            label = stringResource(if (enabled) Res.string.mcp_script_sandbox_turn_off else Res.string.mcp_script_sandbox_turn_on),
+            seed = "mcp-script-sandbox",
+            onClick = { codeExecution.settings.setEnabled(!enabled) },
         )
     }
 }
