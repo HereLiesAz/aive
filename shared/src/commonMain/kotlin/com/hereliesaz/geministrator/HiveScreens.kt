@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.events.WorkflowEvent
@@ -29,7 +30,12 @@ import com.hereliesaz.geministrator.resources.hive_objective
 import com.hereliesaz.geministrator.resources.hive_repository
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
+import com.hereliesaz.geministrator.resources.timeline_view_events
+import com.hereliesaz.geministrator.resources.timeline_view_waterfall
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
@@ -101,15 +107,54 @@ internal fun hiveRepository(locator: String): com.hereliesaz.geministrator.domai
     return com.hereliesaz.geministrator.domain.parseRepositoryRef(source, clean)
 }
 
-/** A comb's timeline (mockup H3): the run's events in order, what the Runs tab used to list. */
+/**
+ * A comb's timeline (mockup H3): the run as a waterfall of its creatures' attempts
+ * ([runWaterfall], [RunWaterfallChart]), or its events in order, what the Runs tab used to list.
+ * The choice is remembered. While the run lives, unfinished bars grow to now, once a second;
+ * with reduced motion they move only when new events arrive.
+ */
+@OptIn(ExperimentalTime::class)
 @Composable
-internal fun RunTimeline(runKey: String, onLoadTimeline: suspend () -> List<WorkflowEvent>, modifier: Modifier = Modifier) {
+internal fun RunTimeline(
+    runKey: String,
+    onLoadTimeline: suspend () -> List<WorkflowEvent>,
+    modifier: Modifier = Modifier,
+    taskName: (TaskDefinitionId) -> String = { it.value },
+    selectedTaskId: String? = null,
+    onTaskSelected: (String) -> Unit = {},
+) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     LaunchedEffect(runKey) { events = onLoadTimeline() }
+    var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
     Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         val list = events ?: return@Column
-        if (list.isEmpty()) Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
+        if (list.isEmpty()) {
+            Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
+            return@Column
+        }
+        AzphaltTabs(
+            tabs = listOf(
+                AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)),
+                AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)),
+            ),
+            selectedKey = view,
+            onSelected = { view = it },
+            seedPrefix = "timeline-view",
+        )
+        if (view != TIMELINE_EVENTS) {
+            var now by remember(runKey) { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+            val waterfall = remember(list, now) { runWaterfall(list, now) }
+            val reduceMotion = AzphaltMotion.reduceMotion
+            LaunchedEffect(runKey, waterfall.live, reduceMotion) {
+                while (waterfall.live && !reduceMotion) {
+                    delay(1_000)
+                    now = Clock.System.now().toEpochMilliseconds()
+                }
+            }
+            RunWaterfallChart(waterfall, taskName, selectedTaskId, onTaskSelected)
+            return@Column
+        }
         list.sortedBy { it.occurredAtEpochMillis }.forEach { event ->
             AzphaltRecord(
                 seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
@@ -121,6 +166,9 @@ internal fun RunTimeline(runKey: String, onLoadTimeline: suspend () -> List<Work
         }
     }
 }
+
+private const val TIMELINE_WATERFALL = "waterfall"
+private const val TIMELINE_EVENTS = "events"
 
 /**
  * A hive that has never run (mockups H2, H6): its workflow at rest, editable in Build, with the

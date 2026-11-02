@@ -71,6 +71,27 @@ A hive that stopped reads **The hive stopped**; one that cannot reach its agents
 
 A completed hive shows **What it made** under its run's status: the text artifacts of its final tasks (those nothing depends on), selectable. Once its run has completed, failed or been cancelled, its one follow-up is **Feed it more**, which asks what next and launches a continuation in the same project (`ContinueRunPanel`). A resting hive keeps its objective bar (`HiveLaunchBar`); a live one has none.
 
+## The hive's timeline
+
+A live hive's **Timeline** pill swaps the hive for its run's timeline, in two views (remembered, `overview.timeline.view`):
+
+- **Waterfall** (the default): one row per creature, one bar per attempt, on a shared time axis, so work running in parallel overlaps. Each bar is coloured by phase: Planning, Waiting on you (drawn as a thin pause line: a gate), Running, Verifying, Retrying. A white tick ends a finished attempt, a red one a failed attempt; a bar still going runs to now. Hovering or tapping a bar shows its phases and usage (tokens, cost); tapping also selects its creature. Each bar is one labelled button for screen readers. The bars unroll once on arrival and, while the run lives, grow once a second; with reduced motion they do neither and move only when new events arrive.
+- **Events:** the run's events in order.
+
+The waterfall is a pure function of the run's event journal (`runWaterfall` in `RunWaterfall.kt`, tested in `RunWaterfallTest`):
+
+~~~
+TaskStarted                         -> an attempt begins (Running)
+events before it starts             -> it begins early, in Planning
+ApprovalRequired, HumanDecisionRequired -> Waiting on you until the decision
+work before an attempt's first gate -> Planning (a plan gate follows planning)
+ArtifactCreated                     -> Verifying
+VerificationFailed, RetryScheduled  -> Retrying, until the next attempt starts
+TaskCompleted / TaskFailed / TaskCancelled -> it ends
+the run's end                       -> every open bar ends; otherwise they run to now
+ProviderUsageRecorded               -> added to the attempt it fell in
+~~~
+
 ## Consolidation plan
 
 1. **Stage 1 (done):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.
