@@ -8,6 +8,16 @@ import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
 import com.hereliesaz.geministrator.events.WorkflowEventSink
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyDecision
+import com.hereliesaz.geministrator.policy.PolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isAllowed
+import com.hereliesaz.geministrator.policy.recordPolicyDecision
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -16,6 +26,37 @@ class ApprovalGateCoordinator(
     private val eventSink: WorkflowEventSink,
 ) {
     private val mutex = Mutex()
+
+    /** Records a deny or require-approval policy decision about a gate on the run timeline. */
+    suspend fun recordPolicyDecision(
+        request: PolicyRequest,
+        decision: PolicyDecision,
+        nowEpochMillis: Long,
+    ) {
+        eventSink.recordPolicyDecision(request, decision, nowEpochMillis)
+    }
+
+    /**
+     * Asks the policy decision point whether [decidedByRoleId] (null for a person) may decide
+     * [gate], records a denial, and fails with the denial's reason, as the former inline check did.
+     */
+    suspend fun requireDecider(
+        gate: ApprovalGate,
+        decidedByRoleId: RoleDefinitionId?,
+        nowEpochMillis: Long,
+        policy: PolicyDecisionPoint = InProcessPolicyDecisionPoint,
+    ) {
+        val request = PolicyRequest(
+            subject = PolicySubject.decider(decidedByRoleId),
+            action = PolicyAction.DecideApprovalGate(gate.kind),
+            resource = PolicyResource.gate(gate.id, gate.requiredRoleId),
+            context = PolicyContext(workflowRunId = gate.workflowRunId, taskDefinitionId = gate.taskDefinitionId),
+        )
+        val decision = policy.decide(request)
+        if (decision.isAllowed) return
+        recordPolicyDecision(request, decision, nowEpochMillis)
+        throw IllegalArgumentException(decision.reason)
+    }
 
     suspend fun open(
         id: ApprovalGateId,

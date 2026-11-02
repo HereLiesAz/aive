@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.policy.PolicyEffect
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -228,5 +229,25 @@ data class ProviderUsageRecorded(
     val costUsd: Double? = null,
     val cacheHitFraction: Float? = null,
     val latencyMillis: Long? = null,
+    override val occurredAtEpochMillis: Long,
+) : WorkflowEvent
+
+/**
+ * A non-trivial decision (deny or require-approval) from the in-process policy decision point,
+ * kept on the run timeline for audit. Fields are plain values so the record outlives rule changes;
+ * see docs/architecture/POLICY.md.
+ */
+@Serializable
+data class PolicyDecisionRecorded(
+    override val workflowRunId: WorkflowRunId,
+    val taskDefinitionId: TaskDefinitionId? = null,
+    val effect: PolicyEffect,
+    val code: String,
+    val action: String,
+    val subjectType: String,
+    val subjectId: String? = null,
+    val resourceType: String,
+    val resourceId: String? = null,
+    val reason: String,
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent

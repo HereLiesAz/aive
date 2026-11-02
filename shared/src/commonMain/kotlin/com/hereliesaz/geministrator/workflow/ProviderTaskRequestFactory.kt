@@ -24,6 +24,13 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isAllowed
 import kotlinx.serialization.json.Json
 
 /**
@@ -75,7 +82,15 @@ internal fun buildProviderTaskRequest(
         contextArtifacts = dependencyArtifacts,
         requiredArtifacts = task.requiredArtifacts,
         repository = project.repository,
-        requirePlanApproval = task.approvalPolicy != ApprovalPolicy.None,
+        // The provider stops for approval unless the policy decision point lets the plan proceed.
+        requirePlanApproval = !InProcessPolicyDecisionPoint.decide(
+            PolicyRequest(
+                subject = PolicySubject.of(role),
+                action = PolicyAction.ProceedPastPlan(task.approvalPolicy),
+                resource = PolicyResource.task(task.id, project.repository),
+                context = PolicyContext(workflowRunId = run.id, taskDefinitionId = task.id),
+            ),
+        ).isAllowed,
         promptContext = PromptContext(
             stablePrefix = listOf(
                 PromptContextBlock(

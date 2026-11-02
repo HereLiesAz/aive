@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.workflow
 
-import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.BuiltInRoles
@@ -16,6 +15,11 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.VerificationPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyCodes
+import com.hereliesaz.geministrator.policy.decideRole
+import com.hereliesaz.geministrator.policy.isAllowed
 
 /**
  * Materializes Skeleton-of-Thought into the ordinary workflow DAG:
@@ -232,10 +236,11 @@ object SkeletonOfThoughtExpander {
 }
 
 private fun requireReasoningOnly(role: RoleDefinition, stage: String) {
-    require(RoleAuthority.Implement !in role.authorities) {
+    val reasonOnly = InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ReasonOnly)
+    require(reasonOnly.code != PolicyCodes.HOLDS_IMPLEMENT_AUTHORITY) {
         "Skeleton-of-Thought $stage role ${role.name} may not hold implementation authority"
     }
-    require(AgentCapability.RepositoryWrite !in role.capabilitiesRequired) {
+    require(reasonOnly.code != PolicyCodes.REQUIRES_REPOSITORY_WRITE) {
         "Skeleton-of-Thought $stage role ${role.name} may not require repository-write capability"
     }
 }
@@ -249,7 +254,7 @@ private fun TaskDefinition.skeletonVerifierRole(
         val role = requireNotNull(rolesById[explicitVerifier]) {
             "Skeleton-of-Thought verifier role ${explicitVerifier.value} is not registered and enabled"
         }
-        require(RoleAuthority.Verify in role.authorities) {
+        require(InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ExerciseAuthority(RoleAuthority.Verify)).isAllowed) {
             "Skeleton-of-Thought verifier ${role.name} does not have Verify authority"
         }
         return role

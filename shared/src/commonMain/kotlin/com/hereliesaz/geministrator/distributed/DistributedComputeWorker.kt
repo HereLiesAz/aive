@@ -5,11 +5,18 @@ import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
+import com.hereliesaz.geministrator.policy.PolicyAction
+import com.hereliesaz.geministrator.policy.PolicyContext
+import com.hereliesaz.geministrator.policy.PolicyProvenance
+import com.hereliesaz.geministrator.policy.PolicyRequest
+import com.hereliesaz.geministrator.policy.PolicyResource
+import com.hereliesaz.geministrator.policy.PolicySubject
+import com.hereliesaz.geministrator.policy.isDenied
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
-import com.hereliesaz.geministrator.workflow.isMutation
 import com.hereliesaz.geministrator.workflow.isSystemExecutor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -141,8 +148,20 @@ class SystemExecutorDistributedWorkloadRunner(
         // Approval state arrives in the envelope, which any pool-token holder can forge, so a
         // remote worker cannot tell a real human approval from a claimed one. Mutations therefore
         // run only on the origin device, where the approval was actually given.
-        if (delegate is TaskExecutor.RepositoryOperation && delegate.isMutation()) {
-            return "repository operation '${delegate.operation}' changes the repository; remote workers run only read-only operations"
+        if (delegate is TaskExecutor.RepositoryOperation) {
+            val decision = InProcessPolicyDecisionPoint.decide(
+                PolicyRequest(
+                    subject = PolicySubject.RemotePeer(),
+                    action = PolicyAction.RunRepositoryOperation(delegate.operation),
+                    resource = PolicyResource.task(declared.id, envelope.project.repository),
+                    context = PolicyContext(
+                        workflowRunId = envelope.run.id,
+                        taskDefinitionId = declared.id,
+                        provenance = PolicyProvenance.RemoteLease,
+                    ),
+                ),
+            )
+            if (decision.isDenied) return decision.reason
         }
         if (delegate.usesRepositoryCredentials()) {
             val repository = envelope.project.repository ?: return "the project has no linked repository"

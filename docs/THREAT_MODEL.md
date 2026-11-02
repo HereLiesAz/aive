@@ -450,6 +450,8 @@ The following invariants must hold regardless of the integration used:
 6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
 7. A task whose executor can change something does not run on external, unknown-provenance or externally derived inputs until a person approves a gate that names those inputs. An artifact without a provenance label counts as external.
 
+Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
+
 ## Open Items
 
 - Automated prompt-injection scanning of artifact content before use as provider context.

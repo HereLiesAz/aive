@@ -36,9 +36,7 @@ class WorkflowApprovalService(
         require(gate.kind == ApprovalGateKind.PlanApproval) {
             "Approval gate ${gateId.value} is not a plan gate"
         }
-        require(gate.requiredRoleId == null || gate.requiredRoleId == decidedByRoleId) {
-            "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
-        }
+        gateCoordinator.requireDecider(gate, decidedByRoleId, nowEpochMillis)
 
         if (handle == null) {
             require(gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
@@ -172,9 +170,7 @@ class WorkflowApprovalService(
         require(gate.status == ApprovalGateStatus.Pending) {
             "Approval gate ${gateId.value} is already resolved"
         }
-        require(gate.requiredRoleId == null || gate.requiredRoleId == decidedByRoleId) {
-            "Role ${decidedByRoleId?.value ?: "<human>"} is not authorized for gate ${gateId.value}"
-        }
+        gateCoordinator.requireDecider(gate, decidedByRoleId, nowEpochMillis)
 
         val taskDefinitionId = requireNotNull(gate.taskDefinitionId) {
             "Failure escalation gate ${gateId.value} has no task"

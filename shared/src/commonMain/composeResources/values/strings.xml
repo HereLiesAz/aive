@@ -702,6 +702,9 @@
     <string name="runs_no_projects_yet">No projects yet. Open Overview and start a run to create one.</string>
     <string name="runs_no_runs">No runs yet. Open Overview, enter an objective and start a run.</string>
     <string name="runs_plan_approval">Plan Approval</string>
+    <string name="runs_policy_allowed">Policy allowed</string>
+    <string name="runs_policy_denied">Policy denied</string>
+    <string name="runs_policy_requires_approval">Policy requires approval</string>
     <string name="runs_reject_reassigns_to"> · Reject reassigns to %1$s</string>
     <string name="runs_reject_stops_the_workflow"> · Reject stops the workflow</string>
     <string name="runs_rejected">Rejected</string>

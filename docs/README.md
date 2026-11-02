@@ -93,6 +93,10 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`VERSIONING.md`](VERSIONING.md) defines the four-part build identity, immutable exact-build tags, patch-grouped GitHub Releases, centralized release/version policy, desktop package-version mapping, and Google Play versionCode rules.
 
+### Policy decisions
+
+[`architecture/POLICY.md`](architecture/POLICY.md) defines the in-process, AuthZEN-shaped policy decision point that answers gate-decider, approval-policy, add-on host-permission, role-authority and repository-mutation (THREAT_MODEL invariant 4) checks, the `PolicyDecisionRecorded` audit event, and the hook points for MCP tool calls, context taint and delegation.
+
 ### Workflow add-ons
 
 [`architecture/ADDONS.md`](architecture/ADDONS.md) defines the mediated Azphalt workflow/role package boundary, Aive host compatibility rules, catalog discovery behavior, and the capabilities that add-ons can never access.
