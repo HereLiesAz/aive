@@ -41,6 +41,8 @@ A coarse bucket preserves the episode IDs represented by its finer source bucket
 
 Temporal compaction is therefore retrieval/index compaction, not memory deletion.
 
+The index buckets episodes by ingest time by default. Asked for valid time (`MemoryTemporalIndex.build(episodes, MemoryTimeAxis.Valid)`, `AgentMemoryLayer.temporalIndex(MemoryTimeAxis.Valid)`), it buckets each episode by when what it records happened (`occurredAtEpochMillis`), falling back to its ingest time. Programmatic temporal co-bucketing stays on ingest time. See [`docs/Memory-layer.md`](../Memory-layer.md#valid-time).
+
 Consolidated memories follow the same idea for time. A raw memory keeps its exact time (the date its text states, else its episode's time). A consolidated current version carries a time range, `[earliest, latest]` over all its contributors, and an occurrence count (distinct source episodes); further consolidation takes the union, so ranges only widen. Recall shows the range and count; exact times stay with the history. See [`docs/Memory-layer.md`](../Memory-layer.md#time-ranges-and-occurrences).
 
 ## The workflow's lineage bank is the association boundary

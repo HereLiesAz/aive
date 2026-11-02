@@ -645,6 +645,8 @@ class MemoryLayerController(
                                 taskDefinitionId = trace.taskDefinitionId,
                             ),
                             bankedAtEpochMillis = trace.recordedAtEpochMillis,
+                            // The receipt's own execution time: the valid-from of what it records.
+                            occurredAtEpochMillis = trace.recordedAtEpochMillis,
                         ),
                         priority = MemoryQueuePriority.Normal,
                     )
