@@ -101,6 +101,11 @@ import com.hereliesaz.geministrator.resources.inspector_now
 import com.hereliesaz.geministrator.resources.inspector_payload_context
 import com.hereliesaz.geministrator.resources.inspector_plan
 import com.hereliesaz.geministrator.resources.inspector_plan_place
+import com.hereliesaz.geministrator.resources.inspector_open_trace
+import com.hereliesaz.geministrator.resources.inspector_fed_by
+import com.hereliesaz.geministrator.resources.inspector_feeds
+import com.hereliesaz.geministrator.resources.inspector_not_taken_yet
+import com.hereliesaz.geministrator.resources.inspector_took_its_output
 import com.hereliesaz.geministrator.resources.inspector_proceed
 import com.hereliesaz.geministrator.resources.inspector_progress
 import com.hereliesaz.geministrator.resources.inspector_provider
@@ -162,6 +167,8 @@ internal fun TechnicalInspector(
     activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
     /** Runs a finished run again from this creature; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
+    /** Closes the panel onto the hive's Timeline with this creature selected; null where there is none. */
+    onOpenTrace: (() -> Unit)? = null,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -318,6 +325,15 @@ internal fun TechnicalInspector(
             CreatureTab.Work -> {
                 // What it is doing, live: its own thinking and steps, apart from what you tell it.
                 CreatureActivity(taskRun, activity)
+                // Its whole trace: the hive's Timeline, this creature selected on it.
+                onOpenTrace?.let { openTrace ->
+                    AzphaltPill(
+                        label = stringResource(Res.string.inspector_open_trace),
+                        seed = "open-trace-$selectedTaskId",
+                        onClick = openTrace,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 // Talking to its agent is part of its work, not something it needs from you.
                 if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
                     OutlinedTextField(
@@ -399,6 +415,22 @@ internal fun TechnicalInspector(
                         append(input.provenanceLabel())
                     }
                 })
+                // Its Connections (docs/Swarm-OS.md): who feeds it, and whom it feeds and whether they took it.
+                val connections = creatureConnections(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+                if (connections.fedBy.isNotEmpty()) {
+                    LiveInspectorLine(
+                        stringResource(Res.string.inspector_fed_by),
+                        connections.fedBy.joinToString("\n") { it.name },
+                    )
+                }
+                if (connections.feeds.isNotEmpty()) {
+                    val took = stringResource(Res.string.inspector_took_its_output)
+                    val notYet = stringResource(Res.string.inspector_not_taken_yet)
+                    LiveInspectorLine(
+                        stringResource(Res.string.inspector_feeds),
+                        connections.feeds.joinToString("\n") { "${it.name} · ${if (it.tookOutput) took else notYet}" },
+                    )
+                }
                 // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
                 taskRun.artifacts.forEach { artifact ->
@@ -627,6 +659,17 @@ internal fun creatureNeedsYou(taskRun: TaskRun): Boolean =
         taskRun.awaitsNestedHumanApproval() ||
         taskRun.isHeldForRoleBudget() ||
         taskRun.awaitsKeeperAnswer()
+
+/**
+ * After "Open its trace" sets a creature's panel aside, tapping that creature again reopens its
+ * panel instead of deselecting it.
+ */
+internal fun reopensSetAsidePanel(tappedTaskId: String, setAsideTaskId: String?): Boolean =
+    tappedTaskId == setAsideTaskId
+
+/** A set-aside panel is forgotten once another creature, or none, is selected. */
+internal fun setAsideAfterSelection(selectedTaskId: String?, setAsideTaskId: String?): String? =
+    setAsideTaskId?.takeIf { it == selectedTaskId }
 
 /** The tab a creature opens on: Needs when it is waiting on you, else its Work. */
 internal fun openingTab(taskRun: TaskRun?): CreatureTab =

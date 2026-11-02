@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- A creature's Work has **Open its trace**: it closes the panel and opens the hive's Timeline with that creature selected. Tapping the creature again opens its panel.
+- A creature's Work now lists its Connections after its inputs: **Fed by**, the creatures whose output it reads, and **Feeds**, the creatures that read its output, each saying whether it has taken that output yet.
 - A creature's panel now says, under its name, its state, its provider and its place in the plan ("Running · Claude · 3 of 5"), so you no longer open Work to see them. A creature with no provider yet leaves the provider out.
 - A creature's Mind tab now queues proposed changes to its role's instructions, drafted from its past work: a failure that keeps recurring, a task that failed repeatedly before it passed, or the same kind of correction you sent its agent more than once. Each shows the current and proposed text and why. **Approve and apply** saves it to the role; **Dismiss** drops it for good. Nothing changes without your approval, and the Mind tab shows how many wait.
 - Cancelling a run now stops the work it started elsewhere too: its GitHub Actions runs are cancelled on GitHub, its nested workflow child runs are cancelled (with their own sessions, external runs and children), and its distributed leases are cancelled on the relay. These remote cancels are best effort. One that fails is listed in the run's events as "Remote run not cancelled", and the run is still cancelled.
