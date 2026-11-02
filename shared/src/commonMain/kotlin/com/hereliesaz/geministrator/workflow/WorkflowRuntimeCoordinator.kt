@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RetryReason
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -16,6 +17,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
@@ -330,23 +332,113 @@ class WorkflowRuntimeCoordinator(
     }
 
     /**
-     * Cancels [state]'s run: every unfinished task, and every provider session it still holds.
-     * Used when a run is abandoned, such as a new launch replacing it.
+     * Cancels [state]'s run: every unfinished task, every provider session it still holds, and the
+     * remote work behind every unfinished system-executor task (GitHub Actions runs, nested child
+     * runs, distributed leases, external service runs). Used when a run is abandoned, such as a
+     * new launch replacing it.
+     *
+     * The local cancellation is persisted first. Remote cancels follow, best effort, outside the
+     * cycle lock; one that fails is recorded as [ExternalRunCancelFailed] and the rest still run.
      */
     suspend fun cancel(
         project: Project,
         definition: WorkflowDefinition,
         state: WorkflowRuntimeState,
         nowEpochMillis: Long,
-    ): WorkflowRuntimeState = cycleMutex.withLock {
-        val persistedRun = persistence.runs.get(state.run.id)
-            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
-            ?: state.run
-        if (persistedRun.status.isTerminal()) {
-            cancelSessions(persistedRun, state.handles)
-            return@withLock WorkflowRuntimeState(persistedRun, emptyMap())
+    ): WorkflowRuntimeState {
+        val (cancelled, remote) = cycleMutex.withLock {
+            val persistedRun = persistence.runs.get(state.run.id)
+                ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
+                ?: state.run
+            if (persistedRun.status.isTerminal()) {
+                cancelSessions(persistedRun, state.handles)
+                return@withLock WorkflowRuntimeState(persistedRun, emptyMap()) to emptyList<ExternalRunToCancel>()
+            }
+            val pending = unfinishedExternalRuns(definition, persistedRun)
+            terminate(
+                project,
+                definition,
+                engine.cancelWorkflow(persistedRun, nowEpochMillis),
+                state.handles,
+                nowEpochMillis,
+            ) to pending
         }
-        terminate(project, definition, engine.cancelWorkflow(persistedRun, nowEpochMillis), state.handles, nowEpochMillis)
+        cancelExternalRuns(project, definition, cancelled.run, remote, nowEpochMillis)
+        return cancelled
+    }
+
+    private data class ExternalRunToCancel(
+        val task: TaskDefinition,
+        val taskRun: TaskRun,
+        val executor: TaskExecutor,
+    )
+
+    /** Unfinished system-executor tasks that hold a remote handle, read before the run is cancelled. */
+    private fun unfinishedExternalRuns(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+    ): List<ExternalRunToCancel> {
+        val tasks = definition.tasks.associateBy { it.id }
+        return run.taskRuns.mapNotNull { (id, taskRun) ->
+            if (taskRun.externalRunId == null) return@mapNotNull null
+            if (taskRun.status in TERMINAL_TASK_STATUSES) return@mapNotNull null
+            // The compute mesh owns these handles, not an executor integration.
+            if (remoteComputeCoordinator?.owns(taskRun) == true) return@mapNotNull null
+            val task = tasks[id] ?: return@mapNotNull null
+            val executor = taskRun.executor ?: task.effectiveExecutor()
+            if (!executor.isSystemExecutor()) return@mapNotNull null
+            ExternalRunToCancel(task, taskRun, executor)
+        }
+    }
+
+    /** Best effort: each failure is recorded as an event and never stops the others. */
+    private suspend fun cancelExternalRuns(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        remote: List<ExternalRunToCancel>,
+        nowEpochMillis: Long,
+    ) {
+        if (remote.isEmpty()) return
+        withContext(NonCancellable) {
+            for ((task, taskRun, executor) in remote) {
+                val externalRunId = taskRun.externalRunId ?: continue
+                val failure: Throwable? = try {
+                    executorIntegrations.integrationFor(executor, project)?.cancel(
+                        TaskExecutorContext(
+                            project = project,
+                            definition = definition,
+                            run = run,
+                            task = task,
+                            taskRun = taskRun,
+                            executor = executor,
+                            nowEpochMillis = nowEpochMillis,
+                            role = engine.roleDefinition(run, task.roleId),
+                        ),
+                    )
+                    null
+                } catch (thrown: Throwable) {
+                    // Including a CancellationException from the integration itself: this block is
+                    // NonCancellable, so the remaining remote cancels still go out.
+                    thrown
+                }
+                if (failure == null) continue
+                try {
+                    persistence.events.append(
+                        ExternalRunCancelFailed(
+                            workflowRunId = run.id,
+                            taskDefinitionId = task.id,
+                            externalRunId = externalRunId,
+                            reason = failure.message?.takeIf(String::isNotBlank)
+                                ?: "${executor.displayLabel()} could not be cancelled",
+                            occurredAtEpochMillis = nowEpochMillis,
+                        ),
+                    )
+                } catch (_: Throwable) {
+                    // Recording the failure is itself best effort.
+                }
+            }
+        }
     }
 
     /** Ends a run that has just become terminal: closes its gates, stops its sessions, persists it. */
@@ -1009,6 +1101,11 @@ class WorkflowRuntimeCoordinator(
 
     private companion object {
         const val REMOTE_COMPUTE_UNAVAILABLE: String = "remote_compute_unavailable"
+        val TERMINAL_TASK_STATUSES: Set<TaskRunStatus> = setOf(
+            TaskRunStatus.Completed,
+            TaskRunStatus.Failed,
+            TaskRunStatus.Cancelled,
+        )
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

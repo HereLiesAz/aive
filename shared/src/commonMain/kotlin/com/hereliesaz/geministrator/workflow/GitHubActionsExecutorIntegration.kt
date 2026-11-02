@@ -70,6 +70,12 @@ interface GitHubActionsClient {
     suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun
     suspend fun getRun(repository: RepositoryRef, runId: String): GitHubWorkflowRun
     suspend fun downloadArtifact(repository: RepositoryRef, artifactId: String): ByteArray
+
+    /**
+     * Ask GitHub to cancel run [runId]. Best effort and idempotent: a run that already finished is
+     * not an error. The default does nothing, for clients with no cancel endpoint.
+     */
+    suspend fun cancel(repository: RepositoryRef, runId: String) = Unit
 }
 
 class GitHubRestActionsClient(
@@ -194,6 +200,18 @@ class GitHubRestActionsClient(
         return response.body()
     }
 
+    override suspend fun cancel(repository: RepositoryRef, runId: String) {
+        val token = requireToken()
+        val response = httpClient.post(
+            "$baseUrl/repos/${repository.owner.pathSegment()}/${repository.name.pathSegment()}/actions/runs/${runId.pathSegment()}/cancel",
+        ) {
+            githubHeaders(token)
+        }
+        // 409 Conflict: the run has already completed, so there is nothing left to cancel.
+        if (response.status.value == HTTP_CONFLICT) return
+        response.requireSuccessBody("cancel GitHub Actions run $runId")
+    }
+
     private suspend fun requireToken(): String = tokenProvider.getToken().trim().also {
         require(it.isNotEmpty()) { "GitHub Actions token is not configured" }
     }
@@ -282,6 +300,7 @@ class GitHubRestActionsClient(
 
     private companion object {
         const val API_VERSION = "2026-03-10"
+        const val HTTP_CONFLICT = 409
     }
 }
 
@@ -373,6 +392,11 @@ class GitHubActionsExecutorIntegration(
                 )
             }
         return run.toExecution(context, scriptResult)
+    }
+
+    override suspend fun cancel(context: TaskExecutorContext) {
+        val runId = context.taskRun.externalRunId ?: return
+        client.cancel(requireGitHubRepository(context), runId)
     }
 
     private fun requireGitHubRepository(context: TaskExecutorContext): RepositoryRef {

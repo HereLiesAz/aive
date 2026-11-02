@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class GitHubRestActionsClientTest {
@@ -245,5 +246,37 @@ class GitHubRestActionsClientTest {
 
         assertEquals(GitHubWorkflowRunStatus.Failed, run.status)
         assertEquals("Run timed out", run.progressMessage)
+    }
+
+    @Test
+    fun cancelPostsToTheRunCancelEndpointAndTreatsAFinishedRunAsDone() = runBlocking {
+        val requests = mutableListOf<HttpRequestData>()
+        var status = HttpStatusCode.Accepted
+        val engine = MockEngine { request ->
+            requests += request
+            respond(content = "{}", status = status, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val client = GitHubRestActionsClient(
+            httpClient = HttpClient(engine),
+            tokenProvider = GitHubTokenProvider { "token-123" },
+            baseUrl = "https://api.github.test",
+        )
+        val repository = RepositoryRef("HereLiesAz", "aive", "main")
+
+        client.cancel(repository, "42")
+        // 409: the run already finished. Cancelling it again is not an error.
+        status = HttpStatusCode.Conflict
+        client.cancel(repository, "42")
+
+        assertEquals(2, requests.size)
+        requests.forEach { request ->
+            assertEquals(HttpMethod.Post, request.method)
+            assertEquals("/repos/HereLiesAz/aive/actions/runs/42/cancel", request.url.encodedPath)
+            assertEquals("Bearer token-123", request.headers[HttpHeaders.Authorization])
+        }
+
+        status = HttpStatusCode.Forbidden
+        val failure = assertFailsWith<IllegalStateException> { client.cancel(repository, "42") }
+        assertTrue(failure.message.orEmpty().contains("HTTP 403"), failure.message)
     }
 }

@@ -667,6 +667,7 @@
     <string name="runs_security_risk">Security risk</string>
     <string name="runs_stop">Stop</string>
     <string name="runs_task_cancelled">Task cancelled</string>
+    <string name="runs_external_cancel_failed">Remote run not cancelled</string>
     <string name="runs_task_completed">Task completed</string>
     <string name="runs_task_escalated">Task escalated</string>
     <string name="runs_task_failed">Task failed</string>

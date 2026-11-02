@@ -138,6 +138,37 @@ class WorkflowRunNestedWorkflowClient(
     }
 
     /**
+     * Cancel child run [runId] through a coordinator of its own. That coordinator stops the child's
+     * provider sessions and cancels the child's own external runs, nested children included, so
+     * cancellation cascades down the whole tree. A finished or missing child is left alone.
+     */
+    override suspend fun cancel(project: Project, runId: String) {
+        val id = WorkflowRunId(runId)
+        val stored = persistence.runs.get(id) ?: return
+        if (stored.status.isTerminal()) {
+            childrenMutex.withLock { children.remove(id) }
+            return
+        }
+        val childProject = checkNotNull(persistence.projects.get(stored.projectId)) {
+            "Project ${stored.projectId.value} was not found"
+        }
+        val definition = checkNotNull(persistence.definitions.get(stored.workflowDefinitionId)) {
+            "Workflow definition ${stored.workflowDefinitionId.value} was not found"
+        }
+        val cached = childrenMutex.withLock { children.remove(id) }
+        val coordinator = cached?.coordinator ?: coordinatorFactory()
+        val state = cached?.state ?: try {
+            // Reconnecting provider sessions lets the coordinator cancel them too.
+            coordinator.resume(id)
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Throwable) {
+            WorkflowRuntimeState(stored)
+        }
+        coordinator.cancel(childProject, definition, state, nowEpochMillis())
+    }
+
+    /**
      * Approve the first pending [TaskExecutor.HumanApproval] task in [childRunId] or, failing that,
      * in its own running nested children. This is the explicit human decision for a gate the parent
      * node surfaces; nothing in this client approves a gate on its own.
