@@ -160,11 +160,37 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 - Diff paths are validated as Git parses them: `git apply --numstat -z` on the patch and on its reverse lists both sides of every file, including rename/copy targets, quoted (octal-escaped) names and traditional `---`/`+++` sections. Absolute paths, `.git/` and `..` segments, and `.gitattributes`/`.gitmodules` (compared case-insensitively) are rejected, as is any patch Git cannot parse. The diff must then pass `git apply --check` before it is applied.
 - The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `haive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
 - `git worktree add` (post-checkout) and `git commit` run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
-- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed.
+- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed. Only a separate `TestRunner` task runs the change's tests, and only after a person approves it (see the next section).
 
 **Residual risks**
 - Git still honours the user's own Git configuration while checking out and committing. A clean/smudge filter or other driver that the user configured (for example Git LFS, or a filter that runs a tracked script) runs for paths the repository's existing `.gitattributes` select.
 - When Entire recording is on, `entire session attach` amends the commit in the worktree with Entire's own process, which does not get the hooks override.
+
+### Local test runner (desktop)
+
+`TaskExecutor.TestRunner` on desktop runs a test command for a linked Local Git project (`LocalTestRunnerClient`; see `docs/Local-Git-Repository-Operations.md`). This is the one place The Aive deliberately runs repository code on the host.
+
+**Threats**
+- The test command, or the repository code it runs (build scripts, tests), does harm with the keeper's permissions. A planner or an imported workflow could name any command.
+- A command string smuggles shell syntax (`&&`, `;`, `$(...)`, redirections) so it does something other than what it shows.
+- The test process reads the app's secrets from its environment (provider API keys, tokens).
+- An artifact's metadata points the run at another directory.
+- A pool lease from another device makes this computer run a command.
+- A hung or runaway test never ends, or floods memory with output.
+
+**Mitigations in place**
+- A run starts only when a human-approval task upstream of the test task was approved (completed) in this run; otherwise the task fails. The approval is checked on this device, against this device's run.
+- The command is split into an argument list without a shell. Quotes group words; `$`, backticks, line breaks, NUL, and outside quotes `| & ; < > ( ) * ? [ ] { } ~ ! # \`, a leading `NAME=value` and a leading `-` are refused, never interpreted.
+- The child gets an allowlisted environment (`PATH`, `HOME`, locale, temp folders, `JAVA_HOME`, Gradle/Android SDK locations and the Windows system variables), no `GIT_*` variables, no prompts, and `CI=true`; provider keys and tokens are not passed.
+- It runs in a `worktree-branch` worktree only when the path lies under `<repo>-worktrees/`; otherwise at the newest upstream `headCommit` (validated as a hex commit id) in a temporary detached worktree created with hooks and the fsmonitor disabled and removed afterwards; otherwise in the linked folder.
+- It has a timeout (20 minutes). On timeout, on the app closing, or when its workflow stops polling it for two minutes (cancelled or replaced), the whole process tree is ended. Output is kept to the last 32,000 characters per stream.
+- The integration is registered only for the device's own runs, not in the set that pool leases use, so another device cannot make this one run tests.
+- Exit code 0 completes the task; any other result, including a timeout, fails it. Runs are held in memory and are never replayed after a restart.
+
+**Residual risks**
+- Once approved, the command and the repository code run with the keeper's full permissions; nothing is sandboxed. The approval is the boundary, so a person should read what the test task will run.
+- A process that leaves the process tree (a daemon that detaches, such as a Gradle daemon) can outlive the run.
+- A bare program name is looked up on the app's `PATH`.
 
 ### Entire checkpoints and the `entire` CLI (desktop)
 

@@ -26,7 +26,18 @@ enum class ExternalExecutionStatus {
 }
 
 interface TestRunnerClient {
+    /** Whether this client can run tests for [project] (for example, only a linked local folder). */
+    fun supports(project: Project): Boolean = true
+
     suspend fun start(project: Project, command: String?): ExternalExecutionRun
+
+    /**
+     * Starts a test run with the whole task context: the run's upstream work (where to run) and its
+     * approvals. Clients that only need the project keep the default.
+     */
+    suspend fun start(context: TaskExecutorContext, command: String?): ExternalExecutionRun =
+        start(context.project, command)
+
     suspend fun getRun(project: Project, runId: String): ExternalExecutionRun
 }
 
@@ -35,9 +46,12 @@ class TestRunnerExecutorIntegration(
 ) : TaskExecutorIntegration {
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.TestRunner
 
+    override fun supports(executor: TaskExecutor, project: Project): Boolean =
+        executor is TaskExecutor.TestRunner && client.supports(project)
+
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.TestRunner
-        return client.start(context.project, executor.command).toTaskExecution()
+        return client.start(context, executor.command).toTaskExecution()
     }
 
     override suspend fun reconcile(context: TaskExecutorContext): TaskExecutorExecution {
