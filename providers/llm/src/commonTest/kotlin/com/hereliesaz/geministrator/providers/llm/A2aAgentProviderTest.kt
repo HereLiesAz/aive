@@ -138,6 +138,8 @@ class A2aAgentProviderTest {
             assertContains(artifacts.first().textContent.orEmpty(), "Root cause: a race.")
             assertEquals("https://agent.example/report.pdf", artifacts.single { it.uri != null }.uri)
             assertEquals("t-1", artifacts.first().metadata["a2aTaskId"])
+            // Remote output is external content, links included (docs/THREAT_MODEL.md, Context provenance).
+            artifacts.forEach { assertEquals("ExternalContent", it.metadata["aive.provenance"]) }
         } finally {
             client.close()
         }

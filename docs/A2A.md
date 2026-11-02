@@ -16,6 +16,13 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 - The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`.
 - Disconnecting an agent forgets both.
 
+**Drifters at the hive's edge.** The other way in is the hive's edge (`Swarm-OS.md`): **Bring in a drifter** takes the same Agent Card address and reads the card, without a token and without following redirects (`A2aDrifters.read`). The drifter waits at the edge, drawn as a creature picked by a stable hash of its card URL, with its name, description and skill names (one bounded line each; the card is remote text). What went wrong lands on it in plain words: not an address it can be reached at, nothing answered (with the HTTP status or error kind), no Agent Card there (404/410), not an Agent Card, or a card with no `JSONRPC` interface. Waiting drifters last for the session.
+
+- **Let it in** adds the card to `A2aAgentConnections` (the same list the Keeper's room shows; nothing is duplicated), names it after the card, and adds a role `drifter-<host>` to the swarm. The role prefers the drifter's `a2a:<host>` provider, needs only `Research`, and has no authorities, so it can never approve a plan, gate or release. Its description quotes the card's description and skills, bounded and on one line.
+- A card with no bearer scheme is linked keyless at once. One that declares `Bearer` comes in waiting for its token: **Give it its token** opens the same credential step as the Keeper's room, which keeps it in the platform credential store under `a2a:<host>`.
+- **Send it away** on a waiting drifter just drops it. On one already in, it unlinks the provider, forgets the connection and takes its role out of the swarm.
+- Nothing can be let in while no runtime is awake; the drifter says so.
+
 **When it runs.** `A2aAgentProvider` is `explicitOnly`. The router never picks it on its own; it runs only for roles that prefer it, or tasks that require it by id. Choose it as the role's provider in the swarm. It offers `PlanGeneration`, `PlanApproval` (through the engine-owned plan gate), `Messaging` and `Research`, and no repository access.
 
 **A task's life:**
@@ -45,6 +52,7 @@ If the agent answers `SendMessage` with a message instead of a task, that messag
 - When a token is set, the endpoint must be on the card's origin. A card cannot send the token anywhere else.
 - Redirects are not followed, and the card is fetched without the token.
 - Remote output is opaque text and links. The runtime never executes it.
+- Remote output is external content (`THREAT_MODEL.md`, Context provenance). The provider labels its artifacts `ExternalContent`, and the runtime labels whatever an `a2a:` provider produced `ExternalContent` whatever the role (`outputProvenanceOnProvider`). A task that can change things and reads it waits at a context-taint gate for a person.
 
 ## Server: The Aive as an A2A agent (desktop)
 
@@ -85,4 +93,6 @@ Turn it on in **Keeper's room › This device › A2A server**. It is off by def
 - `shared/src/commonTest/.../a2a/A2aProtocolTest.kt`: card JSON shape, both message/task shapes, state and method mapping.
 - `A2aServerTest.kt`: auth refusal, Host check, launch/get/cancel, legacy names, busy rejection, error codes.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
+- `A2aDriftersTest.kt`: reading a card and each failure, the stable creature, the waiting list, and the role a drifter takes (prefers its provider, `Research` only, no authority).
+- `workflow/ContextTaintTest.kt`: an `a2a:` provider's output is external whatever its role.
 - `providers/llm/src/commonTest/.../A2aAgentProviderTest.kt`: the client against a mock agent, including the token-origin rule.

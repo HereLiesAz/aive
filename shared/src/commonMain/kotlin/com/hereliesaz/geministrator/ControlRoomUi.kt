@@ -674,6 +674,8 @@ private fun MainDestination(
 ) {
     // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
     var showTimeline by rememberDurableBooleanState("overview.timeline")
+    // The hive edge's "Bring in a drifter" form is open (A2aDrifterShelf).
+    var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
@@ -738,11 +740,12 @@ private fun MainDestination(
                                     }
                                 }
                             },
-                            onImportAgent = { onDestinationSelected(ControlRoomDestination.AddOns) },
+                            // Escorts to the hive's edge, where a drifter is brought in (docs/Swarm-OS.md).
+                            onImportAgent = { bringingInDrifter = true },
                             edge = {
-                                azphaltStoreService?.let { store ->
+                                val store = azphaltStoreService
                                 HiveEdge(
-                                    onLoadPackages = { store.search().packages },
+                                    onLoadPackages = { store?.search()?.packages.orEmpty() },
                                     onBringIn = { item ->
                                         // Opens the Store on this package, where its install is approved.
                                         DurableUiState.store.putString("azphalt-store.query", "")
@@ -750,8 +753,20 @@ private fun MainDestination(
                                         DurableUiState.store.putString("azphalt-store.selected-package", item.id)
                                         onDestinationSelected(ControlRoomDestination.AddOns)
                                     },
+                                    bringingIn = bringingInDrifter,
+                                    a2aDrifters = {
+                                        A2aDrifterShelf(
+                                            open = bringingInDrifter,
+                                            onOpenChange = { bringingInDrifter = it },
+                                            swarmRoles = swarmRoles(runtimeState),
+                                            connectedProviderIds = connectedProviderIds,
+                                            onSaveRoles = onSaveRoleCollection,
+                                            onConnectKeyless = onConnectFreeProvider,
+                                            onGiveToken = onReconfigureProvider,
+                                            onDisconnect = onDisconnectProvider,
+                                        )
+                                    },
                                 )
-                                }
                             },
                             roles = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.roles.orEmpty(),
                             onAdopt = { child ->
@@ -968,3 +983,14 @@ internal fun firstCreatureNeedingYou(live: LiveWorkflowPresentation, unseen: (St
 
 /** The hive's left edge: its rows of places and actions line up with the hive's own content. */
 internal fun hiveGutter(compact: Boolean) = if (compact) 16.dp else 26.dp
+
+/** The active swarm the runtime shows, or none while it is not awake (A2aDrifterShelf). */
+private fun swarmRoles(state: ApplicationRuntimeState): List<RoleDefinition> = when (state) {
+    is ApplicationRuntimeState.Live -> state.presentation.roles.toList()
+    is ApplicationRuntimeState.NoRun -> state.roles
+    is ApplicationRuntimeState.NoProject -> state.roles
+    ApplicationRuntimeState.Loading,
+    is ApplicationRuntimeState.Disconnected,
+    is ApplicationRuntimeState.ResumeFailed,
+    -> emptyList()
+}

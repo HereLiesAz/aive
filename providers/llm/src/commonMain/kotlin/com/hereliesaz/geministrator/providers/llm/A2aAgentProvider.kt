@@ -17,6 +17,8 @@ import com.hereliesaz.geministrator.a2a.A2aVersion
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.net.CleartextPolicy
 import com.hereliesaz.geministrator.providers.AgentCapabilities
@@ -336,7 +338,12 @@ internal fun a2aProviderArtifacts(
     runId: ProviderRunId,
     displayName: String,
 ): List<ProviderArtifact> {
-    val metadata = mapOf("a2aTaskId" to runId.value)
+    // Made outside the keeper's control: external content (docs/THREAT_MODEL.md, Context provenance).
+    // A producer may lower trust, so this label survives intake whatever the role says.
+    val metadata = mapOf(
+        "a2aTaskId" to runId.value,
+        CONTEXT_PROVENANCE_METADATA_KEY to ContextProvenance.ExternalContent.name,
+    )
     val text = buildString {
         artifacts.forEach { artifact ->
             val body = artifact.parts.mapNotNull { part ->

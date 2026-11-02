@@ -578,8 +578,11 @@ class WorkflowEngine(
                 definition.labelTaskOutputs(
                     run = nextRun,
                     task = producingTask,
-                    assigned = (taskRun.executor ?: producingTask.effectiveExecutor())
-                        .outputProvenance(roleDefinition(nextRun, taskRun.assignedRoleId ?: producingTask.roleId)),
+                    assigned = outputProvenanceOnProvider(
+                        (taskRun.executor ?: producingTask.effectiveExecutor())
+                            .outputProvenance(roleDefinition(nextRun, taskRun.assignedRoleId ?: producingTask.roleId)),
+                        handle.providerId,
+                    ),
                     artifacts = receivedArtifacts,
                 )
             }
