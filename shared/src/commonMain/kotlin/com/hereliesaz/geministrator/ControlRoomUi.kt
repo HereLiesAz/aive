@@ -696,6 +696,8 @@ private fun MainDestination(
 ) {
     // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
     var showTimeline by showTimelineState
+    // The hive edge's "Bring in a drifter" form is open (A2aDrifterShelf).
+    var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
