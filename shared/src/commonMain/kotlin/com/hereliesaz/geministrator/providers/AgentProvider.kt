@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -40,6 +41,8 @@ data class AgentCapabilities(
 data class PromptContextBlock(
     val label: String,
     val content: String,
+    /** Where this content came from (docs/THREAT_MODEL.md, "Context provenance"); null = unknown. */
+    val provenance: ContextProvenance? = null,
 )
 
 data class PromptContext(

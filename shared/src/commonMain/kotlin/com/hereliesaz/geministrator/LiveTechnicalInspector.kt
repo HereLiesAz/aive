@@ -26,6 +26,25 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
+import com.hereliesaz.geministrator.workflow.CONTEXT_TAINT_BLOCKING_CODE
+import com.hereliesaz.geministrator.workflow.contextInputs
+import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.domain.isUntrustedContext
+import com.hereliesaz.geministrator.domain.madeFromUntrustedInput
+import com.hereliesaz.geministrator.domain.provenance
+import com.hereliesaz.geministrator.resources.inspector_external_inputs
+import com.hereliesaz.geministrator.resources.inspector_hint_external_inputs
+import com.hereliesaz.geministrator.resources.inspector_input_objective
+import com.hereliesaz.geministrator.resources.inspector_inputs
+import com.hereliesaz.geministrator.resources.provenance_agent_artifact
+import com.hereliesaz.geministrator.resources.provenance_external_content
+import com.hereliesaz.geministrator.resources.provenance_keeper_written
+import com.hereliesaz.geministrator.resources.provenance_made_from_external
+import com.hereliesaz.geministrator.resources.provenance_memory_recall
+import com.hereliesaz.geministrator.resources.provenance_repository_content
+import com.hereliesaz.geministrator.resources.provenance_unknown
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
@@ -172,6 +191,19 @@ internal fun TechnicalInspector(
                     ?.let { CreatureNeedsPanel(it, titled = false) }
                 if (taskRun.status == TaskRunStatus.AwaitingApproval) {
                     val providerPlan = taskRun.assignedProviderId != null
+                    if (taskRun.isHeldAtContextTaintGate()) {
+                        // The gate's reason: which of its inputs came from outside the keeper's control.
+                        val external = liveWorkflow.definition.contextInputs(liveWorkflow.run, task)
+                            .filter(ArtifactRef::isUntrustedContext)
+                        LiveInspectorLine(
+                            stringResource(Res.string.inspector_external_inputs),
+                            stringResource(
+                                Res.string.inspector_hint_external_inputs,
+                                external.joinToString { "${it.label} (${it.kind.name})" },
+                            ),
+                            live = true,
+                        )
+                    }
                     AzphaltPill(
                         label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
                         seed = "approve-$selectedTaskId",
@@ -283,8 +315,20 @@ internal fun TechnicalInspector(
                     LiveInspectorLine(label, it, live = true)
                 }
                 taskRun.blockingReason?.let {
-                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), "${it.code} · ${it.message}", live = true)
+                    val text = if (it.code == CONTEXT_TAINT_BLOCKING_CODE) it.message else "${it.code} · ${it.message}"
+                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), text, live = true)
                 }
+                // What it reads, each with where it came from (docs/THREAT_MODEL.md, "Context provenance").
+                val inputs = liveWorkflow.definition.contextInputs(liveWorkflow.run, task)
+                LiveInspectorLine(stringResource(Res.string.inspector_inputs), buildString {
+                    append(stringResource(Res.string.inspector_input_objective))
+                    append(" · ")
+                    append(stringResource(Res.string.provenance_keeper_written))
+                    inputs.forEach { input ->
+                        append("\n${input.label} (${input.kind.name}) · ")
+                        append(input.provenanceLabel())
+                    }
+                })
                 // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
                 taskRun.artifacts.forEach { artifact ->
@@ -378,6 +422,21 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.ExternalService -> listOfNotNull(service, operation).joinToString(" · ")
     is TaskExecutor.NestedWorkflow -> workflowDefinitionId.value
     is TaskExecutor.Distributed -> label ?: (stringResource(Res.string.inspector_remote) + delegate.displayName())
+}
+
+@Composable
+private fun ArtifactRef.provenanceLabel(): String {
+    val source = stringResource(
+        when (provenance) {
+            ContextProvenance.KeeperWritten -> Res.string.provenance_keeper_written
+            ContextProvenance.AgentArtifact -> Res.string.provenance_agent_artifact
+            ContextProvenance.RepositoryContent -> Res.string.provenance_repository_content
+            ContextProvenance.ExternalContent -> Res.string.provenance_external_content
+            ContextProvenance.MemoryRecall -> Res.string.provenance_memory_recall
+            ContextProvenance.Unknown -> Res.string.provenance_unknown
+        },
+    )
+    return if (madeFromUntrustedInput) stringResource(Res.string.provenance_made_from_external, source) else source
 }
 
 @Composable

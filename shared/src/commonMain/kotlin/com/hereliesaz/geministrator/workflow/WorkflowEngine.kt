@@ -471,7 +471,7 @@ class WorkflowEngine(
                 throw cancellation
             } catch (_: Exception) {
             }
-            val durableArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
+            val receivedArtifacts = sessionGateway.artifacts(handle).mapIndexed { index, artifact ->
                 ArtifactRef(
                     id = artifactIdFactory(taskRun, artifact, index),
                     kind = artifact.kind,
@@ -482,6 +482,19 @@ class WorkflowEngine(
                     mediaType = artifact.mediaType,
                     metadata = artifact.metadata,
                     createdAtEpochMillis = nowEpochMillis,
+                )
+            }
+            // Labelled with where they came from (ContextTaint.kt); the provider cannot claim more trust.
+            val producingTask = definition.tasks.firstOrNull { it.id == taskId }
+            val durableArtifacts = if (producingTask == null) {
+                receivedArtifacts
+            } else {
+                definition.labelTaskOutputs(
+                    run = nextRun,
+                    task = producingTask,
+                    assigned = (taskRun.executor ?: producingTask.effectiveExecutor())
+                        .outputProvenance(roleDefinition(nextRun, taskRun.assignedRoleId ?: producingTask.roleId)),
+                    artifacts = receivedArtifacts,
                 )
             }
             val mappedStatus = when (status) {

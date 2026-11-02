@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.workflow
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.releasedDependencies
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -79,15 +80,17 @@ internal fun buildProviderTaskRequest(
                 PromptContextBlock(
                     "Workflow objective",
                     if (redaction.redactObjective) "[redacted]" else run.objective,
+                    ContextProvenance.KeeperWritten,
                 ),
                 PromptContextBlock(
                     "Role",
                     if (redaction.redactRoleInstructions) "[redacted]" else role.instructions,
+                    ContextProvenance.KeeperWritten,
                 ),
             ),
             dynamicContext = buildList {
-                add(PromptContextBlock("Task", objective))
-                add(PromptContextBlock("Attempt", taskRun.attempt.toString()))
+                add(PromptContextBlock("Task", objective, ContextProvenance.KeeperWritten))
+                add(PromptContextBlock("Attempt", taskRun.attempt.toString(), ContextProvenance.KeeperWritten))
                 if (resolvedSurfaces.isNotEmpty()) {
                     add(
                         PromptContextBlock(
@@ -288,12 +291,14 @@ private fun buildUtilityPromptBlocks(
         )
     }
 
+    // The runtime's own control summaries: built from the keeper's definition and run state, never
+    // from artifact text.
     return buildList {
         add(executionBlock)
         if (dependencies.isNotEmpty()) add(handoffBlock)
         add(escalationBlock)
         verificationBlock?.let(::add)
-    }
+    }.map { it.copy(provenance = ContextProvenance.KeeperWritten) }
 }
 
 /** Handoff blocks are cut to this size, least important sections first. */
