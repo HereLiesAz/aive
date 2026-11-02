@@ -134,7 +134,8 @@ sealed interface AgentEvent {
 
     /**
      * Reasoning the provider streams while it thinks, for providers that expose it (local models,
-     * APIs with visible thinking). Memory watches it for recall triggers; it is not shown as output.
+     * APIs with visible thinking). Memory watches it for recall triggers; it is not shown as output,
+     * only as live activity in the creature's panel (`SessionActivityFeeds`), never persisted there.
      */
     data class Thinking(
         override val runId: ProviderRunId,

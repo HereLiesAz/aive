@@ -49,6 +49,11 @@ class ProviderBackedManagedSessionGateway(
     private val contextRetriever: ContextRetriever? = SimilarityContextRetriever(listOf(ArtifactChunkSource)),
     /** Opt-in agent-neutral conversation hook; never a substitute for memory or workflow gates. */
     private val duplexAttachment: DuplexSessionAttachment? = null,
+    /**
+     * Each session's live thinking and progress lines for the creature's panel: bounded, in memory,
+     * never persisted into workflow state nor passed to the duplex peer.
+     */
+    private val activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -607,6 +612,7 @@ class ProviderBackedManagedSessionGateway(
             )
             else -> Unit
         }
+        activity.record(handle, effectiveEvent)
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->
