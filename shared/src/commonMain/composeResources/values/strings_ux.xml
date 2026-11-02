@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="error_key_rejected">Key rejected. Reconnect this provider in Settings with a valid key.</string>
+    <string name="error_out_of_credit">Out of credit with this provider. Add credit in its billing settings, or switch to another provider.</string>
     <string name="error_rate_limited">Rate limited. Wait a minute, or switch to another provider.</string>
     <string name="error_offline">Can't reach the service. Check your internet connection, then retry.</string>
     <string name="error_timed_out">The service took too long to answer. Retry, or switch to another provider.</string>

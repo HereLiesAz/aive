@@ -21,6 +21,17 @@ class UserFacingErrorTest {
     }
 
     @Test
+    fun aSpentBalanceIsOutOfCreditNotRateLimited() {
+        listOf(
+            // Seen on Android: a 402 whose body names its "quota" read as a rate limit.
+            "Unable to generate compatible chat response: HTTP 402: {\"message\":\"Payment required to access this resource. " +
+                "Visit your billing tab.\",\"type\":\"payment_required_error\",\"param\":\"quota\",\"code\":\"payment_required\"}",
+            "insufficient_quota: You exceeded your current quota, please check your plan and billing details.",
+            "Your credit balance is too low to access the API",
+        ).forEach { assertEquals(ErrorKind.OutOfCredit, classifyError(it), it) }
+    }
+
+    @Test
     fun networkFailuresMapToOfflineOrTimeout() {
         assertEquals(ErrorKind.Offline, classifyError("Unable to resolve host \"api.openai.com\""))
         assertEquals(ErrorKind.Offline, classifyError("java.net.ConnectException: Connection refused"))

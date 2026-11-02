@@ -6,6 +6,10 @@ import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
 import com.hereliesaz.geministrator.memory.procedural.ProcedureBankCatalog
 import com.hereliesaz.geministrator.memory.procedural.ProcedureMutation
 import com.hereliesaz.geministrator.memory.procedural.ProcedureArchives
+import com.hereliesaz.geministrator.memory.procedural.ProcedurePattern
+import com.hereliesaz.geministrator.memory.procedural.ProcedureOperationDescriptor
+import com.hereliesaz.geministrator.memory.procedural.ProcedureCandidateProposalService
+import com.hereliesaz.geministrator.memory.procedural.ProcedureReference
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
@@ -468,6 +472,29 @@ class MemoryLayerController(
         }
         publish()
         drainSoon()
+    }
+
+    /** Inspection-only patterns extracted from recorded, provenance-linked executor observations. */
+    suspend fun discoverProceduralPatterns(): List<ProcedurePattern> {
+        val workflow = selectedWorkflow() ?: return emptyList()
+        val catalog = procedureCatalog ?: return emptyList()
+        return ProcedureCandidateProposalService(catalog, banks).discover(workflow)
+    }
+
+    /**
+     * Explicitly save a provisional candidate using host-supplied typed operation descriptors.
+     * This does not validate, authorize, invoke, or promote the proposed procedure.
+     */
+    suspend fun proposeProceduralCandidate(
+        pattern: ProcedurePattern,
+        name: String,
+        operationDescriptors: Map<String, ProcedureOperationDescriptor>,
+    ): ProcedureReference {
+        val workflow = selectedWorkflow() ?: error("No memory bank selected")
+        val catalog = procedureCatalog ?: error("Procedural memory is unavailable")
+        return ProcedureCandidateProposalService(catalog, banks).propose(
+            workflow, pattern, name, operationDescriptors, nowEpochMillis(),
+        )
     }
 
     /** Export only the selected workflow's procedural bank; ancestors remain in their own banks. */
