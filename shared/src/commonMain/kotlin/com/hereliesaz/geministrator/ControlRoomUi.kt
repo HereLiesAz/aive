@@ -903,12 +903,15 @@ private fun MainDestination(
                                 compact = compact,
                                 trailing = {
                                     when (section) {
-                                        KeeperSection.Connections -> RepositoryConnections(
-                                            connectedServiceIds = connectedRepositoryServiceIds,
-                                            onConfigureService = onConfigureRepositoryService,
-                                            onDisconnectService = onDisconnectRepositoryService,
-                                            compact = compact,
-                                        )
+                                        KeeperSection.Connections -> {
+                                            RepositoryConnections(
+                                                connectedServiceIds = connectedRepositoryServiceIds,
+                                                onConfigureService = onConfigureRepositoryService,
+                                                onDisconnectService = onDisconnectRepositoryService,
+                                                compact = compact,
+                                            )
+                                            LocalMcpHost.current?.let { host -> McpServerConnections(host, compact) }
+                                        }
                                         KeeperSection.Compute -> ComputeDelegationScreen(
                                             runtimeState = runtimeState,
                                             distributedComputeState = distributedComputeState,

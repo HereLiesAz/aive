@@ -36,7 +36,7 @@ class OpenAiCompatibleChatApi(
     /** False for keyless free endpoints: a blank key then sends no Authorization header. */
     private val requireApiKey: Boolean = true,
     client: HttpClient = openAiCompatibleClient(),
-) : TextGenerationApi {
+) : ToolCallingTextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
     private val client = client.config { followRedirects = false }
 
@@ -62,6 +62,22 @@ class OpenAiCompatibleChatApi(
             "Refusing to send an API key over plain HTTP to a public host; use an https:// base URL"
         }
         return apiKey
+    }
+
+    override suspend fun converse(
+        prompt: String,
+        tools: List<com.hereliesaz.geministrator.mcp.McpToolOffer>,
+        rounds: List<ToolRound>,
+        allowTools: Boolean,
+    ): ToolTurn {
+        val apiKey = sendableApiKey()
+        val body = CompatibleToolWire.request(model, prompt, tools, rounds, allowTools)
+        return CompatibleToolWire.turn(
+            client.postJson("$baseUrl/chat/completions", body, "generate compatible chat response") {
+                if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
+                extraHeaders.forEach { (name, value) -> header(name, value) }
+            },
+        )
     }
 
     override suspend fun generate(prompt: String): TextGenerationResult {

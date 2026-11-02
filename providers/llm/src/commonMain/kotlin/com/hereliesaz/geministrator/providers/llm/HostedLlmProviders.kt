@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.providers.llm
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.mcp.McpToolSource
 import com.hereliesaz.geministrator.providers.AgentProvider
 
 /**
@@ -200,6 +201,8 @@ object HostedLlmProviders {
         spec: HostedLlmProviderSpec,
         credential: String,
         model: String = spec.defaultModel,
+        /** MCP tools for runs on this provider (docs/architecture/MCP_HOST.md); null offers none. */
+        tools: McpToolSource? = null,
     ): AgentProvider = when {
         "moyai-session" in spec.protocols -> MoyaiProvider(
             id = AgentProviderId(spec.id),
@@ -213,6 +216,7 @@ object HostedLlmProviders {
             id = AgentProviderId(spec.id),
             displayName = spec.displayName,
             api = textApi(spec, credential, model),
+            tools = tools,
         )
         else -> error("${spec.displayName} has no supported direct LLM protocol")
     }
@@ -251,8 +255,11 @@ object HostedLlmProviders {
     }
 
     /** Build every hosted provider whose credential is currently configured. */
-    fun configured(credentials: Map<String, String>): List<AgentProvider> = entries.mapNotNull { spec ->
+    fun configured(
+        credentials: Map<String, String>,
+        tools: McpToolSource? = null,
+    ): List<AgentProvider> = entries.mapNotNull { spec ->
         val credential = credentials[spec.id]?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
-        runCatching { create(spec, credential) }.getOrNull()
+        runCatching { create(spec, credential, tools = tools) }.getOrNull()
     }
 }

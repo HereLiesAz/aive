@@ -130,6 +130,9 @@ fun App(
     onRunTimelineChanged: ((List<com.hereliesaz.geministrator.events.WorkflowEvent>) -> Unit)? = null,
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
+    /** The MCP host and its approval gate (docs/architecture/MCP_HOST.md); null where there is none. */
+    mcpHost: com.hereliesaz.geministrator.mcp.McpHost? = null,
+    mcpConsent: com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate? = null,
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -531,12 +534,14 @@ fun App(
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,
+            LocalMcpHost provides mcpHost,
             LocalCreatureRig provides { label ->
                 if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
             },
         ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
+                mcpConsent?.let { McpConsentDialog(it) }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,

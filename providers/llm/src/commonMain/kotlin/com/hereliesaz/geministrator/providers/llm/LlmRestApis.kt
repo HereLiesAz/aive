@@ -258,8 +258,24 @@ class AnthropicMessagesApi(
     private val model: String = "claude-sonnet-5",
     private val baseUrl: String = "https://api.anthropic.com/v1",
     client: HttpClient = defaultClient(),
-) : TextGenerationApi {
+) : ToolCallingTextGenerationApi {
     private val client = client.config { followRedirects = false }
+
+    override suspend fun converse(
+        prompt: String,
+        tools: List<com.hereliesaz.geministrator.mcp.McpToolOffer>,
+        rounds: List<ToolRound>,
+        allowTools: Boolean,
+    ): ToolTurn {
+        val key = apiKeyProvider.requireKey("Anthropic")
+        val body = AnthropicToolWire.request(model, 16_000, prompt, tools, rounds, allowTools)
+        return AnthropicToolWire.turn(
+            client.postJson("$baseUrl/messages", body, "generate Claude response") {
+                header("x-api-key", key)
+                header("anthropic-version", "2023-06-01")
+            },
+        )
+    }
 
     /** A `cache_control` breakpoint ends the stable prefix; usage reports cache reads and writes. */
     override val promptCaching: PromptCacheCapabilities = PromptCacheCapabilities(
@@ -427,11 +443,26 @@ class GeminiGenerateContentApi(
     private val model: String = "gemini-3.8-flash",
     private val baseUrl: String = "https://generativelanguage.googleapis.com/v1beta",
     client: HttpClient = defaultClient(),
-) : TextGenerationApi {
+) : ToolCallingTextGenerationApi {
     private val client = client.config { followRedirects = false }
 
     /** Gemini caches repeated prompt prefixes implicitly and reports `cachedContentTokenCount`. */
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
+
+    override suspend fun converse(
+        prompt: String,
+        tools: List<com.hereliesaz.geministrator.mcp.McpToolOffer>,
+        rounds: List<ToolRound>,
+        allowTools: Boolean,
+    ): ToolTurn {
+        val key = apiKeyProvider.requireKey("Gemini")
+        val body = GeminiToolWire.request(prompt, tools, rounds, allowTools)
+        return GeminiToolWire.turn(
+            client.postJson("$baseUrl/models/$model:generateContent", body, "generate Gemini response") {
+                header("x-goog-api-key", key)
+            },
+        )
+    }
 
     init {
         // The model id becomes a URL path segment, so it may not carry '/', '?', '#' or '..'.
