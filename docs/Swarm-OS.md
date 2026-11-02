@@ -67,6 +67,7 @@ Each tool is a real control (see the ledger). One sits in the creature's needs p
 - **The tide.** Every build edit is undoable by dragging the tide back (or Undo/Redo on the rim). It covers edits, never run history.
 - **Clusters.** Lasso creatures into a cluster; it folds into one creature from farther out, and is a nested workflow inside.
 - **Duplicate** by pulling a second creature out of one: same config, its own task. That's a clone, and the needs panel says so.
+- **Add creature**, beside Duplicate: a role from the swarm (switched-on roles only), or a step with no agent that wears the neuron (run tests, repository status, fetch repository). It joins unwired, nothing feeds it and nothing waits on it, and the add is on the tide like any other edit (`addTerrariumCreature`, `WorkflowTerrariumAuthoring.kt`). Steps that need setting up first (a script's source, an action's workflow, a deployment's environment) and repository changes are not offered: alone and unwired, a repository change would have no approval ahead of it (THREAT_MODEL.md, invariant 4). Releasing a creature is not built yet.
 - **Gestation and adversaries,** as decided: every block is an egg fed by every contributor's tail; reviewers go after the work they check, and a failed check wounds.
 
 ## Accessibility

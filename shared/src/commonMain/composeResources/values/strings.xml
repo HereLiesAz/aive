@@ -406,6 +406,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_fed_by">%1$s IS FED BY</string>
     <string name="build_add_connection">FEED IT FROM</string>
     <string name="build_pick_a_creature">Tap a creature to wire it.</string>
+    <string name="build_add_creature">Add creature</string>
+    <string name="build_add_hint">It joins unwired. Tap it to wire it.</string>
+    <string name="build_add_from_swarm">FROM THE SWARM</string>
+    <string name="build_add_from_steps">A STEP, NO AGENT</string>
+    <string name="build_step_tests">Run tests</string>
+    <string name="build_step_repo_status">Repository status</string>
+    <string name="build_step_repo_fetch">Fetch repository</string>
     <string name="swarm_token_budget">Token budget per run</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
