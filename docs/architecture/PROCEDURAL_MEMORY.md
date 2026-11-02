@@ -1,6 +1,6 @@
 # Aive procedural memory: reflexes, habits, and contextual-memory integration
 
-Status: **Architecture proposed; initial non-executable procedure definitions, in-memory catalog and contextual provenance filtering implemented.** Execution, durable SQL persistence, promotion, automatic recall and duplex procedure exchange are not implemented. This design extends the normative [Memory-layer](../Memory-layer.md), [Memory Banking and Attention](MEMORY_BANKING_AND_ATTENTION.md), [GRIP](GRIP.md), [Role Execution Sources](ROLE_EXECUTION_SOURCES.md), and [Duplex MCP](DUPLEX_MCP.md) contracts. It does not change their existing authority boundaries.
+Status: **Architecture proposed; non-executable procedure definitions, contextual provenance filtering, opt-in redacted executor receipts, durable per-workflow SQL storage (`SqlProcedureStore`, wired on Android, desktop and web, with an in-memory fallback in the browser) and keeper-gated role-instruction proposals (§10) implemented.** Execution, promotion, automatic recall and duplex procedure exchange are not implemented. This design extends the normative [Memory-layer](../Memory-layer.md), [Memory Banking and Attention](MEMORY_BANKING_AND_ATTENTION.md), [GRIP](GRIP.md), [Role Execution Sources](ROLE_EXECUTION_SOURCES.md), and [Duplex MCP](DUPLEX_MCP.md) contracts. It does not change their existing authority boundaries.
 
 ## 1. The four pillars
 
@@ -171,5 +171,22 @@ Token accounting uses *actual* provider token usage and run traces when availabl
 8. A failed procedure cannot silently complete a task or mutate its workflow history; failures and partial effects are auditable.
 9. Transport failure, memory outage and procedural-memory failure leave ordinary workflows functional.
 10. The duplex link never becomes a backdoor to MCPServed phone control or an unrestricted tool executor.
+
+## 10. Self-updating instructions as diff-gated edits
+
+Run history can propose a change to the responsible role's instructions; only the keeper applies it (`memory/procedural/RoleInstructionProposals.kt`, `RoleInstructionProposalPanel.kt`).
+
+~~~text
+workflow events + executor receipts + keeper's messages
+  -> RoleObservation (bounded, deduplicated, per role)
+  -> deterministic heuristics -> RoleInstructionProposal (current -> proposed text + evidence)
+  -> creature's Mind tab: Approve (saved through the Mind's role save path) | Dismiss
+~~~
+
+- **Sources.** `RoleInstructionObservations.fromRun` reads `VerificationFailed`/`TaskFailed` reasons, `TaskStarted` attempts and `TaskCompleted` from the run's event log, plus failure/completion receipts from the workflow's procedure bank (`MemoryRuntimeBridge.procedureTraceReader`, empty unless trace capture is on). A message the keeper sends to an agent (Work tab) is recorded when the provider accepts it. The role is the task's assigned or responsible role; only agent roles get proposals.
+- **Heuristics.** The same failure (case, spacing and numbers ignored) at least twice for a role; a task that failed at least twice and then completed; at least two corrective keeper messages (don't, never, always, instead, should, must, ...). Each yields one line appended under `Learned from past work:`; failure text and keeper text are quoted and bounded to 200 characters. No model drafts the wording.
+- **Gate.** The ledger never writes a role. Approve applies a pending proposal only if the role's instructions still equal the text it was drafted against (otherwise it is superseded and redrafted), then saves the collection through the same `onSaveRoleCollection` path as the Mind's own form. Dismiss changes nothing, and dismissed or approved lines are not proposed again. The Mind tab shows the pending count; the diff is selectable for copying.
+- **Storage.** One bounded JSON state (observations, proposals, decisions) in the durable UI settings store, key `procedural.role-instruction-proposals.v1`.
+- **Limits and follow-ups.** Roles are one catalog shared by every hive; the Fishbowl fork rule (copy a role used elsewhere into a hive-local one) is not implemented by the Mind's save path, so an approved edit changes the role everywhere and the panel says so. `AGENTS.md` in a linked repository is not proposed yet; when it is, it must be a copyable diff or a mutating repository operation behind a `HumanApproval` ancestor (THREAT_MODEL invariant 4). Evidence text can originate from an agent or external output, so it stays quoted data until the keeper approves it.
 
 See [Procedural Memory Implementation Plan](PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md) for tasks, exact code integration points, tests, rollout gates, and dependencies.

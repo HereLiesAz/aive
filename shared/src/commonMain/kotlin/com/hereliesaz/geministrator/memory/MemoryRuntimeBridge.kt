@@ -1,7 +1,9 @@
 package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.orchestration.MemoryQueryPlan
+import com.hereliesaz.geministrator.memory.procedural.NoOpProcedureTraceReader
 import com.hereliesaz.geministrator.memory.procedural.NoOpProcedureTraceSink
+import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceReader
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContextBlock
@@ -56,10 +58,13 @@ object MemoryRuntimeBridge {
     var promptContextProvider: MemoryPromptContextProvider = NoOpMemoryPromptContextProvider
     /** Optional system-executor observer, enabled only by MemoryLayerSettings. */
     var procedureTraceSink: ProcedureTraceSink = NoOpProcedureTraceSink
+    /** Read-only receipts for role-instruction proposals; never an execution path. */
+    var procedureTraceReader: ProcedureTraceReader = NoOpProcedureTraceReader
 
     fun reset() {
         observer = NoOpMemorySessionObserver
         promptContextProvider = NoOpMemoryPromptContextProvider
         procedureTraceSink = NoOpProcedureTraceSink
+        procedureTraceReader = NoOpProcedureTraceReader
     }
 }

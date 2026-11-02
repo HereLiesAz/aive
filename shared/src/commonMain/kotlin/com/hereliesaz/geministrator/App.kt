@@ -232,6 +232,30 @@ fun App(
         }
     }
 
+    // Self-updating procedural memory (docs/architecture/PROCEDURAL_MEMORY.md §10): the live run's
+    // failures, fixes and executor receipts redraft proposed edits of its roles' instructions. This
+    // only queues proposals on each creature's Mind tab; a role changes only when the keeper approves.
+    LaunchedEffect(liveRun?.run?.id, liveRun?.run?.updatedAtEpochMillis) {
+        val presentation = liveRun ?: return@LaunchedEffect
+        val target = runtime ?: return@LaunchedEffect
+        // Settle first: a busy run restarts this effect, so its history is read once it pauses.
+        kotlinx.coroutines.delay(1_500)
+        try {
+            val events = target.persistence.events.forRun(presentation.run.id)
+            val traces = com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.procedureTraceReader
+                .traces(presentation.run.id.value)
+            RoleInstructionProposalsHost.ledger.observe(
+                com.hereliesaz.geministrator.memory.procedural.RoleInstructionObservations.fromRun(presentation.run, events, traces),
+                presentation.roles,
+                presentation.run.updatedAtEpochMillis,
+            )
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Proposals are best effort; reading history never disturbs the run.
+        }
+    }
+
     /**
      * Launches [objective] the way the launch form does; ignored while a launch is in progress.
      * [onFinished] receives null once the workflow started, or the failure; it is not called
@@ -573,7 +597,30 @@ fun App(
                             try {
                                 when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {
                                     null -> getString(Res.string.app_runtime_is_unavailable)
-                                    ProviderActionResult.Accepted -> null
+                                    ProviderActionResult.Accepted -> {
+                                        // What the keeper told an agent is evidence for proposed edits of its
+                                        // role's instructions (PROCEDURAL_MEMORY.md §10); it changes no role.
+                                        runCatching {
+                                            (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.let { live ->
+                                                live.run.taskRuns[TaskDefinitionId(taskId)]?.assignedRoleId?.let { roleId ->
+                                                    RoleInstructionProposalsHost.ledger.observe(
+                                                        listOf(
+                                                            com.hereliesaz.geministrator.memory.procedural.RoleInstructionObservations.keeperMessage(
+                                                                roleId = roleId,
+                                                                workflowRunId = live.run.id.value,
+                                                                taskDefinitionId = taskId,
+                                                                text = message,
+                                                                atEpochMillis = live.run.updatedAtEpochMillis,
+                                                            ),
+                                                        ),
+                                                        live.roles,
+                                                        live.run.updatedAtEpochMillis,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        null
+                                    }
                                     is ProviderActionResult.Rejected -> result.reason
                                 }
                             } catch (failure: CancellationException) {

@@ -44,8 +44,8 @@ interface ProcedureStore {
 }
 
 /**
- * Per-workflow test/preview implementation, using exactly the same invariants expected of a
- * future SQLDelight-backed store. No persistence is claimed.
+ * Per-workflow test/preview implementation, using exactly the same invariants as the
+ * SQLDelight-backed [SqlProcedureStore]. No persistence is claimed.
  */
 class InMemoryProcedureStore(
     val workflowId: String,
