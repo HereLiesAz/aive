@@ -43,6 +43,7 @@ import com.hereliesaz.geministrator.workflow.RepositoryOperationExecutorIntegrat
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import com.hereliesaz.geministrator.workflow.RoutingRepositoryOperationClient
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
+import com.hereliesaz.geministrator.workflow.TestRunnerExecutorIntegration
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import java.util.UUID
@@ -122,6 +123,7 @@ fun main() {
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
+    val testRunner = LocalTestRunnerClient()
 
     try {
         application {
@@ -195,7 +197,12 @@ fun main() {
                         }
                     }
                 }
-                val executorIntegrations = computeSession?.executorIntegrations ?: baseExecutorIntegrations
+                // The test runner runs repository code on this computer, so it is added only here,
+                // never to the base set that pool leases from other devices run on.
+                val executorIntegrations = remember(computeSession, baseExecutorIntegrations) {
+                    (computeSession?.executorIntegrations ?: baseExecutorIntegrations)
+                        .withIntegration(TestRunnerExecutorIntegration(testRunner))
+                }
                 val uiScope = rememberCoroutineScope()
                 var localPlannerStatus by remember {
                     mutableStateOf<LocalPlannerStatus>(
@@ -427,6 +434,7 @@ fun main() {
             }
         }
     } finally {
+        testRunner.close()
         memoryLayer.detach()
         memoryScope.cancel()
         memorySessions.close()
