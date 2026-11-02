@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- The hive field now names its capillaries: each provider's name is written along its blood supply, and each capillary is a screen-reader node naming the provider and the creatures it feeds ("Claude, feeding Architect, Engineer").
 - The Swarm's role list now says how many saved hives use each role ("in N hives"), and **All / Producers / Reviewers** above it filters the list. Reviewers are the roles whose kind reviews others' work (QA, code and adversarial review, compliance and the like); every other role is a producer.
 - The Memory swarm now opens with a status line: when consolidation last did work since this start, how much waits in the selected bank's queue, how many instruction proposals wait across all roles, and **Consolidate now**. While memory is off or consolidation is paused, the button is replaced by the reason and the switch that resolves it sits just below.
 - Keeper's room › Appearance has an **Always show labels** switch for creature labels, stored on this device. A hive of more than 12 creatures normally keeps only the selected creature's label; with the switch on, every creature keeps its label.

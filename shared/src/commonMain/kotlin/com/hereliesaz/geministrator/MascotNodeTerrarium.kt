@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +50,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -69,6 +71,7 @@ import kotlin.math.roundToInt
 import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.semantics_capillary
 import com.hereliesaz.geministrator.resources.semantics_move_node_down
 import com.hereliesaz.geministrator.resources.semantics_move_node_left
 import com.hereliesaz.geministrator.resources.semantics_move_node_right
@@ -239,6 +242,7 @@ private fun MascotNodeTerrarium(
         }
         val subjectById = remember(subjects) { subjects.associateBy { it.node.id } }
         val onGround = azphaltOnSurface()
+        val capillaryText = rememberTextMeasurer()
 
         fun screenCenter(position: H2g2TerrariumPosition): Offset = Offset(
             x = widthPx * 0.5f + (position.x - focusX) * widthPx * zoom,
@@ -416,6 +420,7 @@ private fun MascotNodeTerrarium(
                     creatureRadius = creatureSizePx * zoom * 0.42f,
                     phase = linkPulse(),
                     isFlowing = { id -> subjectById[id]?.node?.state == H2g2WorkflowState.Active },
+                    textMeasurer = capillaryText,
                 ) { id -> (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) } }
             } else {
                 drawRect(Azphalt.Ink.copy(alpha = 0.025f))
@@ -660,6 +665,25 @@ private fun MascotNodeTerrarium(
                 )
             }
         }
+
+        // Each capillary is named where its name is written, for those who hear the field: the
+        // provider and the creatures it feeds. It only speaks; touches pass through to the tissue.
+        tissue?.capillaryCourses(widthPx, heightPx) { id ->
+            (workingPositions[id] ?: subjectById[id]?.position)?.let { screenCenter(it) }
+        }?.forEach { course -> key(course.capillary.providerId) {
+            val description = stringResource(
+                Res.string.semantics_capillary,
+                capillaryName(course.capillary.providerId),
+                capillaryFeeds(course.fed.map { id -> subjectById[id]?.node?.label ?: id }),
+            )
+            val half = with(density) { (AzphaltMinTouchTarget / 2).toPx() }
+            Box(
+                Modifier
+                    .offset { IntOffset((course.labelAt.x - half).roundToInt(), (course.labelAt.y - half).roundToInt()) }
+                    .size(AzphaltMinTouchTarget)
+                    .semantics(mergeDescendants = true) { contentDescription = description },
+            )
+        } }
 
         // Each clasp glows by how the upstream work came out: green succeeded, red failed or blocked.
         Canvas(Modifier.fillMaxSize()) {
