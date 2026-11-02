@@ -111,6 +111,7 @@ internal fun buildProviderTaskRequest(
             taskDefinitionId = task.id,
             roleId = role.id,
             parentWorkflowRunIds = run.parentWorkflowRunIds,
+            taskName = if (redaction.redactObjective) null else task.name,
         ),
     )
 }

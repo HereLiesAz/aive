@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.CHECKPOINT_COMMIT_METADATA_KEY
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
@@ -45,7 +46,8 @@ import kotlinx.coroutines.runInterruptible
  *
  * The model never receives shell access. It receives a bounded repository snapshot and returns a
  * unified diff. Haive checks every path Git would touch, validates the diff with `git apply --check`,
- * applies it inside an isolated Git worktree, and commits the resulting branch. Every Git command
+ * applies it inside an isolated Git worktree, and commits the result as this task's checkpoint, on the
+ * workflow run's `haive/run-...` branch when that branch can fast-forward to it. Every Git command
  * runs with repository hooks and the fsmonitor disabled, so Haive itself never runs repository code;
  * Git still honours the user's own configured filters (for example LFS) when it checks files out.
  * Verification must use a genuinely sandboxed test-capable provider.
@@ -87,6 +89,13 @@ internal class LocalWorkspaceAgentProvider(
         val artifacts: List<ProviderArtifact>,
         val generationUsage: TextGenerationResult? = null,
         val failureReason: String? = null,
+    )
+
+    /** The run's branch moved from [previous] (null: it did not exist) to [head], to undo if the task fails. */
+    private data class RunBranchMove(
+        val ref: String,
+        val previous: String?,
+        val head: String,
     )
 
     private companion object {
@@ -424,6 +433,7 @@ internal class LocalWorkspaceAgentProvider(
         planUsage: TextGenerationResult? = null,
     ): WorkspaceOutcome {
         val branch = workspaceBranch(request)
+        val runBranch = runBranch(request)
         val workspace = withContext(Dispatchers.IO) {
             Files.createTempDirectory("haive-${safeSegment(request.taskRunId.value)}-").toFile()
         }
@@ -435,6 +445,10 @@ internal class LocalWorkspaceAgentProvider(
         // Set before `worktree add` starts: a cancellation mid-command can leave its branch behind.
         var worktreeStarted = false
         var delivered = false
+        // Set just before the run's branch may move to this task's commit, so a task that then fails
+        // (or is cancelled) moves it back; and whether the checkpoint was delivered on it.
+        var runBranchMove: RunBranchMove? = null
+        var deliveredOnRunBranch = false
         return try {
             worktreeStarted = true
             git(
@@ -469,7 +483,27 @@ internal class LocalWorkspaceAgentProvider(
 
             applyPatch(workspace, patch)
             val changed = git(workspace, "status", "--porcelain").requireSuccess("inspect workspace changes").output
-            require(changed.isNotBlank()) { "$displayName patch did not change the working tree" }
+            if (changed.isBlank()) {
+                // The task left the repository as it found it: no commit, so no checkpoint and no branch.
+                // Later tasks continue from the same commit.
+                return WorkspaceOutcome(
+                    artifacts = listOf(
+                        ProviderArtifact(
+                            kind = ArtifactKind.CommandOutput,
+                            label = "No checkpoint: nothing changed",
+                            textContent = "$displayName's patch left the repository unchanged, so no commit was made.",
+                            mediaType = "text/plain",
+                            metadata = mapOf(
+                                "provider" to id.value,
+                                "source" to RepositorySource.Local.name,
+                                "baseCommitId" to baseCommit,
+                                "headCommit" to baseCommit,
+                            ),
+                        ),
+                    ),
+                    generationUsage = generated,
+                )
+            }
 
             val firstObjectiveLine = request.objective.trim().lineSequence().firstOrNull().orEmpty()
             val commitMessage = "Haive: ${firstObjectiveLine.take(68)}".trimEnd()
@@ -485,6 +519,8 @@ internal class LocalWorkspaceAgentProvider(
                 "commit",
                 "-m",
                 commitMessage,
+                "-m",
+                checkpointTrailers(request),
             ).requireSuccess("commit workspace changes")
             val checkpoint = recording?.let { cli ->
                 recordCheckpoint(cli, root, workspace, baseCommit, sessionId, generated)
@@ -494,6 +530,14 @@ internal class LocalWorkspaceAgentProvider(
                 .requireSuccess("capture committed patch")
                 .output
 
+            // Last fallible step: the checkpoint joins the run's branch, else stays on its own task branch.
+            val deliveredBranch = runBranch?.takeIf { target ->
+                advanceRunBranch(root, noHooks, target, baseCommit, headCommit) { runBranchMove = it }
+            } ?: branch
+            deliveredOnRunBranch = deliveredBranch != branch
+            delivered = true
+
+            val context = request.orchestrationContext
             val artifacts = buildList {
                 add(
                     ProviderArtifact(
@@ -501,15 +545,18 @@ internal class LocalWorkspaceAgentProvider(
                         label = commitMessage,
                         textContent = committedPatch,
                         mediaType = "text/x-diff",
-                        metadata = mapOf(
-                            "provider" to id.value,
-                            "source" to RepositorySource.Local.name,
-                            "branch" to branch,
-                            "baseCommitId" to baseCommit,
-                            "headCommit" to headCommit,
-                            "suggestedCommitMessage" to commitMessage,
-                            "commitOutput" to commit.output.take(2_000),
-                        ),
+                        metadata = buildMap {
+                            put("provider", id.value)
+                            put("source", RepositorySource.Local.name)
+                            put("branch", deliveredBranch)
+                            put("baseCommitId", baseCommit)
+                            put("headCommit", headCommit)
+                            put(CHECKPOINT_COMMIT_METADATA_KEY, headCommit)
+                            put("suggestedCommitMessage", commitMessage)
+                            put("commitOutput", commit.output.take(2_000))
+                            context.workflowRunId?.let { put("workflowRunId", it.value) }
+                            context.taskName?.let { put("taskName", it) }
+                        },
                     ),
                 )
                 checkpoint?.let { result ->
@@ -520,7 +567,7 @@ internal class LocalWorkspaceAgentProvider(
                             textContent = result.message.take(4_000).ifBlank { "entire session attach exited ${result.exitCode}" },
                             mediaType = "text/plain",
                             metadata = mapOf(
-                                "branch" to branch,
+                                "branch" to deliveredBranch,
                                 "headCommit" to headCommit,
                                 "entireSession" to sessionId,
                                 "exitCode" to result.exitCode.toString(),
@@ -533,11 +580,11 @@ internal class LocalWorkspaceAgentProvider(
                         kind = ArtifactKind.CommandOutput,
                         label = "Host execution withheld",
                         textContent =
-                            "Changes were committed on $branch. Repository code was not executed on the desktop host; " +
+                            "Changes were committed on $deliveredBranch. Repository code was not executed on the desktop host; " +
                                 "verification requires a sandboxed test-capable provider.",
                         mediaType = "text/plain",
                         metadata = mapOf(
-                            "branch" to branch,
+                            "branch" to deliveredBranch,
                             "baseCommitId" to baseCommit,
                             "headCommit" to headCommit,
                             "executionPolicy" to "no-host-repository-code",
@@ -548,7 +595,7 @@ internal class LocalWorkspaceAgentProvider(
             WorkspaceOutcome(
                 artifacts = artifacts,
                 generationUsage = generated,
-            ).also { delivered = true }
+            )
         } finally {
             // Cleanup must outlive cancellation: a cancelled coroutine cannot otherwise even start the
             // process that removes the worktree.
@@ -556,9 +603,20 @@ internal class LocalWorkspaceAgentProvider(
                 if (worktreeStarted) {
                     // Best-effort cleanup only; each step runs even when an earlier one fails.
                     runCatching { git(root, "worktree", "remove", "--force", workspace.absolutePath) }
-                    // A delivered branch stays durable in the source repository; one nobody will hear
-                    // about (failure or cancellation) is removed with its worktree.
-                    if (!delivered) runCatching { git(root, "branch", "-D", branch) }
+                    // A checkpoint nobody will hear about (failure or cancellation) leaves the run's branch
+                    // where it was; compare-and-swap, so a branch that has moved on since is left alone.
+                    if (!delivered) runBranchMove?.let { move ->
+                        runCatching {
+                            if (move.previous == null) {
+                                git(root, *noHooks, "update-ref", "-d", move.ref, move.head)
+                            } else {
+                                git(root, *noHooks, "update-ref", move.ref, move.previous, move.head)
+                            }
+                        }
+                    }
+                    // A delivered task branch stays durable in the source repository; one nobody will hear
+                    // about, or whose commit now lives on the run's branch, is removed with its worktree.
+                    if (!delivered || deliveredOnRunBranch) runCatching { git(root, *noHooks, "branch", "-D", branch) }
                 }
                 withContext(Dispatchers.IO) {
                     runCatching { workspace.deleteRecursively() }
@@ -854,9 +912,72 @@ internal class LocalWorkspaceAgentProvider(
     private fun workspaceBranch(request: AgentTaskRequest): String =
         "haive/${safeSegment(request.taskRunId.value).take(40)}-${UUID.randomUUID().toString().take(12)}"
 
+    /** The workflow run's branch, which each of its tasks' checkpoints extends; null outside a run. */
+    private fun runBranch(request: AgentTaskRequest): String? =
+        request.orchestrationContext.workflowRunId?.value?.let { runId ->
+            "haive/run-" + safeSegment(runId).take(48).trimEnd('-', '.', '_').removeSuffix(".lock").ifBlank { "run" }
+        }
+
+    /**
+     * The commit message's body: which task made this checkpoint, in which run. Values are single
+     * lines, so each stays one Git trailer.
+     */
+    private fun checkpointTrailers(request: AgentTaskRequest): String {
+        fun line(value: String?): String? =
+            value?.lineSequence()?.firstOrNull()?.trim()?.take(120)?.takeIf(String::isNotEmpty)
+        val context = request.orchestrationContext
+        val name = line(context.taskName)
+        val definition = line(context.taskDefinitionId?.value)
+        return buildList {
+            when {
+                name != null && definition != null && name != definition -> add("Haive-Task: $name ($definition)")
+                name != null -> add("Haive-Task: $name")
+                definition != null -> add("Haive-Task: $definition")
+            }
+            line(context.workflowRunId?.value)?.let { add("Haive-Run: $it") }
+            line(request.taskRunId.value)?.let { add("Haive-Task-Run: $it") }
+        }.joinToString("\n").ifEmpty { "Haive-Task-Run: unknown" }
+    }
+
+    /**
+     * Moves the run's branch [runBranch] to [headCommit] when it does not exist yet or still points at
+     * [baseCommit], the commit this task started from; [onMove] hears of the move before it is made so a
+     * later failure can undo it. False, leaving the checkpoint on its own task branch, when the run's
+     * branch has moved on (a parallel task got there first) or is checked out anywhere: a branch someone
+     * has checked out never moves under them.
+     */
+    private suspend fun advanceRunBranch(
+        root: File,
+        noHooks: Array<String>,
+        runBranch: String,
+        baseCommit: String,
+        headCommit: String,
+        onMove: (RunBranchMove) -> Unit,
+    ): Boolean {
+        val ref = "refs/heads/$runBranch"
+        val worktrees = git(root, "worktree", "list", "--porcelain").requireSuccess("list worktrees").output
+        if (worktrees.lineSequence().any { it.trim() == "branch $ref" }) return false
+        val base = git(root, "rev-parse", "--verify", "--quiet", "$baseCommit^{commit}")
+            .requireSuccess("resolve base commit")
+            .output
+            .trim()
+        val current = git(root, "rev-parse", "--verify", "--quiet", "$ref^{commit}")
+        require(!current.timedOut) { "Unable to read $runBranch: command timed out" }
+        val previous = when {
+            current.exitCode != 0 -> null
+            current.output.trim() == base -> base
+            else -> return false
+        }
+        onMove(RunBranchMove(ref = ref, previous = previous, head = headCommit))
+        // The expected old value makes this a compare-and-swap; empty means "must not exist yet".
+        val moved = git(root, *noHooks, "update-ref", "-m", "Haive checkpoint", ref, headCommit, previous.orEmpty())
+        return moved.exitCode == 0 && !moved.timedOut
+    }
+
     private fun safeSegment(value: String): String = value
         .lowercase()
         .replace(Regex("[^a-z0-9._-]+"), "-")
+        .replace(Regex("\\.{2,}"), ".")
         .trim('-', '.', '_')
         .ifBlank { "task" }
 

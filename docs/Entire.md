@@ -6,11 +6,11 @@ The Aive finds `entire` on `PATH` (absolute entries only) or where its installer
 
 ## The Aive as an Entire agent
 
-With **Record runs as checkpoints** on (Repositories → Entire), each Local Git coding run in a repository where Entire is set up (`entire enable`) becomes a checkpoint:
+With **Record runs as checkpoints** on (Repositories → Entire), each Local Git coding task in a repository where Entire is set up (`entire enable`) becomes a checkpoint, one per DAG node that changed the repository (`Local-Git-Repository-Operations.md`, "A checkpoint per task"); a task that changed nothing makes none:
 
 1. While the run works, The Aive writes its transcript to `~/.aive/entire/sessions/<session>.jsonl`: the task, the plan, the diff, the files changed and the tokens used. Transcripts not written for 30 days are deleted when the next run starts.
 2. It commits in its isolated worktree as before, with git hooks still disabled, so no repository code runs on the host.
-3. It then runs `entire session attach <session> --agent aive --force` in that worktree. Entire adds the `Entire-Checkpoint` trailer to the run's commit (on its own `haive/...` branch; the keeper's checkout is untouched), and the checkpoint is pushed with that branch.
+3. It then runs `entire session attach <session> --agent aive --force` in that worktree. Entire adds the `Entire-Checkpoint` trailer to the task's commit (the keeper's checkout is untouched), which then joins the run's `haive/run-...` branch (or stays on the task's own `haive/...` branch), and the checkpoint is pushed with that branch.
 4. The run shows an **Entire checkpoint** artifact with what `entire` reported. If attaching fails, the commit stands and the artifact says why.
 
 Entire reads the transcript through `entire-agent-aive`, an [external agent plugin](https://github.com/entireio/cli/blob/main/docs/architecture/external-agent-protocol.md) (protocol 1). The Aive writes that launcher to `~/.aive/bin` each time it attaches, pointing at the running installation (`<The Aive> entire-agent <subcommand>`), and puts that folder first on `PATH` for the `entire` it starts. The plugin declares no hooks; it reads sessions, transcripts, prompts, changed files and token counts, and refuses any transcript outside the sessions folder. `read-session` returns the transcript as `native_data` (base64), and `write-session` writes it back to its `session_ref`, inside the sessions folder only, so `entire session resume` can restore it.
