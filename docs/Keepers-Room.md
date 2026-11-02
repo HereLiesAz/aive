@@ -11,10 +11,16 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
 | | **This device** | remote access, the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **This device** | spend caps, remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
+| | **This device** | remote access, the local planner, local orchestration specialists | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Appearance** | the ground | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
+
+## Delegations
+
+When you approve the same creature's plan on the same provider several times in a row (5 by default) and never reject it, a dialog asks once: "Let it proceed without asking for plan approval?". **Let it proceed** delegates that gate; **Keep asking** leaves it for the rest of the streak. A delegated gate approves itself and its run's events show "Approved by delegation". Only a creature that cannot write to a repository, deploy or write anywhere else, on a provider that cannot either, is ever offered; `HumanApproval` tasks and every other gate always ask (`docs/THREAT_MODEL.md`, Progressive delegation). A rejection starts the streak over and ends the delegation. The Delegations part lists each one with **Revoke**. Delegations stay on this device and are never in the setup file or an export.
 
 Memory is not here: it is a swarm of its own, running beside every other, so it lives in the hive (**Memory swarm**, beside Swarm at the top of the hive). Its stages that run without a model wear the neuron (`Node-Creatures.md`, Programmatic work).
 

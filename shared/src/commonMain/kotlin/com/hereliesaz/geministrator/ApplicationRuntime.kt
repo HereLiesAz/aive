@@ -47,6 +47,11 @@ import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.workflow.ApprovalGateCoordinator
 import com.hereliesaz.geministrator.workflow.ApprovalGateKind
 import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
+import com.hereliesaz.geministrator.workflow.DelegationEligibility
+import com.hereliesaz.geministrator.workflow.DelegationKey
+import com.hereliesaz.geministrator.workflow.DelegationPolicy
+import com.hereliesaz.geministrator.workflow.GateDelegationContext
+import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import com.hereliesaz.geministrator.workflow.ManagedSessionFailure
 import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
@@ -122,6 +127,8 @@ class ApplicationRuntime private constructor(
     private val runtimeScope: CoroutineScope,
     private val roles: List<RoleDefinition>,
     private val nestedWorkflows: WorkflowRunNestedWorkflowClient? = null,
+    /** The keeper's approval habits and delegations; null turns progressive delegation off. */
+    val delegations: ProgressiveDelegationStore? = null,
 ) {
     private data class Current(
         val project: Project,
@@ -370,136 +377,237 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun approveTask(taskDefinitionId: TaskDefinitionId) {
-        runtimeMutex.withLock {
-            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
-            val task = requireNotNull(snapshot.definition.tasks.firstOrNull { it.id == taskDefinitionId }) {
-                "Task ${taskDefinitionId.value} is not defined"
-            }
-            val taskRun = requireNotNull(snapshot.state.run.taskRuns[taskDefinitionId]) {
-                "Task ${taskDefinitionId.value} has no runtime state"
-            }
-            if (taskRun.awaitsNestedHumanApproval()) {
-                // The gate lives in the child run; the next cycle carries the decision back up.
-                val childRunId = requireNotNull(taskRun.externalRunId)
-                require(nestedWorkflows?.approvePendingHumanApproval(childRunId) == true) {
-                    "Nested workflow run $childRunId has no pending human approval"
-                }
-                return@withLock
-            }
-            require(taskRun.status == TaskRunStatus.AwaitingApproval) {
-                "Task ${taskDefinitionId.value} is not awaiting approval"
-            }
+        runtimeMutex.withLock { approveTaskLocked(taskDefinitionId, byDelegation = false) }
+    }
 
-            val now = nowEpochMillis()
-            val nextState = if (taskRun.isHeldAtContextTaintGate()) {
-                // Held because its inputs include external content (ContextTaint.kt): approval is the
-                // person's decision to let it act on them; the cycle then lets it run.
-                val gateCoordinator = ApprovalGateCoordinator(
-                    repository = persistence.approvalGates,
-                    eventSink = RepositoryWorkflowEventSink(persistence.events),
-                )
-                val gateId = contextTaintGateId(snapshot.state.run.id, taskDefinitionId, taskRun.attempt)
-                if (persistence.approvalGates.get(gateId) == null) {
-                    gateCoordinator.open(
-                        id = gateId,
-                        workflowRunId = snapshot.state.run.id,
-                        taskDefinitionId = taskDefinitionId,
-                        kind = ApprovalGateKind.SecurityRisk,
-                        reason = taskRun.blockingReason?.message ?: "External inputs for '${task.name}'",
-                        requiresHuman = true,
-                        nowEpochMillis = now,
-                    )
-                }
-                val gate = requireNotNull(persistence.approvalGates.get(gateId))
-                if (gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
-                    gateCoordinator.decide(
-                        id = gateId,
-                        approved = true,
-                        decidedByRoleId = null,
-                        note = "Approved in application",
-                        nowEpochMillis = now,
-                    )
-                }
-                coordinator.cycle(
-                    project = snapshot.project,
-                    definition = snapshot.definition,
-                    state = snapshot.state,
+    /**
+     * Approves [taskDefinitionId]'s gate. [byDelegation] is true only when [approveDelegatedGatesLocked]
+     * approves a plan gate the keeper delegated; everything else is the keeper's own decision.
+     */
+    private suspend fun approveTaskLocked(taskDefinitionId: TaskDefinitionId, byDelegation: Boolean) {
+        val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+        val task = requireNotNull(snapshot.definition.tasks.firstOrNull { it.id == taskDefinitionId }) {
+            "Task ${taskDefinitionId.value} is not defined"
+        }
+        val taskRun = requireNotNull(snapshot.state.run.taskRuns[taskDefinitionId]) {
+            "Task ${taskDefinitionId.value} has no runtime state"
+        }
+        if (taskRun.awaitsNestedHumanApproval()) {
+            require(!byDelegation) { "Nested human approvals are never delegated" }
+            // The gate lives in the child run; the next cycle carries the decision back up.
+            val childRunId = requireNotNull(taskRun.externalRunId)
+            require(nestedWorkflows?.approvePendingHumanApproval(childRunId) == true) {
+                "Nested workflow run $childRunId has no pending human approval"
+            }
+            return
+        }
+        require(taskRun.status == TaskRunStatus.AwaitingApproval) {
+            "Task ${taskDefinitionId.value} is not awaiting approval"
+        }
+
+        val now = nowEpochMillis()
+        val nextState = if (taskRun.isHeldAtContextTaintGate()) {
+            // External-input gates are the keeper's own decision; never delegated.
+            require(!byDelegation) { "External-input gates are never delegated" }
+            // Held because its inputs include external content (ContextTaint.kt): approval is the
+            // person's decision to let it act on them; the cycle then lets it run.
+            val gateCoordinator = ApprovalGateCoordinator(
+                repository = persistence.approvalGates,
+                eventSink = RepositoryWorkflowEventSink(persistence.events),
+            )
+            val gateId = contextTaintGateId(snapshot.state.run.id, taskDefinitionId, taskRun.attempt)
+            if (persistence.approvalGates.get(gateId) == null) {
+                gateCoordinator.open(
+                    id = gateId,
+                    workflowRunId = snapshot.state.run.id,
+                    taskDefinitionId = taskDefinitionId,
+                    kind = ApprovalGateKind.SecurityRisk,
+                    reason = taskRun.blockingReason?.message ?: "External inputs for '${task.name}'",
+                    requiresHuman = true,
                     nowEpochMillis = now,
-                    artifactIdFactory = ::artifactId,
                 )
-            } else if (taskRun.assignedProviderId != null) {
-                // An engine-held plan has no provider session yet; approval only records the decision.
-                val handle = if (taskRun.isHeldAtEnginePlanGate()) {
-                    null
-                } else {
-                    requireNotNull(snapshot.state.handles[taskDefinitionId]) {
-                        "Task ${taskDefinitionId.value} has no provider session to approve"
-                    }
-                }
-                val eventSink = RepositoryWorkflowEventSink(persistence.events)
-                val gateCoordinator = ApprovalGateCoordinator(
-                    repository = persistence.approvalGates,
-                    eventSink = eventSink,
-                )
-                val approvalService = WorkflowApprovalService(
-                    gateRepository = persistence.approvalGates,
-                    gateCoordinator = gateCoordinator,
-                    sessionGateway = sessionGateway,
-                    failureEscalationDecisionStore = persistence,
-                )
-                val gateId = ApprovalGateId(
-                    "plan:${snapshot.state.run.id.value}:${taskDefinitionId.value}:${taskRun.attempt}",
-                )
-                if (persistence.approvalGates.get(gateId) == null) {
-                    gateCoordinator.open(
-                        id = gateId,
-                        workflowRunId = snapshot.state.run.id,
-                        taskDefinitionId = taskDefinitionId,
-                        kind = ApprovalGateKind.PlanApproval,
-                        reason = "Plan approval required for '${task.name}'",
-                        requiresHuman = true,
-                        nowEpochMillis = now,
-                    )
-                }
-
-                val decision = approvalService.approvePlan(
-                    gateId = gateId,
-                    handle = handle,
+            }
+            val gate = requireNotNull(persistence.approvalGates.get(gateId))
+            if (gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
+                gateCoordinator.decide(
+                    id = gateId,
+                    approved = true,
                     decidedByRoleId = null,
                     note = "Approved in application",
                     nowEpochMillis = now,
                 )
-                val stateForCycle = if (decision.status == ApprovalGateStatus.Rejected) {
-                    snapshot.state.copy(handles = snapshot.state.handles - taskDefinitionId)
-                } else {
-                    snapshot.state
-                }
-                coordinator.cycle(
-                    project = snapshot.project,
-                    definition = snapshot.definition,
-                    state = stateForCycle,
-                    nowEpochMillis = now,
-                    artifactIdFactory = ::artifactId,
-                )
+            }
+            coordinator.cycle(
+                project = snapshot.project,
+                definition = snapshot.definition,
+                state = snapshot.state,
+                nowEpochMillis = now,
+                artifactIdFactory = ::artifactId,
+            )
+        } else if (taskRun.assignedProviderId != null) {
+            // An engine-held plan has no provider session yet; approval only records the decision.
+            val handle = if (taskRun.isHeldAtEnginePlanGate()) {
+                null
             } else {
-                require(task.effectiveExecutor() is TaskExecutor.HumanApproval) {
-                    "Task ${taskDefinitionId.value} is not a human approval gate"
-                }
-                WorkflowRuntimeState(
-                    run = engine.completeHumanApprovalTask(
-                        definition = snapshot.definition,
-                        run = snapshot.state.run,
-                        taskDefinitionId = taskDefinitionId,
-                        nowEpochMillis = now,
-                    ),
-                    handles = snapshot.state.handles,
-                ).also {
-                    coordinator.persist(snapshot.project, snapshot.definition, it)
+                requireNotNull(snapshot.state.handles[taskDefinitionId]) {
+                    "Task ${taskDefinitionId.value} has no provider session to approve"
                 }
             }
+            val eventSink = RepositoryWorkflowEventSink(persistence.events)
+            val gateCoordinator = ApprovalGateCoordinator(
+                repository = persistence.approvalGates,
+                eventSink = eventSink,
+            )
+            val approvalService = WorkflowApprovalService(
+                gateRepository = persistence.approvalGates,
+                gateCoordinator = gateCoordinator,
+                sessionGateway = sessionGateway,
+                failureEscalationDecisionStore = persistence,
+            )
+            val gateId = ApprovalGateId(
+                "plan:${snapshot.state.run.id.value}:${taskDefinitionId.value}:${taskRun.attempt}",
+            )
+            val delegation = planGateDelegation(snapshot.definition, snapshot.state.run, taskDefinitionId)
+            if (byDelegation) {
+                // The single eligibility check runs again at the moment of approval.
+                require(delegation != null && delegations?.isDelegated(delegation.key) == true) {
+                    "Task ${taskDefinitionId.value}'s plan gate is not delegated"
+                }
+            }
+            if (persistence.approvalGates.get(gateId) == null) {
+                gateCoordinator.open(
+                    id = gateId,
+                    workflowRunId = snapshot.state.run.id,
+                    taskDefinitionId = taskDefinitionId,
+                    kind = ApprovalGateKind.PlanApproval,
+                    reason = "Plan approval required for '${task.name}'",
+                    requiresHuman = true,
+                    nowEpochMillis = now,
+                )
+            }
 
-            replaceCurrent(snapshot.copy(state = nextState))
-            publishCurrent()
+            val decision = approvalService.approvePlan(
+                gateId = gateId,
+                handle = handle,
+                decidedByRoleId = null,
+                note = if (byDelegation) "Approved by delegation" else "Approved in application",
+                nowEpochMillis = now,
+                byDelegation = byDelegation,
+            )
+            if (!byDelegation && decision.status == ApprovalGateStatus.Approved && delegation != null) {
+                delegations?.recordApproval(delegation.key, delegation.roleName)
+            }
+            val stateForCycle = if (decision.status == ApprovalGateStatus.Rejected) {
+                snapshot.state.copy(handles = snapshot.state.handles - taskDefinitionId)
+            } else {
+                snapshot.state
+            }
+            coordinator.cycle(
+                project = snapshot.project,
+                definition = snapshot.definition,
+                state = stateForCycle,
+                nowEpochMillis = now,
+                artifactIdFactory = ::artifactId,
+            )
+        } else {
+            // Invariant 4 (docs/THREAT_MODEL.md): a HumanApproval task is always the keeper's own act.
+            require(!byDelegation) { "Human approval tasks are never delegated" }
+            require(task.effectiveExecutor() is TaskExecutor.HumanApproval) {
+                "Task ${taskDefinitionId.value} is not a human approval gate"
+            }
+            WorkflowRuntimeState(
+                run = engine.completeHumanApprovalTask(
+                    definition = snapshot.definition,
+                    run = snapshot.state.run,
+                    taskDefinitionId = taskDefinitionId,
+                    nowEpochMillis = now,
+                ),
+                handles = snapshot.state.handles,
+            ).also {
+                coordinator.persist(snapshot.project, snapshot.definition, it)
+            }
+        }
+
+        replaceCurrent(snapshot.copy(state = nextState))
+        publishCurrent()
+    }
+
+    /** The delegation [taskDefinitionId]'s plan gate falls under, or null when it can never be delegated. */
+    private suspend fun planGateDelegation(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+    ): PlanGateDelegation? {
+        if (delegations == null) return null
+        val task = definition.tasks.firstOrNull { it.id == taskDefinitionId } ?: return null
+        val taskRun = run.taskRuns[taskDefinitionId] ?: return null
+        val roleId = taskRun.assignedRoleId ?: task.roleId
+        val role = roleId?.let { id ->
+            run.roleSnapshot.firstOrNull { it.id == id } ?: roles.firstOrNull { it.id == id }
+        }
+        val executor = taskRun.executor
+            ?: runCatching { task.effectiveExecutor(role) }.getOrNull()
+            ?: return null
+        val providerId = taskRun.assignedProviderId
+        val capabilities = providerId?.let { id ->
+            try {
+                providerRegistry.provider(id)?.capabilities()?.supported
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val eligibility = DelegationPolicy.eligibility(
+            GateDelegationContext(
+                gateKind = ApprovalGateKind.PlanApproval,
+                executor = executor,
+                role = role,
+                requiredRoleAuthority = task.requiredRoleAuthority,
+                providerId = providerId,
+                providerCapabilities = capabilities,
+            ),
+        )
+        return when (eligibility) {
+            is DelegationEligibility.Eligible -> PlanGateDelegation(eligibility.key, role?.name ?: eligibility.key.roleId)
+            is DelegationEligibility.Ineligible -> null
+        }
+    }
+
+    private data class PlanGateDelegation(val key: DelegationKey, val roleName: String)
+
+    /** The keeper rejected [taskDefinitionId]'s plan: its role's streak on that provider starts over. */
+    internal fun recordPlanRejection(run: WorkflowRun, taskDefinitionId: TaskDefinitionId) {
+        val store = delegations ?: return
+        val taskRun = run.taskRuns[taskDefinitionId] ?: return
+        val roleId = taskRun.assignedRoleId ?: return
+        store.recordRejection(roleId.value, taskRun.assignedProviderId?.value)
+    }
+
+    /**
+     * Approves every plan gate waiting on the keeper that the keeper delegated, each recorded as
+     * approved by delegation. Eligibility is checked again for each, so a role that has since gained
+     * a writing authority, or now runs on a provider that writes, asks again.
+     */
+    private suspend fun approveDelegatedGatesLocked() {
+        val store = delegations ?: return
+        if (store.state.value.delegations.isEmpty()) return
+        val waiting = current?.state?.run?.taskRuns?.keys?.toList() ?: return
+        for (taskDefinitionId in waiting) {
+            val snapshot = current ?: return
+            if (snapshot.state.run.status.isTerminal()) return
+            val taskRun = snapshot.state.run.taskRuns[taskDefinitionId] ?: continue
+            if (taskRun.status != TaskRunStatus.AwaitingApproval || taskRun.assignedProviderId == null) continue
+            if (taskRun.awaitsNestedHumanApproval()) continue
+            val delegation = planGateDelegation(snapshot.definition, snapshot.state.run, taskDefinitionId) ?: continue
+            if (!store.isDelegated(delegation.key)) continue
+            try {
+                approveTaskLocked(taskDefinitionId, byDelegation = true)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // The gate keeps waiting on the keeper, who can still decide it by hand.
+            }
         }
     }
 
@@ -558,6 +666,7 @@ class ApplicationRuntime private constructor(
                         if (currentGeneration != snapshotGeneration || current !== snapshot) return@withLock
                         replaceCurrent(snapshot.copy(state = nextState))
                         publishCurrent()
+                        approveDelegatedGatesLocked()
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (failure: Exception) {
@@ -919,6 +1028,8 @@ class ApplicationRuntime private constructor(
             spendCaps: () -> SpendCaps = { SpendCaps() },
             /** Opt-in OTLP trace export of finished runs (docs/architecture/OBSERVABILITY.md); null exports nothing. */
             traceExport: com.hereliesaz.geministrator.telemetry.WorkflowTraceExport? = null,
+            /** The keeper's approval habits (workflow/ProgressiveDelegation.kt); null leaves every gate asking. */
+            delegations: ProgressiveDelegationStore? = null,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
@@ -983,6 +1094,7 @@ class ApplicationRuntime private constructor(
                     runtimeScope,
                     roles,
                     nestedWorkflows,
+                    delegations,
                 )
             }
 

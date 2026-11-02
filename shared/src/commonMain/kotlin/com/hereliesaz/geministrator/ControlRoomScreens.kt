@@ -85,6 +85,7 @@ import com.hereliesaz.geministrator.resources.runs_agent_assigned
 import com.hereliesaz.geministrator.resources.runs_approval_required
 import com.hereliesaz.geministrator.resources.runs_approve_to_begin_execution
 import com.hereliesaz.geministrator.resources.runs_approved
+import com.hereliesaz.geministrator.resources.runs_approved_by_delegation
 import com.hereliesaz.geministrator.resources.runs_artifact_created
 import com.hereliesaz.geministrator.resources.runs_attempt_of
 import com.hereliesaz.geministrator.resources.runs_authority
@@ -500,7 +501,11 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     is AgentAssigned -> stringResource(Res.string.runs_agent_assigned)
     is TaskStarted -> stringResource(Res.string.runs_task_started_attempt, event.attempt)
     is ApprovalRequired -> stringResource(Res.string.runs_approval_required)
-    is ApprovalDecisionReceived -> if (event.approved) stringResource(Res.string.runs_approved) else stringResource(Res.string.runs_rejected)
+    is ApprovalDecisionReceived -> when {
+        !event.approved -> stringResource(Res.string.runs_rejected)
+        event.byDelegation -> stringResource(Res.string.runs_approved_by_delegation)
+        else -> stringResource(Res.string.runs_approved)
+    }
     is ArtifactCreated -> stringResource(Res.string.runs_artifact_created, event.artifact.kind.name)
     is VerificationFailed -> stringResource(Res.string.runs_verification_failed)
     is RetryScheduled -> stringResource(Res.string.runs_retry_scheduled_attempt, event.nextAttempt)

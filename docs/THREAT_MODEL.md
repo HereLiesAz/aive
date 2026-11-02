@@ -272,6 +272,23 @@ Every artifact a task receives is labelled with where it came from, in `Artifact
 - A gate inside a nested child run is named on the parent node but, like plan approvals, cannot be decided from it.
 - Labels are not signed. A tampered store or imported bundle can relabel artifacts (see Persistence).
 - Each new attempt opens a new gate, even when the inputs are unchanged.
+### Progressive delegation
+
+After the keeper approves the same role's plan gate on the same provider N times in a row (default 5, 2 to 20, set under the Keeper's room › Delegations), The Aive offers once to stop asking (`workflow/ProgressiveDelegation.kt`). Accepted, later gates of that kind approve themselves; each is recorded as an `ApprovalDecisionReceived` with `byDelegation = true` and shown as "Approved by delegation".
+
+**Threats**
+- Learned auto-approval lets a mutating action through without a person (invariant 4).
+- A forged or imported delegation grants itself.
+- A role or provider gains write access after it was delegated.
+
+**Mitigations in place**
+- One function, `DelegationPolicy.eligibility`, decides eligibility, and only an eligible gate yields a `DelegationKey` (its constructor is internal). Only plan approval (`DelegableGateKind`) can be delegated. Never eligible: `HumanApproval` tasks (including nested ones), repository operations, deployments, external services, executors that run code (GitHub Actions, scripts, test runners), nested and distributed work, roles with `Implement`, `AuthorTests`, `ApproveIntegration` or `ApproveRelease`, tasks exercising those, roles needing or providers offering `RepositoryWrite`, `ShellExecution`, `Testing`, `TestAuthoring` or `PullRequestCreation`, roles with a writable surface, providers whose capabilities are unknown, and gates raised by context taint. The authority and capability classifications are exhaustive `when`s, so a new value must be classified.
+- Eligibility is checked again at every automatic approval; a role or provider that has since gained write access asks again. `ApprovalGateCoordinator.decide` refuses `byDelegation` for anything but an approved plan gate, and the runtime refuses it for `HumanApproval` tasks.
+- The offer is explicit: Keep asking declines it for the rest of the streak. Any plan rejection for the role resets its streak and ends its delegation. Every delegation is listed under the Keeper's room › Delegations with Revoke.
+- Delegations live only in this device's settings store. They are not in the setup file, `.ive` files or exports, so a file cannot grant one.
+
+**Remaining gaps**
+- The Aive has no context-taint signal yet; `GateDelegationContext.raisedByContextTaint` is the hook and is always false today.
 
 ### Nested workflows
 

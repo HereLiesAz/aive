@@ -135,6 +135,8 @@ fun App(
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
+    val delegations = remember { com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore.createDefault() }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
     var runtime by remember { mutableStateOf<ApplicationRuntime?>(null) }
     var runtimeGeneration by remember { mutableStateOf(0) }
@@ -166,6 +168,7 @@ fun App(
                 ),
                 spendCaps = { spendCapStore.caps },
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
+                delegations = delegations,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))
@@ -863,6 +866,7 @@ fun App(
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
                         memoryLayer = memoryLayer,
+                        delegations = delegations,
                         azphaltStoreService = azphaltStoreService,
                         azphaltPackageImportRequest = azphaltPackageImportRequest,
                         onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,

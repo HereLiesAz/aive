@@ -29,6 +29,8 @@ class WorkflowApprovalService(
         decidedByRoleId: RoleDefinitionId?,
         note: String?,
         nowEpochMillis: Long,
+        /** The keeper delegated this gate (ProgressiveDelegation.kt); recorded on the decision event. */
+        byDelegation: Boolean = false,
     ): ApprovalGate = planApprovalMutex.withLock {
         val gate = requireNotNull(gateRepository.get(gateId)) {
             "Approval gate ${gateId.value} does not exist"
@@ -48,6 +50,7 @@ class WorkflowApprovalService(
                 decidedByRoleId = decidedByRoleId,
                 note = note,
                 nowEpochMillis = nowEpochMillis,
+                byDelegation = byDelegation,
             )
         }
         if (gate.status == ApprovalGateStatus.Applying) {
@@ -75,6 +78,7 @@ class WorkflowApprovalService(
                 decidedByRoleId = decidedByRoleId,
                 note = note,
                 nowEpochMillis = nowEpochMillis,
+                byDelegation = byDelegation,
             )
 
             is ProviderActionResult.Rejected -> {
