@@ -236,4 +236,20 @@ class RoleInstructionProposalsTest {
         assertEquals("$once\n- two", RoleInstructionProposer.applyLines(once, listOf("two")))
         assertEquals("${RoleInstructionProposer.LESSONS_HEADER}\n- one", RoleInstructionProposer.applyLines("", listOf("one")))
     }
+
+    @Test
+    fun pendingCountCountsWaitingProposalsAcrossEveryRole() {
+        fun proposal(id: String, role: RoleDefinition, status: RoleInstructionProposalStatus) =
+            RoleInstructionProposal(id, role.id, "Base.", "Base.\n- x", emptyList(), 0L, status)
+        val state = RoleInstructionProposalState(
+            proposals = listOf(
+                proposal("1", engineer, RoleInstructionProposalStatus.Pending),
+                proposal("2", qa, RoleInstructionProposalStatus.Pending),
+                proposal("3", qa, RoleInstructionProposalStatus.Dismissed),
+                proposal("4", engineer, RoleInstructionProposalStatus.Superseded),
+            ),
+        )
+        assertEquals(2, state.pendingCount)
+        assertEquals(1, state.pendingFor(qa.id).size)
+    }
 }

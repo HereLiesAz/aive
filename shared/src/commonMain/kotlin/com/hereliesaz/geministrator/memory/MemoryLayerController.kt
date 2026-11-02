@@ -30,6 +30,12 @@ data class MemoryActivity(
     val last: MemoryConsolidationResult? = null,
     val lastStage: MemoryConsolidationStage? = null,
     val lastAtEpochMillis: Long? = null,
+    /**
+     * When a packet last did consolidation work ([consolidatedSomething]) since this start; null until
+     * then. In memory only: nothing durable records when a queue entry finished, so the Memory swarm's
+     * status line says "since this start".
+     */
+    val lastConsolidatedAtEpochMillis: Long? = null,
     /** Sessions banked since the app started. */
     val banked: Int = 0,
 )
@@ -310,6 +316,16 @@ class MemoryLayerController(
 
     // ---- consolidation --------------------------------------------------------------------------
 
+    /**
+     * The keeper's **Consolidate now**: starts a drain of every workflow's queue unless memory is off
+     * or consolidation is paused (or a drain is already working). Returns why it did or did not start.
+     */
+    fun consolidateNow(): ConsolidateNowState {
+        val state = consolidateNowState(settings.value, activity.value)
+        if (state == ConsolidateNowState.Ready) drainSoon()
+        return state
+    }
+
     fun drainSoon() {
         scope.launch {
             drain()
@@ -334,6 +350,7 @@ class MemoryLayerController(
                     last = result,
                     lastStage = next?.stage ?: mutableActivity.value.lastStage,
                     lastAtEpochMillis = nowEpochMillis(),
+                    lastConsolidatedAtEpochMillis = if (result.consolidatedSomething) nowEpochMillis() else mutableActivity.value.lastConsolidatedAtEpochMillis,
                 )
                 publish()
                 if (result == MemoryConsolidationResult.Idle) break

@@ -584,6 +584,17 @@ programmatically and the reason is reported. Settings also carry `enabled` (off:
 recalled, stored memory kept), `consolidationPaused` (banking continues, consolidation waits) and the
 consolidation `policy`. Changes apply between packets.
 
+The Memory swarm opens with a status line just above the on/off and running/paused switches:
+when consolidation last did work (a stage applied, an entry completed, pair summaries written or a
+condensation declined; an idle pass or a failure does not count), how many queue entries wait in the
+selected bank, how many role-instruction proposals wait across every role (each is reviewed on its
+creature's Mind tab), and **Consolidate now** (`MemoryLayerController.consolidateNow`), which starts a
+drain of every workflow's queue. The time is kept in memory only
+(`MemoryActivity.lastConsolidatedAtEpochMillis`), so it reads "since this start": nothing durable
+records when a queue entry finished (entries carry only `createdAtEpochMillis`), and the settings
+store holds choices, not activity. While memory is off or consolidation is paused, the button gives
+way to the reason and points at the switch below; nothing is consolidated (`consolidateNowState`).
+
 ### Storage
 
 Each workflow's bank is its own SQLite database through SQLDelight (`SqlMemoryStore`; schema in
