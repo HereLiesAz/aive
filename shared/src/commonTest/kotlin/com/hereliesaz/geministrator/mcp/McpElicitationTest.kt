@@ -222,7 +222,7 @@ class McpElicitationTest {
             "colour" to McpFieldInput.Choices(setOf("#0f0")),
             "tags" to McpFieldInput.Choices(setOf("c", "a")),
         )
-        assertEquals(
+        assertEquals<kotlinx.serialization.json.JsonElement?>(
             Json.parseToJsonElement(
                 """{"name":"Ann","email":"ann@example.com","age":30,"score":2.5,"subscribe":true,"colour":"#0f0","tags":["a","c"]}""",
             ),

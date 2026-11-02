@@ -34,7 +34,6 @@ import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.CONTEXT_TAINT_BLOCKING_CODE
 import com.hereliesaz.geministrator.workflow.contextInputs
 import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
-import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.isUntrustedContext
 import com.hereliesaz.geministrator.domain.madeFromUntrustedInput

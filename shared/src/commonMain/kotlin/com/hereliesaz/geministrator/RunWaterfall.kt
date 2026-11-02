@@ -2,6 +2,9 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.events.AgentAssigned
+import com.hereliesaz.geministrator.events.TaskRerunRequested
+import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ApprovalRequired
 import com.hereliesaz.geministrator.events.ArtifactCreated
@@ -161,6 +164,7 @@ internal fun runWaterfall(events: List<WorkflowEvent>, nowEpochMillis: Long): Ru
         val at = event.occurredAtEpochMillis
         when (event) {
             is WorkflowCreated -> Unit
+            is ExternalRunCancelFailed, is PolicyDecisionRecorded, is TaskRerunRequested -> Unit
             is TaskBecameReady -> if (open[event.taskDefinitionId] == null) preStart(event.taskDefinitionId, at)
             is AgentAssigned -> if (open[event.taskDefinitionId] == null) preStart(event.taskDefinitionId, at)
             is ExecutorAssigned -> if (open[event.taskDefinitionId] == null) preStart(event.taskDefinitionId, at)
