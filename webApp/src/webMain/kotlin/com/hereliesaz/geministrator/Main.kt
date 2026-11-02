@@ -62,7 +62,7 @@ private fun prefersReducedMotion(): Boolean =
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    AzphaltMotion.reduceMotion = shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = prefersReducedMotion())
+    AzphaltMotion.platformReduceMotion = shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = prefersReducedMotion())
     // Memory in SQLite persisted in OPFS (opened in a worker; the old Settings log is imported once).
     // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)

@@ -279,6 +279,9 @@ data class RoleInstructionProposalState(
 ) {
     fun pendingFor(roleId: RoleDefinitionId): List<RoleInstructionProposal> =
         proposals.filter { it.roleId == roleId && it.status == RoleInstructionProposalStatus.Pending }
+
+    /** Proposals waiting on the keeper across every role (the Memory swarm's status line). */
+    val pendingCount: Int get() = proposals.count { it.status == RoleInstructionProposalStatus.Pending }
 }
 
 /**
