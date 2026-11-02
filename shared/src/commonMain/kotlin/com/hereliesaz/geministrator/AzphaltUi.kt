@@ -93,23 +93,27 @@ internal object Azphalt {
     private const val GROUND_STORAGE_KEY = "aive.appearance.ground.v1"
 
     var currentGround: Ground by mutableStateOf(
-        settings.getStringOrNull(GROUND_STORAGE_KEY)
-            ?.let { saved -> grounds.firstOrNull { it.name == saved } }
-            ?: grounds.first(),
+        groundNamed(settings.getStringOrNull(GROUND_STORAGE_KEY)) ?: grounds.first(),
     )
         private set
 
-    fun rerollGround() {
-        val currentIndex = grounds.indexOf(currentGround)
-        currentGround = grounds[(currentIndex + 1) % grounds.size]
-        settings.putString(GROUND_STORAGE_KEY, currentGround.name)
+    /** The ground called [name] (as saved, for example "Teal"), or null when there is none. */
+    fun groundNamed(name: String?): Ground? = grounds.firstOrNull { it.name == name }
+
+    /**
+     * Makes the ground called [name] current and remembers it on this device. An unknown name
+     * changes nothing and returns false.
+     */
+    fun setGround(name: String): Boolean {
+        val ground = groundNamed(name) ?: return false
+        currentGround = ground
+        settings.putString(GROUND_STORAGE_KEY, ground.name)
+        return true
     }
 
-    /** Re-reads the saved ground, after something other than [rerollGround] wrote it (a setup import). */
+    /** Re-reads the saved ground, after something other than [setGround] wrote it (a setup import). */
     fun reloadGround() {
-        settings.getStringOrNull(GROUND_STORAGE_KEY)
-            ?.let { saved -> grounds.firstOrNull { it.name == saved } }
-            ?.let { currentGround = it }
+        groundNamed(settings.getStringOrNull(GROUND_STORAGE_KEY))?.let { currentGround = it }
     }
 
     fun hueIndex(seed: String): Int = seed.hashCode().mod(hues.size)
