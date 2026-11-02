@@ -66,6 +66,8 @@ class DefaultMcpTransportFactory(
  * The Aive's MCP host (docs/architecture/MCP_HOST.md): the keeper's configured servers, a client
  * per server, and the consent rule. A server's tools run only when the keeper allowed that server
  * always, or answered [consent] for it in the current run; the first call per server per run asks.
+ * When [elicitation] is set, a server may ask the keeper for input during an allowed call; the
+ * request is shown under the server's name. Without it, no call declares elicitation.
  */
 class McpHost(
     private val store: McpServerStore,
@@ -75,6 +77,7 @@ class McpHost(
     /** True where local (stdio) servers can be started: the desktop. */
     val stdioSupported: Boolean = false,
     private val clientFactory: (McpTransport) -> McpClient = { McpClient(it) },
+    private val elicitation: McpElicitationGate? = null,
 ) : McpToolSource {
     private val mutex = Mutex()
     private val _servers = MutableStateFlow(store.read())
@@ -185,13 +188,33 @@ class McpHost(
                 return outcome("The keeper did not allow tools from ${server.name} in this run. Continue without them.", isError = true)
             }
             return try {
-                val result = client(server).callTool(offer.toolName, arguments)
+                val result = client(server).callTool(offer.toolName, arguments, elicitorFor(server, offer.toolName))
                 outcome(fenceExternal(server, offer.toolName, result.renderText()), result.isError)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {
-                if (failure !is McpRpcException && failure !is McpInputRequiredException) dropClient(server.id)
+                // Refusals, unanswerable input and ended tasks are about this call, not the connection.
+                if (failure !is McpRpcException && failure !is McpInputRequiredException && failure !is McpTaskException) dropClient(server.id)
                 outcome("The tool call failed: ${failure.message ?: failure::class.simpleName}", isError = true)
+            }
+        }
+
+        /**
+         * Puts a server's `elicitation/create` to the keeper, labelled with that server. A request
+         * that cannot be shown faithfully is cancelled without asking.
+         */
+        private fun elicitorFor(server: McpServerConfig, toolName: String): McpElicitor? {
+            val gate = elicitation ?: return null
+            return McpElicitor { params ->
+                val request = McpElicitationRequest.parse(
+                    params = params,
+                    serverId = server.id,
+                    serverName = server.name,
+                    serverLocation = server.location,
+                    toolName = toolName,
+                    runKey = runKey,
+                )
+                (request?.let { gate.elicit(it) } ?: McpElicitationResponse.Cancel).toJson()
             }
         }
 

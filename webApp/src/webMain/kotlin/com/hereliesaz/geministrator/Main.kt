@@ -120,12 +120,14 @@ fun main() {
         // MCP servers the keeper connects (docs/architecture/MCP_HOST.md): Streamable HTTP only, and
         // only servers whose CORS policy admits this origin.
         val mcpConsent = remember { com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate() }
+        val mcpElicitation = remember { com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate() }
         val mcpHost = remember {
             com.hereliesaz.geministrator.mcp.McpHost(
                 store = com.hereliesaz.geministrator.mcp.McpServerStore(),
                 vault = WebMcpCredentialStore,
                 transports = com.hereliesaz.geministrator.mcp.DefaultMcpTransportFactory(repositoryHttpClient),
                 consent = mcpConsent,
+                elicitation = mcpElicitation,
             )
         }
         val providers = remember(credentials, repositoryCredentials) {
@@ -184,6 +186,7 @@ fun main() {
                 providers = providers,
                 mcpHost = mcpHost,
                 mcpConsent = mcpConsent,
+                mcpElicitation = mcpElicitation,
                 executorIntegrations = executorIntegrations,
                 connectedRepositoryServiceIds = repositoryCredentials.keys,
                 onSearchRepositories = repositoryDiscovery::search,

@@ -199,6 +199,8 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - A server's tool descriptions or annotations lie about what the tool does.
 - A local (stdio) server runs arbitrary code on the desktop.
 - A bearer token is sent to the wrong host or over cleartext.
+- A server uses elicitation to phish: it asks the keeper for a password or token in a form, or sends a look-alike URL.
+- A server keeps a call open forever (endless input requests, a task that never ends) or leaves work running after the keeper cancels.
 
 **Mitigations in place**
 - Every server needs the keeper's consent. Either it is **Always allow**, or the first call per server per run stops at an approval gate that shows the tool, the server and the arguments. An unanswered gate is a refusal, and a refused call is never sent. Reaching a server or listing its tools is not consent.
@@ -206,12 +208,15 @@ The keeper connects MCP servers in the Keeper's room (`docs/architecture/MCP_HOS
 - Calls are bounded: 8 rounds, 8 calls per round, 64 tools per run, 4 MB per response, 120 s per request. Results are truncated at 20,000 characters.
 - MCP calls are not repository operations and never receive The Aive's repository credentials. Workspace agents, which write branches, get no MCP tools. Runs behind a provider-side plan gate get no tools, so no tool runs before approval.
 - Addresses must be HTTPS, or HTTP to this device or a private network. They may not embed credentials, and redirects are not followed. Tokens live in the platform credential store, as other connection secrets do, and are excluded from Android backup.
-- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell. The client declares no capabilities, so a server cannot ask for sampling, elicitation or roots.
+- Local servers are added only by the keeper on the desktop. They start from a fixed argument list, never a shell.
+- The client never declares sampling or roots. It declares elicitation only on a call the keeper already allowed, and only where a keeper can be asked. Each request is titled with the server's name, warns against entering secrets (and flags secret-looking fields), and is validated against its flat schema before anything is sent. A URL is shown in full as plain text, with its host set apart and look-alikes (Punycode, embedded names, cleartext) flagged; only `http(s)` is accepted, and it is opened in the system browser only on the keeper's tap, never fetched. Declining, cancelling or 10 minutes of silence sends no data. The Aive sends answers to that server only, never to the model or run artifacts; a result that repeats them is fenced like any other.
+- Input rounds are bounded (4 retries, 8 requests each). Tasks are polled with backoff, capped at 30 minutes and 1,000 polls, and cancelled with `tasks/cancel` when the run is cancelled or the wait ends.
 
 **Residual risks**
 - After consent, a server sees whatever arguments the model writes, which may include task content. A server allowed always is never asked about again.
 - A local server runs with the keeper's own permissions; The Aive does not sandbox it.
 - Tool descriptions are shown to the model as the server wrote them.
+- A keeper can still type a secret into a form, or complete a phishing page opened from a URL request; the warnings do not prevent it. A task the keeper cancels may still finish on the server.
 
 ### Repository operations
 

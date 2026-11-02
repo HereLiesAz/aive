@@ -99,7 +99,11 @@ class McpClientTest {
                 assertTrue(call.headers[HttpHeaders.Accept].orEmpty().contains("text/event-stream"))
                 val meta = call.body.getValue("params").jsonObject.getValue("_meta").jsonObject
                 assertEquals(McpProtocol.MODERN_VERSION, meta.getValue(McpProtocol.META_PROTOCOL_VERSION).jsonPrimitive.content)
-                assertEquals(JsonObject(emptyMap()), meta.getValue(McpProtocol.META_CLIENT_CAPABILITIES))
+                assertEquals(
+                    McpClient.clientCapabilities(elicitation = false),
+                    meta.getValue(McpProtocol.META_CLIENT_CAPABILITIES),
+                    "the Tasks extension only: no elicitation without a keeper, never sampling or roots",
+                )
                 assertEquals("The Aive", meta.getValue(McpProtocol.META_CLIENT_INFO).jsonObject.getValue("name").jsonPrimitive.content)
             }
             val toolCall = seen.last()
@@ -126,6 +130,7 @@ class McpClientTest {
                     "initialize" -> {
                         val params = call.body.getValue("params").jsonObject
                         assertEquals(McpProtocol.LEGACY_VERSIONS.first(), params.getValue("protocolVersion").jsonPrimitive.content)
+                        assertEquals(JsonObject(emptyMap()), params.getValue("capabilities"), "a handshake-era server is offered nothing")
                         json(
                             result(id!!, """{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"Old","version":"1"}}"""),
                             extra = mapOf(McpProtocol.HEADER_SESSION_ID to "s-1"),
@@ -174,7 +179,7 @@ class McpClientTest {
     }
 
     @Test
-    fun anInputRequiredResultEndsTheCallForNow() = runTest {
+    fun anInputRequiredResultEndsACallWithNoKeeperToAsk() = runTest {
         withContext(Dispatchers.Default) {
             val engine = MockEngine { request ->
                 val call = request.seen()
