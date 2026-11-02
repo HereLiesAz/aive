@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -225,7 +226,7 @@ class ProviderBackedManagedSessionGateway(
 
         val blocksById = linkedMapOf<String, PromptContextBlock>()
         val memoryEvidence = recalled.blocks.mapIndexed { index, block ->
-            blocksById["memory-context-$index"] = block
+            blocksById["memory-context-$index"] = block.copy(provenance = block.provenance ?: ContextProvenance.MemoryRecall)
             ContextEvidence(
                 id = "memory-context-$index",
                 estimatedTokens = approximateTokens(block.content),
@@ -236,7 +237,11 @@ class ProviderBackedManagedSessionGateway(
         // Retrieved chunks rank by similarity among themselves and below every memory block.
         val retrievedEvidence = retrieved.mapIndexed { index, hit ->
             val id = "retrieved-context-$index"
-            blocksById[id] = PromptContextBlock(label = hit.chunk.label, content = hit.chunk.text)
+            blocksById[id] = PromptContextBlock(
+                label = hit.chunk.label,
+                content = hit.chunk.text,
+                provenance = ContextProvenance.RepositoryContent,
+            )
             ContextEvidence(
                 id = id,
                 estimatedTokens = approximateTokens(hit.chunk.text),

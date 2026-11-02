@@ -170,6 +170,17 @@
     <string name="inspector_external_run">EXTERNAL RUN ID</string>
     <string name="inspector_github_actions">GitHub Actions</string>
     <string name="inspector_inline_evidence">inline evidence</string>
+    <string name="inspector_inputs">INPUTS</string>
+    <string name="inspector_input_objective">Objective</string>
+    <string name="inspector_external_inputs">EXTERNAL INPUTS</string>
+    <string name="inspector_hint_external_inputs">This task can change things, and some of what it reads came from outside your control: %1$s. Approve only if you trust that content to steer it.</string>
+    <string name="provenance_keeper_written">written by you</string>
+    <string name="provenance_agent_artifact">made by an agent</string>
+    <string name="provenance_repository_content">from your repository</string>
+    <string name="provenance_external_content">external content</string>
+    <string name="provenance_memory_recall">recalled from memory</string>
+    <string name="provenance_unknown">unknown origin, treated as external</string>
+    <string name="provenance_made_from_external">%1$s, made from external content</string>
     <string name="inspector_inspector">INSPECTOR</string>
     <string name="inspector_local_sandbox">local sandbox</string>
     <string name="inspector_message">MESSAGE</string>

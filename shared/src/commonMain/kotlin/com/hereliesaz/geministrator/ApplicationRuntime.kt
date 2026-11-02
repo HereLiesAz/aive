@@ -58,6 +58,8 @@ import com.hereliesaz.geministrator.workflow.TaskRerunPlanner
 import com.hereliesaz.geministrator.workflow.TaskRerunRequest
 import com.hereliesaz.geministrator.workflow.WorkflowApprovalService
 import com.hereliesaz.geministrator.workflow.isHeldAtEnginePlanGate
+import com.hereliesaz.geministrator.workflow.contextTaintGateId
+import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowEngine
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
@@ -386,7 +388,43 @@ class ApplicationRuntime private constructor(
             }
 
             val now = nowEpochMillis()
-            val nextState = if (taskRun.assignedProviderId != null) {
+            val nextState = if (taskRun.isHeldAtContextTaintGate()) {
+                // Held because its inputs include external content (ContextTaint.kt): approval is the
+                // person's decision to let it act on them; the cycle then lets it run.
+                val gateCoordinator = ApprovalGateCoordinator(
+                    repository = persistence.approvalGates,
+                    eventSink = RepositoryWorkflowEventSink(persistence.events),
+                )
+                val gateId = contextTaintGateId(snapshot.state.run.id, taskDefinitionId, taskRun.attempt)
+                if (persistence.approvalGates.get(gateId) == null) {
+                    gateCoordinator.open(
+                        id = gateId,
+                        workflowRunId = snapshot.state.run.id,
+                        taskDefinitionId = taskDefinitionId,
+                        kind = ApprovalGateKind.SecurityRisk,
+                        reason = taskRun.blockingReason?.message ?: "External inputs for '${task.name}'",
+                        requiresHuman = true,
+                        nowEpochMillis = now,
+                    )
+                }
+                val gate = requireNotNull(persistence.approvalGates.get(gateId))
+                if (gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying) {
+                    gateCoordinator.decide(
+                        id = gateId,
+                        approved = true,
+                        decidedByRoleId = null,
+                        note = "Approved in application",
+                        nowEpochMillis = now,
+                    )
+                }
+                coordinator.cycle(
+                    project = snapshot.project,
+                    definition = snapshot.definition,
+                    state = snapshot.state,
+                    nowEpochMillis = now,
+                    artifactIdFactory = ::artifactId,
+                )
+            } else if (taskRun.assignedProviderId != null) {
                 // An engine-held plan has no provider session yet; approval only records the decision.
                 val handle = if (taskRun.isHeldAtEnginePlanGate()) {
                     null

@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BlockingReason
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -242,6 +243,7 @@ class WorkflowRuntimeCoordinator(
         }
 
         ensureMissingFailureEscalationGates(nextRun, nowEpochMillis)
+        nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
         if (
             nextRun.taskRuns.values.any {
@@ -311,6 +313,8 @@ class WorkflowRuntimeCoordinator(
         if (nextRun.status.isTerminal()) {
             return terminate(project, definition, nextRun, nextHandles, nowEpochMillis)
         }
+        // Tasks that system executors made ready in this cycle pass the same gate before agents start.
+        nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
         val dispatched = engine.dispatchReadyTasks(
             project = project,
@@ -590,6 +594,10 @@ class WorkflowRuntimeCoordinator(
         for ((taskId, taskRun) in run.taskRuns) {
             if (taskRun.status != TaskRunStatus.AwaitingApproval) continue
             val task = tasks[taskId] ?: continue
+            if (taskRun.isHeldAtContextTaintGate()) {
+                ensureContextTaintGate(run, task, taskRun, taskRun.blockingReason?.message.orEmpty(), now)
+                continue
+            }
 
             val gateId = ApprovalGateId("plan:${run.id.value}:${taskId.value}:${taskRun.attempt}")
             if (persistence.approvalGates.get(gateId) != null) continue
@@ -641,6 +649,44 @@ class WorkflowRuntimeCoordinator(
 
                 TaskRunStatus.AwaitingApproval -> {
                     if (tasks[taskId] == null) continue
+                    if (taskRun.isHeldAtContextTaintGate()) {
+                        val gate = persistence.approvalGates.get(
+                            contextTaintGateId(nextRun.id, taskId, taskRun.attempt),
+                        ) ?: continue
+                        if (
+                            gate.status == ApprovalGateStatus.Pending ||
+                            gate.status == ApprovalGateStatus.Applying
+                        ) {
+                            continue
+                        }
+                        nextRun = if (gate.status == ApprovalGateStatus.Approved) {
+                            // Approved: the task may now run, and a provider may still ask for plan approval.
+                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Ready)
+                            nextRun.copy(
+                                taskRuns = nextRun.taskRuns + (
+                                    taskId to taskRun.copy(
+                                        status = TaskRunStatus.Ready,
+                                        blockingReason = null,
+                                        progressMessage = null,
+                                    )
+                                ),
+                                updatedAtEpochMillis = now,
+                            )
+                        } else {
+                            // Retrying would only meet the same inputs at the same gate.
+                            engine.handleFailure(
+                                definition = definition,
+                                run = nextRun,
+                                taskDefinitionId = taskId,
+                                retryReason = RetryReason.PlanRejected,
+                                reason = "Acting on external inputs was not approved",
+                                nowEpochMillis = now,
+                                allowRetry = false,
+                            )
+                        }
+                        if (nextRun.status.isTerminal()) break
+                        continue
+                    }
                     val gateId = ApprovalGateId(
                         "plan:${nextRun.id.value}:${taskId.value}:${taskRun.attempt}",
                     )
@@ -672,6 +718,91 @@ class WorkflowRuntimeCoordinator(
         return nextRun
     }
 
+    /**
+     * Holds each ready task that can change something and whose inputs include external or unknown
+     * content at a human gate naming those inputs (ContextTaint.kt). An approved gate lets it run.
+     */
+    private suspend fun holdTaintedPrivilegedTasks(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ): WorkflowRun {
+        val tasks = definition.tasks.associateBy { it.id }
+        var next = run
+        for ((id, taskRun) in run.taskRuns) {
+            if (taskRun.status != TaskRunStatus.Ready && taskRun.status != TaskRunStatus.Retrying) continue
+            if (taskRun.externalRunId != null) continue
+            val task = tasks[id] ?: continue
+            val executor = taskRun.executor ?: task.effectiveExecutor()
+            val roleId = (executor.withoutPlacement() as? TaskExecutor.RoleAgent)?.roleId ?: task.roleId
+            val untrusted = definition.untrustedInputsForPrivilegedTask(
+                run = next,
+                task = task,
+                executor = executor,
+                role = engine.roleDefinition(next, roleId),
+            )
+            if (untrusted.isEmpty()) continue
+            val gate = persistence.approvalGates.get(contextTaintGateId(next.id, id, taskRun.attempt))
+            if (gate?.status == ApprovalGateStatus.Approved) continue
+
+            val reason = contextTaintReason(task, untrusted)
+            ensureContextTaintGate(next, task, taskRun, reason, now)
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.AwaitingApproval)
+            next = next.copy(
+                taskRuns = next.taskRuns + (
+                    id to taskRun.copy(
+                        status = TaskRunStatus.AwaitingApproval,
+                        executor = executor,
+                        blockingReason = BlockingReason(CONTEXT_TAINT_BLOCKING_CODE, reason),
+                        progress = null,
+                        progressMessage = null,
+                    )
+                ),
+                updatedAtEpochMillis = now,
+            )
+        }
+        return next
+    }
+
+    private suspend fun ensureContextTaintGate(
+        run: WorkflowRun,
+        task: TaskDefinition,
+        taskRun: TaskRun,
+        reason: String,
+        now: Long,
+    ) {
+        val gateId = contextTaintGateId(run.id, task.id, taskRun.attempt)
+        if (persistence.approvalGates.get(gateId) != null) return
+        gateCoordinator.open(
+            id = gateId,
+            workflowRunId = run.id,
+            taskDefinitionId = task.id,
+            kind = ApprovalGateKind.SecurityRisk,
+            reason = reason.ifBlank { "'${task.name}' can change things and its inputs include external content" },
+            requiresHuman = true,
+            nowEpochMillis = now,
+        )
+    }
+
+    /** Labels what [executor] produced for [task] with where it came from (ContextTaint.kt). */
+    private fun labelOutputs(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        task: TaskDefinition,
+        executor: TaskExecutor,
+        execution: TaskExecutorExecution,
+    ): TaskExecutorExecution {
+        if (execution.artifacts.isEmpty()) return execution
+        return execution.copy(
+            artifacts = definition.labelTaskOutputs(
+                run = run,
+                task = task,
+                assigned = executor.outputProvenance(engine.roleDefinition(run, task.roleId)),
+                artifacts = execution.artifacts,
+            ),
+        )
+    }
+
     private suspend fun dispatchSystemExecutors(
         project: Project,
         definition: WorkflowDefinition,
@@ -697,7 +828,7 @@ class WorkflowRuntimeCoordinator(
             val integration = executorIntegrations.integrationFor(executor, project) ?: continue
             // A throwing integration fails its own task (through the normal retry/escalation path)
             // instead of escaping the cycle and leaving the task Ready forever.
-            val execution = try {
+            val dispatched = try {
                 integration.dispatch(
                     TaskExecutorContext(
                         project = project,
@@ -719,6 +850,7 @@ class WorkflowRuntimeCoordinator(
                         ?: "${executor.displayLabel()} dispatch failed",
                 )
             }
+            val execution = labelOutputs(definition, next, task, executor, dispatched)
             next = applyExecution(
                 run = next,
                 id = id,
@@ -760,16 +892,22 @@ class WorkflowRuntimeCoordinator(
                 id = id,
                 previous = taskRun,
                 executor = executor,
-                execution = integration.reconcile(
-                    TaskExecutorContext(
-                        project = project,
-                        definition = definition,
-                        run = next,
-                        task = task,
-                        taskRun = taskRun,
-                        executor = executor,
-                        nowEpochMillis = now,
-                        role = engine.roleDefinition(next, task.roleId),
+                execution = labelOutputs(
+                    definition = definition,
+                    run = next,
+                    task = task,
+                    executor = executor,
+                    execution = integration.reconcile(
+                        TaskExecutorContext(
+                            project = project,
+                            definition = definition,
+                            run = next,
+                            task = task,
+                            taskRun = taskRun,
+                            executor = executor,
+                            nowEpochMillis = now,
+                            role = engine.roleDefinition(next, task.roleId),
+                        ),
                     ),
                 ),
                 now = now,
@@ -929,7 +1067,9 @@ class WorkflowRuntimeCoordinator(
             val mergedArtifacts = if (update.artifacts.isEmpty()) {
                 taskRun.artifacts
             } else {
-                (taskRun.artifacts + update.artifacts).distinctBy { it.id }
+                // Self-attested by whichever pool member ran it: external, whatever it claims.
+                val received = definition.labelTaskOutputs(next, task, ContextProvenance.ExternalContent, update.artifacts)
+                (taskRun.artifacts + received).distinctBy { it.id }
             }
             next = next.copy(
                 taskRuns = next.taskRuns + (

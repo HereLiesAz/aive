@@ -57,6 +57,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Provider completion requires explicit reconciliation. A provider claiming immediate success returns `Completed` only after the runtime polls and confirms.
 - Acceptance criteria are authored by the workflow definition, not the provider.
 - Failure reasons and keeper messages can be quoted into a proposed edit of a role's instructions (`RoleInstructionProposals`). Such text may come from a provider or external output, so it is bounded, quoted and shown with its evidence, and it reaches a role only when the keeper approves that exact diff on the Mind tab. Nothing applies it automatically.
+- Context provenance (see "Context provenance" below): provider artifacts are labelled as they are taken in, and a provider cannot label its output as more trusted than the runtime says it is.
 - A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
@@ -240,6 +241,37 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 - Operations do not reject protected branches up front. They rely on the host's branch protection.
 - Workspace agents (OpenCode, GitLab, Local) write branches without a `HumanApproval` task. Plan approval is optional per task.
 
+### Context provenance
+
+Every artifact a task receives is labelled with where it came from, in `ArtifactRef.metadata["aive.provenance"]` (`ContextProvenance` in `domain/ContextProvenance.kt`; the rule is in `workflow/ContextTaint.kt`). Prompt context blocks carry the same label (`PromptContextBlock.provenance`).
+
+| Label | Given to |
+|---|---|
+| `KeeperWritten` | Objective, task and role text, the runtime's own control summaries, human-approval output |
+| `AgentArtifact` | Output of an agent, GitHub Action, script or test runner |
+| `RepositoryContent` | Repository-operation output; retrieved repository files |
+| `ExternalContent` | Output of a role with the `Research` capability, an external service, a deployment, or anything returned by another pool device |
+| `MemoryRecall` | Blocks recalled from the memory layer |
+| `Unknown` | Anything without a label, including artifacts stored before labelling. Treated as external. |
+
+**Threats**
+- Prompt injection in web research, service responses or pool results steers a task that can write the repository, deploy, call a service or run a script.
+- Injected content is laundered through an intermediate agent whose output looks trusted.
+- A provider or executor labels its own output as keeper-written.
+
+**Mitigations in place**
+- The runtime labels artifacts when it takes them in (`WorkflowEngine.reconcile`, system executor dispatch and reconcile, remote compute). The runtime's label replaces the producer's. A producer can only lower trust: its own `ExternalContent` label and its untrusted-input flag are kept.
+- Taint propagates. Anything made by a task whose inputs include external or unknown content is flagged `aive.provenance.untrustedInput` and counts as external downstream.
+- Before a task runs, `WorkflowRuntimeCoordinator` checks it. If its executor can change something and any of its inputs are external, unknown or flagged, the task is held `AwaitingApproval` at a `SecurityRisk` gate (`taint:<run>:<task>:<attempt>`, human only). The gate names those inputs, and nothing is dispatched until a person approves. Rejecting fails the task without a retry. Executors that can change something: repository operations other than `status`/`fetch`, deployments, external services, GitHub Actions, scripts, test runners, and agents whose role needs `RepositoryWrite`, `PullRequestCreation` or `ShellExecution` (or whose role is unknown). Distributed placements are judged by their delegate.
+- Keeper-written content, the project's own repository and clean agent output never trigger the gate. The gate adds to invariant 4 and never replaces a `HumanApproval` task.
+- The creature's Work tab lists each input with its label. Its Needs tab shows the gate's reason.
+
+**Remaining gaps**
+- Recalled memory, which can hold content from earlier runs, and role-surface data (including HTTPS spreadsheets) enter agent prompts after the check, so neither triggers the gate. Role-surface blocks are unlabelled.
+- A gate inside a nested child run is named on the parent node but, like plan approvals, cannot be decided from it.
+- Labels are not signed. A tampered store or imported bundle can relabel artifacts (see Persistence).
+- Each new attempt opens a new gate, even when the inputs are unchanged.
+
 ### Nested workflows
 
 `TaskExecutor.NestedWorkflow` and composition (`WorkflowComposer.nest` / `inline`) ship. Inlined children become ordinary namespaced tasks and are validated with the parent. Their repository-operation approval rule and cycle detection therefore apply.
@@ -416,6 +448,7 @@ The following invariants must hold regardless of the integration used:
 4. Every mutating `RepositoryOperation` task (anything other than `status`/`fetch`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents write only to new dedicated branches.
 5. Provider payloads are subject to `PayloadRedactionPolicy` before transmission.
 6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
+7. A task whose executor can change something does not run on external, unknown-provenance or externally derived inputs until a person approves a gate that names those inputs. An artifact without a provenance label counts as external.
 
 ## Open Items
 
