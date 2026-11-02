@@ -684,6 +684,19 @@ fun App(
                                 failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_rerun_failed)
                             }
                         },
+                        onAnswerKeeperQuestion = { taskId, questionKey, answer ->
+                            try {
+                                when (val result = runtime?.answerKeeperQuestion(TaskDefinitionId(taskId), questionKey, answer)) {
+                                    null -> getString(Res.string.app_runtime_is_unavailable)
+                                    ProviderActionResult.Accepted -> null
+                                    is ProviderActionResult.Rejected -> result.reason
+                                }
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_provider_message_failed)
+                            }
+                        },
                         onRecoverFromCorruption = {
                             scope.launch {
                                 try {

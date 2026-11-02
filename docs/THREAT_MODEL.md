@@ -61,6 +61,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Context provenance (see "Context provenance" below): provider artifacts are labelled as they are taken in, and a provider cannot label its output as more trusted than the runtime says it is.
 - A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
+- An agent's question to the keeper (`docs/Agent-UI.md`) is rendered only from the host's fixed catalog (text, choices, buttons, short text or number fields, a read-only table), every string as plain text. Unknown components or properties, data bindings without a literal, oversized or deeply nested payloads and broken references are rejected and the message is shown as plain text. Nothing in it is executed, fetched or shown as HTML, a link or an image, and the answer reaches the agent only as a message through its own session.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
 
 **Remaining gaps**
@@ -489,6 +490,7 @@ The following invariants must hold regardless of the integration used:
 7. A task whose executor can change something does not run on external, unknown-provenance or externally derived inputs until a person approves a gate that names those inputs. An artifact without a provenance label counts as external.
 
 Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
+7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
 
 ## Open Items
 

@@ -143,6 +143,8 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`Keepers-Room.md`](Keepers-Room.md) describes the Keeper's room, the one place for setup (connections, compute, projects and data, this device, appearance, about), the header and the hive's places, first launch and how feeding is gated, the hive's stopped and finished states, and the plan for consolidating the app into the hive and the Keeper's room.
 
+[`Agent-UI.md`](Agent-UI.md) describes how an agent asks the keeper a question richer than text: the A2UI-shaped subset drawn from the host catalog, what is rejected and shown as plain text, how the question waits in the creature's Needs, the structured answer, and the prompt that tells messaging-capable agents about it.
+
 ### Threat model
 
 [`THREAT_MODEL.md`](THREAT_MODEL.md) identifies trust boundaries, threat actors, attack surfaces by integration, invariants, and open items.

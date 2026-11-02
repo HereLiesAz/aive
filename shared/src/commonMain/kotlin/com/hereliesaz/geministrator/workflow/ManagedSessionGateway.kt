@@ -105,7 +105,32 @@ interface ManagedSessionGateway {
      * them: the engine polls every cycle and records each report it gets as an event.
      */
     suspend fun usageReport(handle: ManagedSessionHandle): ManagedSessionUsage? = null
+
+    /**
+     * The question the session's agent is waiting on the keeper for (docs/Agent-UI.md), or null when
+     * this gateway does not know (the task keeps what it already holds).
+     */
+    suspend fun keeperQuestion(handle: ManagedSessionHandle): KeeperQuestionState? = null
+
+    /**
+     * Sends the keeper's [answer] to the question whose `AgentUi.questionKey` is [questionKey], through
+     * the session's ordinary messaging path, and marks that question answered once it is accepted.
+     */
+    suspend fun answerKeeperQuestion(
+        handle: ManagedSessionHandle,
+        questionKey: String,
+        answer: String,
+    ): ProviderActionResult = message(handle, answer)
 }
+
+/**
+ * What a session knows about its agent's question to the keeper: the [pending] question's message,
+ * if any, and the key of the last question answered in this process ([answeredKey]).
+ */
+data class KeeperQuestionState(
+    val pending: String? = null,
+    val answeredKey: String? = null,
+)
 
 data class ManagedSessionUsage(
     val inputTokens: Long? = null,

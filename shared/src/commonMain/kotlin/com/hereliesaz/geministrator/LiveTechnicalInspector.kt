@@ -54,6 +54,7 @@ import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
 import com.hereliesaz.geministrator.workflow.roleTokensSpent
 import com.hereliesaz.geministrator.resources.inspector_budget_spent
 import com.hereliesaz.geministrator.resources.inspector_raise_budget
+import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
@@ -150,6 +151,8 @@ internal fun TechnicalInspector(
     onRejectPlan: (String) -> Unit = {},
     onResolveEscalation: (String, Boolean) -> Unit = { _, _ -> },
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    /** Answers the creature's question to the keeper: task id, question key, answer; null on success. */
+    onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     modifier: Modifier = Modifier,
     tab: CreatureTab = CreatureTab.Needs,
     onTabChange: (CreatureTab) -> Unit = {},
@@ -215,6 +218,14 @@ internal fun TechnicalInspector(
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
                     ?.let { CreatureNeedsPanel(it, titled = false) }
+                // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
+                taskRun.keeperQuestion?.takeIf { taskRun.awaitsKeeperAnswer() }?.let { question ->
+                    AgentQuestionPanel(
+                        taskId = selectedTaskId,
+                        question = question,
+                        onAnswer = { questionKey, answer -> onAnswerKeeperQuestion(selectedTaskId, questionKey, answer) },
+                    )
+                }
                 if (taskRun.status == TaskRunStatus.AwaitingApproval) {
                     val providerPlan = taskRun.assignedProviderId != null
                     if (taskRun.isHeldAtContextTaintGate()) {
@@ -602,7 +613,8 @@ internal fun creatureNeedsYou(taskRun: TaskRun): Boolean =
     taskRun.status == TaskRunStatus.AwaitingApproval ||
         taskRun.status == TaskRunStatus.Escalated ||
         taskRun.awaitsNestedHumanApproval() ||
-        taskRun.isHeldForRoleBudget()
+        taskRun.isHeldForRoleBudget() ||
+        taskRun.awaitsKeeperAnswer()
 
 /** The tab a creature opens on: Needs when it is waiting on you, else its Work. */
 internal fun openingTab(taskRun: TaskRun?): CreatureTab =

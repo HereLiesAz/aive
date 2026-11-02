@@ -149,6 +149,8 @@ fun ControlRoom(
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
+    /** Answers a creature's question to the keeper: task id, question key, answer; null on success. */
+    onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -421,6 +423,7 @@ fun ControlRoom(
                         onResolveEscalation = onResolveEscalation,
                         onMessageAgent = onMessageAgent,
                         onRerunFromTask = onRerunFromTask,
+                        onAnswerKeeperQuestion = onAnswerKeeperQuestion,
                         tab = creatureTab,
                         onTabChange = { creatureTabName = it.name },
                         onSaveRoleCollection = onSaveRoleCollection,
