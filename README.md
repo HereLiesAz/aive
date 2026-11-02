@@ -62,6 +62,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Live runtime acceptance](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
 - [Remote API (Android)](docs/Remote-API.md)
+- [A2A (Agent2Agent)](docs/A2A.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
 

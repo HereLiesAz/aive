@@ -150,3 +150,5 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 ### Agent-to-agent communication
 
 [`architecture/DUPLEX_MCP.md`](architecture/DUPLEX_MCP.md) defines the opt-in, agent-neutral full-duplex MCP peer, its bounded messaging semantics, and its governed connection to live Aive task sessions and memory.
+
+[`A2A.md`](A2A.md) defines The Aive's Agent2Agent support: remote A2A agents as explicit-only providers, and the opt-in, loopback, token-protected desktop A2A server that launches workflows.

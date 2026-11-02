@@ -15,6 +15,8 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | Boundary | What crosses it | Direction |
 |---|---|---|
 | Device ↔ Provider (hosted LLMs, keyless gateways, OpenCode) | Task objectives, role instructions, context artifacts, acceptance criteria, repository snapshots (workspace agents) | Outbound, responses inbound |
+| Device ↔ Remote A2A agent | Task objective, role instructions, approved context, optional bearer token; task status and artifacts back | Outbound, responses inbound |
+| Local agent ↔ A2A server (desktop, opt-in) | Objectives that launch workflows; run status and final artifacts | Inbound on loopback |
 | Device ↔ GitHub API | Workflow dispatch and inputs, run status, check runs, artifact downloads, workflow-file installs, repository operations | Both |
 | Device ↔ GitLab API | Repository tree/file reads, workspace-agent commits, repository operations | Both |
 | GitHub runner ↔ Agent/script | Prompt or script source, repository checkout, job token (runner only) | Inside the user's repository's Actions |
@@ -325,6 +327,33 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 **Remaining gaps**
 - Azphalt trust keys come from the repository's own index, so a malicious custom repository can vouch for its own packages; revocations match package id plus version rather than key or digest. Installing from a custom repository is an explicit user action.
 - The GitHub release feed is unauthenticated and rate-limited; a failed check is shown as no update, not as an error.
+
+### A2A (Agent2Agent) client and server
+
+The Aive delegates a role's task to a remote A2A agent, and on desktop can accept tasks from local agents. Protocol and behavior: `docs/A2A.md`.
+
+**Assets**
+- A remote agent's optional bearer token (platform credential store, id `a2a:<host>`).
+- The desktop server's bearer token (OS keychain, or memory only when there is none). Whoever holds it can start workflows on the user's linked providers.
+
+**Threats**
+- A malicious or compromised Agent Card points the JSON-RPC endpoint (and so the prompts and token) at another host.
+- A remote agent returns prompt-injection in its artifacts, or claims success it did not reach.
+- A web page in the user's browser reaches the loopback server (CSRF, DNS rebinding).
+- A local process or agent holding the token floods The Aive with launches, or replaces the user's running work.
+- A remote agent is used for confidential work it should not see.
+
+**Mitigations in place**
+- Remote agents are `explicitOnly`: they run only for roles that prefer them or tasks that require them by id, never by automatic routing.
+- Card and endpoint URLs must pass `CleartextPolicy`. With a token set, the endpoint must share the card's origin. Redirects are not followed, and the card is fetched without the token.
+- A remote task completes only when a `GetTask` poll reads `completed` (or the agent answers with a final message). `unknown` and unrecognized states are never success. Artifacts are stored as opaque text and links; inline file bytes are dropped.
+- The server is off by default. It binds to loopback only and refuses requests whose `Host` is not a loopback name. It sends no CORS headers, so a browser cannot attach the `Authorization` header cross-origin. Every JSON-RPC call needs the bearer token, compared in constant time; the card is public, as A2A discovery expects. Bodies are capped at 1 MB and objectives at 20,000 characters.
+- The server never approves a plan, task or gate, picks a provider or touches a repository. It only queues a launch through the same path as the launch form. It refuses a launch while a run is unfinished or another launch is queued, so it cannot replace the user's work. Cancel reaches only the run its own task started.
+
+**Residual risks**
+- Anyone with the server token is a full client until the token is reset; there is no per-client identity or spend cap.
+- Without an OS keychain the server token is regenerated on every start and held only in memory.
+- Remote A2A agents see the task content they are sent; whether they retain it is up to their operator.
 
 ### Remote access and relay (Android)
 

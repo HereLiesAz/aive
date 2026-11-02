@@ -14,6 +14,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import kotlin.coroutines.cancellation.CancellationException
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,25 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.keeper_add_provider
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_add
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
+import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent
+import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent_hint
+import com.hereliesaz.geministrator.resources.settings_a2a_server
+import com.hereliesaz.geministrator.resources.settings_a2a_server_card_url
+import com.hereliesaz.geministrator.resources.settings_a2a_server_copy_token
+import com.hereliesaz.geministrator.resources.settings_a2a_server_description
+import com.hereliesaz.geministrator.resources.settings_a2a_server_failed
+import com.hereliesaz.geministrator.resources.settings_a2a_server_listening
+import com.hereliesaz.geministrator.resources.settings_a2a_server_off
+import com.hereliesaz.geministrator.resources.settings_a2a_server_on
+import com.hereliesaz.geministrator.resources.settings_a2a_server_reset_token
+import com.hereliesaz.geministrator.resources.settings_a2a_server_temporary_token
+import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
+import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.resources.confirm_cancel
 import com.hereliesaz.geministrator.resources.confirm_disconnect_action
 import com.hereliesaz.geministrator.resources.confirm_disconnect_body
@@ -437,6 +457,7 @@ internal fun ProviderSettingsScreen(
     onDisconnectDistributedCompute: () -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     /** The part of the Keeper's room this shows (docs/Keepers-Room.md). */
@@ -510,8 +531,9 @@ internal fun ProviderSettingsScreen(
     ) {
       if (section == KeeperSection.Connections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
-        // No AI provider yet (a linked GitHub's OpenCode is no brain for a hive without a repository).
-        if (ProviderCatalog.entries.none { it.id in connectedProviderIds }) {
+        // No AI provider yet (a linked GitHub's OpenCode is no brain for a hive without a repository,
+        // nor is a remote A2A agent, which runs only for roles that prefer it).
+        if (ProviderCatalog.entries.none { it.id in connectedProviderIds && !ProviderCatalog.isA2aAgent(it.id) }) {
             Text(
                 stringResource(Res.string.settings_connect_as_many_providers_as_you),
                 style = AzphaltType.body,
@@ -521,6 +543,9 @@ internal fun ProviderSettingsScreen(
         }
 
         var addingProvider by rememberDurableBooleanState("keeper.connections.adding-provider")
+        // Read as state so adding or removing an A2A agent recomposes the lists built from the catalog.
+        val a2aAgents by A2aAgentConnections.connections.collectAsState()
+        val a2aAgentIds = a2aAgents.mapTo(hashSetOf()) { it.providerId }
         ProviderCatalog.entries.filter { it.id in connectedProviderIds }.forEach { entry ->
             val healthRaw = healthResults?.get(entry.id)
             val health = healthRaw?.substringBefore('\n')
@@ -578,9 +603,62 @@ internal fun ProviderSettingsScreen(
                                 onClick = { uriHandler.openUri(entry.apiKeyUrl) },
                             )
                         }
+                        if (entry.id in a2aAgentIds) {
+                            AzphaltPill(
+                                stringResource(Res.string.keeper_a2a_agent_remove),
+                                "remove-a2a-${entry.id}",
+                                onClick = { A2aAgentConnections.remove(entry.id) },
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        // Remote A2A agents (docs/A2A.md): added by Agent Card URL, then linked like a provider,
+        // with an optional bearer token. Never chosen automatically; a role has to prefer one.
+        var addingA2aAgent by rememberDurableBooleanState("keeper.connections.adding-a2a-agent")
+        var a2aUrlDraft by remember { mutableStateOf("") }
+        var a2aUrlError by remember { mutableStateOf<String?>(null) }
+        val invalidA2aUrl = stringResource(Res.string.keeper_a2a_agent_invalid_url)
+        AddConnectionRow(
+            label = stringResource(Res.string.keeper_add_a2a_agent),
+            hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
+            open = addingA2aAgent,
+            onToggle = { addingA2aAgent = !addingA2aAgent },
+        )
+        if (addingA2aAgent) {
+            Text(
+                stringResource(Res.string.keeper_a2a_agent_explain),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            AzphaltTextField(
+                value = a2aUrlDraft,
+                onValueChange = {
+                    a2aUrlDraft = it
+                    a2aUrlError = null
+                },
+                label = stringResource(Res.string.keeper_a2a_agent_card_url),
+                placeholder = "https://agent.example/.well-known/agent-card.json",
+                errorMessage = a2aUrlError,
+            )
+            AzphaltPill(
+                stringResource(Res.string.keeper_a2a_agent_add),
+                "add-a2a-agent",
+                onClick = {
+                    try {
+                        val agent = A2aAgentConnections.add(a2aUrlDraft)
+                        a2aUrlDraft = ""
+                        addingA2aAgent = false
+                        // Linking asks for the optional bearer token, as for any provider.
+                        onConfigureProvider(agent.providerId)
+                    } catch (_: IllegalArgumentException) {
+                        a2aUrlError = invalidA2aUrl
+                    }
+                },
+                tone = PillTone.Primary,
+            )
         }
 
         disconnectProviderId?.let { id ->
@@ -591,6 +669,8 @@ internal fun ProviderSettingsScreen(
                 onConfirm = {
                     disconnectProviderId = null
                     onDisconnectProvider(id)
+                    // A remote A2A agent is forgotten with its link; adding it again is one URL away.
+                    if (ProviderCatalog.isA2aAgent(id)) A2aAgentConnections.remove(id)
                 },
                 onDismissRequest = { disconnectProviderId = null },
                 dismissLabel = stringResource(Res.string.confirm_cancel),
@@ -749,6 +829,68 @@ internal fun ProviderSettingsScreen(
                         },
                         onDismissRequest = { resetPairingConfirm = false },
                         dismissLabel = stringResource(Res.string.confirm_cancel),
+                    )
+                }
+            }
+        }
+
+        a2aServerSetting?.let { setting ->
+            ProviderSectionLabel(stringResource(Res.string.settings_a2a_server))
+            Text(
+                stringResource(Res.string.settings_a2a_server_description),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            AzphaltPill(
+                if (setting.enabled) stringResource(Res.string.settings_a2a_server_on) else stringResource(Res.string.settings_a2a_server_off),
+                "a2a-server-toggle",
+                selected = setting.enabled,
+                onClick = { setting.onEnabledChange(!setting.enabled) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val a2aStatus = when (val status = setting.status) {
+                A2aServerStatus.Off -> null
+                is A2aServerStatus.Listening -> stringResource(Res.string.settings_a2a_server_listening, status.address)
+                is A2aServerStatus.Failed -> stringResource(Res.string.settings_a2a_server_failed)
+            }
+            a2aStatus?.let { status ->
+                Text(
+                    status,
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            ErrorDetailsToggle((setting.status as? A2aServerStatus.Failed)?.detail, seed = "a2a-server")
+            setting.agentCardUrl?.let { url ->
+                Text(
+                    stringResource(Res.string.settings_a2a_server_warning),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+                AzphaltTextField(
+                    value = url,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = stringResource(Res.string.settings_a2a_server_card_url),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AzphaltPill(
+                        stringResource(Res.string.settings_a2a_server_copy_token),
+                        "a2a-server-copy-token",
+                        onClick = setting.onCopyToken,
+                    )
+                    AzphaltPill(
+                        stringResource(Res.string.settings_a2a_server_reset_token),
+                        "a2a-server-reset-token",
+                        onClick = setting.onResetToken,
+                    )
+                }
+                if (setting.tokenIsTemporary) {
+                    Text(
+                        stringResource(Res.string.settings_a2a_server_temporary_token),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
                     )
                 }
             }

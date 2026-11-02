@@ -235,6 +235,24 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /** True while the active run has not finished: a new launch would take its place. */
+    suspend fun hasUnfinishedActiveRun(): Boolean =
+        runtimeMutex.withLock { current?.state?.run?.status?.isTerminal() == false }
+
+    /**
+     * Cancels [runId] when it is the active, unfinished run (every unfinished task and provider
+     * session, as a replaced run is cancelled). False when it is not the active run or has ended.
+     * For hosts outside the UI, such as the desktop A2A server (docs/A2A.md).
+     */
+    suspend fun cancelActiveRun(runId: WorkflowRunId): Boolean = runtimeMutex.withLock {
+        val active = current ?: return@withLock false
+        if (active.state.run.id != runId || active.state.run.status.isTerminal()) return@withLock false
+        val cancelled = coordinator.cancel(active.project, active.definition, active.state, nowEpochMillis())
+        replaceCurrent(active.copy(state = cancelled))
+        publishCurrent()
+        true
+    }
+
     suspend fun launchStarterWorkflow(
         projectName: String,
         objective: String,

@@ -103,6 +103,8 @@ fun App(
     distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    /** The desktop's A2A server switch (docs/A2A.md); null where there is none. */
+    a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     memoryLayer: com.hereliesaz.geministrator.memory.MemoryLayerController? = null,
@@ -119,6 +121,8 @@ fun App(
     onExternalWorkflowLaunchHandled: (requestId: Long, failure: String?) -> Unit = { _, _ -> },
     /** Every runtime state, for observers outside the UI (the Android remote service). */
     onRuntimeStateChanged: (ApplicationRuntimeState) -> Unit = {},
+    /** The runtime once it exists (null while it is replaced), for hosts outside the UI (the desktop A2A server). */
+    onRuntimeAvailable: (ApplicationRuntime?) -> Unit = {},
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
 ) {
@@ -318,6 +322,7 @@ fun App(
     }
 
     LaunchedEffect(runtimeState) { onRuntimeStateChanged(runtimeState) }
+    LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
 
     // Requests whose launch finished here. The host drops them from its queue asynchronously, so
     // this keeps a finished request from being launched twice in the meantime.
@@ -760,6 +765,7 @@ fun App(
                         onDisconnectDistributedCompute = onDisconnectDistributedCompute,
                         crashReportingSetting = crashReportingSetting,
                         remoteAccessSetting = remoteAccessSetting,
+                        a2aServerSetting = a2aServerSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                         memoryLayer = memoryLayer,
