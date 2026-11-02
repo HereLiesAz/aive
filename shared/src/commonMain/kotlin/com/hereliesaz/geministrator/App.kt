@@ -165,6 +165,7 @@ fun App(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
                 spendCaps = { spendCapStore.caps },
+                traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))

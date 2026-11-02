@@ -1,6 +1,6 @@
 # Privacy Policy for The Aive
 
-**Effective date: October 22, 2026**
+**Effective date: November 2, 2026**
 
 This policy describes the current source-available builds of **The Aive**, application ID `com.hereliesaz.aive`.
 
@@ -14,6 +14,7 @@ Android ships in two flavors. The **GitHub release** flavor (APKs published on G
 - The current source does **not** include third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry SDKs.
 - The GitHub release flavor for Android has opt-in crash/ANR reporting: it is **off unless you turn it on** in Settings. It is first-party code that posts to a first-party relay, not a telemetry SDK. See [Crash and ANR reports](#crash-and-anr-reports-github-release-flavor-only).
 - Android has an opt-in **Remote access** feature, **off by default**, that lets your own IDEaz on another device reach The Aive through a relay. The relay sees only encrypted data, a room name and your IP address. See [Remote access](#remote-access-android).
+- Every build has an opt-in **Trace export** to an OpenTelemetry collector that you name, **off by default**. It sends run structure, timing, token counts and cost; prompts and outputs only if you turn on a second toggle. See [Trace export](#trace-export-opentelemetry).
 - The Aive does **not** sell personal information.
 - Workflow state is stored locally by the application unless it must be sent to an external service to perform work you requested.
 - External providers process data under their own privacy policies and retention practices.
@@ -32,7 +33,7 @@ Depending on how you use the app, The Aive may store:
 - workflow events
 - artifacts and references to artifacts
 - provider/executor run identifiers needed to resume work
-- settings, such as distributed-compute configuration and whether crash reporting, the Gemini bridge or Remote access is enabled
+- settings, such as distributed-compute configuration and whether crash reporting, the Gemini bridge, Remote access or trace export is enabled (with the trace collector's address and headers)
 - on the Android GitHub release flavor, crash/ANR reports waiting to be sent (only while crash reporting is on)
 
 Workflow state is stored locally:
@@ -119,6 +120,18 @@ The Android GitHub release flavor includes automatic crash and app-not-respondin
 
 Like any web request, a report reveals your IP address to the relay's host. The payload itself does not include it.
 
+## Trace export (OpenTelemetry)
+
+Trace export sends a trace of each finished run to an OpenTelemetry collector you choose, so you can watch your hives in your own observability tools. It exists in every build and is **off by default**: nothing is recorded or sent until you enter a collector address and turn on **Keeper's room › About and privacy › Trace export**. See [`architecture/OBSERVABILITY.md`](architecture/OBSERVABILITY.md).
+
+- **Destination.** Only the collector address you enter, over HTTPS (plain HTTP only to a collector on the same device), as OTLP/HTTP JSON. The Aive has no default collector and operates none.
+- **What is sent by default.** For each run that ends after you turned export on: the run, task and attempt structure; start and end times; the workflow definition, project, run, task and role ids; each executor's kind; each provider's id and session id; token counts, cost and cache-hit fraction; whether each step succeeded and a short error kind; artifact kinds and approval outcomes. Each run is sent once. Runs that ended before you turned export on are never sent.
+- **What is not sent by default.** Prompts, the run's objective, artifact names and text, model outputs, and failure, approval and escalation reasons.
+- **Prompts and outputs.** A second toggle, **Include prompts and outputs**, shown only while export is on and off by default, adds the run's objective, artifact names and text, and failure, approval and escalation reasons (each cut to 4,096 characters). These can contain code, secrets and personal data.
+- **Headers.** Headers you enter (for example a collector's API key) are sent with every export. They are kept in the app's local settings, not in the platform credential store, and are not written to setup files.
+- **Delivery.** Failed sends are retried a few times with backoff and then dropped. Nothing is kept for later.
+- **Turning it off.** Turn off Trace export at any time; sending stops at once. Data already received by your collector is governed by that collector's operator.
+
 ## Remote access (Android)
 
 Remote access lets IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It exists in both Android flavors and is **off by default**: nothing runs, connects or is created until you turn on **Settings → Remote Access**.
@@ -160,7 +173,7 @@ Repository secrets used by GitHub Actions remain within GitHub Actions and are n
 
 ## Analytics, advertising, and tracking
 
-The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The only diagnostics are the crash/ANR reports described above (opt-in), and they exist only in the Android GitHub release flavor.
+The current codebase contains no advertising SDK and no third-party product analytics or behavioral tracking SDK. The only diagnostics are the crash/ANR reports described above (opt-in), which exist only in the Android GitHub release flavor, and [trace export](#trace-export-opentelemetry) (opt-in), which sends only to a collector you name.
 
 The public web build may still be subject to ordinary infrastructure logging performed by its hosting platform or network intermediaries. The repository's GitHub Pages hosting and GitHub itself are governed by GitHub's own policies.
 
@@ -174,7 +187,7 @@ Deleting local data does not automatically delete data already sent to an extern
 
 ## Data sharing
 
-The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. If you enable Remote access, encrypted messages pass through the relay you chose. The current application does not sell personal data or share workflow content with advertisers.
+The Aive shares task data only as needed to use services/executors you choose. If you enable crash reporting, crash reports go to the maintainer's relay and the public issue tracker. If you enable Remote access, encrypted messages pass through the relay you chose. If you enable trace export, run traces go to the collector you named. The current application does not sell personal data or share workflow content with advertisers.
 
 ## Children's privacy
 

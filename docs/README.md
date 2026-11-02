@@ -109,6 +109,10 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`architecture/PROMPT_CACHING.md`](architecture/PROMPT_CACHING.md) defines provider-neutral prompt reuse. Caching is an optimization and never workflow semantics.
 
+### Observability
+
+[`architecture/OBSERVABILITY.md`](architecture/OBSERVABILITY.md) defines the opt-in OpenTelemetry trace export: GenAI spans derived from the workflow event journal and the OTLP/HTTP JSON exporter. Content is excluded unless a separate toggle is on.
+
 ### Repository services
 
 [`Repository-Services.md`](Repository-Services.md) describes GitHub, GitLab, and Local Git repository sources, their repository-operation vocabularies, the GitLab workspace agent, orchestration artifacts, and failure behavior.
