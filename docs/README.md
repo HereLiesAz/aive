@@ -133,7 +133,7 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`BRANDING.md`](BRANDING.md) defines the canonical brand source assets in `branding/` and the icons and loader animations generated from them.
 
-[`Keepers-Room.md`](Keepers-Room.md) describes the Keeper's room, the one place for setup (connections, memory, compute, projects and data, this device, appearance, about), and the plan for consolidating the app into the hive and the Keeper's room.
+[`Keepers-Room.md`](Keepers-Room.md) describes the Keeper's room, the one place for setup (connections, compute, projects and data, this device, appearance, about), the header and the hive's places, first launch and how feeding is gated, the hive's stopped and finished states, and the plan for consolidating the app into the hive and the Keeper's room.
 
 ### Threat model
 

@@ -338,7 +338,7 @@
     <string name="tab_position">Tab %1$d of %2$d</string>
 
     <string name="lineage_a_new_run_that_reads_this">It keeps what it learned here and builds on it.</string>
-    <string name="lineage_cancel_continue">Cancel continue</string>
+    <string name="lineage_cancel_continue">Not now</string>
     <string name="lineage_continue_this_run">Feed it more</string>
     <string name="lineage_lineage">LINEAGE</string>
     <string name="lineage_loading_runs">Loading runs…</string>

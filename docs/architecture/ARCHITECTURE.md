@@ -152,7 +152,7 @@ Registered agent providers are built from the configured credentials:
 - Text LLM providers from `providers/llm` — native OpenAI, Anthropic, Gemini, and xAI adapters plus OpenAI-compatible hosted providers.
 - GitLab workspace agent (`providers/llm`) for linked GitLab repositories, and the Desktop-only local workspace agent for linked Local Git projects. Both return validated file changes and commit them to a branch; neither executes repository code.
 
-A provider may declare itself explicit-only (`AgentProvider.explicitOnly`): the registry then never selects it automatically, and it runs only as a role's preferred provider or when a task requires it by ID. Provider-specific identifiers, payloads, credentials, and event schemas stay inside each adapter.
+A provider may declare itself explicit-only (`AgentProvider.explicitOnly`): the registry then never selects it automatically, and it runs only as a role's preferred provider or when a task requires it by ID. Every selection asks `supportsRepository(repository)`, also when the run has no repository, so an agent that works only inside one (OpenCode on GitHub Actions) never gets repository-less work. `canStaff(required, repository)` answers the same question for planning: the planner's role list holds only roles some agent can take for that repository (all of them when none can, so the failure names the gap), and `WorkflowDefinitionPreparer` adds test-design steps only when some test-authoring role can be staffed. Provider-specific identifiers, payloads, credentials, and event schemas stay inside each adapter.
 
 Jules was removed in 0.9.6. Credential stores delete any Jules key they still hold (`ProviderCatalog.RETIRED_PROVIDER_IDS`).
 

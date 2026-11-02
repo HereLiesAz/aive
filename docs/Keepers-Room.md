@@ -25,17 +25,17 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 ## Connections
 
-One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. AI providers not yet connected sit behind one **Add a provider** row rather than a card each; with none connected, the free, keyless gateways come first. Local Git needs no account: a folder is picked when launching.
+One row per thing (`ConnectionRow`): its name, one line about it, its status and what can be done to it. Connected things are Ink rows; things not yet connected are outlined. While no AI provider from the catalog is connected (an agent that comes with a repository host, such as OpenCode through GitHub, does not count), a **Try it free, no key** card offers each keyless gateway in one tap. AI providers not yet connected sit behind one **Add a provider** row rather than a card each, keyless ones first; those have no **Get API key**. On desktop a keyless link holds no secret and is stored without the keychain, so it works on Linux without `secret-tool`. Local Git needs no account: a folder is picked when launching.
 
 ## Navigation
 
 There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):
 
-- **The Aive** and how its runtime is.
+- **The Aive** and the hive's state in a word: NEW, RESTING, WAKING, STOPPED, CAN'T REACH ITS AGENTS, or its run's status.
 - **The breadcrumb**: Hive › a hive › a creature › its tab, or Hive › a place opened from it (Swarm, the Keeper's room › its part). The last step is where you are and is not a button; any earlier step goes back up to it, popping rather than stacking. Hive is the district, every hive at once; from a place opened off the hive, Hive returns to the hive you came from. A creature's step closes its panel. It replaces the page titles. On a phone it takes its own line and scrolls to keep where you are in view.
 - **The Inbox** badge and **the Keeper's room** gear.
 
-Inside a hive, one row holds its places: its Swarm, the Memory swarm and the Store. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
+Once there is a hive, resting or live, one row holds its places: its Swarm, the Memory swarm and the Store. It is hidden on a first launch and while the hive is waking or stopped. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
 
 ## A creature's panel
 
@@ -55,7 +55,21 @@ Back closes the creature panel, then returns through the places opened off the h
 
 ## First launch
 
-Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. With no AI provider connected, **Connect a provider** comes first and Feed it waits quietly. Feeding keeps the picked starter and names the hive from the first words it was fed (never from an empty tap). Its name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
+Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. Feeding keeps the picked starter and names the hive from the first words it was fed (never from an empty tap). Its name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
+
+Feed it is gated on what the connected agents can reach (`ProviderReach`, `FeedGate`), and the gate sits right above it with its resolution in place:
+
+- **No AI provider:** the free keyless gateways, each a one-tap pill (**Use Kilo Gateway · free, no key**), with the note that a free gateway may log prompts; then a quieter **Use your own key** pill to the Keeper's room. Feed it waits quietly.
+- **Every agent works only inside a repository** (OpenCode on GitHub Actions, linked with a GitHub token): the repository fields open above Feed it, offering only the kinds those agents work in, alongside the free gateways for work with no repository.
+- **A repository no agent works in:** the fields open there too, to choose another kind, or none.
+
+Pressing a gated Feed it shows the gate's message and starts nothing. A launch that fails stays beside Feed it, the objective still typed, until the next edit or launch.
+
+## The hive's state
+
+A hive that stopped reads **The hive stopped**; one that cannot reach its agents, **The hive can't reach its agents**. Both offer **Try again** and **Connections**; a hive stopped by corrupted data offers only **Delete all projects and runs to recover**. Work no connected agent can take fails as "No connected agent can do this work", with what to connect (`UserFacingError`, `ErrorKind.NoAgent`).
+
+A completed hive shows **What it made** under its run's status: the text artifacts of its final tasks (those nothing depends on), selectable. Once its run has completed, failed or been cancelled, its one follow-up is **Feed it more**, which asks what next and launches a continuation in the same project (`ContinueRunPanel`). A resting hive keeps its objective bar (`HiveLaunchBar`); a live one has none.
 
 ## Consolidation plan
 

@@ -272,8 +272,8 @@ run's first session starts; a second parent makes the run a merge and its contra
 In the app, the launch form's **Lineage** choice sets them: **New** (none), **Continue a run** (pick
 one earlier run) or **Combine runs** (pick two or more, in the order picked; the first is primary).
 The run list shows each run's workflow, date, status and project (`loadLaunchableRuns`,
-`LaunchLineageState`). A finished run's view also offers **Continue this run**, which asks for the
-next objective and launches a continuation in the same project.
+`LaunchLineageState`). A finished run's hive also offers **Feed it more**, which asks what next and
+launches a continuation in the same project (`ContinueRunPanel`).
 
 ```mermaid
 flowchart LR
