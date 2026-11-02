@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.agentui.AgentUi
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
@@ -323,6 +324,8 @@ class WorkflowEngine(
                             blockingReason = null,
                             progress = null,
                             progressMessage = null,
+                            // A new session has asked nothing yet.
+                            keeperQuestion = null,
                             // An engine-approved plan stays visible on the task it is being executed for.
                             providerPlan = pending.taskRun.approvedEnginePlan(),
                         )
@@ -499,6 +502,19 @@ class WorkflowEngine(
             } else {
                 taskRun.status
             }
+            // The agent's question to the keeper (docs/Agent-UI.md). A gateway that does not know
+            // keeps what the task holds; an answered question stays answered even when replayed.
+            val questionState = try {
+                sessionGateway.keeperQuestion(handle)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                null
+            }
+            val answeredQuestion = questionState?.answeredKey ?: taskRun.answeredKeeperQuestion
+            val keeperQuestion = (if (questionState == null) taskRun.keeperQuestion else questionState.pending)
+                ?.takeUnless { AgentUi.questionKey(it) == answeredQuestion }
+                ?.takeUnless { safeStatus.isFinishedForQuestions() }
             val mergedArtifacts = mergeArtifacts(taskRun.artifacts, durableArtifacts)
             val previousArtifactIds = taskRun.artifacts.mapTo(mutableSetOf()) { it.id }
             mergedArtifacts
@@ -519,6 +535,8 @@ class WorkflowEngine(
                         },
                         progressMessage = providerProgress?.message ?: taskRun.progressMessage,
                         usage = usageTotal,
+                        keeperQuestion = keeperQuestion,
+                        answeredKeeperQuestion = answeredQuestion,
                         providerPlan = if (
                             safeStatus == TaskRunStatus.AwaitingApproval &&
                             !providerProgress?.message.isNullOrBlank()
@@ -584,6 +602,7 @@ class WorkflowEngine(
                             progress = null,
                             progressMessage = null,
                             providerPlan = null,
+                            keeperQuestion = null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
@@ -742,6 +761,13 @@ class WorkflowEngine(
         WorkflowRunStatus.Completed,
         WorkflowRunStatus.Failed,
         WorkflowRunStatus.Cancelled,
+    )
+
+    /** A task in one of these states has no agent left to answer: its question is dropped. */
+    private fun TaskRunStatus.isFinishedForQuestions() = this in setOf(
+        TaskRunStatus.Completed,
+        TaskRunStatus.Failed,
+        TaskRunStatus.Cancelled,
     )
 
     private fun TaskRunStatus.isActive() = this in setOf(

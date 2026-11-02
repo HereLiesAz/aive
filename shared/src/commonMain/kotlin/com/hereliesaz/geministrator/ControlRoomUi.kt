@@ -143,6 +143,8 @@ fun ControlRoom(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
+    /** Answers a creature's question to the keeper: task id, question key, answer; null on success. */
+    onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit = {},
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },
@@ -405,6 +407,7 @@ fun ControlRoom(
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
                         onMessageAgent = onMessageAgent,
+                        onAnswerKeeperQuestion = onAnswerKeeperQuestion,
                         tab = creatureTab,
                         onTabChange = { creatureTabName = it.name },
                         onSaveRoleCollection = onSaveRoleCollection,

@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- An agent the keeper can reply to can now ask a question richer than text (choices, a confirm, a short text or number, a read-only table) as an A2UI-shaped request. The Aive draws it only from its own catalog of controls; anything else is shown as plain text, and nothing in it is executed or loaded. The question waits in the creature's Needs like any other wait, and the answer goes back to the agent as a structured message (`docs/Agent-UI.md`).
 - On Android and desktop, one unreadable workflow record no longer marks the whole store as corrupt (whose recovery clears everything). The record is skipped, its contents are kept aside in the database, and it is listed as quarantined; everything else loads as usual.
 - Retrying a repository operation (for example after approving a failure escalation) runs it again; each attempt now has its own run record instead of replaying the first attempt's failure. On desktop, two starts of the same Local Git operation can no longer both run Git, and its run record is replaced in one atomic step.
 - An executor (GitHub Action, script, test runner, deployment, external service) that throws while starting now fails only its own task, which then follows its retry or escalation policy, instead of stopping the whole cycle with the task stuck Ready. Each started external run is saved as soon as it starts, so a later failure in the same cycle cannot cause it to be started twice.

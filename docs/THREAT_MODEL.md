@@ -58,6 +58,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 - Acceptance criteria are authored by the workflow definition, not the provider.
 - A bearer secret travels over plain `http://` only to a loopback or private-network host (`CleartextPolicy`); anything else needs `https://`. The host is read from the URL's authority (cut at the first `/`, `?`, `#` or `\`, then userinfo dropped), so an `@` or `.local` in a fragment, query or path cannot pose as the host.
 - Keyless use requires an explicit link. It is stored as the `anonymous` credential, and the catalog tells users about the logging risk. Keyless entries are listed last so that planning, which uses the first linked provider, prefers a keyed provider.
+- An agent's question to the keeper (`docs/Agent-UI.md`) is rendered only from the host's fixed catalog (text, choices, buttons, short text or number fields, a read-only table), every string as plain text. Unknown components or properties, data bindings without a literal, oversized or deeply nested payloads and broken references are rejected and the message is shown as plain text. Nothing in it is executed, fetched or shown as HTML, a link or an image, and the answer reaches the agent only as a message through its own session.
 - Store-installed language models (Azphalt `kind:"llm"`, endpoint tier) are verified like any package (integrity, signature, publisher pin, revocation). Literal endpoints come from the signed manifest; self-hosted endpoints may instead come from a declared non-secret install input and are required to use HTTPS. They get the `azphalt:` id prefix, so a package cannot impersonate or replace a built-in provider. Their setup scripts are never executed on-device. `openai-chat` responses use the normal text-provider path; `moyai-session` is confined to a native `AgentProvider` adapter and cannot alter workflow semantics. Moyai model/provider credentials remain server-side; an optional Moyai workspace password is stored only in Aive's platform credential vault.
 
 **Remaining gaps**
@@ -384,6 +385,7 @@ The following invariants must hold regardless of the integration used:
 4. Every mutating `RepositoryOperation` task (anything other than `status`/`fetch`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents write only to new dedicated branches.
 5. Provider payloads are subject to `PayloadRedactionPolicy` before transmission.
 6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
+7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
 
 ## Open Items
 

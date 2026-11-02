@@ -32,6 +32,8 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.agentui.AgentUi
+import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
@@ -76,6 +78,17 @@ internal fun inboxItemKeys(run: WorkflowRun, taskId: String): List<String> =
 
 // One definition of waiting on the keeper, shared with the creature panel ([creatureNeedsYou]).
 private fun inboxKey(run: WorkflowRun, taskRun: com.hereliesaz.geministrator.domain.TaskRun): String {
+    val question = taskRun.keeperQuestion
+    if (taskRun.awaitsKeeperAnswer() && question != null) {
+        // Each new question is a new item, so a second question is unread even after the first was seen.
+        return inboxKey(
+            "question",
+            run.id.value,
+            taskRun.taskDefinitionId.value,
+            taskRun.attempt.toString(),
+            AgentUi.questionKey(question),
+        )
+    }
     val kind = when {
         taskRun.status == TaskRunStatus.AwaitingApproval -> "approval"
         taskRun.status == TaskRunStatus.Escalated -> "escalation"
