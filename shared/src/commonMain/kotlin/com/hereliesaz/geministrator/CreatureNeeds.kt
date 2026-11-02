@@ -43,7 +43,8 @@ internal fun echoStateOf(echo: Int): EchoState = when {
     else -> EchoState.Grounded
 }
 
-private val REVIEWER_KINDS = setOf(
+/** The kinds whose work is reviewing others' work: Echo counts them, and the Swarm filters on them. */
+internal val REVIEWER_KINDS = setOf(
     NodeCreatureRoleKind.QaEngineer,
     NodeCreatureRoleKind.AdversarialReviewer,
     NodeCreatureRoleKind.CodeReviewer,
@@ -53,8 +54,10 @@ private val REVIEWER_KINDS = setOf(
     NodeCreatureRoleKind.ComplianceOfficer,
 )
 
-/** A downstream creature in one of these has taken its upstream's output. */
-internal val TAKEN_UP = setOf(
+/** Whether a role, by its name, is a reviewer (see [REVIEWER_KINDS]). */
+internal fun isReviewerRoleName(roleName: String): Boolean = classifyNodeCreatureRole(roleName) in REVIEWER_KINDS
+
+private val TAKEN_UP = setOf(
     TaskRunStatus.Planning,
     TaskRunStatus.AwaitingApproval,
     TaskRunStatus.Running,
@@ -81,7 +84,7 @@ internal fun creatureNeeds(
     fun isReviewer(id: TaskDefinitionId): Boolean {
         val t = tasks[id] ?: return false
         val roleName = (run.taskRuns[id]?.assignedRoleId ?: t.roleId)?.let { rolesById[it]?.name ?: it.value }
-        return roleName != null && classifyNodeCreatureRole(roleName) in REVIEWER_KINDS
+        return roleName != null && isReviewerRoleName(roleName)
     }
 
     val own = config(taskId)
