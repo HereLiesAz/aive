@@ -51,9 +51,15 @@ data class A2aDrifter(
     val looking: Boolean = false,
     /** From the seed list rather than brought in by the keeper. */
     val seeded: Boolean = false,
+    /** A seed's own name and line about it, shown until its card is read ([A2aDrifterSeed]). */
+    val label: String? = null,
+    val blurb: String? = null,
 ) {
-    /** Its card's name, or its host while the card is unread. */
-    val name: String get() = A2aDrifters.nameOf(card, cardUrl)
+    /** Its card's name, else its seed's, else its host. */
+    val name: String get() = card?.let { A2aDrifters.nameOf(it, cardUrl) } ?: label ?: A2aDrifters.hostOf(cardUrl)
+
+    /** A seed nobody has read yet: "Let it in" reads its card first. */
+    val isUnreadSeed: Boolean get() = seeded && card == null && trouble == null && !looking
 
     /** The creature it is drawn as: the same one every time for the same card URL. */
     val creature: String get() = A2aDrifters.creatureFor(cardUrl)
@@ -87,11 +93,26 @@ object A2aDrifters {
     /** Reads the card at [rawUrl] and puts the drifter at the edge, its trouble and all. */
     suspend fun bringIn(rawUrl: String, client: HttpClient = cardClient, seeded: Boolean = false): A2aDrifter {
         val key = runCatching { A2aAgentConnections.normalizeCardUrl(rawUrl) }.getOrNull() ?: rawUrl.trim()
-        put(A2aDrifter(cardUrl = key, looking = true, seeded = seeded))
-        val read = read(rawUrl, client).copy(seeded = seeded)
+        val seed = if (seeded) A2aDrifterSeeds.seedFor(key) else null
+        put(A2aDrifter(cardUrl = key, looking = true, seeded = seeded, label = seed?.name, blurb = seed?.about))
+        val read = read(rawUrl, client).copy(seeded = seeded, label = seed?.name, blurb = seed?.about)
         // Sent away while it was being read: it stays away.
         if (state.value.any { it.cardUrl == key }) put(read)
         return read
+    }
+
+    /**
+     * Puts the seeds still pending ([A2aDrifterSeeds.pending]) at the edge, behind any drifter
+     * already there, unread: nothing is fetched until the keeper lets one in.
+     */
+    fun offerSeeds(pending: List<A2aDrifterSeed> = A2aDrifterSeeds.pending()) {
+        state.update { current ->
+            val here = current.mapTo(hashSetOf()) { it.cardUrl }
+            val seeds = pending.filter { it.cardUrl !in here }.map { seed ->
+                A2aDrifter(cardUrl = seed.cardUrl, seeded = true, label = seed.name, blurb = seed.about)
+            }
+            (current + seeds).take(MAX_WAITING)
+        }
     }
 
     /** Sends the drifter at [cardUrl] away from the edge. */
