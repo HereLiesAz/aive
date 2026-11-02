@@ -519,6 +519,10 @@ class MainActivity : ComponentActivity() {
                             configuringGeminiApiKey = false
                             configuringProviderId = id
                         },
+                        onConnectFreeProvider = { freeProviderId ->
+                            providerCredentialStore.write(freeProviderId, ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                            credentials = providerCredentialStore.readAll()
+                        },
                         onDisconnectProvider = { disconnectedProviderId ->
                             if (disconnectedProviderId == ProviderCatalog.GEMINI_ID) {
                                 InstalledGeminiPreference.setEnabled(this, false)
@@ -655,7 +659,7 @@ class MainActivity : ComponentActivity() {
             com.hereliesaz.geministrator.ErrorKind.RateLimited -> R.string.remote_problem_rate_limited
             com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
             com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out
-            com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
+            com.hereliesaz.geministrator.ErrorKind.NoAgent, com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
         },
     )
 

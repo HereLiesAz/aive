@@ -15,6 +15,7 @@ import com.hereliesaz.geministrator.resources.error_details_hide
 import com.hereliesaz.geministrator.resources.error_details_label
 import com.hereliesaz.geministrator.resources.error_details_show
 import com.hereliesaz.geministrator.resources.error_key_rejected
+import com.hereliesaz.geministrator.resources.error_no_agent
 import com.hereliesaz.geministrator.resources.error_offline
 import com.hereliesaz.geministrator.resources.error_other
 import com.hereliesaz.geministrator.resources.error_rate_limited
@@ -24,7 +25,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, RateLimited, Offline, TimedOut, Other }
+enum class ErrorKind { KeyRejected, RateLimited, Offline, TimedOut, NoAgent, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
 private val rateLimitCode = Regex("""(^|[^0-9])429([^0-9]|$)""")
@@ -34,6 +35,11 @@ fun classifyError(raw: String?): ErrorKind {
     val text = raw?.lowercase().orEmpty()
     if (text.isBlank()) return ErrorKind.Other
     return when {
+        // Before the codes: "no agent provider satisfies…" must not read as a rejected key.
+        "no agent provider satisfies" in text || "only inside a linked repository" in text ||
+            "runs against a linked" in text || "cannot resume without its linked" in text ||
+            "is not registered" in text -> ErrorKind.NoAgent
+
         unauthorizedCode.containsMatchIn(text) ||
             "unauthorized" in text || "forbidden" in text || "invalid api key" in text ||
             "invalid_api_key" in text || "incorrect api key" in text || "authentication" in text ||
@@ -59,6 +65,7 @@ internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.RateLimited -> Res.string.error_rate_limited
     ErrorKind.Offline -> Res.string.error_offline
     ErrorKind.TimedOut -> Res.string.error_timed_out
+    ErrorKind.NoAgent -> Res.string.error_no_agent
     ErrorKind.Other -> Res.string.error_other
 }
 

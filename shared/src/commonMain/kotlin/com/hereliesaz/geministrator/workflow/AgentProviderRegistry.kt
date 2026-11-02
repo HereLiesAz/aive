@@ -84,10 +84,10 @@ class AgentProviderRegistry(
     fun provider(id: AgentProviderId): AgentProvider? = providersById[id]
 
     /** Whether a provider [select] may choose on its own supports every capability in [required]. */
-    suspend fun canStaff(required: Set<AgentCapability>): Boolean =
+    suspend fun canStaff(required: Set<AgentCapability>, repository: RepositoryRef? = null): Boolean =
         providersById.values
             .filterNot { it.explicitOnly }
-            .any { it.capabilities().supported.containsAll(required) }
+            .any { it.capabilities().supported.containsAll(required) && it.supportsRepository(repository) }
 
     suspend fun select(request: ProviderSelectionRequest): AgentProvider {
         val required = buildSet {
@@ -107,10 +107,14 @@ class AgentProviderRegistry(
                 if (!provider.capabilities().supported.containsAll(required)) {
                     error("Provider ${constraints.providerId.value} does not satisfy required capabilities $required")
                 }
-                if (request.repository != null && !provider.supportsRepository(request.repository)) {
+                if (!provider.supportsRepository(request.repository)) {
                     error(
-                        "Provider ${constraints.providerId.value} cannot operate in the context of the linked " +
-                            "${request.repository.source.displayName()} repository",
+                        if (request.repository == null) {
+                            "Provider ${constraints.providerId.value} works only inside a linked repository"
+                        } else {
+                            "Provider ${constraints.providerId.value} cannot operate in the context of the linked " +
+                                "${request.repository.source.displayName()} repository"
+                        },
                     )
                 }
                 return provider
@@ -129,10 +133,9 @@ class AgentProviderRegistry(
         val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
         for (provider in ordered) {
             val capabilities = provider.capabilities().supported
-            if (
-                capabilities.containsAll(required) &&
-                (request.repository == null || provider.supportsRepository(request.repository))
-            ) {
+            // Asked even without a repository: an agent that only works inside one (OpenCode on
+            // GitHub, a local or GitLab workspace) says no to repository-less work.
+            if (capabilities.containsAll(required) && provider.supportsRepository(request.repository)) {
                 eligibleProviders += provider to capabilities
             }
         }

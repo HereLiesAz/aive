@@ -113,6 +113,25 @@ class AgentProviderRegistryRepositoryTest {
     }
 
     @Test
+    fun workWithoutARepositoryNeverGoesToAnAgentThatOnlyWorksInsideOne() = runBlocking {
+        // OpenCode on GitHub: listed first, yet useless to a hive with no repository.
+        val insideARepository = SourceAwareProvider(
+            id = AgentProviderId("opencode"),
+            supportedSources = setOf(RepositorySource.GitHub),
+            worksWithoutRepository = false,
+        )
+        val anywhere = SourceAwareProvider(AgentProviderId("claude"), setOf(RepositorySource.GitHub))
+        val request = ProviderSelectionRequest(requiredCapabilities = setOf(AgentCapability.RepositoryWrite))
+
+        val both = AgentProviderRegistry(listOf(insideARepository, anywhere), inferenceSettings = InMemorySettings())
+        assertEquals(anywhere.id, both.select(request).id)
+
+        val onlyInside = AgentProviderRegistry(listOf(insideARepository), inferenceSettings = InMemorySettings())
+        assertFailsWith<IllegalStateException> { onlyInside.select(request) }
+        Unit
+    }
+
+    @Test
     fun explicitOnlyProviderIsNeverChosenAutomatically() = runBlocking {
         val explicitAgent = SourceAwareProvider(
             id = AgentProviderId("explicit-agent"),
@@ -188,11 +207,12 @@ private class SourceAwareProvider(
         AgentCapability.RepositoryWrite,
     ),
     override val explicitOnly: Boolean = false,
+    private val worksWithoutRepository: Boolean = true,
 ) : AgentProvider {
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(capabilities)
 
     override suspend fun supportsRepository(repository: RepositoryRef?): Boolean =
-        repository == null || repository.source in supportedSources
+        if (repository == null) worksWithoutRepository else repository.source in supportedSources
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle =
         AgentRunHandle(ProviderRunId("run"))

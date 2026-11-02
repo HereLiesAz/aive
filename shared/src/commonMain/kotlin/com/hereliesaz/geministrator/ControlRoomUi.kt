@@ -188,6 +188,12 @@ fun ControlRoom(
     contentPadding: PaddingValues,
     runtimeState: ApplicationRuntimeState,
     connectedProviderIds: Set<String> = emptySet(),
+    /** Where the connected agents can work; feeding a hive is gated on it. */
+    providerReach: ProviderReach = ProviderReach.Unknown,
+    onConnectFreeProvider: (String) -> Unit = onReconfigureProvider,
+    /** Why the last launch did not start, shown beside Feed it; null when it did. */
+    launchError: String? = null,
+    onDismissLaunchError: () -> Unit = {},
 ) {
     val ground = Azphalt.currentGround
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -368,6 +374,10 @@ fun ControlRoom(
                 azphaltPackageImportRequest = azphaltPackageImportRequest,
                 onAzphaltPackageImportHandled = onAzphaltPackageImportHandled,
                 connectedProviderIds = connectedProviderIds,
+                providerReach = providerReach,
+                onConnectFreeProvider = onConnectFreeProvider,
+                launchError = launchError,
+                onDismissLaunchError = onDismissLaunchError,
                 modifier = Modifier.weight(1f),
                 compact = compact,
                 district = district,
@@ -616,6 +626,10 @@ private fun MainDestination(
     azphaltPackageImportRequest: AzphaltPackageImportRequest? = null,
     onAzphaltPackageImportHandled: (Long) -> Unit = {},
     connectedProviderIds: Set<String>,
+    providerReach: ProviderReach,
+    onConnectFreeProvider: (String) -> Unit,
+    launchError: String?,
+    onDismissLaunchError: () -> Unit,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     runtimeState: ApplicationRuntimeState,
@@ -629,8 +643,10 @@ private fun MainDestination(
     keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
     Column(modifier.fillMaxSize()) {
-        // A first launch is one step: no places to wander off to until there is a hive.
-        if (destination.navigationItem == ControlRoomDestination.Overview && runtimeState !is ApplicationRuntimeState.NoProject) {
+        // A first launch is one step: no places to wander off to until there is a hive, nor while
+        // the hive is stopped or waking (its trouble and the way out come first).
+        val hasHive = runtimeState is ApplicationRuntimeState.Live || runtimeState is ApplicationRuntimeState.NoRun
+        if (destination.navigationItem == ControlRoomDestination.Overview && hasHive) {
             OverviewSectionTabs(compact, destination, onDestinationSelected)
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
@@ -774,10 +790,14 @@ private fun MainDestination(
                             compact = compact,
                             onSurface = onZoomOut,
                             runtimeState = runtimeState,
-                            hasProvider = connectedProviderIds.isNotEmpty(),
+                            providerReach = providerReach,
+                            onConnectFreeProvider = onConnectFreeProvider,
+                            launchError = launchError,
+                            onDismissLaunchError = onDismissLaunchError,
                         )
                             }
-                            live?.let { HiveLaunchBar(it.definition) }
+                            // No second launcher under a live hive: a finished one offers "Feed it more"
+                            // above (one Heroic act per screen, Conveyance §11).
                         }
                     }
                 }
@@ -887,7 +907,7 @@ private fun runtimeStatusLabel(state: ApplicationRuntimeState): String = when (s
     ApplicationRuntimeState.Loading -> stringResource(Res.string.nav_runtime_loading)
     is ApplicationRuntimeState.NoProject -> stringResource(Res.string.nav_runtime_no_project)
     is ApplicationRuntimeState.NoRun -> stringResource(Res.string.nav_runtime_no_run)
-    is ApplicationRuntimeState.Live -> stringResource(Res.string.nav_runtime, state.presentation.run.status.name.uppercase())
+    is ApplicationRuntimeState.Live -> stringResource(Res.string.nav_runtime, state.presentation.run.status.label().uppercase())
     is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.nav_runtime_disconnected)
     is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.nav_runtime_resume_failed)
 }

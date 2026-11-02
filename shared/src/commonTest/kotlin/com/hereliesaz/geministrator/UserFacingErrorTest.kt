@@ -39,4 +39,13 @@ class UserFacingErrorTest {
         assertEquals(ErrorKind.Other, classifyError("   "))
         assertEquals(ErrorKind.Other, classifyError("Project could not be loaded"))
     }
+
+    @Test
+    fun aMissingAgentIsNamedAsSuchNotAsARejectedKey() {
+        assertEquals(
+            ErrorKind.NoAgent,
+            classifyError("No agent provider satisfies required capabilities [RepositoryRead, RepositoryWrite]"),
+        )
+        assertEquals(ErrorKind.NoAgent, classifyError("OpenCode runs against a linked GitHub repository"))
+    }
 }

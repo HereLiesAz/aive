@@ -1,6 +1,6 @@
 # UI simplification proposals
 
-Status: proposal only. No code in this change implements anything below.
+Status: proposal. An item marked **Done** is implemented; the rest are not.
 
 Scope: every destination in `shared/src/commonMain` as of this branch: Overview, Runs, Workflows (all tabs),
 Swarm, Artifacts, Inbox, Repositories, Compute, Memory, Azphalt Store, Settings, the header and navigation,
@@ -136,6 +136,8 @@ step, and error states mostly print a raw exception message. Some of this is dea
 - Why: the compact header never showed runtime status, so users on phones and users on desktop see different
   information; and the sidebar status repeats what Overview prints ("RUNTIME · NO RUN" next to "NO ACTIVE RUN").
 - Effort: S. Risk: low.
+- **Done**, differently: one header on every width (`ShellHeader`), no "SWARM OS" eyebrow, and its status is
+  always shown, as a plain word (NEW, RESTING, WAKING, STOPPED, CAN'T REACH ITS AGENTS, or the run's status).
 
 ### 10. One spacing scale, and gutters that suit a phone
 

@@ -6,7 +6,7 @@ play-billing = "9.1.0"
 jgit = "5.13.5.202508271544-r"
 # Must match vendor/conveyance-h2g2 (its gradle/libs.versions.toml): one build allows only one AGP.
 # Raise both together.
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 compose = "1.12.2"
 android-compileSdk = "37"

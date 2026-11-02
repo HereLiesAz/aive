@@ -180,6 +180,12 @@ fun main() {
                     repositoryCredentials = repositoryCredentials - serviceId
                 },
                 onReconfigureProvider = { configuringProviderId = it },
+                onConnectFreeProvider = { freeProviderId ->
+                    scope.launch {
+                        WebCredentialStore.write(providerStorageKey(freeProviderId), ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                        credentials = readWebProviderCredentials()
+                    }
+                },
                 onDisconnectProvider = { disconnectedProviderId ->
                     WebCredentialStore.remove(providerStorageKey(disconnectedProviderId))
                     credentials = credentials - disconnectedProviderId
