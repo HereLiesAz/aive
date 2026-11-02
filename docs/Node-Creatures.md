@@ -55,7 +55,7 @@ Work done programmatically rather than by an agent wears one body: **the neuron*
 - roles that run a script or an action instead of an agent (`RoleExecutionSource` other than `Agent`);
 - memory stages running without a model (the memory swarm).
 
-The neuron only connects. It takes its place in the swarm, wired to what feeds it and what it feeds, so the swarm doubles as a standing flowchart of the workflow, every step visible. Its work counts toward a run like any other, but it has no genes: it is never a parent of a hatch, never sways a generation's mutation, and is never in the stable or the Store. A programmatic role has no creature to choose.
+The neuron only connects. It takes its place in the swarm, wired to what feeds it and what it feeds, so the swarm doubles as a standing flowchart of the workflow, every step visible. Its work counts toward a run like any other, but it has no genes: it is never a parent of a hatch, never sways a generation's mutation, and is never in the stable or the Store. A programmatic role has no creature to choose. In Build, **Add creature** brings in a step that wears the neuron, or a role whose own execution source is a script or an action, which wears it too (`docs/Swarm-OS.md`).
 
 ## Birth, breeding, mutation, death
 
@@ -84,4 +84,4 @@ Every Act also exists in the care panel and the semantics tree, so nothing depen
 
 ## Consequence for the mockups
 
-The creatures are the existing paintings and rigs; nothing here redesigns them. What changes is what their parts do: dendrite beads light per input, tails grow with output, bulbs become eggs, pulses show work, and the status table above sets their posture. The interface around them stays as full as it needs to be: each creature is labelled with its task and state, the bowl carries its run status, and the app's navigation stays. The anatomy explains the behaviour; it doesn't replace the information.
+The creatures are the existing paintings and rigs; nothing here redesigns them. What changes is what their parts do: dendrite beads light per input, tails grow with output, bulbs become eggs, pulses show work, and the status table above sets their posture. The interface around them stays as full as it needs to be: each creature is labelled with its task and state (past 12 creatures only the selected one keeps its label on the field, unless **Always show labels** is on in Keeper's room › Appearance; the semantics always carry it), the bowl carries its run status, and the app's navigation stays. The anatomy explains the behaviour; it doesn't replace the information.

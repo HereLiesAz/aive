@@ -41,6 +41,36 @@ internal data class TissueCapillary(
     val end: H2g2TerrariumPosition,
 )
 
+/** The creatures [providerId]'s capillary feeds: the tasks assigned to it, in id order. */
+internal fun TissueScene.fedBy(providerId: String): List<String> =
+    providerOf.filterValues { it == providerId }.keys.sorted()
+
+/** The name a capillary carries on the field: the provider's catalog name, else its id. */
+internal fun capillaryName(providerId: String): String =
+    ProviderCatalog.entry(providerId)?.displayName ?: providerId
+
+/** The creatures a capillary feeds, as said aloud: their names once each, in order ("Architect, Engineer"). */
+internal fun capillaryFeeds(creatureNames: List<String>): String =
+    creatureNames.map(String::trim).filter(String::isNotEmpty).distinct().joinToString(", ")
+
+/**
+ * A capillary's name is written along its course, but never upside down: [degrees] (the course's
+ * angle, screen y down) turned by a half turn when needed, so the result lies in (-90, 90].
+ */
+internal fun capillaryLabelAngle(degrees: Float): Float {
+    var a = degrees % 360f
+    if (a > 180f) a -= 360f
+    if (a <= -180f) a += 360f
+    return when {
+        a > 90f -> a - 180f
+        a <= -90f -> a + 180f
+        else -> a
+    }
+}
+
+/** How far along its course, from the field's edge toward its creatures, a capillary's name sits. */
+internal const val CAPILLARY_LABEL_AT = 0.35f
+
 internal data class TissueEgg(
     val position: H2g2TerrariumPosition,
     /** Completed tasks over all tasks, 0..1. */

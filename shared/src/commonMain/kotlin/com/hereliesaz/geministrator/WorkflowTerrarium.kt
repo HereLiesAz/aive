@@ -223,6 +223,7 @@ internal fun GeministratorWorkflowTerrarium(
                     }
                 },
                 onEdit = ::applyEdit,
+                roles = roles,
                 onUndo = {
                     val back = tide.undo()
                     scope.launch {
