@@ -4,6 +4,9 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Keeper's room › Appearance has an **Always show labels** switch for creature labels, stored on this device. A hive of more than 12 creatures normally keeps only the selected creature's label; with the switch on, every creature keeps its label.
+- Keeper's room › Appearance has a **Reduce motion** switch, stored on this device. It holds the creatures and other looping movement still, adds to the device's own reduced-motion setting rather than replacing it (so it can turn motion off but never back on), and gives desktop a way to reduce motion without an environment variable.
+- Keeper's room › Appearance now shows the six grounds as swatches, the current one selected, instead of one pill that cycled to the next. Each swatch is a radio button named for its ground; the choice is still remembered on this device.
 - A creature's Work has **Open its trace**: it closes the panel and opens the hive's Timeline with that creature selected. Tapping the creature again opens its panel.
 - A creature's Work now lists its Connections after its inputs: **Fed by**, the creatures whose output it reads, and **Feeds**, the creatures that read its output, each saying whether it has taken that output yet.
 - A creature's panel now says, under its name, its state, its provider and its place in the plan ("Running · Claude · 3 of 5"), so you no longer open Work to see them. A creature with no provider yet leaves the provider out.

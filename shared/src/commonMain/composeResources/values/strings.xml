@@ -840,7 +840,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_ai_providers">AI Providers</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_ground">Ground</string>
-    <string name="settings_ground_explain">Tap to switch to the next ground; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_ground_explain">Pick the ground everything sits on; text and icons follow the colour they sit on. Your choice is remembered on this device.</string>
+    <string name="settings_motion">Motion</string>
+    <string name="settings_reduce_motion_explain">Holds the creatures still and stops other looping movement. Remembered on this device.</string>
+    <string name="settings_reduce_motion_on">Reduce motion: ON</string>
+    <string name="settings_reduce_motion_off">Reduce motion: OFF</string>
+    <string name="settings_reduce_motion_by_device">This device already asks for less motion, so motion stays reduced whatever this switch says.</string>
+    <string name="settings_creature_labels">Creature labels</string>
+    <string name="settings_creature_labels_explain">A hive of more than %1$d creatures shows only the selected one's label, so packed cells stay readable. Turn this on to keep every creature's label, its task on its state's colour. Remembered on this device.</string>
+    <string name="settings_creature_labels_always">Always show labels: ON</string>
+    <string name="settings_creature_labels_crowded">Always show labels: OFF</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>
