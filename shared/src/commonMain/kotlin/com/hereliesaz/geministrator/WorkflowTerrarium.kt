@@ -26,8 +26,15 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
@@ -49,6 +56,13 @@ internal fun GeministratorWorkflowTerrarium(
     onSurface: (() -> Unit)? = null,
     /** Opens in Build instead of Live; for a hive that has never run, and for screenshots. */
     startInBuild: Boolean = false,
+    /**
+     * A hive's own head (mockup H6): set, it leads the row and Live and Build sit beside it as one
+     * segmented control; null keeps the two pills on their own.
+     */
+    heading: (@Composable () -> Unit)? = null,
+    /** Shown under the field while building, given the staged hive and the way to edit it (H6's bench). */
+    beneathField: (@Composable (WorkflowDefinition, (TerrariumDependencyEditResult) -> Unit) -> Unit)? = null,
     /** On wide screens, the hive in one frame: controls bar, tissue, legend and feed bar (HiveWorkspace.kt). */
     frame: HiveFrame? = null,
 ) {
@@ -170,7 +184,18 @@ internal fun GeministratorWorkflowTerrarium(
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (frame == null) {
-            TerrariumModeToggle(building = building, onBuildingChange = { building = it })
+            if (heading == null) {
+                TerrariumModeToggle(building = building, onBuildingChange = { building = it })
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f, fill = false).padding(end = 8.dp)) { heading() }
+                    TerrariumModeToggle(building = building, onBuildingChange = { building = it }, segmented = true)
+                }
+            }
         } else {
             HiveControlsBar(
                 building = building,
@@ -232,12 +257,28 @@ internal fun GeministratorWorkflowTerrarium(
                 camera = camera.takeIf { frame != null },
             )
           }
+            // An empty hive in Build says how it fills (mockup H6).
+            if (building && stagedDefinition.tasks.isEmpty()) {
+                Box(Modifier.fillMaxSize()) {
+                    Text(
+                        text = stringResource(Res.string.hive_new_empty),
+                        style = AzphaltType.body.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.Center),
+                        // The field is dark tissue whatever the ground: its text is Ink's opposite, softened.
+                        color = Azphalt.Ink.onOpposite().copy(alpha = 0.78f),
+                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 36.dp),
+                    )
+                }
+            }
         }
+
         if (frame == null) {
             Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { field() }
         } else {
             HiveTissueFrame(height = frame.tissueHeight, building = building) { field() }
             frame.feedBar()
+        }
+        if (building) beneathField?.let { bench ->
+            Box(Modifier.padding(top = 12.dp)) { bench(stagedDefinition, ::applyEdit) }
         }
 
         if (building) {

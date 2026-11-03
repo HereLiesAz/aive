@@ -157,6 +157,22 @@ class HiveScreenshotTest {
         shoot("2-hive-build", 900, 2600) {
             GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it }, startInBuild = true)
         }
+        // A new hive (mockup H6): empty, in Build, named and filled from under the field. A phone.
+        shoot("16-new-hive", 780, 1688) {
+            val empty = WorkflowDefinition(id = WorkflowDefinitionId("hive-1"), name = "New hive", tasks = emptyList())
+            GeministratorWorkflowTerrarium(
+                empty,
+                restingWorkflowRun(empty),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+                compact = true,
+                startInBuild = true,
+                heading = { NewHiveCrumb(name = empty.name, onSurface = {}) },
+                beneathField = { staged, edit -> NewHiveBench(staged, roles, onEdit = edit, onRename = {}) },
+            )
+        }
         shoot("3-whole-hive", 900, 1400) {
             DistrictScreen(
                 onLoadDefinitions = { listOf(definition, definition.copy(id = WorkflowDefinitionId("research"), name = "Deep research")) },

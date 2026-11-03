@@ -53,7 +53,13 @@ internal fun TerrariumModeToggle(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** One Ink capsule holding both, the open one filled (mockup H6's hive head). */
+    segmented: Boolean = false,
 ) {
+    if (segmented) {
+        TerrariumModeSegments(building, onBuildingChange, modifier)
+        return
+    }
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
             label = stringResource(Res.string.build_live),

@@ -184,31 +184,63 @@ internal fun RestingHive(
     modifier: Modifier = Modifier,
 ) {
     val host = LocalWorkflowLibraryHost.current
-    var definition by remember(definitionId) { mutableStateOf<WorkflowDefinition?>(null) }
+    // The hive as opened: the field's tide starts from it, so saving an edit never resets undo.
+    var opened by remember(definitionId) { mutableStateOf<WorkflowDefinition?>(null) }
+    // The hive as last saved, edits and name included: what the launch bar runs.
+    var latest by remember(definitionId) { mutableStateOf<WorkflowDefinition?>(null) }
     var missing by remember(definitionId) { mutableStateOf(false) }
     LaunchedEffect(definitionId) {
-        definition = runCatching { onLoadDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == definitionId }
-        missing = definition == null
+        opened = runCatching { onLoadDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == definitionId }
+        latest = opened
+        missing = opened == null
     }
-    val current = definition ?: run {
+    val start = opened ?: run {
         // A hive deleted since it was last open: say so; the breadcrumb leads back out.
         if (missing) Text(stringResource(Res.string.hive_gone), style = AzphaltType.body, color = azphaltOnSurface(), modifier = modifier)
         return
     }
+    val current = latest ?: start
+    // Opened empty, it is a new hive (mockup H6): in Build, named and filled from under the field.
+    val fresh = remember(start.id) { opensAsNewHive(start) }
     val roles = remember(host) { mutableStateOf<Collection<com.hereliesaz.geministrator.domain.RoleDefinition>>(emptyList()) }
     LaunchedEffect(host) { roles.value = host?.installedRoles().orEmpty() }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // The breadcrumb names the hive.
+        // The breadcrumb names the hive; a new one names itself in its own head as well.
         GeministratorWorkflowTerrarium(
-            definition = current,
-            liveRun = remember(current.id) { restingWorkflowRun(current) },
+            definition = start,
+            liveRun = remember(start.id) { restingWorkflowRun(start) },
             roles = roles.value,
             selectedTaskId = selectedTaskId,
             onTaskSelected = onTaskSelected,
-            onStageDefinition = host?.let { h -> { candidate -> h.saveAuthored(candidate).also { definition = it } } },
+            // Every edit keeps the name the keeper gave, so undo never takes the name back.
+            onStageDefinition = host?.let { h ->
+                { candidate -> h.saveAuthored(candidate.copy(name = (latest ?: start).name)).also { latest = it } }
+            },
             onSurface = onSurface,
+            startInBuild = fresh,
+            heading = if (fresh) {
+                { NewHiveCrumb(name = current.name, onSurface = onSurface) }
+            } else {
+                null
+            },
+            beneathField = if (fresh) {
+                { staged, edit ->
+                    NewHiveBench(
+                        definition = staged,
+                        roles = roles.value,
+                        onEdit = edit,
+                        onRename = { name ->
+                            val h = host ?: error(getString(Res.string.hive_gone))
+                            latest = h.saveAuthored(renamedHive(latest ?: staged, name))
+                        },
+                    )
+                }
+            } else {
+                null
+            },
         )
-        HiveLaunchBar(current)
+        // An empty hive has nothing to launch yet; the launch bar comes with its first creature.
+        if (!fresh || current.tasks.isNotEmpty()) HiveLaunchBar(current)
     }
 }
 
