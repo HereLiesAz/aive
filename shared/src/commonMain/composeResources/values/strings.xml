@@ -320,6 +320,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="mind_proposal_approve">Approve and apply</string>
     <string name="mind_proposal_dismiss">Dismiss</string>
     <string name="mind_proposal_stale">Its instructions changed since that proposal was drafted, so nothing was applied. A fresh one will follow if the pattern still holds.</string>
+    <string name="places_hives">Hives</string>
     <string name="district_your_swarm">YOUR HIVE</string>
     <string name="district_empty">The hive is empty. Bring a workflow in from the Azphalt Store or build one.</string>
     <string name="district_needs_you">needs you</string>

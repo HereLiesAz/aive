@@ -75,6 +75,7 @@ import com.hereliesaz.geministrator.resources.nav_runtime_loading
 import com.hereliesaz.geministrator.resources.nav_runtime_no_project
 import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
+import com.hereliesaz.geministrator.resources.places_hives
 import com.hereliesaz.geministrator.resources.crumb_here
 import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.crumb_hive
@@ -91,6 +92,7 @@ enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
     Workflows("Workflows"),
     Company("Swarm"),
+    Stable("Stable"),
     Inbox("Inbox"),
     Compute("Compute"),
     Memory("Memory swarm"),
@@ -114,7 +116,8 @@ enum class ControlRoomDestination(val label: String) {
         // Memory is a swarm of its own, running beside every run: it lives in the hive, not the Keeper's room.
         // The Store is also the district's edge. The Swarm keeps adding, arranging and resetting roles;
         // one role's mind is changed in its creature's panel.
-        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Memory, AddOns)
+        // The Stable holds the keeper's creatures (StableSection); the district shows it too.
+        val OverviewSections: List<ControlRoomDestination> = listOf(Company, Stable, Memory, AddOns)
 
         /**
          * Reachable, but not in the hive's row (docs/Keepers-Room.md, stage 3): Workflows opens from a
@@ -600,12 +603,14 @@ private fun OverviewSectionTabs(
     compact: Boolean,
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
+    leading: @Composable () -> Unit = {},
     trailing: @Composable () -> Unit = {},
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        leading()
         ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
             AzphaltPill(
                 label = section.label,
@@ -702,13 +707,34 @@ private fun MainDestination(
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
     Column(modifier.fillMaxSize()) {
-        // A first launch is one step: no places to wander off to until there is a hive, nor while
-        // the hive is stopped or waking (its trouble and the way out come first).
-        val hasHive = runtimeState is ApplicationRuntimeState.Live || runtimeState is ApplicationRuntimeState.NoRun
-        if (destination.navigationItem == ControlRoomDestination.Overview && hasHive) {
+        // A first launch is one step: no places to wander off to until there is a hive. A stopped or
+        // waking hive keeps the row, so every hive, the Stable and the Store stay reachable.
+        val firstLaunch = runtimeState is ApplicationRuntimeState.NoProject
+        if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch) {
             val liveHive = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
                 ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
-            OverviewSectionTabs(compact, destination, onDestinationSelected) {
+            val inDistrictNow = destination == ControlRoomDestination.Overview && district.value
+            OverviewSectionTabs(
+                compact,
+                destination,
+                onDestinationSelected,
+                leading = {
+                    // Hives: the district, every hive at once, with New hive, the Stable and drifters.
+                    AzphaltPill(
+                        label = stringResource(Res.string.places_hives),
+                        seed = "places-hives",
+                        selected = inDistrictNow,
+                        onClick = {
+                            if (inDistrictNow) {
+                                district.value = false
+                            } else {
+                                onZoomOut()
+                                onDestinationSelected(ControlRoomDestination.Overview)
+                            }
+                        },
+                    )
+                },
+            ) {
                 // One row of places: the hive's own come after Swarm, Memory swarm and the Store.
                 liveHive?.let { live ->
                     AzphaltPill(
@@ -887,6 +913,12 @@ private fun MainDestination(
                     onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                 )
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
+                ControlRoomDestination.Stable -> Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .padding(horizontal = hiveGutter(compact), vertical = 12.dp),
+                ) {
+                    StableSection()
+                }
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
                     connectedProviderIds = connectedProviderIds,
