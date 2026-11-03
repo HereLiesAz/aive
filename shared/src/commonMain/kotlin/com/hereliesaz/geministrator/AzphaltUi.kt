@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -42,6 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.archivo_black_regular
+import com.hereliesaz.geministrator.resources.dm_sans_black
+import com.hereliesaz.geministrator.resources.dm_sans_bold
+import com.hereliesaz.geministrator.resources.dm_sans_extrabold
+import com.hereliesaz.geministrator.resources.dm_sans_medium
+import com.hereliesaz.geministrator.resources.dm_sans_regular
+import com.hereliesaz.geministrator.resources.dm_sans_semibold
+import org.jetbrains.compose.resources.Font
 import com.hereliesaz.geministrator.resources.tab_position
 import org.jetbrains.compose.resources.stringResource
 
@@ -154,49 +163,85 @@ internal object AzphaltShapes {
 /** Smallest touch target (dp) for anything clickable. */
 internal val AzphaltMinTouchTarget: Dp = 48.dp
 
+/**
+ * The app's two typefaces, bundled under composeResources/font (licences in THIRD_PARTY_NOTICES.md):
+ * Archivo Black for titles, DM Sans for everything else. They start as the platform sans-serif and
+ * become the bundled faces once [LoadAzphaltFonts] has run at the root of a window; [AzphaltType]
+ * reads them on every access, so text recomposes when they arrive.
+ */
+internal object AzphaltFonts {
+    var display: FontFamily by mutableStateOf(FontFamily.SansSerif)
+        private set
+    var text: FontFamily by mutableStateOf(FontFamily.SansSerif)
+        private set
+
+    internal fun use(display: FontFamily, text: FontFamily) {
+        if (this.display != display) this.display = display
+        if (this.text != text) this.text = text
+    }
+}
+
+/** Loads the bundled faces into [AzphaltFonts]. Call once near the root of each window. */
+@Composable
+internal fun LoadAzphaltFonts() {
+    // Archivo Black has one weight; it is registered as Black so a Black title matches it exactly
+    // and is never given a synthesised bold on top.
+    val display = FontFamily(Font(Res.font.archivo_black_regular, FontWeight.Black))
+    val text = FontFamily(
+        Font(Res.font.dm_sans_regular, FontWeight.Normal),
+        Font(Res.font.dm_sans_medium, FontWeight.Medium),
+        Font(Res.font.dm_sans_semibold, FontWeight.SemiBold),
+        Font(Res.font.dm_sans_bold, FontWeight.Bold),
+        Font(Res.font.dm_sans_extrabold, FontWeight.ExtraBold),
+        Font(Res.font.dm_sans_black, FontWeight.Black),
+    )
+    SideEffect { AzphaltFonts.use(display, text) }
+}
+
 internal object AzphaltType {
-    val hero = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    /** A page's big title (Archivo Black). */
+    val hero get() = TextStyle(
+        fontFamily = AzphaltFonts.display,
         fontWeight = FontWeight.Black,
         fontSize = 46.sp,
-        lineHeight = 56.sp,
-        letterSpacing = (-0.03).em,
+        lineHeight = 50.sp,
+        letterSpacing = (-0.045).em,
     )
-    val section = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val section get() = TextStyle(
+        fontFamily = AzphaltFonts.display,
         fontWeight = FontWeight.Black,
         fontSize = 28.sp,
-        lineHeight = 34.sp,
-        letterSpacing = (-0.02).em,
+        lineHeight = 32.sp,
+        letterSpacing = (-0.035).em,
     )
-    val lead = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val lead get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.SemiBold,
         fontSize = 19.sp,
         lineHeight = 24.sp,
     )
-    val body = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val body get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         lineHeight = 21.sp,
     )
-    val capsule = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val capsule get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 13.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.09.em,
     )
-    val eyebrow = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val eyebrow get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
         letterSpacing = 0.22.em,
     )
-    val endCap = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val endCap get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 11.sp,
         lineHeight = 14.sp,

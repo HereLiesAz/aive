@@ -929,6 +929,7 @@ private fun Throwable.toRuntimeFailureState(fallback: String): ApplicationRuntim
 
 @Composable
 private fun GeministratorTheme(content: @Composable () -> Unit) {
+    LoadAzphaltFonts()
     MaterialTheme(
         colorScheme = GeministratorColors,
         content = content,

@@ -42,6 +42,7 @@ class HiveScreenshotTest {
 
     private fun shoot(name: String, width: Int, height: Int, content: @androidx.compose.runtime.Composable () -> Unit) {
         ImageComposeScene(width = width, height = height, density = Density(2f)) {
+            LoadAzphaltFonts()
             Box(Modifier.fillMaxSize().background(Azphalt.currentGround.page).padding(12.dp)) { content() }
         }.use { scene ->
             scene.render(0L)
@@ -327,6 +328,19 @@ class HiveScreenshotTest {
         shoot("29-shell-swarm", 2400, 1500) { shell(ControlRoomDestination.Company, live, false)() }
         shoot("30-shell-district", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, district = true)() }
         shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
+        // The Figma desktop shell: the labelled rail above 1080dp, icons only between 820 and 1080.
+        shoot("36-shell-wide-stable", 2400, 1500) { shell(ControlRoomDestination.Stable, live, false)() }
+        shoot("37-shell-wide-store", 2400, 1500) { shell(ControlRoomDestination.AddOns, live, false)() }
+        shoot("38-shell-icon-rail", 1900, 1400) { shell(ControlRoomDestination.Overview, live, false)() }
+        shoot("39-shell-icon-rail-memory", 1900, 1400) { shell(ControlRoomDestination.Memory, live, false)() }
+        shoot("40-page-title", 2000, 500) {
+            AzphaltPageTitle(
+                eyebrow = "Keeper attention",
+                title = "Inbox",
+                line = "Every creature that needs you, in one place.",
+                action = { AzphaltPill(label = "Mark all read", seed = "shot-mark-all", tone = PillTone.Primary, onClick = {}) },
+            )
+        }
     }
 
     /** A creature's panel (docs/Keepers-Room.md, stage 3): its Needs, its Work, its Mind. */
