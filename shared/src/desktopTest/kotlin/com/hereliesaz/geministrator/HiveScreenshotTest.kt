@@ -42,6 +42,7 @@ class HiveScreenshotTest {
 
     private fun shoot(name: String, width: Int, height: Int, content: @androidx.compose.runtime.Composable () -> Unit) {
         ImageComposeScene(width = width, height = height, density = Density(2f)) {
+            LoadAzphaltFonts()
             Box(Modifier.fillMaxSize().background(Azphalt.currentGround.page).padding(12.dp)) { content() }
         }.use { scene ->
             scene.render(0L)
@@ -284,6 +285,48 @@ class HiveScreenshotTest {
         shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
         shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
+        shoot("36-keeper-limits", 2400, 1500) { room(KeeperSection.Limits, false, signedIn, two)() }
+        shoot("37-keeper-phone-device", 824, 1830) { room(KeeperSection.Device, true, signedIn, two)() }
+        shoot("38-keeper-appearance-narrow-desktop", 1700, 1200) { room(KeeperSection.Appearance, false, signedIn, two)() }
+    }
+
+    /** The Inbox page: list and the open one on a wide window, records on a phone. */
+    @Test
+    fun shootsTheInbox() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
+        val plan = com.hereliesaz.geministrator.domain.ArtifactRef(
+            id = com.hereliesaz.geministrator.domain.ArtifactId("plan-v3"),
+            kind = com.hereliesaz.geministrator.domain.ArtifactKind.Architecture,
+            taskRunId = TaskRunId("r-contract"),
+            label = "System architecture v3",
+            textContent = "Splits the release service from the build service; three public interfaces change.",
+            createdAtEpochMillis = 1,
+        )
+        val waiting = run(
+            WorkflowRunStatus.Running,
+            Triple("contract", TaskRunStatus.AwaitingApproval, "claude"),
+            Triple("build", TaskRunStatus.Escalated, "claude"),
+            Triple("review", TaskRunStatus.AwaitingApproval, "gemini"),
+        ).let { r ->
+            r.copy(
+                taskRuns = r.taskRuns.mapValues { (id, tr) ->
+                    when (id.value) {
+                        "contract" -> tr.copy(artifacts = listOf(plan), progressMessage = "The proposed boundary changes three public interfaces. Review it before the engineer builds on it.")
+                        "build" -> tr.copy(attempt = 2, blockingReason = com.hereliesaz.geministrator.domain.BlockingReason("TESTS_RED", "Two integration tests still fail after the retry."))
+                        else -> tr
+                    }
+                },
+            )
+        }
+        val live = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, waiting, roles))
+        DurableUiState.store.putString("inbox.selected", "")
+        shoot("39-inbox-wide", 2400, 1500) {
+            LiveInboxScreen(live, {}, {}, { _, _ -> }, Modifier.fillMaxSize())
+        }
+        shoot("40-inbox-phone", 824, 1830) {
+            LiveInboxScreen(live, {}, {}, { _, _ -> }, Modifier.fillMaxSize())
+        }
     }
 
     /** The shell (docs/Keepers-Room.md, stage 2): the breadcrumb header over the hive, its places and a first launch. */
@@ -327,6 +370,19 @@ class HiveScreenshotTest {
         shoot("29-shell-swarm", 2400, 1500) { shell(ControlRoomDestination.Company, live, false)() }
         shoot("30-shell-district", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, district = true)() }
         shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
+        // The Figma desktop shell: the labelled rail above 1080dp, icons only between 820 and 1080.
+        shoot("36-shell-wide-stable", 2400, 1500) { shell(ControlRoomDestination.Stable, live, false)() }
+        shoot("37-shell-wide-store", 2400, 1500) { shell(ControlRoomDestination.AddOns, live, false)() }
+        shoot("38-shell-icon-rail", 1900, 1400) { shell(ControlRoomDestination.Overview, live, false)() }
+        shoot("39-shell-icon-rail-memory", 1900, 1400) { shell(ControlRoomDestination.Memory, live, false)() }
+        shoot("40-page-title", 2000, 500) {
+            AzphaltPageTitle(
+                eyebrow = "Keeper attention",
+                title = "Inbox",
+                line = "Every creature that needs you, in one place.",
+                action = { AzphaltPill(label = "Mark all read", seed = "shot-mark-all", tone = PillTone.Primary, onClick = {}) },
+            )
+        }
     }
 
     /** The Memory swarm: Simple (the memory field and its notes) on desktop, a mid width and a phone; Technical unchanged. */

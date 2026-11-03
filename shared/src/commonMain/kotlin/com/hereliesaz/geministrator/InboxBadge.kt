@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +49,9 @@ internal const val INBOX_BADGE_CAP = 99
 private const val INBOX_READ_STORAGE_KEY = "aive.inbox.read.v1"
 private const val INBOX_READ_CAPACITY = 200
 private const val INBOX_READ_SEPARATOR = '\n'
+
+/** Bumped by every [InboxReadLog.markRead], so every log re-reads what was marked elsewhere. */
+private val inboxReadRevision = mutableIntStateOf(0)
 
 /**
  * Stable identities of the things the Inbox lists for [run]: the run's Hall Monitor pause when it
@@ -126,16 +127,29 @@ internal fun inboxBadgeLabel(unread: Int): String? = when {
  * Remembers which Inbox items have been seen, durably, so an item is unread until the Inbox has
  * been open while it was listed. Keeps the most recent [capacity] keys so the record cannot grow
  * without bound.
+ *
+ * Logs over the same [settings] agree: when one marks something read, every other re-reads, so
+ * the Inbox page's MARK ALL READ clears the header's badge without the two sharing an instance.
  */
 internal class InboxReadLog(
     private val settings: Settings,
     private val capacity: Int = INBOX_READ_CAPACITY,
 ) {
     private var ordered: List<String> = load()
+    private var cached: Set<String> = ordered.toSet()
+    private var loadedAt: Int = inboxReadRevision.intValue
 
-    /** Keys already seen. Reading it in composition re-reads when [markRead] adds to it. */
-    var read: Set<String> by mutableStateOf(ordered.toSet())
-        private set
+    /** Keys already seen. Reading it in composition re-reads when any log [markRead]s. */
+    val read: Set<String>
+        get() {
+            val revision = inboxReadRevision.intValue
+            if (revision != loadedAt) {
+                ordered = load()
+                cached = ordered.toSet()
+                loadedAt = revision
+            }
+            return cached
+        }
 
     /** Marks every key in [keys] seen and persists the result. A no-op when all were already seen. */
     fun markRead(keys: Collection<String>) {
@@ -146,8 +160,10 @@ internal class InboxReadLog(
             merged.add(key)
         }
         ordered = if (merged.size > capacity) merged.takeLast(capacity) else merged
-        read = ordered.toSet()
+        cached = ordered.toSet()
         settings.putString(INBOX_READ_STORAGE_KEY, ordered.joinToString(INBOX_READ_SEPARATOR.toString()))
+        loadedAt = inboxReadRevision.intValue + 1
+        inboxReadRevision.intValue = loadedAt
     }
 
     private fun load(): List<String> =
