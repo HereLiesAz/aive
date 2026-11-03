@@ -590,7 +590,7 @@ internal fun TechnicalInspector(
                 if (onClose != null) MindDefinitionList(identity, providerName, role)
                 // Programmatic roles wear the neuron and never a kept creature: they only connect.
                 role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
-                    ?.let { CreaturePicker(it.id) }
+                    ?.let { CreaturePicker(it.id, agentName = { id -> liveWorkflow.roles.firstOrNull { r -> r.id.value == id }?.name }) }
                 // Inside the creature (docs/Swarm-OS.md): its config, changed here (docs/Keepers-Room.md,
                 // stage 3). Its genes never change; changing its mind hatches a new config.
                 role?.let { mind ->

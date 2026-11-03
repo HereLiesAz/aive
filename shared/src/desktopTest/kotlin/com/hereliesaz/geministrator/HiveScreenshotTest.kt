@@ -229,7 +229,7 @@ class HiveScreenshotTest {
                 }
             }
         }
-        shoot("9-stable-pick", 900, 3000, dark(fresh) { StableSection() })
+        shoot("9-stable-pick", 900, 2600, dark(fresh) { StableSection() })
         val shop = object : BreedPurchases {
             override suspend fun prices(breedIds: List<String>) = breedIds.associateWith { "$1.99" }
             override suspend fun buy(breedId: String) = emptyList<BreedPurchase>()
@@ -244,8 +244,23 @@ class HiveScreenshotTest {
             host.assign(engineer.id, host.stable.keys[1])
             host.runCleared(liveRun.copy(id = WorkflowRunId("hatch-shot"), status = WorkflowRunStatus.Completed, taskRuns = liveRun.taskRuns.mapValues { (_, r) -> r.copy(status = TaskRunStatus.Completed) }))
         }
-        shoot("10-stable", 900, 2200, dark(kept) { StableSection() })
-        shoot("11-creature-picker", 900, 700, dark(kept) { CreaturePicker(engineer.id) })
+        // B4: the hatch that run made, until seen; then a lucky one, with a stranger.
+        shoot("10a-stable-hatch", 900, 1700, dark(kept) { StableSection() })
+        val lucky = kept.stable.lastHatching!!.let { it.copy(stranger = kept.catalog.breeds.first { b -> b.lottery == "very-rare" }.id) }
+        val luckyStore = DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")
+        luckyStore.putString("stable", kotlinx.serialization.json.Json.encodeToString(Stable.serializer(), kept.stable.copy(lastHatching = lucky)))
+        val luckyHost = StableHost(luckyStore).also { runBlocking { it.load() } }
+        shoot("10b-stable-hatch-stranger", 900, 1900, dark(luckyHost) { StableSection() })
+        kept.dismissHatching()
+        shoot("10-stable", 900, 1700, dark(kept) { StableSection() })
+        // The desktop Stable (Figma): card grid and filter row, three columns wide and two narrower.
+        shoot("10c-stable-wide", 2400, 1700, dark(kept) { StableSection() })
+        shoot("10d-stable-wide-narrow", 1900, 1900, dark(kept) { StableSection() })
+        // B3: QA already wears one of the bought creatures, so the engineer sees it dimmed, and where.
+        kept.assign(qa.id, kept.stable.keys[2])
+        shoot("11-creature-picker", 900, 900, dark(kept) {
+            CreaturePicker(engineer.id, agentName = { id -> roles.firstOrNull { it.id.value == id }?.name })
+        })
         shoot("12-hive-with-stable", 900, 1400) {
             androidx.compose.runtime.CompositionLocalProvider(
                 LocalStableHost provides kept,
