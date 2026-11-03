@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -42,6 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.archivo_black_regular
+import com.hereliesaz.geministrator.resources.dm_sans_black
+import com.hereliesaz.geministrator.resources.dm_sans_bold
+import com.hereliesaz.geministrator.resources.dm_sans_extrabold
+import com.hereliesaz.geministrator.resources.dm_sans_medium
+import com.hereliesaz.geministrator.resources.dm_sans_regular
+import com.hereliesaz.geministrator.resources.dm_sans_semibold
+import org.jetbrains.compose.resources.Font
 import com.hereliesaz.geministrator.resources.tab_position
 import org.jetbrains.compose.resources.stringResource
 
@@ -154,49 +163,85 @@ internal object AzphaltShapes {
 /** Smallest touch target (dp) for anything clickable. */
 internal val AzphaltMinTouchTarget: Dp = 48.dp
 
+/**
+ * The app's two typefaces, bundled under composeResources/font (licences in THIRD_PARTY_NOTICES.md):
+ * Archivo Black for titles, DM Sans for everything else. They start as the platform sans-serif and
+ * become the bundled faces once [LoadAzphaltFonts] has run at the root of a window; [AzphaltType]
+ * reads them on every access, so text recomposes when they arrive.
+ */
+internal object AzphaltFonts {
+    var display: FontFamily by mutableStateOf(FontFamily.SansSerif)
+        private set
+    var text: FontFamily by mutableStateOf(FontFamily.SansSerif)
+        private set
+
+    internal fun use(display: FontFamily, text: FontFamily) {
+        if (this.display != display) this.display = display
+        if (this.text != text) this.text = text
+    }
+}
+
+/** Loads the bundled faces into [AzphaltFonts]. Call once near the root of each window. */
+@Composable
+internal fun LoadAzphaltFonts() {
+    // Archivo Black has one weight; it is registered as Black so a Black title matches it exactly
+    // and is never given a synthesised bold on top.
+    val display = FontFamily(Font(Res.font.archivo_black_regular, FontWeight.Black))
+    val text = FontFamily(
+        Font(Res.font.dm_sans_regular, FontWeight.Normal),
+        Font(Res.font.dm_sans_medium, FontWeight.Medium),
+        Font(Res.font.dm_sans_semibold, FontWeight.SemiBold),
+        Font(Res.font.dm_sans_bold, FontWeight.Bold),
+        Font(Res.font.dm_sans_extrabold, FontWeight.ExtraBold),
+        Font(Res.font.dm_sans_black, FontWeight.Black),
+    )
+    SideEffect { AzphaltFonts.use(display, text) }
+}
+
 internal object AzphaltType {
-    val hero = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    /** A page's big title (Archivo Black). */
+    val hero get() = TextStyle(
+        fontFamily = AzphaltFonts.display,
         fontWeight = FontWeight.Black,
         fontSize = 46.sp,
-        lineHeight = 56.sp,
-        letterSpacing = (-0.03).em,
+        lineHeight = 50.sp,
+        letterSpacing = (-0.045).em,
     )
-    val section = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val section get() = TextStyle(
+        fontFamily = AzphaltFonts.display,
         fontWeight = FontWeight.Black,
         fontSize = 28.sp,
-        lineHeight = 34.sp,
-        letterSpacing = (-0.02).em,
+        lineHeight = 32.sp,
+        letterSpacing = (-0.035).em,
     )
-    val lead = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val lead get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.SemiBold,
         fontSize = 19.sp,
         lineHeight = 24.sp,
     )
-    val body = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val body get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         lineHeight = 21.sp,
     )
-    val capsule = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val capsule get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 13.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.09.em,
     )
-    val eyebrow = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val eyebrow get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
         letterSpacing = 0.22.em,
     )
-    val endCap = TextStyle(
-        fontFamily = FontFamily.SansSerif,
+    val endCap get() = TextStyle(
+        fontFamily = AzphaltFonts.text,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 11.sp,
         lineHeight = 14.sp,
@@ -209,7 +254,7 @@ internal object AzphaltType {
  * living things (creatures, hives); controls are calm.
  */
 internal enum class PillTone {
-    /** Most controls: outlined in the surface's content colour. */
+    /** Most controls: filled with the pill's own hue, from its seed. */
     Quiet,
     /** The one main action in view: filled. */
     Primary,
@@ -235,15 +280,22 @@ internal fun AzphaltPill(
     stateDescription: String? = null,
     tone: PillTone = PillTone.Quiet,
 ) {
-    // Selected and primary fill with the surface's strong colour; danger fills red; the rest are outlined.
-    val filled = selected || tone != PillTone.Quiet
+    // Every pill wears its own colour: a hue from its seed, with an end cap in the same family.
+    // Selected sits on Ink (Yellow when its surface is Ink, so it never vanishes); the one main
+    // action fills with the surface's strong colour; danger fills red.
+    val onInk = azphaltSurface() == Azphalt.Ink
     val fill = when {
-        tone == PillTone.Danger && !selected -> AzphaltDanger
-        filled -> azphaltStrong()
-        else -> Color.Transparent
+        selected -> if (onInk) Azphalt.Yellow else Azphalt.Ink
+        tone == PillTone.Danger -> AzphaltDanger
+        tone == PillTone.Primary -> azphaltStrong()
+        else -> Azphalt.hue(seed)
     }
-    val line = azphaltOnSurface()
-    val content = if (filled) fill.onOpposite() else line
+    val content = fill.onOpposite()
+    val cap = when {
+        selected -> if (onInk) Azphalt.Ink else Azphalt.Yellow
+        tone == PillTone.Quiet -> Azphalt.cap(seed)
+        else -> content
+    }
     val pillRole = role
     Row(
         modifier = modifier
@@ -257,7 +309,6 @@ internal fun AzphaltPill(
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
             .background(fill)
-            .then(if (filled) Modifier else Modifier.border(2.dp, line, RoundedCornerShape(999.dp)))
             .clickable(onClick = onClick)
             .padding(start = 16.dp, top = 9.dp, bottom = 9.dp, end = if (endCap == null) 16.dp else 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -265,14 +316,13 @@ internal fun AzphaltPill(
     ) {
         Text(label.uppercase(), style = AzphaltType.capsule, color = content)
         if (endCap != null) {
-            // The cap is the pill's opposite: a small chip of the content colour.
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(999.dp))
-                    .background(content)
+                    .background(cap)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Text(endCap.uppercase(), style = AzphaltType.endCap, color = content.onOpposite())
+                Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
             }
         }
     }
