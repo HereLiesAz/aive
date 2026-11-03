@@ -29,7 +29,7 @@ class HiveWorkspaceTest {
         workflowDefinitionId = WorkflowDefinitionId(definition),
         objective = "Ship it",
         status = status,
-        taskRuns = tasks.entries.associate { (task, s) -> TaskDefinitionId(task) to TaskRun(TaskRunId("r-$task"), TaskDefinitionId(task), s) },
+        taskRuns = tasks.entries.associate { (task, s) -> TaskDefinitionId(task) to TaskRun(TaskRunId("r-$task"), TaskDefinitionId(task), s, assignedRoleId = null) },
         createdAtEpochMillis = createdAt,
         updatedAtEpochMillis = createdAt,
     )
