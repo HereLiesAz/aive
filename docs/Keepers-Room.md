@@ -9,7 +9,8 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | Feeds the hive | **Connections** | AI providers, remote A2A agents, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
-| | **This device** | spend caps, remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **Limits** (wide) | the spend caps: a cost cap per run and an hourly spend cap | This device |
+| | **This device** | spend caps (on a phone only), remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
 | | **Appearance** | the ground, chosen from six swatches; Reduce motion; Always show creature labels | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
@@ -24,7 +25,8 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 ## Layout
 
-- **Wide:** the part list on the left (two groups, the open part filled), the open part on the right under its title and one-line lead.
+- **Wide** (820dp and up): a page title (KEEPER'S ROOM, "Make it yours", one line), then an Ink list of the parts on the left (the open one filled Yellow, a part's count beside it) and the open part on its own Ink card on the right, under its group as the eyebrow, its name and its one-line lead. The spend caps have their own part, **Limits**. Appearance there is a grid of ground cards, three across (swatch, name, SELECTED on the current one), then setting rows, each a line about it and a switch; the whole row toggles.
+- **Phone:** there is no Limits part; the spend caps stay at the top of This device.
 - **Phone:** the list is its own page; a part opens over it with a "‹ Keeper's room" pill, and Back returns to the list. The header's gear opens the room from anywhere.
 - The room remembers the open part (`keeper.section`).
 
@@ -46,15 +48,27 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 
 **Creature labels** (off by default, stored on this device as `aive.appearance.always-show-creature-labels.v1`): a hive of more than 12 creatures normally shows only the selected creature's label so packed cells stay readable; turned on, every creature keeps its label however full the hive is (`docs/Node-Creatures.md`).
 
+## Inbox
+
+The Inbox page (`LiveInboxScreen.kt`) on a wide window (820dp and up): KEEPER ATTENTION, "Inbox", and **Mark all read**, which marks every item the run lists as seen in the same read record the header's badge counts (`InboxReadLog`), so the badge clears. Under it, an Ink list of everything waiting on you (NEEDS YOU and how many): each entry is its kind (plan or task approval, sub-workflow gate, escalation, question, budget spent), its attempt when not the first, its task and its role, in plan order. The run keeps no time per wait, so no time is shown. The open entry (remembered as `inbox.selected`) fills the Ink card beside it: its creature, faint in the corner, what it says, each artifact it waits with (ARTIFACT WAITING, its label and a line of it) and the real actions, the same calls as the creature's Needs: **Approve plan** and **Reject plan** (asks first), **Approve task**, **Approve** a sub-workflow gate, **Retry task** and **Stop workflow** (asks first). Approving goes through the run's own approval, so every `HumanApproval` still waits for a person (`THREAT_MODEL.md`, invariant 4). A question or a spent budget says where to answer it: on the creature, in the hive. A Hall Monitor pause or a spend cap stop still has its own screen. On a phone the Inbox is unchanged.
+
 ## Navigation
 
-There is no navigation row. One header sits over every screen, wide and on a phone (`ShellHeader` in `ControlRoomUi.kt`):
+On a phone there is no navigation row. One header sits over every screen (`ShellHeader` in `ControlRoomUi.kt`):
 
 - **The Aive** and the hive's state in a word: NEW, RESTING, WAKING, STOPPED, CAN'T REACH ITS AGENTS, or its run's status.
 - **The breadcrumb**: Hive › a hive › a creature › its tab, or Hive › a place opened from it (Swarm, the Keeper's room › its part). The last step is where you are and is not a button; any earlier step goes back up to it, popping rather than stacking. Hive is the district, every hive at once; from a place opened off the hive, Hive returns to the hive you came from. A creature's step closes its panel. It replaces the page titles. On a phone it takes its own line and scrolls to keep where you are in view.
 - **The Inbox** badge and **the Keeper's room** gear.
 
-Once there is a hive, one row holds its places: Hives (the district: every hive, New hive, the Stable and drifters at the edge), its Swarm, the Stable, the Memory swarm and the Store. It is hidden only on a first launch; a waking or stopped hive keeps it, so nothing is out of reach while the hive is in trouble. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
+**Wide windows** (820dp and up, `ControlRoomBreakpoints.Wide`) follow the Figma desktop design instead (`ShellRail.kt`):
+
+- **The rail** down the left, in Ink: the Aive's mark, then Hive, Inbox (with its unread count), Swarm, Stable, Memory and the Azphalt Store, the selected one filled Yellow; at its foot the keeper and the Keeper's room. From 1080dp it is 210dp wide with words; between 820 and 1080dp it is a 72dp column of icons, each still named for screen readers, with the Inbox count shrunk to a dot. Hive goes back to the hive from any other place; on the hive it goes out to the district (every hive at once), and from the district back in. The rail replaces the row of places below, which on a wide window keeps only a live hive's own pills (Timeline, More editing). The app has no keeper name, so the keeper block says "You".
+- **The header**: THE AIVE / the breadcrumb as words (earlier steps go back up, the last is where you are), the hive's state with a still dot, and the Inbox. The gear lives on the rail.
+- **Page titles** (`AzphaltPageTitle`): a small eyebrow, the big title, one line under it and an optional action at the right.
+
+Titles are set in Archivo Black and everything else in DM Sans, both bundled (`composeResources/font`, SIL Open Font License 1.1, see `THIRD_PARTY_NOTICES.md`) and mapped in `AzphaltType`.
+
+On a phone, once there is a hive, one row holds its places: Hives (the district: every hive, New hive, the Stable and drifters at the edge), its Swarm, the Stable, the Memory swarm and the Store. It is hidden only on a first launch; a waking or stopped hive keeps it, so nothing is out of reach while the hive is in trouble. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
 
 ## A creature's panel
 

@@ -729,7 +729,12 @@ internal fun ProviderSettingsScreen(
         // Appearance: the page colour ("ground"). It lives here, not in the header, so every shell
         // (Android, Desktop, Web) offers it in one place (KeeperAppearance.kt).
       if (section == KeeperSection.Appearance) {
-        KeeperAppearance()
+        KeeperAppearance(wide = !compact)
+      }
+
+      // Limits (wide): the spend caps. A phone has no Limits part and keeps them in This device.
+      if (section == KeeperSection.Limits || (section == KeeperSection.Device && compact)) {
+        SpendCapsSettings()
       }
 
       if (section == KeeperSection.About) {
@@ -755,8 +760,6 @@ internal fun ProviderSettingsScreen(
       }
 
       if (section == KeeperSection.Device) {
-        SpendCapsSettings()
-
         remoteAccessSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
             Text(
