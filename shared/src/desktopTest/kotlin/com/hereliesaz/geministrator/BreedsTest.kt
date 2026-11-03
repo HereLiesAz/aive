@@ -138,4 +138,15 @@ class BreedsTest {
         assertTrue(shipped.breeds.all { it.mutation > 0 })
         assertEquals(2, shipped.breeds.count { it.lottery == "mythic" })
     }
+
+    @Test
+    fun wideStableFiltersOfferOnlyWhatIsOwnedRarestLastThenHatched() {
+        val bred = BredCreature("bred-1", body = "b", tendrils = "a", tail = "a", parents = listOf("b", "a"), generation = 2)
+        val stable = Stable(starter = "a", owned = mapOf("s" to 1, "b" to 2), bred = listOf(bred))
+        assertEquals(listOf(STABLE_FILTER_ALL, "Common", "Rare", STABLE_FILTER_HATCHED), stableFilters(stable, catalog))
+        assertEquals(STABLE_FILTER_HATCHED, stableFilterOf(stable, catalog, "bred-1"))
+        assertEquals("Rare", stableFilterOf(stable, catalog, "s"))
+        // Only a starter: nothing to filter by but its rarity.
+        assertEquals(listOf(STABLE_FILTER_ALL, "Common"), stableFilters(Stable(starter = "a"), catalog))
+    }
 }
