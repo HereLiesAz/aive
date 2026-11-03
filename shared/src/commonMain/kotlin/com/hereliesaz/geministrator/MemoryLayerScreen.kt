@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
@@ -182,8 +183,24 @@ internal fun MemoryLayerScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // The breadcrumb names the place; the lead says what it is.
-        Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface())
+        // The breadcrumb names the place; the lead says what it is, beside the Simple / Technical switch.
+        var storedView by rememberDurableStringState(MemoryView.STORAGE_KEY, MemoryView.Simple.name)
+        val view = MemoryView.fromStored(storedView)
+        val lead: @Composable (Modifier) -> Unit = { m ->
+            Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface(), modifier = m)
+        }
+        val toggle: @Composable () -> Unit = {
+            if (controller != null) MemoryViewToggle(view, onView = { storedView = it.name })
+        }
+        if (compact) {
+            lead(Modifier)
+            toggle()
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
+                lead(Modifier.weight(1f))
+                toggle()
+            }
+        }
         if (controller == null) {
             Text(
                 stringResource(Res.string.memory_memory_is_not_available_in_this),
@@ -192,7 +209,10 @@ internal fun MemoryLayerScreen(
             )
             return@Column
         }
-        MemoryLayerControls(controller, connectedProviderIds)
+        when (view) {
+            MemoryView.Simple -> MemorySimpleView(controller)
+            MemoryView.Technical -> MemoryLayerControls(controller, connectedProviderIds)
+        }
     }
 }
 

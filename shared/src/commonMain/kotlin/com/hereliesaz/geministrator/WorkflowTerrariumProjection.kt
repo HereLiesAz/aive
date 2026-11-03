@@ -332,7 +332,7 @@ private fun taskRunIsNew(run: TaskRun?): Boolean = run == null || run.status in 
     TaskRunStatus.Planning,
 )
 
-private fun TaskRunStatus?.toTerrariumState(): H2g2WorkflowState = when (this) {
+internal fun TaskRunStatus?.toTerrariumState(): H2g2WorkflowState = when (this) {
     null, TaskRunStatus.Created -> H2g2WorkflowState.Pending
     TaskRunStatus.Blocked -> H2g2WorkflowState.Blocked
     TaskRunStatus.Ready -> H2g2WorkflowState.Ready

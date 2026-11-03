@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.toTaskExecutor
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.humanReadable
+import com.hereliesaz.geministrator.distributed.withComputeDelegation
 
 internal sealed interface TerrariumDependencyEditResult {
     data class Applied(val definition: WorkflowDefinition) : TerrariumDependencyEditResult
@@ -332,10 +333,14 @@ internal fun setTerrariumJob(
     criteria: List<String>? = null,
     humanApproval: Boolean? = null,
     maxAttempts: Int? = null,
+    /** Where it runs: this device, any paired device, or one chosen device (the Compute place's targets). */
+    runsOn: com.hereliesaz.geministrator.distributed.ComputeDelegationTarget? = null,
 ): TerrariumDependencyEditResult {
-    val task = definition.tasks.firstOrNull { it.id == taskId }
+    val found = definition.tasks.firstOrNull { it.id == taskId }
         ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
     if (objective != null && objective.isBlank()) return TerrariumDependencyEditResult.Rejected("A job needs an objective")
+    // A person's approval step never leaves this device; withComputeDelegation leaves it as it is.
+    val task = runsOn?.let(found::withComputeDelegation) ?: found
     val next = task.copy(
         objective = objective?.trim() ?: task.objective,
         acceptanceCriteria = criteria?.map(String::trim)?.filter(String::isNotEmpty)
@@ -347,6 +352,6 @@ internal fun setTerrariumJob(
         },
         retryPolicy = maxAttempts?.let { task.retryPolicy.copy(maxAttempts = it.coerceIn(1, 10)) } ?: task.retryPolicy,
     )
-    if (next == task) return TerrariumDependencyEditResult.NoChange
+    if (next == found) return TerrariumDependencyEditResult.NoChange
     return TerrariumDependencyEditResult.Applied(definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it }))
 }
