@@ -363,13 +363,30 @@ class HiveScreenshotTest {
         )
         shoot("35-creature-job", 780, 1688) {
             Box(Modifier.fillMaxSize().background(Azphalt.Ink)) {
-                AzphaltThemedSurface(Azphalt.Ink) {
-                    TechnicalInspector(
-                        selectedTaskId = "build",
-                        liveWorkflow = LiveWorkflowPresentation(project, job, liveRun, roles),
-                        tab = CreatureTab.Work,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                // A library host in memory, so the job is editable as it is in the app.
+                val memory = com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence()
+                runBlocking { memory.definitions.put(job) }
+                val host = com.hereliesaz.geministrator.WorkflowLibraryHost(
+                    persistence = memory,
+                    storeService = null,
+                    authoredStore = object : com.hereliesaz.geministrator.azphalt.AuthoredWorkflowStore {
+                        private val ids = mutableSetOf(job.id)
+                        override suspend fun all() = ids.toSet()
+                        override suspend fun add(id: WorkflowDefinitionId) { ids += id }
+                        override suspend fun remove(id: WorkflowDefinitionId) { ids -= id }
+                    },
+                    launchWorkflow = { _, _, _, _ -> },
+                    onPackagesChanged = {},
+                )
+                androidx.compose.runtime.CompositionLocalProvider(LocalWorkflowLibraryHost provides host) {
+                    AzphaltThemedSurface(Azphalt.Ink) {
+                        TechnicalInspector(
+                            selectedTaskId = "build",
+                            liveWorkflow = LiveWorkflowPresentation(project, job, liveRun, roles),
+                            tab = CreatureTab.Work,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }

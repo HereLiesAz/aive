@@ -42,7 +42,11 @@ class HiveJobTest {
         val back = assertIs<TerrariumDependencyEditResult.Applied>(
             setTerrariumJob(away, implement.id, runsOn = ComputeDelegationTarget.Local),
         ).definition
-        assertEquals(implement, back.tasks.first { it.id == implement.id })
+        // Back on this device it is no longer distributed; its role still decides the agent.
+        val home = back.tasks.first { it.id == implement.id }
+        assertEquals(ComputeDelegationTarget.Local, home.computeDelegationTarget())
+        assertEquals(implement.roleId, home.roleId)
+        assertEquals(implement.objective, home.objective)
     }
 
     @Test

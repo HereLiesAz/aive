@@ -62,6 +62,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.job_not_saved
@@ -756,27 +757,32 @@ private fun CreaturePanelTop(
     onTabChange: (CreatureTab) -> Unit,
     pendingProposals: Int,
 ) {
-    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        NodeMascotSurface(
-            roleLabel = identity,
-            hueSeed = identity,
-            state = status.toTerrariumState(),
-            motionPhase = { 0f },
-            modifier = Modifier.size(CREATURE_PANEL_SIZE).clearAndSetSemantics {},
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            NodeMascotSurface(
+                roleLabel = identity,
+                hueSeed = identity,
+                state = status.toTerrariumState(),
+                motionPhase = { 0f },
+                // The rig leaves a margin for the field's name pills; here the whole creature is drawn larger.
+                modifier = Modifier.size(CREATURE_PANEL_SIZE).graphicsLayer {
+                    scaleX = CREATURE_PANEL_SCALE
+                    scaleY = CREATURE_PANEL_SCALE
+                }.clearAndSetSemantics {},
+            )
             Text(
                 identity,
                 style = AzphaltType.section.copy(fontSize = 22.sp, lineHeight = 28.sp),
                 color = azphaltOnSurface(),
-                modifier = Modifier.semantics { heading() },
+                modifier = Modifier.weight(1f).padding(bottom = 8.dp).semantics { heading() },
             )
-            CreatureTabs(tab, onTabChange, pendingProposals)
         }
+        CreatureTabs(tab, onTabChange, pendingProposals)
     }
 }
 
-private val CREATURE_PANEL_SIZE = 120.dp
+private const val CREATURE_PANEL_SCALE = 1.35f
+private val CREATURE_PANEL_SIZE = 96.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
