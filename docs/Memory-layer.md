@@ -595,6 +595,37 @@ records when a queue entry finished (entries carry only `createdAtEpochMillis`),
 store holds choices, not activity. While memory is off or consolidation is paused, the button gives
 way to the reason and points at the switch below; nothing is consolidated (`consolidateNowState`).
 
+### Simple and Technical views
+
+The Memory swarm has two views, switched by **SIMPLE / TECHNICAL** beside its lead and remembered on
+this device (`MemoryView`, durable UI state key `memory.view`). **Simple** is the default; **Technical**
+is the page described above, unchanged. The switch applies at every width; the Simple layout adapts
+(stages along one strand from 700dp of field width, two by two below; figures and notes stack under
+560dp).
+
+Simple shows the memory field (`MemorySimpleScreen.kt`, figures from `memorySimpleField`) for the
+selected bank, naming the bank only when there is more than one. Its four stages are a reading of
+the real pipeline, not new stages (`MemorySimpleStage`):
+
+| Simple stage | Real work | Figure |
+|---|---|---|
+| Observe | The intake: a finished session is banked as an episode and queued. No clerk runs | Sessions banked (episodes) |
+| Section | The Sectioning stage | Sections |
+| Consolidate | The other seven stages: Salience, Tags, Phrases, Summaries, Categories, Associations, Condensation | Memories (nodes of every kind, as Technical counts them) and links (edges, leaving out `Recalled`) |
+| Recall | Not a consolidation stage: agents reading memory back at task start | Recalls (`Recalled` access links) |
+
+The card of the stage a packet is in now says so. Under the stages: when consolidation last did
+work (since this start, as above), what waits in this bank's queue, the instruction proposals waiting
+across all roles, and **Consolidate now** (`MemoryLayerController.consolidateNow`, which starts
+`drainSoon` only when memory is on and consolidation running; otherwise the reason shows and points
+at Technical). Two notes follow: **Latest memory**, the newest summary, category or phrase that
+nothing supersedes, with how many sessions it was drawn from; and a keeper note that one bank serves
+every creature of a run and each run reads through the runs it came from.
+
+The design this follows also has a "memory tone" line, a "dominant voice" figure and a "useful"
+percentage for Recall. The app has no data for them (episodes do not record a model family, and
+nothing measures usefulness), so Simple leaves them out.
+
 ### Storage
 
 Each workflow's bank is its own SQLite database through SQLDelight (`SqlMemoryStore`; schema in
