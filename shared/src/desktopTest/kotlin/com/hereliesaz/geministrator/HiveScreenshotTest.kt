@@ -77,7 +77,9 @@ class HiveScreenshotTest {
         ),
     )
 
-    private fun run(status: WorkflowRunStatus, vararg tasks: Triple<String, TaskRunStatus, String>) = WorkflowRun(
+    private fun run(status: WorkflowRunStatus, vararg tasks: Triple<String, TaskRunStatus, String>) = run(definition, status, *tasks)
+
+    private fun run(definition: WorkflowDefinition, status: WorkflowRunStatus, vararg tasks: Triple<String, TaskRunStatus, String>) = WorkflowRun(
         id = WorkflowRunId("run-${status.name}"),
         projectId = ProjectId("aive"),
         workflowDefinitionId = definition.id,
@@ -124,6 +126,26 @@ class HiveScreenshotTest {
                     Triple("build", TaskRunStatus.Completed, "claude"),
                     Triple("review", TaskRunStatus.Running, "gemini"),
                     Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+        // Every axon state (the Figma synapses): complete, active, waiting, and a gated receptor.
+        shoot("25-axons", 1800, 1200) {
+            val axons = definition.copy(
+                tasks = definition.tasks + task("approve", "Sign off", architect, "contract"),
+            )
+            GeministratorWorkflowTerrarium(
+                axons,
+                run(
+                    axons,
+                    WorkflowRunStatus.Running,
+                    Triple("contract", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Running, "claude"),
+                    Triple("approve", TaskRunStatus.AwaitingApproval, "claude"),
                 ),
                 roles,
                 selectedTaskId = null,
