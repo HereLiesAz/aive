@@ -3,6 +3,22 @@ buildscript {
         // CVE-2026-102554 (GHSA-xxph-c9ww-hj94): Guava before 33.7.2 over-allocates when deserializing.
         // Guava only arrives transitively; lift every older request to the fixed release, keeping its flavour.
         resolutionStrategy.eachDependency {
+            // Jackson (GHSA alerts #21-#30: ReDoS, unbounded parse and token growth, SSRF, type-ID retention)
+            // arrives only transitively (quickjs4j, Android tooling); lift every older core/databind to 2.22.4.
+            if (requested.group == "com.fasterxml.jackson.core" &&
+                (requested.name == "jackson-core" || requested.name == "jackson-databind")
+            ) {
+                val parts = Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(requested.version.orEmpty())?.destructured
+                if (parts != null) {
+                    val (major, minor, patch) = parts
+                    val old = major.toInt() == 2 &&
+                        (minor.toInt() < 22 || (minor.toInt() == 22 && patch.ifEmpty { "0" }.toInt() < 4))
+                    if (old) {
+                        useVersion("2.22.4")
+                        because("Jackson DoS and SSRF advisories fixed in 2.22.4")
+                    }
+                }
+            }
             if (requested.group == "com.google.guava" && requested.name == "guava") {
                 val version = requested.version.orEmpty()
                 val (major, minor, patch) = (Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(version)?.destructured
@@ -71,6 +87,22 @@ allprojects {
         // CVE-2026-102554 (GHSA-xxph-c9ww-hj94): Guava before 33.7.2 over-allocates when deserializing.
         // Guava only arrives transitively; lift every older request to the fixed release, keeping its flavour.
         resolutionStrategy.eachDependency {
+            // Jackson (GHSA alerts #21-#30: ReDoS, unbounded parse and token growth, SSRF, type-ID retention)
+            // arrives only transitively (quickjs4j, Android tooling); lift every older core/databind to 2.22.4.
+            if (requested.group == "com.fasterxml.jackson.core" &&
+                (requested.name == "jackson-core" || requested.name == "jackson-databind")
+            ) {
+                val parts = Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(requested.version.orEmpty())?.destructured
+                if (parts != null) {
+                    val (major, minor, patch) = parts
+                    val old = major.toInt() == 2 &&
+                        (minor.toInt() < 22 || (minor.toInt() == 22 && patch.ifEmpty { "0" }.toInt() < 4))
+                    if (old) {
+                        useVersion("2.22.4")
+                        because("Jackson DoS and SSRF advisories fixed in 2.22.4")
+                    }
+                }
+            }
             if (requested.group == "com.google.guava" && requested.name == "guava") {
                 val version = requested.version.orEmpty()
                 val (major, minor, patch) = (Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(version)?.destructured
