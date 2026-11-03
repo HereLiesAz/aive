@@ -455,7 +455,20 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_remove">Remove</string>
     <string name="job_approval_person">A person approves</string>
     <string name="job_approval_none">No approval</string>
-    <string name="job_retries">%1$d attempts</string>
+    <string name="job_approval">Approval</string>
+    <string name="job_approval_role">A role approves</string>
+    <string name="job_retries_label">Retries</string>
+    <string name="job_retries_value">%1$s, then %2$s</string>
+    <string name="job_then_stop">the hive stops</string>
+    <string name="job_then_ask">it asks you</string>
+    <string name="job_then_reassign">another creature takes over</string>
+    <string name="job_runs_on">Runs on</string>
+    <string name="job_runs_here">This device</string>
+    <string name="job_runs_any">Any paired device</string>
+    <string name="job_runs_chosen">A chosen device</string>
+    <string name="job_add">Add</string>
+    <string name="job_saved">Saved. It takes effect from its next run.</string>
+    <string name="job_not_saved">Its job could not be saved</string>
     <string name="build_redo">Redo</string>
     <string name="build_cut">Cut</string>
     <string name="build_detach">Detach</string>
@@ -1394,6 +1407,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="terrarium_zoom_out">Zoom out</string>
 
     <!-- Count-dependent text -->
+    <plurals name="job_tries">
+        <item quantity="one">%1$d try</item>
+        <item quantity="other">%1$d tries</item>
+    </plurals>
     <plurals name="inspector_activity_earlier">
         <item quantity="one">Show %1$d earlier line</item>
         <item quantity="other">Show %1$d earlier lines</item>
