@@ -55,6 +55,17 @@ import com.hereliesaz.geministrator.resources.inspector_budget_spent
 import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.unit.sp
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.resources.job_not_saved
+import com.hereliesaz.geministrator.resources.job_saved
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -169,6 +180,8 @@ internal fun TechnicalInspector(
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
     /** Closes the panel onto the hive's Timeline with this creature selected; null where there is none. */
     onOpenTrace: (() -> Unit)? = null,
+    /** Paired devices exist, so its job may be sent off this device (the Compute place is open). */
+    computeAvailable: Boolean = false,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -195,6 +208,36 @@ internal fun TechnicalInspector(
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
     val identity = role?.name ?: executor.displayName()
+    // Its job (mockup H4) is saved to the hive's workflow, the way Build saves it: the running run
+    // stays as it was, so a change takes effect from its next run. Without the library (previews)
+    // the job shows but does not change.
+    val library = LocalWorkflowLibraryHost.current
+    var savedJob by remember(liveWorkflow.definition) { mutableStateOf<WorkflowDefinition?>(null) }
+    var jobStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(library, liveWorkflow.definition.id) {
+        val stored = library?.let { host ->
+            runCatching { host.entries() }.getOrNull()?.firstOrNull { it.definition.id == liveWorkflow.definition.id }?.definition
+        }
+        if (stored != null) savedJob = stored
+    }
+    val jobDefinition = savedJob?.takeIf { saved -> saved.tasks.any { it.id == taskId } } ?: liveWorkflow.definition
+    val jobTask = jobDefinition.tasks.first { it.id == taskId }
+    val editJob: ((TerrariumDependencyEditResult) -> Unit)? = library?.let { host ->
+        { edit ->
+            when (edit) {
+                is TerrariumDependencyEditResult.Applied -> scope.launch {
+                    runCatching { host.saveAuthored(edit.definition) }
+                        .onSuccess { saved ->
+                            savedJob = saved
+                            jobStatus = getString(Res.string.job_saved)
+                        }
+                        .onFailure { failure -> jobStatus = failure.message ?: getString(Res.string.job_not_saved) }
+                }
+                TerrariumDependencyEditResult.NoChange -> Unit
+                is TerrariumDependencyEditResult.Rejected -> jobStatus = edit.reason
+            }
+        }
+    }
     // Everything in the inspector sits on Ink, so its text, hints and fields take the exact
     // opposite of Ink from this surface rather than a colour of their own.
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -205,7 +248,14 @@ internal fun TechnicalInspector(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(identity.uppercase(), style = AzphaltType.section, color = azphaltOnSurface())
+        // The creature large at the top, its name and the three tabs beside it (mockup H4).
+        CreaturePanelTop(
+            identity = identity,
+            status = taskRun.status,
+            tab = tab,
+            onTabChange = onTabChange,
+            pendingProposals = pendingRoleInstructionProposals(role?.id),
+        )
         // One line under its name: its state, its provider, and its place in the plan ("3 of 5").
         val place = planPlace(liveWorkflow.definition.tasks, taskId)
         Text(
@@ -218,8 +268,8 @@ internal fun TechnicalInspector(
             color = azphaltOnSurface(),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
-        Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
-        CreatureTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
+        // Work holds its objective in its job, below.
+        if (tab != CreatureTab.Work) Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
         confirmingStop?.let { isStop ->
             AzphaltAlertDialog(
                 title = stringResource(if (isStop) Res.string.confirm_stop_title else Res.string.confirm_reject_plan_title),
@@ -323,6 +373,15 @@ internal fun TechnicalInspector(
                 }
             }
             CreatureTab.Work -> {
+                // Its job: objective, acceptance criteria, approval, retries, where it runs.
+                HiveJobEditor(
+                    definition = jobDefinition,
+                    task = jobTask,
+                    onEdit = editJob,
+                    titled = false,
+                    remoteAvailable = computeAvailable,
+                )
+                jobStatus?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
                 // What it is doing, live: its own thinking and steps, apart from what you tell it.
                 CreatureActivity(taskRun, activity)
                 // Its whole trace: the hive's Timeline, this creature selected on it.
@@ -684,9 +743,49 @@ internal fun CreatureTab.label(): String = stringResource(
     },
 )
 
+/**
+ * The top of a creature's panel (mockup H4): the creature itself, large, the way it looks in the
+ * hive, then its name over its tabs. The creature is decoration: its name is beside it.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CreaturePanelTop(
+    identity: String,
+    status: TaskRunStatus,
+    tab: CreatureTab,
+    onTabChange: (CreatureTab) -> Unit,
+    pendingProposals: Int,
+) {
+    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        NodeMascotSurface(
+            roleLabel = identity,
+            hueSeed = identity,
+            state = status.toTerrariumState(),
+            motionPhase = { 0f },
+            modifier = Modifier.size(CREATURE_PANEL_SIZE).clearAndSetSemantics {},
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            Text(
+                identity,
+                style = AzphaltType.section.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                color = azphaltOnSurface(),
+                modifier = Modifier.semantics { heading() },
+            )
+            CreatureTabs(tab, onTabChange, pendingProposals)
+        }
+    }
+}
+
+private val CREATURE_PANEL_SIZE = 120.dp
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit, pendingProposals: Int = 0) {
-    Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(
+        Modifier.selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         CreatureTab.entries.forEach { entry ->
             AzphaltPill(
                 label = entry.label(),

@@ -347,6 +347,32 @@ class HiveScreenshotTest {
         shoot("32-creature-needs", 824, 1830) { panel("review", CreatureTab.Needs, true)() }
         shoot("33-creature-work", 824, 1830) { panel("build", CreatureTab.Work, true)() }
         shoot("34-creature-mind", 824, 1830) { panel("build", CreatureTab.Mind, true)() }
+        // A creature's job (mockup H4), at the mockup's phone size: its objective, criteria, approval, retries, where it runs.
+        val job = definition.copy(
+            tasks = definition.tasks.map { task ->
+                if (task.id.value != "build") task else task.copy(
+                    objective = "Implement the smallest coherent change satisfying the contract.",
+                    acceptanceCriteria = listOf(
+                        com.hereliesaz.geministrator.domain.AcceptanceCriterion("Every changed component maps to a requirement"),
+                        com.hereliesaz.geministrator.domain.AcceptanceCriterion("Existing behaviour outside scope is preserved"),
+                    ),
+                    approvalPolicy = com.hereliesaz.geministrator.domain.ApprovalPolicy.HumanApproval,
+                    escalationPolicy = com.hereliesaz.geministrator.domain.EscalationPolicy.RequireHumanDecision,
+                )
+            },
+        )
+        shoot("35-creature-job", 780, 1688) {
+            Box(Modifier.fillMaxSize().background(Azphalt.Ink)) {
+                AzphaltThemedSurface(Azphalt.Ink) {
+                    TechnicalInspector(
+                        selectedTaskId = "build",
+                        liveWorkflow = LiveWorkflowPresentation(project, job, liveRun, roles),
+                        tab = CreatureTab.Work,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
     }
 
     /** The timeline as a waterfall: parallel attempts, a plan gate, a retry and a creature still going. */
