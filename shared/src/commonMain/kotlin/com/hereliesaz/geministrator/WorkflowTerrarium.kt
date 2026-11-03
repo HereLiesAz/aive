@@ -259,24 +259,26 @@ internal fun GeministratorWorkflowTerrarium(
           }
             // An empty hive in Build says how it fills (mockup H6).
             if (building && stagedDefinition.tasks.isEmpty()) {
-                Text(
-                    text = stringResource(Res.string.hive_new_empty),
-                    style = AzphaltType.body.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.Center),
-                    // The field is dark tissue whatever the ground: its text is Ink's opposite, softened.
-                    color = Azphalt.Ink.onOpposite().copy(alpha = 0.78f),
-                    modifier = Modifier.align(Alignment.Center).padding(horizontal = 36.dp),
-                )
+                Box(Modifier.fillMaxSize()) {
+                    Text(
+                        text = stringResource(Res.string.hive_new_empty),
+                        style = AzphaltType.body.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.Center),
+                        // The field is dark tissue whatever the ground: its text is Ink's opposite, softened.
+                        color = Azphalt.Ink.onOpposite().copy(alpha = 0.78f),
+                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 36.dp),
+                    )
+                }
             }
         }
 
-        if (building) beneathField?.let { bench ->
-            Box(Modifier.padding(top = 12.dp)) { bench(stagedDefinition, ::applyEdit) }
-        }
         if (frame == null) {
             Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { field() }
         } else {
             HiveTissueFrame(height = frame.tissueHeight, building = building) { field() }
             frame.feedBar()
+        }
+        if (building) beneathField?.let { bench ->
+            Box(Modifier.padding(top = 12.dp)) { bench(stagedDefinition, ::applyEdit) }
         }
 
         if (building) {
