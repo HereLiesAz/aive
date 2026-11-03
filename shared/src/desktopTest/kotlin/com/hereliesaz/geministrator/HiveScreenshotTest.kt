@@ -329,6 +329,53 @@ class HiveScreenshotTest {
         shoot("31-shell-keeper", 2400, 1500) { shell(ControlRoomDestination.Settings, live, false)() }
     }
 
+    /** The Memory swarm: Simple (the memory field and its notes) on desktop, a mid width and a phone; Technical unchanged. */
+    @Test
+    fun shootsTheMemorySwarm() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val store = com.hereliesaz.geministrator.memory.InMemoryMemoryStore()
+        val controller = com.hereliesaz.geministrator.memory.MemoryLayerController(
+            banks = com.hereliesaz.geministrator.memory.MemoryBanks.inMemory(mapOf("feature-delivery-run" to store)),
+            settingsStore = com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore(com.russhwolf.settings.MapSettings()),
+            engineProvider = object : com.hereliesaz.geministrator.memory.MemoryEngineProvider {},
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        )
+        runBlocking {
+            val queue = com.hereliesaz.geministrator.memory.MemoryConsolidationQueue(store)
+            listOf(
+                "Review every repository change before it lands. The reviewer reads the diff and the tests.",
+                "Release notes come from the changelog. The engineer writes them after review passes.",
+                "Run the tests before review. A failing test sends the work back to the engineer.",
+            ).forEachIndexed { i, text ->
+                queue.enqueueSession(
+                    com.hereliesaz.geministrator.memory.MemorySessionEnvelope(
+                        "session-$i", workflowRunId = "feature-delivery-run", userPrompt = text,
+                        parts = listOf(com.hereliesaz.geministrator.memory.MemorySessionPart(com.hereliesaz.geministrator.memory.MemorySourceKind.Message, "agent", text)),
+                        closedAtEpochMillis = 1_000L + i,
+                    ),
+                )
+            }
+            controller.drain()
+            // One more session arrives after the drain, so the field has something waiting.
+            queue.enqueueSession(
+                com.hereliesaz.geministrator.memory.MemorySessionEnvelope(
+                    "session-late", workflowRunId = "feature-delivery-run", userPrompt = "Ship after approval.",
+                    parts = emptyList(), closedAtEpochMillis = 2_000L,
+                ),
+            )
+            controller.selectBank("feature-delivery-run")
+        }
+        fun memory(view: MemoryView, compact: Boolean) = @androidx.compose.runtime.Composable {
+            DurableUiState.store.putString(MemoryView.STORAGE_KEY, view.name)
+            MemoryLayerScreen(controller, connectedProviderIds = emptySet(), compact = compact)
+        }
+        shoot("40-memory-simple", 2400, 1500) { memory(MemoryView.Simple, false)() }
+        shoot("41-memory-simple-mid", 1400, 1700) { memory(MemoryView.Simple, false)() }
+        shoot("42-memory-simple-phone", 824, 1830) { memory(MemoryView.Simple, true)() }
+        shoot("43-memory-technical", 2400, 1500) { memory(MemoryView.Technical, false)() }
+        DurableUiState.store.putString(MemoryView.STORAGE_KEY, MemoryView.Simple.name)
+    }
+
     /** A creature's panel (docs/Keepers-Room.md, stage 3): its Needs, its Work, its Mind. */
     @Test
     fun shootsTheCreaturePanel() {
