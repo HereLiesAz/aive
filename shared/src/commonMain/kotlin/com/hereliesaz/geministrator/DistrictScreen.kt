@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -86,10 +84,13 @@ internal fun DistrictScreen(
     onNewHive: () -> Unit = {},
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
-    /** The hive's edge: what the Store offers (HiveEdge). */
+    /** The hive's edge: what the Store offers (HiveEdge), shown as a sheet over the district. */
     edge: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** The edge's sheet is open from the start (screenshots). */
+    edgeOpenAtStart: Boolean = false,
 ) {
+    var edgeOpen by remember { mutableStateOf(edgeOpenAtStart) }
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loadFailure by remember { mutableStateOf<String?>(null) }
@@ -105,10 +106,10 @@ internal fun DistrictScreen(
         }
     }
     val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
+    Box(modifier.clip(RoundedCornerShape(32.dp))) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(32.dp))
+        modifier = Modifier
+            .fillMaxSize()
             .background(Brush.radialGradient(listOf(DistrictCore, DistrictEdge)))
             .verticalScroll(scroll)
             .padding(16.dp),
@@ -119,13 +120,13 @@ internal fun DistrictScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
                 // Drifters arrive at the hive's edge (the Store's agents and remote A2A ones): the
-                // cure for the clone trap. This escorts there, below.
+                // cure for the clone trap. This opens the edge, a sheet over the district.
                 AzphaltPill(
                     label = stringResource(Res.string.district_import_agent),
                     seed = "district-import",
                     onClick = {
                         onImportAgent()
-                        scope.launch { scroll.animateScrollTo(scroll.maxValue) }
+                        edgeOpen = true
                     },
                 )
             }
@@ -160,9 +161,10 @@ internal fun DistrictScreen(
                     }
                 }
             StableSection()
-            edge()
             Lineage(roles, onAdopt)
         }
+    }
+    if (edgeOpen) HiveEdgeSheet(onClose = { edgeOpen = false }) { edge() }
     }
 }
 

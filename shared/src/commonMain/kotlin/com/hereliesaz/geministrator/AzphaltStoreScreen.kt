@@ -2,7 +2,9 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -112,6 +114,13 @@ import com.hereliesaz.geministrator.resources.store_revoked
 import com.hereliesaz.geministrator.resources.store_search_workflows_roles_models_and_llms
 import com.hereliesaz.geministrator.resources.store_size_not_published
 import com.hereliesaz.geministrator.resources.store_store
+import com.hereliesaz.geministrator.resources.store_tab_agents
+import com.hereliesaz.geministrator.resources.store_tab_all
+import com.hereliesaz.geministrator.resources.store_tab_breeds
+import com.hereliesaz.geministrator.resources.store_tab_hives
+import com.hereliesaz.geministrator.resources.store_tab_llms
+import com.hereliesaz.geministrator.resources.store_tab_installed
+import com.hereliesaz.geministrator.resources.store_tab_models
 import com.hereliesaz.geministrator.resources.store_store_error
 import com.hereliesaz.geministrator.resources.store_failed_while
 import com.hereliesaz.geministrator.resources.store_step_index
@@ -152,12 +161,18 @@ import com.hereliesaz.geministrator.resources.store_plan_reusable_role_count
 import com.hereliesaz.geministrator.resources.store_plan_fragment_count
 import org.jetbrains.compose.resources.pluralStringResource
 
-private enum class AzphaltStoreCategory(val label: String) {
-    All("All"),
-    Workflows("Workflows"),
-    Roles("Roles"),
-    Models("Models"),
-    Llms("LLMs"),
+/**
+ * The Store's tabs (mockup B5): agents (role packages), hives (workflow packages) and breeds, then
+ * models and LLMs. The names are kept as saved ("Roles", "Workflows") so a remembered tab still opens.
+ */
+private enum class AzphaltStoreCategory(val label: StringResource) {
+    All(Res.string.store_tab_all),
+    Roles(Res.string.store_tab_agents),
+    Workflows(Res.string.store_tab_hives),
+    Breeds(Res.string.store_tab_breeds),
+    Installed(Res.string.store_tab_installed),
+    Models(Res.string.store_tab_models),
+    Llms(Res.string.store_tab_llms),
 }
 
 private fun AzphaltStoreStep.labelResource(): StringResource = when (this) {
@@ -323,6 +338,9 @@ internal fun AzphaltStoreScreen(
         }
     }
 
+    val installedIds = snapshot?.let { loaded ->
+        loaded.installed.map { it.packageId } + loaded.installedModels.map { it.packageId } + loaded.installedLlms.map { it.packageId }
+    }.orEmpty().toSet()
     val visiblePackages = packages.filter { item ->
         when (category) {
             AzphaltStoreCategory.All -> true
@@ -330,11 +348,17 @@ internal fun AzphaltStoreScreen(
             AzphaltStoreCategory.Roles -> item.kind == "role"
             AzphaltStoreCategory.Models -> item.isModelAssetPackage()
             AzphaltStoreCategory.Llms -> item.isDirectLlmPackage()
+            AzphaltStoreCategory.Breeds -> false
+            AzphaltStoreCategory.Installed -> item.id in installedIds
         }
     }
 
+    BoxWithConstraints(modifier) {
+    // Wide (desktop and tablets): the Figma layout, a featured hive and a grid of cards.
+    val wide = maxWidth >= ControlRoomBreakpoints.Wide
+    val gridColumns = if (maxWidth >= 1000.dp) 3 else 2
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(26.dp),
@@ -389,37 +413,29 @@ internal fun AzphaltStoreScreen(
             )
         }
 
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text(stringResource(Res.string.store_search_workflows_roles_models_and_llms)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            AzphaltStoreCategory.entries.forEach { item ->
-                val count = when (item) {
-                    AzphaltStoreCategory.All -> packages.size
-                    AzphaltStoreCategory.Workflows -> packages.count { it.kind == "workflow" }
-                    AzphaltStoreCategory.Roles -> packages.count { it.kind == "role" }
-                    AzphaltStoreCategory.Models -> packages.count(AzphaltPackageSummary::isModelAssetPackage)
-                    AzphaltStoreCategory.Llms -> packages.count(AzphaltPackageSummary::isDirectLlmPackage)
-                }
-                AzphaltPill(
-                    label = item.label,
-                    seed = "azphalt-category-${item.name}",
-                    selected = item == category,
-                    endCap = count.toString(),
-                    onClick = { categoryName = item.name },
-                )
-            }
+        StoreTabsRow(wide) {
+            AzphaltTabs(
+                tabs = AzphaltStoreCategory.entries.map { AzphaltTabItem(it.name, stringResource(it.label)) },
+                selectedKey = category.name,
+                onSelected = { categoryName = it },
+                seedPrefix = "azphalt-category",
+            )
         }
 
-        if (!loading && visiblePackages.isEmpty()) {
+        if (category == AzphaltStoreCategory.Breeds) {
+            // Breeds are not packages: no search, no install plan, only what each costs.
+            StoreBreeds()
+        } else {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text(stringResource(Res.string.store_search_workflows_roles_models_and_llms)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        if (!loading && visiblePackages.isEmpty() && category != AzphaltStoreCategory.Breeds) {
             Text(stringResource(Res.string.store_no_azphalt_packages_match_this_search), style = AzphaltType.body, color = azphaltOnSurface())
         }
 
@@ -429,7 +445,7 @@ internal fun AzphaltStoreScreen(
         val updatesById = snapshot?.updates.orEmpty().associateBy { it.id }
         val revoked = snapshot?.revocations.orEmpty().map { it.id to it.version }.toSet()
 
-        visiblePackages.forEach { item ->
+        val packageRecord: @Composable (AzphaltPackageSummary) -> Unit = packageRecord@{ item ->
             if (item.isDirectLlmPackage()) {
                 val installedLlm = installedLlmsById[item.id]
                 val selected = selectedPackageId == item.id
@@ -482,7 +498,7 @@ internal fun AzphaltStoreScreen(
                         }
                     },
                 )
-                return@forEach
+                return@packageRecord
             }
             val modelAsset = item.isModelAssetPackage()
             val installed = installedById[item.id]
@@ -655,6 +671,42 @@ internal fun AzphaltStoreScreen(
             )
         }
 
+        if (wide && category != AzphaltStoreCategory.Breeds) {
+            // A hive from the Store leads, then every package as a card; Inspect opens its record below.
+            if (category == AzphaltStoreCategory.All || category == AzphaltStoreCategory.Workflows) {
+                visiblePackages.firstOrNull { it.kind == "workflow" }?.let { hive ->
+                    FeaturedStoreHive(hive, onView = { selectedPackageIdValue = hive.id })
+                }
+            }
+            StoreCardGrid(
+                packages = visiblePackages,
+                columns = gridColumns,
+                selectedId = selectedPackageId,
+                footerOf = { item ->
+                    when {
+                        (item.id to item.latest) in revoked -> stringResource(Res.string.store_revoked)
+                        updatesById[item.id]?.updateAvailable == true -> stringResource(Res.string.store_update, updatesById[item.id]?.latest ?: item.latest)
+                        installedById[item.id] != null -> stringResource(Res.string.store_installed_1, installedById.getValue(item.id).version)
+                        installedModelsById[item.id] != null -> stringResource(Res.string.store_installed_1, installedModelsById.getValue(item.id).version)
+                        installedLlmsById[item.id] != null -> stringResource(Res.string.store_installed_1, installedLlmsById.getValue(item.id).version)
+                        item.priceStatus != "free" -> item.priceStatus
+                        else -> item.latest
+                    }
+                },
+                onInspect = { item ->
+                    selectedPackageIdValue = if (selectedPackageId == item.id) "" else item.id
+                    prepared = prepared?.takeIf { it.detail.id == item.id }
+                    preparedModel = preparedModel?.takeIf { it.detail.id == item.id }
+                    preparedLlm = preparedLlm?.takeIf { it.detail.id == item.id }
+                    error = null
+                    status = null
+                },
+            )
+            visiblePackages.firstOrNull { it.id == selectedPackageId }?.let { item -> key(item.id) { packageRecord(item) } }
+        } else {
+            visiblePackages.forEach { item -> key(item.id) { packageRecord(item) } }
+        }
+
         preparedModel?.let { plan ->
             PreparedAzphaltModelInstallPanel(
                 prepared = plan,
@@ -789,6 +841,7 @@ internal fun AzphaltStoreScreen(
                 },
             )
         }
+    }
     }
 }
 

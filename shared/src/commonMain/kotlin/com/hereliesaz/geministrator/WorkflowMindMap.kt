@@ -23,6 +23,7 @@ internal fun GeministratorWorkflowMindMap(
     branchIsolation: Boolean = false,
     modifier: Modifier = Modifier,
     onSurface: (() -> Unit)? = null,
+    frame: HiveFrame? = null,
 ) {
     GeministratorWorkflowTerrarium(
         definition = definition,
@@ -33,5 +34,6 @@ internal fun GeministratorWorkflowMindMap(
         modifier = modifier,
         compact = branchIsolation,
         onSurface = onSurface,
+        frame = frame,
     )
 }

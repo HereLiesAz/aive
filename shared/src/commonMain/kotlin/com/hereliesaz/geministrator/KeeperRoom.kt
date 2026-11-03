@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -50,6 +51,11 @@ import com.hereliesaz.geministrator.resources.keeper_delegations
 import com.hereliesaz.geministrator.resources.keeper_delegations_lead
 import com.hereliesaz.geministrator.resources.keeper_device
 import com.hereliesaz.geministrator.resources.keeper_device_lead
+import com.hereliesaz.geministrator.resources.keeper_device_lead_wide
+import com.hereliesaz.geministrator.resources.keeper_limits
+import com.hereliesaz.geministrator.resources.keeper_limits_lead
+import com.hereliesaz.geministrator.resources.keeper_page_line
+import com.hereliesaz.geministrator.resources.keeper_page_title
 import com.hereliesaz.geministrator.resources.keeper_feeds_the_hive
 import com.hereliesaz.geministrator.resources.keeper_on_count
 import com.hereliesaz.geministrator.resources.keeper_projects
@@ -73,6 +79,8 @@ internal enum class KeeperSection(
     Compute(Res.string.keeper_compute, Res.string.keeper_compute_lead, true),
     Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false),
     Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false),
+    /** Wide only: the spend caps, which a phone keeps in [Device]. */
+    Limits(Res.string.keeper_limits, Res.string.keeper_limits_lead, false),
     Device(Res.string.keeper_device, Res.string.keeper_device_lead, false),
     Appearance(Res.string.keeper_appearance, Res.string.keeper_appearance_lead, false),
     About(Res.string.keeper_about, Res.string.keeper_about_lead, false),
@@ -93,8 +101,9 @@ internal fun keeperContentPadding(compact: Boolean): PaddingValues =
 
 /**
  * The Keeper's room: a short list of parts and the open one. On a phone the list is its own
- * page and a part opens over it; wider, they sit side by side. [content] draws a part, scrolling
- * itself.
+ * page and a part opens over it; wider, a page title sits over an Ink list of parts and the open
+ * part on its own Ink card (docs/Keepers-Room.md, Layout). [content] draws a part, scrolling
+ * itself. [KeeperSection.Limits] is wide only; a phone finds the spend caps in This device.
  */
 @Composable
 internal fun KeeperRoom(
@@ -111,13 +120,16 @@ internal fun KeeperRoom(
 ) {
     var selectedName by selectedName
     var open by open
+    val sections = if (compact) sections.filter { it != KeeperSection.Limits } else sections
     LaunchedEffect(opening) {
         if (opening != null) {
             selectedName = opening.name
             open = true
         }
     }
-    val selected = sections.firstOrNull { it.name == selectedName } ?: sections.first()
+    val selected = sections.firstOrNull { it.name == selectedName }
+        ?: sections.firstOrNull { compact && selectedName == KeeperSection.Limits.name && it == KeeperSection.Device }
+        ?: sections.first()
 
     if (compact) {
         PlatformBackHandler(enabled = open) { open = false }
@@ -139,18 +151,89 @@ internal fun KeeperRoom(
             }
         }
     } else {
-        Row(modifier.fillMaxSize()) {
-            Column(
-                Modifier.width(240.dp).fillMaxHeight().verticalScroll(rememberScrollState()).padding(start = 8.dp, top = 22.dp, end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                KeeperSectionList(sections, selected = selected, statusOf = statusOf) { selectedName = it.name }
-            }
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                KeeperSectionHeading(selected, compact = false)
-                content(selected, Modifier.weight(1f).fillMaxWidth())
+        Column(modifier.fillMaxSize().padding(start = 28.dp, top = 27.dp, end = 28.dp, bottom = 40.dp)) {
+            WidePageTitle(
+                eyebrow = stringResource(Res.string.keeper_room),
+                title = stringResource(Res.string.keeper_page_title),
+                line = stringResource(Res.string.keeper_page_line),
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val ink = Azphalt.Ink
+                Box(Modifier.width(200.dp).clip(RoundedCornerShape(17.dp)).background(ink)) {
+                    AzphaltSurface(ink) {
+                        KeeperNav(sections, selected, statusOf) { selectedName = it.name }
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(19.dp)).background(ink)) {
+                    AzphaltThemedSurface(ink) {
+                        Column(Modifier.fillMaxSize()) {
+                            KeeperCardHeading(selected)
+                            // The part pads itself 12dp in; the card's edge is 27dp in, as its heading.
+                            content(selected, Modifier.weight(1f).fillMaxWidth().padding(start = 15.dp, end = 3.dp))
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+/** The wide room's list of parts: one Ink column, the open part filled in the strong colour. */
+@Composable
+private fun KeeperNav(
+    sections: List<KeeperSection>,
+    selected: KeeperSection,
+    statusOf: @Composable (KeeperSection) -> String?,
+    onSelect: (KeeperSection) -> Unit,
+) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(8.dp).selectableGroup()) {
+        sections.forEach { section ->
+            val isSelected = section == selected
+            val fill = if (isSelected) azphaltStrong() else androidx.compose.ui.graphics.Color.Transparent
+            val text = if (isSelected) fill.onOpposite() else azphaltMutedOnSurface()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = AzphaltMinTouchTarget)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(fill)
+                    .semantics {
+                        role = Role.Tab
+                        this.selected = isSelected
+                    }
+                    .clickable { onSelect(section) }
+                    .padding(horizontal = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(section.title).uppercase(), style = AzphaltType.endCap, color = text, modifier = Modifier.weight(1f))
+                statusOf(section)?.let { Text(it.uppercase(), style = AzphaltType.endCap, color = text) }
+            }
+        }
+    }
+}
+
+/** The open part's heading on its card: its group as the eyebrow, its name, its one-line lead. */
+@Composable
+private fun KeeperCardHeading(section: KeeperSection) {
+    Column(
+        Modifier.fillMaxWidth().padding(start = 27.dp, top = 27.dp, end = 27.dp).semantics(mergeDescendants = true) { heading() },
+    ) {
+        Text(
+            stringResource(if (section.feedsTheHive) Res.string.keeper_feeds_the_hive else Res.string.keeper_the_keeper).uppercase(),
+            style = AzphaltType.eyebrow,
+            color = azphaltStrong(),
+        )
+        Spacer(Modifier.height(7.dp))
+        Text(stringResource(section.title), style = AzphaltType.section, color = azphaltOnSurface())
+        Spacer(Modifier.height(5.dp))
+        Text(
+            stringResource(if (section == KeeperSection.Device) Res.string.keeper_device_lead_wide else section.lead),
+            style = AzphaltType.body,
+            color = azphaltMutedOnSurface(),
+        )
+        Spacer(Modifier.height(14.dp))
     }
 }
 
