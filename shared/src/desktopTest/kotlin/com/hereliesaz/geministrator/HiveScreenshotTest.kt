@@ -169,21 +169,49 @@ class HiveScreenshotTest {
         shoot("5-launch-bar", 900, 600) {
             HiveLaunchBar("shot", onLaunch = { _, _ -> })
         }
-        shoot("6-hive-edge", 900, 900) {
-            // In the app the edge sits inside the whole hive's dark tissue.
-            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.background(androidx.compose.ui.graphics.Color(0xFF1E1A17)).padding(16.dp)) { AzphaltThemedSurface(Azphalt.Ink) {
-                HiveEdge(
-                    onLoadPackages = {
-                        listOf(
-                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r1", name = "Violacea reviewer", description = "Reviews diffs against the contract", author = "azphalt", version = "1", kind = "role"),
-                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r2", name = "Glacia researcher", description = "Finds sources and cites them", author = "azphalt", version = "1", kind = "role"),
-                            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w1", name = "Bug triage", author = "azphalt", version = "1", kind = "workflow"),
-                        )
-                    },
-                    onBringIn = {},
-                )
-            } }
+        val storePackages = listOf(
+            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r1", name = "Violacea reviewer", description = "Reviews diffs against the contract", author = "azphalt", version = "1", kind = "role"),
+            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "r2", name = "Glacia researcher", description = "Finds sources and cites them", author = "azphalt", version = "1", kind = "role"),
+            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w1", name = "Software delivery", description = "A production circuit from planning through adversarial review and release", author = "azphalt", version = "1", kind = "workflow"),
+            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w2", name = "Bug triage", description = "Sorts new issues and drafts a first fix", author = "azphalt", version = "2", kind = "workflow"),
+            com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w3", name = "Deep research", description = "Evidence-first research with citations", author = "azphalt", version = "1", kind = "workflow", priceStatus = "paid"),
+        )
+        // The hive's edge (mockup H5): a sheet from the bottom over the district, on a phone (390x844).
+        fun edgeShot(shelf: EdgeShelf) = @androidx.compose.runtime.Composable {
+            DistrictScreen(
+                onLoadDefinitions = { listOf(definition) },
+                onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
+                onEnterNeighbourhood = {},
+                onImportAgent = {},
+                edge = {
+                    HiveEdge(
+                        onLoadPackages = { storePackages },
+                        onBringIn = {},
+                        shelfAtStart = shelf,
+                        a2aDrifters = if (shelf == EdgeShelf.Drifters) {
+                            {
+                                A2aDrifterShelf(
+                                    open = false,
+                                    onOpenChange = {},
+                                    swarmRoles = roles,
+                                    connectedProviderIds = emptySet(),
+                                    onSaveRoles = {},
+                                    onConnectKeyless = {},
+                                    onGiveToken = {},
+                                    onDisconnect = {},
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                },
+                edgeOpenAtStart = true,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
+        shoot("6-hive-edge", 780, 1688, edgeShot(EdgeShelf.Drifters))
+        shoot("6b-hive-edge-hives", 780, 1688, edgeShot(EdgeShelf.Hives))
         shoot("7-live-row", 780, 300) {
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
@@ -238,12 +266,37 @@ class HiveScreenshotTest {
                 StableCreature("feedback-listener+threat-modeler+support-agent", 160)
             }
         }
-        // Breeds in the Store (mockup B5): name, rarity, price; nothing else.
-        shoot("14-breeds-store", 900, 1500, dark(kept) {
-            androidx.compose.runtime.CompositionLocalProvider(LocalBreedPurchases provides shop) {
-                HiveEdge(onLoadPackages = { emptyList() }, onBringIn = {}, shelfAtStart = EdgeShelf.Breeds)
+        // Breeds in the Store (mockup B5), on a phone: the tabs, the breeds, the footnote.
+        shoot("14-breeds-store", 780, 1688) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalStableHost provides kept, LocalBreedPurchases provides shop) {
+                androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                    StoreTabsRow(wide = false) {
+                        AzphaltTabs(
+                            tabs = listOf("Agents", "Hives", "Breeds", "Installed").map { AzphaltTabItem(it, it) },
+                            selectedKey = "Breeds",
+                            onSelected = {},
+                            seedPrefix = "shot",
+                        )
+                    }
+                    StoreBreeds()
+                }
             }
-        })
+        }
+        // The Store on a wide screen (the Figma design): tabs on Ink, a hive leading, the cards.
+        shoot("14b-store-wide", 2400, 1500) {
+            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
+                StoreTabsRow(wide = true) {
+                    AzphaltTabs(
+                        tabs = listOf("All", "Agents", "Hives", "Breeds", "Installed", "Models", "LLMs").map { AzphaltTabItem(it, it) },
+                        selectedKey = "Hives",
+                        onSelected = {},
+                        seedPrefix = "shot",
+                    )
+                }
+                FeaturedStoreHive(storePackages[2], onView = {})
+                StoreCardGrid(storePackages.filter { it.kind == "workflow" }, columns = 3, selectedId = "w2", footerOf = { it.latest }, onInspect = {})
+            }
+        }
         // Close in on the vessels (zoom 250%), where the red cells show.
         shoot("15-vessels-close", 900, 1400) {
             val scene = TissueScene(
