@@ -5,6 +5,17 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import com.hereliesaz.geministrator.resources.keeper_ground_selected
+import com.hereliesaz.geministrator.resources.settings_always_show_labels
+import com.hereliesaz.geministrator.resources.settings_reduce_motion
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,10 +49,15 @@ import org.jetbrains.compose.resources.stringResource
 /**
  * Keeper's room › Appearance. The ground is chosen from its six swatches, the current one
  * selected; every shell (Android, Desktop, Web) offers it here and nowhere else. Below it, the
- * keeper's Reduce motion and Always show creature labels switches.
+ * keeper's Reduce motion and Always show creature labels switches. [wide] draws the desktop
+ * card's version: a grid of ground cards and switch rows.
  */
 @Composable
-internal fun KeeperAppearance() {
+internal fun KeeperAppearance(wide: Boolean = false) {
+    if (wide) {
+        WideKeeperAppearance()
+        return
+    }
     ProviderSectionLabel(stringResource(Res.string.settings_ground))
     Text(
         stringResource(Res.string.settings_ground_explain),
@@ -147,5 +163,111 @@ private fun GroundSwatches(current: Azphalt.Ground, onSelect: (Azphalt.Ground) -
                 )
             }
         }
+    }
+}
+
+/** Appearance on the wide Keeper's room card: ground cards three across, then the two switches. */
+@Composable
+private fun WideKeeperAppearance() {
+    ProviderSectionLabel(stringResource(Res.string.settings_ground))
+    Text(
+        stringResource(Res.string.settings_ground_explain),
+        style = AzphaltType.body,
+        color = azphaltMutedOnSurface(),
+    )
+    val current = Azphalt.currentGround
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp).selectableGroup(),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Azphalt.grounds.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                row.forEach { ground -> GroundCard(ground, ground == current, Modifier.weight(1f)) { Azphalt.setGround(ground.name) } }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+    val motionOn = AzphaltMotion.keeperReduceMotion
+    SwitchRow(
+        title = stringResource(Res.string.settings_reduce_motion),
+        line = stringResource(Res.string.settings_reduce_motion_explain),
+        on = motionOn,
+        onChange = { AzphaltMotion.updateKeeperReduceMotion(it) },
+        note = stringResource(Res.string.settings_reduce_motion_by_device).takeIf { AzphaltMotion.platformReduceMotion },
+    )
+    val labelsOn = CreatureLabels.alwaysShow
+    SwitchRow(
+        title = stringResource(Res.string.settings_always_show_labels),
+        line = stringResource(Res.string.settings_creature_labels_explain, NAMED_CREATURE_LIMIT),
+        on = labelsOn,
+        onChange = { CreatureLabels.updateAlwaysShow(it) },
+    )
+}
+
+/** One ground: its swatch, its name and, when it is the current one, SELECTED in the corner. */
+@Composable
+private fun GroundCard(ground: Azphalt.Ground, selected: Boolean, modifier: Modifier, onSelect: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    val strong = azphaltStrong()
+    Box(
+        modifier
+            .height(92.dp)
+            .clip(shape)
+            .background(AzphaltLiftedInk)
+            .border(if (selected) 2.dp else 1.dp, if (selected) strong else azphaltMutedOnSurface().copy(alpha = 0.4f), shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .padding(10.dp),
+    ) {
+        AzphaltSurface(AzphaltLiftedInk) {
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(49.dp).clip(CircleShape).background(ground.page).border(1.dp, azphaltMutedOnSurface(), CircleShape))
+                Text(ground.name, style = AzphaltType.lead, color = azphaltOnSurface())
+            }
+            if (selected) {
+                Text(
+                    stringResource(Res.string.keeper_ground_selected).uppercase(),
+                    style = AzphaltType.endCap,
+                    color = strong,
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
+            }
+        }
+    }
+}
+
+/** A setting row: what it is, one line about it, and a switch; the whole row toggles. */
+@Composable
+private fun SwitchRow(title: String, line: String, on: Boolean, onChange: (Boolean) -> Unit, note: String? = null) {
+    val divider = azphaltMutedOnSurface().copy(alpha = 0.35f)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 66.dp)
+            .drawBehind { drawLine(divider, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1f) }
+            .toggleable(value = on, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = AzphaltType.lead, color = azphaltOnSurface())
+            Text(line, style = AzphaltType.body, color = azphaltMutedOnSurface())
+            note?.let { Text(it, style = AzphaltType.body, color = azphaltMutedOnSurface()) }
+        }
+        AzphaltSwitchTrack(on)
+    }
+}
+
+/** The switch itself, drawn: on is the strong colour with a thumb in its opposite, off is muted. */
+@Composable
+private fun AzphaltSwitchTrack(on: Boolean) {
+    val strong = azphaltStrong()
+    val track = if (on) strong else azphaltMutedOnSurface().copy(alpha = 0.45f)
+    val thumb = if (on) strong.onOpposite() else azphaltOnSurface()
+    Box(
+        Modifier.size(width = 43.dp, height = 24.dp).clip(RoundedCornerShape(14.dp)).background(track).padding(3.dp),
+        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Box(Modifier.size(18.dp).clip(CircleShape).background(thumb))
     }
 }

@@ -121,6 +121,9 @@ import com.hereliesaz.geministrator.resources.first_hive_hint
 import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.overview_recover_delete_all_data
 import org.jetbrains.compose.resources.getString
+import com.hereliesaz.geministrator.resources.hive_status_line
+import androidx.compose.runtime.produceState
+import com.hereliesaz.geministrator.domain.WorkflowRun
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -153,6 +156,8 @@ internal fun MindMapRunScreen(
     onDismissLaunchError: () -> Unit = {},
     /** Live thinking and steps of each provider session; the active creature's newest is its "doing now". */
     activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
+    /** Every run, for the wide page's "RUN n" (which run of its hive this is); empty hides it. */
+    onLoadRuns: suspend () -> List<WorkflowRun> = { emptyList() },
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val scope = rememberCoroutineScope()
@@ -237,8 +242,11 @@ internal fun MindMapRunScreen(
         )
     }
 
+    // The viewport's height sizes the wide hive frame so the hive and its feed bar fill the first screen.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier) {
+    val viewportHeight = maxHeight
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(if (compact) 16.dp else 26.dp),
@@ -704,7 +712,52 @@ internal fun MindMapRunScreen(
         val run = liveWorkflow.run
         val completed = run.taskRuns.values.count { it.status == TaskRunStatus.Completed }
         val total = run.taskRuns.size
+        val activeTaskId = remember(run) {
+            run.taskRuns.values
+                .firstOrNull { it.status == TaskRunStatus.Running || it.status == TaskRunStatus.Planning }
+                ?.taskDefinitionId?.value
+        }
 
+        if (!compact) {
+            // Wide (docs/Keepers-Room.md, "The hive on wide screens"): the page title, then the hive in
+            // one frame with the feed bar always under it. The status line is the "doing now" and
+            // opens the working creature, so neither Jump to active nor Feed it more is repeated here.
+            val runNumber by produceState<Int?>(null, run.id) {
+                value = runCatching { hiveRunNumber(run, onLoadRuns()) }.getOrNull()
+            }
+            HivePageTitle(
+                eyebrow = "${run.status.label()} · ${liveWorkflow.project.name}",
+                title = liveWorkflow.definition.name.ifBlank { run.objective },
+                objective = run.objective.takeIf { it != liveWorkflow.definition.name },
+                runNumber = runNumber,
+                activity = hiveActivity(run),
+            )
+            val status = hiveStatusLine(liveWorkflow, activeTaskId, activity)
+            GeministratorWorkflowMindMap(
+                definition = liveWorkflow.definition,
+                run = run,
+                roles = liveWorkflow.roles,
+                selectedTaskId = selectedTaskId,
+                onTaskSelected = onTaskSelected,
+                modifier = Modifier.fillMaxWidth(),
+                onSurface = onSurface,
+                frame = HiveFrame(
+                    // Title, controls bar, feed bar and the page's own padding take the rest.
+                    tissueHeight = (viewportHeight - WIDE_HIVE_CHROME).coerceAtLeast(WIDE_TISSUE_MIN),
+                    status = status,
+                    onStatusClick = activeTaskId?.let { id -> { if (selectedTaskId != id) onTaskSelected(id) } },
+                    feedBar = {
+                        HiveFeedBar(
+                            run = run,
+                            onLaunch = { objective ->
+                                onLaunchWorkflow(liveWorkflow.project.name, objective, liveWorkflow.project.repository, listOf(run.id))
+                            },
+                            message = launchError,
+                        )
+                    },
+                ),
+            )
+        } else {
         // The breadcrumb names the hive; here, what it was fed and how far along it is.
         Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface())
         Text(
@@ -713,6 +766,7 @@ internal fun MindMapRunScreen(
             color = azphaltOnSurface(),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
         )
+        }
 
         // What it made, on the hive itself: the finished work of the creatures nothing else feeds on,
         // so the result is never three taps deep in a creature's panel. Selectable, to take it away.
@@ -742,7 +796,7 @@ internal fun MindMapRunScreen(
             }
         }
 
-        if (run.status.isFinished()) {
+        if (compact && run.status.isFinished()) {
             ContinueRunPanel(
                 runId = run.id,
                 onContinue = { continuation ->
@@ -784,13 +838,7 @@ internal fun MindMapRunScreen(
                 )
             }
         }
-        val activeTaskId = remember(run) {
-            run.taskRuns.values
-                .firstOrNull { it.status == TaskRunStatus.Running || it.status == TaskRunStatus.Planning }
-                ?.taskDefinitionId?.value
-        }
-
-        if (activeTaskId != null) {
+        if (compact && activeTaskId != null) {
             AzphaltPill(
                 label = stringResource(Res.string.overview_jump_to_active),
                 seed = "jump-active",
@@ -808,7 +856,7 @@ internal fun MindMapRunScreen(
                 CreatureDoingNow(activeRun, name, waitingOnIt, activity)
             }
         }
-        GeministratorWorkflowMindMap(
+        if (compact) GeministratorWorkflowMindMap(
             definition = liveWorkflow.definition,
             run = run,
             roles = liveWorkflow.roles,
@@ -846,6 +894,37 @@ internal fun MindMapRunScreen(
         }
         Spacer(Modifier.height(24.dp))
     }
+    }
+}
+
+/** Everything on the wide hive page that is not tissue: title, controls bar, feed bar, padding. */
+private val WIDE_HIVE_CHROME = 300.dp
+
+/** The wide tissue never shrinks below this, however short the window. */
+private val WIDE_TISSUE_MIN = 460.dp
+
+/**
+ * The wide controls bar's one line: what the working creature is doing now ("Architect: reading
+ * the contract · feeds Engineer"), its state when it has said nothing yet, else the run's state.
+ */
+@Composable
+private fun hiveStatusLine(live: LiveWorkflowPresentation, activeTaskId: String?, activity: SessionActivityFeeds): String {
+    val run = live.run
+    val activeRun = activeTaskId?.let { id -> run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == id } }
+        ?: return "${run.status.label()} · ${run.objective}"
+    val name = activeRun.assignedRoleId?.let { roleId -> live.roles.firstOrNull { it.id == roleId }?.name }
+        ?: live.definition.tasks.firstOrNull { it.id == activeRun.taskDefinitionId }?.name
+        ?: activeTaskId
+    val feeds by activity.feeds.collectAsState()
+    val doing = activeRun.providerRunId
+        ?.let { feeds[SessionActivityKey(activeRun.id, it)]?.lastOrNull()?.doingNowText() }
+        ?: activeRun.progressMessage?.takeIf(String::isNotBlank)
+        ?: activeRun.status.label()
+    val waitingOnIt = remember(live.definition, run, live.roles) {
+        creaturesWaitingOn(activeRun.taskDefinitionId, live.definition, run, live.roles)
+    }
+    val line = stringResource(Res.string.hive_status_line, name, doing)
+    return if (waitingOnIt.isEmpty()) line else stringResource(Res.string.overview_doing_now_feeds, line, waitingOnIt.joinToString(", "))
 }
 
 /**

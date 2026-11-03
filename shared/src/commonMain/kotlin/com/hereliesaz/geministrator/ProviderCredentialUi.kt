@@ -52,6 +52,7 @@ fun ProviderCredentialSetup(
     var keylessConfirm by remember(providerId) { mutableStateOf(false) }
     val requiredMessage = stringResource(Res.string.credential_field_required, entry.credentialLabel)
 
+    LoadAzphaltFonts()
     MaterialTheme(colorScheme = GeministratorColors) {
         Surface(
             modifier = Modifier.fillMaxSize(),

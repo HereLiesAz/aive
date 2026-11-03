@@ -632,21 +632,11 @@ private const val DIMMED = 0.45f
 /** A breed for sale (mockup B5): the creature, its name and rarity, and its price on the buy button. */
 @Composable
 internal fun BreedRow(rig: String, title: String, caption: String, price: String, onBuy: (() -> Unit)?) {
-    androidx.compose.foundation.layout.Row(
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
-            .background(androidx.compose.ui.graphics.Color(0xFF2A231E))
-            .padding(8.dp),
-    ) {
-        StableCreature(rig, 80)
-        Column(Modifier.weight(1f)) {
-            Text(title, style = AzphaltType.body, color = Azphalt.White)
-            Text(caption, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
-        }
+    CreatureOfferRow(
+        rig = rig,
+        title = title,
+        details = { Text(caption, style = EdgeLine, color = azphaltMutedOnSurface()) },
         // Without a way to pay on this platform, the price still shows; the button does nothing.
-        AzphaltPill(label = price, seed = "buy-$rig", onClick = { onBuy?.invoke() })
-    }
+        action = { AzphaltPill(label = price, seed = "buy-$rig", tone = PillTone.Primary, onClick = { onBuy?.invoke() }) },
+    )
 }
