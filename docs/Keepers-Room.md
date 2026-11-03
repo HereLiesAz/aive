@@ -9,7 +9,8 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | Feeds the hive | **Connections** | AI providers, remote A2A agents, repository hosts (GitHub, GitLab, Entire) | Settings › AI Providers, Repositories |
 | | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
 | The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
-| | **This device** | spend caps, remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
+| | **Limits** (wide) | the spend caps: a cost cap per run and an hourly spend cap | This device |
+| | **This device** | spend caps (on a phone only), remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
 | | **Appearance** | the ground, chosen from six swatches; Reduce motion; Always show creature labels | Settings › Appearance |
 | | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
@@ -24,7 +25,8 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 
 ## Layout
 
-- **Wide:** the part list on the left (two groups, the open part filled), the open part on the right under its title and one-line lead.
+- **Wide** (820dp and up): a page title (KEEPER'S ROOM, "Make it yours", one line), then an Ink list of the parts on the left (the open one filled Yellow, a part's count beside it) and the open part on its own Ink card on the right, under its group as the eyebrow, its name and its one-line lead. The spend caps have their own part, **Limits**. Appearance there is a grid of ground cards, three across (swatch, name, SELECTED on the current one), then setting rows, each a line about it and a switch; the whole row toggles.
+- **Phone:** there is no Limits part; the spend caps stay at the top of This device.
 - **Phone:** the list is its own page; a part opens over it with a "‹ Keeper's room" pill, and Back returns to the list. The header's gear opens the room from anywhere.
 - The room remembers the open part (`keeper.section`).
 
@@ -45,6 +47,10 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 **Ground** is one radio group of six swatches, the current one ringed (`docs/BRANDING.md`, Ground and the shell header). **Reduce motion** (off by default, stored on this device as `aive.appearance.reduce-motion.v1`) holds the creatures and other looping movement still. It is OR-ed with the platform's own signal (Android's animator scale at 0, the browser's `prefers-reduced-motion`, or `AIVE_REDUCE_MOTION` on desktop), so it can turn motion off but never back on against the system; when the device already asks for less motion, the part says so.
 
 **Creature labels** (off by default, stored on this device as `aive.appearance.always-show-creature-labels.v1`): a hive of more than 12 creatures normally shows only the selected creature's label so packed cells stay readable; turned on, every creature keeps its label however full the hive is (`docs/Node-Creatures.md`).
+
+## Inbox
+
+The Inbox page (`LiveInboxScreen.kt`) on a wide window (820dp and up): KEEPER ATTENTION, "Inbox", and **Mark all read**, which marks every item the run lists as seen in the same read record the header's badge counts (`InboxReadLog`), so the badge clears. Under it, an Ink list of everything waiting on you (NEEDS YOU and how many): each entry is its kind (plan or task approval, sub-workflow gate, escalation, question, budget spent), its attempt when not the first, its task and its role, in plan order. The run keeps no time per wait, so no time is shown. The open entry (remembered as `inbox.selected`) fills the Ink card beside it: its creature, faint in the corner, what it says, each artifact it waits with (ARTIFACT WAITING, its label and a line of it) and the real actions, the same calls as the creature's Needs: **Approve plan** and **Reject plan** (asks first), **Approve task**, **Approve** a sub-workflow gate, **Retry task** and **Stop workflow** (asks first). Approving goes through the run's own approval, so every `HumanApproval` still waits for a person (`THREAT_MODEL.md`, invariant 4). A question or a spent budget says where to answer it: on the creature, in the hive. A Hall Monitor pause or a spend cap stop still has its own screen. On a phone the Inbox is unchanged.
 
 ## Navigation
 

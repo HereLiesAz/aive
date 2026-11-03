@@ -73,6 +73,12 @@
     <string name="keeper_appearance_lead">The ground everything sits on.</string>
     <string name="keeper_about">About and privacy</string>
     <string name="keeper_about_lead">Crash reports, trace export and diagnostics.</string>
+    <string name="keeper_limits">Limits</string>
+    <string name="keeper_limits_lead">Caps that stop the hive when its known spend reaches them.</string>
+    <string name="keeper_device_lead_wide">Models that run here, and reaching this device from another.</string>
+    <string name="keeper_page_title">Make it yours</string>
+    <string name="keeper_page_line">Connections, limits, this device and how it all looks.</string>
+    <string name="keeper_ground_selected">Selected</string>
     <string name="keeper_delegations">Delegations</string>
     <string name="keeper_delegations_lead">Gates you let a creature pass without asking you. Only gates that can't write, deploy or reach outside The Aive are ever offered.</string>
     <string name="delegation_offer_title">Let %1$s proceed without asking for %2$s?</string>
@@ -238,6 +244,20 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_no_project_yet_there_are_no">No project yet. There are no workflow decisions to review.</string>
     <string name="inbox_run_unavailable">Run unavailable: %1$s</string>
     <string name="inbox_runtime_disconnected">Runtime disconnected: %1$s</string>
+    <string name="inbox_page_eyebrow">Keeper attention</string>
+    <string name="inbox_page_title">Inbox</string>
+    <string name="inbox_page_line">Every creature that needs you, in one place.</string>
+    <string name="inbox_mark_all_read">Mark all read</string>
+    <string name="inbox_needs_you_count">%1$d need you</string>
+    <string name="inbox_kind_plan">Plan approval</string>
+    <string name="inbox_kind_task">Task approval</string>
+    <string name="inbox_kind_nested">Sub-workflow gate</string>
+    <string name="inbox_kind_escalation">Escalation</string>
+    <string name="inbox_kind_question">Question</string>
+    <string name="inbox_kind_budget">Budget spent</string>
+    <string name="inbox_artifact_waiting">Artifact waiting</string>
+    <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs, in the hive.</string>
+    <string name="inbox_budget_where">Raise it on this creature’s Mind, in the hive.</string>
 
     <string name="inspector_excluded_by_redaction_policy">, %1$s excluded by redaction policy</string>
     <string name="inspector_any_capable_provider">any capable provider</string>
@@ -907,6 +927,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_creature_labels_explain">A hive of more than %1$d creatures shows only the selected one's label, so packed cells stay readable. Turn this on to keep every creature's label, its task on its state's colour. Remembered on this device.</string>
     <string name="settings_creature_labels_always">Always show labels: ON</string>
     <string name="settings_creature_labels_crowded">Always show labels: OFF</string>
+    <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_always_show_labels">Always show creature labels</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports: OFF</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports: ON</string>
     <string name="settings_available">Available</string>

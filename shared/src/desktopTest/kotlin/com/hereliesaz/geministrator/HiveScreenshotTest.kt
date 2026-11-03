@@ -285,6 +285,48 @@ class HiveScreenshotTest {
         shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
         shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
+        shoot("36-keeper-limits", 2400, 1500) { room(KeeperSection.Limits, false, signedIn, two)() }
+        shoot("37-keeper-phone-device", 824, 1830) { room(KeeperSection.Device, true, signedIn, two)() }
+        shoot("38-keeper-appearance-narrow-desktop", 1700, 1200) { room(KeeperSection.Appearance, false, signedIn, two)() }
+    }
+
+    /** The Inbox page: list and the open one on a wide window, records on a phone. */
+    @Test
+    fun shootsTheInbox() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
+        val plan = com.hereliesaz.geministrator.domain.ArtifactRef(
+            id = com.hereliesaz.geministrator.domain.ArtifactId("plan-v3"),
+            kind = com.hereliesaz.geministrator.domain.ArtifactKind.Architecture,
+            taskRunId = TaskRunId("r-contract"),
+            label = "System architecture v3",
+            textContent = "Splits the release service from the build service; three public interfaces change.",
+            createdAtEpochMillis = 1,
+        )
+        val waiting = run(
+            WorkflowRunStatus.Running,
+            Triple("contract", TaskRunStatus.AwaitingApproval, "claude"),
+            Triple("build", TaskRunStatus.Escalated, "claude"),
+            Triple("review", TaskRunStatus.AwaitingApproval, "gemini"),
+        ).let { r ->
+            r.copy(
+                taskRuns = r.taskRuns.mapValues { (id, tr) ->
+                    when (id.value) {
+                        "contract" -> tr.copy(artifacts = listOf(plan), progressMessage = "The proposed boundary changes three public interfaces. Review it before the engineer builds on it.")
+                        "build" -> tr.copy(attempt = 2, blockingReason = com.hereliesaz.geministrator.domain.BlockingReason("TESTS_RED", "Two integration tests still fail after the retry."))
+                        else -> tr
+                    }
+                },
+            )
+        }
+        val live = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, waiting, roles))
+        DurableUiState.store.putString("inbox.selected", "")
+        shoot("39-inbox-wide", 2400, 1500) {
+            LiveInboxScreen(live, {}, {}, { _, _ -> }, Modifier.fillMaxSize())
+        }
+        shoot("40-inbox-phone", 824, 1830) {
+            LiveInboxScreen(live, {}, {}, { _, _ -> }, Modifier.fillMaxSize())
+        }
     }
 
     /** The shell (docs/Keepers-Room.md, stage 2): the breadcrumb header over the hive, its places and a first launch. */
