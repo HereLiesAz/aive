@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import kotlin.math.hypot
@@ -139,4 +140,61 @@ internal fun claspPulse(flow: ClaspFlow, t: Float): Pair<Float?, Float?> = when 
     ClaspFlow.Through -> (2f * t).let { p -> if (p < 1f) p to null else null to (2f - p) }
     ClaspFlow.ToClasp -> t to null
     ClaspFlow.Still -> null to null
+}
+
+/**
+ * How the axon between two creatures reads (the field's synapses): the clasp seen whole. Complete:
+ * the upstream finished and its result crosses, a glowing core with a vesicle travelling. Active:
+ * the upstream works and the downstream waits on it, travelling dashes with two vesicles. Waiting:
+ * nothing runs yet, a grey dotted core. Failed: the upstream failed or the far side is blocked.
+ */
+internal enum class AxonState { Complete, Active, Waiting, Failed }
+
+internal fun axonState(clasp: Clasp): AxonState = when {
+    clasp.outcome == ClaspOutcome.Failed -> AxonState.Failed
+    clasp.outcome == ClaspOutcome.Succeeded -> AxonState.Complete
+    clasp.flow != ClaspFlow.Still -> AxonState.Active
+    else -> AxonState.Waiting
+}
+
+/** The downstream waits at a gate for the keeper: its receptor wears the gate ring. */
+internal fun axonGated(downstream: H2g2WorkflowState): Boolean = downstream == H2g2WorkflowState.Gate
+
+/** A vesicle on an axon: [at] 0 (terminal) to 1 (receptor), [scale] of the full vesicle size. */
+internal data class Vesicle(val at: Float, val scale: Float)
+
+/**
+ * The vesicles riding an axon at clock [t] (0..1): one on a complete axon, two half a lap apart on
+ * an active one, none otherwise. Reduced motion stops the travel, so none are drawn.
+ */
+internal fun axonVesicles(state: AxonState, t: Float, reduceMotion: Boolean): List<Vesicle> {
+    if (reduceMotion) return emptyList()
+    val at = ((t % 1f) + 1f) % 1f
+    return when (state) {
+        AxonState.Complete -> listOf(Vesicle(at, 0.84f))
+        AxonState.Active -> listOf(Vesicle(at, 1f), Vesicle((at + 0.5f) % 1f, 0.67f))
+        AxonState.Waiting, AxonState.Failed -> emptyList()
+    }
+}
+
+/** How far the axon bows to one side, as a share of its length: a gentle curve, like the mockup's. */
+internal const val AXON_BOW = 0.12f
+
+/** The control point of the axon from [a] to [b]: off the middle, to the left of the run. */
+internal fun axonControl(a: Offset, b: Offset): Offset {
+    val mid = (a + b) / 2f
+    val run = b - a
+    return Offset(mid.x + run.y * AXON_BOW, mid.y - run.x * AXON_BOW)
+}
+
+/** The point [t] (0..1) along the axon from [a] through [control] to [b]. */
+internal fun axonPoint(a: Offset, control: Offset, b: Offset, t: Float): Offset {
+    val u = 1f - t
+    return a * (u * u) + control * (2f * u * t) + b * (t * t)
+}
+
+/** The axon as [segments] straight pieces, for hit tests such as slicing. */
+internal fun axonPolyline(a: Offset, b: Offset, segments: Int = 12): List<Offset> {
+    val control = axonControl(a, b)
+    return (0..segments).map { axonPoint(a, control, b, it / segments.toFloat()) }
 }

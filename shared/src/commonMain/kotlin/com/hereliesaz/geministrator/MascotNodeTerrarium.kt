@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -290,11 +291,11 @@ private fun MascotNodeTerrarium(
             return creatureRigPointToScreen(pose.attachX[k], pose.attachY[k], loaded.rig, creatureSizePx, center, zoom)
         }
 
-        fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? {
-            val fromSubject = subjectById[relationship.from] ?: return null
-            val toSubject = subjectById[relationship.to] ?: return null
-            val fromPosition = workingPositions[relationship.from] ?: fromSubject.position
-            val toPosition = workingPositions[relationship.to] ?: toSubject.position
+        fun linkEndpoints(from: String, to: String): Pair<Offset, Offset>? {
+            val fromSubject = subjectById[from] ?: return null
+            val toSubject = subjectById[to] ?: return null
+            val fromPosition = workingPositions[from] ?: fromSubject.position
+            val toPosition = workingPositions[to] ?: toSubject.position
             val fromCenter = screenCenter(fromPosition)
             val toCenter = screenCenter(toPosition)
             val direction = toCenter - fromCenter
@@ -305,12 +306,15 @@ private fun MascotNodeTerrarium(
             // silhouette edge.
             val normalized = Offset(direction.x / distance, direction.y / distance)
             val anchorRadius = creatureSizePx * zoom * 0.29f
-            val start = rigSocket(relationship.from, fromCenter, normalized.x, normalized.y)
+            val start = rigSocket(from, fromCenter, normalized.x, normalized.y)
                 ?: (fromCenter + normalized * anchorRadius)
-            val end = rigSocket(relationship.to, toCenter, -normalized.x, -normalized.y)
+            val end = rigSocket(to, toCenter, -normalized.x, -normalized.y)
                 ?: (toCenter - normalized * anchorRadius)
             return start to end
         }
+
+        fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? =
+            linkEndpoints(relationship.from, relationship.to)
 
         fun claspOf(from: String, to: String): Clasp {
             val up = subjectById[from]?.node?.state ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
@@ -403,7 +407,9 @@ private fun MascotNodeTerrarium(
                                 .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
                                 .filter { relationship ->
                                     val (a, b) = relationshipEndpoints(relationship) ?: return@filter false
-                                    trail.zipWithNext().any { (p, q) -> segmentsCross(a, b, p, q) }
+                                    // The cut follows the axon as drawn, bow and all.
+                                    val axon = axonPolyline(a, b)
+                                    trail.zipWithNext().any { (p, q) -> axon.zipWithNext().any { (u, v) -> segmentsCross(u, v, p, q) } }
                                 }
                                 .forEach { onTetherSliced(it.from, it.to) }
                         },
@@ -439,7 +445,24 @@ private fun MascotNodeTerrarium(
                 }
             }
 
-            // No drawn synapses: creatures join by their own tendrils (NodeMascotSurface reach).
+            // Synapses drawn as axons beneath the bodies (the Figma field): a dark membrane under a
+            // core that reads the clasp. Creatures still reach for each other with their own tendrils
+            // (NodeMascotSurface reach), which grip the axon from above.
+            val axonScale = (creatureSizePx / 128.dp.toPx()).coerceIn(0.6f, 1.25f) * zoom
+            tendrilLinks.distinct().forEach { (from, to) ->
+                val (a, b) = linkEndpoints(from, to) ?: return@forEach
+                val downstream = subjectById[to]?.node?.state ?: return@forEach
+                drawAxon(
+                    a = a,
+                    b = b,
+                    state = axonState(claspOf(from, to)),
+                    gated = axonGated(downstream),
+                    scale = axonScale,
+                    travel = linkPulse(),
+                    slowTravel = motionPhase(),
+                    reduceMotion = reduceMotion,
+                )
+            }
             sliceTrail.zipWithNext().forEach { (p, q) ->
                 drawLine(Azphalt.Yellow.copy(alpha = 0.8f), p, q, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             }
@@ -820,6 +843,86 @@ private fun segmentsCross(a: Offset, b: Offset, p: Offset, q: Offset): Boolean {
     val d4 = side(a, b, q)
     return (d1 > 0f) != (d2 > 0f) && (d3 > 0f) != (d4 > 0f)
 }
+
+/**
+ * One axon (the Figma synapse): a dark membrane under a core, a terminal where it leaves the
+ * upstream creature and a receptor where it reaches the downstream one. Complete glows green with a
+ * vesicle riding it; active runs yellow dashes with two vesicles; waiting is a grey dotted core;
+ * failed is a still red core. A [gated] receptor wears the gate ring. [travel] (fast) and
+ * [slowTravel] are 0..1 clocks; [reduceMotion] stops the dashes, the firing and the vesicles.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAxon(
+    a: Offset,
+    b: Offset,
+    state: AxonState,
+    gated: Boolean,
+    scale: Float,
+    travel: Float,
+    slowTravel: Float,
+    reduceMotion: Boolean,
+) {
+    fun w(v: Float) = v.dp.toPx() * scale
+    val control = axonControl(a, b)
+    val path = androidx.compose.ui.graphics.Path().apply {
+        moveTo(a.x, a.y)
+        quadraticTo(control.x, control.y, b.x, b.y)
+    }
+    val core = when (state) {
+        AxonState.Complete -> ClaspGreen
+        AxonState.Active -> Azphalt.Yellow
+        AxonState.Waiting -> AxonWaiting
+        AxonState.Failed -> ClaspRed
+    }
+    val glows = state == AxonState.Complete || state == AxonState.Active
+    // Membrane.
+    drawPath(path, Azphalt.Ink.copy(alpha = 0.95f), style = Stroke(width = w(13f), cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    // Core: a soft halo under a lit line when something has crossed or is crossing.
+    when (state) {
+        AxonState.Complete, AxonState.Failed -> {
+            if (glows) drawPath(path, core.copy(alpha = 0.22f), style = Stroke(width = w(11f), cap = StrokeCap.Round))
+            drawPath(path, core.copy(alpha = 0.72f), style = Stroke(width = w(6f), cap = StrokeCap.Round))
+        }
+        AxonState.Active -> {
+            drawPath(path, core.copy(alpha = 0.18f), style = Stroke(width = w(11f), cap = StrokeCap.Round))
+            val dash = w(9f)
+            val gap = w(7f)
+            // The dashes travel toward the receptor: two dash lengths per lap of the clock.
+            val offset = if (reduceMotion) 0f else -travel * (dash + gap) * 2f
+            drawPath(
+                path,
+                core,
+                style = Stroke(width = w(6f), cap = StrokeCap.Butt, pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, gap), offset)),
+            )
+        }
+        AxonState.Waiting -> drawPath(
+            path,
+            core.copy(alpha = 0.72f),
+            style = Stroke(width = w(5f), cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(w(0.01f), w(8f)))),
+        )
+    }
+    // Terminal: the upstream's end. An active one fires (its ring swells) unless motion is reduced.
+    val fire = if (state == AxonState.Active && !reduceMotion) kotlin.math.sin(travel * 2f * kotlin.math.PI.toFloat()).let { it * it } else 0f
+    if (glows) drawCircle(core.copy(alpha = 0.25f * (1f - fire * 0.5f)), radius = w(13f), center = a)
+    drawCircle(Azphalt.Ink, radius = w(8f), center = a)
+    drawCircle(core.copy(alpha = if (state == AxonState.Waiting) 0.9f else 1f - fire * 0.35f), radius = w(8f), center = a, style = Stroke(width = w(4f + 3f * fire)))
+    // Receptor: the downstream's end; a gate rings it.
+    val receptorRadius = if (gated) w(7f) else w(6f)
+    if (state == AxonState.Active) drawCircle(core.copy(alpha = 0.25f), radius = w(10f), center = b)
+    drawCircle(AzphaltLiftedInk, radius = receptorRadius, center = b)
+    drawCircle(if (gated) AzphaltDanger else core, radius = receptorRadius, center = b, style = Stroke(width = if (gated) w(4f) else w(3f)))
+    // Vesicles riding the core: complete on the slow clock, active on the fast one.
+    val vesicleColour = if (state == AxonState.Complete) lerp(ClaspGreen, Azphalt.White, 0.45f) else lerp(Azphalt.Yellow, Azphalt.White, 0.55f)
+    axonVesicles(state, if (state == AxonState.Complete) slowTravel else travel, reduceMotion).forEach { vesicle ->
+        val at = axonPoint(a, control, b, vesicle.at)
+        val r = w(6f) * vesicle.scale
+        val alpha = if (vesicle.scale < 1f && state == AxonState.Active) 0.7f else 1f
+        drawCircle(vesicleColour.copy(alpha = 0.3f * alpha), radius = r * 2f, center = at)
+        drawCircle(vesicleColour.copy(alpha = alpha), radius = r, center = at)
+    }
+}
+
+/** A waiting axon's dotted core: the field's grey (the Pending hue). */
+private val AxonWaiting = Azphalt.hues[10]
 
 /** One tendril: tapered from the body to the clasp, thinner when stretched; dashed when knotted. */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
