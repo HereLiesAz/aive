@@ -1,14 +1,10 @@
 package com.hereliesaz.geministrator
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,10 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
@@ -57,8 +50,6 @@ import com.hereliesaz.geministrator.resources.hive_edge_drifter_unreachable
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_wants_token
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
-
-private val DrifterGround = Color(0xFF2A231E)
 
 /**
  * Remote A2A agents at the hive's edge (docs/Swarm-OS.md, drifters; docs/A2A.md). "Bring in a
@@ -151,25 +142,29 @@ internal fun A2aDrifterShelf(
             DrifterRow(
                 drifter = drifter,
                 trouble = letInTrouble[drifter.cardUrl] ?: troubleText(drifter),
-            ) {
-                if (drifter.canBeLetIn || drifter.isUnreadSeed) {
-                    AzphaltPill(
-                        label = stringResource(Res.string.hive_edge_drifter_let_in),
-                        seed = "edge-let-in-${drifter.cardUrl}",
-                        tone = if (drifter.cardUrl == hero) PillTone.Primary else PillTone.Quiet,
-                        onClick = {
-                            if (drifter.canBeLetIn) {
-                                letIn(drifter)
-                            } else {
-                                // A seed's card is read only now; whatever goes wrong lands on it.
-                                scope.launch {
-                                    val read = A2aDrifters.bringIn(drifter.cardUrl, seeded = true)
-                                    if (read.canBeLetIn) letIn(read)
+                action = if (drifter.canBeLetIn || drifter.isUnreadSeed) {
+                    {
+                        AzphaltPill(
+                            label = stringResource(Res.string.hive_edge_drifter_let_in),
+                            seed = "edge-let-in-${drifter.cardUrl}",
+                            tone = if (drifter.cardUrl == hero) PillTone.Primary else PillTone.Quiet,
+                            onClick = {
+                                if (drifter.canBeLetIn) {
+                                    letIn(drifter)
+                                } else {
+                                    // A seed's card is read only now; whatever goes wrong lands on it.
+                                    scope.launch {
+                                        val read = A2aDrifters.bringIn(drifter.cardUrl, seeded = true)
+                                        if (read.canBeLetIn) letIn(read)
+                                    }
                                 }
-                            }
-                        },
-                    )
-                }
+                            },
+                        )
+                    }
+                } else {
+                    null
+                },
+            ) {
                 AzphaltPill(
                     label = stringResource(Res.string.hive_edge_drifter_send_away),
                     seed = "edge-send-away-${drifter.cardUrl}",
@@ -241,74 +236,55 @@ private fun troubleText(drifter: A2aDrifter): String? = when (drifter.trouble) {
 /** A drifter waiting at the edge: its creature, what its card says, and what went wrong. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DrifterRow(drifter: A2aDrifter, trouble: String?, actions: @Composable () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(DrifterGround)
-            .padding(8.dp),
-    ) {
-        StableCreature(drifter.creature, 80)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(Res.string.hive_edge_drifter_eyebrow, A2aDrifters.hostOf(drifter.cardUrl)),
-                style = AzphaltType.eyebrow,
-                color = Azphalt.White.copy(alpha = 0.7f),
-            )
-            Text(drifter.name, style = AzphaltType.body, color = Azphalt.White)
-            if (drifter.looking) {
-                Text(stringResource(Res.string.hive_edge_drifter_reading), style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
-            }
+private fun DrifterRow(
+    drifter: A2aDrifter,
+    trouble: String?,
+    action: (@Composable () -> Unit)?,
+    below: @Composable () -> Unit,
+) {
+    CreatureOfferRow(
+        rig = drifter.creature,
+        title = drifter.name,
+        details = {
+            val muted = azphaltMutedOnSurface()
             (A2aDrifters.descriptionOf(drifter.card).ifEmpty { drifter.blurb.orEmpty() }).takeIf(String::isNotEmpty)?.let { about ->
-                Text(about, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.85f))
+                Text(about, style = EdgeLine, color = muted, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            Text(stringResource(Res.string.hive_edge_drifter_eyebrow, A2aDrifters.hostOf(drifter.cardUrl)), style = EdgeLine, color = muted)
+            if (drifter.looking) {
+                Text(stringResource(Res.string.hive_edge_drifter_reading), style = EdgeLine, color = muted)
             }
             if (drifter.isUnreadSeed) {
                 A2aDrifterSeeds.seedFor(drifter.cardUrl)?.let { seed ->
-                    Text(stringResource(Res.string.hive_edge_drifter_seed, seed.runBy), style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
+                    Text(stringResource(Res.string.hive_edge_drifter_seed, seed.runBy), style = EdgeLine, color = muted, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
             }
             A2aDrifters.skillsOf(drifter.card).takeIf { it.isNotEmpty() }?.let { skills ->
-                Text(
-                    stringResource(Res.string.hive_edge_drifter_skills, skills.joinToString(", ")),
-                    style = AzphaltType.endCap,
-                    color = Azphalt.White.copy(alpha = 0.7f),
-                )
+                Text(stringResource(Res.string.hive_edge_drifter_skills, skills.joinToString(", ")), style = EdgeLine, color = muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             }
             if (drifter.card?.bearerAuth == true && trouble == null) {
-                Text(stringResource(Res.string.hive_edge_drifter_wants_token), style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
+                Text(stringResource(Res.string.hive_edge_drifter_wants_token), style = EdgeLine, color = muted)
             }
             // The failure lands on the drifter it belongs to.
             trouble?.let { Text(it, style = AzphaltType.body, color = Azphalt.Yellow) }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                actions()
-            }
-        }
-    }
+        },
+        action = action,
+        below = {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { below() }
+        },
+    )
 }
 
 /** A drifter already in the swarm (an A2A connection), as the Keeper's room lists it too. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ResidentRow(resident: A2aAgentConnection, status: String, actions: @Composable () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(DrifterGround)
-            .padding(8.dp),
-    ) {
-        StableCreature(A2aDrifters.creatureFor(resident.cardUrl), 56)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(resident.name, style = AzphaltType.body, color = Azphalt.White)
-            Text(status, style = AzphaltType.endCap, color = Azphalt.White.copy(alpha = 0.7f))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                actions()
-            }
-        }
-    }
+    CreatureOfferRow(
+        rig = A2aDrifters.creatureFor(resident.cardUrl),
+        title = resident.name,
+        details = { Text(status, style = EdgeLine, color = azphaltMutedOnSurface()) },
+        below = {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
+        },
+    )
 }

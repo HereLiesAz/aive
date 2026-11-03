@@ -54,7 +54,7 @@ There is no navigation row. One header sits over every screen, wide and on a pho
 - **The breadcrumb**: Hive › a hive › a creature › its tab, or Hive › a place opened from it (Swarm, the Keeper's room › its part). The last step is where you are and is not a button; any earlier step goes back up to it, popping rather than stacking. Hive is the district, every hive at once; from a place opened off the hive, Hive returns to the hive you came from. A creature's step closes its panel. It replaces the page titles. On a phone it takes its own line and scrolls to keep where you are in view.
 - **The Inbox** badge and **the Keeper's room** gear.
 
-Once there is a hive, resting or live, one row holds its places: its Swarm, the Memory swarm and the Store. It is hidden on a first launch and while the hive is waking or stopped. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
+Once there is a hive, resting or live, one row holds its places: its Swarm, the Memory swarm and the Store. It is hidden on a first launch and while the hive is waking or stopped. The Store is also the district's edge, a sheet over the district (`Swarm-OS.md`). The Store's tabs are **All**, **Agents**, **Hives**, **Breeds**, **Installed**, **Models** and **LLMs**. On wide screens (820dp and up) its tabs sit on an Ink capsule, the first hive the Store lists leads in a large card (**View hive**), and every package is a card (its creature on an art panel of its own hue, what it is, its name, a line, its version or install state, and **Inspect**, which opens its record and install below); phones keep the list. Runs are the hive's combs, and Workflows opens from a hive's More editing.
 
 ## A creature's panel
 

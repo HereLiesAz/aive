@@ -78,6 +78,7 @@ A creature's breed is the keeper's, not its role's: any agent can wear any breed
 - **Lottery.** Each hatch draws once, rarest first: Mythic 1 in 1000, Very rare 1 in 100, Rare 1 in 20.
 - **Sources.** Some breeds are sold and never hatch (their parts are never passed on); some hatch and are never sold.
 - **Hidden.** The keeper sees only names, rarity, how many they own, and prices. Mutation, pairing, pace and odds are never shown.
+- **Buying.** The Store's **Breeds** tab lists the breeds for sale, dearest first: each row is the creature, its name, its rarity ("only here" for one that never hatches) and its price on the button, under the note "Each is one creature, added to your stable." Android buys through Google Play (`BreedPurchases`); a platform without a way to pay shows the catalog price on a button that does nothing.
 
 ## The rules of life
 
