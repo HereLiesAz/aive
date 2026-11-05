@@ -589,7 +589,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_remove_blocked">A run of this hive is live, so creatures cannot be removed. Remove is back when it stops.</string>
     <string name="hive_delete">Delete hive</string>
     <string name="hive_delete_title">Delete “%1$s”?</string>
-    <string name="hive_delete_body">The hive and its %2$d creatures will be deleted from this device. This cannot be undone. Its past runs stay in history, but can only be viewed, not resumed. Your memory, your repositories and your other hives are not touched.</string>
+    <string name="hive_delete_body">The hive and its %1$d creatures will be deleted from this device. This cannot be undone. Its past runs stay in history, but can only be viewed, not resumed. Your memory, your repositories and your other hives are not touched.</string>
     <string name="hive_delete_keep">Keep it</string>
     <string name="hive_delete_refused_live">A run of this hive is live. Delete is back when it stops.</string>
     <string name="hive_delete_refused_circuit">Another hive uses this one as a circuit, so it stays. Nothing was deleted.</string>
