@@ -532,7 +532,12 @@ fun App(
                     }
                 }
             },
-        )
+        ).also { host ->
+            // Drafting a swarm only proposes; it needs the linked planner and a live runtime.
+            host.swarmDrafter = orchestrationRuntime?.let { planner ->
+                { prompt: String -> runtime?.draftSwarm(prompt, planner) ?: SwarmDraftResult.Unavailable }
+            }
+        }
 
         val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
         // A role that runs a script or an action rather than an agent is programmatic work: it wears the neuron, never a kept creature.

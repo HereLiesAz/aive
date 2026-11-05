@@ -36,6 +36,12 @@ class WorkflowLibraryHost(
 ) {
     private val composition = WorkflowCompositionService(persistence)
 
+    /**
+     * Asks the linked keeper to draft a swarm from a prompt (SwarmDraft.kt); null where no planner
+     * is linked. It only proposes: it launches nothing and touches no repository.
+     */
+    internal var swarmDrafter: (suspend (String) -> SwarmDraftResult)? = null
+
     suspend fun entries(): List<WorkflowLibraryEntry> {
         val installedPackages = storeService?.installed().orEmpty()
         val packageByDefinition = buildMap<String, String> {

@@ -170,7 +170,24 @@ class HiveScreenshotTest {
                 compact = true,
                 startInBuild = true,
                 heading = { NewHiveCrumb(name = empty.name, onSurface = {}) },
-                beneathField = { staged, edit -> NewHiveBench(staged, roles, onEdit = edit, onRename = {}) },
+                beneathField = { staged, edit ->
+                    // With a keeper linked, the bench also offers "Or describe it and let a keeper draft it".
+                    NewHiveBench(staged, roles, onEdit = edit, onRename = {}, drafter = { SwarmDraftResult.Unavailable })
+                },
+            )
+        }
+        // An existing hive in Build offers Redraft under the field; it asks before replacing its creatures.
+        shoot("16b-redraft", 780, 1688) {
+            GeministratorWorkflowTerrarium(
+                definition,
+                restingWorkflowRun(definition),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+                compact = true,
+                startInBuild = true,
+                beneathField = { staged, edit -> SwarmDraftBox(staged, { SwarmDraftResult.Unavailable }, edit, redraft = true) },
             )
         }
         shoot("3-whole-hive", 900, 1400) {
