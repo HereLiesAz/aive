@@ -233,10 +233,12 @@ internal fun RestingHive(
                             val h = host ?: error(getString(Res.string.hive_gone))
                             latest = h.saveAuthored(renamedHive(latest ?: staged, name))
                         },
+                        drafter = host?.swarmDrafter,
                     )
                 }
             } else {
-                null
+                // A hive with creatures can be redrafted from a prompt; it asks before replacing them.
+                { staged, edit -> SwarmDraftBox(staged, host?.swarmDrafter, edit, redraft = true) }
             },
         )
         // An empty hive has nothing to launch yet; the launch bar comes with its first creature.

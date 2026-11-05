@@ -165,10 +165,13 @@ internal fun NewHiveBench(
     onEdit: (TerrariumDependencyEditResult) -> Unit,
     onRename: suspend (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Drafts a swarm from a prompt (SwarmDraft.kt); null when no keeper is linked, and the field is not shown. */
+    drafter: (suspend (String) -> SwarmDraftResult)? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         NewHiveNamer(key = definition.id.value, onRename = onRename)
         NewHiveTray(definition, roles, onEdit)
+        SwarmDraftBox(definition, drafter, onEdit, redraft = false, onAdoptName = onRename)
     }
 }
 

@@ -109,3 +109,29 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     reportLaunchProgress("Loading the new run…")
     loadLatest()
 }
+
+/**
+ * Asks the planner to propose a swarm for [prompt] and returns it for the keeper to edit. A draft
+ * only proposes: no project, run or repository is created or read, and nothing is saved here.
+ */
+internal suspend fun ApplicationRuntime.draftSwarm(
+    prompt: String,
+    orchestrationRuntime: OrchestrationAgentRuntime,
+): SwarmDraftResult {
+    val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    // Only roles a linked provider can staff, as at launch; with none, offer them all so the failure names the gap.
+    val staffable = swarmDraftRoles(roles)
+        .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired, null) }
+        .ifEmpty { swarmDraftRoles(roles) }
+    val packet = swarmDraftPacket(prompt, staffable)
+    if (packet.objective.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoPrompt)
+    if (packet.availableAgents.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoRoles)
+    val plan = try {
+        orchestrationRuntime.plan(packet)
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        return swarmDraftFailure(failure)
+    }
+    return swarmDraftFromPlan(prompt, plan, staffable)
+}
